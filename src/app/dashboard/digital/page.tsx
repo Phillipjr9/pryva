@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/auth";
 import { digitalServices, getDigitalService } from "@/lib/digital-services";
 import { formatNaira } from "@/lib/catalog";
 import { DigitalServicesForm } from "./DigitalServicesForm";
+import { ServiceIcon } from "@/components/ServiceIcon";
 
 export const dynamic = "force-dynamic";
 
@@ -32,8 +33,8 @@ export default async function DigitalServicesPage({
               href={`/dashboard/digital?service=${service.slug}`}
               className="card p-6 hover:scale-[1.02] transition-transform"
             >
-              <div className="flex items-start gap-3 mb-4">
-                <div className="text-4xl">{service.icon}</div>
+              <div className="flex items-start gap-4 mb-4">
+                <ServiceIcon service={service.slug as any} size="lg" />
                 <div>
                   <h3 className="text-lg font-bold text-ink">{service.name}</h3>
                   <p className="text-xs text-ink-3">{service.plans.length} plans</p>
