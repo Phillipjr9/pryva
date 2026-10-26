@@ -121,15 +121,15 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
       />
       <div className="space-y-6">
         {/* Tabs */}
-        <div className="flex gap-2 border-b border-line dark:border-gray-700">
+        <div className="flex gap-2 border-b border-line">
           {(["create", "redeem", "history"] as Tab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 text-[0.9rem] font-medium transition-colors ${
                 activeTab === tab
-                  ? "border-b-2 border-lav-600 text-lav-600 dark:border-lav-400 dark:text-lav-400"
-                  : "text-ink-2 hover:text-ink dark:text-gray-400 dark:hover:text-gray-100"
+                  ? "border-b-2 border-lav-600 text-lav-600"
+                  : "text-ink-2 hover:text-ink"
               }`}
             >
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -142,7 +142,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
         <div className="space-y-6">
           {/* Preset Amounts */}
           <div>
-            <label className="block text-[0.86rem] font-medium text-ink dark:text-gray-100 mb-3">
+            <label className="block text-[0.86rem] font-medium text-ink mb-3">
               Select Amount
             </label>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -152,8 +152,8 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
                   onClick={() => setAmount(preset)}
                   className={`rounded-xl border p-3 text-center transition-colors ${
                     amount === preset
-                      ? "border-lav-600 bg-lav-50 text-lav-700 dark:bg-lav-900/20 dark:border-lav-500 dark:text-lav-300"
-                      : "border-line bg-white text-ink hover:bg-cream dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-700"
+                      ? "border-lav-600 bg-lav-50 text-lav-700"
+                      : "border-line bg-white text-ink hover:bg-cream"
                   }`}
                 >
                   <span className="text-[0.9rem] font-semibold">{formatNaira(preset)}</span>
@@ -164,7 +164,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
 
           {/* Custom Amount */}
           <div>
-            <label className="block text-[0.86rem] font-medium text-ink dark:text-gray-100 mb-2">
+            <label className="block text-[0.86rem] font-medium text-ink mb-2">
               Custom Amount (₦1,000 - ₦500,000)
             </label>
             <input
@@ -173,13 +173,13 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
               onChange={(e) => setAmount(Number(e.target.value))}
               min={1000}
               max={500000}
-              className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.95rem] text-ink outline-none transition-colors focus:border-lav-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:focus:border-lav-500"
+              className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.95rem] text-ink outline-none transition-colors focus:border-lav-600"
             />
           </div>
 
           {/* Recipient Email */}
           <div>
-            <label className="block text-[0.86rem] font-medium text-ink dark:text-gray-100 mb-2">
+            <label className="block text-[0.86rem] font-medium text-ink mb-2">
               Recipient Email (optional)
             </label>
             <input
@@ -187,13 +187,13 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
               value={recipientEmail}
               onChange={(e) => setRecipientEmail(e.target.value)}
               placeholder="friend@example.com"
-              className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.95rem] text-ink outline-none transition-colors focus:border-lav-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:focus:border-lav-500"
+              className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.95rem] text-ink outline-none transition-colors focus:border-lav-600"
             />
           </div>
 
           {/* Message */}
           <div>
-            <label className="block text-[0.86rem] font-medium text-ink dark:text-gray-100 mb-2">
+            <label className="block text-[0.86rem] font-medium text-ink mb-2">
               Personal Message (optional)
             </label>
             <textarea
@@ -201,41 +201,41 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Happy birthday! Use this to buy your next virtual number."
               rows={3}
-              className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.95rem] text-ink outline-none transition-colors focus:border-lav-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:focus:border-lav-500"
+              className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.95rem] text-ink outline-none transition-colors focus:border-lav-600"
             />
           </div>
 
           {/* Wallet Balance */}
-          <div className="rounded-xl border border-line bg-cream p-4 dark:bg-gray-800 dark:border-gray-700">
-            <p className="text-[0.86rem] text-ink-2 dark:text-gray-400">Wallet Balance</p>
-            <p className="text-[1.5rem] font-bold text-ink dark:text-gray-100">
+          <div className="rounded-xl border border-line bg-cream p-4">
+            <p className="text-[0.86rem] text-ink-2">Wallet Balance</p>
+            <p className="text-[1.5rem] font-bold text-ink">
               {formatNaira(user.walletBalance)}
             </p>
           </div>
 
           {/* Messages */}
           {error && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.9rem] text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300">
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.9rem] text-red-700">
               {error}
             </div>
           )}
 
           {success && (
-            <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center dark:bg-green-900/20 dark:border-green-800">
-              <Gift className="mx-auto h-12 w-12 text-green-600 dark:text-green-400 mb-3" />
-              <p className="text-[1.1rem] font-semibold text-green-700 dark:text-green-300 mb-2">
+            <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center">
+              <Gift className="mx-auto h-12 w-12 text-green-600 mb-3" />
+              <p className="text-[1.1rem] font-semibold text-green-700 mb-2">
                 Gift Card Created!
               </p>
-              <p className="text-[0.9rem] text-green-600 dark:text-green-400 mb-4">
+              <p className="text-[0.9rem] text-green-600 mb-4">
                 Share this code with the recipient:
               </p>
-              <div className="flex items-center justify-center gap-2 rounded-xl bg-white p-4 dark:bg-gray-800">
-                <code className="text-[1.2rem] font-bold text-ink dark:text-gray-100">
+              <div className="flex items-center justify-center gap-2 rounded-xl bg-white p-4">
+                <code className="text-[1.2rem] font-bold text-ink">
                   {success.code}
                 </code>
                 <button
                   onClick={() => copyCode(success.code)}
-                  className="rounded-lg p-2 text-ink-2 hover:bg-cream dark:text-gray-400 dark:hover:bg-gray-700"
+                  className="rounded-lg p-2 text-ink-2 hover:bg-cream"
                 >
                   {copied === success.code ? (
                     <Check className="h-5 w-5 text-green-600" />
@@ -244,7 +244,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
                   )}
                 </button>
               </div>
-              <p className="mt-3 text-[0.82rem] text-green-600 dark:text-green-400">
+              <p className="mt-3 text-[0.82rem] text-green-600">
                 Amount: {formatNaira(success.amount)}
               </p>
             </div>
@@ -255,7 +255,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
             <button
               onClick={handleCreate}
               disabled={loading || amount < 1000 || amount > 500000}
-              className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-lav-500 dark:hover:bg-lav-600"
+              className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Creating..." : `Create Gift Card for ${formatNaira(amount)}`}
             </button>
@@ -267,7 +267,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
       {activeTab === "redeem" && (
         <div className="space-y-6">
           <div>
-            <label className="block text-[0.86rem] font-medium text-ink dark:text-gray-100 mb-2">
+            <label className="block text-[0.86rem] font-medium text-ink mb-2">
               Gift Card Code
             </label>
             <input
@@ -275,26 +275,26 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
               value={redeemCode}
               onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
               placeholder="PRYVA-XXXX-XXXX-XXXX"
-              className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.95rem] text-ink outline-none transition-colors focus:border-lav-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:focus:border-lav-500"
+              className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.95rem] text-ink outline-none transition-colors focus:border-lav-600"
             />
           </div>
 
           {error && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.9rem] text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300">
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.9rem] text-red-700">
               {error}
             </div>
           )}
 
           {redeemSuccess && (
-            <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center dark:bg-green-900/20 dark:border-green-800">
-              <Check className="mx-auto h-12 w-12 text-green-600 dark:text-green-400 mb-3" />
-              <p className="text-[1.1rem] font-semibold text-green-700 dark:text-green-300 mb-2">
+            <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center">
+              <Check className="mx-auto h-12 w-12 text-green-600 mb-3" />
+              <p className="text-[1.1rem] font-semibold text-green-700 mb-2">
                 Gift Card Redeemed!
               </p>
-              <p className="text-[1.5rem] font-bold text-green-600 dark:text-green-400">
+              <p className="text-[1.5rem] font-bold text-green-600">
                 {formatNaira(redeemSuccess)}
               </p>
-              <p className="mt-2 text-[0.86rem] text-green-600 dark:text-green-400">
+              <p className="mt-2 text-[0.86rem] text-green-600">
                 Added to your wallet balance
               </p>
             </div>
@@ -304,7 +304,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
             <button
               onClick={handleRedeem}
               disabled={redeemLoading || !redeemCode}
-              className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-lav-500 dark:hover:bg-lav-600"
+              className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {redeemLoading ? "Redeeming..." : "Redeem Gift Card"}
             </button>
@@ -316,9 +316,9 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
       {activeTab === "history" && (
         <div className="space-y-4">
           {cards.length === 0 ? (
-            <div className="rounded-xl border border-line bg-white p-8 text-center dark:bg-gray-800 dark:border-gray-700">
-              <Gift className="mx-auto h-12 w-12 text-ink-3 dark:text-gray-600 mb-3" />
-              <p className="text-[0.95rem] text-ink-2 dark:text-gray-400">
+            <div className="rounded-xl border border-line bg-white p-8 text-center">
+              <Gift className="mx-auto h-12 w-12 text-ink-3 mb-3" />
+              <p className="text-[0.95rem] text-ink-2">
                 No gift cards purchased yet
               </p>
             </div>
@@ -326,17 +326,17 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
             cards.map((card) => (
               <div
                 key={card.id}
-                className="rounded-xl border border-line bg-white p-4 dark:bg-gray-800 dark:border-gray-700"
+                className="rounded-xl border border-line bg-white p-4"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <code className="text-[0.95rem] font-bold text-ink dark:text-gray-100">
+                      <code className="text-[0.95rem] font-bold text-ink">
                         {card.code}
                       </code>
                       <button
                         onClick={() => copyCode(card.code)}
-                        className="rounded p-1 text-ink-2 hover:bg-cream dark:text-gray-400 dark:hover:bg-gray-700"
+                        className="rounded p-1 text-ink-2 hover:bg-cream"
                       >
                         {copied === card.code ? (
                           <Check className="h-4 w-4 text-green-600" />
@@ -345,11 +345,11 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
                         )}
                       </button>
                     </div>
-                    <p className="text-[0.86rem] text-ink-2 dark:text-gray-400">
+                    <p className="text-[0.86rem] text-ink-2">
                       {formatNaira(card.amount)} · {new Date(card.createdAt).toLocaleDateString()}
                     </p>
                     {card.recipientEmail && (
-                      <p className="text-[0.82rem] text-ink-3 dark:text-gray-500 mt-1">
+                      <p className="text-[0.82rem] text-ink-3 mt-1">
                         To: {card.recipientEmail}
                       </p>
                     )}
@@ -357,10 +357,10 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
                   <span
                     className={`rounded-full px-3 py-1 text-[0.75rem] font-semibold ${
                       card.status === "active"
-                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                        ? "bg-green-100 text-green-700"
                         : card.status === "redeemed"
-                        ? "bg-lav-100 text-lav-700 dark:bg-lav-900/30 dark:text-lav-300"
-                        : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                        ? "bg-lav-100 text-lav-700"
+                        : "bg-gray-100 text-gray-700"
                     }`}
                   >
                     {card.status.charAt(0).toUpperCase() + card.status.slice(1)}

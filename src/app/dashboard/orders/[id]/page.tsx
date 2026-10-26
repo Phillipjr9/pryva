@@ -35,15 +35,15 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
         <div className="flex items-center gap-4">
           <Link
             href="/dashboard/orders"
-            className="grid h-10 w-10 place-items-center rounded-full border border-line bg-white text-ink hover:bg-cream dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-700"
+            className="grid h-10 w-10 place-items-center rounded-full border border-line bg-white text-ink hover:bg-cream"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div>
-            <h1 className="text-[1.75rem] font-medium tracking-tight text-ink dark:text-gray-100">
+            <h1 className="text-[1.75rem] font-medium tracking-tight text-ink">
               Order Details
             </h1>
-            <p className="text-[0.9rem] text-ink-2 dark:text-gray-400">{order.reference}</p>
+            <p className="text-[0.9rem] text-ink-2">{order.reference}</p>
           </div>
         </div>
 
@@ -56,37 +56,37 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 dark:text-gray-500 mb-1">Product</p>
-                    <p className="text-[0.95rem] font-medium text-ink dark:text-gray-100">
+                    <p className="text-[0.82rem] text-ink-3 mb-1">Product</p>
+                    <p className="text-[0.95rem] font-medium text-ink">
                       {order.productName}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 dark:text-gray-500 mb-1">Service</p>
-                    <p className="text-[0.95rem] font-medium text-ink dark:text-gray-100 capitalize">
+                    <p className="text-[0.82rem] text-ink-3 mb-1">Service</p>
+                    <p className="text-[0.95rem] font-medium text-ink capitalize">
                       {order.service}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 dark:text-gray-500 mb-1">Region</p>
-                    <p className="text-[0.95rem] font-medium text-ink dark:text-gray-100">
+                    <p className="text-[0.82rem] text-ink-3 mb-1">Region</p>
+                    <p className="text-[0.95rem] font-medium text-ink">
                       {order.region}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 dark:text-gray-500 mb-1">Duration</p>
-                    <p className="text-[0.95rem] font-medium text-ink dark:text-gray-100">
+                    <p className="text-[0.82rem] text-ink-3 mb-1">Duration</p>
+                    <p className="text-[0.95rem] font-medium text-ink">
                       {order.duration}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 dark:text-gray-500 mb-1">Amount</p>
-                    <p className="text-[0.95rem] font-medium text-ink dark:text-gray-100">
+                    <p className="text-[0.82rem] text-ink-3 mb-1">Amount</p>
+                    <p className="text-[0.95rem] font-medium text-ink">
                       {formatNaira(order.amount)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 dark:text-gray-500 mb-1">Status</p>
+                    <p className="text-[0.82rem] text-ink-3 mb-1">Status</p>
                     <Badge variant={statusColors[order.status as keyof typeof statusColors] || "default"}>
                       {order.status}
                     </Badge>
@@ -102,8 +102,8 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                 </CardHeader>
                 <CardContent>
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 dark:text-gray-500 mb-2">Reference Code</p>
-                    <p className="text-[1.1rem] font-mono font-semibold text-ink dark:text-gray-100">
+                    <p className="text-[0.82rem] text-ink-3 mb-2">Reference Code</p>
+                    <p className="text-[1.1rem] font-mono font-semibold text-ink">
                       {order.referenceCode}
                     </p>
                   </div>
@@ -118,8 +118,8 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                 </CardHeader>
                 <CardContent>
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 dark:text-gray-500 mb-2">Verification Code</p>
-                    <p className="text-[2rem] font-mono font-bold text-lav-600 dark:text-lav-400">
+                    <p className="text-[0.82rem] text-ink-3 mb-2">Verification Code</p>
+                    <p className="text-[2rem] font-mono font-bold text-lav-600">
                       {order.otpCode}
                     </p>
                   </div>
@@ -135,15 +135,15 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-[0.82rem] text-ink-3 dark:text-gray-500 mb-1">Created</p>
-                  <p className="text-[0.9rem] text-ink dark:text-gray-100">
+                  <p className="text-[0.82rem] text-ink-3 mb-1">Created</p>
+                  <p className="text-[0.9rem] text-ink">
                     {new Date(order.createdAt).toLocaleString()}
                   </p>
                 </div>
                 {order.expiresAt && (
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 dark:text-gray-500 mb-1">Expires</p>
-                    <p className="text-[0.9rem] text-ink dark:text-gray-100">
+                    <p className="text-[0.82rem] text-ink-3 mb-1">Expires</p>
+                    <p className="text-[0.9rem] text-ink">
                       {new Date(order.expiresAt).toLocaleString()}
                     </p>
                   </div>

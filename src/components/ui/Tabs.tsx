@@ -28,7 +28,7 @@ interface TabsListProps {
 
 export function TabsList({ children, className }: TabsListProps) {
   return (
-    <div className={cn("flex gap-2 border-b border-line dark:border-gray-700", className)}>
+    <div className={cn("flex gap-2 border-b border-line", className)}>
       {children}
     </div>
   );
@@ -51,8 +51,8 @@ export function TabsTrigger({ value, children, activeTab, setActiveTab, classNam
       className={cn(
         "px-4 py-2 text-[0.9rem] font-medium transition-colors",
         isActive
-          ? "border-b-2 border-lav-600 text-lav-600 dark:border-lav-400 dark:text-lav-400"
-          : "text-ink-2 hover:text-ink dark:text-gray-400 dark:hover:text-gray-100",
+          ? "border-b-2 border-lav-600 text-lav-600"
+          : "text-ink-2 hover:text-ink",
         className
       )}
     >

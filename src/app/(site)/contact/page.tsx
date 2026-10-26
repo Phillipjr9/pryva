@@ -58,9 +58,9 @@ export default function ContactPage() {
   }
 
   return (
-    <div className="min-h-screen bg-cream dark:bg-gray-900">
+    <div className="min-h-screen bg-cream">
       {/* Header */}
-      <header className="border-b border-line bg-white dark:bg-gray-800 dark:border-gray-700">
+      <header className="border-b border-line bg-white">
         <div className="shell flex h-16 items-center justify-between">
           <Link href="/">
             <Logo />
@@ -68,13 +68,13 @@ export default function ContactPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="text-[0.86rem] font-medium text-ink-2 hover:text-ink dark:text-gray-400 dark:hover:text-gray-100"
+              className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"
             >
               Sign in
             </Link>
             <Link
               href="/signup"
-              className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700 dark:bg-lav-500 dark:hover:bg-lav-600"
+              className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700"
             >
               Get Started
             </Link>
@@ -85,10 +85,10 @@ export default function ContactPage() {
       {/* Hero */}
       <section className="py-16">
         <div className="shell text-center">
-          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem] dark:text-gray-100">
+          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem]">
             Get in touch
           </h1>
-          <p className="mt-4 text-[1.1rem] text-ink-2 dark:text-gray-400 max-w-2xl mx-auto">
+          <p className="mt-4 text-[1.1rem] text-ink-2 max-w-2xl mx-auto">
             Have a question or need help? We're here to assist you.
           </p>
         </div>
@@ -98,33 +98,33 @@ export default function ContactPage() {
       <section className="pb-16">
         <div className="shell">
           <div className="grid gap-6 sm:grid-cols-3 mb-12">
-            <div className="rounded-2xl border border-line bg-white p-6 text-center dark:bg-gray-800 dark:border-gray-700">
-              <div className="grid h-12 w-12 place-items-center rounded-xl bg-lav-100 text-lav-600 mx-auto mb-4 dark:bg-lav-900/30 dark:text-lav-400">
+            <div className="rounded-2xl border border-line bg-white p-6 text-center">
+              <div className="grid h-12 w-12 place-items-center rounded-xl bg-lav-100 text-lav-600 mx-auto mb-4">
                 <Mail className="h-6 w-6" />
               </div>
-              <h3 className="text-[1rem] font-semibold text-ink mb-2 dark:text-gray-100">Email Us</h3>
-              <p className="text-[0.86rem] text-ink-2 dark:text-gray-400">support@pryva.ng</p>
+              <h3 className="text-[1rem] font-semibold text-ink mb-2">Email Us</h3>
+              <p className="text-[0.86rem] text-ink-2">support@pryva.ng</p>
             </div>
-            <div className="rounded-2xl border border-line bg-white p-6 text-center dark:bg-gray-800 dark:border-gray-700">
-              <div className="grid h-12 w-12 place-items-center rounded-xl bg-green-100 text-green-600 mx-auto mb-4 dark:bg-green-900/30 dark:text-green-400">
+            <div className="rounded-2xl border border-line bg-white p-6 text-center">
+              <div className="grid h-12 w-12 place-items-center rounded-xl bg-green-100 text-green-600 mx-auto mb-4">
                 <MessageCircle className="h-6 w-6" />
               </div>
-              <h3 className="text-[1rem] font-semibold text-ink mb-2 dark:text-gray-100">Live Chat</h3>
-              <p className="text-[0.86rem] text-ink-2 dark:text-gray-400">Available 9AM-6PM WAT</p>
+              <h3 className="text-[1rem] font-semibold text-ink mb-2">Live Chat</h3>
+              <p className="text-[0.86rem] text-ink-2">Available 9AM-6PM WAT</p>
             </div>
-            <div className="rounded-2xl border border-line bg-white p-6 text-center dark:bg-gray-800 dark:border-gray-700">
-              <div className="grid h-12 w-12 place-items-center rounded-xl bg-blue-100 text-blue-600 mx-auto mb-4 dark:bg-blue-900/30 dark:text-blue-400">
+            <div className="rounded-2xl border border-line bg-white p-6 text-center">
+              <div className="grid h-12 w-12 place-items-center rounded-xl bg-blue-100 text-blue-600 mx-auto mb-4">
                 <Clock className="h-6 w-6" />
               </div>
-              <h3 className="text-[1rem] font-semibold text-ink mb-2 dark:text-gray-100">Response Time</h3>
-              <p className="text-[0.86rem] text-ink-2 dark:text-gray-400">Within 24 hours</p>
+              <h3 className="text-[1rem] font-semibold text-ink mb-2">Response Time</h3>
+              <p className="text-[0.86rem] text-ink-2">Within 24 hours</p>
             </div>
           </div>
 
           {/* Contact Form */}
           <div className="max-w-2xl mx-auto">
-            <div className="rounded-2xl border border-line bg-white p-8 dark:bg-gray-800 dark:border-gray-700">
-              <h2 className="text-[1.5rem] font-semibold text-ink mb-6 dark:text-gray-100">
+            <div className="rounded-2xl border border-line bg-white p-8">
+              <h2 className="text-[1.5rem] font-semibold text-ink mb-6">
                 Send us a message
               </h2>
 

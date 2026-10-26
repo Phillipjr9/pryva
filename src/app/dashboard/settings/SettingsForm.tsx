@@ -157,14 +157,14 @@ export function SettingsForm({ user }: SettingsFormProps) {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex justify-between text-[0.9rem]">
-            <span className="text-ink-2 dark:text-gray-400">Account created</span>
-            <span className="font-medium text-ink dark:text-gray-100">
+            <span className="text-ink-2">Account created</span>
+            <span className="font-medium text-ink">
               {new Date(user.createdAt).toLocaleDateString()}
             </span>
           </div>
           <div className="flex justify-between text-[0.9rem]">
-            <span className="text-ink-2 dark:text-gray-400">Wallet balance</span>
-            <span className="font-medium text-ink dark:text-gray-100">
+            <span className="text-ink-2">Wallet balance</span>
+            <span className="font-medium text-ink">
               ₦{user.walletBalance.toLocaleString()}
             </span>
           </div>

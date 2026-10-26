@@ -74,7 +74,7 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
       <div className="space-y-6">
         {/* Provider Selection */}
       <div>
-        <label className="block text-[0.86rem] font-medium text-ink dark:text-gray-100 mb-3">
+        <label className="block text-[0.86rem] font-medium text-ink mb-3">
           Select Network
         </label>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -87,8 +87,8 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
               }}
               className={`rounded-xl border p-4 text-center transition-colors ${
                 selectedProvider === provider.id
-                  ? "border-lav-600 bg-lav-50 text-lav-700 dark:bg-lav-900/20 dark:border-lav-500 dark:text-lav-300"
-                  : "border-line bg-white text-ink hover:bg-cream dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-700"
+                  ? "border-lav-600 bg-lav-50 text-lav-700"
+                  : "border-line bg-white text-ink hover:bg-cream"
               }`}
             >
               <span className="text-[0.9rem] font-semibold">{provider.name}</span>
@@ -99,7 +99,7 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
 
       {/* Plan Selection */}
       <div>
-        <label className="block text-[0.86rem] font-medium text-ink dark:text-gray-100 mb-3">
+        <label className="block text-[0.86rem] font-medium text-ink mb-3">
           Select Data Plan
         </label>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -109,16 +109,16 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
               onClick={() => setSelectedPlan(plan.id)}
               className={`rounded-xl border p-4 text-left transition-colors ${
                 selectedPlan === plan.id
-                  ? "border-lav-600 bg-lav-50 dark:bg-lav-900/20 dark:border-lav-500"
-                  : "border-line bg-white hover:bg-cream dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700"
+                  ? "border-lav-600 bg-lav-50"
+                  : "border-line bg-white hover:bg-cream"
               }`}
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[0.95rem] font-semibold text-ink dark:text-gray-100">{plan.name}</p>
-                  <p className="text-[0.82rem] text-ink-2 dark:text-gray-400">{plan.duration}</p>
+                  <p className="text-[0.95rem] font-semibold text-ink">{plan.name}</p>
+                  <p className="text-[0.82rem] text-ink-2">{plan.duration}</p>
                 </div>
-                <p className="text-[1.1rem] font-bold text-lav-600 dark:text-lav-400">
+                <p className="text-[1.1rem] font-bold text-lav-600">
                   {formatNaira(plan.price)}
                 </p>
               </div>
@@ -129,7 +129,7 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
 
       {/* Phone Number */}
       <div>
-        <label className="block text-[0.86rem] font-medium text-ink dark:text-gray-100 mb-2">
+        <label className="block text-[0.86rem] font-medium text-ink mb-2">
           Phone Number
         </label>
         <input
@@ -137,21 +137,21 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
           value={phoneNumber}
           onChange={(e) => setPhoneNumber(e.target.value)}
           placeholder="08012345678"
-          className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.95rem] text-ink outline-none transition-colors focus:border-lav-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:focus:border-lav-500"
+          className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.95rem] text-ink outline-none transition-colors focus:border-lav-600"
         />
       </div>
 
       {/* Wallet Balance */}
-      <div className="rounded-xl border border-line bg-cream p-4 dark:bg-gray-800 dark:border-gray-700">
-        <p className="text-[0.86rem] text-ink-2 dark:text-gray-400">Wallet Balance</p>
-        <p className="text-[1.5rem] font-bold text-ink dark:text-gray-100">
+      <div className="rounded-xl border border-line bg-cream p-4">
+        <p className="text-[0.86rem] text-ink-2">Wallet Balance</p>
+        <p className="text-[1.5rem] font-bold text-ink">
           {formatNaira(user.walletBalance)}
         </p>
       </div>
 
       {/* Messages */}
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.9rem] text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.9rem] text-red-700">
           {error}
         </div>
       )}
@@ -160,7 +160,7 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
       <button
         onClick={handlePurchase}
         disabled={loading || !selectedPlan || !phoneNumber}
-        className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-lav-500 dark:hover:bg-lav-600"
+        className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? "Processing..." : "Purchase Data Plan"}
       </button>

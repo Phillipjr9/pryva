@@ -8,7 +8,7 @@ interface DataTableProps {
 
 export function DataTable({ children, className }: DataTableProps) {
   return (
-    <div className={cn("rounded-2xl border border-line bg-white overflow-hidden dark:bg-gray-800 dark:border-gray-700", className)}>
+    <div className={cn("rounded-2xl border border-line bg-white overflow-hidden", className)}>
       <div className="overflow-x-auto">
         <table className="w-full">
           {children}
@@ -25,7 +25,7 @@ interface DataTableHeaderProps {
 
 export function DataTableHeader({ children, className }: DataTableHeaderProps) {
   return (
-    <thead className={cn("border-b border-line bg-cream dark:bg-gray-900 dark:border-gray-700", className)}>
+    <thead className={cn("border-b border-line bg-cream", className)}>
       {children}
     </thead>
   );
@@ -38,7 +38,7 @@ interface DataTableBodyProps {
 
 export function DataTableBody({ children, className }: DataTableBodyProps) {
   return (
-    <tbody className={cn("divide-y divide-line dark:divide-gray-700", className)}>
+    <tbody className={cn("divide-y divide-line", className)}>
       {children}
     </tbody>
   );
@@ -54,7 +54,7 @@ export function DataTableRow({ children, className, onClick }: DataTableRowProps
   return (
     <tr
       className={cn(
-        "transition-colors hover:bg-cream dark:hover:bg-gray-700",
+        "transition-colors hover:bg-cream",
         onClick && "cursor-pointer",
         className
       )}
@@ -72,7 +72,7 @@ interface DataTableHeadProps {
 
 export function DataTableHead({ children, className }: DataTableHeadProps) {
   return (
-    <th className={cn("px-4 py-3 text-left text-[0.78rem] font-semibold uppercase tracking-wider text-ink-2 dark:text-gray-400", className)}>
+    <th className={cn("px-4 py-3 text-left text-[0.78rem] font-semibold uppercase tracking-wider text-ink-2", className)}>
       {children}
     </th>
   );
@@ -85,7 +85,7 @@ interface DataTableCellProps {
 
 export function DataTableCell({ children, className }: DataTableCellProps) {
   return (
-    <td className={cn("px-4 py-3 text-[0.9rem] text-ink dark:text-gray-100", className)}>
+    <td className={cn("px-4 py-3 text-[0.9rem] text-ink", className)}>
       {children}
     </td>
   );
@@ -99,7 +99,7 @@ interface DataTableEmptyProps {
 export function DataTableEmpty({ message = "No data available", colSpan = 1 }: DataTableEmptyProps) {
   return (
     <tr>
-      <td colSpan={colSpan} className="px-4 py-12 text-center text-[0.9rem] text-ink-2 dark:text-gray-400">
+      <td colSpan={colSpan} className="px-4 py-12 text-center text-[0.9rem] text-ink-2">
         {message}
       </td>
     </tr>

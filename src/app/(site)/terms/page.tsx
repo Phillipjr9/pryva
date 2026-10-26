@@ -9,9 +9,9 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-cream dark:bg-gray-900">
+    <div className="min-h-screen bg-cream">
       {/* Header */}
-      <header className="border-b border-line bg-white dark:bg-gray-800 dark:border-gray-700">
+      <header className="border-b border-line bg-white">
         <div className="shell flex h-16 items-center justify-between">
           <Link href="/">
             <Logo />
@@ -19,13 +19,13 @@ export default function TermsPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="text-[0.86rem] font-medium text-ink-2 hover:text-ink dark:text-gray-400 dark:hover:text-gray-100"
+              className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"
             >
               Sign in
             </Link>
             <Link
               href="/signup"
-              className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700 dark:bg-lav-500 dark:hover:bg-lav-600"
+              className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700"
             >
               Get Started
             </Link>
@@ -36,14 +36,14 @@ export default function TermsPage() {
       {/* Content */}
       <section className="py-16">
         <div className="shell max-w-3xl">
-          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink mb-8 dark:text-gray-100">
+          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink mb-8">
             Terms of Service
           </h1>
-          <p className="text-[0.9rem] text-ink-2 mb-8 dark:text-gray-400">
+          <p className="text-[0.9rem] text-ink-2 mb-8">
             Last updated: {new Date().toLocaleDateString("en-NG", { year: "numeric", month: "long", day: "numeric" })}
           </p>
 
-          <div className="prose prose-lg max-w-none dark:prose-invert">
+          <div className="prose prose-lg max-w-none">
             <h2>1. Acceptance of Terms</h2>
             <p>
               By accessing and using Pryva's services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.

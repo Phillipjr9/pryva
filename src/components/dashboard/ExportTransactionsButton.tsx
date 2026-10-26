@@ -40,7 +40,7 @@ export function ExportTransactionsButton() {
       <button
         onClick={() => setShowMenu(!showMenu)}
         disabled={exporting}
-        className="flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2 text-[0.86rem] font-medium text-ink transition-colors hover:bg-cream disabled:opacity-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-700"
+        className="flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2 text-[0.86rem] font-medium text-ink transition-colors hover:bg-cream disabled:opacity-50"
       >
         <Download className="h-4 w-4" />
         {exporting ? "Exporting..." : "Export"}
@@ -49,19 +49,19 @@ export function ExportTransactionsButton() {
       {showMenu && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-          <div className="absolute right-0 top-full z-20 mt-2 w-48 rounded-xl border border-line bg-white shadow-[var(--shadow-card)] dark:bg-gray-900 dark:border-gray-700">
+          <div className="absolute right-0 top-full z-20 mt-2 w-48 rounded-xl border border-line bg-white shadow-[var(--shadow-card)]">
             <button
               onClick={() => handleExport("csv")}
-              className="flex w-full items-center gap-3 px-4 py-3 text-left text-[0.86rem] font-medium text-ink transition-colors hover:bg-cream dark:text-gray-100 dark:hover:bg-gray-800"
+              className="flex w-full items-center gap-3 px-4 py-3 text-left text-[0.86rem] font-medium text-ink transition-colors hover:bg-cream"
             >
-              <FileText className="h-4 w-4 text-ink-2 dark:text-gray-400" />
+              <FileText className="h-4 w-4 text-ink-2" />
               Export as CSV
             </button>
             <button
               onClick={() => handleExport("json")}
-              className="flex w-full items-center gap-3 px-4 py-3 text-left text-[0.86rem] font-medium text-ink transition-colors hover:bg-cream dark:text-gray-100 dark:hover:bg-gray-800"
+              className="flex w-full items-center gap-3 px-4 py-3 text-left text-[0.86rem] font-medium text-ink transition-colors hover:bg-cream"
             >
-              <FileJson className="h-4 w-4 text-ink-2 dark:text-gray-400" />
+              <FileJson className="h-4 w-4 text-ink-2" />
               Export as JSON
             </button>
           </div>
