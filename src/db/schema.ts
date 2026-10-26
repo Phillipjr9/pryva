@@ -155,6 +155,26 @@ export const notifications = pgTable(
   ],
 );
 
+export const securityViolations = pgTable(
+  "security_violations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    userEmail: varchar("user_email", { length: 200 }),
+    type: varchar("type", { length: 40 }).notNull(),
+    details: text("details").notNull(),
+    ip: varchar("ip", { length: 45 }),
+    url: varchar("url", { length: 500 }),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("security_violations_user_idx").on(table.userId),
+    index("security_violations_type_idx").on(table.type),
+    index("security_violations_created_idx").on(table.createdAt),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type WalletTransaction = typeof walletTransactions.$inferSelect;
@@ -162,3 +182,4 @@ export type ContactMessage = typeof contactMessages.$inferSelect;
 export type GiftCard = typeof giftCards.$inferSelect;
 export type ScheduledOrder = typeof scheduledOrders.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
+export type SecurityViolation = typeof securityViolations.$inferSelect;
