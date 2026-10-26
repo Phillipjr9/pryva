@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { formatNaira } from "@/lib/catalog";
 import { Gift, Copy, Check } from "@/components/icons";
+import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
+import { PaymentLoading } from "@/components/ui/PaymentLoading";
 import type { User, GiftCard } from "@/db/schema";
 
 interface GiftCardsManagerProps {
@@ -108,23 +110,32 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
   const presetAmounts = [2000, 5000, 10000, 25000, 50000];
 
   return (
-    <div className="space-y-6">
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-line dark:border-gray-700">
-        {(["create", "redeem", "history"] as Tab[]).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-[0.9rem] font-medium transition-colors ${
-              activeTab === tab
-                ? "border-b-2 border-lav-600 text-lav-600 dark:border-lav-400 dark:text-lav-400"
-                : "text-ink-2 hover:text-ink dark:text-gray-400 dark:hover:text-gray-100"
-            }`}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
-      </div>
+    <>
+      <PaymentLoading show={loading || redeemLoading} message="Processing your gift card..." />
+      <PaymentSuccess
+        show={!!success || !!redeemSuccess}
+        title={success ? "Gift Card Created!" : "Gift Card Redeemed!"}
+        message={success ? `Code: ${success.code}` : `${formatNaira(redeemSuccess || 0)} added to your wallet`}
+        redirectUrl="/dashboard"
+        redirectDelay={2500}
+      />
+      <div className="space-y-6">
+        {/* Tabs */}
+        <div className="flex gap-2 border-b border-line dark:border-gray-700">
+          {(["create", "redeem", "history"] as Tab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 text-[0.9rem] font-medium transition-colors ${
+                activeTab === tab
+                  ? "border-b-2 border-lav-600 text-lav-600 dark:border-lav-400 dark:text-lav-400"
+                  : "text-ink-2 hover:text-ink dark:text-gray-400 dark:hover:text-gray-100"
+              }`}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </div>
 
       {/* Create Tab */}
       {activeTab === "create" && (
@@ -361,5 +372,6 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
         </div>
       )}
     </div>
+    </>
   );
 }

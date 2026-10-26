@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { dataPlans, type AirtimeProvider } from "@/lib/airtime";
 import { formatNaira } from "@/lib/catalog";
+import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
+import { PaymentLoading } from "@/components/ui/PaymentLoading";
 import type { User } from "@/db/schema";
 
 interface DataPlansFormProps {
@@ -60,8 +62,17 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Provider Selection */}
+    <>
+      <PaymentLoading show={loading} message="Processing your data plan purchase..." />
+      <PaymentSuccess
+        show={!!success}
+        title="Data Plan Purchased!"
+        message={success || "Your data plan has been activated successfully."}
+        redirectUrl="/dashboard"
+        redirectDelay={2500}
+      />
+      <div className="space-y-6">
+        {/* Provider Selection */}
       <div>
         <label className="block text-[0.86rem] font-medium text-ink dark:text-gray-100 mb-3">
           Select Network
@@ -144,11 +155,6 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
           {error}
         </div>
       )}
-      {success && (
-        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-[0.9rem] text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300">
-          {success}
-        </div>
-      )}
 
       {/* Purchase Button */}
       <button
@@ -159,5 +165,6 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
         {loading ? "Processing..." : "Purchase Data Plan"}
       </button>
     </div>
+    </>
   );
 }

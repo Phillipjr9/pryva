@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { plans, formatNaira, findPlan } from "@/lib/catalog";
 import { calculateBulkOrder, getBulkDiscountMessage, type BulkOrderItem } from "@/lib/bulk-orders";
+import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
+import { PaymentLoading } from "@/components/ui/PaymentLoading";
 import type { User } from "@/db/schema";
 
 interface BulkOrdersFormProps {
@@ -82,7 +84,16 @@ export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <>
+      <PaymentLoading show={loading} message="Processing your bulk order..." />
+      <PaymentSuccess
+        show={!!success}
+        title="Bulk Order Completed!"
+        message={`Total: ${formatNaira(success?.total || 0)}${success?.discount ? ` (${success.discountPercent}% discount applied)` : ''}`}
+        redirectUrl="/dashboard"
+        redirectDelay={2500}
+      />
+      <div className="space-y-6">
       {/* Add Items */}
       <div>
         <label className="block text-[0.86rem] font-medium text-ink dark:text-gray-100 mb-3">
@@ -226,5 +237,6 @@ export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
         </button>
       )}
     </div>
+    </>
   );
 }
