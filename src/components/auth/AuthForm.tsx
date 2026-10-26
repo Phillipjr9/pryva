@@ -98,7 +98,6 @@ export function AuthForm({
         <form
           action="/api/auth/demo-web"
           method="post"
-          onSubmit={submitDemo}
           className="mt-2.5"
         >
           <input type="hidden" name="next" value={next} />
@@ -106,6 +105,7 @@ export function AuthForm({
             type="submit"
             disabled={pending !== null}
             className="btn w-full border-2 border-lav-400 bg-gradient-to-r from-lav-100 to-lav-50 !py-4 !text-[0.9rem] font-semibold text-lav-800 hover:from-lav-200 hover:to-lav-100 disabled:opacity-60 shadow-sm transition-all"
+            onClick={() => setPending("demo")}
           >
             <Sparkle className="h-5 w-5" />
             {pending === "demo" ? "Opening the demo…" : "⚡ One-Click Demo Login"}

@@ -1050,7 +1050,7 @@ export default function HomePage() {
             <div className="relative overflow-hidden rounded-[2.25rem] bg-ink px-6 py-12 text-white sm:px-12 sm:py-16">
               <div className="pointer-events-none absolute -left-20 -top-24 h-72 w-72 rounded-full bg-lav-500/30 blur-[90px]" />
               <div className="pointer-events-none absolute -bottom-24 right-0 h-72 w-72 rounded-full bg-lav-400/25 blur-[90px]" />
-              <Monogram className="pointer-events-none absolute -bottom-16 right-4 h-64 w-64 opacity-10" tone="mono" />
+              <Monogram className="pointer-events-none absolute -bottom-16 right-4 h-64 w-64 opacity-10" />
 
               <div className="relative grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
                 <div>
