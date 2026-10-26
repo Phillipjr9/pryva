@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Reveal } from "@/components/ui/Reveal";
 import { ContactForm } from "@/components/site/ContactForm";
 import { FaqAccordion } from "@/components/ui/FaqAccordion";
+import { hasDatabase } from "@/db";
 import { getCurrentUser } from "@/lib/auth";
 import { ArrowRight, Chat, Clock, Mail, Refresh, Shield, Wallet } from "@/components/icons";
 
@@ -145,6 +146,7 @@ export default async function ContactPage() {
                   defaultName={user?.name ?? ""}
                   defaultEmail={user?.email ?? ""}
                   signedIn={Boolean(user)}
+                  readOnly={!hasDatabase}
                 />
                 {!user && (
                   <p className="mt-3 flex flex-wrap items-center gap-2 text-[0.76rem] text-ink-3">

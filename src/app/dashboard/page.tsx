@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, hasDatabase } from "@/db";
 import { orders, walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { getFleexaStatus } from "@/lib/fleexa";
@@ -46,13 +46,17 @@ export default async function DashboardOverviewPage() {
   const user = await requireUser("/dashboard");
 
   const [recentOrders, recentTx, fleexa] = await Promise.all([
-    db.select().from(orders).where(eq(orders.userId, user.id)).orderBy(desc(orders.createdAt)).limit(5),
-    db
-      .select()
-      .from(walletTransactions)
-      .where(eq(walletTransactions.userId, user.id))
-      .orderBy(desc(walletTransactions.createdAt))
-      .limit(4),
+    hasDatabase
+      ? db.select().from(orders).where(eq(orders.userId, user.id)).orderBy(desc(orders.createdAt)).limit(5)
+      : Promise.resolve([]),
+    hasDatabase
+      ? db
+          .select()
+          .from(walletTransactions)
+          .where(eq(walletTransactions.userId, user.id))
+          .orderBy(desc(walletTransactions.createdAt))
+          .limit(4)
+      : Promise.resolve([]),
     getFleexaStatus(),
   ]);
 
@@ -101,15 +105,22 @@ export default async function DashboardOverviewPage() {
               Your Pryva wallet is ready.
             </h1>
             <p className="mt-1.5 max-w-md text-[0.86rem] leading-relaxed text-ink-2">
-              Buy a number, eSIM, proxy pack or temporary inbox. Everything you order appears here
-              instantly, with refund protection attached.
+              {hasDatabase
+                ? "Buy a number, eSIM, proxy pack or temporary inbox. Everything you order appears here instantly, with refund protection attached."
+                : "Explore the Pryva workspace, see your sample wallet balance, and browse the services available in the full product."}
             </p>
           </div>
           <Link href="/dashboard/wallet" className="btn btn-primary !px-5 !py-3 !text-[0.8rem]">
-            <Plus className="h-4 w-4" /> Top up wallet
+            <Plus className="h-4 w-4" /> {hasDatabase ? "Top up wallet" : "View wallet"}
           </Link>
         </div>
       </div>
+
+      {!hasDatabase && (
+        <div className="rounded-2xl border border-lav-200 bg-lav-50/80 px-4 py-3 text-[0.78rem] leading-relaxed text-lav-800">
+          <span className="font-semibold">Read-only demo preview.</span> The wallet balance is sample credit; purchases, top-ups and support messages are disabled until a database is configured.
+        </div>
+      )}
 
       {fleexa.configured && (
         <div

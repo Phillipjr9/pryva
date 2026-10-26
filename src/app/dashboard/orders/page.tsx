@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, hasDatabase } from "@/db";
 import { orders } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/catalog";
@@ -23,11 +23,13 @@ function statusStyle(status: string) {
 
 export default async function OrdersPage() {
   const user = await requireUser("/dashboard/orders");
-  const rows = await db
-    .select()
-    .from(orders)
-    .where(eq(orders.userId, user.id))
-    .orderBy(desc(orders.createdAt));
+  const rows = hasDatabase
+    ? await db
+        .select()
+        .from(orders)
+        .where(eq(orders.userId, user.id))
+        .orderBy(desc(orders.createdAt))
+    : [];
 
   const active = rows.filter((order) => order.status === "active").length;
 

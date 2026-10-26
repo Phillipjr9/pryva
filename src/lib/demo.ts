@@ -1,16 +1,21 @@
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, hasDatabase } from "@/db";
 import { users } from "@/db/schema";
 import { hashPassword } from "@/lib/auth";
 import { creditWallet } from "@/lib/wallet";
+import {
+  DEMO_EMAIL,
+  DEMO_PASSWORD,
+  DEMO_STARTING_BALANCE,
+  DEMO_USER,
+} from "@/lib/demo-account";
 
-const DEMO_EMAIL = "demo@pryva.ng";
-const DEMO_PASSWORD = "pryva-demo-2026";
-export const DEMO_STARTING_BALANCE = 25000;
 const DEMO_MIN_BALANCE = 5000;
 
-/** Finds or creates the shared demo account and keeps it topped up. */
+/** Finds or creates the shared demo account, or opens a static preview account. */
 export async function openDemoAccount() {
+  if (!hasDatabase) return DEMO_USER;
+
   let [user] = await db.select().from(users).where(eq(users.email, DEMO_EMAIL)).limit(1);
 
   if (!user) {

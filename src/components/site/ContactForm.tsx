@@ -18,9 +18,15 @@ type Props = {
   defaultName?: string;
   defaultEmail?: string;
   signedIn?: boolean;
+  readOnly?: boolean;
 };
 
-export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = false }: Props) {
+export function ContactForm({
+  defaultName = "",
+  defaultEmail = "",
+  signedIn = false,
+  readOnly = false,
+}: Props) {
   const [form, setForm] = useState({
     name: defaultName,
     email: defaultEmail,
@@ -53,6 +59,23 @@ export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = fa
     } finally {
       setPending(false);
     }
+  }
+
+  if (readOnly) {
+    return (
+      <div className="card p-6 sm:p-8">
+        <span className="grid h-12 w-12 place-items-center rounded-full bg-lav-100 text-lav-700">
+          <Shield className="h-5 w-5" />
+        </span>
+        <h3 className="mt-5 text-xl font-medium">Support is read-only in this preview.</h3>
+        <p className="mt-2 max-w-md text-[0.88rem] leading-relaxed text-ink-2">
+          The demo workspace doesn&apos;t save messages. For assistance, email the Pryva support team directly.
+        </p>
+        <a href="mailto:support@pryva.ng" className="btn btn-primary mt-5">
+          Email support <ArrowRight className="h-4 w-4" />
+        </a>
+      </div>
+    );
   }
 
   if (sent) {

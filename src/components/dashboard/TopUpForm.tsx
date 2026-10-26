@@ -7,7 +7,13 @@ import { formatNaira } from "@/lib/catalog";
 
 const presets = [2000, 5000, 10000, 25000, 50000];
 
-export function TopUpForm({ balance }: { balance: number }) {
+export function TopUpForm({
+  balance,
+  previewMode = false,
+}: {
+  balance: number;
+  previewMode?: boolean;
+}) {
   const router = useRouter();
   const [amount, setAmount] = useState<number>(5000);
   const [custom, setCustom] = useState("");
@@ -46,6 +52,28 @@ export function TopUpForm({ balance }: { balance: number }) {
     } finally {
       setPending(false);
     }
+  }
+
+  if (previewMode) {
+    return (
+      <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 sm:p-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[1.05rem] font-semibold">Demo wallet</h2>
+          <span className="rounded-full bg-cream px-2.5 py-1 text-[0.66rem] font-medium text-ink-2">
+            Sample balance {formatNaira(balance)}
+          </span>
+        </div>
+        <div className="mt-5 rounded-2xl border border-lav-200 bg-lav-50/80 p-4">
+          <p className="text-[0.85rem] font-semibold text-ink">Read-only preview</p>
+          <p className="mt-1.5 text-[0.78rem] leading-relaxed text-ink-2">
+            This sample balance is here so you can explore the dashboard. Funding and purchases are disabled in this demo environment.
+          </p>
+        </div>
+        <a href="/pricing" className="btn btn-ghost mt-4 w-full">
+          Explore services <ArrowRight className="h-4 w-4" />
+        </a>
+      </div>
+    );
   }
 
   return (

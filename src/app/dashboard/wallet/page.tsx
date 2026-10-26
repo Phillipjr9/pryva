@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, hasDatabase } from "@/db";
 import { walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/catalog";
@@ -14,12 +14,14 @@ export const dynamic = "force-dynamic";
 export default async function WalletPage() {
   const user = await requireUser("/dashboard/wallet");
 
-  const transactions = await db
-    .select()
-    .from(walletTransactions)
-    .where(eq(walletTransactions.userId, user.id))
-    .orderBy(desc(walletTransactions.createdAt))
-    .limit(40);
+  const transactions = hasDatabase
+    ? await db
+        .select()
+        .from(walletTransactions)
+        .where(eq(walletTransactions.userId, user.id))
+        .orderBy(desc(walletTransactions.createdAt))
+        .limit(40)
+    : [];
 
   const added = transactions
     .filter((tx) => tx.type !== "debit")
@@ -67,7 +69,7 @@ export default async function WalletPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-        <TopUpForm balance={user.walletBalance} />
+        <TopUpForm balance={user.walletBalance} previewMode={!hasDatabase} />
 
         <div className="grid gap-4">
           <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">

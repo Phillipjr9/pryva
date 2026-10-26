@@ -1,24 +1,25 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.DATABASE_URL?.trim();
 
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required");
-}
+/** The public preview can run a read-only demo without provisioning Postgres. */
+export const hasDatabase = Boolean(databaseUrl);
 
 const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;
 };
 
-export const pool =
-  globalForDb.__arenaNextJsPostgresqlPool ??
-  new Pool({
-    connectionString: databaseUrl,
-  });
+export const pool: Pool | null = databaseUrl
+  ? globalForDb.__arenaNextJsPostgresqlPool ?? new Pool({ connectionString: databaseUrl })
+  : null;
 
-if (process.env.NODE_ENV !== "production") {
+if (pool && process.env.NODE_ENV !== "production") {
   globalForDb.__arenaNextJsPostgresqlPool = pool;
 }
 
-export const db = drizzle(pool);
+// Keep a stable Drizzle type for existing database-backed modules. Callers
+// must check `hasDatabase` before querying; the demo path never touches `db`.
+export const db: ReturnType<typeof drizzle> = pool
+  ? drizzle(pool)
+  : (undefined as unknown as ReturnType<typeof drizzle>);

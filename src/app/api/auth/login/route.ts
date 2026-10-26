@@ -1,7 +1,10 @@
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, hasDatabase } from "@/db";
 import { users } from "@/db/schema";
 import { createSession, isValidEmail, normalizeEmail, verifyPassword } from "@/lib/auth";
+import { DEMO_EMAIL, DEMO_PASSWORD, DEMO_USER } from "@/lib/demo-account";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
@@ -14,6 +17,17 @@ export async function POST(request: Request) {
         { ok: false, error: "Enter your email and password to continue." },
         { status: 400 },
       );
+    }
+
+    if (!hasDatabase) {
+      if (email !== DEMO_EMAIL || password !== DEMO_PASSWORD) {
+        return Response.json(
+          { ok: false, error: "This preview only supports the Pryva demo account. Use the live demo button or enter its demo credentials." },
+          { status: 401 },
+        );
+      }
+      await createSession(DEMO_USER.id, request);
+      return Response.json({ ok: true });
     }
 
     const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);

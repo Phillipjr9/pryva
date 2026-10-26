@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
-import { db } from "@/db";
+import { db, hasDatabase } from "@/db";
 import { users } from "@/db/schema";
 import { createSession, hashPassword } from "@/lib/auth";
 import { exchangeGoogleCode, fetchGoogleUser, googleConfigured } from "@/lib/google";
@@ -41,6 +41,7 @@ export async function GET(request: Request) {
     return response;
   };
 
+  if (!hasDatabase) return clearCookies(goToLogin("demo-only"));
   if (error) return clearCookies(goToLogin("google-canceled"));
   if (!googleConfigured()) return clearCookies(goToLogin("google-not-configured"));
   if (!code || !state || !expectedState || state !== expectedState) {

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, hasDatabase } from "@/db";
 import { orders } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { formatNaira, orderStatusLabel } from "@/lib/catalog";
@@ -25,8 +25,9 @@ export default async function OrderDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const user = await requireUser("/dashboard/orders");
-  const { id } = await params;
+  if (!hasDatabase) notFound();
 
+  const { id } = await params;
   const [order] = await db
     .select()
     .from(orders)

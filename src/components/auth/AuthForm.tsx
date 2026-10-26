@@ -8,6 +8,7 @@ import { BrandMark } from "@/components/brand/BrandMark";
 type Mode = "login" | "signup";
 
 const GOOGLE_ERRORS: Record<string, string> = {
+  "demo-only": "Google sign-in and new account creation are unavailable in this read-only preview. Use the live demo to open the sample dashboard.",
   "google-not-configured":
     "Google sign-in isn’t configured on this preview yet — the site owner needs to add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.",
   "google-canceled": "Google sign-in was cancelled before it finished.",

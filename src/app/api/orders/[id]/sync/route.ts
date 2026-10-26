@@ -1,5 +1,5 @@
 import { and, desc, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, hasDatabase } from "@/db";
 import { orders, walletTransactions } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import {
@@ -22,6 +22,9 @@ export async function GET(
 ) {
   const user = await getCurrentUser();
   if (!user) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  if (!hasDatabase) {
+    return Response.json({ ok: false, error: "Order sync is unavailable in this read-only demo preview." }, { status: 503 });
+  }
 
   const { id } = await params;
 
@@ -92,6 +95,9 @@ export async function GET(
 export async function POST() {
   const user = await getCurrentUser();
   if (!user) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  if (!hasDatabase) {
+    return Response.json({ ok: false, error: "Order actions are unavailable in this read-only demo preview." }, { status: 503 });
+  }
 
   const [tx] = await db
     .select()

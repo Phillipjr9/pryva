@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, hasDatabase } from "@/db";
 import { contactMessages } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { ContactForm } from "@/components/site/ContactForm";
@@ -13,12 +13,14 @@ export const dynamic = "force-dynamic";
 export default async function SupportPage() {
   const user = await requireUser("/dashboard/support");
 
-  const messages = await db
-    .select()
-    .from(contactMessages)
-    .where(eq(contactMessages.userId, user.id))
-    .orderBy(desc(contactMessages.createdAt))
-    .limit(10);
+  const messages = hasDatabase
+    ? await db
+        .select()
+        .from(contactMessages)
+        .where(eq(contactMessages.userId, user.id))
+        .orderBy(desc(contactMessages.createdAt))
+        .limit(10)
+    : [];
 
   return (
     <div className="grid gap-4">
@@ -55,7 +57,12 @@ export default async function SupportPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
-        <ContactForm defaultName={user.name} defaultEmail={user.email} signedIn />
+        <ContactForm
+          defaultName={user.name}
+          defaultEmail={user.email}
+          signedIn
+          readOnly={!hasDatabase}
+        />
 
         <div className="grid gap-4">
           <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">

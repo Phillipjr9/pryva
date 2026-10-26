@@ -2,8 +2,9 @@ import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, eq, gt } from "drizzle-orm";
-import { db } from "@/db";
+import { db, hasDatabase } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
+import { DEMO_SESSION_TOKEN, DEMO_USER } from "@/lib/demo-account";
 import { requestProto } from "@/lib/net";
 
 export const SESSION_COOKIE = "pryva_session";
@@ -63,10 +64,16 @@ function toPublicUser(user: User): PublicUser {
 }
 
 export async function createSession(userId: string, request?: Request): Promise<string> {
-  const token = randomBytes(32).toString("hex");
+  if (!hasDatabase && userId !== DEMO_USER.id) {
+    throw new Error("Only the demo account is available without a database");
+  }
+
+  const token = hasDatabase ? randomBytes(32).toString("hex") : DEMO_SESSION_TOKEN;
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
 
-  await db.insert(sessions).values({ token, userId, expiresAt });
+  if (hasDatabase) {
+    await db.insert(sessions).values({ token, userId, expiresAt });
+  }
 
   const secure = request ? requestProto(request) === "https" : await requestIsSecure();
   const jar = await cookies();
@@ -85,6 +92,10 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
+
+  if (!hasDatabase) {
+    return token === DEMO_SESSION_TOKEN ? toPublicUser(DEMO_USER) : null;
+  }
 
   const rows = await db
     .select({ user: users })
@@ -108,7 +119,7 @@ export async function requireUser(nextPath = "/dashboard"): Promise<PublicUser> 
 export async function destroySession(): Promise<void> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
-  if (token) {
+  if (token && hasDatabase) {
     await db.delete(sessions).where(eq(sessions.token, token));
   }
   jar.delete(SESSION_COOKIE);

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { hasDatabase } from "@/db";
 import { googleAuthorizeUrl, googleConfigured, makeState } from "@/lib/google";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,9 @@ export async function GET(request: Request) {
   const nextRaw = url.searchParams.get("next") ?? "/dashboard";
   const next = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/dashboard";
 
+  if (!hasDatabase) {
+    redirect("/login?error=demo-only");
+  }
   if (!googleConfigured()) {
     redirect("/login?error=google-not-configured");
   }

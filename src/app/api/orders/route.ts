@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, hasDatabase } from "@/db";
 import { orders } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { findPlan } from "@/lib/catalog";
@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  if (!hasDatabase) return Response.json({ ok: true, orders: [] });
 
   const rows = await db
     .select()
@@ -28,6 +29,12 @@ export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return Response.json({ ok: false, error: "Please sign in to complete this order." }, { status: 401 });
+  }
+  if (!hasDatabase) {
+    return Response.json(
+      { ok: false, error: "Purchases are disabled in this read-only demo preview." },
+      { status: 503 },
+    );
   }
 
   try {

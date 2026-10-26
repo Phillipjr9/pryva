@@ -1,3 +1,4 @@
+import { hasDatabase } from "@/db";
 import { getCurrentUser } from "@/lib/auth";
 import { makeReference, creditWallet } from "@/lib/wallet";
 
@@ -9,6 +10,12 @@ export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return Response.json({ ok: false, error: "Please sign in first." }, { status: 401 });
+  }
+  if (!hasDatabase) {
+    return Response.json(
+      { ok: false, error: "Wallet funding is disabled in this read-only demo preview." },
+      { status: 503 },
+    );
   }
 
   try {

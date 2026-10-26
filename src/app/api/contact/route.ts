@@ -1,10 +1,17 @@
-import { db } from "@/db";
+import { db, hasDatabase } from "@/db";
 import { contactMessages } from "@/db/schema";
 import { getCurrentUser, isValidEmail, normalizeEmail } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  if (!hasDatabase) {
+    return Response.json(
+      { ok: false, error: "Messaging is unavailable in this read-only preview. Please email support@pryva.ng." },
+      { status: 503 },
+    );
+  }
+
   try {
     const body = (await request.json()) as {
       name?: string;

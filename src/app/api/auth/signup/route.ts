@@ -1,12 +1,21 @@
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, hasDatabase } from "@/db";
 import { users } from "@/db/schema";
 import { createSession, hashPassword, isValidEmail, normalizeEmail } from "@/lib/auth";
 import { creditWallet } from "@/lib/wallet";
 
 const WELCOME_CREDIT = 5000;
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
+  if (!hasDatabase) {
+    return Response.json(
+      { ok: false, error: "Account creation is disabled in this database-free preview. You can use the Pryva demo account instead." },
+      { status: 503 },
+    );
+  }
+
   try {
     const body = (await request.json()) as {
       name?: string;
