@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Clock, Copy, Refresh, Shield } from "@/components/icons";
 import { formatNaira } from "@/lib/catalog";
 
@@ -34,6 +35,7 @@ export function OrderActions({
   service,
   provider = null,
 }: Props) {
+  const router = useRouter();
   const [copied, setCopied] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<string | null>(() => timeLeft(expiresAt));
   const [settledStatus, setSettledStatus] = useState(status);
@@ -104,6 +106,7 @@ export function OrderActions({
       }
       setSettledStatus("refunded");
       setRefunded(true);
+      router.refresh();
     } catch {
       setError("Network hiccup. Please try again.");
     } finally {

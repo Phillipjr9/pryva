@@ -14,203 +14,392 @@ function hashPassword(password: string): string {
   return `${salt}:${derived}`;
 }
 
+function isDrizzleColumn(value: unknown): value is { name: string; table: unknown } {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    "name" in value &&
+    "table" in value &&
+    typeof (value as { name?: unknown }).name === "string"
+  );
+}
+
+function isDrizzleTable(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const drizzleBaseName = Symbol.for("drizzle:BaseName");
+  return typeof (value as Record<PropertyKey, unknown>)[drizzleBaseName] === "string";
+}
+
 function tableNameFor(table: unknown): string {
   if (table && typeof table === "object") {
     const drizzleBaseName = Symbol.for("drizzle:BaseName");
     const baseName = (table as Record<PropertyKey, unknown>)[drizzleBaseName];
-    if (typeof baseName === "string") return baseName;
+    if (typeof baseName === "string") return toCamelCase(baseName);
     const name = (table as { name?: string }).name;
-    if (typeof name === "string") return name;
+    if (typeof name === "string") return toCamelCase(name);
   }
   return "unknown";
 }
 
-function extractColumnName(condition: unknown): string | null {
-  if (!condition || typeof condition !== "object" || !("queryChunks" in condition)) {
-    return null;
+type FlatToken =
+  | { kind: "col"; table: string; prop: string }
+  | { kind: "op"; text: string }
+  | { kind: "val"; value: unknown };
+
+function flattenSqlChunks(node: unknown, out: FlatToken[] = []): FlatToken[] {
+  if (node === null || node === undefined) return out;
+
+  if (
+    typeof node === "string" ||
+    typeof node === "number" ||
+    typeof node === "boolean" ||
+    node instanceof Date
+  ) {
+    out.push({ kind: "val", value: node });
+    return out;
   }
 
-  const { queryChunks } = condition as { queryChunks?: unknown[] };
-  const columnChunk = queryChunks?.find(
-    (chunk) => !!chunk && typeof chunk === "object" && "name" in chunk && "table" in chunk,
-  );
-
-  if (!columnChunk || typeof columnChunk !== "object" || !("name" in columnChunk)) {
-    return null;
+  if (isDrizzleColumn(node)) {
+    out.push({
+      kind: "col",
+      table: tableNameFor(node.table),
+      prop: toCamelCase(node.name),
+    });
+    return out;
   }
 
-  const name = String((columnChunk as { name?: string }).name);
-  return name ? toCamelCase(name) : null;
+  if (typeof node === "object" && "queryChunks" in node) {
+    const chunks = (node as { queryChunks?: unknown[] }).queryChunks ?? [];
+    for (const chunk of chunks) {
+      flattenSqlChunks(chunk, out);
+    }
+    return out;
+  }
+
+  if (typeof node === "object" && "value" in node) {
+    const rawVal = (node as { value?: unknown }).value;
+    if (Array.isArray(rawVal) && !("encoder" in node)) {
+      const text = rawVal.join("");
+      if (text.trim().length > 0) {
+        out.push({ kind: "op", text });
+      }
+      return out;
+    }
+    out.push({ kind: "val", value: rawVal });
+  }
+
+  return out;
 }
 
-function extractParamValue(condition: unknown): unknown {
-  if (!condition || typeof condition !== "object" || !("queryChunks" in condition)) {
-    return undefined;
+type TableRowContext = Record<string, Record<string, unknown>>;
+
+function resolveValue(token: FlatToken, ctx: TableRowContext, defaultTable: string): unknown {
+  if (token.kind === "val") return token.value;
+  if (token.kind === "col") {
+    const tableRecord = ctx[token.table] ?? ctx[defaultTable] ?? {};
+    return tableRecord[token.prop];
   }
-
-  const { queryChunks } = condition as { queryChunks?: unknown[] };
-  const paramChunk = queryChunks?.find(
-    (chunk) =>
-      !!chunk &&
-      typeof chunk === "object" &&
-      "value" in chunk &&
-      !("table" in chunk) &&
-      !("queryChunks" in chunk),
-  );
-
-  if (!paramChunk || typeof paramChunk !== "object" || !("value" in paramChunk)) {
-    return undefined;
-  }
-
-  return (paramChunk as { value?: unknown }).value;
+  return undefined;
 }
 
-function matchesCondition(record: Record<string, unknown>, condition: unknown): boolean {
-  if (!condition || typeof condition !== "object" || !("queryChunks" in condition)) {
-    return true;
+function compareValues(left: unknown, op: string, right: unknown): boolean {
+  const normalizedOp = op.trim();
+  const lNum = left instanceof Date ? left.getTime() : left;
+  const rNum = right instanceof Date ? right.getTime() : right;
+
+  switch (normalizedOp) {
+    case "=":
+      return lNum === rNum;
+    case "!=":
+    case "<>":
+      return lNum !== rNum;
+    case ">":
+      return Number(lNum) > Number(rNum);
+    case ">=":
+      return Number(lNum) >= Number(rNum);
+    case "<":
+      return Number(lNum) < Number(rNum);
+    case "<=":
+      return Number(lNum) <= Number(rNum);
+    default:
+      return lNum === rNum;
   }
+}
 
-  const { queryChunks } = condition as { queryChunks?: unknown[] };
-  const nested = (queryChunks ?? []).filter(
-    (chunk) => !!chunk && typeof chunk === "object" && "queryChunks" in chunk,
-  );
+function matchesConditionInContext(
+  ctx: TableRowContext,
+  defaultTable: string,
+  condition: unknown,
+): boolean {
+  if (!condition) return true;
+  const tokens = flattenSqlChunks(condition);
+  if (tokens.length === 0) return true;
 
-  if (nested.length > 0) {
-    return nested.every((chunk) => matchesCondition(record, chunk));
+  // Split by AND keywords while ignoring surrounding parentheses
+  const cleaned: FlatToken[] = [];
+  const clauses: FlatToken[][] = [];
+
+  for (const tok of tokens) {
+    if (tok.kind === "op") {
+      const parts = tok.text.split(/\band\b/i);
+      parts.forEach((part, index) => {
+        const trimmed = part.replace(/[()]/g, "").trim();
+        if (index > 0) {
+          if (cleaned.length > 0) clauses.push([...cleaned]);
+          cleaned.length = 0;
+        }
+        if (trimmed.length > 0) {
+          cleaned.push({ kind: "op", text: trimmed });
+        }
+      });
+    } else {
+      cleaned.push(tok);
+    }
   }
+  if (cleaned.length > 0) clauses.push(cleaned);
 
-  const columnName = extractColumnName(condition);
-  const paramValue = extractParamValue(condition);
+  return clauses.every((clause) => {
+    if (clause.length < 3) return true;
+    const [leftTok, opTok, rightTok] = clause;
+    if (!leftTok || !opTok || !rightTok || opTok.kind !== "op") return true;
+    const leftVal = resolveValue(leftTok, ctx, defaultTable);
+    const rightVal = resolveValue(rightTok, ctx, defaultTable);
+    return compareValues(leftVal, opTok.text, rightVal);
+  });
+}
 
-  if (!columnName || paramValue === undefined) {
-    return true;
+function evaluateSetValue(
+  rawValue: unknown,
+  row: Record<string, unknown>,
+  tableKey: string,
+): unknown {
+  if (!rawValue || typeof rawValue !== "object" || !("queryChunks" in rawValue)) {
+    return rawValue;
   }
-
-  const currentValue = record[columnName];
-  if (paramValue instanceof Date) {
-    return Number(currentValue ?? 0) > Number(paramValue);
+  const tokens = flattenSqlChunks(rawValue);
+  if (tokens.length >= 3 && tokens[0].kind === "col" && tokens[1].kind === "op") {
+    const base = Number(resolveValue(tokens[0], { [tableKey]: row }, tableKey) ?? 0);
+    const delta = Number(resolveValue(tokens[2], { [tableKey]: row }, tableKey) ?? 0);
+    const op = tokens[1].text.trim();
+    if (op === "+") return base + delta;
+    if (op === "-") return base - delta;
   }
+  return rawValue;
+}
 
-  return currentValue === paramValue;
+function projectRow(
+  selection: Record<string, unknown> | undefined,
+  ctx: TableRowContext,
+  defaultTable: string,
+): Record<string, unknown> {
+  if (!selection) {
+    return { ...(ctx[defaultTable] ?? {}) };
+  }
+  const result: Record<string, unknown> = {};
+  for (const [key, spec] of Object.entries(selection)) {
+    if (isDrizzleTable(spec)) {
+      const tbl = tableNameFor(spec);
+      result[key] = { ...(ctx[tbl] ?? {}) };
+    } else if (isDrizzleColumn(spec)) {
+      const tbl = tableNameFor(spec.table);
+      const prop = toCamelCase(spec.name);
+      result[key] = (ctx[tbl] ?? ctx[defaultTable] ?? {})[prop];
+    } else {
+      result[key] = spec;
+    }
+  }
+  return result;
+}
+
+function withLimit<T>(items: T[]): T[] & { limit: (count: number) => T[] } {
+  return Object.assign([...items], {
+    limit(count: number) {
+      return items.slice(0, count);
+    },
+  });
+}
+
+function sortDescendingByCreatedAt<T extends Record<string, unknown>>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : Number(a.createdAt ?? 0);
+    const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : Number(b.createdAt ?? 0);
+    return bTime - aTime;
+  });
+}
+
+type MockState = {
+  users: Array<Record<string, unknown>>;
+  sessions: Array<Record<string, unknown>>;
+  orders: Array<Record<string, unknown>>;
+  walletTransactions: Array<Record<string, unknown>>;
+  contactMessages: Array<Record<string, unknown>>;
+};
+
+const globalForDb = globalThis as typeof globalThis & {
+  __arenaNextJsPostgresqlPool?: Pool;
+  __arenaPryvaMockState?: MockState;
+};
+
+const mockState: MockState =
+  globalForDb.__arenaPryvaMockState ?? {
+    users: [],
+    sessions: [],
+    orders: [],
+    walletTransactions: [],
+    contactMessages: [],
+  };
+
+if (process.env.NODE_ENV !== "production") {
+  globalForDb.__arenaPryvaMockState = mockState;
 }
 
 function ensureDemoUser() {
   const state = mockState.users;
   if (!state.some((user) => user.email === "demo@pryva.ng")) {
+    const demoUserId = "demo-user";
     state.push({
-      id: "demo-user",
+      id: demoUserId,
       name: "Ada Demo",
       email: "demo@pryva.ng",
       passwordHash: hashPassword("pryva-demo-2026"),
       walletBalance: 25000,
       createdAt: new Date(),
     });
+    mockState.walletTransactions.push({
+      id: "demo-welcome-credit",
+      userId: demoUserId,
+      orderId: null,
+      type: "credit",
+      amount: 25000,
+      balanceAfter: 25000,
+      description: "Demo starter wallet credit",
+      reference: "TOP-DEMO01",
+      createdAt: new Date(),
+    });
   }
 }
 
-const mockState = {
-  users: [] as Array<Record<string, unknown>>,
-  sessions: [] as Array<Record<string, unknown>>,
-  orders: [] as Array<Record<string, unknown>>,
-  walletTransactions: [] as Array<Record<string, unknown>>,
-  contactMessages: [] as Array<Record<string, unknown>>,
-};
-
 ensureDemoUser();
+
+function buildQueryResult(
+  contexts: TableRowContext[],
+  selection: Record<string, unknown> | undefined,
+  defaultTable: string,
+) {
+  const projected = contexts.map((ctx) => projectRow(selection, ctx, defaultTable));
+  return Object.assign([...projected], {
+    orderBy() {
+      const sorted = sortDescendingByCreatedAt(projected);
+      return withLimit(sorted);
+    },
+    limit(count: number) {
+      return projected.slice(0, count);
+    },
+  });
+}
 
 const mockDb: any = {
   async execute() {
     return [{ "?column?": 1 }];
   },
-  select() {
+  select(selection?: Record<string, unknown>) {
     return {
       from(table: unknown) {
-        const rows = mockState[tableNameFor(table) as keyof typeof mockState] ?? [];
+        const baseKey = tableNameFor(table) as keyof MockState;
+        const baseRows = mockState[baseKey] ?? [];
+        const baseContexts: TableRowContext[] = baseRows.map((row) => ({ [baseKey]: row }));
 
-        return {
+        return Object.assign(buildQueryResult(baseContexts, selection, baseKey), {
           where(condition: unknown) {
-            const filtered = rows.filter((row) => matchesCondition(row, condition));
-            return {
-              orderBy() {
-                return { limit: (count: number) => filtered.slice(0, count) };
-              },
-              limit: (count: number) => filtered.slice(0, count),
-              innerJoin(joinTable: unknown) {
-                return {
-                  where(joinCondition: unknown) {
-                    const joinRows = filtered.flatMap((row) => {
-                      const joinData = mockState[tableNameFor(joinTable) as keyof typeof mockState] ?? [];
-                      return joinData
-                        .filter((candidate) => matchesCondition(candidate, joinCondition))
-                        .map((candidate) => ({ ...row, ...candidate }));
-                    });
-                    return { limit: (count: number) => joinRows.slice(0, count) };
-                  },
-                };
-              },
-            };
+            const filtered = baseContexts.filter((ctx) =>
+              matchesConditionInContext(ctx, baseKey, condition),
+            );
+            return buildQueryResult(filtered, selection, baseKey);
           },
-          orderBy() {
-            return { limit: (count: number) => rows.slice(0, count) };
-          },
-          limit: (count: number) => rows.slice(0, count),
-          innerJoin(joinTable: unknown) {
-            return {
-              where(joinCondition: unknown) {
-                const joinRows = rows.flatMap((row) => {
-                  const joinData = mockState[tableNameFor(joinTable) as keyof typeof mockState] ?? [];
-                  return joinData
-                    .filter((candidate) => matchesCondition(candidate, joinCondition))
-                    .map((candidate) => ({ ...row, ...candidate }));
-                });
-                return { limit: (count: number) => joinRows.slice(0, count) };
+          innerJoin(joinTable: unknown, onCondition?: unknown) {
+            const joinKey = tableNameFor(joinTable) as keyof MockState;
+            const joinRows = mockState[joinKey] ?? [];
+            const joinedContexts: TableRowContext[] = baseContexts.flatMap((ctx) =>
+              joinRows
+                .map((candidate) => ({ ...ctx, [joinKey]: candidate }))
+                .filter((combined) => matchesConditionInContext(combined, baseKey, onCondition)),
+            );
+
+            return Object.assign(buildQueryResult(joinedContexts, selection, baseKey), {
+              where(whereCondition: unknown) {
+                const filtered = joinedContexts.filter((ctx) =>
+                  matchesConditionInContext(ctx, baseKey, whereCondition),
+                );
+                return buildQueryResult(filtered, selection, baseKey);
               },
-            };
+            });
           },
-        };
+        });
       },
     };
   },
   insert(table: unknown) {
+    const tableKey = tableNameFor(table) as keyof MockState;
     return {
       values(value: Record<string, unknown>) {
-        return {
-          returning(select?: Record<string, unknown>) {
-            const rows = mockState[tableNameFor(table) as keyof typeof mockState] ?? [];
-            const row = { ...value, id: value.id ?? randomBytes(16).toString("hex"), createdAt: new Date() };
-            rows.push(row);
-            return [select ? { ...row, ...select } : row];
-          },
+        const rows = mockState[tableKey] ?? [];
+        const row: Record<string, unknown> = {
+          status: tableKey === "orders" ? "active" : tableKey === "contactMessages" ? "open" : undefined,
+          provider: tableKey === "orders" ? "simulated" : undefined,
+          walletBalance: tableKey === "users" ? 0 : undefined,
+          ...value,
+          id: value.id ?? randomBytes(16).toString("hex"),
+          createdAt: value.createdAt ?? new Date(),
         };
+        rows.push(row);
+
+        const insertedList = [{ ...row }];
+        return Object.assign(insertedList, {
+          returning(selection?: Record<string, unknown>) {
+            return [projectRow(selection, { [tableKey]: row }, tableKey)];
+          },
+        });
       },
     };
   },
   update(table: unknown) {
+    const tableKey = tableNameFor(table) as keyof MockState;
     return {
       set(updates: Record<string, unknown>) {
         return {
           where(condition: unknown) {
-            return {
-              returning() {
-                const rows = mockState[tableNameFor(table) as keyof typeof mockState] ?? [];
-                const matched = rows.filter((row) => matchesCondition(row, condition));
-                matched.forEach((row) => {
-                  Object.assign(row, updates);
-                });
-                return matched.map((row) => ({ ...row }));
+            const rows = mockState[tableKey] ?? [];
+            const matched = rows.filter((row) =>
+              matchesConditionInContext({ [tableKey]: row }, tableKey, condition),
+            );
+            matched.forEach((row) => {
+              for (const [k, v] of Object.entries(updates)) {
+                row[k] = evaluateSetValue(v, row, tableKey);
+              }
+            });
+
+            const updatedCopies = matched.map((row) => ({ ...row }));
+            return Object.assign(updatedCopies, {
+              returning(selection?: Record<string, unknown>) {
+                return matched.map((row) =>
+                  projectRow(selection, { [tableKey]: row }, tableKey),
+                );
               },
-            };
+            });
           },
         };
       },
     };
   },
   delete(table: unknown) {
+    const tableKey = tableNameFor(table) as keyof MockState;
     return {
       where(condition: unknown) {
-        const rows = mockState[tableNameFor(table) as keyof typeof mockState] ?? [];
-        const survivors = rows.filter((row) => !matchesCondition(row, condition));
-        mockState[tableNameFor(table) as keyof typeof mockState] = survivors;
+        const rows = mockState[tableKey] ?? [];
+        const survivors = rows.filter(
+          (row) => !matchesConditionInContext({ [tableKey]: row }, tableKey, condition),
+        );
+        mockState[tableKey] = survivors;
         return { rows: survivors };
       },
     };
@@ -218,10 +407,6 @@ const mockDb: any = {
   async transaction<T>(callback: (tx: typeof mockDb) => Promise<T> | T): Promise<T> {
     return await callback(mockDb);
   },
-};
-
-const globalForDb = globalThis as typeof globalThis & {
-  __arenaNextJsPostgresqlPool?: Pool;
 };
 
 export const pool = databaseUrl
