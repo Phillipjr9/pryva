@@ -56,10 +56,10 @@ export default async function DashboardOverviewPage() {
     getFleexaStatus(),
   ]);
 
-  const activeOrders = recentOrders.filter((order) => order.status === "active").length;
+  const activeOrders = recentOrders.filter((order: { status: string }) => order.status === "active").length;
   const refunded = recentOrders
-    .filter((order) => order.status === "refunded")
-    .reduce((sum, order) => sum + order.amount, 0);
+    .filter((order: { status: string }) => order.status === "refunded")
+    .reduce((sum: number, order: { amount: number }) => sum + order.amount, 0);
 
   const stats = [
     {
@@ -194,7 +194,7 @@ export default async function DashboardOverviewPage() {
             </div>
           ) : (
             <div className="mt-3 divide-y divide-line/80">
-              {recentOrders.map((order) => (
+              {recentOrders.map((order: { id: string; productName: string; planLabel: string; reference: string; amount: number; status: string; createdAt: Date | string }) => (
                 <Link
                   key={order.id}
                   href={`/dashboard/orders/${order.id}`}
@@ -267,7 +267,7 @@ export default async function DashboardOverviewPage() {
               <p className="mt-3 text-[0.8rem] text-ink-3">No transactions yet.</p>
             ) : (
               <div className="mt-3 grid gap-2">
-                {recentTx.map((tx) => (
+                {recentTx.map((tx: { id: string; description: string; amount: number; type: string; balanceAfter: number; reference: string; createdAt: Date | string }) => (
                   <div key={tx.id} className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-[0.78rem] font-medium text-ink">{tx.description}</p>

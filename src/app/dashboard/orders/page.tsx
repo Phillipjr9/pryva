@@ -29,7 +29,7 @@ export default async function OrdersPage() {
     .where(eq(orders.userId, user.id))
     .orderBy(desc(orders.createdAt));
 
-  const active = rows.filter((order) => order.status === "active").length;
+  const active = rows.filter((order: { status: string }) => order.status === "active").length;
 
   return (
     <div className="grid gap-4">
@@ -82,7 +82,7 @@ export default async function OrdersPage() {
             <span />
           </div>
           <div className="divide-y divide-line/80">
-            {rows.map((order) => (
+            {rows.map((order: { id: string; productName: string; planLabel: string; reference: string; amount: number; status: string; createdAt: Date | string }) => (
               <Link
                 key={order.id}
                 href={`/dashboard/orders/${order.id}`}

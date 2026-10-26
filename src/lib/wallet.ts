@@ -30,7 +30,7 @@ export class InsufficientFundsError extends Error {
 }
 
 export async function creditWallet(input: WalletEntryInput): Promise<number> {
-  return db.transaction(async (tx) => {
+  return db.transaction(async (tx: any) => {
     const [updated] = await tx
       .update(users)
       .set({ walletBalance: sql`${users.walletBalance} + ${input.amount}` })
@@ -54,7 +54,7 @@ export async function creditWallet(input: WalletEntryInput): Promise<number> {
 }
 
 export async function debitWallet(input: WalletEntryInput): Promise<number> {
-  return db.transaction(async (tx) => {
+  return db.transaction(async (tx: any) => {
     const [updated] = await tx
       .update(users)
       .set({ walletBalance: sql`${users.walletBalance} - ${input.amount}` })
