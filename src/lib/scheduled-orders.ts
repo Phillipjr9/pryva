@@ -73,6 +73,67 @@ export async function getUserScheduledOrders(userId: string) {
   });
 }
 
+export async function processScheduledOrder(scheduled: typeof scheduledOrders.$inferSelect): Promise<void> {
+  const plan = findPlan(scheduled.productSlug);
+  if (!plan) {
+    throw new Error("Invalid product");
+  }
+
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, scheduled.userId),
+  });
+
+  if (!user || user.walletBalance < plan.price) {
+    throw new Error("Insufficient balance");
+  }
+
+  await db.transaction(async (tx) => {
+    const newBalance = user.walletBalance - plan.price;
+
+    await tx.update(users).set({ walletBalance: newBalance }).where(eq(users.id, scheduled.userId));
+
+    const reference = `ORD-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+
+    const [order] = await tx
+      .insert(orders)
+      .values({
+        reference,
+        userId: scheduled.userId,
+        service: scheduled.service,
+        productSlug: scheduled.productSlug,
+        productName: plan.name,
+        planLabel: plan.planLabel,
+        region: plan.region,
+        duration: plan.duration,
+        amount: plan.price,
+        status: "delivered",
+        provider: "scheduled",
+      })
+      .returning();
+
+    await tx.insert(walletTransactions).values({
+      userId: scheduled.userId,
+      orderId: order.id,
+      type: "debit",
+      amount: plan.price,
+      balanceAfter: newBalance,
+      description: `Scheduled purchase: ${plan.name}`,
+      reference,
+    });
+
+    const nextRunAt = calculateNextRun(scheduled.frequency as Frequency);
+
+    await tx
+      .update(scheduledOrders)
+      .set({
+        lastRunAt: new Date(),
+        lastOrderId: order.id,
+        nextRunAt,
+      })
+      .where(eq(scheduledOrders.id, scheduled.id));
+  });
+}
+
 export async function processScheduledOrders(): Promise<number> {
   const now = new Date();
   const dueOrders = await db.query.scheduledOrders.findMany({
