@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Lock, Shield, Sparkle } from "@/components/icons";
 import { formatNaira, type Plan } from "@/lib/catalog";
+import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
+import { PaymentLoading } from "@/components/ui/PaymentLoading";
 
 type Group = { label: string; plans: Plan[] };
 
@@ -78,6 +80,17 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
       setPending(false);
     }
   }
+
+  return (
+    <>
+      <PaymentLoading show={pending} message="Processing your order..." />
+      <PaymentSuccess
+        show={!!success}
+        title="Order Placed Successfully!"
+        message={`${success?.name} is now in your dashboard.`}
+        redirectUrl={`/dashboard/orders/${success?.id}`}
+        redirectDelay={2500}
+      />
 
   if (success) {
     return (
@@ -268,5 +281,6 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
         </div>
       </div>
     </div>
+    </>
   );
 }

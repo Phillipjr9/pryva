@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { type DigitalService } from "@/lib/digital-services";
 import { formatNaira } from "@/lib/catalog";
-import { Confetti } from "@/components/ui/Confetti";
 import { ServiceIcon } from "@/components/ServiceIcon";
+import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
+import { PaymentLoading } from "@/components/ui/PaymentLoading";
 import type { User } from "@/db/schema";
 
 interface DigitalServicesFormProps {
@@ -17,7 +18,6 @@ export function DigitalServicesForm({ user, service }: DigitalServicesFormProps)
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showConfetti, setShowConfetti] = useState(false);
 
   const selectedPlanData = service.plans.find((p) => p.id === selectedPlan);
 
@@ -44,12 +44,7 @@ export function DigitalServicesForm({ user, service }: DigitalServicesFormProps)
       }
 
       setSuccess(true);
-      setShowConfetti(true);
       setSelectedPlan(null);
-
-      setTimeout(() => {
-        setShowConfetti(false);
-      }, 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Purchase failed");
     } finally {
@@ -57,33 +52,18 @@ export function DigitalServicesForm({ user, service }: DigitalServicesFormProps)
     }
   }
 
-  if (success) {
-    return (
-      <div className="space-y-6">
-        <Confetti trigger={showConfetti} />
-        <div className="card p-8 text-center">
-          <div className="text-6xl mb-4">🎉</div>
-          <h2 className="text-2xl font-bold text-ink mb-2">Purchase Successful!</h2>
-          <p className="text-ink-2 mb-6">
-            Your account credentials will be sent to your email within 5 minutes.
-          </p>
-          <button
-            onClick={() => {
-              setSuccess(false);
-              setError(null);
-            }}
-            className="btn btn-primary"
-          >
-            Buy Another
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4 mb-6">
+    <>
+      <PaymentLoading show={loading} message="Processing your purchase..." />
+      <PaymentSuccess
+        show={success}
+        title="Purchase Successful!"
+        message="Your account credentials will be sent to your email within 5 minutes."
+        redirectUrl="/dashboard"
+        redirectDelay={2500}
+      />
+      <div className="space-y-6">
+        <div className="flex items-center gap-4 mb-6">
         <a href="/dashboard/digital" className="text-ink-3 hover:text-ink">
           ← Back
         </a>
@@ -194,5 +174,6 @@ export function DigitalServicesForm({ user, service }: DigitalServicesFormProps)
         {loading ? "Processing..." : selectedPlan ? `Purchase for ${formatNaira(selectedPlanData?.price || 0)}` : "Select a Plan"}
       </button>
     </div>
+    </>
   );
 }
