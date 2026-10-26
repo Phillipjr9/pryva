@@ -35,6 +35,22 @@ export async function requestIsSecure(): Promise<boolean> {
   return process.env.NODE_ENV === "production";
 }
 
+async function isCrossSiteIframeRequest(request?: Request): Promise<boolean> {
+  try {
+    if (request) {
+      const site = request.headers.get("sec-fetch-site");
+      const dest = request.headers.get("sec-fetch-dest");
+      if (site === "cross-site" || dest === "iframe") return true;
+    }
+    const headerList = await headers();
+    const site = headerList.get("sec-fetch-site");
+    const dest = headerList.get("sec-fetch-dest");
+    return site === "cross-site" || dest === "iframe";
+  } catch {
+    return false;
+  }
+}
+
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
   const derived = scryptSync(password, salt, 64).toString("hex");
@@ -69,11 +85,13 @@ export async function createSession(userId: string, request?: Request): Promise<
   await db.insert(sessions).values({ token, userId, expiresAt });
 
   const secure = request ? requestProto(request) === "https" : await requestIsSecure();
+  const useCrossSiteCookie = secure && (await isCrossSiteIframeRequest(request));
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: useCrossSiteCookie ? "none" : "lax",
     secure,
+    ...(useCrossSiteCookie ? { partitioned: true } : {}),
     path: "/",
     expires: expiresAt,
   });
@@ -111,7 +129,16 @@ export async function destroySession(): Promise<void> {
   if (token) {
     await db.delete(sessions).where(eq(sessions.token, token));
   }
-  jar.delete(SESSION_COOKIE);
+  const secure = await requestIsSecure();
+  const useCrossSiteCookie = secure && (await isCrossSiteIframeRequest());
+  jar.set(SESSION_COOKIE, "", {
+    httpOnly: true,
+    sameSite: useCrossSiteCookie ? "none" : "lax",
+    secure,
+    ...(useCrossSiteCookie ? { partitioned: true } : {}),
+    path: "/",
+    maxAge: 0,
+  });
 }
 
 export function normalizeEmail(email: string): string {

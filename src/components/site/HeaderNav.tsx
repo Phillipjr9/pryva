@@ -48,13 +48,14 @@ export function HeaderNav({ user }: { user: NavUser }) {
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <header
-      className={`sticky top-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? "border-b border-line/80 bg-cream/85 backdrop-blur-xl"
-          : "border-b border-transparent bg-transparent"
-      }`}
-    >
+    <>
+      <header
+        className={`sticky top-0 z-50 transition-all duration-300 ${
+          scrolled
+            ? "border-b border-line/80 bg-cream/85 backdrop-blur-xl"
+            : "border-b border-transparent bg-transparent"
+        }`}
+      >
       <div className="shell flex h-[74px] items-center justify-between gap-4">
         <Logo tagline={false} />
 
@@ -160,6 +161,7 @@ export function HeaderNav({ user }: { user: NavUser }) {
           <Menu className="h-5 w-5" />
         </button>
       </div>
+      </header>
 
       {open && (
         <div className="fixed inset-0 z-[60] bg-cream lg:hidden">
@@ -226,6 +228,6 @@ export function HeaderNav({ user }: { user: NavUser }) {
           </div>
         </div>
       )}
-    </header>
+    </>
   );
 }

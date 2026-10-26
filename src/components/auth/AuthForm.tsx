@@ -59,9 +59,24 @@ export function AuthForm({
     }
   }
 
-  // The demo runs as a plain HTML form post to /api/auth/demo-web, which
-  // returns a real 303 redirect — dependable in every browser, including
-  // when JavaScript is slow to hydrate.
+  async function submitDemo(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending("demo");
+    setError(null);
+    try {
+      const response = await fetch("/api/auth/demo", { method: "POST" });
+      const data = (await response.json()) as { ok?: boolean; error?: string };
+      if (!response.ok || !data.ok) {
+        setError(data.error ?? "The demo could not open right now. Please try again.");
+        setPending(null);
+        return;
+      }
+      window.location.replace(next);
+    } catch {
+      setError("Network hiccup. Please try again.");
+      setPending(null);
+    }
+  }
 
   return (
     <div>
@@ -83,9 +98,10 @@ export function AuthForm({
         <form
           action="/api/auth/demo-web"
           method="post"
-          onSubmit={() => setPending("demo")}
+          onSubmit={submitDemo}
           className="mt-2.5"
         >
+          <input type="hidden" name="next" value={next} />
           <button
             type="submit"
             disabled={pending !== null}
