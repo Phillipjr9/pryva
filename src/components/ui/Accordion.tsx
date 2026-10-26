@@ -24,21 +24,21 @@ export function AccordionItem({ title, children, defaultOpen = false, className 
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className={cn("rounded-xl border border-line bg-white dark:bg-gray-800 dark:border-gray-700", className)}>
+    <div className={cn("rounded-xl border border-line bg-white", className)}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex w-full items-center justify-between px-4 py-3 text-left"
       >
-        <span className="text-[0.95rem] font-semibold text-ink dark:text-gray-100">{title}</span>
+        <span className="text-[0.95rem] font-semibold text-ink">{title}</span>
         <ChevronDown
           className={cn(
-            "h-5 w-5 text-ink-2 transition-transform dark:text-gray-400",
+            "h-5 w-5 text-ink-2 transition-transform",
             isOpen && "rotate-180"
           )}
         />
       </button>
       {isOpen && (
-        <div className="px-4 pb-4 text-[0.9rem] text-ink-2 leading-relaxed dark:text-gray-400">
+        <div className="px-4 pb-4 text-[0.9rem] text-ink-2 leading-relaxed">
           {children}
         </div>
       )}

@@ -11,10 +11,10 @@ export default async function SettingsPage() {
     <DashboardShell user={user}>
       <div className="space-y-6">
         <div>
-          <h1 className="text-[1.75rem] font-medium tracking-tight text-ink dark:text-gray-100">
+          <h1 className="text-[1.75rem] font-medium tracking-tight text-ink">
             Settings
           </h1>
-          <p className="mt-2 text-[0.95rem] text-ink-2 dark:text-gray-400">
+          <p className="mt-2 text-[0.95rem] text-ink-2">
             Manage your account settings and preferences.
           </p>
         </div>

@@ -98,24 +98,24 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/50 p-4 pt-[20vh] backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-2xl border border-line bg-white shadow-[var(--shadow-float)] dark:bg-gray-900 dark:border-gray-700">
-        <div className="flex items-center gap-3 border-b border-line px-4 py-3 dark:border-gray-700">
-          <Search className="h-5 w-5 text-ink-2 dark:text-gray-400" />
+      <div className="w-full max-w-2xl rounded-2xl border border-line bg-white shadow-[var(--shadow-float)]">
+        <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+          <Search className="h-5 w-5 text-ink-2" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Type a command..."
-            className="flex-1 bg-transparent text-[0.95rem] text-ink outline-none placeholder:text-ink-3 dark:text-gray-100 dark:placeholder:text-gray-500"
+            className="flex-1 bg-transparent text-[0.95rem] text-ink outline-none placeholder:text-ink-3"
             autoFocus
           />
-          <kbd className="rounded border border-line bg-cream px-2 py-0.5 text-[0.7rem] font-medium text-ink-2 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400">
+          <kbd className="rounded border border-line bg-cream px-2 py-0.5 text-[0.7rem] font-medium text-ink-2">
             ESC
           </kbd>
         </div>
         <div className="max-h-[400px] overflow-y-auto p-2">
           {filteredCommands.length === 0 ? (
-            <div className="px-4 py-8 text-center text-[0.9rem] text-ink-2 dark:text-gray-400">
+            <div className="px-4 py-8 text-center text-[0.9rem] text-ink-2">
               No commands found
             </div>
           ) : (
@@ -129,10 +129,10 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                       cmd.action();
                       onClose();
                     }}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-cream dark:hover:bg-gray-800"
+                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-cream"
                   >
-                    <Icon className="h-5 w-5 text-ink-2 dark:text-gray-400" />
-                    <span className="text-[0.9rem] font-medium text-ink dark:text-gray-100">
+                    <Icon className="h-5 w-5 text-ink-2" />
+                    <span className="text-[0.9rem] font-medium text-ink">
                       {cmd.label}
                     </span>
                   </button>
@@ -162,11 +162,11 @@ export function CommandPaletteTrigger({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="hidden items-center gap-2 rounded-full border border-line bg-white/70 px-3.5 py-2 text-[0.82rem] font-medium text-ink-2 transition-colors hover:bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 lg:flex"
+      className="hidden items-center gap-2 rounded-full border border-line bg-white/70 px-3.5 py-2 text-[0.82rem] font-medium text-ink-2 transition-colors hover:bg-white lg:flex"
     >
       <Search className="h-4 w-4" />
       <span>Search...</span>
-      <kbd className="rounded border border-line bg-cream px-1.5 py-0.5 text-[0.65rem] font-semibold text-ink-3 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-500">
+      <kbd className="rounded border border-line bg-cream px-1.5 py-0.5 text-[0.65rem] font-semibold text-ink-3">
         ⌘K
       </kbd>
     </button>

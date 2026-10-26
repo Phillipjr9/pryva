@@ -92,38 +92,38 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
       className={cn(
         "flex items-start gap-3 rounded-xl border p-4 shadow-lg animate-in slide-in-from-right",
         {
-          "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20": toast.type === "success",
-          "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20": toast.type === "error",
-          "border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20": toast.type === "warning",
-          "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20": toast.type === "info",
+          "border-green-200 bg-green-50": toast.type === "success",
+          "border-red-200 bg-red-50": toast.type === "error",
+          "border-yellow-200 bg-yellow-50": toast.type === "warning",
+          "border-blue-200 bg-blue-50": toast.type === "info",
         }
       )}
     >
       <Icon
         className={cn("h-5 w-5 shrink-0 mt-0.5", {
-          "text-green-600 dark:text-green-400": toast.type === "success",
-          "text-red-600 dark:text-red-400": toast.type === "error",
-          "text-yellow-600 dark:text-yellow-400": toast.type === "warning",
-          "text-blue-600 dark:text-blue-400": toast.type === "info",
+          "text-green-600": toast.type === "success",
+          "text-red-600": toast.type === "error",
+          "text-yellow-600": toast.type === "warning",
+          "text-blue-600": toast.type === "info",
         })}
       />
       <p
         className={cn("flex-1 text-[0.86rem]", {
-          "text-green-700 dark:text-green-300": toast.type === "success",
-          "text-red-700 dark:text-red-300": toast.type === "error",
-          "text-yellow-700 dark:text-yellow-300": toast.type === "warning",
-          "text-blue-700 dark:text-blue-300": toast.type === "info",
+          "text-green-700": toast.type === "success",
+          "text-red-700": toast.type === "error",
+          "text-yellow-700": toast.type === "warning",
+          "text-blue-700": toast.type === "info",
         })}
       >
         {toast.message}
       </p>
       <button
         onClick={onClose}
-        className={cn("shrink-0 rounded-lg p-1 hover:bg-black/5 dark:hover:bg-white/5", {
-          "text-green-600 dark:text-green-400": toast.type === "success",
-          "text-red-600 dark:text-red-400": toast.type === "error",
-          "text-yellow-600 dark:text-yellow-400": toast.type === "warning",
-          "text-blue-600 dark:text-blue-400": toast.type === "info",
+        className={cn("shrink-0 rounded-lg p-1 hover:bg-black/5", {
+          "text-green-600": toast.type === "success",
+          "text-red-600": toast.type === "error",
+          "text-yellow-600": toast.type === "warning",
+          "text-blue-600": toast.type === "info",
         })}
       >
         <Close className="h-4 w-4" />

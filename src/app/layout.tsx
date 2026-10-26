@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -51,7 +50,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </noscript>
       </head>
       <body className="min-h-screen bg-cream text-ink antialiased">
-        <ThemeProvider>{children}</ThemeProvider>
+        {children}
       </body>
     </html>
   );

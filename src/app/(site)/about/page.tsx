@@ -40,9 +40,9 @@ const stats = [
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-cream dark:bg-gray-900">
+    <div className="min-h-screen bg-cream">
       {/* Header */}
-      <header className="border-b border-line bg-white dark:bg-gray-800 dark:border-gray-700">
+      <header className="border-b border-line bg-white">
         <div className="shell flex h-16 items-center justify-between">
           <Link href="/">
             <Logo />
@@ -50,13 +50,13 @@ export default function AboutPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="text-[0.86rem] font-medium text-ink-2 hover:text-ink dark:text-gray-400 dark:hover:text-gray-100"
+              className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"
             >
               Sign in
             </Link>
             <Link
               href="/signup"
-              className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700 dark:bg-lav-500 dark:hover:bg-lav-600"
+              className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700"
             >
               Get Started
             </Link>
@@ -67,12 +67,12 @@ export default function AboutPage() {
       {/* Hero */}
       <section className="py-16 sm:py-24">
         <div className="shell text-center">
-          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3.5rem] dark:text-gray-100">
+          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3.5rem]">
             Simplifying digital services
             <br />
-            <span className="text-lav-600 dark:text-lav-400">for Nigerians</span>
+            <span className="text-lav-600">for Nigerians</span>
           </h1>
-          <p className="mt-6 text-[1.1rem] text-ink-2 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
+          <p className="mt-6 text-[1.1rem] text-ink-2 max-w-2xl mx-auto leading-relaxed">
             Pryva was built to solve a simple problem: accessing virtual numbers, eSIMs, and other digital services shouldn't be complicated or expensive. We're making it easy for Nigerians to connect globally.
           </p>
         </div>
@@ -85,10 +85,10 @@ export default function AboutPage() {
             {stats.map((stat) => (
               <div
                 key={stat.label}
-                className="rounded-2xl border border-line bg-white p-6 text-center dark:bg-gray-800 dark:border-gray-700"
+                className="rounded-2xl border border-line bg-white p-6 text-center"
               >
-                <p className="text-[2.5rem] font-bold text-lav-600 dark:text-lav-400">{stat.value}</p>
-                <p className="text-[0.9rem] text-ink-2 dark:text-gray-400 mt-2">{stat.label}</p>
+                <p className="text-[2.5rem] font-bold text-lav-600">{stat.value}</p>
+                <p className="text-[0.9rem] text-ink-2 mt-2">{stat.label}</p>
               </div>
             ))}
           </div>
@@ -98,10 +98,10 @@ export default function AboutPage() {
       {/* Our Story */}
       <section className="pb-16">
         <div className="shell max-w-3xl">
-          <h2 className="text-[2rem] font-medium tracking-tight text-ink mb-6 dark:text-gray-100">
+          <h2 className="text-[2rem] font-medium tracking-tight text-ink mb-6">
             Our Story
           </h2>
-          <div className="space-y-4 text-[1rem] text-ink-2 leading-relaxed dark:text-gray-400">
+          <div className="space-y-4 text-[1rem] text-ink-2 leading-relaxed">
             <p>
               Pryva started with a simple observation: Nigerians face unnecessary friction when trying to access global digital services. Whether it's verifying accounts on international platforms, staying connected while traveling, or accessing services that require non-Nigerian phone numbers, the process was often complicated, expensive, or simply unavailable.
             </p>
@@ -118,7 +118,7 @@ export default function AboutPage() {
       {/* Values */}
       <section className="pb-16">
         <div className="shell">
-          <h2 className="text-[2rem] font-medium tracking-tight text-ink mb-8 text-center dark:text-gray-100">
+          <h2 className="text-[2rem] font-medium tracking-tight text-ink mb-8 text-center">
             Our Values
           </h2>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -127,15 +127,15 @@ export default function AboutPage() {
               return (
                 <div
                   key={value.title}
-                  className="rounded-2xl border border-line bg-white p-6 dark:bg-gray-800 dark:border-gray-700"
+                  className="rounded-2xl border border-line bg-white p-6"
                 >
-                  <div className="grid h-12 w-12 place-items-center rounded-xl bg-lav-100 text-lav-600 mb-4 dark:bg-lav-900/30 dark:text-lav-400">
+                  <div className="grid h-12 w-12 place-items-center rounded-xl bg-lav-100 text-lav-600 mb-4">
                     <Icon className="h-6 w-6" />
                   </div>
-                  <h3 className="text-[1.1rem] font-semibold text-ink mb-2 dark:text-gray-100">
+                  <h3 className="text-[1.1rem] font-semibold text-ink mb-2">
                     {value.title}
                   </h3>
-                  <p className="text-[0.86rem] text-ink-2 leading-relaxed dark:text-gray-400">
+                  <p className="text-[0.86rem] text-ink-2 leading-relaxed">
                     {value.description}
                   </p>
                 </div>
@@ -148,16 +148,16 @@ export default function AboutPage() {
       {/* CTA */}
       <section className="pb-16">
         <div className="shell">
-          <div className="rounded-2xl border border-line bg-white p-8 text-center dark:bg-gray-800 dark:border-gray-700">
-            <h2 className="text-[1.75rem] font-semibold text-ink mb-3 dark:text-gray-100">
+          <div className="rounded-2xl border border-line bg-white p-8 text-center">
+            <h2 className="text-[1.75rem] font-semibold text-ink mb-3">
               Ready to get started?
             </h2>
-            <p className="text-[0.95rem] text-ink-2 mb-6 max-w-md mx-auto dark:text-gray-400">
+            <p className="text-[0.95rem] text-ink-2 mb-6 max-w-md mx-auto">
               Join thousands of Nigerians using Pryva for their digital service needs.
             </p>
             <Link
               href="/signup"
-              className="inline-flex items-center gap-2 rounded-xl bg-lav-600 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-700 dark:bg-lav-500 dark:hover:bg-lav-600"
+              className="inline-flex items-center gap-2 rounded-xl bg-lav-600 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-700"
             >
               Create Your Account
             </Link>

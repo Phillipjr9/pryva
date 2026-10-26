@@ -67,9 +67,9 @@ const posts = [
 
 export default function BlogPage() {
   return (
-    <div className="min-h-screen bg-cream dark:bg-gray-900">
+    <div className="min-h-screen bg-cream">
       {/* Header */}
-      <header className="border-b border-line bg-white dark:bg-gray-800 dark:border-gray-700">
+      <header className="border-b border-line bg-white">
         <div className="shell flex h-16 items-center justify-between">
           <Link href="/">
             <Logo />
@@ -77,13 +77,13 @@ export default function BlogPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="text-[0.86rem] font-medium text-ink-2 hover:text-ink dark:text-gray-400 dark:hover:text-gray-100"
+              className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"
             >
               Sign in
             </Link>
             <Link
               href="/signup"
-              className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700 dark:bg-lav-500 dark:hover:bg-lav-600"
+              className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700"
             >
               Get Started
             </Link>
@@ -94,10 +94,10 @@ export default function BlogPage() {
       {/* Hero */}
       <section className="py-16">
         <div className="shell text-center">
-          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem] dark:text-gray-100">
+          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem]">
             Pryva Blog
           </h1>
-          <p className="mt-4 text-[1.1rem] text-ink-2 dark:text-gray-400 max-w-2xl mx-auto">
+          <p className="mt-4 text-[1.1rem] text-ink-2 max-w-2xl mx-auto">
             News, updates, and guides to help you get the most out of Pryva.
           </p>
         </div>
@@ -111,20 +111,20 @@ export default function BlogPage() {
               <Link
                 key={post.slug}
                 href={`/blog/${post.slug}`}
-                className="group rounded-2xl border border-line bg-white p-6 transition-all hover:shadow-[var(--shadow-card)] dark:bg-gray-800 dark:border-gray-700"
+                className="group rounded-2xl border border-line bg-white p-6 transition-all hover:shadow-[var(--shadow-card)]"
               >
                 <div className="mb-4">
-                  <span className="inline-block rounded-full bg-lav-100 px-3 py-1 text-[0.72rem] font-semibold text-lav-700 dark:bg-lav-900/30 dark:text-lav-300">
+                  <span className="inline-block rounded-full bg-lav-100 px-3 py-1 text-[0.72rem] font-semibold text-lav-700">
                     {post.category}
                   </span>
                 </div>
-                <h2 className="text-[1.1rem] font-semibold text-ink mb-3 group-hover:text-lav-600 dark:text-gray-100 dark:group-hover:text-lav-400">
+                <h2 className="text-[1.1rem] font-semibold text-ink mb-3 group-hover:text-lav-600">
                   {post.title}
                 </h2>
-                <p className="text-[0.86rem] text-ink-2 mb-4 line-clamp-3 dark:text-gray-400">
+                <p className="text-[0.86rem] text-ink-2 mb-4 line-clamp-3">
                   {post.excerpt}
                 </p>
-                <div className="flex items-center gap-4 text-[0.78rem] text-ink-3 dark:text-gray-500">
+                <div className="flex items-center gap-4 text-[0.78rem] text-ink-3">
                   <span className="flex items-center gap-1">
                     <User className="h-3.5 w-3.5" />
                     {post.author}

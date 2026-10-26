@@ -106,9 +106,9 @@ const faqCategories = [
 
 export default function FAQPage() {
   return (
-    <div className="min-h-screen bg-cream dark:bg-gray-900">
+    <div className="min-h-screen bg-cream">
       {/* Header */}
-      <header className="border-b border-line bg-white dark:bg-gray-800 dark:border-gray-700">
+      <header className="border-b border-line bg-white">
         <div className="shell flex h-16 items-center justify-between">
           <Link href="/">
             <Logo />
@@ -116,13 +116,13 @@ export default function FAQPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="text-[0.86rem] font-medium text-ink-2 hover:text-ink dark:text-gray-400 dark:hover:text-gray-100"
+              className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"
             >
               Sign in
             </Link>
             <Link
               href="/signup"
-              className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700 dark:bg-lav-500 dark:hover:bg-lav-600"
+              className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700"
             >
               Get Started
             </Link>
@@ -133,10 +133,10 @@ export default function FAQPage() {
       {/* Hero */}
       <section className="py-16">
         <div className="shell text-center">
-          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem] dark:text-gray-100">
+          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem]">
             Frequently Asked Questions
           </h1>
-          <p className="mt-4 text-[1.1rem] text-ink-2 dark:text-gray-400 max-w-2xl mx-auto">
+          <p className="mt-4 text-[1.1rem] text-ink-2 max-w-2xl mx-auto">
             Find answers to common questions about Pryva and our services.
           </p>
         </div>
@@ -148,7 +148,7 @@ export default function FAQPage() {
           <div className="space-y-8">
             {faqCategories.map((category) => (
               <div key={category.title}>
-                <h2 className="text-[1.5rem] font-semibold text-ink mb-4 dark:text-gray-100">
+                <h2 className="text-[1.5rem] font-semibold text-ink mb-4">
                   {category.title}
                 </h2>
                 <Accordion>
@@ -167,16 +167,16 @@ export default function FAQPage() {
       {/* Contact CTA */}
       <section className="pb-16">
         <div className="shell">
-          <div className="max-w-2xl mx-auto rounded-2xl border border-line bg-white p-8 text-center dark:bg-gray-800 dark:border-gray-700">
-            <h2 className="text-[1.5rem] font-semibold text-ink mb-3 dark:text-gray-100">
+          <div className="max-w-2xl mx-auto rounded-2xl border border-line bg-white p-8 text-center">
+            <h2 className="text-[1.5rem] font-semibold text-ink mb-3">
               Still have questions?
             </h2>
-            <p className="text-[0.95rem] text-ink-2 mb-6 dark:text-gray-400">
+            <p className="text-[0.95rem] text-ink-2 mb-6">
               Can't find what you're looking for? Our support team is here to help.
             </p>
             <Link
               href="/contact"
-              className="inline-flex items-center gap-2 rounded-xl bg-lav-600 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-700 dark:bg-lav-500 dark:hover:bg-lav-600"
+              className="inline-flex items-center gap-2 rounded-xl bg-lav-600 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-700"
             >
               Contact Support
             </Link>

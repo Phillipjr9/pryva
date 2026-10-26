@@ -15,7 +15,7 @@ export function ThemeToggle({ variant = "icon", className = "" }: ThemeTogglePro
     return (
       <button
         onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        className={`grid h-10 w-10 place-items-center rounded-full border border-line bg-white/70 text-ink transition-colors hover:bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 ${className}`}
+        className={`grid h-10 w-10 place-items-center rounded-full border border-line bg-white/70 text-ink transition-colors hover:bg-white ${className}`}
         aria-label="Toggle theme"
       >
         {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
@@ -24,13 +24,13 @@ export function ThemeToggle({ variant = "icon", className = "" }: ThemeTogglePro
   }
 
   return (
-    <div className={`flex items-center gap-1 rounded-full border border-line bg-white/70 p-1 dark:bg-gray-800 dark:border-gray-700 ${className}`}>
+    <div className={`flex items-center gap-1 rounded-full border border-line bg-white/70 p-1 ${className}`}>
       <button
         onClick={() => setTheme("light")}
         className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.82rem] font-medium transition-colors ${
           theme === "light"
-            ? "bg-lav-100 text-lav-700 dark:bg-lav-900/30 dark:text-lav-300"
-            : "text-ink-2 hover:text-ink dark:text-gray-400 dark:hover:text-gray-100"
+            ? "bg-lav-100 text-lav-700"
+            : "text-ink-2 hover:text-ink"
         }`}
         aria-label="Light theme"
       >
@@ -41,8 +41,8 @@ export function ThemeToggle({ variant = "icon", className = "" }: ThemeTogglePro
         onClick={() => setTheme("dark")}
         className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.82rem] font-medium transition-colors ${
           theme === "dark"
-            ? "bg-lav-100 text-lav-700 dark:bg-lav-900/30 dark:text-lav-300"
-            : "text-ink-2 hover:text-ink dark:text-gray-400 dark:hover:text-gray-100"
+            ? "bg-lav-100 text-lav-700"
+            : "text-ink-2 hover:text-ink"
         }`}
         aria-label="Dark theme"
       >
@@ -53,8 +53,8 @@ export function ThemeToggle({ variant = "icon", className = "" }: ThemeTogglePro
         onClick={() => setTheme("system")}
         className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.82rem] font-medium transition-colors ${
           theme === "system"
-            ? "bg-lav-100 text-lav-700 dark:bg-lav-900/30 dark:text-lav-300"
-            : "text-ink-2 hover:text-ink dark:text-gray-400 dark:hover:text-gray-100"
+            ? "bg-lav-100 text-lav-700"
+            : "text-ink-2 hover:text-ink"
         }`}
         aria-label="System theme"
       >

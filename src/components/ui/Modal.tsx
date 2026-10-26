@@ -17,13 +17,13 @@ export function Modal({ isOpen, onClose, children, className }: ModalProps) {
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div
         className={cn(
-          "relative w-full max-w-lg rounded-2xl border border-line bg-white shadow-[var(--shadow-float)] dark:bg-gray-900 dark:border-gray-700",
+          "relative w-full max-w-lg rounded-2xl border border-line bg-white shadow-[var(--shadow-float)]",
           className
         )}
       >
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full text-ink-2 hover:bg-cream dark:text-gray-400 dark:hover:bg-gray-800"
+          className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full text-ink-2 hover:bg-cream"
           aria-label="Close modal"
         >
           <Close className="h-4 w-4" />
@@ -41,7 +41,7 @@ interface ModalHeaderProps {
 
 export function ModalHeader({ children, className }: ModalHeaderProps) {
   return (
-    <div className={cn("border-b border-line px-6 py-4 dark:border-gray-700", className)}>
+    <div className={cn("border-b border-line px-6 py-4", className)}>
       {children}
     </div>
   );
@@ -54,7 +54,7 @@ interface ModalTitleProps {
 
 export function ModalTitle({ children, className }: ModalTitleProps) {
   return (
-    <h2 className={cn("text-[1.25rem] font-semibold text-ink dark:text-gray-100", className)}>
+    <h2 className={cn("text-[1.25rem] font-semibold text-ink", className)}>
       {children}
     </h2>
   );
@@ -80,7 +80,7 @@ interface ModalFooterProps {
 
 export function ModalFooter({ children, className }: ModalFooterProps) {
   return (
-    <div className={cn("border-t border-line px-6 py-4 dark:border-gray-700", className)}>
+    <div className={cn("border-t border-line px-6 py-4", className)}>
       {children}
     </div>
   );

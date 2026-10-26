@@ -9,7 +9,7 @@ export function LoadingSpinner({ size = "md", className }: LoadingSpinnerProps) 
   return (
     <svg
       className={cn(
-        "animate-spin text-lav-600 dark:text-lav-400",
+        "animate-spin text-lav-600",
         {
           "h-4 w-4": size === "sm",
           "h-6 w-6": size === "md",
@@ -37,9 +37,9 @@ interface LoadingOverlayProps {
 export function LoadingOverlay({ message = "Loading..." }: LoadingOverlayProps) {
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="rounded-2xl bg-white p-8 text-center shadow-[var(--shadow-float)] dark:bg-gray-900">
+      <div className="rounded-2xl bg-white p-8 text-center shadow-[var(--shadow-float)]">
         <LoadingSpinner size="lg" />
-        <p className="mt-4 text-[0.9rem] text-ink-2 dark:text-gray-400">{message}</p>
+        <p className="mt-4 text-[0.9rem] text-ink-2">{message}</p>
       </div>
     </div>
   );
@@ -51,10 +51,10 @@ interface LoadingPageProps {
 
 export function LoadingPage({ message = "Loading..." }: LoadingPageProps) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-cream dark:bg-gray-900">
+    <div className="flex min-h-screen items-center justify-center bg-cream">
       <div className="text-center">
         <LoadingSpinner size="lg" />
-        <p className="mt-4 text-[0.9rem] text-ink-2 dark:text-gray-400">{message}</p>
+        <p className="mt-4 text-[0.9rem] text-ink-2">{message}</p>
       </div>
     </div>
   );

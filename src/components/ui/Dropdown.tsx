@@ -21,7 +21,7 @@ export function Dropdown({ trigger, children, align = "left", className }: Dropd
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
           <div
             className={cn(
-              "absolute z-20 mt-2 min-w-[200px] rounded-xl border border-line bg-white shadow-[var(--shadow-card)] dark:bg-gray-900 dark:border-gray-700",
+              "absolute z-20 mt-2 min-w-[200px] rounded-xl border border-line bg-white shadow-[var(--shadow-card)]",
               align === "right" ? "right-0" : "left-0",
               className
             )}
@@ -45,7 +45,7 @@ export function DropdownItem({ children, onClick, className }: DropdownItemProps
     <button
       onClick={onClick}
       className={cn(
-        "flex w-full items-center gap-3 px-4 py-3 text-left text-[0.86rem] font-medium text-ink transition-colors hover:bg-cream dark:text-gray-100 dark:hover:bg-gray-800",
+        "flex w-full items-center gap-3 px-4 py-3 text-left text-[0.86rem] font-medium text-ink transition-colors hover:bg-cream",
         className
       )}
     >
@@ -59,5 +59,5 @@ interface DropdownDividerProps {
 }
 
 export function DropdownDivider({ className }: DropdownDividerProps) {
-  return <div className={cn("border-t border-line dark:border-gray-700", className)} />;
+  return <div className={cn("border-t border-line", className)} />;
 }

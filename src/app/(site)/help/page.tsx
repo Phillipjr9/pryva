@@ -84,9 +84,9 @@ const faqs = [
 
 export default function HelpPage() {
   return (
-    <div className="min-h-screen bg-cream dark:bg-gray-900">
+    <div className="min-h-screen bg-cream">
       {/* Header */}
-      <header className="border-b border-line bg-white dark:bg-gray-800 dark:border-gray-700">
+      <header className="border-b border-line bg-white">
         <div className="shell flex h-16 items-center justify-between">
           <Link href="/">
             <Logo />
@@ -94,13 +94,13 @@ export default function HelpPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="text-[0.86rem] font-medium text-ink-2 hover:text-ink dark:text-gray-400 dark:hover:text-gray-100"
+              className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"
             >
               Sign in
             </Link>
             <Link
               href="/signup"
-              className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700 dark:bg-lav-500 dark:hover:bg-lav-600"
+              className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700"
             >
               Get Started
             </Link>
@@ -111,10 +111,10 @@ export default function HelpPage() {
       {/* Hero */}
       <section className="py-16 sm:py-20">
         <div className="shell text-center">
-          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem] dark:text-gray-100">
+          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem]">
             How can we help you?
           </h1>
-          <p className="mt-4 text-[1.1rem] text-ink-2 dark:text-gray-400 max-w-2xl mx-auto">
+          <p className="mt-4 text-[1.1rem] text-ink-2 max-w-2xl mx-auto">
             Find answers to common questions, learn how to use Pryva, and get support when you need it.
           </p>
         </div>
@@ -129,17 +129,17 @@ export default function HelpPage() {
               return (
                 <div
                   key={category.title}
-                  className="rounded-2xl border border-line bg-white p-6 dark:bg-gray-800 dark:border-gray-700"
+                  className="rounded-2xl border border-line bg-white p-6"
                 >
                   <div className="flex items-start gap-4 mb-4">
-                    <div className="grid h-12 w-12 place-items-center rounded-xl bg-lav-100 text-lav-600 dark:bg-lav-900/30 dark:text-lav-400">
+                    <div className="grid h-12 w-12 place-items-center rounded-xl bg-lav-100 text-lav-600">
                       <Icon className="h-6 w-6" />
                     </div>
                     <div>
-                      <h3 className="text-[1.1rem] font-semibold text-ink dark:text-gray-100">
+                      <h3 className="text-[1.1rem] font-semibold text-ink">
                         {category.title}
                       </h3>
-                      <p className="text-[0.86rem] text-ink-2 dark:text-gray-400">
+                      <p className="text-[0.86rem] text-ink-2">
                         {category.description}
                       </p>
                     </div>
@@ -149,7 +149,7 @@ export default function HelpPage() {
                       <li key={article}>
                         <a
                           href="#"
-                          className="flex items-center gap-2 text-[0.86rem] text-ink-2 hover:text-lav-600 dark:text-gray-400 dark:hover:text-lav-400"
+                          className="flex items-center gap-2 text-[0.86rem] text-ink-2 hover:text-lav-600"
                         >
                           <ArrowRight className="h-3 w-3" />
                           {article}
@@ -167,19 +167,19 @@ export default function HelpPage() {
       {/* FAQ */}
       <section className="pb-16">
         <div className="shell">
-          <h2 className="text-[1.75rem] font-medium tracking-tight text-ink mb-8 text-center dark:text-gray-100">
+          <h2 className="text-[1.75rem] font-medium tracking-tight text-ink mb-8 text-center">
             Frequently Asked Questions
           </h2>
           <div className="max-w-3xl mx-auto space-y-4">
             {faqs.map((faq, index) => (
               <div
                 key={index}
-                className="rounded-2xl border border-line bg-white p-6 dark:bg-gray-800 dark:border-gray-700"
+                className="rounded-2xl border border-line bg-white p-6"
               >
-                <h3 className="text-[1rem] font-semibold text-ink mb-2 dark:text-gray-100">
+                <h3 className="text-[1rem] font-semibold text-ink mb-2">
                   {faq.q}
                 </h3>
-                <p className="text-[0.9rem] text-ink-2 leading-relaxed dark:text-gray-400">
+                <p className="text-[0.9rem] text-ink-2 leading-relaxed">
                   {faq.a}
                 </p>
               </div>
@@ -191,16 +191,16 @@ export default function HelpPage() {
       {/* Contact Support */}
       <section className="pb-16">
         <div className="shell">
-          <div className="rounded-2xl border border-line bg-white p-8 text-center dark:bg-gray-800 dark:border-gray-700">
-            <h2 className="text-[1.5rem] font-semibold text-ink mb-3 dark:text-gray-100">
+          <div className="rounded-2xl border border-line bg-white p-8 text-center">
+            <h2 className="text-[1.5rem] font-semibold text-ink mb-3">
               Still need help?
             </h2>
-            <p className="text-[0.95rem] text-ink-2 mb-6 max-w-md mx-auto dark:text-gray-400">
+            <p className="text-[0.95rem] text-ink-2 mb-6 max-w-md mx-auto">
               Can't find what you're looking for? Our support team is here to help.
             </p>
             <Link
               href="/contact"
-              className="inline-flex items-center gap-2 rounded-xl bg-lav-600 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-700 dark:bg-lav-500 dark:hover:bg-lav-600"
+              className="inline-flex items-center gap-2 rounded-xl bg-lav-600 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-700"
             >
               Contact Support
               <ArrowRight className="h-4 w-4" />
