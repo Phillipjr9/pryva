@@ -1,6 +1,7 @@
 import { digitalServices } from "@/lib/digital-services";
 import Link from "next/link";
 import { formatNaira } from "@/lib/catalog";
+import { ServiceIcon, CategoryIcon } from "@/components/ServiceIcon";
 
 export const metadata = {
   title: "Digital Accounts — Netflix, Spotify, ChatGPT & More | Pryva",
@@ -9,10 +10,10 @@ export const metadata = {
 
 export default function DigitalServicesPage() {
   const categories = [
-    { slug: "streaming", name: "Streaming", icon: "🎬" },
-    { slug: "music", name: "Music", icon: "🎵" },
-    { slug: "productivity", name: "Productivity", icon: "💼" },
-    { slug: "gaming", name: "Gaming", icon: "🎮" },
+    { slug: "streaming", name: "Streaming", icon: "streaming" as const },
+    { slug: "music", name: "Music", icon: "music" as const },
+    { slug: "productivity", name: "Productivity", icon: "productivity" as const },
+    { slug: "gaming", name: "Gaming", icon: "gaming" as const },
   ];
 
   return (
@@ -31,24 +32,29 @@ export default function DigitalServicesPage() {
         </p>
       </div>
 
-      {/* Categories */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-12">
-        {categories.map((cat) => {
-          const count = digitalServices.filter((s) => s.category === cat.slug).length;
-          if (count === 0) return null;
-          
-          return (
-            <a
-              key={cat.slug}
-              href={`#${cat.slug}`}
-              className="card p-6 hover:scale-[1.02] transition-transform"
-            >
-              <div className="text-3xl mb-2">{cat.icon}</div>
-              <h3 className="text-lg font-semibold text-ink mb-1">{cat.name}</h3>
-              <p className="text-sm text-ink-3">{count} services</p>
-            </a>
-          );
-        })}
+      {/* Quick Navigation */}
+      <div className="mb-12">
+        <h2 className="text-sm font-semibold text-ink-3 uppercase tracking-wide mb-4">Browse by Category</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {categories.map((cat) => {
+            const count = digitalServices.filter((s) => s.category === cat.slug).length;
+            if (count === 0) return null;
+            
+            return (
+              <a
+                key={cat.slug}
+                href={`#${cat.slug}`}
+                className="card p-6 hover:scale-[1.02] transition-transform flex items-center gap-4"
+              >
+                <CategoryIcon category={cat.icon} size="md" />
+                <div>
+                  <h3 className="text-lg font-semibold text-ink mb-1">{cat.name}</h3>
+                  <p className="text-sm text-ink-3">{count} {count === 1 ? 'service' : 'services'}</p>
+                </div>
+              </a>
+            );
+          })}
+        </div>
       </div>
 
       {/* Services */}
@@ -59,15 +65,15 @@ export default function DigitalServicesPage() {
         return (
           <div key={cat.slug} id={cat.slug} className="mb-16">
             <h2 className="text-2xl font-bold text-ink mb-6 flex items-center gap-3">
-              <span className="text-3xl">{cat.icon}</span>
+              <CategoryIcon category={cat.icon} size="md" />
               {cat.name}
             </h2>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {services.map((service) => (
-                <div key={service.slug} className="card p-6">
+                <div key={service.slug} className="card p-6 hover:shadow-lg transition-shadow">
                   <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="text-4xl">{service.icon}</div>
+                    <div className="flex items-center gap-4">
+                      <ServiceIcon service={service.slug as any} size="lg" />
                       <div>
                         <h3 className="text-xl font-bold text-ink">{service.name}</h3>
                         <p className="text-sm text-ink-3">{service.plans.length} plans available</p>

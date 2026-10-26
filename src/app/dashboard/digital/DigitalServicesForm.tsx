@@ -4,6 +4,7 @@ import { useState } from "react";
 import { type DigitalService } from "@/lib/digital-services";
 import { formatNaira } from "@/lib/catalog";
 import { Confetti } from "@/components/ui/Confetti";
+import { ServiceIcon } from "@/components/ServiceIcon";
 import type { User } from "@/db/schema";
 
 interface DigitalServicesFormProps {
@@ -86,8 +87,8 @@ export function DigitalServicesForm({ user, service }: DigitalServicesFormProps)
         <a href="/dashboard/digital" className="text-ink-3 hover:text-ink">
           ← Back
         </a>
-        <div className="flex items-center gap-3">
-          <div className="text-4xl">{service.icon}</div>
+        <div className="flex items-center gap-4">
+          <ServiceIcon service={service.slug as any} size="lg" />
           <div>
             <h2 className="text-xl font-bold text-ink">{service.name}</h2>
             <p className="text-sm text-ink-3">{service.description}</p>
