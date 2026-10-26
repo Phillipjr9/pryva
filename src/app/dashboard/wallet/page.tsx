@@ -22,11 +22,11 @@ export default async function WalletPage() {
     .limit(40);
 
   const added = transactions
-    .filter((tx) => tx.type !== "debit")
-    .reduce((sum, tx) => sum + tx.amount, 0);
+    .filter((tx: { type: string }) => tx.type !== "debit")
+    .reduce((sum: number, tx: { amount: number }) => sum + tx.amount, 0);
   const spent = transactions
-    .filter((tx) => tx.type === "debit")
-    .reduce((sum, tx) => sum + tx.amount, 0);
+    .filter((tx: { type: string }) => tx.type === "debit")
+    .reduce((sum: number, tx: { amount: number }) => sum + tx.amount, 0);
 
   return (
     <div className="grid gap-4">
@@ -62,7 +62,7 @@ export default async function WalletPage() {
             <Refresh className="h-4 w-4 text-lav-600" />
           </div>
           <p className="mt-2 text-[1.55rem] font-semibold leading-none">{formatNaira(spent)}</p>
-          <p className="mt-2 text-[0.68rem] text-ink-3">Across {transactions.filter((tx) => tx.type === "debit").length} orders</p>
+          <p className="mt-2 text-[0.68rem] text-ink-3">Across {transactions.filter((tx: { type: string }) => tx.type === "debit").length} orders</p>
         </div>
       </div>
 
@@ -81,7 +81,7 @@ export default async function WalletPage() {
               </p>
             ) : (
               <div className="mt-3 max-h-[26rem] divide-y divide-line/80 overflow-y-auto pr-1">
-                {transactions.map((tx) => (
+                {transactions.map((tx: { id: string; description: string; amount: number; type: string; balanceAfter: number; reference: string; createdAt: Date | string }) => (
                   <div key={tx.id} className="flex items-start justify-between gap-3 py-2.5">
                     <div className="min-w-0">
                       <p className="truncate text-[0.82rem] font-medium text-ink">{tx.description}</p>

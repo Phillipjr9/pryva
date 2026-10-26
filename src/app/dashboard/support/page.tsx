@@ -69,7 +69,7 @@ export default async function SupportPage() {
               </p>
             ) : (
               <div className="mt-3 grid gap-2.5">
-                {messages.map((message) => (
+                {messages.map((message: { id: string; topic: string; status: string; message: string; createdAt: Date | string }) => (
                   <div key={message.id} className="rounded-xl border border-line bg-white p-3.5">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-[0.78rem] font-semibold text-ink">{message.topic}</p>
