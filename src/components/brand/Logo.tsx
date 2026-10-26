@@ -1,4 +1,4 @@
-import { useId } from "react";
+import Image from "next/image";
 import Link from "next/link";
 
 type LogoProps = {
@@ -9,8 +9,7 @@ type LogoProps = {
   href?: string | null;
 };
 
-const markPath = [
-  // Outer silhouette: a soft, confident P with a long rounded stem.
+const monochromeMarkPath = [
   "M 19.8 66",
   "C 13.9 66 9.8 62.1 9.8 56.2",
   "L 9.8 14.4",
@@ -22,7 +21,6 @@ const markPath = [
   "C 24.6 58.8 24.8 62.6 22.6 65.1",
   "C 22 65.8 20.9 66 19.8 66",
   "Z",
-  // Counter: kept generously open so the mark stays crisp at small sizes.
   "M 26 23.7",
   "C 26 20.3 28.1 17.9 31.8 17.9",
   "H 36.4",
@@ -40,12 +38,19 @@ export function Monogram({
   className?: string;
   tone?: "color" | "mono";
 }) {
-  const instanceId = useId().replace(/:/g, "");
-  const gradientId = `pryva-mark-gradient-${instanceId}`;
-  const sheenId = `pryva-mark-sheen-${instanceId}`;
-  const rimId = `pryva-mark-rim-${instanceId}`;
-  const shadowId = `pryva-mark-shadow-${instanceId}`;
-  const clipId = `pryva-mark-clip-${instanceId}`;
+  if (tone === "color") {
+    return (
+      <Image
+        src="/pryva-mark.png"
+        alt=""
+        width={1024}
+        height={1024}
+        sizes={className.includes("h-64") ? "256px" : "40px"}
+        className={`${className} object-contain`}
+        aria-hidden="true"
+      />
+    );
+  }
 
   return (
     <svg
@@ -56,92 +61,12 @@ export function Monogram({
       focusable="false"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {tone === "color" ? (
-        <>
-          <defs>
-            <linearGradient
-              id={gradientId}
-              x1="8"
-              y1="3"
-              x2="65"
-              y2="67"
-              gradientUnits="userSpaceOnUse"
-            >
-              <stop stopColor="#E9DFFC" />
-              <stop offset="0.3" stopColor="#CBB8F0" />
-              <stop offset="0.68" stopColor="#9B7DDD" />
-              <stop offset="1" stopColor="#7255B8" />
-            </linearGradient>
-            <linearGradient id={sheenId} x1="0" y1="0" x2="1" y2="0.2">
-              <stop stopColor="#FFFFFF" stopOpacity="0.48" />
-              <stop offset="0.38" stopColor="#FFFFFF" stopOpacity="0.15" />
-              <stop offset="0.76" stopColor="#FFFFFF" stopOpacity="0" />
-              <stop offset="1" stopColor="#4F3B83" stopOpacity="0.18" />
-            </linearGradient>
-            <linearGradient id={rimId} x1="0" y1="0" x2="1" y2="1">
-              <stop stopColor="#FFFFFF" stopOpacity="0.72" />
-              <stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0.28" />
-              <stop offset="1" stopColor="#FFFFFF" stopOpacity="0.08" />
-            </linearGradient>
-            <clipPath id={clipId}>
-              <path d={markPath} fillRule="evenodd" clipRule="evenodd" />
-            </clipPath>
-            <filter
-              id={shadowId}
-              x="-20%"
-              y="-15%"
-              width="145%"
-              height="150%"
-              colorInterpolationFilters="sRGB"
-            >
-              <feDropShadow
-                dx="0"
-                dy="1.2"
-                stdDeviation="1.25"
-                floodColor="#4F3B83"
-                floodOpacity="0.2"
-              />
-            </filter>
-          </defs>
-          <path
-            d={markPath}
-            fill={`url(#${gradientId})`}
-            fillRule="evenodd"
-            clipRule="evenodd"
-            filter={`url(#${shadowId})`}
-          />
-          <g clipPath={`url(#${clipId})`}>
-            <rect width="72" height="72" fill={`url(#${sheenId})`} />
-            <path
-              d="M 15.2 14.8 V 54.8 C 15.2 58.3 16.9 60.6 19.7 61.7"
-              fill="none"
-              stroke="#FFFFFF"
-              strokeOpacity="0.44"
-              strokeWidth="1.2"
-              strokeLinecap="round"
-            />
-            <path
-              d="M 16.1 11.3 C 17.7 9.1 19.9 8.2 23 8.2 H 36.2 C 48.4 8.2 56.4 14.3 59.6 23.8"
-              fill="none"
-              stroke="#FFFFFF"
-              strokeOpacity="0.35"
-              strokeWidth="0.9"
-              strokeLinecap="round"
-            />
-          </g>
-          <path
-            d={markPath}
-            fill="none"
-            stroke={`url(#${rimId})`}
-            strokeWidth="0.65"
-            strokeLinejoin="round"
-            fillRule="evenodd"
-            clipRule="evenodd"
-          />
-        </>
-      ) : (
-        <path d={markPath} fill="currentColor" fillRule="evenodd" clipRule="evenodd" />
-      )}
+      <path
+        d={monochromeMarkPath}
+        fill="currentColor"
+        fillRule="evenodd"
+        clipRule="evenodd"
+      />
     </svg>
   );
 }
