@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { BrandMark, hasBrand } from "@/components/brand/BrandMark";
@@ -33,6 +34,33 @@ const serviceIcons = {
   proxies: Globe,
   "email-otp": Mail,
 } satisfies Record<ServiceSlug, typeof Phone>;
+
+const servicePhotos: Record<ServiceSlug, { src: string; alt: string; width: number; height: number }> = {
+  numbers: {
+    src: "/images/landing/virtual-numbers.jpg",
+    alt: "Hands holding a smartphone beside an open laptop.",
+    width: 500,
+    height: 333,
+  },
+  esim: {
+    src: "/images/landing/travel-esim.jpg",
+    alt: "A traveler checking her phone while standing with a suitcase.",
+    width: 500,
+    height: 333,
+  },
+  proxies: {
+    src: "/images/landing/residential-proxies.jpg",
+    alt: "A professional working at a laptop in a bright office.",
+    width: 500,
+    height: 749,
+  },
+  "email-otp": {
+    src: "/images/landing/email-inbox.jpg",
+    alt: "A laptop, smartphone and tablet arranged on a home-office desk.",
+    width: 500,
+    height: 334,
+  },
+};
 
 const platforms = [
   "WhatsApp",
@@ -115,127 +143,63 @@ function WorkspacePreview() {
   return (
     <div className="relative mx-auto w-full max-w-[35rem]">
       <div className="pointer-events-none absolute -inset-5 rounded-[3rem] bg-gradient-to-br from-lav-200/75 via-white/20 to-peach/70 blur-2xl" />
-      <div className="relative rounded-[2rem] border border-white/90 bg-white/75 p-2.5 shadow-[var(--shadow-float)] backdrop-blur-xl sm:p-3.5">
-        <div className="overflow-hidden rounded-[1.5rem] bg-[#211a30] text-white">
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3.5 sm:px-5">
-            <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-xl bg-white/10">
-                <Monogram className="h-6 w-6" />
-              </span>
-              <div>
-                <p className="text-[0.78rem] font-semibold">Pryva workspace</p>
-                <p className="text-[0.62rem] text-white/50">Your digital toolkit</p>
-              </div>
-            </div>
-            <span className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[0.6rem] font-medium text-white/70">
-              Illustrative preview
-            </span>
-          </div>
+      <div className="relative aspect-[1.02] overflow-hidden rounded-[2rem] border border-white/90 bg-lav-100 shadow-[var(--shadow-float)] sm:aspect-[1.16]">
+        <Image
+          src="/images/landing/hero-remote-work.jpg"
+          alt="A professional working on a laptop while checking her phone in a bright workspace."
+          width={1124}
+          height={750}
+          priority
+          sizes="(min-width: 1024px) 42vw, 92vw"
+          className="absolute inset-0 h-full w-full object-cover object-left sm:object-[34%_center]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#211a30]/80 via-[#211a30]/5 to-[#211a30]/10" />
 
-          <div className="p-4 sm:p-5">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <p className="text-[0.65rem] font-medium text-white/50">MONDAY, 09:41 AM</p>
-                <p className="mt-1 text-[1.2rem] font-medium tracking-tight sm:text-[1.45rem]">
-                  Your workspace, at a glance.
-                </p>
-              </div>
-              <span className="hidden items-center gap-1.5 rounded-full bg-emerald-400/10 px-2.5 py-1.5 text-[0.62rem] font-medium text-emerald-200 sm:inline-flex">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" /> All systems ready
-              </span>
-            </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-[0.82fr_1.18fr]">
-              <div className="rounded-[1.2rem] border border-white/10 bg-white/[0.07] p-4">
-                <div className="flex items-center justify-between">
-                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-lav-300/15 text-lav-100">
-                    <Wallet className="h-4 w-4" />
-                  </span>
-                  <span className="text-[0.58rem] font-medium uppercase tracking-[0.12em] text-white/40">
-                    Wallet
-                  </span>
-                </div>
-                <p className="mt-5 text-[0.62rem] text-white/50">Available balance</p>
-                <p className="mt-1 text-[1.45rem] font-semibold tracking-tight">₦25,000</p>
-                <div className="mt-3 flex items-center gap-1.5 text-[0.62rem] text-emerald-200">
-                  <Check className="h-3 w-3" /> Ready to use
-                </div>
-              </div>
-
-              <div className="rounded-[1.2rem] border border-white/10 bg-white/[0.07] p-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-[0.62rem] font-medium uppercase tracking-[0.12em] text-white/45">
-                    Recent verification
-                  </p>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/10 px-2 py-1 text-[0.58rem] font-semibold text-emerald-200">
-                    <Check className="h-2.5 w-2.5" /> Ready
-                  </span>
-                </div>
-                <div className="mt-3 flex items-center justify-between rounded-xl border border-white/10 bg-[#171222] px-3 py-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-white text-[0.9rem] text-ink">
-                      🇳🇬
-                    </span>
-                    <div>
-                      <p className="text-[0.78rem] font-semibold">+234 812 445 9081</p>
-                      <p className="text-[0.6rem] text-white/45">WhatsApp · Nigeria</p>
-                    </div>
-                  </div>
-                  <ArrowUpRight className="h-3.5 w-3.5 text-white/45" />
-                </div>
-                <div className="mt-2.5 flex items-center justify-between rounded-xl bg-lav-300/10 px-3 py-2">
-                  <span className="text-[0.62rem] text-white/55">Verification code</span>
-                  <span className="font-mono text-[0.8rem] font-semibold tracking-[0.2em] text-lav-100">
-                    482 069
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {[
-                { icon: Sim, label: "Travel eSIM", detail: "190+ destinations" },
-                { icon: Globe, label: "Proxies", detail: "Residential IPs" },
-                { icon: Mail, label: "Email OTP", detail: "Private inboxes" },
-              ].map((item) => {
-                const Icon = item.icon;
-                return (
-                  <div
-                    key={item.label}
-                    className="rounded-xl border border-white/10 bg-white/[0.045] px-2.5 py-3 sm:px-3"
-                  >
-                    <Icon className="h-3.5 w-3.5 text-lav-200" />
-                    <p className="mt-2 text-[0.64rem] font-semibold sm:text-[0.7rem]">{item.label}</p>
-                    <p className="mt-0.5 hidden text-[0.58rem] text-white/40 sm:block">{item.detail}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+        <div className="absolute inset-x-4 top-4 flex items-center justify-between gap-2 sm:inset-x-5 sm:top-5">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/90 px-3 py-2 text-[0.7rem] font-semibold text-ink shadow-sm backdrop-blur">
+            <Monogram className="h-5 w-5" /> Pryva workspace
+          </span>
+          <span className="rounded-full border border-white/25 bg-ink/35 px-3 py-2 text-[0.62rem] font-medium text-white backdrop-blur">
+            Illustrative preview
+          </span>
         </div>
 
-        <div className="absolute -left-4 top-[28%] hidden rounded-2xl border border-white/90 bg-white/95 p-3 shadow-[var(--shadow-soft)] sm:block lg:-left-7">
-          <div className="flex items-center gap-2.5">
+        <div className="absolute bottom-5 left-5 max-w-[17rem] text-white sm:bottom-6 sm:left-6 sm:max-w-[17rem] xl:max-w-[19rem]">
+          <span className="text-[0.64rem] font-semibold uppercase tracking-[0.17em] text-white/75">
+            Numbers · eSIM · proxies · inboxes
+          </span>
+          <p className="mt-2 text-[1.7rem] font-medium leading-[1.04] tracking-tight sm:text-[2rem]">
+            Keep your digital tools close.
+          </p>
+          <p className="mt-2 max-w-xs text-[0.76rem] leading-relaxed text-white/75">
+            One calm workspace for the little things that keep you moving.
+          </p>
+        </div>
+
+        <div className="absolute right-3 top-[34%] hidden w-[10.75rem] rounded-2xl border border-white/80 bg-white/95 p-3 shadow-[var(--shadow-soft)] backdrop-blur sm:block lg:right-4">
+          <div className="flex items-center gap-2">
             <span className="grid h-8 w-8 place-items-center rounded-xl bg-emerald-50 text-emerald-700">
-              <Bolt className="h-4 w-4" />
+              <Check className="h-4 w-4" />
             </span>
             <div>
-              <p className="text-[0.68rem] font-semibold text-ink">Delivered in seconds</p>
-              <p className="text-[0.6rem] text-ink-3">No waiting around</p>
+              <p className="text-[0.68rem] font-semibold text-ink">Code received</p>
+              <p className="text-[0.59rem] text-ink-3">WhatsApp · Nigeria</p>
             </div>
           </div>
+          <p className="mt-2.5 rounded-lg bg-lav-50 px-2.5 py-2 text-center font-mono text-[0.88rem] font-semibold tracking-[0.18em] text-lav-800">
+            482 069
+          </p>
         </div>
 
-        <div className="absolute -right-3 bottom-[12%] hidden rounded-2xl border border-white/90 bg-white/95 p-3 shadow-[var(--shadow-soft)] sm:block lg:-right-6">
-          <div className="flex items-center gap-2.5">
-            <span className="grid h-8 w-8 place-items-center rounded-xl bg-lav-50 text-lav-700">
-              <Shield className="h-4 w-4" />
-            </span>
-            <div>
-              <p className="text-[0.68rem] font-semibold text-ink">Refund protection</p>
-              <p className="text-[0.6rem] text-ink-3">Built into eligible orders</p>
-            </div>
+        <div className="absolute bottom-4 right-3 hidden w-[10.75rem] rounded-2xl border border-white/80 bg-white/95 p-3 shadow-[var(--shadow-soft)] backdrop-blur sm:block lg:right-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[0.62rem] font-medium text-ink-3">Sample wallet</p>
+            <Wallet className="h-3.5 w-3.5 text-lav-700" />
           </div>
+          <p className="mt-1 text-[1.1rem] font-semibold tracking-tight text-ink">₦25,000</p>
+          <p className="mt-1 inline-flex items-center gap-1 text-[0.59rem] font-medium text-emerald-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Demo balance
+          </p>
         </div>
       </div>
     </div>
@@ -350,8 +314,22 @@ export default function HomePage() {
                 <Reveal key={service.slug} delay={index * 55}>
                   <Link
                     href={service.href}
-                    className="group flex h-full min-h-[15.5rem] flex-col rounded-[1.4rem] border border-line bg-[#fffdfa]/90 p-5 shadow-[0_16px_45px_-38px_rgba(72,52,120,0.55)] transition-all duration-300 hover:-translate-y-1 hover:border-lav-200 hover:bg-white hover:shadow-[var(--shadow-card)]"
+                    className="group flex h-full min-h-[25rem] flex-col rounded-[1.4rem] border border-line bg-[#fffdfa]/90 p-4 shadow-[0_16px_45px_-38px_rgba(72,52,120,0.55)] transition-all duration-300 hover:-translate-y-1 hover:border-lav-200 hover:bg-white hover:shadow-[var(--shadow-card)] sm:p-5"
                   >
+                    <div className="relative mb-4 h-36 overflow-hidden rounded-[1.05rem] bg-lav-50">
+                      <Image
+                        src={servicePhotos[service.slug].src}
+                        alt={servicePhotos[service.slug].alt}
+                        width={servicePhotos[service.slug].width}
+                        height={servicePhotos[service.slug].height}
+                        sizes="(min-width: 1280px) 260px, (min-width: 640px) 44vw, 90vw"
+                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#211a30]/45 via-transparent to-transparent" />
+                      <span className="absolute bottom-2.5 left-3 rounded-full border border-white/55 bg-white/90 px-2.5 py-1 text-[0.61rem] font-semibold text-ink backdrop-blur">
+                        {service.eyebrow}
+                      </span>
+                    </div>
                     <div className="flex items-start justify-between">
                       <span className="grid h-11 w-11 place-items-center rounded-2xl bg-lav-50 text-lav-700 transition-colors group-hover:bg-lav-100">
                         <Icon className="h-5 w-5" />
