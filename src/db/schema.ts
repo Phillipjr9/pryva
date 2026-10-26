@@ -136,9 +136,29 @@ export const scheduledOrders = pgTable(
   ],
 );
 
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 200 }).notNull(),
+    message: text("message").notNull(),
+    type: varchar("type", { length: 40 }).notNull().default("info"),
+    read: integer("read").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("notifications_user_idx").on(table.userId),
+    index("notifications_read_idx").on(table.read),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type WalletTransaction = typeof walletTransactions.$inferSelect;
 export type ContactMessage = typeof contactMessages.$inferSelect;
 export type GiftCard = typeof giftCards.$inferSelect;
 export type ScheduledOrder = typeof scheduledOrders.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
