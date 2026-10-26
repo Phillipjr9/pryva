@@ -13,33 +13,37 @@ export function Reveal({
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [visible, setVisible] = useState(false);
+  const [observerReady, setObserverReady] = useState(false);
 
   useEffect(() => {
     const node = ref.current;
-    if (!node) return;
-    if (typeof IntersectionObserver === "undefined") {
-      const timeout = setTimeout(() => setVisible(true), 0);
-      return () => clearTimeout(timeout);
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
+    if (!node || typeof IntersectionObserver === "undefined") return;
+
+    try {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0];
+          if (!entry) return;
+          setObserverReady(true);
           if (entry.isIntersecting) {
             setVisible(true);
             observer.disconnect();
           }
-        });
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -60px 0px" },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
+        },
+        { threshold: 0.12, rootMargin: "0px 0px -60px 0px" },
+      );
+      observer.observe(node);
+      return () => observer.disconnect();
+    } catch {
+      // Keep the content visible if the observer cannot be created.
+      return;
+    }
   }, []);
 
   return (
     <div
       ref={ref}
-      className={`reveal ${visible ? "is-visible" : ""} ${className}`}
+      className={`reveal ${!observerReady || visible ? "is-visible" : ""} ${className}`}
       style={{ transitionDelay: `${delay}ms` }}
     >
       {children}
