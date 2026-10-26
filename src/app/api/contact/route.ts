@@ -1,51 +1,42 @@
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { contactMessages } from "@/db/schema";
-import { getCurrentUser, isValidEmail, normalizeEmail } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as {
-      name?: string;
-      email?: string;
-      topic?: string;
-      message?: string;
-    };
+    const body = await request.json();
+    const { name, email, topic, message } = body;
 
-    const name = (body.name ?? "").trim();
-    const email = normalizeEmail(body.email ?? "");
-    const topic = (body.topic ?? "General question").trim().slice(0, 80);
-    const message = (body.message ?? "").trim();
-
-    if (name.length < 2) {
-      return Response.json({ ok: false, error: "Please share your name." }, { status: 400 });
-    }
-    if (!isValidEmail(email)) {
-      return Response.json({ ok: false, error: "Please check your email address." }, { status: 400 });
-    }
-    if (message.length < 10) {
-      return Response.json(
-        { ok: false, error: "A little more detail would help us help you." },
-        { status: 400 },
-      );
+    if (!name || !email || !topic || !message) {
+      return NextResponse.json({ error: "All fields are required" }, { status: 400 });
     }
 
-    const user = await getCurrentUser();
+    if (typeof name !== "string" || name.trim().length < 2) {
+      return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
+    }
+
+    if (typeof message !== "string" || message.trim().length < 10) {
+      return NextResponse.json({ error: "Message must be at least 10 characters" }, { status: 400 });
+    }
 
     await db.insert(contactMessages).values({
-      userId: user?.id ?? null,
-      name,
-      email,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
       topic,
-      message,
+      message: message.trim(),
+      status: "open",
     });
 
-    return Response.json({ ok: true });
-  } catch {
-    return Response.json(
-      { ok: false, error: "We couldn't send that message. Please email support@pryva.ng." },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Failed to submit contact form:", error);
+    return NextResponse.json({ error: "Failed to submit message" }, { status: 500 });
   }
 }
