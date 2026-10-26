@@ -1,0 +1,133 @@
+"use client";
+
+import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
+import { CheckCircle, XCircle, AlertCircle, Info, Close } from "@/components/icons";
+
+type ToastType = "success" | "error" | "warning" | "info";
+
+interface Toast {
+  id: string;
+  type: ToastType;
+  message: string;
+  duration?: number;
+}
+
+interface ToastContextType {
+  toasts: Toast[];
+  addToast: (toast: Omit<Toast, "id">) => void;
+  removeToast: (id: string) => void;
+}
+
+const ToastContext = createContext<ToastContextType | undefined>(undefined);
+
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const addToast = useCallback((toast: Omit<Toast, "id">) => {
+    const id = Math.random().toString(36).substring(2);
+    const newToast = { ...toast, id };
+    setToasts((prev) => [...prev, newToast]);
+
+    const duration = toast.duration || 5000;
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, duration);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  return (
+    <ToastContext.Provider value={{ toasts, addToast, removeToast }}>
+      {children}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+    </ToastContext.Provider>
+  );
+}
+
+export function useToast() {
+  const context = useContext(ToastContext);
+  if (!context) {
+    throw new Error("useToast must be used within a ToastProvider");
+  }
+  return context;
+}
+
+interface ToastContainerProps {
+  toasts: Toast[];
+  removeToast: (id: string) => void;
+}
+
+function ToastContainer({ toasts, removeToast }: ToastContainerProps) {
+  if (toasts.length === 0) return null;
+
+  return (
+    <div className="fixed bottom-4 right-4 z-[200] flex flex-col gap-2 max-w-sm">
+      {toasts.map((toast) => (
+        <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
+      ))}
+    </div>
+  );
+}
+
+interface ToastItemProps {
+  toast: Toast;
+  onClose: () => void;
+}
+
+function ToastItem({ toast, onClose }: ToastItemProps) {
+  const icons = {
+    success: CheckCircle,
+    error: XCircle,
+    warning: AlertCircle,
+    info: Info,
+  };
+
+  const Icon = icons[toast.type];
+
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-3 rounded-xl border p-4 shadow-lg animate-in slide-in-from-right",
+        {
+          "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20": toast.type === "success",
+          "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20": toast.type === "error",
+          "border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20": toast.type === "warning",
+          "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20": toast.type === "info",
+        }
+      )}
+    >
+      <Icon
+        className={cn("h-5 w-5 shrink-0 mt-0.5", {
+          "text-green-600 dark:text-green-400": toast.type === "success",
+          "text-red-600 dark:text-red-400": toast.type === "error",
+          "text-yellow-600 dark:text-yellow-400": toast.type === "warning",
+          "text-blue-600 dark:text-blue-400": toast.type === "info",
+        })}
+      />
+      <p
+        className={cn("flex-1 text-[0.86rem]", {
+          "text-green-700 dark:text-green-300": toast.type === "success",
+          "text-red-700 dark:text-red-300": toast.type === "error",
+          "text-yellow-700 dark:text-yellow-300": toast.type === "warning",
+          "text-blue-700 dark:text-blue-300": toast.type === "info",
+        })}
+      >
+        {toast.message}
+      </p>
+      <button
+        onClick={onClose}
+        className={cn("shrink-0 rounded-lg p-1 hover:bg-black/5 dark:hover:bg-white/5", {
+          "text-green-600 dark:text-green-400": toast.type === "success",
+          "text-red-600 dark:text-red-400": toast.type === "error",
+          "text-yellow-600 dark:text-yellow-400": toast.type === "warning",
+          "text-blue-600 dark:text-blue-400": toast.type === "info",
+        })}
+      >
+        <Close className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
