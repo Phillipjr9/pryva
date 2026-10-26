@@ -87,7 +87,58 @@ export const contactMessages = pgTable("contact_messages", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const giftCards = pgTable(
+  "gift_cards",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    code: varchar("code", { length: 20 }).notNull().unique(),
+    amount: integer("amount").notNull(),
+    initialAmount: integer("initial_amount").notNull(),
+    purchasedBy: uuid("purchased_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    redeemedBy: uuid("redeemed_by").references(() => users.id, { onDelete: "set null" }),
+    recipientEmail: varchar("recipient_email", { length: 200 }),
+    message: text("message"),
+    status: varchar("status", { length: 24 }).notNull().default("active"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("gift_cards_code_idx").on(table.code),
+    index("gift_cards_status_idx").on(table.status),
+    index("gift_cards_purchased_by_idx").on(table.purchasedBy),
+    index("gift_cards_redeemed_by_idx").on(table.redeemedBy),
+  ],
+);
+
+export const scheduledOrders = pgTable(
+  "scheduled_orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    service: varchar("service", { length: 40 }).notNull(),
+    productSlug: varchar("product_slug", { length: 80 }).notNull(),
+    frequency: varchar("frequency", { length: 24 }).notNull(),
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull(),
+    lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+    lastOrderId: uuid("last_order_id").references(() => orders.id, { onDelete: "set null" }),
+    status: varchar("status", { length: 24 }).notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("scheduled_orders_user_idx").on(table.userId),
+    index("scheduled_orders_next_run_idx").on(table.nextRunAt),
+    index("scheduled_orders_status_idx").on(table.status),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type WalletTransaction = typeof walletTransactions.$inferSelect;
 export type ContactMessage = typeof contactMessages.$inferSelect;
+export type GiftCard = typeof giftCards.$inferSelect;
+export type ScheduledOrder = typeof scheduledOrders.$inferSelect;

@@ -1,0 +1,163 @@
+"use client";
+
+import { useState } from "react";
+import { dataPlans, type AirtimeProvider } from "@/lib/airtime";
+import { formatNaira } from "@/lib/catalog";
+import type { User } from "@/db/schema";
+
+interface DataPlansFormProps {
+  user: User;
+}
+
+export function DataPlansForm({ user }: DataPlansFormProps) {
+  const [selectedProvider, setSelectedProvider] = useState<AirtimeProvider>("mtn");
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const providers: { id: AirtimeProvider; name: string }[] = [
+    { id: "mtn", name: "MTN" },
+    { id: "airtel", name: "Airtel" },
+    { id: "glo", name: "Glo" },
+    { id: "9mobile", name: "9mobile" },
+  ];
+
+  const filteredPlans = dataPlans.filter((plan) => plan.provider === selectedProvider);
+
+  async function handlePurchase() {
+    if (!selectedPlan || !phoneNumber) {
+      setError("Please select a plan and enter a phone number");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch("/api/airtime/purchase", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: selectedPlan, phoneNumber }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "Purchase failed");
+      }
+
+      setSuccess(data.message);
+      setSelectedPlan(null);
+      setPhoneNumber("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Purchase failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Provider Selection */}
+      <div>
+        <label className="block text-[0.86rem] font-medium text-ink dark:text-gray-100 mb-3">
+          Select Network
+        </label>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {providers.map((provider) => (
+            <button
+              key={provider.id}
+              onClick={() => {
+                setSelectedProvider(provider.id);
+                setSelectedPlan(null);
+              }}
+              className={`rounded-xl border p-4 text-center transition-colors ${
+                selectedProvider === provider.id
+                  ? "border-lav-600 bg-lav-50 text-lav-700 dark:bg-lav-900/20 dark:border-lav-500 dark:text-lav-300"
+                  : "border-line bg-white text-ink hover:bg-cream dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-700"
+              }`}
+            >
+              <span className="text-[0.9rem] font-semibold">{provider.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Plan Selection */}
+      <div>
+        <label className="block text-[0.86rem] font-medium text-ink dark:text-gray-100 mb-3">
+          Select Data Plan
+        </label>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredPlans.map((plan) => (
+            <button
+              key={plan.id}
+              onClick={() => setSelectedPlan(plan.id)}
+              className={`rounded-xl border p-4 text-left transition-colors ${
+                selectedPlan === plan.id
+                  ? "border-lav-600 bg-lav-50 dark:bg-lav-900/20 dark:border-lav-500"
+                  : "border-line bg-white hover:bg-cream dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[0.95rem] font-semibold text-ink dark:text-gray-100">{plan.name}</p>
+                  <p className="text-[0.82rem] text-ink-2 dark:text-gray-400">{plan.duration}</p>
+                </div>
+                <p className="text-[1.1rem] font-bold text-lav-600 dark:text-lav-400">
+                  {formatNaira(plan.price)}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Phone Number */}
+      <div>
+        <label className="block text-[0.86rem] font-medium text-ink dark:text-gray-100 mb-2">
+          Phone Number
+        </label>
+        <input
+          type="tel"
+          value={phoneNumber}
+          onChange={(e) => setPhoneNumber(e.target.value)}
+          placeholder="08012345678"
+          className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.95rem] text-ink outline-none transition-colors focus:border-lav-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:focus:border-lav-500"
+        />
+      </div>
+
+      {/* Wallet Balance */}
+      <div className="rounded-xl border border-line bg-cream p-4 dark:bg-gray-800 dark:border-gray-700">
+        <p className="text-[0.86rem] text-ink-2 dark:text-gray-400">Wallet Balance</p>
+        <p className="text-[1.5rem] font-bold text-ink dark:text-gray-100">
+          {formatNaira(user.walletBalance)}
+        </p>
+      </div>
+
+      {/* Messages */}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.9rem] text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-[0.9rem] text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300">
+          {success}
+        </div>
+      )}
+
+      {/* Purchase Button */}
+      <button
+        onClick={handlePurchase}
+        disabled={loading || !selectedPlan || !phoneNumber}
+        className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-lav-500 dark:hover:bg-lav-600"
+      >
+        {loading ? "Processing..." : "Purchase Data Plan"}
+      </button>
+    </div>
+  );
+}

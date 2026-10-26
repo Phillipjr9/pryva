@@ -22,6 +22,10 @@ const navItems = [
   { href: "/dashboard", label: "Overview", icon: Grid },
   { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
   { href: "/dashboard/orders", label: "Orders", icon: Receipt },
+  { href: "/dashboard/data", label: "Data Plans", icon: Receipt },
+  { href: "/dashboard/gift-cards", label: "Gift Cards", icon: Sparkle },
+  { href: "/dashboard/bulk-orders", label: "Bulk Orders", icon: Receipt },
+  { href: "/dashboard/scheduled", label: "Scheduled", icon: Receipt },
   { href: "/dashboard/support", label: "Support", icon: Chat },
 ];
 
