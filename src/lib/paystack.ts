@@ -90,11 +90,11 @@ export async function verifyPayment(reference: string): Promise<PaystackVerifyRe
   return response.json();
 }
 
-export async function createTransferRecipient(
-  name: string,
-  accountNumber: string,
-  bankCode: string
-): Promise<{ recipientCode: string }> {
+export async function createTransferRecipient(params: {
+  name: string;
+  accountNumber: string;
+  bankCode: string;
+}): Promise<{ status: boolean; data: { recipient_code: string } }> {
   const response = await fetch(`${PAYSTACK_BASE_URL}/transferrecipient`, {
     method: "POST",
     headers: {
@@ -103,9 +103,9 @@ export async function createTransferRecipient(
     },
     body: JSON.stringify({
       type: "nuban",
-      name,
-      account_number: accountNumber,
-      bank_code: bankCode,
+      name: params.name,
+      account_number: params.accountNumber,
+      bank_code: params.bankCode,
       currency: "NGN",
     }),
   });
@@ -115,8 +115,7 @@ export async function createTransferRecipient(
     throw new Error(`Failed to create transfer recipient: ${error}`);
   }
 
-  const data = await response.json();
-  return { recipientCode: data.data.recipient_code };
+  return response.json();
 }
 
 export async function initiateTransfer(params: PaystackTransferRequest): Promise<PaystackTransferResponse> {
@@ -159,7 +158,7 @@ export async function getBanks(): Promise<Array<{ name: string; code: string }>>
 export async function resolveBankAccount(
   accountNumber: string,
   bankCode: string
-): Promise<{ accountName: string; accountNumber: string }> {
+): Promise<{ status: boolean; data: { account_name: string; account_number: string; bank_name: string } }> {
   const response = await fetch(
     `${PAYSTACK_BASE_URL}/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`,
     {
@@ -174,11 +173,7 @@ export async function resolveBankAccount(
     throw new Error(`Failed to resolve bank account: ${error}`);
   }
 
-  const data = await response.json();
-  return {
-    accountName: data.data.account_name,
-    accountNumber: data.data.account_number,
-  };
+  return response.json();
 }
 
 export function verifyWebhookSignature(payload: string, signature: string): boolean {
