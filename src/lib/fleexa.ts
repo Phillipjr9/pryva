@@ -80,6 +80,37 @@ export async function getFleexaSmsMessages(orderId: string): Promise<FleexaSmsRe
   return response.json();
 }
 
+export async function getFleexaStatus(): Promise<{
+  configured: boolean;
+  online: boolean;
+  balanceNgn?: number;
+}> {
+  if (!FLEEXA_API_KEY) {
+    return { configured: false, online: false };
+  }
+
+  try {
+    const response = await fetch(`${FLEEXA_BASE_URL}/balance`, {
+      headers: {
+        Authorization: `Bearer ${FLEEXA_API_KEY}`,
+      },
+    });
+
+    if (!response.ok) {
+      return { configured: true, online: false };
+    }
+
+    const data = await response.json();
+    return {
+      configured: true,
+      online: true,
+      balanceNgn: data.balance || 0,
+    };
+  } catch {
+    return { configured: true, online: false };
+  }
+}
+
 export async function cancelFleexaOrder(orderId: string): Promise<void> {
   const response = await fetch(`${FLEEXA_BASE_URL}/orders/${orderId}`, {
     method: "DELETE",
