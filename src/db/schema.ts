@@ -175,6 +175,54 @@ export const securityViolations = pgTable(
   ],
 );
 
+export const withdrawals = pgTable(
+  "withdrawals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    amount: integer("amount").notNull(),
+    fee: integer("fee").notNull().default(0),
+    bankName: varchar("bank_name", { length: 100 }).notNull(),
+    accountNumber: varchar("account_number", { length: 20 }).notNull(),
+    accountName: varchar("account_name", { length: 200 }).notNull(),
+    recipientCode: varchar("recipient_code", { length: 100 }),
+    status: varchar("status", { length: 24 }).notNull().default("pending"),
+    reference: varchar("reference", { length: 50 }).notNull().unique(),
+    transferReference: varchar("transfer_reference", { length: 100 }),
+    failureReason: text("failure_reason"),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("withdrawals_user_idx").on(table.userId),
+    index("withdrawals_status_idx").on(table.status),
+    index("withdrawals_reference_idx").on(table.reference),
+  ],
+);
+
+export const bankAccounts = pgTable(
+  "bank_accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    bankName: varchar("bank_name", { length: 100 }).notNull(),
+    bankCode: varchar("bank_code", { length: 20 }).notNull(),
+    accountNumber: varchar("account_number", { length: 20 }).notNull(),
+    accountName: varchar("account_name", { length: 200 }).notNull(),
+    recipientCode: varchar("recipient_code", { length: 100 }),
+    isDefault: integer("is_default").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("bank_accounts_user_idx").on(table.userId),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type WalletTransaction = typeof walletTransactions.$inferSelect;
@@ -183,3 +231,5 @@ export type GiftCard = typeof giftCards.$inferSelect;
 export type ScheduledOrder = typeof scheduledOrders.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type SecurityViolation = typeof securityViolations.$inferSelect;
+export type Withdrawal = typeof withdrawals.$inferSelect;
+export type BankAccount = typeof bankAccounts.$inferSelect;
