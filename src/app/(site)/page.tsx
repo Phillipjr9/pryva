@@ -15,8 +15,10 @@ import {
   Clock,
   Copy,
   Globe,
+  Grid,
   Mail,
   Phone,
+  Receipt,
   Refresh,
   Shield,
   Sim,
@@ -37,6 +39,10 @@ const serviceIcons = {
   esim: Sim,
   proxies: Globe,
   "email-otp": Mail,
+  data: Phone,
+  "gift-cards": Sparkle,
+  bulk: Receipt,
+  scheduled: Clock,
 } as const;
 
 const shortcuts = [
