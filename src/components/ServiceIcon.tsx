@@ -2,7 +2,9 @@
 
 import Image from "next/image";
 
-type ServiceType = "netflix" | "spotify" | "youtube" | "disney" | "chatgpt" | "canva";
+type DigitalServiceType = "netflix" | "spotify" | "youtube" | "disney" | "chatgpt" | "canva";
+type CoreServiceType = "numbers" | "esim" | "proxies" | "email-otp";
+type ServiceType = DigitalServiceType | CoreServiceType;
 type CategoryType = "streaming" | "music" | "gaming" | "productivity";
 
 interface ServiceIconProps {
@@ -11,13 +13,25 @@ interface ServiceIconProps {
   className?: string;
 }
 
-const serviceImages: Record<ServiceType, string> = {
+const digitalServiceImages: Record<DigitalServiceType, string> = {
   netflix: "/images/services/netflix.png",
   spotify: "/images/services/spotify.png",
   youtube: "/images/services/youtube.png",
   disney: "/images/services/disney.png",
   chatgpt: "/images/services/chatgpt.png",
   canva: "/images/services/canva.png",
+};
+
+const coreServiceImages: Record<CoreServiceType, string> = {
+  numbers: "/images/services/virtual-numbers.png",
+  esim: "/images/services/esim.png",
+  proxies: "/images/services/proxies.png",
+  "email-otp": "/images/services/email-otp.png",
+};
+
+const serviceImages: Record<ServiceType, string> = {
+  ...digitalServiceImages,
+  ...coreServiceImages,
 };
 
 const serviceNames: Record<ServiceType, string> = {
@@ -27,6 +41,10 @@ const serviceNames: Record<ServiceType, string> = {
   disney: "Disney+",
   chatgpt: "ChatGPT Plus",
   canva: "Canva Pro",
+  numbers: "Virtual Numbers",
+  esim: "eSIM Data",
+  proxies: "Residential Proxies",
+  "email-otp": "Email OTP",
 };
 
 const sizeMap = {
