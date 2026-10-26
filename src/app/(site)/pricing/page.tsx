@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
 import { plans, services, formatNaira } from "@/lib/catalog";
 import { Check } from "@/components/icons";
+import { ServiceIcon } from "@/components/ServiceIcon";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -62,9 +63,12 @@ export default function PricingPage() {
         return (
           <section key={group.slug} className="pb-16">
             <div className="shell">
-              <h2 className="text-[1.75rem] font-semibold text-ink mb-8 dark:text-gray-100">
-                {group.name}
-              </h2>
+              <div className="flex items-center gap-4 mb-8">
+                <ServiceIcon service={group.slug as any} size="lg" />
+                <h2 className="text-[1.75rem] font-semibold text-ink dark:text-gray-100">
+                  {group.name}
+                </h2>
+              </div>
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {servicePlans.map((plan) => (
                   <div
