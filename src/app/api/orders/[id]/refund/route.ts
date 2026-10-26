@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { db, hasDatabase } from "@/db";
 import { orders } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isDemoUser } from "@/lib/auth";
 import { cancelUpstream } from "@/lib/fulfillment";
 import { creditWallet } from "@/lib/wallet";
 
@@ -15,9 +15,9 @@ export async function POST(
   if (!user) {
     return Response.json({ ok: false, error: "Please sign in first." }, { status: 401 });
   }
-  if (!hasDatabase) {
+  if (!hasDatabase || isDemoUser(user)) {
     return Response.json(
-      { ok: false, error: "Order actions are unavailable in this read-only demo preview." },
+      { ok: false, error: "Order actions are unavailable for the read-only demo account." },
       { status: 503 },
     );
   }

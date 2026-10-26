@@ -40,6 +40,7 @@ export function OrderActions({
   const [liveOtp, setLiveOtp] = useState<string | null>(otpCode);
   const [synced, setSynced] = useState(false);
   const [pending, setPending] = useState(false);
+  const [refundReview, setRefundReview] = useState(false);
   const [refunded, setRefunded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(service === "numbers" || service === "email-otp");
@@ -104,6 +105,7 @@ export function OrderActions({
       }
       setSettledStatus("refunded");
       setRefunded(true);
+      setRefundReview(false);
     } catch {
       setError("Network hiccup. Please try again.");
     } finally {
@@ -115,8 +117,8 @@ export function OrderActions({
   const expired = active && !remaining;
 
   return (
-    <div className="grid gap-3.5">
-      <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
+    <div className="pryva-order-actions grid gap-3.5">
+      <div className="pryva-panel pryva-order-delivery rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
             {service === "numbers"
@@ -222,7 +224,7 @@ export function OrderActions({
         {error && <p className="mt-3 text-[0.78rem] font-medium text-rose-600">{error}</p>}
       </div>
 
-      <div className="rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
+      <div className="pryva-panel pryva-order-refund rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
         <p className="flex items-center gap-2 text-[0.85rem] font-semibold text-ink">
           <Shield className="h-4 w-4 text-lav-700" /> Auto-refund protection
         </p>
@@ -238,15 +240,43 @@ export function OrderActions({
                 ? "The delivery window has closed without a code. You can request a refund now."
                 : "No code yet? You can request a refund once the delivery window closes, or straight away if you know the line won't work."}
             </p>
-            <button
-              type="button"
-              onClick={requestRefund}
-              disabled={pending}
-              className="btn btn-dark mt-3.5 w-full !py-3 !text-[0.8rem] disabled:opacity-60"
-            >
-              {pending ? "Processing refund…" : `Request ${formatNaira(amount)} refund`}
-              {!pending && <Refresh className="h-3.5 w-3.5" />}
-            </button>
+            {refundReview ? (
+              <div className="pryva-refund-review" role="group" aria-label="Confirm refund request">
+                <div>
+                  <span>REFUND TO PRYVA WALLET</span>
+                  <strong>{formatNaira(amount)}</strong>
+                  <p>Confirming will cancel this active order and return the amount to your wallet.</p>
+                </div>
+                <div className="pryva-refund-review-actions">
+                  <button
+                    type="button"
+                    onClick={() => setRefundReview(false)}
+                    disabled={pending}
+                    className="pryva-refund-cancel"
+                  >
+                    Keep order
+                  </button>
+                  <button
+                    type="button"
+                    onClick={requestRefund}
+                    disabled={pending}
+                    className="pryva-refund-confirm"
+                  >
+                    {pending ? "Processing…" : "Confirm refund"}
+                    {!pending && <Refresh className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setError(null); setRefundReview(true); }}
+                disabled={pending}
+                className="pryva-refund-open"
+              >
+                Review {formatNaira(amount)} refund <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            )}
           </>
         ) : (
           <p className="mt-2 flex items-center gap-2 text-[0.82rem] text-ink-2">

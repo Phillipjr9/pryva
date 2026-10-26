@@ -15,7 +15,6 @@ import {
   Phone,
   Shield,
   Sim,
-  Sparkle,
   Wallet,
 } from "@/components/icons";
 import { FaqAccordion } from "@/components/ui/FaqAccordion";
@@ -141,9 +140,15 @@ const faqs = [
 
 function WorkspacePreview() {
   return (
-    <div className="relative mx-auto w-full max-w-[35rem]">
-      <div className="pointer-events-none absolute -inset-5 rounded-[3rem] bg-gradient-to-br from-lav-200/75 via-white/20 to-peach/70 blur-2xl" />
-      <div className="relative aspect-[1.02] overflow-hidden rounded-[2rem] border border-white/90 bg-lav-100 shadow-[var(--shadow-float)] sm:aspect-[1.16]">
+    <div className="ph-vault">
+      <div className="ph-vault-grid" aria-hidden="true" />
+      <div className="ph-vault-orbit ph-vault-orbit-one" aria-hidden="true" />
+      <div className="ph-vault-orbit ph-vault-orbit-two" aria-hidden="true" />
+      <div className="ph-vault-coordinate" aria-hidden="true">
+        P / 01 <span>YOUR DIGITAL TOOLKIT</span>
+      </div>
+
+      <div className="ph-vault-photo-frame">
         <Image
           src="/images/landing/hero-remote-work.jpg"
           alt="A professional working on a laptop while checking her phone in a bright workspace."
@@ -151,56 +156,40 @@ function WorkspacePreview() {
           height={750}
           priority
           sizes="(min-width: 1024px) 42vw, 92vw"
-          className="absolute inset-0 h-full w-full object-cover object-left sm:object-[34%_center]"
+          className="ph-vault-photo"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#211a30]/80 via-[#211a30]/5 to-[#211a30]/10" />
-
-        <div className="absolute inset-x-4 top-4 flex items-center justify-between gap-2 sm:inset-x-5 sm:top-5">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/90 px-3 py-2 text-[0.7rem] font-semibold text-ink shadow-sm backdrop-blur">
+        <div className="ph-vault-photo-overlay" aria-hidden="true" />
+        <div className="ph-vault-photo-header">
+          <span className="ph-vault-workspace-chip">
             <Monogram className="h-5 w-5" /> Pryva workspace
           </span>
-          <span className="rounded-full border border-white/25 bg-ink/35 px-3 py-2 text-[0.62rem] font-medium text-white backdrop-blur">
-            Illustrative preview
-          </span>
+          <span className="ph-vault-preview-chip">Illustrative preview</span>
         </div>
 
-        <div className="absolute bottom-5 left-5 max-w-[17rem] text-white sm:bottom-6 sm:left-6 sm:max-w-[17rem] xl:max-w-[19rem]">
-          <span className="text-[0.64rem] font-semibold uppercase tracking-[0.17em] text-white/75">
-            Numbers · eSIM · proxies · inboxes
-          </span>
-          <p className="mt-2 text-[1.7rem] font-medium leading-[1.04] tracking-tight sm:text-[2rem]">
-            Keep your digital tools close.
-          </p>
-          <p className="mt-2 max-w-xs text-[0.76rem] leading-relaxed text-white/75">
-            One calm workspace for the little things that keep you moving.
-          </p>
+        <div className="ph-vault-photo-copy">
+          <span>Numbers · eSIM · proxies · inboxes</span>
+          <p>Keep your digital tools close.</p>
+          <small>One calm workspace for the little things that keep you moving.</small>
         </div>
+      </div>
 
-        <div className="absolute right-3 top-[34%] hidden w-[10.75rem] rounded-2xl border border-white/80 bg-white/95 p-3 shadow-[var(--shadow-soft)] backdrop-blur sm:block lg:right-4">
-          <div className="flex items-center gap-2">
-            <span className="grid h-8 w-8 place-items-center rounded-xl bg-emerald-50 text-emerald-700">
-              <Check className="h-4 w-4" />
-            </span>
-            <div>
-              <p className="text-[0.68rem] font-semibold text-ink">Code received</p>
-              <p className="text-[0.59rem] text-ink-3">WhatsApp · Nigeria</p>
-            </div>
-          </div>
-          <p className="mt-2.5 rounded-lg bg-lav-50 px-2.5 py-2 text-center font-mono text-[0.88rem] font-semibold tracking-[0.18em] text-lav-800">
-            482 069
-          </p>
+      <div className="ph-vault-status-card">
+        <div className="ph-vault-card-heading">
+          <span className="ph-vault-check"><Check className="h-4 w-4" /></span>
+          <span><strong>Code received</strong><small>WhatsApp · Nigeria</small></span>
         </div>
+        <p>482 069</p>
+      </div>
 
-        <div className="absolute bottom-4 right-3 hidden w-[10.75rem] rounded-2xl border border-white/80 bg-white/95 p-3 shadow-[var(--shadow-soft)] backdrop-blur sm:block lg:right-4">
-          <div className="flex items-center justify-between">
-            <p className="text-[0.62rem] font-medium text-ink-3">Sample wallet</p>
-            <Wallet className="h-3.5 w-3.5 text-lav-700" />
-          </div>
-          <p className="mt-1 text-[1.1rem] font-semibold tracking-tight text-ink">₦25,000</p>
-          <p className="mt-1 inline-flex items-center gap-1 text-[0.59rem] font-medium text-emerald-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Demo balance
-          </p>
-        </div>
+      <div className="ph-vault-balance-card">
+        <div><span>Sample wallet</span><Wallet className="h-3.5 w-3.5" /></div>
+        <strong>₦25,000</strong>
+        <small><i /> Demo balance</small>
+      </div>
+
+      <div className="ph-vault-caption" aria-hidden="true">
+        <span><i /> A CLEARER WAY TO GET CONNECTED</span>
+        <span>MADE FOR YOUR NEXT MOVE</span>
       </div>
     </div>
   );
@@ -208,82 +197,79 @@ function WorkspacePreview() {
 
 export default function HomePage() {
   return (
-    <>
-      <section className="relative grain overflow-hidden pb-16 pt-10 sm:pb-20 sm:pt-16 lg:pb-24">
-        <div className="pointer-events-none absolute -left-40 -top-32 h-[33rem] w-[33rem] rounded-full bg-lav-200/60 blur-[120px]" />
-        <div className="pointer-events-none absolute -right-40 top-44 h-[31rem] w-[31rem] rounded-full bg-peach/65 blur-[130px]" />
-        <div className="shell relative">
-          <div className="grid items-center gap-12 lg:grid-cols-[0.95fr_1.05fr] lg:gap-10">
-            <div className="max-w-2xl">
+    <div className="pryva-home">
+      <section className="ph-hero relative grain overflow-hidden">
+        <div className="ph-hero-ambient ph-hero-ambient-left" aria-hidden="true" />
+        <div className="ph-hero-ambient ph-hero-ambient-right" aria-hidden="true" />
+        <div className="shell ph-container relative">
+          <div className="ph-hero-grid">
+            <div className="ph-hero-copy">
               <Reveal>
-                <span className="inline-flex items-center gap-2 rounded-full border border-lav-200/80 bg-white/75 px-3.5 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.15em] text-lav-800 shadow-sm backdrop-blur">
-                  <span className="relative grid h-2 w-2 place-items-center">
-                    <span className="absolute h-full w-full animate-ring rounded-full bg-emerald-500/70" />
-                    <span className="relative h-1.5 w-1.5 rounded-full bg-emerald-600" />
-                  </span>
+                <span className="ph-announcement">
+                  <span className="ph-status-dot" aria-hidden="true" />
                   Digital access, made simple
+                  <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </span>
               </Reveal>
 
               <Reveal delay={50}>
-                <h1 className="mt-6 max-w-[12ch] text-[clamp(2.7rem,6.2vw,5rem)] font-medium leading-[0.98] tracking-[-0.055em]">
+                <h1 className="ph-hero-title">
                   Your next step,
                   <br />
-                  <span className="text-display italic text-lav-700">without the friction.</span>
+                  <span>without the<br />friction.</span>
                 </h1>
               </Reveal>
 
               <Reveal delay={110}>
-                <p className="mt-6 max-w-xl text-[1rem] leading-[1.8] text-ink-2 sm:text-[1.08rem]">
+                <p className="ph-hero-description">
                   Virtual numbers, travel eSIMs, residential proxies and temporary inboxes — one calm
                   workspace, priced in Naira and ready when you are.
                 </p>
               </Reveal>
 
               <Reveal delay={170}>
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <Link href="/pricing" className="btn btn-primary !px-6 !py-3.5">
+                <div className="ph-hero-actions">
+                  <Link href="/pricing" className="ph-button ph-button-primary">
                     Explore services
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                  <Link href="/login" className="btn btn-ghost !px-6 !py-3.5">
-                    Try the live demo
                     <ArrowUpRight className="h-4 w-4" />
+                  </Link>
+                  <Link href="/login" className="ph-secondary">
+                    Try the live demo
+                    <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
               </Reveal>
 
               <Reveal delay={230}>
-                <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2.5 text-[0.78rem] text-ink-2">
+                <div className="ph-hero-note">
                   {[
                     "Naira-first pricing",
                     "Instant delivery",
                     "Refund protection",
                   ].map((item) => (
-                    <span key={item} className="inline-flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-lav-600" /> {item}
+                    <span key={item}>
+                      <Check className="h-3.5 w-3.5" aria-hidden="true" /> {item}
                     </span>
                   ))}
                 </div>
               </Reveal>
             </div>
 
-            <Reveal delay={100} className="relative">
+            <Reveal delay={100} className="ph-hero-art">
               <WorkspacePreview />
             </Reveal>
           </div>
 
           <Reveal delay={260}>
-            <div className="mt-14 grid gap-3 border-t border-line/80 pt-6 sm:grid-cols-3 lg:mt-16">
+            <div className="ph-hero-bottom">
               {[
                 { value: "4 services", label: "One workspace for your digital toolkit" },
                 { value: "Naira-native", label: "No foreign card or surprise conversion" },
                 { value: "On demand", label: "Get details as soon as you need them" },
               ].map((item) => (
-                <div key={item.value} className="flex items-center gap-3 sm:justify-center">
-                  <span className="text-[0.92rem] font-semibold tracking-tight text-ink">{item.value}</span>
-                  <span className="hidden h-1 w-1 rounded-full bg-lav-400 sm:block" />
-                  <span className="text-[0.74rem] text-ink-3">{item.label}</span>
+                <div key={item.value}>
+                  <strong>{item.value}</strong>
+                  <span>{item.label}</span>
                 </div>
               ))}
             </div>
@@ -291,59 +277,48 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="relative z-10 -mt-3 pb-5 sm:pb-8">
-        <div className="shell">
-          <Reveal>
-            <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <span className="eyebrow">The Pryva toolkit</span>
-                <h2 className="mt-2 max-w-2xl text-[1.85rem] font-medium leading-[1.08] tracking-tight sm:text-[2.4rem]">
-                  Four useful tools. <span className="text-display italic text-lav-700">One easy place.</span>
-                </h2>
-              </div>
-              <Link href="/pricing" className="inline-flex items-center gap-1.5 text-[0.8rem] font-semibold text-lav-700 hover:underline">
-                Compare all plans <ArrowRight className="h-3.5 w-3.5" />
+      <section className="ph-products relative z-10">
+        <div className="shell ph-container">
+          <Reveal className="ph-section-heading">
+            <div>
+              <span className="ph-eyebrow"><i /> THE PRYVA TOOLKIT</span>
+              <h2>Four useful tools.<br />One easy place.</h2>
+            </div>
+            <div className="ph-section-heading-aside">
+              <p>Everyday digital access, brought together in one clear workspace.</p>
+              <Link href="/pricing" className="ph-link">
+                Compare all plans <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </Reveal>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="ph-product-grid">
             {services.map((service, index) => {
               const Icon = serviceIcons[service.slug];
               return (
-                <Reveal key={service.slug} delay={index * 55}>
-                  <Link
-                    href={service.href}
-                    className="group flex h-full min-h-[25rem] flex-col rounded-[1.4rem] border border-line bg-[#fffdfa]/90 p-4 shadow-[0_16px_45px_-38px_rgba(72,52,120,0.55)] transition-all duration-300 hover:-translate-y-1 hover:border-lav-200 hover:bg-white hover:shadow-[var(--shadow-card)] sm:p-5"
-                  >
-                    <div className="relative mb-4 h-36 overflow-hidden rounded-[1.05rem] bg-lav-50">
+                <Reveal key={service.slug} delay={index * 55} className="ph-product-entry">
+                  <Link href={service.href} className="ph-product-card group">
+                    <div className="ph-card-topline">
+                      <span>0{index + 1} / {service.eyebrow}</span>
+                      <Icon className="h-[1.1rem] w-[1.1rem]" aria-hidden="true" />
+                    </div>
+                    <div className="ph-product-visual">
                       <Image
                         src={servicePhotos[service.slug].src}
                         alt={servicePhotos[service.slug].alt}
                         width={servicePhotos[service.slug].width}
                         height={servicePhotos[service.slug].height}
                         sizes="(min-width: 1280px) 260px, (min-width: 640px) 44vw, 90vw"
-                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                        className="ph-product-image"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#211a30]/45 via-transparent to-transparent" />
-                      <span className="absolute bottom-2.5 left-3 rounded-full border border-white/55 bg-white/90 px-2.5 py-1 text-[0.61rem] font-semibold text-ink backdrop-blur">
-                        {service.eyebrow}
-                      </span>
+                      <div className="ph-product-image-wash" aria-hidden="true" />
+                      <span className="ph-product-image-note">Made for your next move</span>
                     </div>
-                    <div className="flex items-start justify-between">
-                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-lav-50 text-lav-700 transition-colors group-hover:bg-lav-100">
-                        <Icon className="h-5 w-5" />
-                      </span>
-                      <ArrowUpRight className="h-4 w-4 text-ink-3 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-lav-700" />
-                    </div>
-                    <p className="mt-5 text-[1rem] font-semibold tracking-tight">{service.name}</p>
-                    <p className="mt-1 text-[0.8rem] leading-relaxed text-ink-3">{service.tagline}</p>
-                    <div className="mt-auto flex items-end justify-between gap-2 pt-5">
-                      <div>
-                        <p className="text-[0.62rem] uppercase tracking-[0.14em] text-ink-3">From</p>
-                        <p className="mt-0.5 text-[1.08rem] font-semibold">{formatNaira(service.fromPrice)}</p>
-                      </div>
-                      <span className="pb-0.5 text-right text-[0.68rem] text-ink-3">{service.unit}</span>
+                    <h3>{service.name}</h3>
+                    <p>{service.tagline}</p>
+                    <div className="ph-product-bottom">
+                      <span><small>From</small><strong>{formatNaira(service.fromPrice)}</strong><small>{service.unit}</small></span>
+                      <span className="ph-product-link">Explore service <ArrowUpRight className="h-4 w-4" /></span>
                     </div>
                   </Link>
                 </Reveal>
@@ -353,15 +328,15 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="overflow-hidden border-y border-line/70 bg-white/55 py-5 sm:py-6">
-        <div className="shell flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-8">
-          <p className="shrink-0 text-[0.66rem] font-semibold uppercase tracking-[0.18em] text-ink-3">
+      <section className="ph-platforms overflow-hidden border-y border-line/70 bg-white/55 py-5 sm:py-6">
+        <div className="shell ph-container flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-8">
+          <p className="ph-platforms-label shrink-0 text-[0.66rem] font-semibold uppercase tracking-[0.18em] text-ink-3">
             Made for the apps you already use
           </p>
-          <div className="no-scrollbar flex min-w-0 flex-1 items-center gap-5 overflow-x-auto">
+          <div className="ph-platform-list no-scrollbar flex min-w-0 flex-1 items-center gap-5 overflow-x-auto">
             {platforms.filter(hasBrand).map((platform) => (
-              <span key={platform} className="inline-flex shrink-0 items-center gap-2 text-[0.78rem] font-medium text-ink-2">
-                <span className="grid h-7 w-7 place-items-center rounded-lg border border-line bg-white">
+              <span key={platform} className="ph-platform-item inline-flex shrink-0 items-center gap-2 text-[0.78rem] font-medium text-ink-2">
+                <span className="ph-platform-mark grid h-7 w-7 place-items-center rounded-lg border border-line bg-white">
                   <BrandMark name={platform} className="h-3.5 w-3.5" tone="mono" />
                 </span>
                 {platform}
@@ -371,65 +346,60 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="relative overflow-hidden bg-ink py-16 text-white sm:py-20">
-        <div className="pointer-events-none absolute -right-24 -top-32 h-[30rem] w-[30rem] rounded-full bg-lav-500/20 blur-[120px]" />
-        <div className="shell relative">
-          <div className="grid gap-10 lg:grid-cols-[0.75fr_1.25fr] lg:items-end">
-            <div>
-              <Reveal>
-                <span className="inline-flex items-center gap-2 text-[0.66rem] font-semibold uppercase tracking-[0.2em] text-lav-200">
-                  <Sparkle className="h-3.5 w-3.5" /> A simpler way through
-                </span>
-              </Reveal>
-              <Reveal delay={50}>
-                <h2 className="mt-4 max-w-xl text-[2rem] font-medium leading-[1.05] tracking-tight sm:text-[2.8rem]">
-                  From first click to <span className="text-display italic text-lav-200">ready to go.</span>
-                </h2>
-              </Reveal>
-              <Reveal delay={100}>
-                <p className="mt-4 max-w-md text-[0.9rem] leading-relaxed text-white/65">
-                  No scattered tools or confusing steps. Start with what you need, then keep the important details in one place.
-                </p>
-              </Reveal>
+      <section className="ph-process relative overflow-hidden">
+        <div className="ph-process-glow" aria-hidden="true" />
+        <div className="shell ph-container ph-process-grid">
+          <Reveal className="ph-process-art">
+            <div className="ph-process-orbit ph-process-orbit-outer" aria-hidden="true" />
+            <div className="ph-process-orbit ph-process-orbit-inner" aria-hidden="true" />
+            <span className="ph-process-cross ph-process-cross-one" aria-hidden="true">+</span>
+            <span className="ph-process-cross ph-process-cross-two" aria-hidden="true">+</span>
+            <div className="ph-process-core"><Monogram className="h-64 w-64 sm:h-20 sm:w-20" /></div>
+            <div className="ph-process-art-label"><span className="ph-status-dot" /> PRYVA / YOUR WORKSPACE</div>
+            <div className="ph-process-card">
+              <span className="ph-process-card-icon"><Shield className="h-4 w-4" /></span>
+              <span><strong>All in one place</strong><small>Orders · codes · wallet · support</small></span>
+              <Check className="ph-process-card-check h-4 w-4" />
             </div>
+            <span className="ph-process-caption">ONE WORKSPACE. CLEAR NEXT STEPS.</span>
+          </Reveal>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              {steps.map((step, index) => (
-                <Reveal key={step.number} delay={index * 70}>
-                  <div className="h-full rounded-[1.35rem] border border-white/10 bg-white/[0.055] p-4 sm:p-5">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-lav-300/15 font-mono text-[0.74rem] font-semibold text-lav-100">
-                      {step.number}
-                    </span>
-                    <h3 className="mt-5 text-[0.93rem] font-semibold">{step.title}</h3>
-                    <p className="mt-2 text-[0.76rem] leading-relaxed text-white/60">{step.body}</p>
-                  </div>
-                </Reveal>
-              ))}
+          <div className="ph-process-copy">
+            <Reveal>
+              <span className="ph-eyebrow ph-eyebrow-light"><i /> A SIMPLER WAY THROUGH</span>
+            </Reveal>
+            <Reveal delay={50}>
+              <h2>From first click to<br /><span>ready to go.</span></h2>
+            </Reveal>
+            <Reveal delay={100}>
+              <p>No scattered tools or confusing steps. Start with what you need, then keep the important details in one place.</p>
+            </Reveal>
+            <Reveal delay={150}>
+              <div className="ph-process-accordion">
+                <FaqAccordion
+                  items={steps.map((step) => ({ q: `${step.number}  ${step.title}`, a: step.body }))}
+                />
+              </div>
+            </Reveal>
+            <div className="ph-process-proof">
+              {[
+                { icon: Wallet, text: "Local Naira pricing" },
+                { icon: Clock, text: "Fast delivery" },
+                { icon: Shield, text: "Clear refund coverage" },
+              ].map((item) => {
+                const Icon = item.icon;
+                return <span key={item.text}><Icon className="h-3.5 w-3.5" /> {item.text}</span>;
+              })}
             </div>
-          </div>
-
-          <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-white/10 pt-5 text-[0.76rem] text-white/65">
-            {[
-              { icon: Wallet, text: "Local Naira pricing" },
-              { icon: Clock, text: "Fast delivery" },
-              { icon: Shield, text: "Clear refund coverage" },
-            ].map((item) => {
-              const Icon = item.icon;
-              return (
-                <span key={item.text} className="inline-flex items-center gap-2">
-                  <Icon className="h-3.5 w-3.5 text-lav-200" /> {item.text}
-                </span>
-              );
-            })}
           </div>
         </div>
       </section>
 
-      <section className="relative py-16 sm:py-20">
-        <div className="shell grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
-          <div className="lg:sticky lg:top-28">
+      <section className="ph-benefits relative py-16 sm:py-20">
+        <div className="shell ph-container grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+          <div className="ph-benefits-copy lg:sticky lg:top-28">
             <Reveal>
-              <span className="eyebrow">Designed around your day</span>
+              <span className="ph-eyebrow"><i /> DESIGNED AROUND YOUR DAY</span>
             </Reveal>
             <Reveal delay={50}>
               <h2 className="mt-3 max-w-lg text-[2rem] font-medium leading-[1.08] tracking-tight sm:text-[2.75rem]">
@@ -448,7 +418,7 @@ export default function HomePage() {
             </Reveal>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="ph-benefit-grid grid gap-3 sm:grid-cols-2">
             {benefits.map((benefit, index) => {
               const Icon = benefit.icon;
               const toneClass = {
@@ -459,8 +429,8 @@ export default function HomePage() {
               }[benefit.tone];
               return (
                 <Reveal key={benefit.title} delay={index * 55}>
-                  <article className="h-full rounded-[1.45rem] border border-line bg-white/75 p-5 transition-colors hover:bg-white sm:p-6">
-                    <span className={`grid h-10 w-10 place-items-center rounded-2xl ${toneClass}`}>
+                  <article className="ph-benefit-card h-full rounded-[1.45rem] border border-line bg-white/75 p-5 transition-colors hover:bg-white sm:p-6">
+                    <span className={`ph-benefit-icon grid h-10 w-10 place-items-center rounded-2xl ${toneClass}`}>
                       <Icon className="h-[1.1rem] w-[1.1rem]" />
                     </span>
                     <h3 className="mt-5 text-[0.98rem] font-semibold tracking-tight">{benefit.title}</h3>
@@ -473,96 +443,51 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="pb-16 sm:pb-20">
-        <div className="shell">
-          <Reveal>
-            <div className="relative overflow-hidden rounded-[2rem] border border-lav-200/80 bg-gradient-to-br from-lav-100 via-[#fbf7ff] to-cream px-6 py-8 sm:px-10 sm:py-10">
-              <Monogram className="pointer-events-none absolute -right-8 -top-16 h-60 w-60 opacity-[0.12]" />
-              <div className="relative grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
-                <div className="max-w-2xl">
-                  <span className="inline-flex items-center gap-1.5 text-[0.66rem] font-semibold uppercase tracking-[0.18em] text-lav-800">
-                    <Lock className="h-3.5 w-3.5" /> Clear prices. Calm process.
-                  </span>
-                  <h2 className="mt-3 text-[1.75rem] font-medium leading-[1.08] tracking-tight sm:text-[2.25rem]">
-                    The right tool is closer than you think.
-                  </h2>
-                  <p className="mt-3 max-w-xl text-[0.88rem] leading-relaxed text-ink-2">
-                    Start with one service, keep your details in one workspace, and add more only when you need them.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2.5 sm:flex-row md:flex-col">
-                  <Link href="/signup" className="btn btn-primary">
-                    Create your account <ArrowRight className="h-4 w-4" />
-                  </Link>
-                  <Link href="/pricing" className="btn btn-ghost">
-                    Browse pricing
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      <section className="pb-16 sm:pb-20">
-        <div className="shell grid gap-8 lg:grid-cols-[0.75fr_1.25fr] lg:items-start">
-          <div>
+      <section className="ph-faq pb-16 sm:pb-20">
+        <div className="shell ph-container grid gap-8 lg:grid-cols-[0.75fr_1.25fr] lg:items-start">
+          <div className="ph-faq-intro">
             <Reveal>
-              <span className="eyebrow">Questions, answered</span>
+              <span className="ph-eyebrow"><i /> QUESTIONS, ANSWERED</span>
             </Reveal>
             <Reveal delay={50}>
-              <h2 className="mt-3 text-[2rem] font-medium leading-[1.08] tracking-tight sm:text-[2.5rem]">
-                Good to know <span className="text-display italic text-lav-700">before you begin.</span>
-              </h2>
+              <h2>Good to know<br /><span>before you begin.</span></h2>
             </Reveal>
             <Reveal delay={100}>
-              <p className="mt-3 max-w-sm text-[0.88rem] leading-relaxed text-ink-2">
-                Straight answers about pricing, delivery and your first steps with Pryva.
-              </p>
+              <p>Straight answers about pricing, delivery and your first steps with Pryva.</p>
             </Reveal>
             <Reveal delay={140}>
-              <Link href="/faq" className="inline-flex items-center gap-1.5 mt-4 text-[0.8rem] font-semibold text-lav-700 hover:underline">
-                Visit the full FAQ <ArrowRight className="h-3.5 w-3.5" />
+              <Link href="/faq" className="ph-link">
+                Visit the full FAQ <ArrowRight className="h-4 w-4" />
               </Link>
             </Reveal>
           </div>
           <Reveal delay={70}>
-            <FaqAccordion items={faqs} />
-          </Reveal>
-        </div>
-      </section>
-
-      <section className="pb-8">
-        <div className="shell">
-          <Reveal>
-            <div className="relative overflow-hidden rounded-[2rem] bg-[#211a30] px-6 py-9 text-white sm:px-10 sm:py-12">
-              <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-lav-500/25 blur-[90px]" />
-              <div className="pointer-events-none absolute -bottom-36 left-1/3 h-64 w-64 rounded-full bg-peach/10 blur-[90px]" />
-              <div className="relative flex flex-col gap-7 md:flex-row md:items-end md:justify-between">
-                <div className="max-w-2xl">
-                  <span className="inline-flex items-center gap-2 text-[0.66rem] font-semibold uppercase tracking-[0.2em] text-lav-200">
-                    <Sparkle className="h-3.5 w-3.5" /> Begin in a couple of minutes
-                  </span>
-                  <h2 className="mt-3 text-[2rem] font-medium leading-[1.06] tracking-tight sm:text-[2.75rem]">
-                    Make your next digital task feel <span className="text-display italic text-lav-200">easy.</span>
-                  </h2>
-                  <p className="mt-3 max-w-xl text-[0.88rem] leading-relaxed text-white/65">
-                    Explore the services, start with the demo, or create your own Pryva workspace.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2.5 sm:flex-row md:flex-col">
-                  <Link href="/signup" className="btn btn-primary">
-                    Get started <ArrowRight className="h-4 w-4" />
-                  </Link>
-                  <Link href="/login" className="btn border border-white/20 bg-white/10 text-white hover:bg-white/15">
-                    Open the demo
-                  </Link>
-                </div>
-              </div>
+            <div className="ph-faq-accordion">
+              <FaqAccordion items={faqs} />
             </div>
           </Reveal>
         </div>
       </section>
-    </>
+
+      <section className="ph-final-cta">
+        <div className="shell ph-container ph-final-cta-shell">
+          <Monogram className="ph-final-watermark h-64 w-64" />
+          <Reveal className="ph-final-cta-content">
+            <span className="ph-eyebrow"><i /> BEGIN IN A COUPLE OF MINUTES</span>
+            <h2>Make your next digital task feel <span>easy.</span></h2>
+            <p>Explore the services, start with the demo, or create your own Pryva workspace.</p>
+            <div className="ph-final-actions">
+              <Link href="/signup" className="ph-button ph-button-primary">
+                Get started <ArrowUpRight className="h-4 w-4" />
+              </Link>
+              <Link href="/login" className="ph-secondary">
+                Open the demo <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <span className="ph-final-caption">PRYVA · DIGITAL ACCESS, MADE SIMPLE</span>
+          </Reveal>
+        </div>
+      </section>
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AuthForm } from "@/components/auth/AuthForm";
+import { hasDatabase } from "@/db";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
@@ -21,7 +22,7 @@ export default async function LoginPage({
 
   return (
     <div className="mx-auto w-full max-w-md rounded-[1.75rem] border border-line bg-[#fffdfa] p-6 shadow-[var(--shadow-card)] sm:p-8">
-      <AuthForm mode="login" next={safeNext} errorParam={error ?? null} />
+      <AuthForm mode="login" next={safeNext} errorParam={error ?? null} demoOnly={!hasDatabase} />
     </div>
   );
 }

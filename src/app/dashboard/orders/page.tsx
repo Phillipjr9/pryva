@@ -3,9 +3,9 @@ import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { db, hasDatabase } from "@/db";
 import { orders } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
+import { isDemoUser, requireUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/catalog";
-import { ArrowRight, ArrowUpRight, Clock, Receipt, Shield, Sparkle } from "@/components/icons";
+import { ArrowRight, Clock, Receipt, Shield, Sparkle } from "@/components/icons";
 
 export const metadata: Metadata = { title: "Orders" };
 export const dynamic = "force-dynamic";
@@ -13,17 +13,18 @@ export const dynamic = "force-dynamic";
 function statusStyle(status: string) {
   switch (status) {
     case "active":
-      return "bg-emerald-50 text-emerald-700";
+      return "is-active";
     case "refunded":
-      return "bg-amber-50 text-amber-700";
+      return "is-refunded";
     default:
-      return "bg-lav-50 text-lav-700";
+      return "is-pending";
   }
 }
 
 export default async function OrdersPage() {
   const user = await requireUser("/dashboard/orders");
-  const rows = hasDatabase
+  const readOnlyDemo = !hasDatabase || isDemoUser(user);
+  const rows = !readOnlyDemo
     ? await db
         .select()
         .from(orders)
@@ -34,90 +35,64 @@ export default async function OrdersPage() {
   const active = rows.filter((order) => order.status === "active").length;
 
   return (
-    <div className="grid gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="pryva-page pryva-orders-page">
+      <header className="pryva-page-header">
         <div>
-          <h1 className="text-[1.5rem] font-medium tracking-tight">Orders</h1>
-          <p className="mt-1 text-[0.86rem] text-ink-2">
-            Every number, eSIM, proxy pack and inbox you&apos;ve bought — with codes kept safe.
-          </p>
+          <span className="pryva-section-eyebrow">ACCOUNT / ORDERS</span>
+          <h1>Your orders</h1>
+          <p>Service purchases, delivery status and credentials in one place.</p>
         </div>
-        <Link href="/pricing" className="btn btn-primary !px-4 !py-2.5 !text-[0.78rem]">
-          <Sparkle className="h-3.5 w-3.5" /> New order
+        <Link href="/pricing" className="pryva-outline-action">
+          <Sparkle className="h-3.5 w-3.5" /> New order <ArrowRight className="h-3.5 w-3.5" />
         </Link>
-      </div>
+      </header>
 
-      <div className="flex flex-wrap gap-2 text-[0.72rem]">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-3 py-1.5 text-ink-2">
-          <Receipt className="h-3.5 w-3.5 text-lav-600" /> {rows.length} total
-        </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-3 py-1.5 text-ink-2">
-          <Clock className="h-3.5 w-3.5 text-emerald-600" /> {active} active
-        </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-3 py-1.5 text-ink-2">
-          <Shield className="h-3.5 w-3.5 text-lav-600" /> Auto-refund on every number order
-        </span>
+      <div className="pryva-order-summary-pills" aria-label="Order summary">
+        <span><Receipt className="h-3.5 w-3.5" /> {rows.length} total</span>
+        <span><Clock className="h-3.5 w-3.5" /> {active} active</span>
+        <span><Shield className="h-3.5 w-3.5" /> Refund protection on eligible orders</span>
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-[1.5rem] border border-dashed border-line bg-[#fffdfa] p-10 text-center">
-          <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-lav-50 text-lav-700">
-            <Receipt className="h-5 w-5" />
-          </span>
-          <h2 className="mt-4 text-[1.1rem] font-medium">No orders yet</h2>
-          <p className="mx-auto mt-1.5 max-w-sm text-[0.84rem] text-ink-2">
-            Your first purchase appears here instantly. Numbers start at ₦1,200 and temporary inboxes
-            at ₦700.
-          </p>
-          <Link href="/pricing" className="btn btn-primary mt-5 !px-5 !py-3 !text-[0.8rem]">
-            Browse pricing
-            <ArrowRight className="h-3.5 w-3.5" />
+        <section className="pryva-panel pryva-empty-state pryva-orders-empty">
+          <span className="pryva-empty-icon"><Receipt className="h-5 w-5" /></span>
+          <span className="pryva-section-eyebrow">NO ACTIVITY YET</span>
+          <h2>No orders yet</h2>
+          <p>Your purchases will appear here with their delivery details and order reference.</p>
+          <Link href="/pricing" className="pryva-checkout-primary">
+            Browse services <ArrowRight className="h-4 w-4" />
           </Link>
-        </div>
+        </section>
       ) : (
-        <div className="overflow-hidden rounded-[1.5rem] border border-line bg-[#fffdfa]">
-          <div className="hidden grid-cols-[1.6fr_0.9fr_0.7fr_0.6fr_0.4fr] gap-3 border-b border-line px-5 py-3 text-[0.64rem] font-semibold uppercase tracking-[0.14em] text-ink-3 md:grid">
-            <span>Order</span>
-            <span>Placed</span>
-            <span>Amount</span>
-            <span>Status</span>
-            <span />
+        <section className="pryva-panel pryva-orders-table">
+          <div className="pryva-orders-table-head">
+            <span>ORDER</span><span>PLACED</span><span>AMOUNT</span><span>STATUS</span><span />
           </div>
-          <div className="divide-y divide-line/80">
+          <div className="pryva-orders-list">
             {rows.map((order) => (
               <Link
                 key={order.id}
                 href={`/dashboard/orders/${order.id}`}
-                className="grid gap-1.5 px-5 py-3.5 transition-colors hover:bg-lav-50/40 md:grid-cols-[1.6fr_0.9fr_0.7fr_0.6fr_0.4fr] md:items-center md:gap-3"
+                className="pryva-orders-list-row"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-[0.87rem] font-semibold text-ink">
-                    {order.productName}
-                  </p>
-                  <p className="truncate text-[0.7rem] text-ink-3">
-                    {order.planLabel} · {order.reference}
-                  </p>
-                </div>
-                <p className="text-[0.76rem] text-ink-2">
+                <span className="pryva-orders-name">
+                  <strong>{order.productName}</strong>
+                  <small>{order.planLabel} · {order.reference}</small>
+                </span>
+                <span className="pryva-orders-date">
                   {new Date(order.createdAt).toLocaleDateString("en-NG", {
                     day: "numeric",
                     month: "short",
                     year: "numeric",
                   })}
-                </p>
-                <p className="text-[0.82rem] font-semibold text-ink">{formatNaira(order.amount)}</p>
-                <span
-                  className={`inline-flex w-fit items-center rounded-full px-2.5 py-1 text-[0.64rem] font-semibold capitalize ${statusStyle(order.status)}`}
-                >
-                  {order.status}
                 </span>
-                <span className="hidden justify-self-end text-ink-3 md:block">
-                  <ArrowUpRight className="h-4 w-4" />
-                </span>
+                <strong className="pryva-orders-amount">{formatNaira(order.amount)}</strong>
+                <span className={`pryva-status ${statusStyle(order.status)}`}>{order.status}</span>
+                <ArrowRight className="pryva-orders-arrow h-3.5 w-3.5" />
               </Link>
             ))}
           </div>
-        </div>
+        </section>
       )}
     </div>
   );

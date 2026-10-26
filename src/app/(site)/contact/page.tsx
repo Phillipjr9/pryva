@@ -4,7 +4,7 @@ import { Reveal } from "@/components/ui/Reveal";
 import { ContactForm } from "@/components/site/ContactForm";
 import { FaqAccordion } from "@/components/ui/FaqAccordion";
 import { hasDatabase } from "@/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isDemoUser } from "@/lib/auth";
 import { ArrowRight, Chat, Clock, Mail, Refresh, Shield, Wallet } from "@/components/icons";
 
 export const metadata: Metadata = {
@@ -54,6 +54,7 @@ const faqs = [
 
 export default async function ContactPage() {
   const user = await getCurrentUser();
+  const readOnlyDemo = !hasDatabase || isDemoUser(user);
 
   return (
     <>
@@ -146,7 +147,7 @@ export default async function ContactPage() {
                   defaultName={user?.name ?? ""}
                   defaultEmail={user?.email ?? ""}
                   signedIn={Boolean(user)}
-                  readOnly={!hasDatabase}
+                  readOnly={readOnlyDemo}
                 />
                 {!user && (
                   <p className="mt-3 flex flex-wrap items-center gap-2 text-[0.76rem] text-ink-3">

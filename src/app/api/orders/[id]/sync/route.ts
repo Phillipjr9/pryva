@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db, hasDatabase } from "@/db";
 import { orders, walletTransactions } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isDemoUser } from "@/lib/auth";
 import {
   checkFleexaEmail,
   checkFleexaSms,
@@ -22,8 +22,8 @@ export async function GET(
 ) {
   const user = await getCurrentUser();
   if (!user) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  if (!hasDatabase) {
-    return Response.json({ ok: false, error: "Order sync is unavailable in this read-only demo preview." }, { status: 503 });
+  if (!hasDatabase || isDemoUser(user)) {
+    return Response.json({ ok: false, error: "Order sync is unavailable for the read-only demo account." }, { status: 503 });
   }
 
   const { id } = await params;
@@ -95,8 +95,8 @@ export async function GET(
 export async function POST() {
   const user = await getCurrentUser();
   if (!user) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  if (!hasDatabase) {
-    return Response.json({ ok: false, error: "Order actions are unavailable in this read-only demo preview." }, { status: 503 });
+  if (!hasDatabase || isDemoUser(user)) {
+    return Response.json({ ok: false, error: "Order actions are unavailable for the read-only demo account." }, { status: 503 });
   }
 
   const [tx] = await db

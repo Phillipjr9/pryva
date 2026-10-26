@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db, hasDatabase } from "@/db";
 import { orders } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
+import { isDemoUser, requireUser } from "@/lib/auth";
 import { formatNaira, orderStatusLabel } from "@/lib/catalog";
 import { OrderActions } from "@/components/dashboard/OrderActions";
 import { ArrowRight, Clock, Globe, Mail, Phone, Receipt, Shield, Sim } from "@/components/icons";
@@ -25,7 +25,7 @@ export default async function OrderDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const user = await requireUser("/dashboard/orders");
-  if (!hasDatabase) notFound();
+  if (!hasDatabase || isDemoUser(user)) notFound();
 
   const { id } = await params;
   const [order] = await db
@@ -44,8 +44,8 @@ export default async function OrderDetailPage({
   const Icon = meta.icon;
 
   return (
-    <div className="grid gap-4">
-      <div className="flex flex-wrap items-center gap-2 text-[0.74rem] text-ink-3">
+    <div className="pryva-page pryva-order-detail-page">
+      <div className="pryva-order-breadcrumb flex flex-wrap items-center gap-2 text-[0.74rem] text-ink-3">
         <Link href="/dashboard/orders" className="hover:text-lav-700">
           Orders
         </Link>
@@ -53,7 +53,7 @@ export default async function OrderDetailPage({
         <span className="font-medium text-ink-2">{order.reference}</span>
       </div>
 
-      <div className="flex flex-wrap items-start justify-between gap-4 rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
+      <div className="pryva-order-hero flex flex-wrap items-start justify-between gap-4 rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
         <div className="flex items-start gap-3">
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-lav-50 text-lav-700">
             <Icon className="h-5 w-5" />
@@ -90,7 +90,7 @@ export default async function OrderDetailPage({
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
+      <div className="pryva-order-detail-columns grid gap-4 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
         <OrderActions
           orderId={order.id}
           status={order.status}
@@ -103,7 +103,7 @@ export default async function OrderDetailPage({
         />
 
         <div className="grid gap-4">
-          <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
+          <div className="pryva-panel pryva-order-summary rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
             <h2 className="text-[1rem] font-semibold">Order summary</h2>
             <dl className="mt-3 grid gap-2.5 text-[0.8rem]">
               {[
@@ -135,7 +135,7 @@ export default async function OrderDetailPage({
             </dl>
           </div>
 
-          <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
+          <div className="pryva-panel pryva-order-note rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
             <p className="flex items-start gap-2 text-[0.8rem] leading-relaxed text-ink-2">
               <Shield className="mt-0.5 h-4 w-4 shrink-0 text-lav-600" />
               Keep this page bookmarked — your codes and credentials stay available here, even after

@@ -24,6 +24,15 @@ export function ArrowRight(props: IconProps) {
   );
 }
 
+export function ArrowLeft(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M19 12H5" />
+      <path d="m11 6-6 6 6 6" />
+    </svg>
+  );
+}
+
 export function ArrowUpRight(props: IconProps) {
   return (
     <svg {...base(props)}>

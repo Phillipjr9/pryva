@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { db, hasDatabase } from "@/db";
 import { orders } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isDemoUser } from "@/lib/auth";
 import { findPlan } from "@/lib/catalog";
 import { FleexaError } from "@/lib/fleexa";
 import { cancelUpstream, fulfillPlan } from "@/lib/fulfillment";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  if (!hasDatabase) return Response.json({ ok: true, orders: [] });
+  if (!hasDatabase || isDemoUser(user)) return Response.json({ ok: true, orders: [] });
 
   const rows = await db
     .select()
@@ -30,9 +30,9 @@ export async function POST(request: Request) {
   if (!user) {
     return Response.json({ ok: false, error: "Please sign in to complete this order." }, { status: 401 });
   }
-  if (!hasDatabase) {
+  if (!hasDatabase || isDemoUser(user)) {
     return Response.json(
-      { ok: false, error: "Purchases are disabled in this read-only demo preview." },
+      { ok: false, error: "Purchases are disabled for the read-only demo account." },
       { status: 503 },
     );
   }

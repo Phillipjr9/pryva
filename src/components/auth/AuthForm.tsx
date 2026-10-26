@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Shield, Sparkle } from "@/components/icons";
 import { BrandMark } from "@/components/brand/BrandMark";
+import { DEMO_EMAIL, DEMO_PASSWORD } from "@/lib/demo-account";
 
 type Mode = "login" | "signup";
 
@@ -15,19 +16,27 @@ const GOOGLE_ERRORS: Record<string, string> = {
   "google-state": "That Google sign-in link expired. Please start again.",
   "google-exchange": "Google couldn’t complete the sign-in. Please try again.",
   "demo-failed": "The demo could not open right now. Please try again in a moment.",
+  "login-invalid": "Those email and password details don’t match an account.",
+  "login-failed": "We couldn’t sign you in right now. Please try again.",
 };
 
 export function AuthForm({
   mode,
   next,
   errorParam,
+  demoOnly = false,
 }: {
   mode: Mode;
   next: string;
   errorParam?: string | null;
+  demoOnly?: boolean;
 }) {
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
-  const [pending, setPending] = useState<"form" | "demo" | null>(null);
+  const [form, setForm] = useState(() => ({
+    name: "",
+    email: demoOnly && mode === "login" ? DEMO_EMAIL : "",
+    password: demoOnly && mode === "login" ? DEMO_PASSWORD : "",
+  }));
+  const [pending, setPending] = useState<"form" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -60,9 +69,10 @@ export function AuthForm({
     }
   }
 
-  // The demo runs as a plain HTML form post to /api/auth/demo-web, which
-  // returns a real 303 redirect — dependable in every browser, including
-  // when JavaScript is slow to hydrate.
+  // In the database-free preview, let the browser submit the demo form as a
+  // regular document navigation. The API responds with a 303, avoiding any
+  // dependence on client-side fetch or hydration to navigate to the dashboard.
+  const useNativeDemoLogin = demoOnly && mode === "login";
 
   return (
     <div>
@@ -81,21 +91,13 @@ export function AuthForm({
           Continue with Google
         </a>
 
-        <form
-          action="/api/auth/demo-web"
-          method="post"
-          onSubmit={() => setPending("demo")}
-          className="mt-2.5"
+        <a
+          href="/api/auth/demo-web"
+          className="btn mt-2.5 w-full border border-transparent bg-lav-100 !py-3.5 !text-[0.85rem] text-lav-800 hover:bg-lav-200/80"
         >
-          <button
-            type="submit"
-            disabled={pending !== null}
-            className="btn w-full border border-transparent bg-lav-100 !py-3.5 !text-[0.85rem] text-lav-800 hover:bg-lav-200/80 disabled:opacity-60"
-          >
-            <Sparkle className="h-4 w-4" />
-            {pending === "demo" ? "Opening the demo…" : "Try the live demo — no signup"}
-          </button>
-        </form>
+          <Sparkle className="h-4 w-4" />
+          Try the live demo — no signup
+        </a>
         <p className="mt-2 text-center text-[0.7rem] text-ink-3">
           Demo starts signed in with ₦25,000 wallet credit.
         </p>
@@ -132,9 +134,20 @@ export function AuthForm({
             ? "No documents, no waiting list. New preview accounts are credited with ₦5,000 to try a real purchase."
             : "Your wallet, orders, codes and refunds are waiting exactly where you left them."}
         </p>
+        {demoOnly && mode === "login" && (
+          <p className="mt-3 rounded-xl border border-lav-200 bg-lav-50 px-3.5 py-2.5 text-[0.76rem] font-medium text-lav-800">
+            Read-only preview: demo credentials are filled in below. Select Sign in to open the dashboard.
+          </p>
+        )}
       </div>
 
-      <form onSubmit={submit} className="grid gap-3.5">
+      <form
+        action={mode === "login" ? "/api/auth/login" : undefined}
+        method={mode === "login" ? "post" : undefined}
+        onSubmit={useNativeDemoLogin ? undefined : submit}
+        className="grid gap-3.5"
+      >
+        {mode === "login" && <input type="hidden" name="next" value={next} />}
         {mode === "signup" && (
           <div>
             <label htmlFor="name" className="field-label">
@@ -142,6 +155,7 @@ export function AuthForm({
             </label>
             <input
               id="name"
+              name="name"
               required
               minLength={2}
               autoComplete="name"
@@ -158,6 +172,7 @@ export function AuthForm({
           </label>
           <input
             id="email"
+            name="email"
             type="email"
             required
             autoComplete="email"
@@ -173,6 +188,7 @@ export function AuthForm({
           </label>
           <input
             id="password"
+            name="password"
             type="password"
             required
             minLength={mode === "signup" ? 8 : 1}

@@ -1,0 +1,657 @@
+/* Pryva authenticated workspace — warm editorial surfaces, clear account hierarchy. */
+.pryva-dashboard {
+  --pd-bg: #f7f5f0;
+  --pd-paper: #fffefa;
+  --pd-line: #e7e1d8;
+  --pd-ink: #29223a;
+  --pd-muted: #777181;
+  --pd-accent: #7055b1;
+  --pd-accent-soft: #f1ecfa;
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  color: var(--pd-ink);
+  background: var(--pd-bg);
+}
+
+.pryva-dashboard-ambient {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 78% -8%, rgba(204, 188, 238, .17), transparent 34rem),
+    linear-gradient(180deg, #faf8f4 0%, var(--pd-bg) 58%);
+}
+
+.pryva-dashboard-shell {
+  position: relative;
+  display: grid;
+  grid-template-columns: 258px minmax(0, 1fr);
+  width: min(1600px, 100%);
+  min-height: 100vh;
+  margin: 0 auto;
+}
+
+.pryva-dashboard-sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  display: block;
+  height: 100vh;
+  height: 100dvh;
+  padding: 20px 15px 17px;
+  border-right: 1px solid var(--pd-line);
+  background: rgba(255, 254, 250, .66);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.pryva-dashboard-sidebar-inner { min-height: 100%; }
+.pryva-dashboard-brand-row { min-height: 38px; padding: 0 2px; }
+.pryva-dashboard-close { display: none; border: 1px solid var(--pd-line); border-radius: 10px; background: var(--pd-paper); color: var(--pd-ink); }
+
+.pryva-dashboard-balance {
+  padding: 16px 15px 13px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 92% 4%, rgba(196, 174, 244, .23), transparent 46%),
+    linear-gradient(140deg, #29223a, #39304b 75%, #46365f);
+  color: #fff;
+  box-shadow: 0 13px 30px -22px rgba(35, 26, 57, .75);
+}
+
+.pryva-dashboard-balance-label,
+.pryva-dashboard-balance-foot { display: flex; align-items: center; justify-content: space-between; }
+.pryva-dashboard-balance-label { color: rgba(255, 255, 255, .62); font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
+.pryva-dashboard-balance > strong { display: block; margin-top: 8px; font: 500 25px/1 var(--font-display); letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.pryva-dashboard-balance-foot { margin-top: 16px; padding-top: 11px; border-top: 1px solid rgba(255, 255, 255, .14); color: rgba(255, 255, 255, .8); font-size: 11px; }
+.pryva-dashboard-balance-foot svg { transition: transform .18s ease; }
+.pryva-dashboard-balance:hover .pryva-dashboard-balance-foot svg { transform: translateX(3px); }
+
+.pryva-dashboard-nav-label { margin: 24px 10px 7px; color: #948d9b; font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+.pryva-dashboard-nav { gap: 3px; }
+.pryva-dashboard-nav-link { position: relative; min-height: 41px; border-radius: 9px; color: #615b6b; font-size: 13px; text-decoration: none; }
+.pryva-dashboard-nav-link:hover { background: rgba(255, 255, 255, .72); color: var(--pd-ink); }
+.pryva-dashboard-nav-link > svg { color: #817a8c; }
+.pryva-dashboard-nav-link.is-active { background: #eee9f6; color: #554184; font-weight: 650; }
+.pryva-dashboard-nav-link.is-active > svg { color: var(--pd-accent); }
+.pryva-dashboard-nav-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pd-accent); }
+
+.pryva-dashboard-promo { padding: 14px 14px 13px; border: 1px solid #e4dcef; border-radius: 14px; background: linear-gradient(145deg, #f6f2fb, #fffefa 82%); }
+.pryva-dashboard-promo-label { display: inline-flex; align-items: center; gap: 6px; color: #6c55a2; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.pryva-dashboard-promo p { margin: 9px 0 10px; color: #595263; font-size: 12px; line-height: 1.55; }
+.pryva-dashboard-promo > a { display: inline-flex; align-items: center; gap: 5px; color: #624a9b; font-size: 12px; font-weight: 700; text-decoration: none; }
+.pryva-dashboard-promo > a svg { transition: transform .18s ease; }
+.pryva-dashboard-promo > a:hover svg { transform: translateX(3px); }
+
+.pryva-dashboard-user { padding-top: 14px; border-top: 1px solid var(--pd-line); }
+.pryva-dashboard-avatar { border-radius: 50%; background: #e5dcf2; color: #5b438e; font-size: 11px; font-weight: 750; }
+.pryva-dashboard-user-row p:first-child { color: var(--pd-ink); }
+.pryva-dashboard-user-row p:last-child { color: var(--pd-muted); }
+.pryva-dashboard-logout { min-height: 34px; border: 0; border-radius: 8px; background: transparent; color: #6d6676; cursor: pointer; }
+.pryva-dashboard-logout:hover { background: #f5eded; color: #9d4040; }
+
+.pryva-dashboard-content { min-width: 0; }
+.pryva-dashboard-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  min-height: 76px;
+  border-bottom: 1px solid rgba(224, 218, 209, .88);
+  background: rgba(250, 248, 244, .9);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.pryva-dashboard-topbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 20px; width: min(1330px, 100%); min-height: 76px; margin: 0 auto; padding: 0 36px; }
+.pryva-dashboard-topbar-greeting { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.pryva-dashboard-topbar-greeting > div { display: grid; gap: 3px; }
+.pryva-dashboard-topbar-greeting > div > span { color: #8a8392; font-size: 9px; font-weight: 700; letter-spacing: .16em; }
+.pryva-dashboard-topbar-greeting > div > strong { color: var(--pd-ink); font-size: 13px; font-weight: 650; }
+.pryva-dashboard-menu { display: none; border: 1px solid var(--pd-line); border-radius: 10px; background: var(--pd-paper); color: var(--pd-ink); }
+.pryva-dashboard-topbar-actions { display: flex; align-items: center; gap: 12px; }
+.pryva-dashboard-top-balance { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 13px; border: 1px solid var(--pd-line); border-radius: 10px; background: rgba(255, 254, 250, .85); color: #6c6576; font-size: 12px; text-decoration: none; }
+.pryva-dashboard-top-balance svg { color: var(--pd-accent); }
+.pryva-dashboard-top-balance strong { color: var(--pd-ink); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pryva-dashboard-top-balance:hover { border-color: #cfc1e3; background: #fff; }
+.pryva-dashboard-shop { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 39px; padding: 0 14px; border: 1px solid #29223a; border-radius: 10px; background: #29223a; color: #fff; font-size: 12px; font-weight: 650; text-decoration: none; transition: background .18s, transform .18s; }
+.pryva-dashboard-shop:hover { transform: translateY(-1px); background: #49396c; }
+.pryva-dashboard-body { min-width: 0; }
+
+.pryva-dashboard-mobile-overlay { display: none; }
+
+/* Shared page frame and small editorial labels. */
+.pryva-page { display: grid; gap: 20px; width: min(100%, 1320px); margin: 0 auto; padding: 30px 36px 76px; }
+.pryva-section-eyebrow { display: inline-flex; align-items: center; gap: 6px; color: #766b8a; font-size: 9px; font-weight: 750; letter-spacing: .16em; line-height: 1.4; text-transform: uppercase; }
+.pryva-page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; }
+.pryva-page-header h1 { margin: 8px 0 5px; color: var(--pd-ink); font: 500 clamp(30px, 3.3vw, 40px)/1.02 var(--font-display); letter-spacing: -.035em; }
+.pryva-page-header p { max-width: 650px; margin: 0; color: #686171; font-size: 13px; line-height: 1.6; }
+.pryva-outline-action { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 0 13px; border: 1px solid var(--pd-line); border-radius: 9px; background: rgba(255, 254, 250, .8); color: #484153; font-size: 12px; font-weight: 650; text-decoration: none; white-space: nowrap; }
+.pryva-outline-action:hover { border-color: #cdbfe0; background: #fff; color: #604b91; }
+.pryva-panel { min-width: 0; border: 1px solid var(--pd-line); border-radius: 16px; background: rgba(255, 254, 250, .93); box-shadow: 0 6px 22px -22px rgba(42, 34, 58, .45); }
+.pryva-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pryva-section-head > div { min-width: 0; }
+.pryva-section-head h2 { margin: 5px 0 0; color: var(--pd-ink); font-size: 16px; font-weight: 650; letter-spacing: -.02em; }
+.pryva-section-head > svg { flex: none; color: var(--pd-accent); }
+.pryva-text-link { display: inline-flex; align-items: center; gap: 5px; color: #624b99; font-size: 11px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.pryva-text-link:hover { color: #3f2f68; }
+.pryva-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 235px; padding: 28px 22px; text-align: center; }
+.pryva-empty-state h2 { margin: 12px 0 0; color: var(--pd-ink); font-size: 17px; font-weight: 650; }
+.pryva-empty-state > p { margin: 12px 0 0; color: var(--pd-ink); font-size: 14px; font-weight: 650; }
+.pryva-empty-state > span:not(.pryva-empty-icon):not(.pryva-section-eyebrow) { max-width: 360px; margin-top: 5px; color: var(--pd-muted); font-size: 12px; line-height: 1.55; }
+.pryva-empty-icon { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid #e4dcef; border-radius: 13px; background: #f5f1fa; color: #7055b1; }
+.pryva-status { display: inline-flex; align-items: center; width: fit-content; min-height: 22px; padding: 0 8px; border-radius: 999px; font-size: 9px; font-weight: 750; letter-spacing: .02em; text-transform: capitalize; white-space: nowrap; }
+.pryva-status.is-active { background: #e9f3eb; color: #34734c; }
+.pryva-status.is-refunded { background: #f7f0df; color: #8a6b24; }
+.pryva-status.is-pending { background: #f0ecf7; color: #67518f; }
+
+/* Overview */
+.pryva-overview-page { gap: 18px; }
+.pryva-overview-hero { position: relative; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr); align-items: stretch; gap: 25px; min-height: 255px; padding: 30px; overflow: hidden; border: 1px solid #312844; border-radius: 20px; background: linear-gradient(125deg, #29223a 0%, #332a46 62%, #42345d 100%); color: #fff; box-shadow: 0 20px 55px -38px rgba(37, 27, 57, .85); }
+.pryva-overview-hero::before { position: absolute; right: -90px; top: -175px; width: 380px; height: 380px; border: 1px solid rgba(221, 208, 247, .15); border-radius: 50%; content: ""; }
+.pryva-overview-hero::after { position: absolute; right: -42px; top: -126px; width: 285px; height: 285px; border: 1px solid rgba(221, 208, 247, .1); border-radius: 50%; content: ""; }
+.pryva-overview-orbit { position: absolute; top: 28px; right: 105px; width: 7px; height: 7px; border-radius: 50%; background: #d4c2f4; box-shadow: 0 0 18px 4px rgba(207, 188, 242, .32); }
+.pryva-overview-hero-copy { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; min-width: 0; }
+.pryva-overview-eyebrow { display: inline-flex; align-items: center; gap: 7px; color: #cbb7ee; font-size: 9px; font-weight: 750; letter-spacing: .16em; }
+.pryva-overview-hero-copy h1 { margin: 15px 0 0; font: 500 clamp(34px, 4vw, 49px)/.98 var(--font-display); letter-spacing: -.045em; }
+.pryva-overview-hero-copy > p { max-width: 520px; margin: 12px 0 0; color: #d1cbd9; font-size: 12.5px; line-height: 1.65; }
+.pryva-overview-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 22px; }
+.pryva-hero-primary, .pryva-hero-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 37px; border-radius: 9px; font-size: 11px; font-weight: 700; text-decoration: none; transition: background .18s, transform .18s; }
+.pryva-hero-primary { padding: 0 13px; background: #fff; color: #342a48; }
+.pryva-hero-primary:hover { transform: translateY(-1px); background: #eee8f8; }
+.pryva-hero-secondary { color: #ded6ea; }
+.pryva-hero-secondary:hover { color: #fff; }
+.pryva-overview-balance { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 20px 22px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 15px; background: rgba(255, 255, 255, .075); backdrop-filter: blur(8px); }
+.pryva-overview-balance-top { display: flex; align-items: center; justify-content: space-between; color: #c2b7d2; font-size: 9px; font-weight: 700; letter-spacing: .15em; }
+.pryva-overview-balance-top svg { color: #d0baf3; }
+.pryva-overview-balance > strong { display: block; margin-top: 11px; color: #fff; font: 500 clamp(31px, 3.2vw, 42px)/1 var(--font-display); letter-spacing: -.045em; font-variant-numeric: tabular-nums; }
+.pryva-overview-balance > p { margin: 9px 0 0; color: #bdb5ca; font-size: 11px; }
+.pryva-overview-balance-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 22px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .13); color: #d5cfdf; font-size: 10px; }
+.pryva-balance-ready { display: inline-flex; align-items: center; gap: 6px; color: #ddd5e8; }
+.pryva-balance-ready i { width: 6px; height: 6px; border-radius: 50%; background: #a8d8b6; }
+
+.pryva-demo-notice, .pryva-provider-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; border: 1px solid #e5dff0; border-radius: 12px; background: #f5f1fa; color: #544b63; }
+.pryva-demo-notice p, .pryva-provider-notice p { margin: 0; font-size: 11px; line-height: 1.55; }
+.pryva-demo-notice p strong { color: #46366e; }
+.pryva-demo-mark { flex: none; padding: 4px 7px; border-radius: 5px; background: #ebe3f7; color: #624b99; font-size: 8px; font-weight: 800; letter-spacing: .12em; }
+.pryva-provider-notice { border-color: #e5e0d2; background: #f8f5ec; }
+.pryva-provider-notice.is-online { border-color: #d8e9db; background: #f0f7f0; }
+.pryva-provider-notice > p { display: flex; align-items: center; gap: 7px; }
+.pryva-provider-notice > p > span:last-child { color: #766e7e; }
+.pryva-provider-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: #bb8f38; }
+.pryva-provider-notice.is-online .pryva-provider-dot { background: #4d9b63; }
+.pryva-provider-balance { flex: none; color: #5f5868; font-size: 10px; font-weight: 650; }
+
+.pryva-overview-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 11px; }
+.pryva-dashboard-stat { min-width: 0; padding: 15px 15px 14px; border: 1px solid var(--pd-line); border-radius: 14px; background: rgba(255, 254, 250, .9); }
+.pryva-dashboard-stat-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pryva-dashboard-stat-head p { margin: 0; overflow: hidden; color: #7f7887; font-size: 9px; font-weight: 700; letter-spacing: .11em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.pryva-dashboard-stat-head svg { flex: none; color: #8b73b8; }
+.pryva-dashboard-stat > strong { display: block; margin-top: 11px; overflow: hidden; color: var(--pd-ink); font: 500 24px/1 var(--font-display); letter-spacing: -.035em; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.pryva-dashboard-stat > span { display: block; margin-top: 7px; color: #8a8391; font-size: 10px; line-height: 1.4; }
+.pryva-overview-columns { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(290px, .8fr); align-items: start; gap: 15px; }
+.pryva-recent-orders, .pryva-quick-buy, .pryva-wallet-activity { padding: 18px; }
+.pryva-overview-side { display: grid; gap: 15px; min-width: 0; }
+.pryva-order-list { display: grid; margin-top: 15px; }
+.pryva-order-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto auto 15px; align-items: center; gap: 10px; min-width: 0; padding: 11px 3px; border-top: 1px solid #eee9e2; color: inherit; text-decoration: none; }
+.pryva-order-row:hover .pryva-order-copy strong { color: #644c9d; }
+.pryva-order-symbol { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid #e7e1ef; border-radius: 10px; background: #f5f1fa; color: #7359ad; }
+.pryva-order-copy { display: grid; min-width: 0; gap: 4px; }
+.pryva-order-copy strong { overflow: hidden; color: var(--pd-ink); font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.pryva-order-copy small { overflow: hidden; color: #888190; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.pryva-order-total { color: var(--pd-ink); font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pryva-order-arrow { color: #9a93a2; }
+.pryva-quick-buy-list { display: grid; gap: 1px; margin-top: 12px; }
+.pryva-quick-buy-row { display: grid; grid-template-columns: 31px minmax(0, 1fr) 14px; align-items: center; gap: 10px; min-width: 0; padding: 9px 0; border-top: 1px solid #eee9e2; color: inherit; text-decoration: none; }
+.pryva-quick-buy-icon { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; background: #f2eef8; color: #7359ad; }
+.pryva-quick-buy-row > span:nth-child(2) { display: grid; min-width: 0; gap: 3px; }
+.pryva-quick-buy-row strong { overflow: hidden; color: #393243; font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.pryva-quick-buy-row small { color: #87808f; font-size: 9px; }
+.pryva-quick-buy-row > svg { color: #a29ba9; transition: transform .18s, color .18s; }
+.pryva-quick-buy-row:hover > svg { transform: translateX(3px); color: var(--pd-accent); }
+.pryva-ledger-list { display: grid; margin-top: 12px; }
+.pryva-ledger-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 9px; min-width: 0; padding: 9px 0; border-top: 1px solid #eee9e2; }
+.pryva-ledger-icon { display: grid; width: 27px; height: 27px; place-items: center; border-radius: 50%; }
+.pryva-ledger-icon.is-in { background: #ecf4ec; color: #4b875b; }
+.pryva-ledger-icon.is-out { background: #f0edf5; color: #67528e; }
+.pryva-ledger-copy { display: grid; min-width: 0; gap: 3px; }
+.pryva-ledger-copy strong { overflow: hidden; color: #494352; font-size: 10px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.pryva-ledger-copy small { overflow: hidden; color: #928b99; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.pryva-ledger-row > strong, .pryva-ledger-amount > strong { color: #3d3746; font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pryva-ledger-row > strong.is-credit, .pryva-ledger-amount > strong.is-credit { color: #388251; }
+.pryva-ledger-row > strong.is-debit, .pryva-ledger-amount > strong.is-debit { color: #514a5a; }
+.pryva-ledger-empty { margin: 13px 0 0; padding: 15px 0; border-top: 1px solid #eee9e2; color: #827b89; font-size: 11px; }
+.pryva-support-cta { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 10px 11px; border: 1px solid #e7e0ef; border-radius: 10px; background: #f5f2f9; color: #5c4a83; font-size: 10px; font-weight: 650; text-decoration: none; }
+.pryva-support-cta:hover { background: #efebf6; }
+
+/* Wallet / funding */
+.pryva-wallet-page { gap: 20px; }
+.pryva-wallet-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pryva-wallet-stat { min-width: 0; padding: 18px; border: 1px solid var(--pd-line); border-radius: 15px; background: var(--pd-paper); }
+.pryva-wallet-stat.is-primary { border-color: #332a45; background: linear-gradient(135deg, #29223a, #403251); color: #fff; }
+.pryva-wallet-stat-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #817a89; font-size: 9px; font-weight: 750; letter-spacing: .13em; }
+.pryva-wallet-stat-head svg { color: #8b73b8; }
+.pryva-wallet-stat.is-primary .pryva-wallet-stat-head { color: #c6bece; }
+.pryva-wallet-stat.is-primary .pryva-wallet-stat-head svg { color: #d5c3f2; }
+.pryva-wallet-stat > strong { display: block; margin-top: 13px; overflow: hidden; color: var(--pd-ink); font: 500 clamp(24px, 3vw, 32px)/1 var(--font-display); letter-spacing: -.035em; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.pryva-wallet-stat.is-primary > strong { color: #fff; }
+.pryva-wallet-stat > small { display: block; margin-top: 8px; color: #8b8492; font-size: 10px; line-height: 1.4; }
+.pryva-wallet-stat.is-primary > small { color: #c6bece; }
+.pryva-wallet-columns { display: grid; grid-template-columns: minmax(290px, .9fr) minmax(0, 1.1fr); align-items: start; gap: 15px; }
+.pryva-wallet-side { display: grid; gap: 15px; min-width: 0; }
+.pryva-funding-card { display: grid; gap: 15px; padding: 19px; border: 1px solid var(--pd-line); border-radius: 16px; background: rgba(255, 254, 250, .94); }
+.pryva-funding-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.pryva-funding-heading h2 { margin: 6px 0 0; color: var(--pd-ink); font-size: 17px; font-weight: 650; letter-spacing: -.025em; }
+.pryva-funding-heading p { margin: 5px 0 0; color: #7e7786; font-size: 11px; line-height: 1.5; }
+.pryva-funding-badge { display: inline-flex; align-items: center; gap: 6px; flex: none; padding: 6px 8px; border: 1px solid #e7e1d8; border-radius: 999px; background: #faf8f3; color: #756d7c; font-size: 8px; font-weight: 750; white-space: nowrap; }
+.pryva-funding-badge i { width: 5px; height: 5px; border-radius: 50%; background: #a38f5d; }
+.pryva-funding-badge.is-preview { border-color: #e6dff0; background: #f4eff9; color: #695393; }
+.pryva-funding-badge.is-preview i { background: #8067b0; }
+.pryva-funding-balance { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 13px; border: 1px solid #e9e4dc; border-radius: 11px; background: #faf8f4; }
+.pryva-funding-balance > span { color: #77707f; font-size: 10px; }
+.pryva-funding-balance > strong { color: var(--pd-ink); font-size: 13px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.pryva-funding-state { display: flex; align-items: flex-start; gap: 10px; padding: 13px; border: 1px solid #e4dced; border-radius: 12px; background: #f7f3fa; }
+.pryva-funding-state-icon { display: grid; width: 28px; height: 28px; flex: none; place-items: center; border-radius: 8px; background: #ebe3f5; color: #7055a9; }
+.pryva-funding-state strong { display: block; color: #473b5d; font-size: 11px; font-weight: 700; }
+.pryva-funding-state p { margin: 4px 0 0; color: #726a7e; font-size: 10px; line-height: 1.55; }
+.pryva-funding-methods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.pryva-funding-method { display: grid; grid-template-columns: 25px minmax(0, 1fr); align-items: center; column-gap: 8px; row-gap: 2px; padding: 10px; border: 1px solid #e9e4dc; border-radius: 10px; background: #fffefa; color: #88818e; }
+.pryva-funding-method > span { display: grid; grid-row: span 2; width: 25px; height: 25px; place-items: center; border-radius: 7px; background: #f2eef6; color: #8878a4; }
+.pryva-funding-method strong { overflow: hidden; font-size: 9px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.pryva-funding-method small { color: #a099a5; font-size: 8px; }
+.pryva-funding-footer { display: grid; gap: 11px; padding-top: 13px; border-top: 1px solid #eee9e2; }
+.pryva-funding-footer > span { display: flex; align-items: center; gap: 6px; color: #827b89; font-size: 9px; }
+.pryva-funding-footer > span svg { color: #7d68a7; }
+.pryva-funding-link { display: inline-flex; align-items: center; gap: 5px; width: fit-content; color: #624b99; font-size: 10px; font-weight: 700; text-decoration: none; }
+.pryva-funding-link:hover { color: #3f2f68; }
+.pryva-transaction-history, .pryva-wallet-explainer { padding: 18px; }
+.pryva-entry-count { color: #8a8390; font-size: 9px; white-space: nowrap; }
+.pryva-empty-ledger { display: flex; flex-direction: column; align-items: center; padding: 24px 10px; border-top: 1px solid #eee9e2; text-align: center; }
+.pryva-empty-ledger > span { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid #e7e0ef; border-radius: 10px; background: #f5f2f9; color: #755ba9; }
+.pryva-empty-ledger p { margin: 9px 0 0; color: #504a58; font-size: 11px; font-weight: 650; }
+.pryva-empty-ledger small { max-width: 280px; margin-top: 4px; color: #8a8390; font-size: 9px; line-height: 1.5; }
+.pryva-wallet-ledger { max-height: 395px; overflow-y: auto; padding-right: 3px; }
+.pryva-ledger-amount { display: grid; justify-items: end; gap: 4px; }
+.pryva-ledger-amount small { color: #99929f; font-size: 8px; white-space: nowrap; }
+.pryva-wallet-explainer > .pryva-section-head > svg { color: #7359ad; }
+.pryva-wallet-explainer ul { display: grid; gap: 10px; margin: 15px 0; padding: 0; list-style: none; }
+.pryva-wallet-explainer li { display: flex; align-items: flex-start; gap: 9px; color: #615a69; font-size: 10px; line-height: 1.5; }
+.pryva-wallet-explainer li svg { flex: none; color: #8068ab; }
+
+/* Order list and details */
+.pryva-orders-page { gap: 18px; }
+.pryva-order-summary-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.pryva-order-summary-pills > span { display: inline-flex; align-items: center; gap: 6px; min-height: 29px; padding: 0 10px; border: 1px solid var(--pd-line); border-radius: 999px; background: rgba(255, 254, 250, .8); color: #686171; font-size: 9px; font-weight: 600; }
+.pryva-order-summary-pills svg { color: #8069ac; }
+.pryva-orders-empty { min-height: 300px; }
+.pryva-orders-empty .pryva-section-eyebrow { margin-top: 15px; }
+.pryva-orders-empty h2 { margin-top: 5px; }
+.pryva-orders-empty > p { margin: 8px 0 0; }
+.pryva-orders-empty .pryva-checkout-primary { margin-top: 17px; }
+.pryva-orders-table { overflow: hidden; }
+.pryva-orders-table-head, .pryva-orders-list-row { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(120px, .7fr) minmax(90px, .55fr) minmax(90px, .5fr) 16px; align-items: center; gap: 14px; }
+.pryva-orders-table-head { min-height: 43px; padding: 0 20px; border-bottom: 1px solid var(--pd-line); color: #8b8492; font-size: 8px; font-weight: 750; letter-spacing: .12em; }
+.pryva-orders-list-row { min-height: 66px; padding: 10px 20px; border-bottom: 1px solid #eee9e2; color: inherit; text-decoration: none; transition: background .16s; }
+.pryva-orders-list-row:last-child { border-bottom: 0; }
+.pryva-orders-list-row:hover { background: #faf8f3; }
+.pryva-orders-name { display: grid; min-width: 0; gap: 4px; }
+.pryva-orders-name strong { overflow: hidden; color: #383241; font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.pryva-orders-name small { overflow: hidden; color: #8b8491; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.pryva-orders-date { color: #6e6876; font-size: 10px; }
+.pryva-orders-amount { color: #373140; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pryva-orders-arrow { color: #9b94a2; }
+.pryva-orders-list-row:hover .pryva-orders-arrow { color: var(--pd-accent); }
+.pryva-order-detail-page { gap: 16px; }
+.pryva-order-breadcrumb { font-size: 10px; }
+.pryva-order-breadcrumb a { color: #716b7b; text-decoration: none; }
+.pryva-order-breadcrumb a:hover { color: #624b99; }
+.pryva-order-hero { padding: 21px; border-color: var(--pd-line); border-radius: 16px; background: var(--pd-paper); }
+.pryva-order-hero h1 { font: 500 25px/1.08 var(--font-display); letter-spacing: -.03em; }
+.pryva-order-hero > div:last-child { min-width: 155px; }
+.pryva-order-detail-columns { grid-template-columns: minmax(0, 1.15fr) minmax(260px, .85fr); }
+.pryva-order-summary, .pryva-order-note, .pryva-order-delivery, .pryva-order-refund { padding: 18px; }
+.pryva-order-summary h2 { color: var(--pd-ink); font-size: 14px; }
+.pryva-order-summary dl { gap: 10px; }
+.pryva-order-summary dl > div { padding-bottom: 8px; border-bottom: 1px solid #eee9e2; }
+.pryva-order-summary dl > div:last-child { padding-bottom: 0; border-bottom: 0; }
+.pryva-order-summary dt { color: #898291; font-size: 10px; }
+.pryva-order-summary dd { color: #46404e; font-size: 10px; }
+.pryva-order-note { background: #f7f3fa; border-color: #e4dcef; }
+.pryva-order-note a { color: #624b99; }
+.pryva-order-delivery { min-width: 0; }
+.pryva-order-delivery > div:first-child > p { color: #77707e; }
+.pryva-order-delivery pre { overflow: auto; }
+.pryva-order-delivery .rounded-2xl { border-color: #e9e4dc; border-radius: 12px; background: #f9f7f2; }
+.pryva-order-delivery .bg-gradient-to-br { border: 1px solid #e8e1ef; border-radius: 12px; background: #f5f1fa; }
+.pryva-order-delivery button { cursor: pointer; }
+.pryva-order-refund { border-color: #e6dfee; background: #f7f3fa; }
+.pryva-order-refund > p:first-child { color: #46404f; }
+.pryva-order-refund > p:first-child svg { color: #7156aa; }
+.pryva-refund-open { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 39px; margin-top: 13px; padding: 0 12px; border: 1px solid #d9cde8; border-radius: 9px; background: #fffefa; color: #55427f; font-size: 10px; font-weight: 700; cursor: pointer; }
+.pryva-refund-open:hover { background: #f2edf8; }
+.pryva-refund-review { display: grid; gap: 13px; margin-top: 13px; padding: 13px; border: 1px solid #e2d6ea; border-radius: 11px; background: rgba(255, 254, 250, .86); }
+.pryva-refund-review > div:first-child { display: grid; gap: 4px; }
+.pryva-refund-review > div:first-child > span { color: #847b8e; font-size: 8px; font-weight: 750; letter-spacing: .12em; }
+.pryva-refund-review > div:first-child > strong { color: #3b3447; font: 500 23px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.pryva-refund-review > div:first-child > p { margin: 3px 0 0; color: #716979; font-size: 9px; line-height: 1.5; }
+.pryva-refund-review-actions { display: flex; gap: 8px; }
+.pryva-refund-cancel, .pryva-refund-confirm { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 35px; padding: 0 10px; border-radius: 8px; font-size: 9px; font-weight: 700; cursor: pointer; }
+.pryva-refund-cancel { flex: 1; border: 1px solid var(--pd-line); background: #fff; color: #5d5665; }
+.pryva-refund-confirm { flex: 1.25; border: 1px solid #332942; background: #332942; color: #fff; }
+.pryva-refund-cancel:disabled, .pryva-refund-confirm:disabled { opacity: .55; cursor: not-allowed; }
+
+/* Support */
+.pryva-support-methods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
+.pryva-support-method { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 14px; border: 1px solid var(--pd-line); border-radius: 13px; background: rgba(255, 254, 250, .9); }
+.pryva-support-method > span { display: grid; width: 32px; height: 32px; flex: none; place-items: center; border-radius: 10px; background: #f2eef8; color: #7055a9; }
+.pryva-support-method > div { display: grid; min-width: 0; gap: 3px; }
+.pryva-support-method strong { color: #3f3948; font-size: 10px; font-weight: 700; }
+.pryva-support-method small { color: #847d8c; font-size: 9px; line-height: 1.4; }
+.pryva-support-columns { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(285px, .9fr); align-items: start; gap: 15px; }
+.pryva-support-form .card { border: 1px solid var(--pd-line); border-radius: 16px; background: var(--pd-paper); box-shadow: none; }
+.pryva-support-form .field { border-color: #e5ded5; border-radius: 9px; background: #fffefa; font-size: 12px; }
+.pryva-support-form .field-label { color: #5f5868; font-size: 10px; }
+.pryva-support-form .btn-primary { border-radius: 9px; background: #332a46; box-shadow: none; font-size: 11px; }
+.pryva-support-side { display: grid; gap: 15px; min-width: 0; }
+.pryva-support-messages, .pryva-support-links { padding: 18px; }
+.pryva-message-list { display: grid; gap: 9px; margin-top: 14px; }
+.pryva-message-item { padding: 11px; border: 1px solid #eee9e2; border-radius: 10px; background: #fffefa; }
+.pryva-message-item-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pryva-message-item-head strong { overflow: hidden; color: #47404e; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.pryva-message-item-head span { flex: none; padding: 3px 6px; border-radius: 99px; background: #f1edf7; color: #67518f; font-size: 8px; font-weight: 700; text-transform: capitalize; }
+.pryva-message-item > p { display: -webkit-box; margin: 7px 0 0; overflow: hidden; color: #6e6776; font-size: 9px; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.pryva-message-item > small { display: block; margin-top: 6px; color: #9a93a0; font-size: 8px; }
+.pryva-support-link-list { display: grid; gap: 6px; margin-top: 12px; }
+.pryva-support-link-list a { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 37px; padding: 0 10px; border: 1px solid #eee9e2; border-radius: 9px; background: #fffefa; color: #615a69; font-size: 10px; text-decoration: none; }
+.pryva-support-link-list a:hover { border-color: #d9cde8; color: #624b99; }
+
+/* Checkout: choose, review, then explicitly pay from the Pryva wallet. */
+.pryva-checkout { display: grid; gap: 16px; }
+.pryva-checkout-progress { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 0 0 13px; border-bottom: 1px solid #e6e0d8; list-style: none; }
+.pryva-checkout-progress li { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; color: #968e9c; }
+.pryva-checkout-progress li::after { position: absolute; top: 14px; left: 32px; right: 10px; height: 1px; background: #e7e1d9; content: ""; }
+.pryva-checkout-progress li:last-child::after { display: none; }
+.pryva-checkout-progress li > span { position: relative; z-index: 1; display: grid; width: 28px; height: 28px; flex: none; place-items: center; border: 1px solid #e4ded6; border-radius: 50%; background: #faf8f4; color: #877f8e; font-size: 9px; font-weight: 700; }
+.pryva-checkout-progress li > strong { overflow: hidden; font-size: 9px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.pryva-checkout-progress li.is-current { color: #55427f; }
+.pryva-checkout-progress li.is-current > span { border-color: #765db0; background: #7055a9; color: #fff; box-shadow: 0 0 0 3px rgba(112, 85, 177, .1); }
+.pryva-checkout-progress li.is-current > strong { color: #514071; }
+.pryva-checkout-progress li.is-done > span { border-color: #ded3ee; background: #f0eaf8; color: #6b519f; }
+.pryva-checkout-progress li.is-done > strong { color: #625579; }
+.pryva-plan-tabs { display: inline-flex; flex-wrap: wrap; gap: 3px; width: fit-content; padding: 4px; border: 1px solid #e6e0d8; border-radius: 10px; background: rgba(255, 254, 250, .75); }
+.pryva-plan-tabs button { min-height: 32px; padding: 0 13px; border: 0; border-radius: 7px; background: transparent; color: #746d7b; font-size: 10px; font-weight: 650; cursor: pointer; }
+.pryva-plan-tabs button:hover { background: #f3eff8; color: #5c478b; }
+.pryva-plan-tabs button.is-selected { background: #332a46; color: #fff; box-shadow: 0 2px 6px rgba(35, 25, 52, .12); }
+.pryva-plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
+.pryva-plan-card { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 250px; padding: 16px; border: 1px solid #e5dfd7; border-radius: 14px; background: rgba(255, 254, 250, .88); color: var(--pd-ink); text-align: left; cursor: pointer; transition: border-color .18s, background .18s, transform .18s, box-shadow .18s; }
+.pryva-plan-card:hover { transform: translateY(-2px); border-color: #d4c6e7; background: #fff; }
+.pryva-plan-card.is-selected { border-color: #9075c2; background: #fff; box-shadow: 0 0 0 2px rgba(144, 117, 194, .12), 0 12px 28px -22px rgba(66, 46, 102, .5); }
+.pryva-plan-badge { position: absolute; top: -8px; right: 12px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 7px; border: 1px solid #e7dff0; border-radius: 999px; background: #f2edf8; color: #674e9d; font-size: 8px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.pryva-plan-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.pryva-plan-card-head > span:first-child { display: grid; min-width: 0; gap: 4px; }
+.pryva-plan-card-head strong { color: #342e3d; font-size: 12px; font-weight: 700; }
+.pryva-plan-card-head small { color: #837c89; font-size: 9px; line-height: 1.4; }
+.pryva-plan-radio { display: grid; width: 18px; height: 18px; flex: none; place-items: center; border: 1px solid #dcd6df; border-radius: 50%; color: transparent; }
+.pryva-plan-card.is-selected .pryva-plan-radio { border-color: #7659ad; background: #7659ad; color: #fff; }
+.pryva-plan-price-row { display: flex; align-items: baseline; gap: 7px; margin-top: 19px; }
+.pryva-plan-price-row > strong { color: #302a39; font: 500 27px/1 var(--font-display); letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.pryva-plan-price-row > del { color: #a69eaa; font-size: 10px; }
+.pryva-plan-duration { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; color: #837c8b; font-size: 9px; }
+.pryva-plan-duration svg { color: #8069ab; }
+.pryva-plan-rule { height: 1px; margin: 14px 0 11px; background: #eee9e2; }
+.pryva-plan-features { display: grid; gap: 6px; color: #5f5867; font-size: 9px; line-height: 1.4; }
+.pryva-plan-features > span { display: flex; align-items: flex-start; gap: 6px; }
+.pryva-plan-features svg { flex: none; margin-top: 1px; color: #8068ad; }
+.pryva-checkout-summary { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 17px 18px; border: 1px solid #e4ded6; border-radius: 15px; background: linear-gradient(135deg, #fffefa, #f7f3fa); }
+.pryva-checkout-summary-copy { display: grid; min-width: 0; gap: 6px; }
+.pryva-checkout-summary-copy > strong { overflow: hidden; color: #342e3d; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.pryva-checkout-summary-notes { display: flex; flex-wrap: wrap; gap: 10px 15px; color: #817a88; font-size: 9px; }
+.pryva-checkout-summary-notes > span { display: inline-flex; align-items: center; gap: 5px; }
+.pryva-checkout-summary-notes svg { color: #8069ad; }
+.pryva-checkout-summary-action { display: flex; align-items: center; gap: 14px; flex: none; }
+.pryva-checkout-summary-action > span { display: grid; gap: 3px; color: #86808d; font-size: 9px; }
+.pryva-checkout-summary-action > span strong { color: #332d3d; font: 500 21px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.pryva-checkout-primary, .pryva-checkout-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 14px; border-radius: 9px; font-size: 10px; font-weight: 700; text-decoration: none; cursor: pointer; transition: background .18s, transform .18s, border-color .18s; }
+.pryva-checkout-primary { border: 1px solid #332a46; background: #332a46; color: #fff; }
+.pryva-checkout-primary:hover:not(:disabled) { transform: translateY(-1px); border-color: #594477; background: #594477; }
+.pryva-checkout-primary:disabled { cursor: not-allowed; opacity: .55; }
+.pryva-checkout-secondary { border: 1px solid #e1dbd3; background: #fffefa; color: #5f5867; }
+.pryva-checkout-secondary:hover { border-color: #cfc2e0; background: #f9f6fb; }
+.pryva-checkout-review { display: grid; gap: 16px; padding: 21px; border: 1px solid #e4ded6; border-radius: 16px; background: #fffefa; }
+.pryva-checkout-review-header { display: grid; justify-items: start; gap: 6px; }
+.pryva-checkout-back { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 2px; padding: 0; border: 0; background: transparent; color: #6d6379; font-size: 9px; font-weight: 700; cursor: pointer; }
+.pryva-checkout-back:hover { color: #4a376f; }
+.pryva-checkout-review-header h3 { margin: 0; color: #332d3d; font: 500 29px/1 var(--font-display); letter-spacing: -.03em; }
+.pryva-checkout-review-header p { margin: 0; color: #797281; font-size: 10px; line-height: 1.5; }
+.pryva-checkout-review-grid { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 14px; }
+.pryva-checkout-product { padding: 16px; border: 1px solid #e8e2da; border-radius: 12px; background: #faf8f4; }
+.pryva-checkout-product-icon { display: grid; width: 34px; height: 34px; place-items: center; margin-bottom: 14px; border: 1px solid #e5dcef; border-radius: 10px; background: #f1ecf8; color: #7156ac; }
+.pryva-checkout-product > h4 { margin: 7px 0 2px; color: #332d3c; font-size: 14px; font-weight: 700; }
+.pryva-checkout-product > p { margin: 0; color: #7f7886; font-size: 10px; }
+.pryva-checkout-product-duration { display: inline-flex; align-items: center; gap: 5px; margin-top: 11px; color: #6b6178; font-size: 9px; }
+.pryva-checkout-product-duration svg { color: #8069ad; }
+.pryva-checkout-product ul { display: grid; gap: 6px; margin: 13px 0 0; padding: 12px 0 0; border-top: 1px solid #eae4dd; list-style: none; }
+.pryva-checkout-product li { display: flex; align-items: flex-start; gap: 6px; color: #625b6a; font-size: 9px; line-height: 1.45; }
+.pryva-checkout-product li svg { flex: none; margin-top: 1px; color: #8069ad; }
+.pryva-checkout-receipt { align-self: stretch; margin: 0; padding: 6px 14px; border: 1px solid #e8e2da; border-radius: 12px; background: #fff; }
+.pryva-checkout-receipt > div { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 38px; border-bottom: 1px solid #f0ece7; }
+.pryva-checkout-receipt > div:last-child { border-bottom: 0; }
+.pryva-checkout-receipt dt { color: #827b89; font-size: 9px; }
+.pryva-checkout-receipt dd { margin: 0; color: #494351; font-size: 10px; font-weight: 650; text-align: right; }
+.pryva-checkout-receipt .is-total { min-height: 47px; }
+.pryva-checkout-receipt .is-total dt { color: #534b5f; font-weight: 700; }
+.pryva-checkout-receipt .is-total dd { color: #312a3b; font: 500 20px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.pryva-checkout-receipt .is-after dd { color: #655879; }
+.pryva-checkout-protection { display: flex; align-items: flex-start; gap: 8px; padding: 10px 11px; border: 1px solid #e4dced; border-radius: 10px; background: #f7f3fa; color: #6f6779; font-size: 9px; line-height: 1.5; }
+.pryva-checkout-protection svg { flex: none; color: #765bad; }
+.pryva-checkout-protection strong { color: #51416f; }
+.pryva-checkout-notice { display: grid; gap: 4px; padding: 11px 12px; border: 1px solid #e7dfeF; border-radius: 10px; background: #f7f3fa; color: #655677; font-size: 9px; line-height: 1.45; }
+.pryva-checkout-notice strong { color: #493966; }
+.pryva-checkout-notice.is-funds { border-color: #ebdfc0; background: #fbf7eb; color: #76633b; }
+.pryva-checkout-notice.is-funds strong { color: #5e4a26; }
+.pryva-checkout-notice > a { display: inline-flex; align-items: center; gap: 4px; width: fit-content; color: #674e9b; font-size: 9px; font-weight: 700; text-decoration: none; }
+.pryva-checkout-error { margin: 0; color: #a83c4a; font-size: 10px; font-weight: 600; }
+.pryva-checkout-review-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 2px; }
+.pryva-checkout-review-actions .pryva-checkout-primary { min-width: 180px; }
+.pryva-checkout-footnote { display: flex; align-items: flex-start; gap: 6px; margin: -7px 0 0; color: #918a97; font-size: 8px; line-height: 1.5; }
+.pryva-checkout-footnote svg { flex: none; margin-top: 1px; color: #8877a7; }
+.pryva-checkout-success { display: grid; justify-items: center; padding: 34px 24px; border: 1px solid #e5dfd7; border-radius: 17px; background: #fffefa; text-align: center; }
+.pryva-checkout-success-mark { display: grid; width: 48px; height: 48px; place-items: center; margin-bottom: 15px; border: 1px solid #d8e8dc; border-radius: 50%; background: #edf6ef; color: #468454; }
+.pryva-checkout-success h3 { margin: 7px 0 0; color: #302a39; font: 500 34px/1 var(--font-display); letter-spacing: -.035em; }
+.pryva-checkout-success > p { max-width: 500px; margin: 9px 0 0; color: #6e6776; font-size: 11px; line-height: 1.6; }
+.pryva-checkout-success > p strong { color: #332d3c; }
+.pryva-checkout-success code { padding: 2px 5px; border-radius: 4px; background: #f1edf7; color: #624b99; font-size: 9px; }
+.pryva-checkout-success-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px; margin-top: 19px; }
+
+/* Keep the dashboard usable on compact tablet and phone widths. */
+@media (max-width: 1180px) {
+  .pryva-dashboard-shell { grid-template-columns: 232px minmax(0, 1fr); }
+  .pryva-overview-columns { grid-template-columns: minmax(0, 1.15fr) minmax(260px, .85fr); }
+  .pryva-dashboard-topbar-inner { padding-inline: 26px; }
+  .pryva-page { padding-inline: 26px; }
+}
+
+@media (max-width: 1023px) {
+  .pryva-dashboard-shell { display: block; }
+  .pryva-dashboard-sidebar { display: none; }
+  .pryva-dashboard-menu { display: grid; }
+  .pryva-dashboard-mobile-overlay { position: fixed; z-index: 120; inset: 0; display: block; }
+  .pryva-dashboard-mobile-scrim { position: absolute; inset: 0; width: 100%; border: 0; background: rgba(27, 22, 39, .42); backdrop-filter: blur(3px); }
+  .pryva-dashboard-mobile-panel { position: absolute; inset: 0 auto 0 0; width: min(88vw, 320px); overflow-y: auto; padding: 18px 15px; border-right: 1px solid var(--pd-line); border-radius: 0 16px 16px 0; background: #fffefa; box-shadow: 20px 0 70px -40px rgba(27, 20, 40, .75); }
+  .pryva-dashboard-mobile-panel .pryva-dashboard-sidebar-inner { min-height: calc(100dvh - 36px); }
+  .pryva-dashboard-close { display: grid; }
+  .pryva-dashboard-topbar, .pryva-dashboard-topbar-inner { min-height: 69px; }
+  .pryva-dashboard-topbar-inner { padding-inline: 22px; }
+  .pryva-page { padding: 26px 22px 62px; }
+  .pryva-overview-hero { gap: 18px; padding: 24px; }
+  .pryva-overview-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pryva-overview-columns { grid-template-columns: minmax(0, 1fr); }
+  .pryva-overview-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pryva-wallet-columns { grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); }
+}
+
+@media (max-width: 760px) {
+  .pryva-dashboard-topbar, .pryva-dashboard-topbar-inner { min-height: 62px; }
+  .pryva-dashboard-topbar-inner { gap: 10px; padding-inline: 15px; }
+  .pryva-dashboard-topbar-greeting { gap: 9px; }
+  .pryva-dashboard-topbar-greeting > div > span { font-size: 8px; }
+  .pryva-dashboard-topbar-greeting > div > strong { font-size: 12px; }
+  .pryva-dashboard-topbar-actions { gap: 7px; }
+  .pryva-dashboard-top-balance { min-height: 35px; gap: 5px; padding-inline: 8px; font-size: 0; }
+  .pryva-dashboard-top-balance strong { font-size: 10px; }
+  .pryva-dashboard-top-balance svg { width: 14px; height: 14px; }
+  .pryva-dashboard-shop { min-height: 35px; gap: 5px; padding-inline: 9px; font-size: 0; }
+  .pryva-dashboard-shop svg { width: 14px; height: 14px; }
+  .pryva-dashboard-shop svg:last-child { display: none; }
+  .pryva-page { gap: 15px; padding: 21px 15px 50px; }
+  .pryva-page-header { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .pryva-page-header h1 { font-size: 32px; }
+  .pryva-overview-hero { grid-template-columns: minmax(0, 1fr); gap: 18px; padding: 21px; border-radius: 16px; }
+  .pryva-overview-hero-copy h1 { margin-top: 12px; font-size: 38px; }
+  .pryva-overview-hero-copy > p { max-width: 100%; font-size: 11px; }
+  .pryva-overview-balance { padding: 15px 16px; }
+  .pryva-overview-balance > strong { font-size: 35px; }
+  .pryva-overview-balance-foot { margin-top: 14px; }
+  .pryva-overview-stats { gap: 8px; }
+  .pryva-dashboard-stat { padding: 12px; border-radius: 12px; }
+  .pryva-dashboard-stat-head p { font-size: 8px; letter-spacing: .08em; }
+  .pryva-dashboard-stat > strong { margin-top: 9px; font-size: 21px; }
+  .pryva-dashboard-stat > span { font-size: 9px; }
+  .pryva-overview-side { grid-template-columns: minmax(0, 1fr); }
+  .pryva-recent-orders, .pryva-quick-buy, .pryva-wallet-activity, .pryva-transaction-history, .pryva-wallet-explainer, .pryva-support-messages, .pryva-support-links { padding: 15px; }
+  .pryva-order-row { grid-template-columns: 30px minmax(0, 1fr) auto 13px; gap: 8px; }
+  .pryva-order-row .pryva-status { grid-column: 2; grid-row: 2; margin-top: -3px; }
+  .pryva-order-total { grid-column: 3; grid-row: 1; }
+  .pryva-order-arrow { grid-column: 4; grid-row: 1; }
+  .pryva-order-symbol { grid-column: 1; grid-row: 1 / span 2; width: 29px; height: 29px; }
+  .pryva-order-copy { grid-column: 2; grid-row: 1; }
+  .pryva-order-copy strong { font-size: 10px; }
+  .pryva-order-copy small { font-size: 8px; }
+  .pryva-demo-notice, .pryva-provider-notice { align-items: flex-start; }
+  .pryva-provider-notice { flex-direction: column; }
+  .pryva-provider-notice > p { flex-wrap: wrap; }
+  .pryva-wallet-stats { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .pryva-wallet-stat { padding: 14px; border-radius: 12px; }
+  .pryva-wallet-stat > strong { margin-top: 9px; font-size: 25px; }
+  .pryva-wallet-columns, .pryva-support-columns { grid-template-columns: minmax(0, 1fr); }
+  .pryva-support-methods { grid-template-columns: minmax(0, 1fr); }
+  .pryva-support-method { padding: 11px; }
+  .pryva-order-summary-pills { gap: 6px; }
+  .pryva-order-summary-pills > span { font-size: 8px; }
+  .pryva-order-detail-columns { grid-template-columns: minmax(0, 1fr); }
+  .pryva-order-hero { padding: 15px; }
+  .pryva-order-hero > div:last-child { width: 100%; text-align: left; }
+  .pryva-order-hero .text-right { text-align: left; }
+  .pryva-order-summary dl > div { gap: 12px; }
+  .pryva-orders-table-head { display: none; }
+  .pryva-orders-list-row { grid-template-columns: minmax(0, 1fr) auto 14px; gap: 5px 10px; padding: 13px 14px; }
+  .pryva-orders-name { grid-column: 1; grid-row: 1; }
+  .pryva-orders-date { grid-column: 1; grid-row: 2; font-size: 9px; }
+  .pryva-orders-amount { grid-column: 2; grid-row: 1; }
+  .pryva-orders-list-row .pryva-status { grid-column: 2; grid-row: 2; }
+  .pryva-orders-arrow { grid-column: 3; grid-row: 1 / span 2; }
+}
+
+/* Checkout can also appear in the public service pages. */
+@media (max-width: 640px) {
+  .pryva-checkout-progress { gap: 3px; }
+  .pryva-checkout-progress li { gap: 5px; }
+  .pryva-checkout-progress li::after { left: 27px; right: 4px; }
+  .pryva-checkout-progress li > span { width: 24px; height: 24px; font-size: 8px; }
+  .pryva-checkout-progress li > strong { font-size: 8px; }
+  .pryva-plan-grid { grid-template-columns: minmax(0, 1fr); }
+  .pryva-plan-card { min-height: auto; padding: 14px; }
+  .pryva-plan-price-row { margin-top: 14px; }
+  .pryva-plan-features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pryva-checkout-summary { align-items: stretch; flex-direction: column; gap: 14px; padding: 14px; }
+  .pryva-checkout-summary-copy > strong { white-space: normal; }
+  .pryva-checkout-summary-action { justify-content: space-between; }
+  .pryva-checkout-summary-action .pryva-checkout-primary { flex: 1; }
+  .pryva-checkout-review { gap: 12px; padding: 15px; }
+  .pryva-checkout-review-grid { grid-template-columns: minmax(0, 1fr); }
+  .pryva-checkout-review-header h3 { font-size: 26px; }
+  .pryva-checkout-review-actions { align-items: stretch; flex-direction: column-reverse; }
+  .pryva-checkout-review-actions .pryva-checkout-primary { width: 100%; }
+  .pryva-checkout-review-actions .pryva-checkout-secondary { width: 100%; }
+  .pryva-checkout-success { padding: 26px 17px; }
+  .pryva-checkout-success-actions { width: 100%; flex-direction: column; }
+  .pryva-checkout-success-actions > * { width: 100%; }
+  .pryva-funding-heading { flex-direction: column; }
+  .pryva-funding-badge { align-self: flex-start; }
+  .pryva-funding-card { padding: 15px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pryva-dashboard *, .pryva-checkout * { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}
+
+/* Live Paystack funding stages */
+.pryva-funding-badge.is-paystack { border-color: #cde7de; background: #eef8f4; color: #28705b; }
+.pryva-funding-badge.is-paystack i { background: #28a17c; }
+.pryva-funding-active { gap: 14px; }
+.pryva-funding-stepper { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin: 0; padding: 0 0 12px; border-bottom: 1px solid #eee9e2; list-style: none; }
+.pryva-funding-stepper li { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: #938b99; font-size: 9px; font-weight: 650; }
+.pryva-funding-stepper li > span { display: grid; width: 22px; height: 22px; flex: none; place-items: center; border: 1px solid #e5dfd7; border-radius: 50%; background: #faf8f4; color: #918a97; font-size: 8px; font-weight: 750; }
+.pryva-funding-stepper li.is-current { color: #57447e; }
+.pryva-funding-stepper li.is-current > span { border-color: #785eae; background: #7055a9; color: #fff; }
+.pryva-funding-stepper li.is-done { color: #66577d; }
+.pryva-funding-stepper li.is-done > span { border-color: #ded3ee; background: #f0eaf8; color: #6b519f; }
+.pryva-funding-field-label { display: block; margin: 0 0 8px; color: #5e5767; font-size: 10px; font-weight: 700; }
+.pryva-funding-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.pryva-funding-presets button { min-height: 37px; padding: 0 7px; border: 1px solid #e7e1d9; border-radius: 9px; background: #fffefa; color: #5f5867; font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color .16s, background .16s, color .16s; }
+.pryva-funding-presets button:hover { border-color: #cfc1e3; background: #faf7fc; }
+.pryva-funding-presets button.is-selected { border-color: #9277c2; background: #f2edf8; color: #594483; box-shadow: inset 0 0 0 1px rgba(112, 85, 177, .08); }
+.pryva-funding-custom { display: grid; gap: 0; }
+.pryva-funding-custom small { margin-top: 5px; color: #918a97; font-size: 8px; }
+.pryva-funding-input-wrap { position: relative; display: flex; align-items: center; min-height: 42px; border: 1px solid #e5ded5; border-radius: 9px; background: #fffefa; }
+.pryva-funding-input-wrap:focus-within { border-color: #ad9ad0; box-shadow: 0 0 0 3px rgba(144, 117, 194, .12); }
+.pryva-funding-input-wrap > span { padding-left: 12px; color: #81798a; font-size: 12px; font-weight: 650; }
+.pryva-funding-input-wrap input { width: 100%; min-width: 0; height: 40px; padding: 0 12px 0 7px; border: 0; outline: 0; background: transparent; color: #342e3d; font: 600 12px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+.pryva-funding-input-wrap input::placeholder { color: #aaa3af; font-weight: 450; }
+.pryva-funding-active .pryva-funding-method { position: relative; width: 100%; grid-template-columns: 25px minmax(0, 1fr) 14px; min-height: 58px; padding: 9px; border-color: #e6e0d8; font: inherit; text-align: left; cursor: pointer; transition: border-color .16s, background .16s; }
+.pryva-funding-active .pryva-funding-method:hover { border-color: #d2c5e3; }
+.pryva-funding-active .pryva-funding-method.is-selected { border-color: #aa96ce; background: #f8f4fc; box-shadow: 0 0 0 1px rgba(112, 85, 177, .08); }
+.pryva-funding-active .pryva-funding-method > span { grid-column: 1; grid-row: 1 / span 2; width: 25px; height: 25px; }
+.pryva-funding-active .pryva-funding-method strong { grid-column: 2; grid-row: 1; padding-right: 2px; color: #514a5b; font-size: 9px; }
+.pryva-funding-active .pryva-funding-method small { grid-column: 2; grid-row: 2; color: #8a8390; font-size: 8px; }
+.pryva-funding-method-check { grid-column: 3; grid-row: 1 / span 2; justify-self: center; color: #7257aa; }
+.pryva-funding-active .pryva-funding-footer { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.pryva-funding-active .pryva-funding-footer .pryva-checkout-primary { min-height: 38px; white-space: nowrap; }
+.pryva-funding-review { margin: 0; padding: 3px 12px; border: 1px solid #e8e2da; border-radius: 11px; background: #fffefa; }
+.pryva-funding-review > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 39px; border-bottom: 1px solid #f0ece7; }
+.pryva-funding-review > div:last-child { border-bottom: 0; }
+.pryva-funding-review dt { color: #817a88; font-size: 9px; }
+.pryva-funding-review dd { margin: 0; color: #494351; font-size: 10px; font-weight: 650; text-align: right; }
+.pryva-funding-review .is-total dt { color: #534b5f; font-weight: 700; }
+.pryva-funding-review .is-total dd { color: #312a3b; font: 500 20px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.pryva-funding-review-actions { display: flex; justify-content: space-between; gap: 8px; }
+.pryva-funding-review-actions > button:last-child { flex: 1; }
+.pryva-funding-footnote { display: flex; align-items: flex-start; gap: 6px; margin: -3px 0 0; color: #928b98; font-size: 8px; line-height: 1.45; }
+.pryva-funding-footnote svg { flex: none; margin-top: 1px; color: #8a78a9; }
+.pryva-funding-result { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: start; gap: 9px; padding: 11px; border: 1px solid #d5e8d9; border-radius: 11px; background: #f1f8f1; }
+.pryva-funding-result-icon { display: grid; width: 27px; height: 27px; place-items: center; border-radius: 50%; background: #e2f1e4; color: #438454; }
+.pryva-funding-result.is-pending { border-color: #eadfbd; background: #fbf7ed; }
+.pryva-funding-result.is-pending .pryva-funding-result-icon { background: #f2e9d1; color: #8a6b24; }
+.pryva-funding-result.is-failed { border-color: #ecd6d6; background: #fbf1f0; }
+.pryva-funding-result.is-failed .pryva-funding-result-icon { background: #f5e2e0; color: #98544d; }
+.pryva-funding-result > div { min-width: 0; }
+.pryva-funding-result > div > strong { display: block; color: #3d6144; font-size: 10px; font-weight: 700; }
+.pryva-funding-result.is-pending > div > strong { color: #705b2b; }
+.pryva-funding-result.is-failed > div > strong { color: #814642; }
+.pryva-funding-result > div > p { margin: 3px 0 0; color: #6f7f71; font-size: 8px; line-height: 1.45; }
+.pryva-funding-result.is-pending > div > p { color: #82734e; }
+.pryva-funding-result.is-failed > div > p { color: #8a6b68; }
+.pryva-funding-result > div > small { display: block; margin-top: 5px; overflow: hidden; color: #928b98; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.pryva-funding-result > button { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid rgba(138, 107, 36, .18); border-radius: 8px; background: #fffefa; color: #7c652c; cursor: pointer; }
+
+@media (max-width: 640px) {
+  .pryva-funding-active .pryva-funding-footer { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+  .pryva-funding-active .pryva-funding-footer .pryva-checkout-primary { width: 100%; }
+  .pryva-funding-stepper li { gap: 4px; font-size: 8px; }
+  .pryva-funding-stepper li > span { width: 20px; height: 20px; }
+  .pryva-funding-result { grid-template-columns: 25px minmax(0, 1fr) 28px; padding: 9px; }
+}
+.pryva-funding-continue { display: inline-flex; align-items: center; gap: 4px; width: fit-content; margin-top: 6px; color: #4b8053; font-size: 8px; font-weight: 750; text-decoration: none; }
+.pryva-funding-continue:hover { color: #315b37; }

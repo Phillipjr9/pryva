@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+import "./home.css";
+import "./dashboard.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://pryva.ng"),

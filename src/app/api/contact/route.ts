@@ -1,13 +1,14 @@
 import { db, hasDatabase } from "@/db";
 import { contactMessages } from "@/db/schema";
-import { getCurrentUser, isValidEmail, normalizeEmail } from "@/lib/auth";
+import { getCurrentUser, isDemoUser, isValidEmail, normalizeEmail } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  if (!hasDatabase) {
+  const user = await getCurrentUser();
+  if (!hasDatabase || (user && isDemoUser(user))) {
     return Response.json(
-      { ok: false, error: "Messaging is unavailable in this read-only preview. Please email support@pryva.ng." },
+      { ok: false, error: "Messaging is unavailable in the read-only demo. Please email support@pryva.ng." },
       { status: 503 },
     );
   }
@@ -37,8 +38,6 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-
-    const user = await getCurrentUser();
 
     await db.insert(contactMessages).values({
       userId: user?.id ?? null,

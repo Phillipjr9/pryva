@@ -3,6 +3,7 @@ import { db, hasDatabase } from "@/db";
 import { users } from "@/db/schema";
 import { createSession, hashPassword, isValidEmail, normalizeEmail } from "@/lib/auth";
 import { creditWallet } from "@/lib/wallet";
+import { DEMO_EMAIL } from "@/lib/demo-account";
 
 const WELCOME_CREDIT = 5000;
 
@@ -32,6 +33,9 @@ export async function POST(request: Request) {
     }
     if (!isValidEmail(email)) {
       return Response.json({ ok: false, error: "That email doesn't look right." }, { status: 400 });
+    }
+    if (email === DEMO_EMAIL) {
+      return Response.json({ ok: false, error: "That email is reserved for the Pryva demo account." }, { status: 409 });
     }
     if (password.length < 8) {
       return Response.json(

@@ -42,7 +42,7 @@ function LogoutButton({ compact = false }: { compact?: boolean }) {
       type="button"
       onClick={signOut}
       disabled={pending}
-      className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[0.78rem] font-medium text-ink-3 transition-colors hover:bg-white hover:text-ink disabled:opacity-60 ${
+      className={`pryva-dashboard-logout flex items-center gap-2 px-3 py-2 text-[0.78rem] font-medium transition-colors disabled:opacity-60 ${
         compact ? "" : "w-full"
       }`}
     >
@@ -72,13 +72,13 @@ export function DashboardShell({
     href === "/dashboard" ? pathname === href : pathname.startsWith(href);
 
   const sidebar = (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between">
+    <div className="pryva-dashboard-sidebar-inner flex h-full flex-col">
+      <div className="pryva-dashboard-brand-row flex items-center justify-between">
         <Logo />
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="grid h-9 w-9 place-items-center rounded-full border border-line bg-white text-ink lg:hidden"
+          className="pryva-dashboard-close grid h-9 w-9 place-items-center"
           aria-label="Close menu"
         >
           <Close className="h-4 w-4" />
@@ -87,18 +87,18 @@ export function DashboardShell({
 
       <Link
         href="/dashboard/wallet"
-        className="mt-6 block rounded-2xl bg-gradient-to-br from-ink to-[#3b2f56] p-4 text-white"
+        onClick={() => setOpen(false)}
+        className="pryva-dashboard-balance mt-6 block"
       >
-        <p className="text-[0.58rem] uppercase tracking-[0.16em] text-white/55">Wallet balance</p>
-        <p className="mt-1.5 text-[1.35rem] font-semibold leading-none">
-          {formatNaira(user.walletBalance)}
-        </p>
-        <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[0.62rem] font-semibold">
-          <Plus className="h-2.5 w-2.5" /> Top up wallet
+        <span className="pryva-dashboard-balance-label">Available balance</span>
+        <strong>{formatNaira(user.walletBalance)}</strong>
+        <span className="pryva-dashboard-balance-foot">
+          Wallet activity <ArrowRight className="h-3 w-3" />
         </span>
       </Link>
 
-      <nav className="mt-6 grid gap-1">
+      <p className="pryva-dashboard-nav-label">Workspace</p>
+      <nav className="pryva-dashboard-nav grid gap-1" aria-label="Dashboard">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
@@ -107,45 +107,37 @@ export function DashboardShell({
               key={item.href}
               href={item.href}
               onClick={() => setOpen(false)}
-              className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[0.85rem] font-medium transition-colors ${
-                active
-                  ? "bg-lav-100/80 text-lav-800"
-                  : "text-ink-2 hover:bg-white hover:text-ink"
+              aria-current={active ? "page" : undefined}
+              className={`pryva-dashboard-nav-link flex items-center gap-2.5 px-3 py-2.5 text-[0.85rem] font-medium transition-colors ${
+                active ? "is-active" : ""
               }`}
             >
-              <Icon className={`h-4 w-4 ${active ? "text-lav-700" : "text-ink-3"}`} />
+              <Icon className="h-4 w-4" />
               {item.label}
-              {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-lav-500" />}
+              {active && <span className="pryva-dashboard-nav-dot ml-auto" />}
             </Link>
           );
         })}
       </nav>
 
-      <div className="mt-6 rounded-2xl border border-lav-200/70 bg-gradient-to-br from-lav-50 to-white p-4">
-        <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-lav-700">
-          <Sparkle className="h-3 w-3" /> New order
+      <div className="pryva-dashboard-promo mt-6">
+        <span className="pryva-dashboard-promo-label">
+          <Sparkle className="h-3 w-3" /> Pryva services
         </span>
-        <p className="mt-2 text-[0.78rem] leading-relaxed text-ink-2">
-          Numbers, eSIMs, proxies and inboxes start from ₦700.
-        </p>
-        <Link
-          href="/pricing"
-          onClick={() => setOpen(false)}
-          className="mt-3 inline-flex items-center gap-1 text-[0.76rem] font-semibold text-lav-700 hover:underline"
-        >
-          Browse services
-          <ArrowRight className="h-3.5 w-3.5" />
+        <p>Numbers, eSIMs, proxies and inboxes — choose what you need.</p>
+        <Link href="/pricing" onClick={() => setOpen(false)}>
+          Browse services <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>
 
-      <div className="mt-auto border-t border-line pt-4">
-        <div className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-lav-200 to-lav-400 text-[0.66rem] font-bold text-lav-800">
+      <div className="pryva-dashboard-user mt-auto">
+        <div className="pryva-dashboard-user-row flex items-center gap-2.5">
+          <span className="pryva-dashboard-avatar grid h-9 w-9 shrink-0 place-items-center">
             {initials || "P"}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-[0.82rem] font-semibold text-ink">{user.name}</p>
-            <p className="truncate text-[0.68rem] text-ink-3">{user.email}</p>
+            <p className="truncate text-[0.82rem] font-semibold">{user.name}</p>
+            <p className="truncate text-[0.68rem]">{user.email}</p>
           </div>
         </div>
         <div className="mt-2.5">
@@ -156,72 +148,64 @@ export function DashboardShell({
   );
 
   return (
-    <div className="relative min-h-screen bg-cream">
-      <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute left-1/3 top-[-14rem] h-[30rem] w-[40rem] rounded-full bg-lav-200/25 blur-[130px]" />
-      </div>
+    <div className="pryva-dashboard min-h-screen">
+      <div className="pryva-dashboard-ambient" aria-hidden="true" />
 
-      <div className="shell flex min-h-screen gap-6 py-5">
-        <aside className="sticky top-5 hidden h-[calc(100vh-2.5rem)] w-[248px] shrink-0 rounded-[1.5rem] border border-line bg-[#fffdfa]/90 p-4 backdrop-blur lg:block">
-          {sidebar}
-        </aside>
+      <div className="pryva-dashboard-shell">
+        <aside className="pryva-dashboard-sidebar">{sidebar}</aside>
 
-        <div className="min-w-0 flex-1">
-          <div className="mb-5 flex items-center justify-between gap-3 rounded-[1.25rem] border border-line bg-[#fffdfa]/80 px-4 py-3 backdrop-blur lg:px-5">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setOpen(true)}
-                className="grid h-9 w-9 place-items-center rounded-full border border-line bg-white text-ink lg:hidden"
-                aria-label="Open menu"
-              >
-                <Menu className="h-4 w-4" />
-              </button>
-              <div>
-                <p className="text-[0.68rem] uppercase tracking-[0.16em] text-ink-3">Dashboard</p>
-                <p className="text-[0.88rem] font-semibold leading-tight text-ink">
-                  Hello, {user.name.split(" ")[0]}
-                </p>
+        <div className="pryva-dashboard-content min-w-0">
+          <header className="pryva-dashboard-topbar">
+            <div className="pryva-dashboard-topbar-inner">
+              <div className="pryva-dashboard-topbar-greeting">
+                <button
+                  type="button"
+                  onClick={() => setOpen(true)}
+                  className="pryva-dashboard-menu grid h-9 w-9 place-items-center"
+                  aria-label="Open dashboard menu"
+                  aria-expanded={open}
+                >
+                  <Menu className="h-4 w-4" />
+                </button>
+                <div>
+                  <span>PRYVA · ACCOUNT</span>
+                  <strong>Hello, {user.name.split(" ")[0]}</strong>
+                </div>
+              </div>
+
+              <div className="pryva-dashboard-topbar-actions">
+                <Link href="/dashboard/wallet" className="pryva-dashboard-top-balance">
+                  <Wallet className="h-4 w-4" />
+                  <span>Wallet</span>
+                  <strong>{formatNaira(user.walletBalance)}</strong>
+                </Link>
+                <Link href="/pricing" className="pryva-dashboard-shop">
+                  <Plus className="h-3.5 w-3.5" />
+                  Browse services
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Link
-                href="/dashboard/wallet"
-                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[0.74rem] font-semibold text-ink-2 sm:hidden"
-              >
-                <Wallet className="h-3.5 w-3.5 text-lav-600" />
-                {formatNaira(user.walletBalance)}
-              </Link>
-              <Link
-                href="/dashboard/wallet"
-                className="hidden items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-1.5 text-[0.76rem] font-semibold text-ink-2 sm:inline-flex"
-              >
-                <Wallet className="h-3.5 w-3.5 text-lav-600" />
-                {formatNaira(user.walletBalance)}
-              </Link>
-              <Link
-                href="/pricing"
-                className="btn btn-primary !px-3.5 !py-2 !text-[0.76rem]"
-              >
-                Buy
-                <ArrowRight className="h-3 w-3" />
-              </Link>
-            </div>
-          </div>
+          </header>
 
-          <div className="pb-10">{children}</div>
+          <main className="pryva-dashboard-body">{children}</main>
         </div>
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-[60] lg:hidden">
+        <div className="pryva-dashboard-mobile-overlay">
           <button
             type="button"
-            aria-label="Close menu overlay"
-            className="absolute inset-0 bg-ink/30 backdrop-blur-sm"
+            aria-label="Close dashboard menu"
+            className="pryva-dashboard-mobile-scrim"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 w-[86%] max-w-[300px] overflow-y-auto rounded-r-[1.5rem] border-r border-line bg-[#fffdfa] p-4 shadow-[var(--shadow-float)]">
+          <div
+            className="pryva-dashboard-mobile-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Dashboard navigation"
+          >
             {sidebar}
           </div>
         </div>

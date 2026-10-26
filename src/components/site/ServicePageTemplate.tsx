@@ -20,7 +20,9 @@ import {
 } from "@/components/icons";
 import { formatNaira, plansFor, services, type Service, type ServiceSlug } from "@/lib/catalog";
 import { BrandMark, hasBrand } from "@/components/brand/BrandMark";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isDemoUser } from "@/lib/auth";
+import { hasDatabase } from "@/db";
+import { isPaystackConfigured } from "@/lib/paystack";
 
 const iconMap = {
   phone: Phone,
@@ -261,6 +263,7 @@ function CrossSell({ current }: { current: ServiceSlug }) {
 
 export async function ServicePageTemplate({ service }: { service: Service }) {
   const user = await getCurrentUser();
+  const readOnlyDemo = !hasDatabase || isDemoUser(user);
   const allPlans = plansFor(service.slug);
 
   const groups =
@@ -385,8 +388,8 @@ export async function ServicePageTemplate({ service }: { service: Service }) {
             <Reveal delay={100}>
               <p className="mt-3 text-[0.92rem] leading-relaxed text-ink-2">
                 {user
-                  ? `You're signed in. Your wallet balance is ${formatNaira(user.walletBalance)} — checkout takes one tap.`
-                  : "Sign in to pay from your wallet. New here? Creating an account takes under a minute."}
+                  ? `Your wallet balance is ${formatNaira(user.walletBalance)}. Review the service and total before confirming payment.`
+                  : "Sign in to review an order and pay from your Pryva wallet. Creating an account takes under a minute."}
               </p>
             </Reveal>
           </div>
@@ -397,6 +400,8 @@ export async function ServicePageTemplate({ service }: { service: Service }) {
               signedIn={Boolean(user)}
               walletBalance={user?.walletBalance ?? null}
               nextPath={service.href}
+              readOnlyDemo={readOnlyDemo}
+              paystackReady={hasDatabase && !readOnlyDemo && isPaystackConfigured()}
             />
           </div>
         </div>

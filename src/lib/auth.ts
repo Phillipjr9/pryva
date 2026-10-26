@@ -4,11 +4,25 @@ import { redirect } from "next/navigation";
 import { and, eq, gt } from "drizzle-orm";
 import { db, hasDatabase } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
-import { DEMO_SESSION_TOKEN, DEMO_USER } from "@/lib/demo-account";
+import { DEMO_EMAIL, DEMO_SESSION_TOKEN, DEMO_USER } from "@/lib/demo-account";
 import { requestProto } from "@/lib/net";
 
 export const SESSION_COOKIE = "pryva_session";
 const SESSION_DAYS = 30;
+
+function isEmbeddedPreviewHost(request: Request): boolean {
+  const candidates = [
+    request.headers.get("x-forwarded-host"),
+    request.headers.get("host"),
+    new URL(request.url).hostname,
+  ];
+
+  return candidates.some((candidate) => {
+    if (!candidate) return false;
+    const host = candidate.split(",")[0]?.trim().toLowerCase().replace(/:\d+$/, "");
+    return host?.endsWith(".e2b.app") ?? false;
+  });
+}
 
 /**
  * Browsers silently drop Secure cookies served over plain HTTP. Derive the
@@ -53,6 +67,10 @@ export function verifyPassword(password: string, stored: string): boolean {
 
 export type PublicUser = Pick<User, "id" | "name" | "email" | "walletBalance" | "createdAt">;
 
+export function isDemoUser(user: Pick<PublicUser, "id" | "email"> | null | undefined): boolean {
+  return Boolean(user && (user.id === DEMO_USER.id || user.email === DEMO_EMAIL));
+}
+
 function toPublicUser(user: User): PublicUser {
   return {
     id: user.id,
@@ -64,23 +82,29 @@ function toPublicUser(user: User): PublicUser {
 }
 
 export async function createSession(userId: string, request?: Request): Promise<string> {
-  if (!hasDatabase && userId !== DEMO_USER.id) {
+  const isStaticDemo = userId === DEMO_USER.id;
+  if (!hasDatabase && !isStaticDemo) {
     throw new Error("Only the demo account is available without a database");
   }
 
-  const token = hasDatabase ? randomBytes(32).toString("hex") : DEMO_SESSION_TOKEN;
+  const token = isStaticDemo ? DEMO_SESSION_TOKEN : randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
 
-  if (hasDatabase) {
+  if (hasDatabase && !isStaticDemo) {
     await db.insert(sessions).values({ token, userId, expiresAt });
   }
 
-  const secure = request ? requestProto(request) === "https" : await requestIsSecure();
+  const secure = request
+    ? process.env.NODE_ENV === "production" || requestProto(request) === "https" || isEmbeddedPreviewHost(request)
+    : await requestIsSecure();
+  // HTTPS sessions also need to survive the cross-site Arena preview iframe.
+  const partitionedSession = secure;
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: partitionedSession ? "none" : "lax",
     secure,
+    partitioned: partitionedSession,
     path: "/",
     expires: expiresAt,
   });
@@ -92,10 +116,8 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
-
-  if (!hasDatabase) {
-    return token === DEMO_SESSION_TOKEN ? toPublicUser(DEMO_USER) : null;
-  }
+  if (token === DEMO_SESSION_TOKEN) return toPublicUser(DEMO_USER);
+  if (!hasDatabase) return null;
 
   const rows = await db
     .select({ user: users })
@@ -119,7 +141,7 @@ export async function requireUser(nextPath = "/dashboard"): Promise<PublicUser> 
 export async function destroySession(): Promise<void> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
-  if (token && hasDatabase) {
+  if (token && hasDatabase && token !== DEMO_SESSION_TOKEN) {
     await db.delete(sessions).where(eq(sessions.token, token));
   }
   jar.delete(SESSION_COOKIE);

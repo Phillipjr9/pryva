@@ -35,7 +35,7 @@ export function SiteFooter() {
       <div className="pointer-events-none absolute -right-20 bottom-0 h-80 w-80 rounded-full bg-peach/60 blur-3xl" />
 
       <div className="shell relative">
-        <div className="relative overflow-hidden rounded-[2rem] border border-lav-200/80 bg-gradient-to-br from-lav-100 via-[#f7f1ff] to-cream px-6 py-10 sm:px-10 sm:py-12">
+          <div className="site-footer-promo relative overflow-hidden rounded-[2rem] border border-lav-200/80 bg-gradient-to-br from-lav-100 via-[#f7f1ff] to-cream px-6 py-10 sm:px-10 sm:py-12">
           <Monogram className="pointer-events-none absolute -right-8 -top-10 h-64 w-64 opacity-[0.08]" />
           <div className="relative flex flex-col gap-7 md:flex-row md:items-end md:justify-between">
             <div className="max-w-xl">

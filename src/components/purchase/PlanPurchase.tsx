@@ -1,48 +1,113 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, Lock, Shield, Sparkle } from "@/components/icons";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Clock,
+  Lock,
+  Shield,
+  Sparkle,
+  Wallet,
+} from "@/components/icons";
 import { formatNaira, type Plan } from "@/lib/catalog";
 
 type Group = { label: string; plans: Plan[] };
+type CheckoutStep = "choose" | "review";
 
 type Props = {
   groups: Group[];
   signedIn: boolean;
   walletBalance: number | null;
   nextPath: string;
+  readOnlyDemo?: boolean;
+  paystackReady?: boolean;
 };
 
-export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Props) {
+type Success = { id: string; reference: string; name: string };
+
+function returnToCheckout(nextPath: string, planSlug: string): string {
+  try {
+    const target = new URL(nextPath, "https://pryva.invalid");
+    if (target.origin !== "https://pryva.invalid") return "/pricing";
+    target.searchParams.set("plan", planSlug);
+    target.hash = "buy";
+    return `${target.pathname}${target.search}${target.hash}`;
+  } catch {
+    return "/pricing";
+  }
+}
+
+export function PlanPurchase({
+  groups,
+  signedIn,
+  walletBalance,
+  nextPath,
+  readOnlyDemo = false,
+  paystackReady = false,
+}: Props) {
   const [tab, setTab] = useState(0);
   const plans = useMemo(() => groups[tab]?.plans ?? [], [groups, tab]);
   const [selectedSlug, setSelectedSlug] = useState<string>(
     () => (groups[0]?.plans.find((plan) => plan.popular) ?? groups[0]?.plans[0])?.slug ?? "",
   );
+  const [step, setStep] = useState<CheckoutStep>("choose");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsFunds, setNeedsFunds] = useState(false);
-  const [success, setSuccess] = useState<{ id: string; reference: string; name: string } | null>(
-    null,
-  );
+  const [success, setSuccess] = useState<Success | null>(null);
 
+  useEffect(() => {
+    const requestedPlan = new URLSearchParams(window.location.search).get("plan");
+    if (!requestedPlan) return;
+    const groupIndex = groups.findIndex((item) => item.plans.some((plan) => plan.slug === requestedPlan));
+    if (groupIndex < 0) return;
+
+    const timer = window.setTimeout(() => {
+      setTab(groupIndex);
+      setSelectedSlug(requestedPlan);
+      setStep("choose");
+      setError(null);
+      setNeedsFunds(false);
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.delete("plan");
+      window.history.replaceState(null, "", `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [groups]);
+
+  const group = groups[tab];
   const selected = plans.find((plan) => plan.slug === selectedSlug) ?? plans[0];
+  const shortfall = selected && walletBalance !== null
+    ? Math.max(0, selected.price - walletBalance)
+    : 0;
+  const enoughFunds = walletBalance !== null && Boolean(selected) && walletBalance >= (selected?.price ?? 0);
 
   function changeTab(index: number) {
     setTab(index);
     const nextPlans = groups[index]?.plans ?? [];
     const preferred = nextPlans.find((plan) => plan.popular) ?? nextPlans[0];
     if (preferred) setSelectedSlug(preferred.slug);
+    setStep("choose");
+    setError(null);
+    setNeedsFunds(false);
+  }
+
+  function selectPlan(plan: Plan) {
+    setSelectedSlug(plan.slug);
+    setStep("choose");
     setError(null);
     setNeedsFunds(false);
   }
 
   async function buy() {
-    if (!selected) return;
+    if (!selected || readOnlyDemo || !enoughFunds) return;
     setPending(true);
     setError(null);
     setNeedsFunds(false);
+
     try {
       const response = await fetch("/api/orders", {
         method: "POST",
@@ -60,8 +125,12 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
         return;
       }
       if (!response.ok || !data.ok || !data.order) {
-        setError(data.error ?? "We couldn't complete that order. Please try again.");
-        if (response.status === 402) setNeedsFunds(true);
+        if (response.status === 402) {
+          setNeedsFunds(true);
+          setError(data.error ?? "Your wallet balance is too low for this order.");
+        } else {
+          setError(data.error ?? "We couldn't complete that order. Please try again.");
+        }
         return;
       }
       setSuccess({
@@ -78,192 +147,237 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
 
   if (success) {
     return (
-      <div className="card relative overflow-hidden p-7 sm:p-9">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-52 w-52 rounded-full bg-lav-100 blur-2xl" />
-        <span className="grid h-12 w-12 place-items-center rounded-full bg-lav-100 text-lav-700">
-          <Check className="h-6 w-6" />
-        </span>
-        <h3 className="mt-5 text-2xl font-medium">Delivered. It&apos;s ready.</h3>
-        <p className="mt-2 max-w-md text-[0.92rem] leading-relaxed text-ink-2">
-          <span className="font-semibold text-ink">{success.name}</span> is now in your dashboard.
-          Order reference{" "}
-          <span className="rounded-md bg-lav-50 px-1.5 py-0.5 font-mono text-[0.8rem] text-lav-700">
-            {success.reference}
-          </span>
-          .
-        </p>
-        <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
-          <Link href={`/dashboard/orders/${success.id}`} className="btn btn-primary">
-            View code &amp; details
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-          <button
-            type="button"
-            onClick={() => setSuccess(null)}
-            className="btn btn-ghost"
-          >
-            Buy another
-          </button>
-        </div>
+      <div id="buy" className="pryva-checkout scroll-mt-28">
+        <CheckoutProgress step={2} />
+        <section className="pryva-checkout-success" aria-live="polite">
+          <span className="pryva-checkout-success-mark"><Check className="h-6 w-6" /></span>
+          <span className="pryva-section-eyebrow">PAYMENT CONFIRMED</span>
+          <h3>Order placed.</h3>
+          <p>
+            <strong>{success.name}</strong> is now in your Pryva orders. Your order reference is <code>{success.reference}</code>.
+          </p>
+          <div className="pryva-checkout-success-actions">
+            <Link href={`/dashboard/orders/${success.id}`} className="pryva-checkout-primary">
+              View order details <ArrowRight className="h-4 w-4" />
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setSuccess(null);
+                setStep("choose");
+                setError(null);
+                setNeedsFunds(false);
+              }}
+              className="pryva-checkout-secondary"
+            >
+              Buy another
+            </button>
+          </div>
+        </section>
       </div>
     );
   }
 
   return (
-    <div id="buy" className="scroll-mt-28">
-      {groups.length > 1 && (
-        <div className="mb-6 inline-flex items-center gap-1 rounded-full border border-line bg-white/70 p-1">
-          {groups.map((group, index) => (
-            <button
-              key={group.label}
-              type="button"
-              onClick={() => changeTab(index)}
-              className={`rounded-full px-4 py-2 text-[0.82rem] font-semibold transition-all ${
-                tab === index
-                  ? "bg-ink text-white shadow-sm"
-                  : "text-ink-2 hover:bg-lav-50 hover:text-lav-700"
-              }`}
-            >
-              {group.label}
-            </button>
-          ))}
-        </div>
-      )}
+    <div id="buy" className="pryva-checkout scroll-mt-28">
+      <CheckoutProgress step={step === "review" ? 1 : 0} />
 
-      <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
-        {plans.map((plan) => {
-          const isSelected = plan.slug === selected?.slug;
-          return (
-            <button
-              key={plan.slug}
-              type="button"
-              onClick={() => {
-                setSelectedSlug(plan.slug);
-                setError(null);
-                setNeedsFunds(false);
-              }}
-              aria-pressed={isSelected}
-              className={`group relative flex flex-col rounded-3xl border p-5 text-left transition-all duration-300 ${
-                isSelected
-                  ? "border-lav-300 bg-white shadow-[var(--shadow-soft)] ring-1 ring-lav-300"
-                  : "border-line bg-white/60 hover:-translate-y-0.5 hover:border-lav-200 hover:bg-white"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <span className="flex items-center gap-2 text-[0.95rem] font-semibold text-ink">
-                    {plan.flag && <span aria-hidden="true">{plan.flag}</span>}
-                    {plan.name}
-                  </span>
-                  <span className="mt-1 block text-[0.76rem] text-ink-3">{plan.planLabel}</span>
-                </div>
-                <span
-                  className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border transition-colors ${
-                    isSelected
-                      ? "border-lav-500 bg-lav-500 text-white"
-                      : "border-line text-transparent"
-                  }`}
+      {step === "choose" ? (
+        <>
+          {groups.length > 1 && (
+            <div className="pryva-plan-tabs" role="tablist" aria-label="Service type">
+              {groups.map((item, index) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === index}
+                  onClick={() => changeTab(index)}
+                  className={tab === index ? "is-selected" : ""}
                 >
-                  <Check className="h-3 w-3" />
-                </span>
-              </div>
-
-              <div className="mt-4 flex items-end gap-2">
-                <span className="text-[1.55rem] font-semibold leading-none tracking-tight">
-                  {formatNaira(plan.price)}
-                </span>
-                {plan.compareAt && (
-                  <span className="pb-0.5 text-[0.78rem] text-ink-3 line-through">
-                    {formatNaira(plan.compareAt)}
-                  </span>
-                )}
-              </div>
-              <span className="mt-1.5 text-[0.74rem] text-ink-3">{plan.duration}</span>
-
-              <ul className="mt-4 space-y-1.5">
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-1.5 text-[0.78rem] text-ink-2">
-                    <Check className="mt-0.5 h-3 w-3 shrink-0 text-lav-500" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-
-              {plan.badge && (
-                <span className="absolute -top-2.5 right-4 inline-flex items-center gap-1 rounded-full bg-lav-100 px-2.5 py-1 text-[0.62rem] font-bold uppercase tracking-[0.1em] text-lav-700">
-                  <Sparkle className="h-2.5 w-2.5" />
-                  {plan.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-6 flex flex-col gap-4 rounded-3xl border border-line bg-gradient-to-br from-white to-lav-50/70 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-        <div>
-          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
-            Your selection
-          </p>
-          <p className="mt-1 text-[0.95rem] font-semibold text-ink">
-            {selected ? `${selected.name} · ${selected.planLabel}` : "Choose a plan"}
-          </p>
-          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.74rem] text-ink-3">
-            <span className="inline-flex items-center gap-1">
-              <Shield className="h-3 w-3 text-lav-500" /> Auto-refund protection
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Lock className="h-3 w-3 text-lav-500" /> Secure Naira checkout
-            </span>
-            {signedIn && walletBalance !== null && (
-              <span className="inline-flex items-center gap-1">
-                Wallet: <span className="font-semibold text-ink-2">{formatNaira(walletBalance)}</span>
-              </span>
-            )}
-          </p>
-        </div>
-
-        <div className="flex flex-col items-stretch gap-2 sm:items-end">
-          <div className="flex items-center gap-3 sm:justify-end">
-            <span className="text-[0.78rem] text-ink-3">Total</span>
-            <span className="text-[1.5rem] font-semibold leading-none">
-              {selected ? formatNaira(selected.price) : "—"}
-            </span>
-          </div>
-          {signedIn ? (
-            <button
-              type="button"
-              onClick={buy}
-              disabled={pending || !selected}
-              className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-            >
-              {pending ? "Delivering…" : "Pay from wallet"}
-              {!pending && <ArrowRight className="h-4 w-4" />}
-            </button>
-          ) : (
-            <Link
-              href={`/login?next=${encodeURIComponent(nextPath)}`}
-              className="btn btn-primary w-full sm:w-auto"
-            >
-              Sign in to buy
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+                  {item.label}
+                </button>
+              ))}
+            </div>
           )}
-          {error && (
-            <p className="max-w-xs text-right text-[0.76rem] font-medium text-rose-600">
-              {error}
-              {needsFunds && (
-                <>
-                  {" "}
-                  <Link href="/dashboard/wallet" className="underline">
-                    Top up your wallet
-                  </Link>
-                </>
-              )}
+
+          <div className="pryva-plan-grid">
+            {plans.map((plan) => {
+              const isSelected = plan.slug === selected?.slug;
+              return (
+                <button
+                  key={plan.slug}
+                  type="button"
+                  onClick={() => selectPlan(plan)}
+                  aria-pressed={isSelected}
+                  className={`pryva-plan-card ${isSelected ? "is-selected" : ""}`}
+                >
+                  {plan.badge && (
+                    <span className="pryva-plan-badge"><Sparkle className="h-3 w-3" /> {plan.badge}</span>
+                  )}
+                  <span className="pryva-plan-card-head">
+                    <span>
+                      <strong>{plan.flag && <span aria-hidden="true">{plan.flag} </span>}{plan.name}</strong>
+                      <small>{plan.planLabel}</small>
+                    </span>
+                    <span className="pryva-plan-radio">{isSelected && <Check className="h-3 w-3" />}</span>
+                  </span>
+                  <span className="pryva-plan-price-row">
+                    <strong>{formatNaira(plan.price)}</strong>
+                    {plan.compareAt && <del>{formatNaira(plan.compareAt)}</del>}
+                  </span>
+                  <span className="pryva-plan-duration"><Clock className="h-3 w-3" /> {plan.duration}</span>
+                  <span className="pryva-plan-rule" />
+                  <span className="pryva-plan-features">
+                    {plan.features.map((feature) => (
+                      <span key={feature}><Check className="h-3.5 w-3.5" /> {feature}</span>
+                    ))}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <section className="pryva-checkout-summary">
+            <div className="pryva-checkout-summary-copy">
+              <span className="pryva-section-eyebrow">YOUR SELECTION</span>
+              <strong>{selected ? `${selected.name} · ${selected.planLabel}` : "Choose a plan"}</strong>
+              <span className="pryva-checkout-summary-notes">
+                <span><Shield className="h-3.5 w-3.5" /> Eligible orders have refund protection</span>
+                {signedIn && walletBalance !== null && (
+                  <span><Wallet className="h-3.5 w-3.5" /> Wallet · {formatNaira(walletBalance)}</span>
+                )}
+              </span>
+            </div>
+            <div className="pryva-checkout-summary-action">
+              <span>Total <strong>{selected ? formatNaira(selected.price) : "—"}</strong></span>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("review");
+                  setError(null);
+                  setNeedsFunds(false);
+                }}
+                disabled={!selected}
+                className="pryva-checkout-primary"
+              >
+                Review order <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </section>
+        </>
+      ) : (
+        <section className="pryva-checkout-review">
+          <header className="pryva-checkout-review-header">
+            <button type="button" onClick={() => setStep("choose")} className="pryva-checkout-back">
+              <ArrowLeft className="h-3.5 w-3.5" /> Edit selection
+            </button>
+            <span className="pryva-section-eyebrow">02 / REVIEW &amp; PAY</span>
+            <h3>Check the details</h3>
+            <p>Confirm your service and total before paying from your Pryva wallet.</p>
+          </header>
+
+          {selected && (
+            <div className="pryva-checkout-review-grid">
+              <div className="pryva-checkout-product">
+                <span className="pryva-checkout-product-icon"><Wallet className="h-5 w-5" /></span>
+                <span className="pryva-section-eyebrow">{group?.label ?? "PRYVA SERVICE"}</span>
+                <h4>{selected.name}</h4>
+                <p>{selected.planLabel}</p>
+                <span className="pryva-checkout-product-duration"><Clock className="h-3.5 w-3.5" /> {selected.duration}</span>
+                <ul>
+                  {selected.features.map((feature) => (
+                    <li key={feature}><Check className="h-3.5 w-3.5" /> {feature}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <dl className="pryva-checkout-receipt">
+                <div><dt>Service</dt><dd>{group?.label ?? "Pryva service"}</dd></div>
+                <div><dt>Plan</dt><dd>{selected.planLabel}</dd></div>
+                <div><dt>Payment method</dt><dd>Pryva wallet</dd></div>
+                <div><dt>Wallet balance</dt><dd>{walletBalance === null ? "Sign in to view" : formatNaira(walletBalance)}</dd></div>
+                <div className="is-total"><dt>Due today</dt><dd>{formatNaira(selected.price)}</dd></div>
+                <div className="is-after"><dt>Balance after order</dt><dd>{walletBalance === null ? "—" : enoughFunds ? formatNaira(walletBalance - selected.price) : "Insufficient balance"}</dd></div>
+              </dl>
+            </div>
+          )}
+
+          <div className="pryva-checkout-protection">
+            <Shield className="h-4 w-4" />
+            <span><strong>Refund protection</strong> · Eligible service orders can be refunded to your Pryva wallet.</span>
+          </div>
+
+          {readOnlyDemo && (
+            <p className="pryva-checkout-notice is-demo" role="status">
+              Read-only demo · This sample wallet cannot place or pay for orders.
             </p>
           )}
-        </div>
-      </div>
+          {!readOnlyDemo && walletBalance !== null && shortfall > 0 && selected && (
+            <div className="pryva-checkout-notice is-funds" role="status">
+              <strong>You&apos;re {formatNaira(shortfall)} short.</strong>
+              <span>
+                {paystackReady
+                  ? "Add funds with Paystack and return here to finish this order."
+                  : "Paystack is not configured on this deployment yet. Choose a lower-priced plan or contact support."}
+              </span>
+              {paystackReady ? (
+                <Link href={`/dashboard/wallet?returnTo=${encodeURIComponent(returnToCheckout(nextPath, selected.slug))}`}>
+                  Add funds with Paystack <ArrowRight className="h-3 w-3" />
+                </Link>
+              ) : (
+                <Link href="/dashboard/support">Contact support <ArrowRight className="h-3 w-3" /></Link>
+              )}
+            </div>
+          )}
+          {error && (
+            <p className="pryva-checkout-error" role="alert">
+              {error}{needsFunds && walletBalance !== null && shortfall === 0 ? " Your balance may have changed; review it in the wallet." : ""}
+            </p>
+          )}
+
+          <div className="pryva-checkout-review-actions">
+            <button type="button" onClick={() => setStep("choose")} className="pryva-checkout-secondary">
+              Back to plans
+            </button>
+            {!signedIn ? (
+              <Link href={`/login?next=${encodeURIComponent(nextPath)}`} className="pryva-checkout-primary">
+                Sign in to continue <ArrowRight className="h-4 w-4" />
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={buy}
+                disabled={pending || readOnlyDemo || !enoughFunds}
+                className="pryva-checkout-primary"
+              >
+                {pending ? "Confirming order…" : readOnlyDemo ? "Read-only demo" : `Confirm & pay ${selected ? formatNaira(selected.price) : ""}`}
+                {!pending && !readOnlyDemo && <Lock className="h-3.5 w-3.5" />}
+              </button>
+            )}
+          </div>
+          <p className="pryva-checkout-footnote">
+            <Lock className="h-3 w-3" /> The order is charged to your wallet after confirmation. No card or bank-transfer funding is available in this flow.
+          </p>
+        </section>
+      )}
     </div>
+  );
+}
+
+function CheckoutProgress({ step }: { step: number }) {
+  const items = ["Choose a plan", "Review & pay", "Order placed"];
+  return (
+    <ol className="pryva-checkout-progress" aria-label="Checkout progress">
+      {items.map((item, index) => {
+        const state = index < step ? "is-done" : index === step ? "is-current" : "";
+        return (
+          <li key={item} className={state} aria-current={index === step ? "step" : undefined}>
+            <span>{index < step ? <Check className="h-3.5 w-3.5" /> : `0${index + 1}`}</span>
+            <strong>{item}</strong>
+          </li>
+        );
+      })}
+    </ol>
   );
 }

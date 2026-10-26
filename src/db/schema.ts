@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
   pgTable,
@@ -76,6 +78,31 @@ export const walletTransactions = pgTable(
   (table) => [index("wallet_user_idx").on(table.userId)],
 );
 
+export const walletTopups = pgTable(
+  "wallet_topups",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reference: varchar("reference", { length: 40 }).notNull().unique(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    amount: integer("amount").notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("NGN"),
+    method: varchar("method", { length: 24 }).notNull(),
+    status: varchar("status", { length: 24 }).notNull().default("pending"),
+    authorizationUrl: text("authorization_url"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("wallet_topups_user_idx").on(table.userId),
+    check("wallet_topups_amount_range_check", sql`${table.amount} >= 1000 AND ${table.amount} <= 500000`),
+    check("wallet_topups_currency_check", sql`${table.currency} = 'NGN'`),
+    check("wallet_topups_method_check", sql`${table.method} IN ('card', 'bank-transfer')`),
+    check("wallet_topups_status_check", sql`${table.status} IN ('pending', 'paid', 'failed')`),
+  ],
+);
+
 export const contactMessages = pgTable("contact_messages", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
@@ -90,4 +117,5 @@ export const contactMessages = pgTable("contact_messages", {
 export type User = typeof users.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type WalletTransaction = typeof walletTransactions.$inferSelect;
+export type WalletTopup = typeof walletTopups.$inferSelect;
 export type ContactMessage = typeof contactMessages.$inferSelect;
