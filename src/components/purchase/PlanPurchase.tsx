@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Lock, Shield, Sparkle } from "@/components/icons";
 import { formatNaira, type Plan } from "@/lib/catalog";
 
@@ -15,6 +16,7 @@ type Props = {
 };
 
 export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Props) {
+  const router = useRouter();
   const [tab, setTab] = useState(0);
   const plans = useMemo(() => groups[tab]?.plans ?? [], [groups, tab]);
   const [selectedSlug, setSelectedSlug] = useState<string>(
@@ -69,6 +71,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
         reference: data.order.reference,
         name: data.order.productName,
       });
+      router.refresh();
     } catch {
       setError("Network hiccup. Please try again.");
     } finally {
