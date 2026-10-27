@@ -38,6 +38,8 @@ export function Logo({
         width={36}
         height={36}
         className="h-9 w-9 shrink-0"
+        loading="eager"
+        priority
       />
       {variant === "lockup" && (
         <span className="flex flex-col leading-none">
