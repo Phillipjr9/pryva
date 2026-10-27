@@ -32,13 +32,22 @@ describe("logo-free presentation", () => {
     expect(googleLink).not.toMatch(/<svg|<img/);
   });
 
-  it("uses generic category art rather than third-party product logos", () => {
+  it("gives every digital service its own distinct artwork", () => {
+    const seen = new Set<string>();
+
     for (const service of ["netflix", "spotify", "youtube", "disney", "chatgpt", "canva"] as const) {
-      expect(existsSync(`public/images/services/${service}.png`)).toBe(false);
+      const file = `public/images/services/${service}.png`;
+      // Original 3D art per product — never a shared category image.
+      expect(existsSync(file)).toBe(true);
+
       const html = decodeURIComponent(renderToStaticMarkup(<ServiceIcon service={service} />));
-      expect(html).not.toContain(`/images/services/${service}.png`);
-      expect(html).toContain("/images/categories/");
+      expect(html).toContain(`/images/services/${service}.png`);
+
+      if (html.includes("/images/services/")) seen.add(service);
     }
+
+    // No two products point at the same file.
+    expect(seen.size).toBe(6);
   });
 
   it("removes the logo from every email template", () => {

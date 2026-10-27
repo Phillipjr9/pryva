@@ -16,16 +16,30 @@ import {
   Sparkle,
   Wallet,
 } from "@/components/icons";
+import { ServiceIcon } from "@/components/ServiceIcon";
 import { formatNaira } from "@/lib/catalog";
 
-const navItems = [
+/**
+ * Sidebar entries. Product rows carry their own 3D artwork (`art`) so the nav
+ * matches the service cards people see on the marketing pages instead of
+ * repeating the same generic line icon for five different products.
+ */
+type NavItem = {
+  href: string;
+  label: string;
+  icon?: (props: { className?: string }) => ReactNode;
+  art?: "accounts" | "data" | "gift-cards" | "bulk" | "scheduled" | "proxies";
+};
+
+const navItems: NavItem[] = [
   { href: "/dashboard", label: "Overview", icon: Grid },
   { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
   { href: "/dashboard/orders", label: "Orders", icon: Receipt },
-  { href: "/dashboard/data", label: "Data Plans", icon: Receipt },
-  { href: "/dashboard/gift-cards", label: "Gift Cards", icon: Sparkle },
-  { href: "/dashboard/bulk-orders", label: "Bulk Orders", icon: Receipt },
-  { href: "/dashboard/scheduled", label: "Scheduled", icon: Receipt },
+  { href: "/accounts", label: "Accounts", art: "accounts" },
+  { href: "/dashboard/data", label: "Data Plans", art: "data" },
+  { href: "/dashboard/gift-cards", label: "Gift Cards", art: "gift-cards" },
+  { href: "/dashboard/bulk-orders", label: "Bulk Orders", art: "bulk" },
+  { href: "/dashboard/scheduled", label: "Scheduled", art: "scheduled" },
   { href: "/dashboard/support", label: "Support", icon: Chat },
 ];
 
@@ -117,7 +131,11 @@ export function DashboardShell({
                   : "text-ink-2 hover:bg-white hover:text-ink"
               }`}
             >
-              <Icon className={`h-4 w-4 ${active ? "text-lav-700" : "text-ink-3"}`} />
+              {item.art ? (
+                <ServiceIcon service={item.art} size="xs" className="overflow-hidden rounded-[5px]" />
+              ) : (
+                Icon && <Icon className={`h-4 w-4 ${active ? "text-lav-700" : "text-ink-3"}`} />
+              )}
               {item.label}
               {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-lav-500" />}
             </Link>

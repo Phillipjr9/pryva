@@ -10,17 +10,22 @@ type CategoryType = "streaming" | "music" | "gaming" | "productivity";
 
 interface ServiceIconProps {
   service: ServiceType;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   className?: string;
 }
 
+/**
+ * Each digital product gets its own artwork. These are original 3D illustrations
+ * themed around the product — deliberately not reproductions of third-party
+ * trademarked logos.
+ */
 const digitalServiceImages: Record<DigitalServiceType, string> = {
-  netflix: "/images/categories/streaming.png",
-  spotify: "/images/categories/music.png",
-  youtube: "/images/categories/streaming.png",
-  disney: "/images/categories/streaming.png",
-  chatgpt: "/images/categories/productivity.png",
-  canva: "/images/categories/productivity.png",
+  netflix: "/images/services/netflix.png",
+  spotify: "/images/services/spotify.png",
+  youtube: "/images/services/youtube.png",
+  disney: "/images/services/disney.png",
+  chatgpt: "/images/services/chatgpt.png",
+  canva: "/images/services/canva.png",
 };
 
 const coreServiceImages: Record<CoreServiceType, string> = {
@@ -66,6 +71,7 @@ const serviceNames: Record<ServiceType, string> = {
 };
 
 const sizeMap = {
+  xs: 20,
   sm: 32,
   md: 48,
   lg: 64,
@@ -94,7 +100,7 @@ export function ServiceIcon({ service, size = "md", className = "" }: ServiceIco
 
 interface CategoryIconProps {
   category: CategoryType;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   className?: string;
 }
 
