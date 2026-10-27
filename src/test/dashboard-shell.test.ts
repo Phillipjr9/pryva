@@ -117,3 +117,21 @@ describe("overview layout", () => {
     expect(overview).toContain("sum(orders.amount)");
   });
 });
+
+describe("balance visibility", () => {
+  it("shows the balance in the top bar on every width", () => {
+    // It is the number people open the dashboard to check, so it is not hidden
+    // behind a `md:` breakpoint any more.
+    const chip = shell.slice(shell.indexOf("Wallet balance ${formatNaira"), shell.indexOf("aria-label={`Wallet balance"));
+    expect(shell).toContain("aria-label={`Wallet balance ${formatNaira(user.walletBalance)}");
+    expect(chip).not.toContain("hidden md:inline-flex");
+  });
+
+  it("reserves the balance slot in the loading state", () => {
+    const loading = readFileSync(join(root, "app/dashboard/loading.tsx"), "utf8");
+    // The first block inside the skeleton must be the dark balance card.
+    const firstBlock = loading.slice(loading.indexOf("<SkeletonPage>"));
+    expect(firstBlock.indexOf("bg-ink")).toBeGreaterThan(-1);
+    expect(firstBlock.indexOf("bg-ink")).toBeLessThan(firstBlock.indexOf("<SkeletonCard"));
+  });
+});
