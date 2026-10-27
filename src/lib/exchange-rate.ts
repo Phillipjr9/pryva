@@ -21,6 +21,9 @@ const FALLBACK_RATE = Number(process.env.USD_NGN_FALLBACK || 1600);
 type Cache = { rate: number; fetchedAt: number; source: "override" | "live" | "fallback" };
 
 let cache: Cache | null = null;
+/** De-duplicates concurrent cold-start lookups (a 20-row listing page would
+ *  otherwise fire 20 identical provider calls). */
+let inFlight: Promise<number | null> | null = null;
 
 function envOverride(): number | null {
   const raw = process.env.USD_NGN_RATE;
@@ -71,7 +74,13 @@ export async function getUsdToNgnRate(): Promise<RateInfo> {
     return { rate: cache.rate, source: cache.source, fetchedAt: new Date(cache.fetchedAt).toISOString() };
   }
 
-  const live = await fetchLiveRate();
+  if (!inFlight) {
+    inFlight = fetchLiveRate().finally(() => {
+      inFlight = null;
+    });
+  }
+
+  const live = await inFlight;
   if (live) {
     cache = { rate: live, fetchedAt: Date.now(), source: "live" };
     return { rate: live, source: "live", fetchedAt: new Date(cache.fetchedAt).toISOString() };
