@@ -43,6 +43,9 @@ const serviceImages: Record<ServiceType, string> = {
   ...additionalServiceImages,
 };
 
+// Fallback image for unknown services
+const FALLBACK_IMAGE = "/images/services/virtual-numbers.png";
+
 const serviceNames: Record<ServiceType, string> = {
   netflix: "Netflix",
   spotify: "Spotify",
@@ -68,13 +71,8 @@ const sizeMap = {
 
 export function ServiceIcon({ service, size = "md", className = "" }: ServiceIconProps) {
   const pixelSize = sizeMap[size];
-  const imageSrc = serviceImages[service];
-  const altText = serviceNames[service];
-
-  // Return null if no image is found to avoid empty src warnings
-  if (!imageSrc) {
-    return null;
-  }
+  const imageSrc = serviceImages[service] || FALLBACK_IMAGE;
+  const altText = serviceNames[service] || service;
 
   return (
     <div className={`relative ${className}`} style={{ width: pixelSize, height: pixelSize }}>
