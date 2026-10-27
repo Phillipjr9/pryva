@@ -1,10 +1,10 @@
 /* eslint-disable @next/next/no-page-custom-font -- fonts are loaded once in the shared App Router root layout. */
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import Script from "next/script";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
-import { BUILD_GUARD_SCRIPT_ID, BUILD_ID, staleBuildScript } from "@/lib/build-id";
+import { BUILD_ID } from "@/lib/build-id";
+import { BuildGuard } from "@/components/system/BuildGuard";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://pryva.ng"),
@@ -62,19 +62,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <noscript>
           <style>{`.reveal{opacity:1 !important;transform:none !important}`}</style>
         </noscript>
-        {/*
-          `next/script` with beforeInteractive — not a raw script element. React
-          never executes a script tag it renders on the client (and warns about
-          it); this one is placed in the server HTML and run by the Next runtime
-          before hydration. Running *before* hydration is the whole point: a tab
-          left open across a deploy reloads instead of reporting a mismatch it
-          cannot otherwise fix.
-        */}
-        <Script id={BUILD_GUARD_SCRIPT_ID} strategy="beforeInteractive">
-          {staleBuildScript(BUILD_ID)}
-        </Script>
       </head>
       <body className="min-h-screen bg-cream text-ink antialiased">
+        <BuildGuard buildId={BUILD_ID} />
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
