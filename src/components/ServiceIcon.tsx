@@ -4,7 +4,7 @@ import Image from "next/image";
 
 type DigitalServiceType = "netflix" | "spotify" | "youtube" | "disney" | "chatgpt" | "canva";
 type CoreServiceType = "numbers" | "esim" | "proxies" | "email-otp";
-type AdditionalServiceType = "data" | "gift-cards" | "bulk" | "scheduled";
+type AdditionalServiceType = "data" | "gift-cards" | "bulk" | "scheduled" | "accounts";
 type ServiceType = DigitalServiceType | CoreServiceType | AdditionalServiceType;
 type CategoryType = "streaming" | "music" | "gaming" | "productivity";
 
@@ -31,6 +31,7 @@ const coreServiceImages: Record<CoreServiceType, string> = {
 };
 
 const additionalServiceImages: Record<AdditionalServiceType, string> = {
+  accounts: "/images/services/digital-accounts.png",
   data: "/images/services/data.png",
   "gift-cards": "/images/services/gift-cards.png",
   bulk: "/images/services/bulk.png",
@@ -57,6 +58,7 @@ const serviceNames: Record<ServiceType, string> = {
   esim: "eSIM Data",
   proxies: "Residential Proxies",
   "email-otp": "Email OTP",
+  accounts: "Digital Accounts",
   data: "Data Plans",
   "gift-cards": "Gift Cards",
   bulk: "Bulk Orders",

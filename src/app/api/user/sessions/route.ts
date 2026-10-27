@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sessions } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { requireAuth } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { SESSION_COOKIE, requireAuth } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,8 @@ export async function GET(request: NextRequest) {
       .where(eq(sessions.userId, user.id))
       .orderBy(desc(sessions.createdAt));
 
+    // The app authenticates with an httpOnly cookie, not a bearer token.
+    const currentToken = (await cookies()).get(SESSION_COOKIE)?.value ?? null;
     const now = new Date();
     const activeSessions = userSessions.filter((s) => s.expiresAt > now);
 
@@ -30,7 +33,7 @@ export async function GET(request: NextRequest) {
         id: s.id,
         createdAt: s.createdAt,
         expiresAt: s.expiresAt,
-        isCurrent: s.token === request.headers.get("authorization")?.replace("Bearer ", ""),
+        isCurrent: Boolean(currentToken) && s.token === currentToken,
       })),
       count: activeSessions.length,
     });
@@ -53,7 +56,7 @@ export async function DELETE(request: NextRequest) {
 
     if (revokeAll) {
       // Revoke all sessions except current
-      const currentToken = request.headers.get("authorization")?.replace("Bearer ", "");
+      const currentToken = (await cookies()).get(SESSION_COOKIE)?.value ?? null;
       const userSessions = await db
         .select()
         .from(sessions)

@@ -593,6 +593,7 @@ export const serviceIconMap = {
   sim: Sim,
   globe: Globe,
   mail: Mail,
+  accounts: Users,
   gift: Gift,
   package: ShoppingCart,
   calendar: Calendar,
