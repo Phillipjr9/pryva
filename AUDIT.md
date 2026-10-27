@@ -161,6 +161,7 @@ Pryva's own invention keeps original artwork.
 |---|---|---|
 | Third-party products (Netflix, Spotify, YouTube, Disney+, ChatGPT, Canva) | Official brand mark | `src/lib/brand-marks.ts` — generated from `simple-icons` (CC0), `@iconify-json/logos` (CC0) and `devicon` (MIT) |
 | Platforms sold as accounts (Facebook, Instagram, TikTok, X, Gmail, Telegram, WhatsApp, Discord, Steam…) | Official brand mark | same file, rendered by `BrandIcon` |
+| Homepage scrolling strip (16 platforms, WhatsApp → Spotify) | Official brand mark on every pill | `PLATFORM_SHOWCASE` + `BrandIcon` |
 | Carriers (MTN, Airtel, Glo, 9mobile) | Airtel's official mark; MTN/Glo/9mobile as wordmark tiles (no redistributable logo exists) | `NetworkBadge` → `BrandIcon` |
 | Countries (60 markets) | Real flag artwork | `public/images/flags/*.svg`, copied from `flag-icons` (MIT) by `scripts/copy-flags.mjs` |
 | Pryva's own catalogue (virtual numbers, eSIM, proxies, email OTP, data, gift cards, bulk, scheduled, accounts) | Original 3D art — there is no "real logo" for a product we invented | `public/images/services/*.png` |
@@ -169,6 +170,10 @@ Pryva's own invention keeps original artwork.
 **Why the change:** the 3D renders looked good but read as "some streaming thing" at 20 px in the
 dashboard, and a buyer scanning account listings needs to see Netflix as Netflix. Official paths are
 also tiny (≤3 KB each, SVG, scales to any size) versus 250 KB PNGs.
+
+**Contrast rule:** yellow/lime marks (Snapchat, Binance) would vanish as white-on-brand, so the
+component computes the tile's luminance and flips the glyph to near-black — the way those brands
+draw themselves.
 
 **Gone:** `services/{netflix,spotify,youtube,disney,chatgpt,canva}.png` deleted — nothing referenced
 them any more, and keeping two representations of the same product is how the wrong one ends up on a
