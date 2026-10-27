@@ -12,22 +12,17 @@ import {
   Globe,
   Lock,
   Mail,
-  Phone,
   Shield,
   Sim,
   Sparkle,
   Wallet,
+  serviceIconMap,
 } from "@/components/icons";
 import { formatNaira, plansFor, services, type Service, type ServiceSlug } from "@/lib/catalog";
 import { BrandMark, hasBrand } from "@/components/brand/BrandMark";
 import { getCurrentUser } from "@/lib/auth";
 
-const iconMap = {
-  phone: Phone,
-  sim: Sim,
-  globe: Globe,
-  mail: Mail,
-} as const;
+const iconMap = serviceIconMap;
 
 const clipChips = ["WhatsApp", "Telegram", "Google", "Binance", "TikTok", "Discord"];
 
@@ -306,6 +301,10 @@ export async function ServicePageTemplate({ service }: { service: Service }) {
                         esim: "Scan once, travel lighter.",
                         proxies: "No data-center tell.",
                         "email-otp": "Not your real inbox.",
+                        data: "Top up without the USSD dance.",
+                        "gift-cards": "Any card, any store.",
+                        bulk: "Order once, deliver many.",
+                        scheduled: "Set it, forget it, we run it.",
                       }[service.slug]}
                   </span>
                 </h1>
@@ -437,7 +436,7 @@ export async function ServicePageTemplate({ service }: { service: Service }) {
               </div>
               <p className="mt-5 flex items-start gap-2 text-[0.8rem] leading-relaxed text-ink-2">
                 <Monogram className="mt-0.5 h-5 w-5 shrink-0" />
-                Provisioned through Fleexa&apos;s infrastructure and monitored by the Pryva team in
+                Provisioned on carrier-grade infrastructure and monitored by the Pryva team in
                 Lagos.
               </p>
             </div>

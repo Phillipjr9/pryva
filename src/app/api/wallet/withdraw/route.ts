@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, withdrawals, walletTransactions } from "@/db/schema";
+import { bankAccounts, users, withdrawals, walletTransactions } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
+import { debitWallet, InsufficientFundsError } from "@/lib/wallet";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -110,23 +111,32 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    // Deduct from wallet immediately
-    const newBalance = currentUser.walletBalance - totalDeduction;
+    // Debit atomically. The balance guard lives in the SQL WHERE clause, so two
+    // concurrent withdrawal requests can never spend the same Naira twice — the
+    // balance check above is only a friendly pre-check.
+    let newBalance: number;
+    try {
+      newBalance = await debitWallet({
+        userId: user.id,
+        amount: totalDeduction,
+        type: "debit",
+        description: `Withdrawal to ${bankAccount.bankName} (${bankAccount.accountNumber})`.slice(0, 200),
+        reference: withdrawal.reference,
+      });
+    } catch (error) {
+      await db
+        .update(withdrawals)
+        .set({ status: "failed", failureReason: "Wallet debit failed" })
+        .where(eq(withdrawals.id, withdrawal.id));
 
-    await db
-      .update(users)
-      .set({ walletBalance: newBalance })
-      .where(eq(users.id, user.id));
-
-    // Record wallet transaction
-    await db.insert(walletTransactions).values({
-      userId: user.id,
-      type: "withdrawal",
-      amount: totalDeduction,
-      balanceAfter: newBalance,
-      description: `Withdrawal to ${bankAccount.bankName} (${bankAccount.accountNumber})`,
-      reference: withdrawal.reference,
-    });
+      if (error instanceof InsufficientFundsError) {
+        return NextResponse.json(
+          { error: "Insufficient wallet balance.", balance: error.balance, required: error.required },
+          { status: 402 },
+        );
+      }
+      throw error;
+    }
 
     logger.info("Withdrawal request created", {
       userId: user.id,

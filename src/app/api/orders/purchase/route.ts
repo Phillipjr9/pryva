@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders, walletTransactions, users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { findPlan } from "@/lib/catalog";
 import { fulfillOrder } from "@/lib/fulfillment";
 import { logger } from "@/lib/logger";
+import { InsufficientFundsError } from "@/lib/wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -36,14 +37,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Insufficient wallet balance" }, { status: 400 });
     }
 
-    let orderId: string;
+    let orderId: string | undefined;
 
     await db.transaction(async (tx) => {
-      const newBalance = currentUser.walletBalance - plan.price;
-
-      await tx.update(users).set({ walletBalance: newBalance }).where(eq(users.id, user.id));
-
       const reference = `ORD-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+
+      // Atomic debit: the WHERE clause carries the balance guard, so two
+      // concurrent purchases can never spend the same Naira twice.
+      const [debited] = await tx
+        .update(users)
+        .set({ walletBalance: sql`${users.walletBalance} - ${plan.price}` })
+        .where(and(eq(users.id, user.id), gte(users.walletBalance, plan.price)))
+        .returning({ balance: users.walletBalance });
+
+      if (!debited) {
+        throw new InsufficientFundsError(currentUser.walletBalance, plan.price);
+      }
+
+      const newBalance = debited.balance;
 
       const [order] = await tx
         .insert(orders)
@@ -75,10 +86,14 @@ export async function POST(request: NextRequest) {
       });
     });
 
+    if (!orderId) {
+      return NextResponse.json({ error: "Could not create your order. Nothing was charged." }, { status: 500 });
+    }
+
     logger.info("Order created successfully", { orderId, userId: user.id, planSlug });
 
     // Trigger fulfillment asynchronously
-    fulfillOrder(orderId!).catch((error) => {
+    fulfillOrder(orderId).catch((error) => {
       logger.error("Order fulfillment failed", { orderId, error });
     });
 

@@ -1,9 +1,73 @@
+import { randomUUID } from "node:crypto";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { createFleexaOrder, pollForOtp } from "./fleexa";
+import {
+  cancelFleexaOrder,
+  createFleexaOrder,
+  isFleexaConfigured,
+  pollForOtp,
+} from "./fleexa";
 import { getServiceTimeout } from "./service-timeouts";
+import type { Plan } from "./catalog";
 import { logger } from "./logger";
+
+export type FulfilledPlan = {
+  provider: string;
+  providerRequestId: string | null;
+  referenceCode: string | null;
+  otpCode: string | null;
+  expiresAt: Date | null;
+};
+
+/**
+ * Provision a plan upstream *before* the wallet is charged.
+ *
+ * When the provider isn't configured (local preview, no keys) we return a
+ * clearly-marked simulated result instead of throwing, so the purchase flow
+ * stays testable end to end.
+ */
+export async function fulfillPlan(plan: Plan): Promise<FulfilledPlan> {
+  if (!isFleexaConfigured()) {
+    logger.warn("Fulfilment simulated — provider not configured", { planSlug: plan.slug });
+    return {
+      provider: "simulated",
+      providerRequestId: null,
+      referenceCode: `SIM-${randomUUID().slice(0, 8).toUpperCase()}`,
+      otpCode: null,
+      expiresAt: null,
+    };
+  }
+
+  const upstream = await createFleexaOrder({
+    service: plan.service,
+    country: plan.provider?.country ?? (plan.region === "Nigeria" ? "ng" : plan.region.toLowerCase()),
+    app: plan.provider?.app,
+    emailProduct: plan.provider?.emailProduct,
+    months: plan.provider?.months,
+  });
+
+  return {
+    provider: "fleexa",
+    providerRequestId: upstream.orderId,
+    referenceCode: upstream.number ?? upstream.email ?? upstream.proxyEndpoint ?? null,
+    otpCode: null,
+    expiresAt: upstream.expiresAt ? new Date(upstream.expiresAt) : null,
+  };
+}
+
+/**
+ * Best-effort cancel of an upstream order. Used when the wallet charge fails
+ * after provisioning succeeded, so we don't leave a paid upstream order behind.
+ */
+export async function cancelUpstream(input: {
+  provider: string;
+  providerRequestId: string | null;
+  service: string;
+}): Promise<void> {
+  if (input.provider !== "fleexa" || !input.providerRequestId) return;
+  await cancelFleexaOrder(input.providerRequestId);
+}
 
 export async function fulfillOrder(orderId: string): Promise<void> {
   const order = await db.query.orders.findFirst({

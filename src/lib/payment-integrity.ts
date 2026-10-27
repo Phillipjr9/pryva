@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { walletTransactions, orders } from "@/db/schema";
+import { users, walletTransactions, orders } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 
 export interface IntegrityCheckResult {

@@ -1,4 +1,4 @@
-import { db } from "@/db";
+import { db, type Transaction } from "@/db";
 import { orders, walletTransactions, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { isTimedOut } from "./service-timeouts";
@@ -24,7 +24,7 @@ export async function processAutoRefunds(): Promise<number> {
       }
 
       // Process refund
-      await db.transaction(async (tx: typeof db) => {
+      await db.transaction(async (tx: Transaction) => {
         const user = await tx.query.users.findFirst({
           where: eq(users.id, order.userId),
         });

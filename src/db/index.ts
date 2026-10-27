@@ -1,6 +1,7 @@
 import { randomBytes, scryptSync } from "node:crypto";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import * as schema from "./schema";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -251,10 +252,18 @@ function evaluateAggregateExpression(
   return null;
 }
 
-function withLimit<T>(items: T[]): T[] & { limit: (count: number) => T[] } {
+type Pageable<T> = T[] & {
+  limit: (count: number) => Pageable<T>;
+  offset: (start: number) => Pageable<T>;
+};
+
+function withLimit<T>(items: T[]): Pageable<T> {
   return Object.assign([...items], {
     limit(count: number) {
-      return items.slice(0, count);
+      return withLimit(items.slice(0, count));
+    },
+    offset(start: number) {
+      return withLimit(items.slice(start));
     },
   });
 }
@@ -273,6 +282,12 @@ type MockState = {
   orders: Array<Record<string, unknown>>;
   walletTransactions: Array<Record<string, unknown>>;
   contactMessages: Array<Record<string, unknown>>;
+  giftCards: Array<Record<string, unknown>>;
+  scheduledOrders: Array<Record<string, unknown>>;
+  notifications: Array<Record<string, unknown>>;
+  securityViolations: Array<Record<string, unknown>>;
+  withdrawals: Array<Record<string, unknown>>;
+  bankAccounts: Array<Record<string, unknown>>;
 };
 
 const globalForDb = globalThis as typeof globalThis & {
@@ -287,6 +302,12 @@ const mockState: MockState =
     orders: [],
     walletTransactions: [],
     contactMessages: [],
+    giftCards: [],
+    scheduledOrders: [],
+    notifications: [],
+    securityViolations: [],
+    withdrawals: [],
+    bankAccounts: [],
   };
 
 if (process.env.NODE_ENV !== "production") {
@@ -344,7 +365,10 @@ function buildQueryResult(
         return withLimit([aggregateRow]);
       },
       limit(count: number) {
-        return [aggregateRow].slice(0, count);
+        return withLimit([aggregateRow].slice(0, count));
+      },
+      offset() {
+        return withLimit([aggregateRow]);
       },
     });
   }
@@ -356,7 +380,10 @@ function buildQueryResult(
       return withLimit(sorted);
     },
     limit(count: number) {
-      return projected.slice(0, count);
+      return withLimit(projected.slice(0, count));
+    },
+    offset(start: number) {
+      return withLimit(projected.slice(start));
     },
   });
 }
@@ -542,4 +569,19 @@ export const pool = databaseUrl
     })()
   : null;
 
-export const db = databaseUrl ? drizzle(pool as Pool) : mockDb;
+type Database = NonNullable<ReturnType<typeof createDrizzle>>;
+
+function createDrizzle() {
+  return databaseUrl ? drizzle(pool as Pool, { schema }) : null;
+}
+
+/**
+ * The real Drizzle client when DATABASE_URL is set, otherwise the in-memory
+ * mock. Both are exposed under one fully-typed interface so route handlers get
+ * real row types (and so `db.query.<table>` — which requires `schema` to be
+ * registered — works against Postgres).
+ */
+export const db: Database = (createDrizzle() ?? (mockDb as unknown as Database)) as Database;
+
+/** The client a `db.transaction(async (tx) => …)` callback receives. */
+export type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];

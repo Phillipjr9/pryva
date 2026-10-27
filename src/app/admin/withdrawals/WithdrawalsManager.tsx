@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "@/components/ui/Toast";
-import { Loader2, CheckCircle, XCircle, Clock, Filter } from "lucide-react";
+import { CheckCircle, Clock, Search, Loader2, XCircle } from "@/components/icons";
 
 interface Withdrawal {
   id: string;
@@ -125,7 +125,7 @@ export function WithdrawalsManager() {
     };
 
     const { color, icon: Icon } = config[status as keyof typeof config] || {
-      color: "bg-gray-100 text-gray-800",
+      color: "bg-cream-2 text-gray-800",
       icon: Clock,
     };
 
@@ -157,8 +157,8 @@ export function WithdrawalsManager() {
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-sm text-gray-600">Total</p>
+        <div className="bg-white border border-line rounded-lg p-4">
+          <p className="text-sm text-ink-2">Total</p>
           <p className="text-2xl font-bold">{stats.total}</p>
         </div>
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -179,13 +179,13 @@ export function WithdrawalsManager() {
         </div>
       </div>
 
-      {/* Filter */}
+      {/* Search */}
       <div className="flex items-center gap-2">
-        <Filter className="w-4 h-4 text-gray-600" />
+        <Search className="w-4 h-4 text-ink-2" />
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          className="border border-line rounded-lg px-3 py-2 text-sm"
         >
           <option value="all">All Statuses</option>
           <option value="pending">Pending</option>
@@ -198,15 +198,15 @@ export function WithdrawalsManager() {
 
       {/* Withdrawals List */}
       {withdrawals.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <p className="text-gray-600">No withdrawal requests found</p>
+        <div className="text-center py-12 bg-cream rounded-lg">
+          <p className="text-ink-2">No withdrawal requests found</p>
         </div>
       ) : (
         <div className="space-y-4">
           {withdrawals.map((withdrawal) => (
             <div
               key={withdrawal.id}
-              className="bg-white border border-gray-200 rounded-lg p-6"
+              className="bg-white border border-line rounded-lg p-6"
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -214,11 +214,11 @@ export function WithdrawalsManager() {
                     <p className="text-xl font-bold">{formatCurrency(withdrawal.amount)}</p>
                     {getStatusBadge(withdrawal.status)}
                   </div>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-ink-2">
                     {withdrawal.userName} • {withdrawal.userEmail}
                   </p>
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-ink-3">
                   {new Date(withdrawal.createdAt).toLocaleDateString("en-NG", {
                     year: "numeric",
                     month: "short",
@@ -231,28 +231,28 @@ export function WithdrawalsManager() {
 
               <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                 <div>
-                  <p className="text-gray-600">Bank</p>
+                  <p className="text-ink-2">Bank</p>
                   <p className="font-medium">{withdrawal.bankName}</p>
                 </div>
                 <div>
-                  <p className="text-gray-600">Account Number</p>
+                  <p className="text-ink-2">Account Number</p>
                   <p className="font-medium">{withdrawal.accountNumber}</p>
                 </div>
                 <div>
-                  <p className="text-gray-600">Account Name</p>
+                  <p className="text-ink-2">Account Name</p>
                   <p className="font-medium">{withdrawal.accountName}</p>
                 </div>
                 <div>
-                  <p className="text-gray-600">Reference</p>
+                  <p className="text-ink-2">Reference</p>
                   <p className="font-medium font-mono text-xs">{withdrawal.reference}</p>
                 </div>
                 <div>
-                  <p className="text-gray-600">Fee</p>
+                  <p className="text-ink-2">Fee</p>
                   <p className="font-medium">{formatCurrency(withdrawal.fee)}</p>
                 </div>
                 <div>
-                  <p className="text-gray-600">Net Amount</p>
-                  <p className="font-medium text-green-600">
+                  <p className="text-ink-2">Net Amount</p>
+                  <p className="font-medium text-emerald-600">
                     {formatCurrency(withdrawal.amount - withdrawal.fee)}
                   </p>
                 </div>

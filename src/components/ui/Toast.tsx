@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { CheckCircle, XCircle, AlertCircle, Info, Close } from "@/components/icons";
 
@@ -21,6 +21,27 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
+const TOAST_EVENT = "pryva:toast";
+
+type ToastPayload = { type: ToastType; message: string; duration?: number };
+
+function emitToast(payload: ToastPayload) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<ToastPayload>(TOAST_EVENT, { detail: payload }));
+}
+
+/**
+ * Imperative toast helper. Works from anywhere — including event handlers in
+ * components that never rendered the provider — because it goes through a DOM
+ * event that ToastProvider listens for.
+ */
+export const toast = {
+  success: (message: string, duration?: number) => emitToast({ type: "success", message, duration }),
+  error: (message: string, duration?: number) => emitToast({ type: "error", message, duration }),
+  warning: (message: string, duration?: number) => emitToast({ type: "warning", message, duration }),
+  info: (message: string, duration?: number) => emitToast({ type: "info", message, duration }),
+};
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -38,6 +59,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
+
+  useEffect(() => {
+    function onToast(event: Event) {
+      const detail = (event as CustomEvent<ToastPayload>).detail;
+      if (detail?.message) addToast({ type: detail.type, message: detail.message, duration: detail.duration });
+    }
+    window.addEventListener(TOAST_EVENT, onToast);
+    return () => window.removeEventListener(TOAST_EVENT, onToast);
+  }, [addToast]);
 
   return (
     <ToastContext.Provider value={{ toasts, addToast, removeToast }}>

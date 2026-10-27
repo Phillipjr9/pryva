@@ -68,7 +68,7 @@ const protections = [
   {
     icon: Shield,
     title: "Non-VoIP numbers",
-    body: "Every line is carrier-grade, sourced through Fleexa. That's why major platforms accept it.",
+    body: "Every line is carrier-grade, sourced through vetted carrier partners. That's why major platforms accept it.",
   },
   {
     icon: Clock,

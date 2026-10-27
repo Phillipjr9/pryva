@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminApi } from "@/lib/auth";
 import { db } from "@/db";
 import { securityViolations } from "@/db/schema";
 import { desc, eq, sql } from "drizzle-orm";
@@ -12,7 +12,10 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin();
+    const admin = await requireAdminApi();
+    if (!admin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     // Get total violations count
     const totalResult = await db

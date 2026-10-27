@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdminApi } from "@/lib/auth";
 import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
@@ -8,6 +9,10 @@ export const dynamic = "force-dynamic";
 
 // GET /api/admin/refunds - List orders eligible for refund or with pending refunds
 export async function GET(request: NextRequest) {
+    const admin = await requireAdminApi();
+    if (!admin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   try {
     const { searchParams } = request.nextUrl;
     const status = searchParams.get("status") || "pending"; // pending, processed, all
@@ -49,6 +54,10 @@ export async function GET(request: NextRequest) {
 
 // POST /api/admin/refunds - Process a refund manually
 export async function POST(request: NextRequest) {
+    const admin = await requireAdminApi();
+    if (!admin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   try {
     const body = await request.json();
     const { orderId, reason } = body;

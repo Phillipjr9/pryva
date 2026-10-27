@@ -20,7 +20,7 @@ export default async function AdminAnalyticsPage() {
   const stats = {
     totalUsers: totalUsers[0]?.count || 0,
     totalOrders: totalOrders[0]?.count || 0,
-    totalRevenue: totalRevenue[0]?.sum || 0,
+    totalRevenue: Number(totalRevenue[0]?.sum ?? 0),
   };
 
   return (

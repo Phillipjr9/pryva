@@ -5,10 +5,10 @@ import { plans, formatNaira, findPlan } from "@/lib/catalog";
 import { calculateBulkOrder, getBulkDiscountMessage, type BulkOrderItem } from "@/lib/bulk-orders";
 import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
-import type { User } from "@/db/schema";
+import type { SafeUser } from "@/lib/auth-types";
 
 interface BulkOrdersFormProps {
-  user: User;
+  user: SafeUser;
 }
 
 export function BulkOrdersForm({ user }: BulkOrdersFormProps) {

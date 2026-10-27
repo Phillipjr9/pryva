@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
@@ -9,21 +10,44 @@ import { Badge } from "@/components/ui/Badge";
 import { formatNaira } from "@/lib/catalog";
 import Link from "next/link";
 import { ArrowLeft } from "@/components/icons";
+import { CredentialList } from "./CredentialList";
 
-export default async function OrderDetailsPage({ params }: { params: { id: string } }) {
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+function parseAccounts(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+  } catch {
+    // A single credential string, or something written before the JSON column.
+    return raw.trim() ? [raw] : [];
+  }
+}
+
+export default async function OrderDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireAuth();
   if (!user) redirect("/login?next=/dashboard/orders");
 
+  // Credentials live on this page: never cache the HTML anywhere.
+  await connection();
+
+  const { id } = await params;
+
   const order = await db.query.orders.findFirst({
-    where: and(eq(orders.id, params.id), eq(orders.userId, user.id)),
+    where: and(eq(orders.id, id), eq(orders.userId, user.id)),
   });
 
   if (!order) {
     redirect("/dashboard/orders");
   }
 
+  const credentials = parseAccounts(order.accounts);
+
   const statusColors = {
     active: "info",
+    processing: "info",
     delivered: "success",
     refunded: "warning",
     expired: "error",
@@ -95,7 +119,51 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
               </CardContent>
             </Card>
 
-            {order.referenceCode && (
+            {credentials.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Account credentials ({credentials.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CredentialList accounts={credentials} />
+                </CardContent>
+              </Card>
+            )}
+
+            {order.status === "refunded" && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Refunded</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-[0.88rem] text-ink-2">
+                    {formatNaira(order.amount)} was returned to your wallet automatically. Refunded or
+                    replaced credentials are masked by the seller and are no longer usable.
+                  </p>
+                  {credentials.length > 0 && (
+                    <div className="mt-3">
+                      <CredentialList accounts={credentials} />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {order.status === "processing" && credentials.length === 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Delivery in progress</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-[0.88rem] text-ink-2">
+                    We&apos;re still waiting on the seller. If nothing arrives, the amount is refunded to
+                    your wallet automatically — you don&apos;t need to ask.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {order.referenceCode && credentials.length === 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle>Service Details</CardTitle>
@@ -145,6 +213,14 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                     <p className="text-[0.82rem] text-ink-3 mb-1">Expires</p>
                     <p className="text-[0.9rem] text-ink">
                       {new Date(order.expiresAt).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+                {order.refundedAt && (
+                  <div>
+                    <p className="text-[0.82rem] text-ink-3 mb-1">Refunded</p>
+                    <p className="text-[0.9rem] text-ink">
+                      {new Date(order.refundedAt).toLocaleString()}
                     </p>
                   </div>
                 )}
