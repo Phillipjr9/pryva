@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Reveal } from "@/components/ui/Reveal";
 import { FaqAccordion } from "@/components/ui/FaqAccordion";
 import { PlanPurchase } from "@/components/purchase/PlanPurchase";
-import { Monogram } from "@/components/brand/Logo";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -12,17 +11,21 @@ import {
   Globe,
   Lock,
   Mail,
+  serviceIconMap,
   Shield,
   Sim,
   Sparkle,
   Wallet,
-  serviceIconMap,
 } from "@/components/icons";
 import { formatNaira, plansFor, services, type Service, type ServiceSlug } from "@/lib/catalog";
-import { BrandMark, hasBrand } from "@/components/brand/BrandMark";
 import { getCurrentUser } from "@/lib/auth";
 
-const iconMap = serviceIconMap;
+const subtitleByService: Partial<Record<ServiceSlug, string>> = {
+  numbers: "Delivered in seconds.",
+  esim: "Scan once, travel lighter.",
+  proxies: "No data-center tell.",
+  "email-otp": "Not your real inbox.",
+};
 
 const clipChips = ["WhatsApp", "Telegram", "Google", "Binance", "TikTok", "Discord"];
 
@@ -75,7 +78,6 @@ function ServiceVisual({ slug, service }: { slug: ServiceSlug; service: Service 
               key={chip}
               className="inline-flex items-center gap-1 rounded-full border border-line bg-white px-2 py-1 text-[0.6rem] font-medium text-ink-2"
             >
-              <BrandMark name={chip} className="h-2.5 w-2.5" />
               {chip}
             </span>
           ))}
@@ -232,7 +234,7 @@ function CrossSell({ current }: { current: ServiceSlug }) {
   return (
     <div className="grid gap-3 sm:grid-cols-3">
       {others.map((service) => {
-        const Icon = iconMap[service.icon];
+        const Icon = serviceIconMap[service.icon];
         return (
           <Link
             key={service.slug}
@@ -296,16 +298,7 @@ export async function ServicePageTemplate({ service }: { service: Service }) {
                   <br />
                   <span className="text-display italic text-lav-700">
                     {service.tagline.split(".").slice(1).join(".").trim() ||
-                      {
-                        numbers: "Delivered in seconds.",
-                        esim: "Scan once, travel lighter.",
-                        proxies: "No data-center tell.",
-                        "email-otp": "Not your real inbox.",
-                        data: "Top up without the USSD dance.",
-                        "gift-cards": "Any card, any store.",
-                        bulk: "Order once, deliver many.",
-                        scheduled: "Set it, forget it, we run it.",
-                      }[service.slug]}
+                      (subtitleByService[service.slug] ?? "Simple. Secure. Scalable.")}
                   </span>
                 </h1>
               </Reveal>
@@ -425,18 +418,12 @@ export async function ServicePageTemplate({ service }: { service: Service }) {
                     key={item}
                     className="inline-flex items-center gap-2 rounded-full border border-lav-200/80 bg-white/80 px-3 py-1.5 text-[0.78rem] font-medium text-lav-800"
                   >
-                    {hasBrand(item) && (
-                      <span className="grid h-5 w-5 place-items-center rounded-md bg-white shadow-sm ring-1 ring-line/60">
-                        <BrandMark name={item} className="h-3 w-3" />
-                      </span>
-                    )}
                     {item}
                   </span>
                 ))}
               </div>
-              <p className="mt-5 flex items-start gap-2 text-[0.8rem] leading-relaxed text-ink-2">
-                <Monogram className="mt-0.5 h-5 w-5 shrink-0" />
-                Provisioned on carrier-grade infrastructure and monitored by the Pryva team in
+              <p className="mt-5 text-[0.8rem] leading-relaxed text-ink-2">
+                Provisioned through Fleexa&apos;s infrastructure and monitored by the Pryva team in
                 Lagos.
               </p>
             </div>

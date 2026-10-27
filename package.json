@@ -7,8 +7,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest run"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",
@@ -17,8 +16,7 @@
     "next": "16.2.6",
     "pg": "8.20.0",
     "react": "19.2.6",
-    "react-dom": "19.2.6",
-    "simple-icons": "^16.36.0"
+    "react-dom": "19.2.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.1.17",
@@ -33,6 +31,6 @@
     "postcss": "8.5.8",
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3",
-    "vitest": "^3.2.7"
+    "vitest": "^3.2.4"
   }
 }

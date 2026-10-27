@@ -5,10 +5,10 @@ import { dataPlans, type AirtimeProvider } from "@/lib/airtime";
 import { formatNaira } from "@/lib/catalog";
 import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
-import type { SafeUser } from "@/lib/auth-types";
+import type { PublicUser } from "@/lib/auth";
 
 interface DataPlansFormProps {
-  user: SafeUser;
+  user: PublicUser;
 }
 
 export function DataPlansForm({ user }: DataPlansFormProps) {

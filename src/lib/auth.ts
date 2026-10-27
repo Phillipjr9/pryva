@@ -3,9 +3,9 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
-import type { SafeUser } from "@/lib/auth-types";
 import { sessions, users, type User } from "@/db/schema";
 import { requestProto } from "@/lib/net";
+import { isDemoEmail, isPreviewDatabase } from "@/lib/demo-policy";
 
 export const SESSION_COOKIE = "pryva_session";
 const SESSION_DAYS = 30;
@@ -67,7 +67,7 @@ export function verifyPassword(password: string, stored: string): boolean {
   return timingSafeEqual(derived, expected);
 }
 
-export type PublicUser = SafeUser;
+export type PublicUser = Pick<User, "id" | "name" | "email" | "walletBalance" | "createdAt">;
 
 function toPublicUser(user: User): PublicUser {
   return {
@@ -113,7 +113,8 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
     .limit(1);
 
   const row = rows[0];
-  return row ? toPublicUser(row.user) : null;
+  if (!row || (isDemoEmail(row.user.email) && !isPreviewDatabase())) return null;
+  return toPublicUser(row.user);
 }
 
 export async function requireAuth(
@@ -128,28 +129,19 @@ export async function requireAuth(
   return user;
 }
 
-/**
- * Admin guard for API routes.
- *
- * Unlike requireAuth/requireAdmin it never redirects — a route handler needs a
- * 401/403 it can return, not a navigation.
- */
-export async function requireAdminApi(): Promise<PublicUser | null> {
-  const user = await getCurrentUser();
-  if (!user || !isAdminUser(user)) return null;
-  return user;
+export function isConfiguredAdminEmail(email: string): boolean {
+  const normalized = email.trim().toLowerCase();
+  return (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(normalized);
 }
 
 export function isAdminUser(user: Pick<User, "email"> | PublicUser | null): boolean {
-  if (!user) return false;
-
-  const normalized = user.email.trim().toLowerCase();
-  const admins = (process.env.ADMIN_EMAILS ?? "admin@pryva.ng,demo@pryva.ng")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-
-  return admins.includes(normalized) || normalized === "demo@pryva.ng";
+  // The one-click demo identity must never become an administrator, even if
+  // it is accidentally added to the allowlist.
+  return Boolean(user && !isDemoEmail(user.email) && isConfiguredAdminEmail(user.email));
 }
 
 export async function requireUser(nextPath = "/dashboard"): Promise<PublicUser> {

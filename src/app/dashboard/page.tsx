@@ -4,6 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import { isPreviewDatabase } from "@/lib/demo-policy";
 import { formatNaira } from "@/lib/catalog";
 import {
   ArrowRight,
@@ -96,14 +97,21 @@ export default async function DashboardOverviewPage() {
               Your Pryva wallet is ready.
             </h1>
             <p className="mt-1.5 max-w-md text-[0.86rem] leading-relaxed text-ink-2">
-              Buy a number, eSIM, proxy pack or temporary inbox. Everything you order appears here
-              instantly, with refund protection attached.
+              {isPreviewDatabase()
+                ? "Explore the dashboard with simulated orders and a preview wallet."
+                : "Review your wallet and orders while live purchasing is temporarily unavailable."}
             </p>
           </div>
           <Link href="/dashboard/wallet" className="btn btn-primary !px-5 !py-3 !text-[0.8rem]">
             <Plus className="h-4 w-4" /> Top up wallet
           </Link>
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-[0.8rem] text-ink">
+        {isPreviewDatabase()
+          ? "Preview mode: orders and wallet balances are simulated and do not deliver real services."
+          : "Live purchasing is temporarily unavailable while payment and provider integrations are reviewed."}
       </div>
 
       <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">

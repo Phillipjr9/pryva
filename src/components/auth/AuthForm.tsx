@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Shield, Sparkle } from "@/components/icons";
-import { BrandMark } from "@/components/brand/BrandMark";
 
 type Mode = "login" | "signup";
 
@@ -91,7 +90,6 @@ export function AuthForm({
           href={`/api/auth/google?next=${encodeURIComponent(next)}`}
           className="btn w-full border border-line bg-white !py-3.5 text-ink shadow-sm hover:bg-lav-50/60"
         >
-          <BrandMark name="Google" className="h-4.5 w-4.5" />
           Continue with Google
         </a>
 

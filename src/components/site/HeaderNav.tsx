@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Logo } from "@/components/brand/Logo";
 import { ArrowRight, ChevronDown, Close, Menu } from "@/components/icons";
 import { formatNaira, services } from "@/lib/catalog";
 
 type NavUser = { name: string; walletBalance: number } | null;
 
 const primaryLinks = [
+  { href: "/", label: "Home" },
   { href: "/accounts", label: "Accounts" },
   { href: "/pricing", label: "Pricing" },
   { href: "/how-it-works", label: "How it works" },
@@ -58,8 +58,6 @@ export function HeaderNav({ user }: { user: NavUser }) {
         }`}
       >
       <div className="shell flex h-[74px] items-center justify-between gap-4">
-        <Logo tagline={false} />
-
         <nav className="hidden items-center gap-1 lg:flex">
           <div className="relative" ref={dropdownRef}>
             <button
@@ -156,7 +154,7 @@ export function HeaderNav({ user }: { user: NavUser }) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="grid h-10 w-10 place-items-center rounded-full border border-line bg-white/70 text-ink lg:hidden"
+          className="ml-auto grid h-10 w-10 place-items-center rounded-full border border-line bg-white/70 text-ink lg:hidden"
           aria-label="Open menu"
         >
           <Menu className="h-5 w-5" />
@@ -167,11 +165,10 @@ export function HeaderNav({ user }: { user: NavUser }) {
       {open && (
         <div className="fixed inset-0 z-[60] bg-cream lg:hidden">
           <div className="shell flex h-[74px] items-center justify-between">
-            <Logo />
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="grid h-10 w-10 place-items-center rounded-full border border-line bg-white text-ink"
+              className="ml-auto grid h-10 w-10 place-items-center rounded-full border border-line bg-white text-ink"
               aria-label="Close menu"
             >
               <Close className="h-5 w-5" />

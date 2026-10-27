@@ -78,6 +78,23 @@ export const walletTransactions = pgTable(
   (table) => [index("wallet_user_idx").on(table.userId)],
 );
 
+// A server-created top-up is required before a signed Paystack event can
+// credit a wallet. The reference is unique, so retries are idempotent.
+export const paymentTopups = pgTable(
+  "payment_topups",
+  {
+    reference: varchar("reference", { length: 40 }).primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    amount: integer("amount").notNull(),
+    status: varchar("status", { length: 24 }).notNull().default("pending"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("payment_topups_user_idx").on(table.userId)],
+);
+
 export const contactMessages = pgTable("contact_messages", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),

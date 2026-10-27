@@ -1,3 +1,4 @@
+import { isPreviewDatabase } from "@/lib/demo-policy";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { scheduledOrders, orders } from "@/db/schema";
@@ -14,9 +15,13 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
       logger.warn("Unauthorized cron attempt");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!isPreviewDatabase()) {
+      return NextResponse.json({ error: "Live scheduled fulfillment is not configured" }, { status: 503 });
     }
 
     const now = new Date();

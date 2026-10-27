@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -63,7 +63,7 @@ export async function PATCH(request: NextRequest) {
       await db
         .update(notifications)
         .set({ read: 1 })
-        .where(eq(notifications.id, notificationId));
+        .where(and(eq(notifications.id, notificationId), eq(notifications.userId, user.id)));
     } else {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }

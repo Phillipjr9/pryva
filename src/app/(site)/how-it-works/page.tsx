@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Reveal } from "@/components/ui/Reveal";
 import { FaqAccordion } from "@/components/ui/FaqAccordion";
-import { Monogram } from "@/components/brand/Logo";
 import {
   ArrowRight,
   Bolt,
@@ -185,8 +184,7 @@ export default function HowItWorksPage() {
             <div className="grid gap-3 lg:sticky lg:top-24">
               <Reveal delay={80}>
                 <div className="rounded-2xl border border-lav-200 bg-gradient-to-br from-lav-100/80 via-[#fbf7ff] to-white p-5">
-                  <Monogram className="h-9 w-9" />
-                  <h2 className="mt-4 text-[1.1rem] font-semibold">What it costs to try</h2>
+                  <h2 className="text-[1.1rem] font-semibold">What it costs to try</h2>
                   <p className="mt-1.5 text-[0.83rem] leading-relaxed text-ink-2">
                     The cheapest way to test Pryva is a temporary inbox at{" "}
                     {formatNaira(700)} or a Nigerian verification at{" "}

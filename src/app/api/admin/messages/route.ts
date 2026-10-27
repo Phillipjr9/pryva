@@ -1,5 +1,5 @@
+import { authorizeAdminApi } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApi } from "@/lib/auth";
 import { db } from "@/db";
 import { contactMessages } from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
@@ -9,11 +9,10 @@ export const dynamic = "force-dynamic";
 
 // GET /api/admin/messages - List all contact messages
 export async function GET(request: NextRequest) {
-    const admin = await requireAdminApi();
-    if (!admin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
   try {
+    const access = await authorizeAdminApi(request);
+    if (access.response) return access.response;
+
     const { searchParams } = request.nextUrl;
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50")));
@@ -61,11 +60,10 @@ export async function GET(request: NextRequest) {
 
 // PATCH /api/admin/messages - Update message status
 export async function PATCH(request: NextRequest) {
-    const admin = await requireAdminApi();
-    if (!admin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
   try {
+    const access = await authorizeAdminApi(request);
+    if (access.response) return access.response;
+
     const body = await request.json();
     const { messageId, status } = body;
 

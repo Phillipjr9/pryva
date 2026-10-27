@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -62,10 +61,7 @@ export default function ContactPage() {
       {/* Header */}
       <header className="border-b border-line bg-white">
         <div className="shell flex h-16 items-center justify-between">
-          <Link href="/">
-            <Logo />
-          </Link>
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3">
             <Link
               href="/login"
               className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"
@@ -89,7 +85,7 @@ export default function ContactPage() {
             Get in touch
           </h1>
           <p className="mt-4 text-[1.1rem] text-ink-2 max-w-2xl mx-auto">
-            Have a question or need help? We're here to assist you.
+            Have a question or need help? We&apos;re here to assist you.
           </p>
         </div>
       </section>

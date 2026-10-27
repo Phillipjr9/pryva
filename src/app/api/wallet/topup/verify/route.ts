@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { isPaystackConfigured, verifyPayment } from "@/lib/paystack";
-import { creditTopUpOnce, isReferenceCredited } from "@/lib/payments";
+import { completeTopUp } from "@/lib/topups";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -10,11 +10,10 @@ export const dynamic = "force-dynamic";
  * POST /api/wallet/topup/verify  { reference }
  *
  * Called by the wallet page when Paystack redirects back with
- * `?topup=success&reference=…`. We never trust that redirect: the money is only
- * credited after Paystack's own verify endpoint says the charge succeeded.
- *
- * Safe to call repeatedly — crediting is idempotent per reference, and this is
- * also the path that runs if the webhook arrives late.
+ * `?topup=success&reference=…`. The redirect is only a hint: the money is
+ * credited only after Paystack's own verify endpoint confirms the charge, and
+ * only through `completeTopUp()` — the same path the webhook uses, so a payment
+ * confirmed twice still credits once.
  */
 export async function POST(request: NextRequest) {
   const user = await requireAuth(request);
@@ -38,10 +37,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid payment reference." }, { status: 400 });
   }
 
-  if (await isReferenceCredited(reference)) {
-    return NextResponse.json({ ok: true, credited: false, reason: "already_credited" });
-  }
-
   try {
     const result = await verifyPayment(reference);
     const payment = result.data;
@@ -60,8 +55,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "That payment wasn't successful." }, { status: 402 });
     }
 
-    // The reference must belong to this account — otherwise someone could ask
-    // us to credit their wallet with another customer's payment.
+    // The payment must belong to this account — otherwise someone could ask us
+    // to credit their wallet with another customer's payment.
     const payerEmail = payment.customer?.email?.toLowerCase();
     if (payerEmail && payerEmail !== user.email.toLowerCase()) {
       logger.error("Top-up verification for the wrong customer", {
@@ -80,19 +75,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Only Naira payments can be credited." }, { status: 400 });
     }
 
-    const credited = await creditTopUpOnce({
-      reference,
-      amountNgn: Math.round(Number(payment.amount) / 100),
-      userId: user.id,
-      description: "Wallet top-up",
-    });
+    const amount = Math.round(Number(payment.amount) / 100);
+    const outcome = await completeTopUp({ reference: payment.reference ?? reference, userId: user.id, amount });
 
-    if (!credited.credited) {
-      // Most likely the webhook won the race — that's a success, not an error.
-      return NextResponse.json({ ok: true, credited: false, reason: credited.reason });
+    if (outcome === "mismatch") {
+      // No pending top-up for this reference (or the amount doesn't match what
+      // the user asked for) — the webhook will report the same, so say it plainly.
+      logger.warn("Top-up verification did not match a pending top-up", {
+        reference,
+        userId: user.id,
+        amount,
+      });
+      return NextResponse.json(
+        { error: "That payment doesn't match a pending top-up. Contact support with your reference." },
+        { status: 409 },
+      );
     }
 
-    return NextResponse.json({ ok: true, credited: true, balance: credited.balance });
+    return NextResponse.json({
+      ok: true,
+      credited: outcome === "credited",
+      reason: outcome === "duplicate" ? "already_credited" : undefined,
+    });
   } catch (error) {
     logger.error("Top-up verification failed", {
       reference,

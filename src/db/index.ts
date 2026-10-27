@@ -1,9 +1,10 @@
 import { randomBytes, scryptSync } from "node:crypto";
-import { drizzle } from "drizzle-orm/node-postgres";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { getOperators, getOrderByOperators } from "drizzle-orm";
 import * as schema from "./schema";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.DATABASE_URL?.trim();
 
 function toCamelCase(value: string): string {
   return value.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
@@ -252,18 +253,10 @@ function evaluateAggregateExpression(
   return null;
 }
 
-type Pageable<T> = T[] & {
-  limit: (count: number) => Pageable<T>;
-  offset: (start: number) => Pageable<T>;
-};
-
-function withLimit<T>(items: T[]): Pageable<T> {
+function withLimit<T>(items: T[]): T[] & { limit: (count: number) => T[] } {
   return Object.assign([...items], {
     limit(count: number) {
-      return withLimit(items.slice(0, count));
-    },
-    offset(start: number) {
-      return withLimit(items.slice(start));
+      return items.slice(0, count);
     },
   });
 }
@@ -276,19 +269,12 @@ function sortDescendingByCreatedAt<T extends Record<string, unknown>>(items: T[]
   });
 }
 
-type MockState = {
-  users: Array<Record<string, unknown>>;
-  sessions: Array<Record<string, unknown>>;
-  orders: Array<Record<string, unknown>>;
-  walletTransactions: Array<Record<string, unknown>>;
-  contactMessages: Array<Record<string, unknown>>;
-  giftCards: Array<Record<string, unknown>>;
-  scheduledOrders: Array<Record<string, unknown>>;
-  notifications: Array<Record<string, unknown>>;
-  securityViolations: Array<Record<string, unknown>>;
-  withdrawals: Array<Record<string, unknown>>;
-  bankAccounts: Array<Record<string, unknown>>;
-};
+type MockState = Record<
+  | "users" | "sessions" | "orders" | "walletTransactions" | "paymentTopups"
+  | "contactMessages" | "giftCards" | "scheduledOrders" | "notifications"
+  | "securityViolations" | "withdrawals" | "bankAccounts",
+  Array<Record<string, unknown>>
+>;
 
 const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;
@@ -301,6 +287,7 @@ const mockState: MockState =
     sessions: [],
     orders: [],
     walletTransactions: [],
+    paymentTopups: [],
     contactMessages: [],
     giftCards: [],
     scheduledOrders: [],
@@ -310,7 +297,12 @@ const mockState: MockState =
     bankAccounts: [],
   };
 
-if (process.env.NODE_ENV !== "production") {
+// Next can load route handlers and server components in separate bundles.
+// Share the in-memory preview state across those bundles in this process.
+if (!databaseUrl) {
+  for (const key of ["users", "sessions", "orders", "walletTransactions", "paymentTopups", "contactMessages", "giftCards", "scheduledOrders", "notifications", "securityViolations", "withdrawals", "bankAccounts"] as const) {
+    mockState[key] ??= [];
+  }
   globalForDb.__arenaPryvaMockState = mockState;
 }
 
@@ -340,7 +332,7 @@ function ensureDemoUser() {
   }
 }
 
-ensureDemoUser();
+if (!databaseUrl) ensureDemoUser();
 
 function buildQueryResult(
   contexts: TableRowContext[],
@@ -365,10 +357,7 @@ function buildQueryResult(
         return withLimit([aggregateRow]);
       },
       limit(count: number) {
-        return withLimit([aggregateRow].slice(0, count));
-      },
-      offset() {
-        return withLimit([aggregateRow]);
+        return [aggregateRow].slice(0, count);
       },
     });
   }
@@ -380,10 +369,7 @@ function buildQueryResult(
       return withLimit(sorted);
     },
     limit(count: number) {
-      return withLimit(projected.slice(0, count));
-    },
-    offset(start: number) {
-      return withLimit(projected.slice(start));
+      return projected.slice(0, count);
     },
   });
 }
@@ -403,14 +389,21 @@ function applyQueryOptions<T extends Record<string, unknown>>(
 ): T[] {
   let filtered = rows;
 
-  if (options.where) {
+  const table = (schema as unknown as Record<string, unknown>)[tableKey];
+  const condition = typeof options.where === "function"
+    ? options.where(table, getOperators())
+    : options.where;
+  if (condition) {
     filtered = filtered.filter((row) =>
-      matchesConditionInContext({ [tableKey]: row }, tableKey, options.where),
+      matchesConditionInContext({ [tableKey]: row }, tableKey, condition),
     );
   }
 
-  if (options.orderBy) {
-    filtered = sortQueryRows(filtered, options.orderBy);
+  const ordering = typeof options.orderBy === "function"
+    ? options.orderBy(table, getOrderByOperators())
+    : options.orderBy;
+  if (ordering) {
+    filtered = sortQueryRows(filtered, ordering);
   }
 
   if (typeof options.offset === "number") {
@@ -424,18 +417,25 @@ function applyQueryOptions<T extends Record<string, unknown>>(
   return filtered;
 }
 
+function projectQueryColumns(row: Record<string, unknown>, columns: unknown): Record<string, unknown> {
+  if (!columns || typeof columns !== "object") return { ...row };
+  const flags = columns as Record<string, boolean>;
+  const include = Object.values(flags).some(Boolean);
+  return Object.fromEntries(Object.entries(row).filter(([key]) => include ? flags[key] === true : flags[key] !== false));
+}
+
 const mockQuery = Object.fromEntries(
   (Object.keys(mockState) as Array<keyof MockState>).map((tableKey) => [
     tableKey,
     {
       async findMany(options: Record<string, unknown> = {}) {
         const rows = applyQueryOptions((mockState[tableKey] ?? []) as Record<string, unknown>[], options, tableKey);
-        return rows.map((row) => projectRow(options.columns as Record<string, unknown> | undefined, { [tableKey]: row }, tableKey));
+        return rows.map((row) => projectQueryColumns(row, options.columns));
       },
       async findFirst(options: Record<string, unknown> = {}) {
         const rows = applyQueryOptions((mockState[tableKey] ?? []) as Record<string, unknown>[], options, tableKey);
         const row = rows[0];
-        return row ? projectRow(options.columns as Record<string, unknown> | undefined, { [tableKey]: row }, tableKey) : null;
+        return row ? projectQueryColumns(row, options.columns) : undefined;
       },
     },
   ]),
@@ -569,19 +569,8 @@ export const pool = databaseUrl
     })()
   : null;
 
-type Database = NonNullable<ReturnType<typeof createDrizzle>>;
-
-function createDrizzle() {
-  return databaseUrl ? drizzle(pool as Pool, { schema }) : null;
-}
-
-/**
- * The real Drizzle client when DATABASE_URL is set, otherwise the in-memory
- * mock. Both are exposed under one fully-typed interface so route handlers get
- * real row types (and so `db.query.<table>` — which requires `schema` to be
- * registered — works against Postgres).
- */
-export const db: Database = (createDrizzle() ?? (mockDb as unknown as Database)) as Database;
-
-/** The client a `db.transaction(async (tx) => …)` callback receives. */
-export type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+// The relational query API needs the schema at runtime. The preview adapter
+// implements the subset of this interface used without a database.
+export const db: NodePgDatabase<typeof schema> = databaseUrl
+  ? drizzle(pool as Pool, { schema })
+  : (mockDb as NodePgDatabase<typeof schema>);

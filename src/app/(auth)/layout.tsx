@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Logo, Monogram } from "@/components/brand/Logo";
 import { Check, Shield, Sparkle } from "@/components/icons";
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
@@ -9,8 +8,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <div className="pointer-events-none absolute left-[-10rem] top-[-10rem] h-[30rem] w-[30rem] rounded-full bg-lav-200/45 blur-[120px]" />
       <div className="pointer-events-none absolute bottom-[-12rem] right-[-6rem] h-[28rem] w-[28rem] rounded-full bg-peach/50 blur-[120px]" />
 
-      <header className="shell relative flex h-[76px] items-center justify-between">
-        <Logo tagline />
+      <header className="shell relative flex h-[76px] items-center justify-end">
         <Link
           href="/"
           className="text-[0.8rem] font-medium text-ink-2 transition-colors hover:text-lav-700"
@@ -22,7 +20,6 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <div className="shell relative grid gap-10 pb-16 pt-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:gap-16 lg:pt-10">
         <div className="order-2 hidden lg:order-1 lg:block">
           <div className="relative overflow-hidden rounded-[2rem] border border-white/80 bg-white/60 p-8 shadow-[var(--shadow-card)] backdrop-blur">
-            <Monogram className="pointer-events-none absolute -right-8 -top-12 h-56 w-56 opacity-[0.08]" />
             <span className="inline-flex items-center gap-1.5 rounded-full border border-lav-200 bg-white/80 px-3 py-1.5 text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-lav-700">
               <Sparkle className="h-3 w-3" /> Simple. Secure. Scalable.
             </span>

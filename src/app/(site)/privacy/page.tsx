@@ -1,6 +1,5 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { Logo } from "@/components/brand/Logo";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -13,10 +12,7 @@ export default function PrivacyPage() {
       {/* Header */}
       <header className="border-b border-line bg-white">
         <div className="shell flex h-16 items-center justify-between">
-          <Link href="/">
-            <Logo />
-          </Link>
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3">
             <Link
               href="/login"
               className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"
@@ -79,14 +75,14 @@ export default function PrivacyPage() {
               You have the right to access, update, or delete your personal information at any time through your account settings. You may also request a copy of your data or ask us to delete your account.
             </p>
 
-            <h2>8. Children's Privacy</h2>
+            <h2>8. Children&apos;s Privacy</h2>
             <p>
               Our services are not intended for children under 18. We do not knowingly collect personal information from children under 18.
             </p>
 
             <h2>9. Changes to Privacy Policy</h2>
             <p>
-              We may update this privacy policy from time to time. We will notify you of any changes by posting the new privacy policy on this page and updating the "Last updated" date.
+              We may update this privacy policy from time to time. We will notify you of any changes by posting the new privacy policy on this page and updating the &quot;Last updated&quot; date.
             </p>
 
             <h2>10. Contact Us</h2>

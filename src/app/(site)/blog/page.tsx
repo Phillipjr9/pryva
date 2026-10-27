@@ -1,6 +1,5 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { Logo } from "@/components/brand/Logo";
 import { Clock, User } from "@/components/icons";
 
 export const metadata: Metadata = {
@@ -71,10 +70,7 @@ export default function BlogPage() {
       {/* Header */}
       <header className="border-b border-line bg-white">
         <div className="shell flex h-16 items-center justify-between">
-          <Link href="/">
-            <Logo />
-          </Link>
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3">
             <Link
               href="/login"
               className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"

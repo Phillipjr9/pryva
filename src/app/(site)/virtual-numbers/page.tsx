@@ -1,6 +1,5 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { Logo } from "@/components/brand/Logo";
 import { serviceMap, plansFor, formatNaira } from "@/lib/catalog";
 import { Check, ArrowRight } from "@/components/icons";
 
@@ -22,10 +21,7 @@ export default function VirtualNumbersPage() {
       {/* Header */}
       <header className="border-b border-line bg-white">
         <div className="shell flex h-16 items-center justify-between">
-          <Link href="/">
-            <Logo />
-          </Link>
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3">
             <Link
               href="/login"
               className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"
@@ -99,7 +95,7 @@ export default function VirtualNumbersPage() {
       <section className="pb-16">
         <div className="shell max-w-3xl">
           <h2 className="text-[1.75rem] font-semibold text-ink mb-8">
-            What's included
+            What&apos;s included
           </h2>
           <div className="space-y-4">
             {service.included.map((item, index) => (

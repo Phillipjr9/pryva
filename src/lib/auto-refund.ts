@@ -1,8 +1,9 @@
-import { db, type Transaction } from "@/db";
+import { db } from "@/db";
 import { orders, walletTransactions, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { isTimedOut } from "./service-timeouts";
 import { isRefundEligible } from "./gift-cards";
+import type { Transaction } from "@/lib/db-types";
 
 export async function processAutoRefunds(): Promise<number> {
   const pendingOrders = await db.query.orders.findMany({

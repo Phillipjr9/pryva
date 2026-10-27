@@ -1,3 +1,4 @@
+import { isPreviewDatabase } from "@/lib/demo-policy";
 import { db } from "@/db";
 import { scheduledOrders, orders, users, walletTransactions } from "@/db/schema";
 import { eq, and, lte } from "drizzle-orm";
@@ -74,6 +75,7 @@ export async function getUserScheduledOrders(userId: string) {
 }
 
 export async function processScheduledOrder(scheduled: typeof scheduledOrders.$inferSelect): Promise<void> {
+  if (!isPreviewDatabase()) throw new Error("Live scheduled fulfillment is not configured");
   const plan = findPlan(scheduled.productSlug);
   if (!plan) {
     throw new Error("Invalid product");
@@ -135,6 +137,7 @@ export async function processScheduledOrder(scheduled: typeof scheduledOrders.$i
 }
 
 export async function processScheduledOrders(): Promise<number> {
+  if (!isPreviewDatabase()) throw new Error("Live scheduled fulfillment is not configured");
   const now = new Date();
   const dueOrders = await db.query.scheduledOrders.findMany({
     where: and(
@@ -213,8 +216,8 @@ export async function processScheduledOrders(): Promise<number> {
   return processed;
 }
 
-export function calculateNextRun(frequency: Frequency): Date {
-  const now = new Date();
+export function calculateNextRun(frequency: Frequency, from = new Date()): Date {
+  const now = new Date(from);
   switch (frequency) {
     case "daily":
       now.setDate(now.getDate() + 1);
@@ -225,9 +228,14 @@ export function calculateNextRun(frequency: Frequency): Date {
     case "biweekly":
       now.setDate(now.getDate() + 14);
       break;
-    case "monthly":
+    case "monthly": {
+      const day = now.getDate();
+      now.setDate(1);
       now.setMonth(now.getMonth() + 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      now.setDate(Math.min(day, lastDay));
       break;
+    }
   }
   return now;
 }
