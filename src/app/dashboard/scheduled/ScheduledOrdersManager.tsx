@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react";
 import { plans, formatNaira, findPlan } from "@/lib/catalog";
 import { Calendar, Pause, Play, X } from "@/components/icons";
-import type { SafeUser } from "@/lib/auth-types";
+import type { PublicUser } from "@/lib/auth";
 
 interface ScheduledOrdersManagerProps {
-  user: SafeUser;
+  user: PublicUser;
 }
 
 interface ScheduledOrder {

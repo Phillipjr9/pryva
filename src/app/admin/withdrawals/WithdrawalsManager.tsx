@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { formatCurrency } from "@/lib/utils";
-import { toast } from "@/components/ui/Toast";
-import { CheckCircle, Clock, Search, Loader2, XCircle } from "@/components/icons";
+import { formatCurrency } from "@/lib/format";
+import { useToast } from "@/components/ui/Toast";
+import { Loader2, CheckCircle, XCircle, Clock, Filter } from "@/components/icons";
 
 interface Withdrawal {
   id: string;
@@ -26,36 +26,42 @@ interface Withdrawal {
 }
 
 export function WithdrawalsManager() {
+  const { addToast } = useToast();
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("all");
 
-  useEffect(() => {
-    fetchWithdrawals();
-  }, [filter]);
-
-  async function fetchWithdrawals() {
+  const fetchWithdrawals = useCallback(async (signal?: AbortSignal) => {
     try {
       const params = new URLSearchParams();
       if (filter !== "all") {
         params.set("status", filter);
       }
 
-      const response = await fetch(`/api/admin/withdrawals?${params}`);
+      const response = await fetch(`/api/admin/withdrawals?${params}`, { signal });
       const data = await response.json();
+      if (signal?.aborted) return;
 
       if (data.ok) {
         setWithdrawals(data.withdrawals);
       } else {
-        toast.error(data.error || "Failed to fetch withdrawals");
+        addToast({ type: "error", message: data.error || "Failed to fetch withdrawals" });
       }
     } catch (error) {
-      toast.error("Failed to fetch withdrawals");
+      if (!signal?.aborted) addToast({ type: "error", message: "Failed to fetch withdrawals" });
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  }
+  }, [filter, addToast]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) void fetchWithdrawals(controller.signal);
+    });
+    return () => controller.abort();
+  }, [fetchWithdrawals]);
 
   async function processWithdrawal(id: string, action: "approve" | "reject") {
     if (!confirm(`Are you sure you want to ${action} this withdrawal?`)) {
@@ -74,13 +80,13 @@ export function WithdrawalsManager() {
       const data = await response.json();
 
       if (data.ok) {
-        toast.success(`Withdrawal ${action}d successfully`);
+        addToast({ type: "success", message: `Withdrawal ${action}d successfully` });
         fetchWithdrawals();
       } else {
-        toast.error(data.error || `Failed to ${action} withdrawal`);
+        addToast({ type: "error", message: data.error || `Failed to ${action} withdrawal` });
       }
     } catch (error) {
-      toast.error(`Failed to ${action} withdrawal`);
+      addToast({ type: "error", message: `Failed to ${action} withdrawal` });
     } finally {
       setProcessing(null);
     }
@@ -103,13 +109,13 @@ export function WithdrawalsManager() {
       const data = await response.json();
 
       if (data.ok) {
-        toast.success("Withdrawal marked as completed");
+        addToast({ type: "success", message: "Withdrawal marked as completed" });
         fetchWithdrawals();
       } else {
-        toast.error(data.error || "Failed to complete withdrawal");
+        addToast({ type: "error", message: data.error || "Failed to complete withdrawal" });
       }
     } catch (error) {
-      toast.error("Failed to complete withdrawal");
+      addToast({ type: "error", message: "Failed to complete withdrawal" });
     } finally {
       setProcessing(null);
     }
@@ -125,7 +131,7 @@ export function WithdrawalsManager() {
     };
 
     const { color, icon: Icon } = config[status as keyof typeof config] || {
-      color: "bg-cream-2 text-gray-800",
+      color: "bg-gray-100 text-gray-800",
       icon: Clock,
     };
 
@@ -157,8 +163,8 @@ export function WithdrawalsManager() {
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-white border border-line rounded-lg p-4">
-          <p className="text-sm text-ink-2">Total</p>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <p className="text-sm text-gray-600">Total</p>
           <p className="text-2xl font-bold">{stats.total}</p>
         </div>
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -179,13 +185,13 @@ export function WithdrawalsManager() {
         </div>
       </div>
 
-      {/* Search */}
+      {/* Filter */}
       <div className="flex items-center gap-2">
-        <Search className="w-4 h-4 text-ink-2" />
+        <Filter className="w-4 h-4 text-gray-600" />
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="border border-line rounded-lg px-3 py-2 text-sm"
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
         >
           <option value="all">All Statuses</option>
           <option value="pending">Pending</option>
@@ -198,15 +204,15 @@ export function WithdrawalsManager() {
 
       {/* Withdrawals List */}
       {withdrawals.length === 0 ? (
-        <div className="text-center py-12 bg-cream rounded-lg">
-          <p className="text-ink-2">No withdrawal requests found</p>
+        <div className="text-center py-12 bg-gray-50 rounded-lg">
+          <p className="text-gray-600">No withdrawal requests found</p>
         </div>
       ) : (
         <div className="space-y-4">
           {withdrawals.map((withdrawal) => (
             <div
               key={withdrawal.id}
-              className="bg-white border border-line rounded-lg p-6"
+              className="bg-white border border-gray-200 rounded-lg p-6"
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -214,11 +220,11 @@ export function WithdrawalsManager() {
                     <p className="text-xl font-bold">{formatCurrency(withdrawal.amount)}</p>
                     {getStatusBadge(withdrawal.status)}
                   </div>
-                  <p className="text-sm text-ink-2">
+                  <p className="text-sm text-gray-600">
                     {withdrawal.userName} • {withdrawal.userEmail}
                   </p>
                 </div>
-                <p className="text-xs text-ink-3">
+                <p className="text-xs text-gray-500">
                   {new Date(withdrawal.createdAt).toLocaleDateString("en-NG", {
                     year: "numeric",
                     month: "short",
@@ -231,28 +237,28 @@ export function WithdrawalsManager() {
 
               <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                 <div>
-                  <p className="text-ink-2">Bank</p>
+                  <p className="text-gray-600">Bank</p>
                   <p className="font-medium">{withdrawal.bankName}</p>
                 </div>
                 <div>
-                  <p className="text-ink-2">Account Number</p>
+                  <p className="text-gray-600">Account Number</p>
                   <p className="font-medium">{withdrawal.accountNumber}</p>
                 </div>
                 <div>
-                  <p className="text-ink-2">Account Name</p>
+                  <p className="text-gray-600">Account Name</p>
                   <p className="font-medium">{withdrawal.accountName}</p>
                 </div>
                 <div>
-                  <p className="text-ink-2">Reference</p>
+                  <p className="text-gray-600">Reference</p>
                   <p className="font-medium font-mono text-xs">{withdrawal.reference}</p>
                 </div>
                 <div>
-                  <p className="text-ink-2">Fee</p>
+                  <p className="text-gray-600">Fee</p>
                   <p className="font-medium">{formatCurrency(withdrawal.fee)}</p>
                 </div>
                 <div>
-                  <p className="text-ink-2">Net Amount</p>
-                  <p className="font-medium text-emerald-600">
+                  <p className="text-gray-600">Net Amount</p>
+                  <p className="font-medium text-green-600">
                     {formatCurrency(withdrawal.amount - withdrawal.fee)}
                   </p>
                 </div>
@@ -273,7 +279,7 @@ export function WithdrawalsManager() {
                     <Button
                       onClick={() => processWithdrawal(withdrawal.id, "approve")}
                       disabled={processing === withdrawal.id}
-                      variant="default"
+                      variant="primary"
                       size="sm"
                     >
                       {processing === withdrawal.id ? (
@@ -286,7 +292,7 @@ export function WithdrawalsManager() {
                     <Button
                       onClick={() => processWithdrawal(withdrawal.id, "reject")}
                       disabled={processing === withdrawal.id}
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
@@ -299,7 +305,7 @@ export function WithdrawalsManager() {
                   <Button
                     onClick={() => completeWithdrawal(withdrawal.id)}
                     disabled={processing === withdrawal.id}
-                    variant="default"
+                    variant="primary"
                     size="sm"
                   >
                     {processing === withdrawal.id ? (

@@ -1,5 +1,5 @@
+import { authorizeAdminApi } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApi } from "@/lib/auth";
 import { db } from "@/db";
 import { users, orders, walletTransactions, giftCards } from "@/db/schema";
 import { sql, gte, and, eq } from "drizzle-orm";
@@ -9,11 +9,10 @@ export const dynamic = "force-dynamic";
 
 // GET /api/admin/analytics - Comprehensive analytics dashboard
 export async function GET(request: NextRequest) {
-    const admin = await requireAdminApi();
-    if (!admin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
   try {
+    const access = await authorizeAdminApi(request);
+    if (access.response) return access.response;
+
     const { searchParams } = request.nextUrl;
     const period = searchParams.get("period") || "30d"; // 7d, 30d, 90d, 1y
 

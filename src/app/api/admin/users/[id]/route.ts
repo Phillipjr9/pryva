@@ -1,9 +1,10 @@
+import { authorizeAdminApi } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, orders, walletTransactions, withdrawals } from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
-import { requireAdminApi } from "@/lib/auth";
 import { logger } from "@/lib/logger";
+import { creditWallet, debitWallet, InsufficientFundsError } from "@/lib/wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +17,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await requireAdminApi();
-    if (!admin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const access = await authorizeAdminApi(request);
+    if (access.response) return access.response;
 
     const { id: userId } = await params;
 
@@ -117,10 +116,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await requireAdminApi();
-    if (!admin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const access = await authorizeAdminApi(request);
+    if (access.response) return access.response;
+    const admin = access.user;
 
     const { id: userId } = await params;
     const body = await request.json();
@@ -147,96 +145,29 @@ export async function PUT(
       );
     }
 
-    if (action === "credit") {
-      if (!amount || amount <= 0) {
-        return NextResponse.json(
-          { error: "Valid amount is required" },
-          { status: 400 }
-        );
-      }
-
-      const newBalance = user.walletBalance + amount;
-
-      await db
-        .update(users)
-        .set({ walletBalance: newBalance })
-        .where(eq(users.id, userId));
-
-      // Record transaction
-      const reference = `ADMIN-CREDIT-${Date.now()}`;
-      await db.insert(walletTransactions).values({
-        userId,
-        type: "credit",
-        amount,
-        balanceAfter: newBalance,
-        description: reason || `Admin credit by ${admin.email}`,
-        reference,
-      });
-
-      logger.info("Admin credited user wallet", {
-        adminId: admin.id,
-        userId,
-        amount,
-        reason,
-      });
-
-      return NextResponse.json({
-        ok: true,
-        message: `₦${amount.toLocaleString()} credited to user wallet`,
-        newBalance,
-      });
-    } else if (action === "debit") {
-      if (!amount || amount <= 0) {
-        return NextResponse.json(
-          { error: "Valid amount is required" },
-          { status: 400 }
-        );
-      }
-
-      if (user.walletBalance < amount) {
-        return NextResponse.json(
-          { error: "Insufficient balance" },
-          { status: 400 }
-        );
-      }
-
-      const newBalance = user.walletBalance - amount;
-
-      await db
-        .update(users)
-        .set({ walletBalance: newBalance })
-        .where(eq(users.id, userId));
-
-      // Record transaction
-      const reference = `ADMIN-DEBIT-${Date.now()}`;
-      await db.insert(walletTransactions).values({
-        userId,
-        type: "debit",
-        amount,
-        balanceAfter: newBalance,
-        description: reason || `Admin debit by ${admin.email}`,
-        reference,
-      });
-
-      logger.info("Admin debited user wallet", {
-        adminId: admin.id,
-        userId,
-        amount,
-        reason,
-      });
-
-      return NextResponse.json({
-        ok: true,
-        message: `₦${amount.toLocaleString()} debited from user wallet`,
-        newBalance,
-      });
-    } else {
-      return NextResponse.json(
-        { error: "Invalid action" },
-        { status: 400 }
-      );
+    if (action !== "credit" && action !== "debit") {
+      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
+    if (typeof amount !== "number" || !Number.isSafeInteger(amount) || amount <= 0 || amount > 2000000000) {
+      return NextResponse.json({ error: "A valid whole-naira amount is required" }, { status: 400 });
+    }
+    if (reason !== undefined && (typeof reason !== "string" || reason.length > 180)) {
+      return NextResponse.json({ error: "Invalid reason" }, { status: 400 });
+    }
+
+    const entry = {
+      userId,
+      type: action,
+      amount,
+      description: typeof reason === "string" && reason.trim() ? reason.trim() : `Admin ${action} by ${admin.email}`.slice(0, 200),
+    } as const;
+    const newBalance = action === "credit" ? await creditWallet(entry) : await debitWallet(entry);
+    logger.info("Admin adjusted user wallet", { adminId: admin.id, userId, amount, action, reason });
+    return NextResponse.json({ ok: true, message: `₦${amount.toLocaleString()} ${action === "credit" ? "credited to" : "debited from"} user wallet`, newBalance });
   } catch (error) {
+    if (error instanceof InsufficientFundsError) {
+      return NextResponse.json({ error: "Insufficient balance" }, { status: 400 });
+    }
     logger.error("Failed to update user:", { error });
     return NextResponse.json(
       { error: "Failed to update user" },

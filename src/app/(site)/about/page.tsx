@@ -1,6 +1,5 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { Logo } from "@/components/brand/Logo";
 import { Shield, Zap, Heart, Globe } from "@/components/icons";
 
 export const metadata: Metadata = {
@@ -44,10 +43,7 @@ export default function AboutPage() {
       {/* Header */}
       <header className="border-b border-line bg-white">
         <div className="shell flex h-16 items-center justify-between">
-          <Link href="/">
-            <Logo />
-          </Link>
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3">
             <Link
               href="/login"
               className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"
@@ -73,7 +69,7 @@ export default function AboutPage() {
             <span className="text-lav-600">for Nigerians</span>
           </h1>
           <p className="mt-6 text-[1.1rem] text-ink-2 max-w-2xl mx-auto leading-relaxed">
-            Pryva was built to solve a simple problem: accessing virtual numbers, eSIMs, and other digital services shouldn't be complicated or expensive. We're making it easy for Nigerians to connect globally.
+            Pryva was built to solve a simple problem: accessing virtual numbers, eSIMs, and other digital services shouldn&apos;t be complicated or expensive. We&apos;re making it easy for Nigerians to connect globally.
           </p>
         </div>
       </section>
@@ -103,13 +99,13 @@ export default function AboutPage() {
           </h2>
           <div className="space-y-4 text-[1rem] text-ink-2 leading-relaxed">
             <p>
-              Pryva started with a simple observation: Nigerians face unnecessary friction when trying to access global digital services. Whether it's verifying accounts on international platforms, staying connected while traveling, or accessing services that require non-Nigerian phone numbers, the process was often complicated, expensive, or simply unavailable.
+              Pryva started with a simple observation: Nigerians face unnecessary friction when trying to access global digital services. Whether it&apos;s verifying accounts on international platforms, staying connected while traveling, or accessing services that require non-Nigerian phone numbers, the process was often complicated, expensive, or simply unavailable.
             </p>
             <p>
               We built Pryva to change that. Our platform brings together virtual numbers from 40+ countries, eSIM data for 190+ destinations, residential proxies, and more—all accessible with Naira payments and instant delivery.
             </p>
             <p>
-              Today, thousands of Nigerians use Pryva every day for everything from WhatsApp verification to international travel. We're proud to be part of their journey and committed to making digital services more accessible, affordable, and reliable.
+              Today, thousands of Nigerians use Pryva every day for everything from WhatsApp verification to international travel. We&apos;re proud to be part of their journey and committed to making digital services more accessible, affordable, and reliable.
             </p>
           </div>
         </div>

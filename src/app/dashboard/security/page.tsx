@@ -113,7 +113,7 @@ export default async function SecurityPage() {
           <ul className="space-y-3 text-[0.86rem] text-ink-2">
             <li className="flex items-start gap-2">
               <span className="text-lav-600 font-bold">•</span>
-              Use a strong, unique password that you don't use on other sites
+              Use a strong, unique password that you don&apos;t use on other sites
             </li>
             <li className="flex items-start gap-2">
               <span className="text-lav-600 font-bold">•</span>

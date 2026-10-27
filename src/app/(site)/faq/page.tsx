@@ -1,6 +1,5 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { Logo } from "@/components/brand/Logo";
 import { Accordion, AccordionItem } from "@/components/ui/Accordion";
 
 export const metadata: Metadata = {
@@ -110,10 +109,7 @@ export default function FAQPage() {
       {/* Header */}
       <header className="border-b border-line bg-white">
         <div className="shell flex h-16 items-center justify-between">
-          <Link href="/">
-            <Logo />
-          </Link>
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3">
             <Link
               href="/login"
               className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"
@@ -172,7 +168,7 @@ export default function FAQPage() {
               Still have questions?
             </h2>
             <p className="text-[0.95rem] text-ink-2 mb-6">
-              Can't find what you're looking for? Our support team is here to help.
+              Can&apos;t find what you&apos;re looking for? Our support team is here to help.
             </p>
             <Link
               href="/contact"

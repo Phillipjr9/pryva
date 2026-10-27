@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { toast } from "@/components/ui/Toast";
-import { ArrowUpRight, Close, Loader2, Plus } from "@/components/icons";
+import { useToast } from "@/components/ui/Toast";
+import { Loader2, Plus, Trash2, ArrowUpRight } from "@/components/icons";
 
 interface BankAccount {
   id: string;
@@ -38,6 +38,7 @@ interface Bank {
 }
 
 export function WithdrawalDashboard() {
+  const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<"withdraw" | "history" | "accounts">("withdraw");
   const [balance, setBalance] = useState(0);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -112,7 +113,7 @@ export function WithdrawalDashboard() {
 
   async function verifyAccount() {
     if (!bankCode || !accountNumber || accountNumber.length !== 10) {
-      toast.error("Please enter a valid bank and 10-digit account number");
+      addToast({ type: "error", message: "Please enter a valid bank and 10-digit account number" });
       return;
     }
 
@@ -130,12 +131,12 @@ export function WithdrawalDashboard() {
 
       if (data.ok) {
         setAccountName(data.accountName);
-        toast.success("Account verified successfully");
+        addToast({ type: "success", message: "Account verified successfully" });
       } else {
-        toast.error(data.error || "Failed to verify account");
+        addToast({ type: "error", message: data.error || "Failed to verify account" });
       }
     } catch (error) {
-      toast.error("Failed to verify account");
+      addToast({ type: "error", message: "Failed to verify account" });
     } finally {
       setVerifyingAccount(false);
     }
@@ -143,7 +144,7 @@ export function WithdrawalDashboard() {
 
   async function addBankAccount() {
     if (!bankCode || !accountNumber || !accountName) {
-      toast.error("Please complete all fields");
+      addToast({ type: "error", message: "Please complete all fields" });
       return;
     }
 
@@ -163,16 +164,16 @@ export function WithdrawalDashboard() {
       const data = await response.json();
 
       if (data.ok) {
-        toast.success("Bank account added successfully");
+        addToast({ type: "success", message: "Bank account added successfully" });
         setBankCode("");
         setAccountNumber("");
         setAccountName("");
         fetchBankAccounts();
       } else {
-        toast.error(data.error || "Failed to add bank account");
+        addToast({ type: "error", message: data.error || "Failed to add bank account" });
       }
     } catch (error) {
-      toast.error("Failed to add bank account");
+      addToast({ type: "error", message: "Failed to add bank account" });
     } finally {
       setLoading(false);
     }
@@ -191,13 +192,13 @@ export function WithdrawalDashboard() {
       const data = await response.json();
 
       if (data.ok) {
-        toast.success("Bank account deleted");
+        addToast({ type: "success", message: "Bank account deleted" });
         fetchBankAccounts();
       } else {
-        toast.error(data.error || "Failed to delete bank account");
+        addToast({ type: "error", message: data.error || "Failed to delete bank account" });
       }
     } catch (error) {
-      toast.error("Failed to delete bank account");
+      addToast({ type: "error", message: "Failed to delete bank account" });
     }
   }
 
@@ -205,17 +206,17 @@ export function WithdrawalDashboard() {
     const withdrawAmount = parseFloat(amount);
 
     if (!withdrawAmount || withdrawAmount < 1000) {
-      toast.error("Minimum withdrawal amount is ₦1,000");
+      addToast({ type: "error", message: "Minimum withdrawal amount is ₦1,000" });
       return;
     }
 
     if (withdrawAmount > balance) {
-      toast.error("Insufficient balance");
+      addToast({ type: "error", message: "Insufficient balance" });
       return;
     }
 
     if (!selectedBankAccountId) {
-      toast.error("Please select a bank account");
+      addToast({ type: "error", message: "Please select a bank account" });
       return;
     }
 
@@ -234,17 +235,17 @@ export function WithdrawalDashboard() {
       const data = await response.json();
 
       if (data.ok) {
-        toast.success("Withdrawal request submitted successfully");
+        addToast({ type: "success", message: "Withdrawal request submitted successfully" });
         setAmount("");
         setSelectedBankAccountId("");
         fetchBalance();
         fetchWithdrawalHistory();
         setActiveTab("history");
       } else {
-        toast.error(data.error || "Failed to process withdrawal");
+        addToast({ type: "error", message: data.error || "Failed to process withdrawal" });
       }
     } catch (error) {
-      toast.error("Failed to process withdrawal");
+      addToast({ type: "error", message: "Failed to process withdrawal" });
     } finally {
       setLoading(false);
     }
@@ -257,7 +258,7 @@ export function WithdrawalDashboard() {
       completed: "bg-green-100 text-green-800",
       failed: "bg-red-100 text-red-800",
     };
-    return styles[status as keyof typeof styles] || "bg-cream-2 text-gray-800";
+    return styles[status as keyof typeof styles] || "bg-gray-100 text-gray-800";
   };
 
   return (
@@ -269,13 +270,13 @@ export function WithdrawalDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-line">
+      <div className="flex gap-2 border-b border-gray-200">
         <button
           onClick={() => setActiveTab("withdraw")}
           className={`px-4 py-2 font-medium transition-colors ${
             activeTab === "withdraw"
               ? "border-b-2 border-purple-600 text-purple-600"
-              : "text-ink-2 hover:text-ink"
+              : "text-gray-600 hover:text-gray-900"
           }`}
         >
           Withdraw
@@ -285,7 +286,7 @@ export function WithdrawalDashboard() {
           className={`px-4 py-2 font-medium transition-colors ${
             activeTab === "history"
               ? "border-b-2 border-purple-600 text-purple-600"
-              : "text-ink-2 hover:text-ink"
+              : "text-gray-600 hover:text-gray-900"
           }`}
         >
           History
@@ -295,7 +296,7 @@ export function WithdrawalDashboard() {
           className={`px-4 py-2 font-medium transition-colors ${
             activeTab === "accounts"
               ? "border-b-2 border-purple-600 text-purple-600"
-              : "text-ink-2 hover:text-ink"
+              : "text-gray-600 hover:text-gray-900"
           }`}
         >
           Bank Accounts
@@ -306,7 +307,7 @@ export function WithdrawalDashboard() {
       {activeTab === "withdraw" && (
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-ink-2 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Amount
             </label>
             <Input
@@ -317,18 +318,18 @@ export function WithdrawalDashboard() {
               min="1000"
               max={balance}
             />
-            <p className="text-xs text-ink-3 mt-1">
+            <p className="text-xs text-gray-500 mt-1">
               Minimum: ₦1,000 • Fee: 1% for amounts above ₦5,000
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-ink-2 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Bank Account
             </label>
             {bankAccounts.length === 0 ? (
-              <div className="text-center py-8 bg-cream rounded-lg">
-                <p className="text-ink-2 mb-4">No bank accounts added yet</p>
+              <div className="text-center py-8 bg-gray-50 rounded-lg">
+                <p className="text-gray-600 mb-4">No bank accounts added yet</p>
                 <Button onClick={() => setActiveTab("accounts")}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Bank Account
@@ -373,20 +374,20 @@ export function WithdrawalDashboard() {
       {activeTab === "history" && (
         <div className="space-y-4">
           {withdrawals.length === 0 ? (
-            <div className="text-center py-12 bg-cream rounded-lg">
-              <p className="text-ink-2">No withdrawal history yet</p>
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <p className="text-gray-600">No withdrawal history yet</p>
             </div>
           ) : (
             <div className="space-y-3">
               {withdrawals.map((withdrawal) => (
                 <div
                   key={withdrawal.id}
-                  className="bg-white border border-line rounded-lg p-4"
+                  className="bg-white border border-gray-200 rounded-lg p-4"
                 >
                   <div className="flex justify-between items-start mb-2">
                     <div>
                       <p className="font-semibold">{formatCurrency(withdrawal.amount)}</p>
-                      <p className="text-sm text-ink-2">
+                      <p className="text-sm text-gray-600">
                         {withdrawal.bankName} • {withdrawal.accountNumber}
                       </p>
                     </div>
@@ -398,7 +399,7 @@ export function WithdrawalDashboard() {
                       {withdrawal.status}
                     </span>
                   </div>
-                  <div className="text-xs text-ink-3 space-y-1">
+                  <div className="text-xs text-gray-500 space-y-1">
                     <p>Reference: {withdrawal.reference}</p>
                     <p>Fee: {formatCurrency(withdrawal.fee)}</p>
                     <p>
@@ -425,11 +426,11 @@ export function WithdrawalDashboard() {
       {activeTab === "accounts" && (
         <div className="space-y-6">
           {/* Add New Account Form */}
-          <div className="bg-cream rounded-lg p-4 space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4 space-y-4">
             <h3 className="font-semibold">Add New Bank Account</h3>
 
             <div>
-              <label className="block text-sm font-medium text-ink-2 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Bank
               </label>
               <Select value={bankCode} onChange={(e) => setBankCode(e.target.value)}>
@@ -443,7 +444,7 @@ export function WithdrawalDashboard() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-ink-2 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Account Number
               </label>
               <div className="flex gap-2">
@@ -457,7 +458,7 @@ export function WithdrawalDashboard() {
                 <Button
                   onClick={verifyAccount}
                   disabled={verifyingAccount || !bankCode || accountNumber.length !== 10}
-                  variant="outline"
+                  variant="secondary"
                 >
                   {verifyingAccount ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -499,20 +500,20 @@ export function WithdrawalDashboard() {
           <div>
             <h3 className="font-semibold mb-4">Saved Bank Accounts</h3>
             {bankAccounts.length === 0 ? (
-              <div className="text-center py-8 bg-cream rounded-lg">
-                <p className="text-ink-2">No bank accounts saved yet</p>
+              <div className="text-center py-8 bg-gray-50 rounded-lg">
+                <p className="text-gray-600">No bank accounts saved yet</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {bankAccounts.map((account) => (
                   <div
                     key={account.id}
-                    className="bg-white border border-line rounded-lg p-4 flex justify-between items-center"
+                    className="bg-white border border-gray-200 rounded-lg p-4 flex justify-between items-center"
                   >
                     <div>
                       <p className="font-semibold">{account.bankName}</p>
-                      <p className="text-sm text-ink-2">{account.accountNumber}</p>
-                      <p className="text-sm text-ink-2">{account.accountName}</p>
+                      <p className="text-sm text-gray-600">{account.accountNumber}</p>
+                      <p className="text-sm text-gray-600">{account.accountName}</p>
                       {account.isDefault && (
                         <span className="inline-block mt-1 px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded-full">
                           Default
@@ -525,7 +526,7 @@ export function WithdrawalDashboard() {
                       size="sm"
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
-                      <Close className="w-4 h-4" />
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 ))}

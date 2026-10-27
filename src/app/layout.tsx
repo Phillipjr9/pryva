@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-page-custom-font -- fonts are loaded once in the shared App Router root layout. */
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";

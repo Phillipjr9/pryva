@@ -1,18 +1,15 @@
+import { authorizeAdminApi } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, orders, walletTransactions } from "@/db/schema";
 import { and, count, sum, eq, gte } from "drizzle-orm";
-import { requireAdminApi } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-    const admin = await requireAdminApi();
-    if (!admin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
   try {
-
+    const access = await authorizeAdminApi(request);
+    if (access.response) return access.response;
 
     const now = new Date();
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);

@@ -1,22 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { ArrowRight, Card, Check, Clock, Lock, Wallet } from "@/components/icons";
 import { formatNaira } from "@/lib/catalog";
-import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
 
 const presets = [2000, 5000, 10000, 25000, 50000];
 
 export function TopUpForm({ balance }: { balance: number }) {
-  const router = useRouter();
   const [amount, setAmount] = useState<number>(5000);
   const [custom, setCustom] = useState("");
   const [method, setMethod] = useState<"bank-transfer" | "card">("bank-transfer");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<{ amount: number; reference: string } | null>(null);
 
   const effectiveAmount = custom ? Math.round(Number(custom)) : amount;
 
@@ -24,7 +20,6 @@ export function TopUpForm({ balance }: { balance: number }) {
     event.preventDefault();
     setPending(true);
     setError(null);
-    setSuccess(null);
     try {
       const response = await fetch("/api/wallet/topup", {
         method: "POST",
@@ -34,15 +29,22 @@ export function TopUpForm({ balance }: { balance: number }) {
       const data = (await response.json()) as {
         ok?: boolean;
         error?: string;
-        reference?: string;
+        authorizationUrl?: string;
       };
       if (!response.ok || !data.ok) {
         setError(data.error ?? "That top-up didn't go through.");
         return;
       }
-      setSuccess({ amount: effectiveAmount, reference: data.reference ?? "TOP" });
-      setCustom("");
-      router.refresh();
+      if (!data.authorizationUrl) {
+        setError("Could not open the secure payment checkout.");
+        return;
+      }
+      const checkout = new URL(data.authorizationUrl);
+      if (checkout.protocol !== "https:" || !checkout.hostname.endsWith(".paystack.com")) {
+        setError("Could not verify the payment checkout.");
+        return;
+      }
+      window.location.assign(checkout.toString());
     } catch {
       setError("Network hiccup. Please try again.");
     } finally {
@@ -52,14 +54,7 @@ export function TopUpForm({ balance }: { balance: number }) {
 
   return (
     <>
-      <PaymentLoading show={pending} message="Processing your top-up..." />
-      <PaymentSuccess
-        show={!!success}
-        title="Wallet Topped Up!"
-        message={`${formatNaira(success?.amount || 0)} has been added to your wallet.`}
-        redirectUrl="/dashboard"
-        redirectDelay={2500}
-      />
+      <PaymentLoading show={pending} message="Opening secure checkout..." />
       <form onSubmit={submit} className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 sm:p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-[1.05rem] font-semibold">Fund your wallet</h2>
@@ -120,7 +115,7 @@ export function TopUpForm({ balance }: { balance: number }) {
             {
               id: "bank-transfer" as const,
               label: "Bank transfer",
-              note: "Instant credit · demo",
+              note: "Secure Paystack checkout",
               icon: Wallet,
             },
             { id: "card" as const, label: "Debit card", note: "Local Naira card", icon: Card },
@@ -150,26 +145,19 @@ export function TopUpForm({ balance }: { balance: number }) {
       </div>
 
       {error && <p className="mt-3 text-[0.78rem] font-medium text-rose-600">{error}</p>}
-      {success && (
-        <p className="mt-3 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-[0.78rem] font-medium text-emerald-700">
-          <Check className="mt-0.5 h-4 w-4 shrink-0" />
-          {formatNaira(success.amount)} added to your wallet. Reference {success.reference}.
-        </p>
-      )}
 
       <button
         type="submit"
-        disabled={pending || !Number.isFinite(effectiveAmount) || effectiveAmount < 1000}
+        disabled={pending || !Number.isFinite(effectiveAmount) || effectiveAmount < 1000 || effectiveAmount > 500000}
         className="btn btn-primary mt-4 w-full !py-3.5 disabled:opacity-60"
       >
-        {pending ? "Adding funds…" : `Add ${formatNaira(Number.isFinite(effectiveAmount) ? effectiveAmount : 0)}`}
+        {pending ? "Opening checkout…" : `Continue to pay ${formatNaira(Number.isFinite(effectiveAmount) ? effectiveAmount : 0)}`}
         {!pending && <ArrowRight className="h-4 w-4" />}
       </button>
 
       <p className="mt-3 flex items-start gap-1.5 text-[0.7rem] leading-relaxed text-ink-3">
         <Lock className="mt-0.5 h-3 w-3 shrink-0 text-lav-500" />
-        Preview environment: top-ups credit instantly so you can test the full flow. Live funding uses
-        Nigerian bank transfer and cards.
+        Pay securely through Paystack. Your wallet is credited after payment is confirmed.
       </p>
       <p className="mt-1 flex items-start gap-1.5 text-[0.7rem] leading-relaxed text-ink-3">
         <Clock className="mt-0.5 h-3 w-3 shrink-0 text-lav-500" />

@@ -18,7 +18,6 @@ const config = {
   infoBackground: "#f8f5ee",
   infoBorder: "#eae5da",
   accentColor: "#8266C9",
-  logoUrl: "https://pryva.ng/pryva-logo.png",
   siteUrl: "https://pryva.ng",
 };
 
@@ -47,9 +46,6 @@ function emailWrapper(content: string, preheader: string = ""): string {
   <tr>
     <td style="padding:0 0 22px;">
       <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-        <td width="38" style="padding-right:11px;">
-          <img src="${config.logoUrl}" width="26" height="26" alt="Pryva" style="display:block;width:26px;height:26px;border:0;outline:none;text-decoration:none;">
-        </td>
         <td style="font-family:'Manrope', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:22px;font-weight:700;letter-spacing:-1.3px;color:${config.darkColor};">Pryva</td>
       </tr></table>
     </td>
