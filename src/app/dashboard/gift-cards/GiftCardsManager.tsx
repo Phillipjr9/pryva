@@ -354,10 +354,10 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
                   <span
                     className={`rounded-full px-3 py-1 text-[0.75rem] font-semibold ${
                       card.status === "active"
-                        ? "bg-green-100 text-green-700"
+                        ? "bg-emerald-50 text-emerald-700"
                         : card.status === "redeemed"
-                        ? "bg-lav-100 text-lav-700"
-                        : "bg-gray-100 text-gray-700"
+                          ? "bg-lav-100 text-lav-700"
+                          : "bg-ink/5 text-ink-2"
                     }`}
                   >
                     {card.status.charAt(0).toUpperCase() + card.status.slice(1)}
