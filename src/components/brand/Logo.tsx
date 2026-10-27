@@ -15,7 +15,7 @@ export function Monogram({
 }) {
   return (
     <Image
-      src="/pryva-logo.png"
+      src="/logos/pryva-icon.svg"
       alt="Pryva"
       width={40}
       height={40}
@@ -33,7 +33,7 @@ export function Logo({
   const content = (
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
       <Image
-        src="/pryva-logo.png"
+        src="/logos/pryva-icon.svg"
         alt="Pryva"
         width={36}
         height={36}
