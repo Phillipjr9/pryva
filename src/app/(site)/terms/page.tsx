@@ -1,6 +1,5 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { Logo } from "@/components/brand/Logo";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -13,10 +12,7 @@ export default function TermsPage() {
       {/* Header */}
       <header className="border-b border-line bg-white">
         <div className="shell flex h-16 items-center justify-between">
-          <Link href="/">
-            <Logo />
-          </Link>
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3">
             <Link
               href="/login"
               className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"
@@ -46,7 +42,7 @@ export default function TermsPage() {
           <div className="prose prose-lg max-w-none">
             <h2>1. Acceptance of Terms</h2>
             <p>
-              By accessing and using Pryva's services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.
+              By accessing and using Pryva&apos;s services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.
             </p>
 
             <h2>2. Description of Services</h2>
@@ -81,7 +77,7 @@ export default function TermsPage() {
 
             <h2>8. Limitation of Liability</h2>
             <p>
-              Pryva's liability is limited to the amount paid for the specific service in question. We are not liable for any indirect, incidental, or consequential damages.
+              Pryva&apos;s liability is limited to the amount paid for the specific service in question. We are not liable for any indirect, incidental, or consequential damages.
             </p>
 
             <h2>9. Privacy</h2>

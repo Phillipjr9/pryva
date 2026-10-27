@@ -3,14 +3,15 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { hashPassword } from "@/lib/auth";
 import { creditWallet } from "@/lib/wallet";
-
-const DEMO_EMAIL = "demo@pryva.ng";
+import { DEMO_EMAIL, isPreviewDatabase } from "@/lib/demo-policy";
 const DEMO_PASSWORD = "pryva-demo-2026";
 export const DEMO_STARTING_BALANCE = 25000;
 const DEMO_MIN_BALANCE = 5000;
 
 /** Finds or creates the shared demo account and keeps it topped up. */
 export async function openDemoAccount() {
+  if (!isPreviewDatabase()) return null;
+
   let [user] = await db.select().from(users).where(eq(users.email, DEMO_EMAIL)).limit(1);
 
   if (!user) {

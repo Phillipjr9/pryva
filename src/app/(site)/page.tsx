@@ -2,10 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { PHOTOS } from "@/lib/photos";
-import { BrandMark, hasBrand } from "@/components/brand/BrandMark";
 import { Reveal } from "@/components/ui/Reveal";
 import { FaqAccordion } from "@/components/ui/FaqAccordion";
-import { Monogram } from "@/components/brand/Logo";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import {
   ArrowRight,
@@ -424,7 +422,6 @@ export default function HomePage() {
                         key={platform}
                         className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-2.5 py-1 text-[0.64rem] font-medium text-ink-2"
                       >
-                        <BrandMark name={platform} className="h-3 w-3" />
                         {platform}
                       </span>
                     ))}
@@ -523,9 +520,6 @@ export default function HomePage() {
               key={`${platform}-${index}`}
               className="inline-flex items-center gap-2 rounded-full border border-line bg-cream/80 px-3.5 py-1.5 text-[0.76rem] font-medium text-ink-2"
             >
-              <span className="grid h-[22px] w-[22px] place-items-center rounded-md bg-white shadow-sm ring-1 ring-line/70">
-                <BrandMark name={platform} className="h-3.5 w-3.5" />
-              </span>
               {platform}
             </span>
           ))}
@@ -573,7 +567,6 @@ export default function HomePage() {
                     href={service.href}
                     className="group relative flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-line bg-[#fffdfa] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-lav-200 hover:shadow-[var(--shadow-card)] sm:p-7"
                   >
-                    <Monogram className="pointer-events-none absolute -right-6 -top-8 h-40 w-40 opacity-[0.05] transition-opacity group-hover:opacity-[0.09]" />
                     <div className="relative flex items-start justify-between gap-4">
                       <ServiceIcon service={service.slug as any} size="md" />
                       <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/80 px-2.5 py-1 text-[0.66rem] font-medium text-ink-3">
@@ -592,11 +585,6 @@ export default function HomePage() {
                             key={tag}
                             className="inline-flex items-center gap-1.5 rounded-full bg-lav-50 px-2.5 py-1 text-[0.68rem] font-medium text-lav-700"
                           >
-                            {hasBrand(tag) && (
-                              <span className="grid h-4 w-4 place-items-center rounded-[5px] bg-white shadow-sm">
-                                <BrandMark name={tag} className="h-2.5 w-2.5" />
-                              </span>
-                            )}
                             {tag}
                           </span>
                         ))}
@@ -693,7 +681,6 @@ export default function HomePage() {
       <section className="py-20 sm:py-28">
         <div className="shell">
           <div className="relative overflow-hidden rounded-[2.25rem] border border-lav-200/70 bg-gradient-to-br from-lav-100/80 via-cream to-cream-2 px-5 py-10 sm:px-10 sm:py-14">
-            <Monogram className="pointer-events-none absolute -right-10 -top-16 h-72 w-72 opacity-[0.07]" />
             <div className="relative grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
               <div>
                 <Reveal>
@@ -736,7 +723,6 @@ export default function HomePage() {
                   <div className="rounded-[1.75rem] border border-white bg-white/85 p-4 shadow-[var(--shadow-float)] backdrop-blur-xl sm:p-5">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Monogram className="h-6 w-6" />
                         <span className="text-[0.72rem] font-semibold text-ink">Dashboard</span>
                       </div>
                       <span className="rounded-full bg-cream px-2.5 py-1 text-[0.62rem] font-medium text-ink-2">
@@ -1045,7 +1031,6 @@ export default function HomePage() {
             <div className="relative overflow-hidden rounded-[2.25rem] bg-ink px-6 py-12 text-white sm:px-12 sm:py-16">
               <div className="pointer-events-none absolute -left-20 -top-24 h-72 w-72 rounded-full bg-lav-500/30 blur-[90px]" />
               <div className="pointer-events-none absolute -bottom-24 right-0 h-72 w-72 rounded-full bg-lav-400/25 blur-[90px]" />
-              <Monogram className="pointer-events-none absolute -bottom-16 right-4 h-64 w-64 opacity-10" />
 
               <div className="relative grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
                 <div>

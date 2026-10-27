@@ -29,23 +29,23 @@ export function SecurityDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchSecurityData();
+    const controller = new AbortController();
+    fetch("/api/admin/security/metrics", { signal: controller.signal })
+      .then(async (response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (data && !controller.signal.aborted) {
+          setMetrics(data.metrics);
+          setViolations(data.violations);
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) console.error("Failed to fetch security data:", error);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, []);
-
-  async function fetchSecurityData() {
-    try {
-      const response = await fetch("/api/admin/security/metrics");
-      if (response.ok) {
-        const data = await response.json();
-        setMetrics(data.metrics);
-        setViolations(data.violations);
-      }
-    } catch (error) {
-      console.error("Failed to fetch security data:", error);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   if (loading) {
     return (

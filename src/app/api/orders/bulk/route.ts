@@ -1,3 +1,4 @@
+import { isPreviewDatabase } from "@/lib/demo-policy";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, orders, walletTransactions } from "@/db/schema";
@@ -12,6 +13,11 @@ export async function POST(request: NextRequest) {
     const user = await requireAuth(request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Provider fulfillment is not implemented for this flow yet.
+    if (!isPreviewDatabase()) {
+      return NextResponse.json({ error: "Bulk purchases are temporarily unavailable." }, { status: 503 });
     }
 
     const body = await request.json();

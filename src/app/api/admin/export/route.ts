@@ -1,3 +1,4 @@
+import { authorizeAdminApi } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
@@ -9,6 +10,9 @@ export const dynamic = "force-dynamic";
 // GET /api/admin/export - Export business data for reporting
 export async function GET(request: NextRequest) {
   try {
+    const access = await authorizeAdminApi(request);
+    if (access.response) return access.response;
+
     const { searchParams } = request.nextUrl;
     const type = searchParams.get("type") || "orders"; // orders, users, transactions
     const startDate = searchParams.get("startDate");

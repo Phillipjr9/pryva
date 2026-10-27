@@ -1,19 +1,15 @@
+import { authorizeAdminApi } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, orders, walletTransactions } from "@/db/schema";
-import { count, sum, eq, gte } from "drizzle-orm";
-import { requireAuth } from "@/lib/auth";
+import { and, count, sum, eq, gte } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // TODO: Add admin role check here
+    const access = await authorizeAdminApi(request);
+    if (access.response) return access.response;
 
     const now = new Date();
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -40,8 +36,7 @@ export async function GET(request: NextRequest) {
     const [revenue24h] = await db
       .select({ sum: sum(orders.amount) })
       .from(orders)
-      .where(eq(orders.status, "delivered"))
-      .where(gte(orders.createdAt, last24h));
+      .where(and(eq(orders.status, "delivered"), gte(orders.createdAt, last24h)));
 
     // Last 7d stats
     const [orders7d] = await db

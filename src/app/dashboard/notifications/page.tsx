@@ -38,7 +38,7 @@ export default async function NotificationsPage() {
           <Bell className="mx-auto h-16 w-16 text-ink-3 mb-4" />
           <h2 className="text-[1.1rem] font-semibold text-ink mb-2">No notifications yet</h2>
           <p className="text-[0.9rem] text-ink-2 max-w-md mx-auto">
-            You'll see notifications here when you receive orders, wallet top-ups, gift card redemptions, and other account activity.
+            You&apos;ll see notifications here when you receive orders, wallet top-ups, gift card redemptions, and other account activity.
           </p>
         </div>
       ) : (

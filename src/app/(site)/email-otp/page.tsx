@@ -1,6 +1,5 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { Logo } from "@/components/brand/Logo";
 import { serviceMap, plansFor, formatNaira } from "@/lib/catalog";
 import { ArrowRight } from "@/components/icons";
 
@@ -19,8 +18,7 @@ export default function EmailOTPPage() {
     <div className="min-h-screen bg-cream">
       <header className="border-b border-line bg-white">
         <div className="shell flex h-16 items-center justify-between">
-          <Link href="/"><Logo /></Link>
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3">
             <Link href="/login" className="text-[0.86rem] font-medium text-ink-2 hover:text-ink">Sign in</Link>
             <Link href="/signup" className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700">Get Started</Link>
           </div>

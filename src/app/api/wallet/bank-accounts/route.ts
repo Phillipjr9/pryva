@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { bankAccounts } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { resolveBankAccount, createTransferRecipient } from "@/lib/paystack";
 import { logger } from "@/lib/logger";
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       .select()
       .from(bankAccounts)
       .where(eq(bankAccounts.userId, user.id))
-      .orderBy(bankAccounts.isDefault, "desc");
+      .orderBy(desc(bankAccounts.isDefault));
 
     return NextResponse.json({
       ok: true,
