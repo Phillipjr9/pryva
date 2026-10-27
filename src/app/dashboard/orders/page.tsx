@@ -192,11 +192,11 @@ export default async function OrdersPage({
                         <div className="flex items-center justify-between gap-2 md:block">
                           <p className="text-[0.76rem] text-ink-2">{dayLabel(new Date(order.createdAt))}</p>
                           <p className="text-[0.82rem] font-semibold text-ink md:hidden">
-                            {formatNaira(order.amount)}
+                            <span className="tnum">{formatNaira(order.amount)}</span>
                           </p>
                         </div>
                         <p className="hidden text-[0.82rem] font-semibold text-ink md:block">
-                          {formatNaira(order.amount)}
+                          <span className="tnum">{formatNaira(order.amount)}</span>
                         </p>
                         <div className="flex items-center gap-2">
                           <span

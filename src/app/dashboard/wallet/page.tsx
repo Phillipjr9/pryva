@@ -77,7 +77,7 @@ export default async function WalletPage({
             <p className="text-[0.64rem] uppercase tracking-[0.16em] text-ink-3">Added in total</p>
             <Card className="h-4 w-4 text-lav-600" />
           </div>
-          <p className="mt-2 text-[1.55rem] font-semibold leading-none">{formatNaira(added)}</p>
+          <p className="tnum mt-2 text-[1.55rem] font-semibold leading-none">{formatNaira(added)}</p>
           <p className="mt-2 text-[0.68rem] text-ink-3">Top-ups, welcome and refund credits</p>
         </div>
         <div className="rounded-2xl border border-line bg-[#fffdfa] p-5">
@@ -85,7 +85,7 @@ export default async function WalletPage({
             <p className="text-[0.64rem] uppercase tracking-[0.16em] text-ink-3">Spent in total</p>
             <Refresh className="h-4 w-4 text-lav-600" />
           </div>
-          <p className="mt-2 text-[1.55rem] font-semibold leading-none">{formatNaira(spent)}</p>
+          <p className="tnum mt-2 text-[1.55rem] font-semibold leading-none">{formatNaira(spent)}</p>
           <p className="mt-2 text-[0.68rem] text-ink-3">Across {spendCount} charges</p>
         </div>
       </div>
@@ -126,9 +126,9 @@ export default async function WalletPage({
                         }`}
                       >
                         {tx.type === "debit" ? "−" : "+"}
-                        {formatNaira(tx.amount)}
+                        <span className="tnum">{formatNaira(tx.amount)}</span>
                       </p>
-                      <p className="text-[0.64rem] text-ink-3">Bal. {formatNaira(tx.balanceAfter)}</p>
+                      <p className="tnum text-[0.64rem] text-ink-3">Bal. {formatNaira(tx.balanceAfter)}</p>
                     </div>
                   </div>
                 ))}

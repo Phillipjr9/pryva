@@ -282,3 +282,126 @@
     transform: none;
   }
 }
+
+/* ==========================================================================
+   Money motion
+   ==========================================================================
+   Ported from Veyra. Two things were wrong here before this block:
+
+   1. `animate-in`, `fade-in`, `zoom-in`, `slide-in-from-bottom` were used in
+      PaymentLoading, PaymentSuccess and Toast — but the plugin that defines
+      them (`tailwindcss-animate`) was never installed, so every one of those
+      "animations" did nothing. The screens looked static because they were.
+   2. There was no shared curve. Each component picked its own duration, so a
+      payment card and a toast moved at unrelated speeds.
+
+   These are the primitives the money screens use. They are deliberately
+   short: a balance that has just changed should be readable immediately.
+   ========================================================================== */
+@layer utilities {
+  /* Digits that don't jitter while counting. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Entrance: a card or panel arriving. */
+  .pryva-in {
+    animation: pryvaIn 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  /* Entrance: rising from below, for receipts and confirmations. */
+  .pryva-rise {
+    animation: pryvaRise 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  /* A tick or badge landing with weight. */
+  .pryva-pop {
+    animation: pryvaPop 480ms cubic-bezier(0.34, 1.42, 0.64, 1) both;
+  }
+  /* A line of text stepping in behind the one before it. */
+  .pryva-step {
+    animation: pryvaStep 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  /* Loading sheen across a progress track. */
+  .pryva-sheen {
+    background-image: linear-gradient(
+      100deg,
+      transparent 20%,
+      rgba(255, 255, 255, 0.55) 50%,
+      transparent 80%
+    );
+    background-size: 220% 100%;
+    animation: pryvaSheen 1.5s linear infinite;
+  }
+  /* The indeterminate progress bar used while a payment is authorised. */
+  .pryva-track {
+    animation: pryvaTrack 1.9s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  }
+}
+
+@keyframes pryvaIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pryvaRise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pryvaPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes pryvaStep {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pryvaSheen {
+  from {
+    background-position: 160% 0;
+  }
+  to {
+    background-position: -60% 0;
+  }
+}
+
+@keyframes pryvaTrack {
+  0% {
+    transform: translateX(-100%) scaleX(0.35);
+  }
+  50% {
+    transform: translateX(20%) scaleX(0.55);
+  }
+  100% {
+    transform: translateX(100%) scaleX(0.35);
+  }
+}

@@ -96,6 +96,10 @@ export async function POST(request: NextRequest) {
       ok: true,
       credited: outcome === "credited",
       reason: outcome === "duplicate" ? "already_credited" : undefined,
+      // The figure the receipt counts up. It comes from the provider's charge
+      // for this member's own reference, so it is safe to echo back — and it is
+      // the one number the member came back to the page to see.
+      amount,
     });
   } catch (error) {
     logger.error("Top-up verification failed", {
