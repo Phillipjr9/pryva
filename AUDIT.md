@@ -211,6 +211,34 @@ templates. `logo-removal.test.tsx` used to assert the opposite of this (it encod
 earlier pass that deleted a placeholder logo); it now asserts the mark + name are
 present everywhere and that the icon files exist.
 
+### Pricing
+
+The catalogue used to be a list of hand-typed naira prices with nothing behind
+them — no cost, no margin, no way to answer "do we make money on this?". That is
+now a pipeline, documented in `PRICING.md`:
+
+- `data/supplier-costs.json` is the only place a buyer's cost lives. `npm run pricing:build`
+  turns it into prices (30–50% markup on cost, rounded up to a step that fits the
+  cost) and writes `src/lib/prices.generated.ts`; `npm run pricing:audit` prints
+  the margin table.
+- Costs stay out of the app bundle on purpose (the catalogue module ships to the
+  browser). A test asserts the generated file carries no cost field.
+- Every discount path is clamped to the 30% floor: marketplace volume tiers,
+  promo codes, bulk-order tiers (the basket caps at its thinnest line's
+  headroom). Category premiums now lift a category *inside* the band instead of
+  past it (Facebook/Instagram were reaching 45%, now 48% max, never 55%).
+- `fromPrice` is computed from real plan prices wherever plans exist, so a
+  marketing "from ₦X" cannot go stale.
+- A ₦500 minimum order is enforced at marketplace checkout because Paystack's
+  flat ₦100 fee makes smaller orders loss-making even at a 50% markup.
+- Exceptions are documented, not hidden: airtime, data and gift cards sell at
+  face value and earn the reseller commission (2–5%). A 30–50% markup there is
+  not a price any customer would pay.
+
+**The costs themselves are placeholders** (seeded as the old price ÷ 1.3) until
+the owner supplies real supplier invoices; the engine, the floors and the audit
+are what shipped.
+
 ### Code
 
 1. **Per-service artwork wired through the app** — homepage grid, pricing, the digital-services
@@ -266,7 +294,7 @@ present everywhere and that the icon files exist.
 
 **Week 3 — credibility & growth**
 7. ~~Remaining images~~ **Done** — 3D set complete, carrier + platform marks hand-authored. Next art gap: homepage Facebook/Instagram showcase (U6).
-8. Referrals + reviews (the two that move revenue).
+8. ~~Real supplier costs into `data/supplier-costs.json`~~ **Open** — engine live, numbers pending invoices. Referrals + reviews next.
 9. CI workflow running `typecheck` + `test` + `build` on every PR.
 
 **Week 4 — polish**

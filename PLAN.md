@@ -258,6 +258,8 @@ Verified facts:
 | 2026-10-27 | **Real icons, not renders.** All third-party products and platforms now show official brand marks (`src/lib/brand-marks.ts`, extracted from simple-icons / @iconify-json/logos / devicon) instead of generated art; carriers use Airtel's official mark plus wordmark tiles; 60 countries got real flag SVGs with a `CountryFlag` component wired into pricing, checkout, numbers and eSIM. Six obsolete product PNGs deleted (images now 4.1 MB). 29 files / 176 tests green. | #26, #27 |
 | 2026-10-27 | **API contract + hardening.** `requireAuthApi()` added and 22 route handlers migrated (signed-out callers were getting 500/307 instead of 401), wildcard CORS removed from `/api/*`, `no-store` on all API responses, footer `/accounts` duplicate key fixed. 26 files / 168 tests green. | #6 (partial), #45 |
 | 2026-10-27 | **Auth throttling + admin console.** Per-IP/per-account login limits, per-IP signup limit (verified live: 6th bad attempt → 429), `/admin/users`, `/admin/orders`, shared admin nav. 23 files / 165 tests green, `next build` clean. | #5, #42, #45 |
+| 2026-10-27 | **Profit band + nav cleanup.** Every price is now derived from a supplier cost sheet (`data/supplier-costs.json` → `npm run pricing:build` → `prices.generated.ts`) at 30–50% markup on cost; volume discounts, promos and bulk tiers are all clamped to a 30% floor; ₦500 minimum order closes the Paystack-fee leak; `PRICING.md` documents the rule, the audit command and the three face-value exceptions (airtime, data, gift cards). Homepage nav lost the Services dropdown (Home, Pricing, Accounts, How it works, FAQ, Contact). 204 tests green. | #13, #24, #26 |
+
 
 ---
 

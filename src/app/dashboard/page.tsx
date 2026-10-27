@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { orders, walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { isPreviewDatabase } from "@/lib/demo-policy";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira, serviceMap } from "@/lib/catalog";
 import {
   ArrowRight,
   Chat,
@@ -22,10 +22,10 @@ export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
 
 const quickBuys = [
-  { label: "Virtual number", note: "From ₦1,200", href: "/virtual-numbers#buy", service: "numbers" as const },
-  { label: "eSIM data", note: "From ₦4,500", href: "/esim#buy", service: "esim" as const },
-  { label: "Residential proxy", note: "From ₦3,500", href: "/proxies#buy", service: "proxies" as const },
-  { label: "Email OTP", note: "From ₦700", href: "/email-otp#buy", service: "email-otp" as const },
+  { label: "Virtual number", note: `From ${formatNaira(serviceMap.numbers.fromPrice)}`, href: "/virtual-numbers#buy", service: "numbers" as const },
+  { label: "eSIM data", note: `From ${formatNaira(serviceMap.esim.fromPrice)}`, href: "/esim#buy", service: "esim" as const },
+  { label: "Residential proxy", note: `From ${formatNaira(serviceMap.proxies.fromPrice)}`, href: "/proxies#buy", service: "proxies" as const },
+  { label: "Email OTP", note: `From ${formatNaira(serviceMap["email-otp"].fromPrice)}`, href: "/email-otp#buy", service: "email-otp" as const },
 ];
 
 function statusStyle(status: string) {
@@ -163,7 +163,8 @@ export default async function DashboardOverviewPage() {
             <div className="mt-4 rounded-2xl border border-dashed border-line bg-cream/50 p-6 text-center">
               <p className="text-[0.9rem] font-medium text-ink">No orders yet</p>
               <p className="mx-auto mt-1 max-w-xs text-[0.8rem] text-ink-3">
-                Start with a ₦700 temporary inbox or a ₦1,200 Nigerian verification number.
+                Start with a {formatNaira(serviceMap["email-otp"].fromPrice)} temporary inbox or a{" "}
+                {formatNaira(serviceMap.numbers.fromPrice)} Nigerian verification number.
               </p>
               <Link href="/pricing" className="btn btn-primary mt-4 !px-4 !py-2.5 !text-[0.78rem]">
                 Browse services
