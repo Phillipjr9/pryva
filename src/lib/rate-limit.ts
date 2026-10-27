@@ -40,6 +40,11 @@ export const purchaseRateLimiter = createRateLimiter({
   maxRequests: 10,
 });
 
+/** Drop a key's counter — used after a successful login. */
+export function resetRateLimit(key: string) {
+  rateLimitStore.delete(key);
+}
+
 export function cleanupRateLimitStore() {
   const now = Date.now();
   for (const [key, record] of rateLimitStore.entries()) {

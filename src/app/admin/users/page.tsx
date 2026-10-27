@@ -1,0 +1,177 @@
+import Link from "next/link";
+import { requireAdmin } from "@/lib/auth";
+import { db } from "@/db";
+import { users, orders } from "@/db/schema";
+import { count, desc, ilike, inArray, or, sql } from "drizzle-orm";
+
+export const dynamic = "force-dynamic";
+
+const PAGE_SIZE = 50;
+
+function formatNaira(amount: number) {
+  return `₦${amount.toLocaleString("en-NG")}`;
+}
+
+function formatDate(value: Date | string) {
+  const date = typeof value === "string" ? new Date(value) : value;
+  return date.toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+export default async function AdminUsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; page?: string }>;
+}) {
+  await requireAdmin("/admin/users");
+
+  const params = await searchParams;
+  const query = (params.q ?? "").trim();
+  const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
+  const term = `%${query}%`;
+
+  // One page of users plus their lifetime order counts. Two queries beat a
+  // correlated subquery per row on Postgres here, and it keeps the count map
+  // small (only the ids on this page).
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      walletBalance: users.walletBalance,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .where(query ? or(ilike(users.name, term), ilike(users.email, term)) : undefined)
+    .orderBy(desc(users.createdAt))
+    .limit(PAGE_SIZE)
+    .offset(offset);
+
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(users)
+    .where(query ? or(ilike(users.name, term), ilike(users.email, term)) : undefined);
+
+  const pageIds = rows.map((row) => row.id);
+  const orderCounts = new Map<string, { orders: number; spent: number }>();
+
+  if (pageIds.length > 0) {
+    const grouped = await db
+      .select({
+        userId: orders.userId,
+        orderCount: count(),
+        spent: sql<number>`coalesce(sum(${orders.amount}), 0)`,
+      })
+      .from(orders)
+      .where(inArray(orders.userId, pageIds))
+      .groupBy(orders.userId);
+
+    for (const row of grouped) {
+      orderCounts.set(row.userId, { orders: Number(row.orderCount), spent: Number(row.spent) });
+    }
+  }
+
+  const totalPages = Math.max(1, Math.ceil(Number(total) / PAGE_SIZE));
+  const walletTotal = rows.reduce((sum, row) => sum + row.walletBalance, 0);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-[1.5rem] font-medium tracking-tight">Users</h1>
+          <p className="mt-1 text-[0.86rem] text-ink-2">
+            {Number(total).toLocaleString("en-NG")} registered {Number(total) === 1 ? "account" : "accounts"}
+            {query ? ` matching “${query}”` : ""}.
+          </p>
+        </div>
+        <div className="rounded-xl border border-line bg-white px-4 py-2 text-right">
+          <p className="text-[0.7rem] uppercase tracking-wide text-ink-3">Wallet balance on this page</p>
+          <p className="text-[1rem] font-semibold text-ink">{formatNaira(walletTotal)}</p>
+        </div>
+      </div>
+
+      <form action="/admin/users" className="flex flex-wrap items-center gap-2">
+        <input
+          type="search"
+          name="q"
+          defaultValue={query}
+          placeholder="Search by name or email"
+          aria-label="Search users"
+          className="w-full max-w-sm rounded-xl border border-line bg-white px-3.5 py-2 text-[0.86rem] outline-none focus:border-lav-400"
+        />
+        <button type="submit" className="btn btn-primary btn-sm">
+          Search
+        </button>
+        {query && (
+          <Link href="/admin/users" className="text-[0.82rem] text-ink-3 underline">
+            Clear
+          </Link>
+        )}
+      </form>
+
+      <div className="overflow-hidden rounded-2xl border border-line bg-white">
+        <table className="w-full text-left text-[0.84rem]">
+          <thead className="bg-cream/70 text-[0.72rem] uppercase tracking-wide text-ink-3">
+            <tr>
+              <th className="px-4 py-3 font-semibold">User</th>
+              <th className="px-4 py-3 font-semibold">Wallet</th>
+              <th className="px-4 py-3 font-semibold">Orders</th>
+              <th className="px-4 py-3 font-semibold">Spent</th>
+              <th className="px-4 py-3 font-semibold">Joined</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-4 py-10 text-center text-ink-2">
+                  No users match that search.
+                </td>
+              </tr>
+            )}
+            {rows.map((row) => {
+              const stats = orderCounts.get(row.id);
+              return (
+                <tr key={row.id} className="border-t border-line/70">
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-ink">{row.name}</p>
+                    <p className="text-[0.76rem] text-ink-3">{row.email}</p>
+                  </td>
+                  <td className="px-4 py-3 font-medium">{formatNaira(row.walletBalance)}</td>
+                  <td className="px-4 py-3">{stats?.orders ?? 0}</td>
+                  <td className="px-4 py-3">{formatNaira(stats?.spent ?? 0)}</td>
+                  <td className="px-4 py-3 text-ink-2">{formatDate(row.createdAt)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-[0.82rem] text-ink-2">
+          <span>
+            Page {page} of {totalPages}
+          </span>
+          <div className="flex gap-2">
+            {page > 1 && (
+              <Link
+                href={`/admin/users?page=${page - 1}${query ? `&q=${encodeURIComponent(query)}` : ""}`}
+                className="rounded-lg border border-line bg-white px-3 py-1.5 hover:border-lav-300"
+              >
+                Previous
+              </Link>
+            )}
+            {page < totalPages && (
+              <Link
+                href={`/admin/users?page=${page + 1}${query ? `&q=${encodeURIComponent(query)}` : ""}`}
+                className="rounded-lg border border-line bg-white px-3 py-1.5 hover:border-lav-300"
+              >
+                Next
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

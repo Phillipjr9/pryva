@@ -93,9 +93,9 @@ So the honest status is: **the marketplace is built, the supply chain is not con
 | S2 | Email verification | Signup accepts any address |
 | S3 | 2FA (TOTP) | Three "Coming Soon" cards; no TOTP library or secret column |
 | S4 | Login history | `security_violations` table exists, no per-user login log or screen |
-| S5 | Rate limits on `/api/auth/*` | `authRateLimiter` exists and is **never imported** — login is unthrottled |
+| S5 | ~~Rate limits on `/api/auth/*`~~ **Fixed in this pass** — `/api/auth/login` 5/15min per account + 30/15min per IP, `/api/auth/signup` 10/hour per IP, 429 + `Retry-After` |
 | S6 | Active sessions UI | **Fixed in this pass** — API existed, screen said "Coming Soon" |
-| S7 | Admin users screen | `GET /api/admin/users` + `[id]` exist; only visitors are the dashboard tiles |
+| S7 | ~~Admin users screen~~ **Fixed in this pass** — `/admin/users` (search, wallet balances, order counts, spend) and `/admin/orders` (status filters, buyer email, search, pagination) |
 
 ### 3.4 Growth & retention
 
@@ -217,6 +217,15 @@ on its card, with a neutral fallback for platforms we don't draw.
    never) and `/cookie-policy` (the three cookies actually set), linked in the footer + sitemap.
 8. **Base migration** — `migrations/0000_base_schema.sql` creates all 12 tables; old incremental
    files moved to `migrations/legacy/` with a README explaining the order.
+9. **Auth throttling** — `src/lib/auth-rate-limit.ts`: per-IP *and* per-account buckets on login,
+   per-IP bucket on signup, cleared on a successful sign-in so real users never lock themselves out.
+   Verified live: attempts 1–5 return 401, attempt 6 returns `429` with `Retry-After`.
+   Counters are in-process, so a multi-instance deploy needs Redis/Postgres — noted in the file.
+10. **Admin console** — real `/admin/users` and `/admin/orders` screens plus a shared admin nav
+    (the stat tiles linked to pages that did not exist). Both are server-rendered, `requireAdmin`
+    gated, paginated and searchable. **Not smoke-tested here**: preview mode has no `ADMIN_EMAILS`
+    entry and the demo identity is barred from admin by design, so verifying them needs an
+    admin account in `.env`.
 
 ---
 
@@ -225,7 +234,7 @@ on its card, with a neutral fallback for platforms we don't draw.
 **Week 1 — make it sell something real**
 1. Connect one fulfilment provider end-to-end (numbers first) and prove a live purchase.
 2. Email sender (Resend/SES) → receipts, verification, password reset. Unblocks S1, S2, F4.
-3. Turn on `authRateLimiter` for `/api/auth/*` (10-line change, closes credential stuffing).
+3. ~~Turn on `authRateLimiter` for `/api/auth/*`~~ **Done** — per-IP + per-account buckets live.
 
 **Week 2 — close the money gaps**
 4. Admin single-withdrawal approval + payment-audit screen.
