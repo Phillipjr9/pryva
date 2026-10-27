@@ -123,11 +123,12 @@ ratings**, **coupons** (marketplace promos are supplier-side only), **support ti
 | # | Missing |
 |---|---|
 | U1 | ~~Dashboard sidebar uses generic line icons for Wallet/Orders/Data/Scheduled/Bulk~~ **Fixed** — 3D product art per nav item |
-| U2 | ~~Provider logos (MTN/Airtel/Glo/9mobile) absent — text only~~ **Fixed** — hand-authored SVG marks (`NetworkBadge`) |
-| U3 | ~~Platform logos (Facebook, Instagram, TikTok…) absent on `/accounts`~~ **Fixed** — hand-authored SVG marks (`PlatformBadge`) on cards + hero strip |
+| U2 | ~~Provider logos (MTN/Airtel/Glo/9mobile) absent — text only~~ **Fixed** — Airtel's official mark + carrier wordmark tiles |
+| U3 | ~~Platform logos (Facebook, Instagram, TikTok…) absent on `/accounts`~~ **Fixed** — real brand marks on cards, hero strip and every product tile |
 | U4 | Withdrawal screen still uses default form styling, not the site's design language |
 | U5 | No loading skeletons on most dashboard screens |
 | U6 | Facebook/Instagram hero showcase on the homepage (#10 in PLAN) |
+| U7 | Country flags were emoji only (rendered as "NG" on Windows) | **Fixed** — 60 real flags + `CountryFlag` on pricing, checkout, numbers and eSIM pages |
 
 ---
 
@@ -151,53 +152,37 @@ ratings**, **coupons** (marketplace promos are supplier-side only), **support ti
 
 ## 5. WHAT I CHANGED IN THIS PASS
 
-### Images — regenerated as 3D renders
+### Images — real brand marks and real flags
 
-The old set was a mix of flat vector art, outlined icons and a UI mockup with readable text baked
-in, at inconsistent aspect ratios (1024×1024 and 1408×768 mixed), totalling **18 MB**.
+**The rule now:** anything that belongs to somebody else shows *its own real logo*; anything that is
+Pryva's own invention keeps original artwork.
 
-All regenerated as a single coherent system: **soft-clay/glass 3D renders** on the brand's warm
-cream background, in the lavender/violet palette, no baked-in text, every file now a square.
+| Where | What it shows | Source |
+|---|---|---|
+| Third-party products (Netflix, Spotify, YouTube, Disney+, ChatGPT, Canva) | Official brand mark | `src/lib/brand-marks.ts` — generated from `simple-icons` (CC0), `@iconify-json/logos` (CC0) and `devicon` (MIT) |
+| Platforms sold as accounts (Facebook, Instagram, TikTok, X, Gmail, Telegram, WhatsApp, Discord, Steam…) | Official brand mark | same file, rendered by `BrandIcon` |
+| Carriers (MTN, Airtel, Glo, 9mobile) | Airtel's official mark; MTN/Glo/9mobile as wordmark tiles (no redistributable logo exists) | `NetworkBadge` → `BrandIcon` |
+| Countries (60 markets) | Real flag artwork | `public/images/flags/*.svg`, copied from `flag-icons` (MIT) by `scripts/copy-flags.mjs` |
+| Pryva's own catalogue (virtual numbers, eSIM, proxies, email OTP, data, gift cards, bulk, scheduled, accounts) | Original 3D art — there is no "real logo" for a product we invented | `public/images/services/*.png` |
+| Category tiles, email heroes | 3D art, unchanged | `public/images/categories/*.png`, `public/images/email/*.jpg` |
 
-| File | Status |
-|---|---|
-| `services/virtual-numbers.png` | ✅ 3D phone + call bubbles + SIM |
-| `services/esim.png` | ✅ 3D eSIM chip + signal arc + globe |
-| `services/proxies.png` | ✅ 3D server stack + shield |
-| `services/email-otp.png` | ✅ 3D envelope + padlock + tokens |
-| `services/data.png` | ✅ 3D signal tower + cloud droplet |
-| `services/gift-cards.png` | ✅ 3D gift card + ribbon |
-| `services/bulk.png` | ✅ 3D tile grid + arrow |
-| `services/scheduled.png` | ✅ 3D calendar + clock |
-| `services/digital-accounts.png` | ✅ **new** — 3D profile card + verified badge |
-| `services/netflix.png` | ✅ **new** — 3D TV + play triangle + popcorn |
-| `services/spotify.png` | ✅ **new** — 3D soundwave disc + music note |
-| `services/youtube.png` | ✅ **new** — 3D play button + clapperboard + film |
-| `services/disney.png` | ✅ **new** — 3D fairytale castle on a cloud |
-| `services/chatgpt.png` | ✅ **new** — 3D iridescent orb + chat bubble |
-| `services/canva.png` | ✅ **new** — 3D palette + brush + design tiles |
-| `categories/streaming.png` | ✅ 3D play button + popcorn |
-| `categories/music.png` | ✅ 3D headphones + soundwave |
-| `categories/gaming.png` | ✅ 3D gamepad + dice + joystick |
-| `categories/productivity.png` | ✅ 3D notebook + pencil + sticky notes |
-| `email/hero-*.jpg` (6) | ✅ already 3D in the last pass — **re-cut this pass** from 1024² squares to 1200×600 banners so the email header reads as a header instead of a full-width square (396 KB total) |
+**Why the change:** the 3D renders looked good but read as "some streaming thing" at 20 px in the
+dashboard, and a buyer scanning account listings needs to see Netflix as Netflix. Official paths are
+also tiny (≤3 KB each, SVG, scales to any size) versus 250 KB PNGs.
 
-Every digital product now has its **own** artwork (previously Netflix, YouTube and Disney+ all
-shared one category image). The art is original 3D illustration themed around each product rather
-than reproductions of third-party trademarked logos — that keeps the visual distinction you asked
-for without shipping someone else's marks. The existing `logo-removal` test now asserts "one
-distinct file per service" instead of "no per-service art".
+**Gone:** `services/{netflix,spotify,youtube,disney,chatgpt,canva}.png` deleted — nothing referenced
+them any more, and keeping two representations of the same product is how the wrong one ends up on a
+page six months from now. `public/images` is now 4.1 MB, of which 428 KB is 60 flags.
 
-**Optimisation:** centre-cropped to square and resized to 512×512 with PNG optimisation.
-**18 MB → 4.0 MB** across 19 files (−78%) with no visible quality loss at the 20–64 px sizes the UI renders them.
-The six email heroes are 1200×600 at q86 (396 KB for all six, down from 725 KB) and render at 600×300 inside the 600 px email column.
+**Flags, not emoji.** Emoji flags (🇳🇬) render as the letters "NG" on Windows and as nothing at all
+in most email clients. `CountryFlag` resolves a plan's region string ("Nigeria", "US · 30 days",
+"Europe (38 countries)") to real artwork, falling back to a drawn globe for bundles that have no
+single flag (Africa, Global, "Any domain").
 
-**Brand marks are never AI-generated.** Two hand-authored SVG sets cover the marks that must be
-accurate: `src/components/NetworkBadge.tsx` (MTN / Airtel / Glo / 9mobile — distinct shapes, not one
-generic oval) and `src/components/PlatformBadge.tsx` (Facebook, Instagram, TikTok, Gmail, Outlook,
-X, Telegram, WhatsApp, Discord, YouTube, Netflix, Spotify, Steam). The second one also includes a
-title/category matcher so a live listing titled "Instagram 5k followers" picks up the Instagram mark
-on its card, with a neutral fallback for platforms we don't draw.
+**Licensing note:** brand marks stay the trademarks of their owners and are used here only to
+identify the product being sold — the same way a shop shelf label works. The icon *data* is
+permissively licensed; the logos are not Pryva's to relicense. Re-extract with
+`scripts/extract-brand-marks.mjs` after bumping the icon packages.
 
 ### Code
 

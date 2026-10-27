@@ -32,22 +32,41 @@ describe("logo-free presentation", () => {
     expect(googleLink).not.toMatch(/<svg|<img/);
   });
 
-  it("gives every digital service its own distinct artwork", () => {
+  it("gives every digital service its real brand mark", () => {
+    // Third-party products show their official logo now, not generated art.
+    // What must stay true: each product renders its OWN mark (no sharing), the
+    // mark is drawn SVG (no bitmap), and the accessible name matches the brand.
+    const names: Record<string, string> = {
+      netflix: "Netflix",
+      spotify: "Spotify",
+      youtube: "YouTube",
+      disney: "Disney+",
+      chatgpt: "ChatGPT",
+      canva: "Canva",
+    };
+
     const seen = new Set<string>();
 
     for (const service of ["netflix", "spotify", "youtube", "disney", "chatgpt", "canva"] as const) {
-      const file = `public/images/services/${service}.png`;
-      // Original 3D art per product — never a shared category image.
-      expect(existsSync(file)).toBe(true);
+      const html = renderToStaticMarkup(<ServiceIcon service={service} />);
+      expect(html).toContain(`aria-label="${names[service]}"`);
+      // No leftover generated artwork for products that have a real logo.
+      expect(html).not.toContain(`/images/services/${service}.png`);
 
-      const html = decodeURIComponent(renderToStaticMarkup(<ServiceIcon service={service} />));
-      expect(html).toContain(`/images/services/${service}.png`);
-
-      if (html.includes("/images/services/")) seen.add(service);
+      const shape = html.slice(html.indexOf("<g"), html.lastIndexOf("</g>") + 4) || html;
+      seen.add(shape);
     }
 
-    // No two products point at the same file.
     expect(seen.size).toBe(6);
+  });
+
+  it("keeps Pryva's own catalogue on its original artwork", () => {
+    // There is no official logo for "virtual numbers" — those keep the 3D set.
+    for (const service of ["numbers", "esim", "proxies", "email-otp", "data", "gift-cards"] as const) {
+      const html = decodeURIComponent(renderToStaticMarkup(<ServiceIcon service={service} />));
+      expect(html).toContain(`/images/services/`);
+      expect(existsSync(`public/images/services/${service === "numbers" ? "virtual-numbers" : service}.png`)).toBe(true);
+    }
   });
 
   it("removes the logo from every email template", () => {

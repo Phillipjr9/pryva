@@ -2,6 +2,8 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { serviceMap, plansFor, formatNaira } from "@/lib/catalog";
 import { Check, ArrowRight } from "@/components/icons";
+import { CountryFlag, CountryChips } from "@/components/CountryFlag";
+import { hasCountryFlag } from "@/lib/countries";
 
 export const metadata: Metadata = {
   title: "Virtual Numbers",
@@ -91,6 +93,20 @@ export default function VirtualNumbersPage() {
         </div>
       </section>
 
+      {/* Coverage */}
+      <section className="pb-16">
+        <div className="shell">
+          <h2 className="mb-3 text-[1.75rem] font-semibold text-ink">Countries</h2>
+          <p className="mb-6 max-w-2xl text-[0.95rem] text-ink-2">
+            Real flags, real numbers. Nigeria, the US, the UK, Canada, Germany and Ghana are
+            live today; the rest of the coverage activates as carriers come online.
+          </p>
+          <CountryChips
+            codes={["ng", "us", "gb", "ca", "de", "gh", "ke", "za", "in", "ae", "fr", "nl"]}
+          />
+        </div>
+      </section>
+
       {/* What's Included */}
       <section className="pb-16">
         <div className="shell max-w-3xl">
@@ -131,7 +147,8 @@ export default function VirtualNumbersPage() {
                     </span>
                   </div>
                 )}
-                <h3 className="text-[1.1rem] font-semibold text-ink mb-2">
+                <h3 className="flex items-center gap-2 text-[1.1rem] font-semibold text-ink mb-2">
+                  {hasCountryFlag(plan.region) && <CountryFlag region={plan.region} size={20} decorative />}
                   {plan.name}
                 </h3>
                 <p className="text-[0.86rem] text-ink-2 mb-4">{plan.planLabel}</p>

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { BrandIcon, type BrandIconProps } from "@/components/BrandIcon";
 
 type DigitalServiceType = "netflix" | "spotify" | "youtube" | "disney" | "chatgpt" | "canva";
 type CoreServiceType = "numbers" | "esim" | "proxies" | "email-otp";
@@ -15,17 +16,18 @@ interface ServiceIconProps {
 }
 
 /**
- * Each digital product gets its own artwork. These are original 3D illustrations
- * themed around the product — deliberately not reproductions of third-party
- * trademarked logos.
+ * Digital products are *third-party brands*, so they show their real logo
+ * (`BrandIcon`) — a hand-drawn Netflix tile reads as Netflix at 20px in a way a
+ * generated illustration never can. Pryva's own catalogue below keeps the 3D
+ * artwork, because there is no "real" logo for "virtual numbers".
  */
-const digitalServiceImages: Record<DigitalServiceType, string> = {
-  netflix: "/images/services/netflix.png",
-  spotify: "/images/services/spotify.png",
-  youtube: "/images/services/youtube.png",
-  disney: "/images/services/disney.png",
-  chatgpt: "/images/services/chatgpt.png",
-  canva: "/images/services/canva.png",
+const digitalServiceBrands: Record<DigitalServiceType, BrandIconProps["brand"]> = {
+  netflix: "netflix",
+  spotify: "spotify",
+  youtube: "youtube",
+  disney: "disney-plus",
+  chatgpt: "chatgpt",
+  canva: "canva",
 };
 
 const coreServiceImages: Record<CoreServiceType, string> = {
@@ -43,8 +45,7 @@ const additionalServiceImages: Record<AdditionalServiceType, string> = {
   scheduled: "/images/services/scheduled.png",
 };
 
-const serviceImages: Record<ServiceType, string> = {
-  ...digitalServiceImages,
+const serviceImages: Record<Exclude<ServiceType, DigitalServiceType>, string> = {
   ...coreServiceImages,
   ...additionalServiceImages,
 };
@@ -79,7 +80,20 @@ const sizeMap = {
 
 export function ServiceIcon({ service, size = "md", className = "" }: ServiceIconProps) {
   const pixelSize = sizeMap[size];
-  const imageSrc = serviceImages[service];
+
+  if (service in digitalServiceBrands) {
+    return (
+      <BrandIcon
+        brand={digitalServiceBrands[service as DigitalServiceType]}
+        size={pixelSize}
+        variant="tile"
+        decorative={false}
+        className={className}
+      />
+    );
+  }
+
+  const imageSrc = serviceImages[service as Exclude<ServiceType, DigitalServiceType>];
   const altText = serviceNames[service] || service;
 
   // Use fallback if imageSrc is undefined, null, or empty string
