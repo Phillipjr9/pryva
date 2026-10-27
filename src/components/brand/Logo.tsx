@@ -15,7 +15,7 @@ export function Monogram({
 }) {
   return (
     <Image
-      src="/logos/pryva-icon.svg"
+      src="/pryva-logo.png"
       alt="Pryva"
       width={40}
       height={40}
@@ -30,28 +30,24 @@ export function Logo({
   tagline = false,
   href = "/",
 }: LogoProps) {
-  const content = (
-    <span className={`inline-flex items-center gap-2.5 ${className}`}>
-      <Image
-        src="/logos/pryva-icon.svg"
-        alt="Pryva"
-        width={36}
-        height={36}
-        className="h-9 w-9 shrink-0"
-      />
-      {variant === "lockup" && (
-        <span className="flex flex-col leading-none">
-          <span className="text-[1.45rem] font-medium tracking-[-0.04em] text-lav-600">
-            Pryva
-          </span>
-          {tagline && (
-            <span className="mt-1 text-[0.5rem] font-semibold uppercase tracking-[0.28em] text-ink-3">
-              Simple. Secure. Scalable.
-            </span>
-          )}
-        </span>
-      )}
-    </span>
+  const isLockup = variant === "lockup";
+
+  const content = isLockup ? (
+    <Image
+      src="/pryva-logo.png"
+      alt="Pryva"
+      width={420}
+      height={420}
+      className={`${className} h-auto w-auto`}
+    />
+  ) : (
+    <Image
+      src="/pryva-logo.png"
+      alt="Pryva"
+      width={36}
+      height={36}
+      className={`${className} h-9 w-9 shrink-0`}
+    />
   );
 
   if (!href) return content;
