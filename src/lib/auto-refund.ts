@@ -24,7 +24,7 @@ export async function processAutoRefunds(): Promise<number> {
       }
 
       // Process refund
-      await db.transaction(async (tx) => {
+      await db.transaction(async (tx: typeof db) => {
         const user = await tx.query.users.findFirst({
           where: eq(users.id, order.userId),
         });

@@ -1,5 +1,33 @@
-export function cn(...classes: (string | boolean | undefined | null)[]): string {
-  return classes.filter(Boolean).join(" ");
+type ClassValue =
+  | string
+  | boolean
+  | null
+  | undefined
+  | Record<string, boolean>
+  | ClassValue[];
+
+export function cn(...classes: ClassValue[]): string {
+  const output: string[] = [];
+
+  for (const entry of classes) {
+    if (!entry) continue;
+
+    if (typeof entry === "string") {
+      output.push(entry);
+      continue;
+    }
+
+    if (Array.isArray(entry)) {
+      output.push(cn(...entry));
+      continue;
+    }
+
+    for (const [key, active] of Object.entries(entry)) {
+      if (active) output.push(key);
+    }
+  }
+
+  return output.join(" ");
 }
 
 export function debounce<T extends (...args: any[]) => any>(

@@ -232,6 +232,55 @@ export function Close(props: IconProps) {
   );
 }
 
+export function Loader2(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 3a9 9 0 0 1 9 9" />
+      <path d="M12 21a9 9 0 0 1-9-9" />
+      <path d="M21 12a9 9 0 0 1-9 9" />
+      <path d="M3 12a9 9 0 0 1 9-9" />
+    </svg>
+  );
+}
+
+export function CheckCircle(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8 12 2.5 2.5L16 7" />
+    </svg>
+  );
+}
+
+export function XCircle(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8 8 8 8M16 8l-8 8" />
+    </svg>
+  );
+}
+
+export function AlertCircle(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8v4" />
+      <path d="M12 16h.01" />
+    </svg>
+  );
+}
+
+export function Info(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5" />
+      <path d="M12 7.6h.01" />
+    </svg>
+  );
+}
+
 export function ChevronDown(props: IconProps) {
   return (
     <svg {...base(props)}>
@@ -334,6 +383,186 @@ export function BarChart3(props: IconProps) {
   );
 }
 
+export function DollarSign(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 2v20" />
+      <path d="M17 5.5c0-1.4-1.8-2.5-5-2.5s-5 1.1-5 2.5 1.8 2.5 5 2.5 5 1.1 5 2.5-1.8 2.5-5 2.5-5-1.1-5-2.5" />
+    </svg>
+  );
+}
+
+export function TrendingUp(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 16 10 10l4 4 6-8" />
+      <path d="M15 6h5v5" />
+    </svg>
+  );
+}
+
+export function AlertTriangle(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="m12 3 9 15H3l9-15Z" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+    </svg>
+  );
+}
+
+export function Activity(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 12h4l2.5-7 4 14 2.5-7H21" />
+    </svg>
+  );
+}
+
+export function Eye(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7S2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+export function Code(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="m8 8-4 4 4 4" />
+      <path d="m16 8 4 4-4 4" />
+      <path d="m14 4-4 16" />
+    </svg>
+  );
+}
+
+export function Book(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H20v15H6.5A2.5 2.5 0 0 0 4 21.5z" />
+      <path d="M4 6.5V19" />
+      <path d="M8 7.5h6" />
+    </svg>
+  );
+}
+
+export function User(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5 19c1.7-3.2 4.2-4.8 7-4.8s5.3 1.6 7 4.8" />
+    </svg>
+  );
+}
+
+export function Bell(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+      <path d="M10 20a2 2 0 0 0 4 0" />
+    </svg>
+  );
+}
+
+export function ArrowLeft(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M19 12H5" />
+      <path d="m12 19-7-7 7-7" />
+    </svg>
+  );
+}
+
+export function Pause(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M8 5v14M16 5v14" />
+    </svg>
+  );
+}
+
+export function Play(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="m8 5 11 7-11 7V5Z" />
+    </svg>
+  );
+}
+
+export function X(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M6 6 18 18M18 6 6 18" />
+    </svg>
+  );
+}
+
+export function Sun(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  );
+}
+
+export function Moon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+    </svg>
+  );
+}
+
+export function Monitor(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="4" width="18" height="12" rx="2" />
+      <path d="M8 20h8M12 16v4" />
+    </svg>
+  );
+}
+
+export function Download(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 4v11" />
+      <path d="m7 20 5 5 5-5" />
+      <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+    </svg>
+  );
+}
+
+export function FileText(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" />
+      <path d="M14 2v5h5" />
+      <path d="M9 12h6M9 16h6" />
+    </svg>
+  );
+}
+
+export function FileJson(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" />
+      <path d="M14 2v5h5" />
+      <path d="M9 11.5c0-1.5 1.2-2.5 3-2.5s3 1 3 2.5-1.2 2.5-3 2.5-3 1-3 2.5 1.2 2.5 3 2.5 3-1 3-2.5" />
+    </svg>
+  );
+}
+
+export function Zap(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M13 2 4 13h6l-1 9 9-11h-6l1-9Z" />
+    </svg>
+  );
+}
+
 export function Settings(props: IconProps) {
   return (
     <svg {...base(props)}>
@@ -348,4 +577,7 @@ export const serviceIconMap = {
   sim: Sim,
   globe: Globe,
   mail: Mail,
+  gift: Gift,
+  package: ShoppingCart,
+  calendar: Calendar,
 } as const;

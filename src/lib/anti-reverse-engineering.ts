@@ -118,7 +118,7 @@ export function detectCodeInjection(): boolean {
 
   // Check if critical globals have been overridden
   for (const global of suspiciousGlobals) {
-    const fn = (window as Record<string, unknown>)[global];
+    const fn = (window as unknown as Record<string, unknown>)[global];
     if (typeof fn !== "function") {
       return true;
     }

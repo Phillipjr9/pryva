@@ -3,8 +3,13 @@
 import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
+interface TabsRenderProps {
+  activeTab: string;
+  setActiveTab: (value: string) => void;
+}
+
 interface TabsProps {
-  children: ReactNode;
+  children: ReactNode | ((props: TabsRenderProps) => ReactNode);
   defaultValue?: string;
   className?: string;
 }
