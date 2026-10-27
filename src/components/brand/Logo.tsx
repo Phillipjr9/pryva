@@ -21,6 +21,7 @@ export function Monogram({
       height={40}
       className={className}
       style={{ background: 'transparent' }}
+      unoptimized
     />
   );
 }
@@ -42,6 +43,7 @@ export function Logo({
         loading="eager"
         priority
         style={{ background: 'transparent' }}
+        unoptimized
       />
       {variant === "lockup" && (
         <span className="flex flex-col leading-none">
