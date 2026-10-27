@@ -1,10 +1,14 @@
 import { createSession } from "@/lib/auth";
 import { openDemoAccount } from "@/lib/demo";
+import { isPreviewDatabase } from "@/lib/demo-policy";
 
 export const dynamic = "force-dynamic";
 
 /** JSON demo login (used by fetch-based clients). */
 export async function POST(request: Request) {
+  if (!isPreviewDatabase()) {
+    return Response.json({ ok: false, error: "Demo login is available only in preview mode." }, { status: 403 });
+  }
   try {
     const user = await openDemoAccount();
     if (!user) {

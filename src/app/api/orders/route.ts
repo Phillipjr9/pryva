@@ -7,6 +7,7 @@ import { findPlan } from "@/lib/catalog";
 import { FleexaError } from "@/lib/fleexa";
 import { cancelUpstream, fulfillPlan } from "@/lib/fulfillment";
 import { InsufficientFundsError, debitWallet } from "@/lib/wallet";
+import { isSameOriginMutation } from "@/lib/net";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,10 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "Please sign in to complete this order." }, { status: 401 });
   }
 
+  if (!isSameOriginMutation(request)) {
+    return Response.json({ ok: false, error: "Cross-origin request denied." }, { status: 403 });
+  }
+
   try {
     const body = (await request.json()) as { planSlug?: string };
     const plan = findPlan(body.planSlug ?? "");
@@ -38,8 +43,12 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, error: "That plan is no longer available." }, { status: 400 });
     }
 
-    // 1. Fulfil first — through the Fleexa API when connected, simulated
-    //    fulfilment during preview. No wallet charge until fulfilment succeeds.
+    if (user.walletBalance < plan.price) {
+      return Response.json({ ok: false, error: "Your wallet balance is too low for this order." }, { status: 402 });
+    }
+
+    // Fulfil first; only in-memory previews use simulated provider data.
+    // No wallet charge is made until fulfilment succeeds.
     let fulfilled;
     try {
       fulfilled = await fulfillPlan(plan);
@@ -50,11 +59,11 @@ export async function POST(request: Request) {
           {
             ok: false,
             error:
-              error.code === "NO_API_KEY"
+              error.code === "NO_API_KEY" || error.code === "SERVICE_UNAVAILABLE"
                 ? "Fulfilment is temporarily unavailable."
                 : "Our provider couldn't fulfil that right now — nothing was charged. Try again in a moment.",
           },
-          { status: 502 },
+          { status: error.code === "NO_API_KEY" || error.code === "SERVICE_UNAVAILABLE" ? 503 : 502 },
         );
       }
       throw error;

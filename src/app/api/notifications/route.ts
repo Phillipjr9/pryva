@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -32,9 +32,8 @@ export async function GET(request: NextRequest) {
         type: n.type,
         title: n.title,
         message: n.message,
-        read: n.read,
+        read: Boolean(n.read),
         createdAt: n.createdAt.toISOString(),
-        data: n.data,
       })),
       unreadCount,
       total: userNotifications.length,
@@ -58,13 +57,13 @@ export async function PATCH(request: NextRequest) {
     if (markAllRead) {
       await db
         .update(notifications)
-        .set({ read: true })
+        .set({ read: 1 })
         .where(eq(notifications.userId, user.id));
     } else if (notificationId) {
       await db
         .update(notifications)
-        .set({ read: true })
-        .where(eq(notifications.id, notificationId));
+        .set({ read: 1 })
+        .where(and(eq(notifications.id, notificationId), eq(notifications.userId, user.id)));
     } else {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }

@@ -1,10 +1,9 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { createSession, hashPassword, isValidEmail, normalizeEmail } from "@/lib/auth";
+import { createSession, hashPassword, isConfiguredAdminEmail, isValidEmail, normalizeEmail } from "@/lib/auth";
 import { creditWallet } from "@/lib/wallet";
-
-const WELCOME_CREDIT = 5000;
+import { isDemoEmail, isPreviewDatabase, PREVIEW_WELCOME_CREDIT } from "@/lib/demo-policy";
 
 export async function POST(request: Request) {
   try {
@@ -23,6 +22,9 @@ export async function POST(request: Request) {
     }
     if (!isValidEmail(email)) {
       return Response.json({ ok: false, error: "That email doesn't look right." }, { status: 400 });
+    }
+    if (isConfiguredAdminEmail(email) || isDemoEmail(email)) {
+      return Response.json({ ok: false, error: "This account cannot be created through public signup." }, { status: 403 });
     }
     if (password.length < 8) {
       return Response.json(
@@ -48,16 +50,19 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, error: "Could not create that account." }, { status: 500 });
     }
 
-    await creditWallet({
-      userId: created.id,
-      amount: WELCOME_CREDIT,
-      type: "credit",
-      description: "Welcome credit — try Pryva",
-    });
+    const welcomeCredit = isPreviewDatabase() ? PREVIEW_WELCOME_CREDIT : 0;
+    if (welcomeCredit > 0) {
+      await creditWallet({
+        userId: created.id,
+        amount: welcomeCredit,
+        type: "credit",
+        description: "Preview welcome credit",
+      });
+    }
 
     await createSession(created.id, request);
 
-    return Response.json({ ok: true, welcomeCredit: WELCOME_CREDIT });
+    return Response.json({ ok: true, welcomeCredit });
   } catch {
     return Response.json({ ok: false, error: "Something went wrong. Please try again." }, { status: 500 });
   }

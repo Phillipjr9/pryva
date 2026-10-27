@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { requireAuth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { db } from "@/db";
 import { users, orders, walletTransactions } from "@/db/schema";
 import { count, sum, desc, eq } from "drizzle-orm";
@@ -7,8 +6,7 @@ import Link from "next/link";
 import { Users, ShoppingCart, DollarSign, TrendingUp } from "@/components/icons";
 
 export default async function AdminDashboardPage() {
-  const user = await requireAuth();
-  if (!user) redirect("/login?next=/admin/dashboard");
+  await requireAdmin("/admin/dashboard");
 
   // Fetch admin statistics
   const [userStats] = await db.select({ count: count() }).from(users);

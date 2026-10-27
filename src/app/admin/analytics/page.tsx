@@ -1,15 +1,12 @@
-import { redirect } from "next/navigation";
-import { requireAuth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { count, sum, eq } from "drizzle-orm";
 import { AnalyticsDashboard } from "./AnalyticsDashboard";
 
 export default async function AdminAnalyticsPage() {
-  const user = await requireAuth();
-  if (!user) redirect("/login?next=/admin/analytics");
+  await requireAdmin("/admin/analytics");
 
-  // For now, show basic stats (in production, add admin role check)
   const totalUsers = await db.select({ count: count() }).from(users);
   const totalOrders = await db.select({ count: count() }).from(orders);
   const totalRevenue = await db
@@ -20,7 +17,7 @@ export default async function AdminAnalyticsPage() {
   const stats = {
     totalUsers: totalUsers[0]?.count || 0,
     totalOrders: totalOrders[0]?.count || 0,
-    totalRevenue: totalRevenue[0]?.sum || 0,
+    totalRevenue: Number(totalRevenue[0]?.sum || 0),
   };
 
   return (

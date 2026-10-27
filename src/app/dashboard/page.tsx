@@ -4,7 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
-import { getFleexaStatus } from "@/lib/fleexa";
+import { isPreviewDatabase } from "@/lib/demo-policy";
 import { formatNaira } from "@/lib/catalog";
 import {
   ArrowRight,
@@ -42,7 +42,7 @@ function statusStyle(status: string) {
 export default async function DashboardOverviewPage() {
   const user = await requireUser("/dashboard");
 
-  const [recentOrders, recentTx, fleexa] = await Promise.all([
+  const [recentOrders, recentTx] = await Promise.all([
     db.select().from(orders).where(eq(orders.userId, user.id)).orderBy(desc(orders.createdAt)).limit(5),
     db
       .select()
@@ -50,7 +50,6 @@ export default async function DashboardOverviewPage() {
       .where(eq(walletTransactions.userId, user.id))
       .orderBy(desc(walletTransactions.createdAt))
       .limit(4),
-    getFleexaStatus(),
   ]);
 
   const activeOrders = recentOrders.filter((order: { status: string }) => order.status === "active").length;
@@ -98,8 +97,9 @@ export default async function DashboardOverviewPage() {
               Your Pryva wallet is ready.
             </h1>
             <p className="mt-1.5 max-w-md text-[0.86rem] leading-relaxed text-ink-2">
-              Buy a number, eSIM, proxy pack or temporary inbox. Everything you order appears here
-              instantly, with refund protection attached.
+              {isPreviewDatabase()
+                ? "Explore the dashboard with simulated orders and a preview wallet."
+                : "Review your wallet and orders while live purchasing is temporarily unavailable."}
             </p>
           </div>
           <Link href="/dashboard/wallet" className="btn btn-primary !px-5 !py-3 !text-[0.8rem]">
@@ -108,30 +108,11 @@ export default async function DashboardOverviewPage() {
         </div>
       </div>
 
-      {fleexa.configured && (
-        <div
-          className={`flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border px-4 py-3 ${
-            fleexa.online ? "border-emerald-200 bg-emerald-50/60" : "border-amber-200 bg-amber-50/60"
-          }`}
-        >
-          <p className="flex items-center gap-2 text-[0.8rem] font-medium text-ink">
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${fleexa.online ? "bg-emerald-500" : "bg-amber-500"}`}
-            />
-            Fulfilment provider: <span className="font-semibold">Fleexa API</span>
-            <span className="text-ink-3">
-              {fleexa.online
-                ? "· connected, numbers & codes come straight from Fleexa"
-                : "· key set but currently unreachable — orders fall back to preview fulfilment"}
-            </span>
-          </p>
-          {fleexa.online && fleexa.balanceNgn !== null && (
-            <p className="text-[0.72rem] font-medium text-ink-2">
-              Fleexa wallet: {formatNaira(fleexa.balanceNgn)}
-            </p>
-          )}
-        </div>
-      )}
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-[0.8rem] text-ink">
+        {isPreviewDatabase()
+          ? "Preview mode: orders and wallet balances are simulated and do not deliver real services."
+          : "Live purchasing is temporarily unavailable while payment and provider integrations are reviewed."}
+      </div>
 
       <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((stat) => {

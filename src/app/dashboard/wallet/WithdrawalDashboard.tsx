@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { toast } from "@/components/ui/Toast";
-import { Loader2, Plus, Trash2, ArrowUpRight } from "lucide-react";
+import { useToast } from "@/components/ui/Toast";
+import { Loader2, Plus, Trash2, ArrowUpRight } from "@/components/icons";
 
 interface BankAccount {
   id: string;
@@ -38,6 +38,7 @@ interface Bank {
 }
 
 export function WithdrawalDashboard() {
+  const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<"withdraw" | "history" | "accounts">("withdraw");
   const [balance, setBalance] = useState(0);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -112,7 +113,7 @@ export function WithdrawalDashboard() {
 
   async function verifyAccount() {
     if (!bankCode || !accountNumber || accountNumber.length !== 10) {
-      toast.error("Please enter a valid bank and 10-digit account number");
+      addToast({ type: "error", message: "Please enter a valid bank and 10-digit account number" });
       return;
     }
 
@@ -130,12 +131,12 @@ export function WithdrawalDashboard() {
 
       if (data.ok) {
         setAccountName(data.accountName);
-        toast.success("Account verified successfully");
+        addToast({ type: "success", message: "Account verified successfully" });
       } else {
-        toast.error(data.error || "Failed to verify account");
+        addToast({ type: "error", message: data.error || "Failed to verify account" });
       }
     } catch (error) {
-      toast.error("Failed to verify account");
+      addToast({ type: "error", message: "Failed to verify account" });
     } finally {
       setVerifyingAccount(false);
     }
@@ -143,7 +144,7 @@ export function WithdrawalDashboard() {
 
   async function addBankAccount() {
     if (!bankCode || !accountNumber || !accountName) {
-      toast.error("Please complete all fields");
+      addToast({ type: "error", message: "Please complete all fields" });
       return;
     }
 
@@ -163,16 +164,16 @@ export function WithdrawalDashboard() {
       const data = await response.json();
 
       if (data.ok) {
-        toast.success("Bank account added successfully");
+        addToast({ type: "success", message: "Bank account added successfully" });
         setBankCode("");
         setAccountNumber("");
         setAccountName("");
         fetchBankAccounts();
       } else {
-        toast.error(data.error || "Failed to add bank account");
+        addToast({ type: "error", message: data.error || "Failed to add bank account" });
       }
     } catch (error) {
-      toast.error("Failed to add bank account");
+      addToast({ type: "error", message: "Failed to add bank account" });
     } finally {
       setLoading(false);
     }
@@ -191,13 +192,13 @@ export function WithdrawalDashboard() {
       const data = await response.json();
 
       if (data.ok) {
-        toast.success("Bank account deleted");
+        addToast({ type: "success", message: "Bank account deleted" });
         fetchBankAccounts();
       } else {
-        toast.error(data.error || "Failed to delete bank account");
+        addToast({ type: "error", message: data.error || "Failed to delete bank account" });
       }
     } catch (error) {
-      toast.error("Failed to delete bank account");
+      addToast({ type: "error", message: "Failed to delete bank account" });
     }
   }
 
@@ -205,17 +206,17 @@ export function WithdrawalDashboard() {
     const withdrawAmount = parseFloat(amount);
 
     if (!withdrawAmount || withdrawAmount < 1000) {
-      toast.error("Minimum withdrawal amount is ₦1,000");
+      addToast({ type: "error", message: "Minimum withdrawal amount is ₦1,000" });
       return;
     }
 
     if (withdrawAmount > balance) {
-      toast.error("Insufficient balance");
+      addToast({ type: "error", message: "Insufficient balance" });
       return;
     }
 
     if (!selectedBankAccountId) {
-      toast.error("Please select a bank account");
+      addToast({ type: "error", message: "Please select a bank account" });
       return;
     }
 
@@ -234,17 +235,17 @@ export function WithdrawalDashboard() {
       const data = await response.json();
 
       if (data.ok) {
-        toast.success("Withdrawal request submitted successfully");
+        addToast({ type: "success", message: "Withdrawal request submitted successfully" });
         setAmount("");
         setSelectedBankAccountId("");
         fetchBalance();
         fetchWithdrawalHistory();
         setActiveTab("history");
       } else {
-        toast.error(data.error || "Failed to process withdrawal");
+        addToast({ type: "error", message: data.error || "Failed to process withdrawal" });
       }
     } catch (error) {
-      toast.error("Failed to process withdrawal");
+      addToast({ type: "error", message: "Failed to process withdrawal" });
     } finally {
       setLoading(false);
     }
@@ -457,7 +458,7 @@ export function WithdrawalDashboard() {
                 <Button
                   onClick={verifyAccount}
                   disabled={verifyingAccount || !bankCode || accountNumber.length !== 10}
-                  variant="outline"
+                  variant="secondary"
                 >
                   {verifyingAccount ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

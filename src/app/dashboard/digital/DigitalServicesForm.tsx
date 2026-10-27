@@ -6,10 +6,10 @@ import { formatNaira } from "@/lib/catalog";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
-import type { User } from "@/db/schema";
+import type { PublicUser } from "@/lib/auth";
 
 interface DigitalServicesFormProps {
-  user: User;
+  user: PublicUser;
   service: DigitalService;
 }
 

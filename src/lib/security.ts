@@ -100,7 +100,7 @@ export function detectAutomation(): { isAutomated: boolean; signals: string[] } 
   ];
 
   for (const prop of automationProps) {
-    if ((window as Record<string, unknown>)[prop]) {
+    if ((window as unknown as Record<string, unknown>)[prop]) {
       signals.push(prop);
     }
   }

@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { createSession, isValidEmail, normalizeEmail, verifyPassword } from "@/lib/auth";
+import { isDemoEmail, isPreviewDatabase } from "@/lib/demo-policy";
 
 export async function POST(request: Request) {
   try {
@@ -9,7 +10,7 @@ export async function POST(request: Request) {
     const email = normalizeEmail(body.email ?? "");
     const password = body.password ?? "";
 
-    if (!isValidEmail(email) || password.length === 0) {
+    if (!isValidEmail(email) || password.length === 0 || (isDemoEmail(email) && !isPreviewDatabase())) {
       return Response.json(
         { ok: false, error: "Enter your email and password to continue." },
         { status: 400 },
