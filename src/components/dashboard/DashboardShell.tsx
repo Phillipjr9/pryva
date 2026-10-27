@@ -3,7 +3,6 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Logo } from "@/components/brand/Logo";
 import { CommandPalette, CommandPaletteTrigger } from "@/components/command/CommandPalette";
 import {
   ArrowRight,
@@ -79,8 +78,7 @@ export function DashboardShell({
 
   const sidebar = (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between">
-        <Logo />
+      <div className="flex items-center justify-end lg:hidden">
         <button
           type="button"
           onClick={() => setOpen(false)}

@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { giftCards, users, walletTransactions } from "@/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, gte, gt, ne, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 
 export function generateCode(): string {
@@ -25,30 +25,20 @@ export async function createGiftCard(params: {
 }): Promise<{ code: string; amount: number; expiresAt: Date }> {
   const { userId, amount, recipientEmail, message } = params;
 
-  if (amount < 1000 || amount > 500000) {
-    throw new Error("Gift card amount must be between ₦1,000 and ₦500,000");
-  }
-
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-  });
-
-  if (!user) {
-    throw new Error("User not found");
-  }
-
-  if (user.walletBalance < amount) {
-    throw new Error("Insufficient wallet balance");
+  if (!Number.isSafeInteger(amount) || amount < 1000 || amount > 500000) {
+    throw new Error("Gift card amount must be a whole-naira value between ₦1,000 and ₦500,000");
   }
 
   const code = generateCode();
   const expiresAt = new Date();
   expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-  await db.transaction(async (tx: typeof db) => {
-    const newBalance = user.walletBalance - amount;
-
-    await tx.update(users).set({ walletBalance: newBalance }).where(eq(users.id, userId));
+  await db.transaction(async (tx) => {
+    const [user] = await tx.update(users)
+      .set({ walletBalance: sql`${users.walletBalance} - ${amount}` })
+      .where(and(eq(users.id, userId), gte(users.walletBalance, amount)))
+      .returning({ balance: users.walletBalance });
+    if (!user) throw new Error("Insufficient wallet balance or user not found");
 
     await tx.insert(giftCards).values({
       code,
@@ -60,12 +50,11 @@ export async function createGiftCard(params: {
       status: "active",
       expiresAt,
     });
-
     await tx.insert(walletTransactions).values({
       userId,
       type: "debit",
       amount,
-      balanceAfter: newBalance,
+      balanceAfter: user.balance,
       description: `Gift card purchase: ${code}`,
       reference: `GIFT-${code}`,
     });
@@ -80,59 +69,38 @@ export async function redeemGiftCard(params: {
 }): Promise<{ amount: number }> {
   const { userId, code } = params;
 
-  const card = await db.query.giftCards.findFirst({
-    where: eq(giftCards.code, code),
-  });
+  return db.transaction(async (tx) => {
+    // Claim the active card before crediting the recipient. A concurrent
+    // redemption can no longer claim it once the first transaction commits.
+    const now = new Date();
+    const [card] = await tx.update(giftCards)
+      .set({ status: "redeemed", redeemedBy: userId, redeemedAt: now })
+      .where(and(
+        eq(giftCards.code, code),
+        eq(giftCards.status, "active"),
+        gt(giftCards.expiresAt, now),
+        ne(giftCards.purchasedBy, userId),
+        gt(giftCards.amount, 0),
+      ))
+      .returning();
+    if (!card) throw new Error("Gift card is invalid, expired, already redeemed, or belongs to you");
 
-  if (!card) {
-    throw new Error("Invalid gift card code");
-  }
-
-  if (card.status !== "active") {
-    throw new Error("Gift card has already been redeemed or cancelled");
-  }
-
-  if (card.expiresAt < new Date()) {
-    throw new Error("Gift card has expired");
-  }
-
-  if (card.purchasedBy === userId) {
-    throw new Error("You cannot redeem your own gift card");
-  }
-
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-  });
-
-  if (!user) {
-    throw new Error("User not found");
-  }
-
-  await db.transaction(async (tx: typeof db) => {
-    const newBalance = user.walletBalance + card.amount;
-
-    await tx.update(users).set({ walletBalance: newBalance }).where(eq(users.id, userId));
-
-    await tx
-      .update(giftCards)
-      .set({
-        status: "redeemed",
-        redeemedBy: userId,
-        redeemedAt: new Date(),
-      })
-      .where(eq(giftCards.code, code));
+    const [user] = await tx.update(users)
+      .set({ walletBalance: sql`${users.walletBalance} + ${card.amount}` })
+      .where(eq(users.id, userId))
+      .returning({ balance: users.walletBalance });
+    if (!user) throw new Error("User not found");
 
     await tx.insert(walletTransactions).values({
       userId,
       type: "credit",
       amount: card.amount,
-      balanceAfter: newBalance,
+      balanceAfter: user.balance,
       description: `Gift card redemption: ${code}`,
       reference: `GIFT-${code}`,
     });
+    return { amount: card.amount };
   });
-
-  return { amount: card.amount };
 }
 
 export async function getUserGiftCards(userId: string) {

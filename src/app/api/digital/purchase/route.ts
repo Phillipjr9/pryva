@@ -6,6 +6,7 @@ import { debitWallet } from "@/lib/wallet";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { logger } from "@/lib/logger";
+import { isPreviewDatabase } from "@/lib/demo-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,12 @@ export async function POST(request: NextRequest) {
     const user = await requireAuth(request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // No account provider is connected yet. Never debit a real wallet for a
+    // placeholder delivery; the flow is available only with preview data.
+    if (!isPreviewDatabase()) {
+      return NextResponse.json({ error: "Digital purchases are temporarily unavailable." }, { status: 503 });
     }
 
     const body = await request.json();
@@ -62,6 +69,7 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       orderId: order.id,
       amount: plan.price,
+      type: "debit",
       description: `${plan.name} purchase`,
       reference,
     });

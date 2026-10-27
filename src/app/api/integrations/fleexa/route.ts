@@ -8,6 +8,6 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-  const status = await getFleexaStatus();
-  return Response.json({ ok: true, fleexa: status });
+  const { configured, online } = await getFleexaStatus();
+  return Response.json({ ok: true, fleexa: { configured, online } });
 }

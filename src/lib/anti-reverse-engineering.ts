@@ -23,7 +23,6 @@ export function detectDebugger(): boolean {
   if (typeof window === "undefined") return false;
 
   const start = performance.now();
-  // eslint-disable-next-line no-debugger
   debugger;
   const end = performance.now();
   
@@ -262,7 +261,6 @@ export function withDeadCode<T>(fn: () => T): T {
   if (false) {
     const fakeVar = "this will never run";
     console.log(fakeVar);
-    // eslint-disable-next-line no-unreachable
     return undefined as T;
   }
 

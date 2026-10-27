@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Logo, Monogram } from "@/components/brand/Logo";
 import { ArrowRight, Card, Shield, Check } from "@/components/icons";
 import { services } from "@/lib/catalog";
 
@@ -36,7 +35,6 @@ export function SiteFooter() {
 
       <div className="shell relative">
         <div className="relative overflow-hidden rounded-[2rem] border border-lav-200/80 bg-gradient-to-br from-lav-100 via-[#f7f1ff] to-cream px-6 py-10 sm:px-10 sm:py-12">
-          <Monogram className="pointer-events-none absolute -right-8 -top-10 h-64 w-64 opacity-[0.08]" />
           <div className="relative flex flex-col gap-7 md:flex-row md:items-end md:justify-between">
             <div className="max-w-xl">
               <span className="eyebrow">Start in a couple of minutes</span>
@@ -64,7 +62,6 @@ export function SiteFooter() {
 
         <div className="mt-14 grid gap-10 pb-12 md:grid-cols-[1.3fr_2fr]">
           <div>
-            <Logo tagline />
             <p className="mt-4 max-w-xs text-[0.88rem] leading-relaxed text-ink-3">
               Pryva is a Nigerian digital services platform for virtual numbers, eSIM data,
               residential proxies and email OTP. Built for people who value calm, reliable access.

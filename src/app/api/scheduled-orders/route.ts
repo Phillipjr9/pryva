@@ -1,3 +1,4 @@
+import { isPreviewDatabase } from "@/lib/demo-policy";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createScheduledOrder, getUserScheduledOrders, pauseScheduledOrder, resumeScheduledOrder, cancelScheduledOrder } from "@/lib/scheduled-orders";
@@ -37,6 +38,10 @@ export async function POST(request: NextRequest) {
     const user = await requireAuth(request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!isPreviewDatabase()) {
+      return NextResponse.json({ error: "Scheduled purchases are temporarily unavailable." }, { status: 503 });
     }
 
     const body = await request.json();

@@ -5,10 +5,11 @@ import { formatNaira } from "@/lib/catalog";
 import { Gift, Copy, Check } from "@/components/icons";
 import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
-import type { User, GiftCard } from "@/db/schema";
+import type { GiftCard } from "@/db/schema";
+import type { PublicUser } from "@/lib/auth";
 
 interface GiftCardsManagerProps {
-  user: User;
+  user: PublicUser;
 }
 
 type Tab = "create" | "redeem" | "history";
@@ -28,22 +29,18 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
   const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
-    if (activeTab === "history") {
-      fetchHistory();
-    }
+    if (activeTab !== "history") return;
+    const controller = new AbortController();
+    fetch("/api/gift-cards/history", { signal: controller.signal })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.ok && !controller.signal.aborted) setCards(data.cards);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) console.error("Failed to fetch history:", error);
+      });
+    return () => controller.abort();
   }, [activeTab]);
-
-  async function fetchHistory() {
-    try {
-      const response = await fetch("/api/gift-cards/history");
-      const data = await response.json();
-      if (data.ok) {
-        setCards(data.cards);
-      }
-    } catch (err) {
-      console.error("Failed to fetch history:", err);
-    }
-  }
 
   async function handleCreate() {
     setLoading(true);

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { formatCurrency } from "@/lib/utils";
-import { toast } from "@/components/ui/Toast";
-import { Loader2, CheckCircle, XCircle, Clock, Filter } from "lucide-react";
+import { formatCurrency } from "@/lib/format";
+import { useToast } from "@/components/ui/Toast";
+import { Loader2, CheckCircle, XCircle, Clock, Filter } from "@/components/icons";
 
 interface Withdrawal {
   id: string;
@@ -26,36 +26,42 @@ interface Withdrawal {
 }
 
 export function WithdrawalsManager() {
+  const { addToast } = useToast();
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("all");
 
-  useEffect(() => {
-    fetchWithdrawals();
-  }, [filter]);
-
-  async function fetchWithdrawals() {
+  const fetchWithdrawals = useCallback(async (signal?: AbortSignal) => {
     try {
       const params = new URLSearchParams();
       if (filter !== "all") {
         params.set("status", filter);
       }
 
-      const response = await fetch(`/api/admin/withdrawals?${params}`);
+      const response = await fetch(`/api/admin/withdrawals?${params}`, { signal });
       const data = await response.json();
+      if (signal?.aborted) return;
 
       if (data.ok) {
         setWithdrawals(data.withdrawals);
       } else {
-        toast.error(data.error || "Failed to fetch withdrawals");
+        addToast({ type: "error", message: data.error || "Failed to fetch withdrawals" });
       }
     } catch (error) {
-      toast.error("Failed to fetch withdrawals");
+      if (!signal?.aborted) addToast({ type: "error", message: "Failed to fetch withdrawals" });
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  }
+  }, [filter, addToast]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) void fetchWithdrawals(controller.signal);
+    });
+    return () => controller.abort();
+  }, [fetchWithdrawals]);
 
   async function processWithdrawal(id: string, action: "approve" | "reject") {
     if (!confirm(`Are you sure you want to ${action} this withdrawal?`)) {
@@ -74,13 +80,13 @@ export function WithdrawalsManager() {
       const data = await response.json();
 
       if (data.ok) {
-        toast.success(`Withdrawal ${action}d successfully`);
+        addToast({ type: "success", message: `Withdrawal ${action}d successfully` });
         fetchWithdrawals();
       } else {
-        toast.error(data.error || `Failed to ${action} withdrawal`);
+        addToast({ type: "error", message: data.error || `Failed to ${action} withdrawal` });
       }
     } catch (error) {
-      toast.error(`Failed to ${action} withdrawal`);
+      addToast({ type: "error", message: `Failed to ${action} withdrawal` });
     } finally {
       setProcessing(null);
     }
@@ -103,13 +109,13 @@ export function WithdrawalsManager() {
       const data = await response.json();
 
       if (data.ok) {
-        toast.success("Withdrawal marked as completed");
+        addToast({ type: "success", message: "Withdrawal marked as completed" });
         fetchWithdrawals();
       } else {
-        toast.error(data.error || "Failed to complete withdrawal");
+        addToast({ type: "error", message: data.error || "Failed to complete withdrawal" });
       }
     } catch (error) {
-      toast.error("Failed to complete withdrawal");
+      addToast({ type: "error", message: "Failed to complete withdrawal" });
     } finally {
       setProcessing(null);
     }
@@ -273,7 +279,7 @@ export function WithdrawalsManager() {
                     <Button
                       onClick={() => processWithdrawal(withdrawal.id, "approve")}
                       disabled={processing === withdrawal.id}
-                      variant="default"
+                      variant="primary"
                       size="sm"
                     >
                       {processing === withdrawal.id ? (
@@ -286,7 +292,7 @@ export function WithdrawalsManager() {
                     <Button
                       onClick={() => processWithdrawal(withdrawal.id, "reject")}
                       disabled={processing === withdrawal.id}
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
@@ -299,7 +305,7 @@ export function WithdrawalsManager() {
                   <Button
                     onClick={() => completeWithdrawal(withdrawal.id)}
                     disabled={processing === withdrawal.id}
-                    variant="default"
+                    variant="primary"
                     size="sm"
                   >
                     {processing === withdrawal.id ? (

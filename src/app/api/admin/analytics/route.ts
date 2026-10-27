@@ -1,3 +1,4 @@
+import { authorizeAdminApi } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, orders, walletTransactions, giftCards } from "@/db/schema";
@@ -9,6 +10,9 @@ export const dynamic = "force-dynamic";
 // GET /api/admin/analytics - Comprehensive analytics dashboard
 export async function GET(request: NextRequest) {
   try {
+    const access = await authorizeAdminApi(request);
+    if (access.response) return access.response;
+
     const { searchParams } = request.nextUrl;
     const period = searchParams.get("period") || "30d"; // 7d, 30d, 90d, 1y
 
