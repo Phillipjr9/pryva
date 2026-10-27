@@ -39,6 +39,44 @@ the broken bundle).
 
 ---
 
+## 1b. Demo login, second report — the client request is gone
+
+The demo was reported stuck again ("Opening the demo…" forever) after the shell
+work. Evidence from the dev server log for the reported window:
+
+```
+GET  /login              200
+POST /api/auth/demo      200   ← the previous session's own curl, not the click
+(no request from the button at all)
+```
+
+A click that produces **no network request** and leaves the label on “Opening the
+demo…” is the signature of the old bundle (the `disabled`-on-click version) still
+running in the tab: React flips the label, then nothing is posted.
+
+Rather than tell you to reload a third time, the demo no longer depends on
+JavaScript at all:
+
+- the button is a plain `type="submit"` in a `method="post"` form pointing at
+  `/api/auth/demo-web`; the only handler is a cosmetic label change that does
+  **not** call `preventDefault`;
+- the server answers with a **303 → /dashboard** and sets the session cookie
+  (`Secure; SameSite=none; Partitioned` when the page is inside the preview
+  iframe), so the browser navigates by itself;
+- `/api/auth/demo-web` now also accepts **GET**, and the login card renders
+  “Button not responding? Open the demo directly” as a plain link — a guaranteed
+  path if a browser ever swallows the submit;
+- `pointer-events-none` is gone from the button too, so a second click is always
+  accepted (a duplicate demo post is harmless);
+- demo login now refuses politely on a real database (`?error=demo-failed`)
+  instead of writing a demo user into production data.
+
+Regression tests (5 in `demo-login.test.tsx`) assert the form still posts, the
+button is never rendered disabled, **nothing intercepts the submit with a
+client-side request**, and the fallback link is present.
+
+---
+
 ## 2. What the demo account actually shows — nothing
 
 Signing in as the demo lands you on a dashboard that says:
