@@ -156,3 +156,78 @@ describe("stale-build guard: hydration recovery", () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("stale-build guard: no reload loop", () => {
+  it("does not reload when storage is unavailable", async () => {
+    // This is the bug that shipped: sessionStorage throws inside a partitioned
+    // preview iframe, the brake could not be recorded, and the reload ran anyway
+    // — an infinite reload loop, visible as a flood of /api/version requests.
+    const reload = vi.fn();
+    const context: Record<string, unknown> = {
+      fetch: async () => ({ ok: true, json: async () => ({ build: "new" }) }),
+      sessionStorage: {
+        getItem: () => {
+          throw new Error("blocked");
+        },
+        setItem: () => {
+          throw new Error("blocked");
+        },
+      },
+      window: { location: { reload }, addEventListener: () => {} },
+      document: { readyState: "loading", visibilityState: "visible", addEventListener: () => {} },
+      Number,
+      String,
+      JSON,
+      Promise,
+      Date,
+      setTimeout: (fn: () => void) => fn(),
+    };
+
+    runInNewContext(staleBuildScript("old"), context);
+    await flush();
+
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it("throttles version checks so a focus storm cannot hammer the endpoint", async () => {
+    let calls = 0;
+    const listeners: Record<string, (event?: unknown) => void> = {};
+    const store = new Map<string, string>();
+    const context: Record<string, unknown> = {
+      fetch: async () => {
+        calls += 1;
+        return { ok: true, json: async () => ({ build: "same" }) };
+      },
+      sessionStorage: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => void store.set(key, value),
+      },
+      window: {
+        location: { reload: vi.fn() },
+        addEventListener: (name: string, handler: (event?: unknown) => void) => {
+          listeners[name] = handler;
+        },
+      },
+      document: {
+        readyState: "loading",
+        visibilityState: "visible",
+        addEventListener: (name: string, handler: (event?: unknown) => void) => {
+          listeners[name] = handler;
+        },
+      },
+      Number,
+      String,
+      JSON,
+      Promise,
+      Date,
+      setTimeout: (fn: () => void) => fn(),
+    };
+
+    runInNewContext(staleBuildScript("same"), context);
+    await flush();
+    for (let index = 0; index < 20; index += 1) listeners.visibilitychange();
+    await flush();
+
+    expect(calls).toBe(1);
+  });
+});

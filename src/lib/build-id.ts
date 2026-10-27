@@ -50,23 +50,35 @@ export const BUILD_GUARD_SCRIPT_ID = "pryva-build-guard";
 export function staleBuildScript(buildId: string): string {
   return `(function(){try{
 var build=${JSON.stringify(buildId)},K="pryva:reloaded-for",C="pryva:reloads";
-function reload(reason){try{
-if(sessionStorage.getItem(K)===reason&&reason==="hydration")return;
-var n=Number(sessionStorage.getItem(C)||0);if(n>=2)return;
-sessionStorage.setItem(C,String(n+1));
-if(reason==="hydration")sessionStorage.setItem(K,reason);else sessionStorage.setItem(K,String(build));
-}catch(e){}
-window.location.reload();}
-function check(){try{fetch("/api/version",{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(d){
-if(!d||!d.build||d.build===build)return;
-try{if(sessionStorage.getItem(K)===d.build)return;}catch(e){}
-reload("version");}).catch(function(){});}catch(e){}}
+var last="";
+function reloadOnce(reason){
+  // Fail SAFE, not open: if sessionStorage is unavailable (partitioned iframes,
+  // storage-blocked browsers) the brakes cannot be recorded, so we must not
+  // reload at all. Doing otherwise produced a reload loop — dozens of
+  // /api/version calls a second — which is how this bug was found.
+  try{
+    if(sessionStorage.getItem(K)===reason)return;
+    if(Number(sessionStorage.getItem(C)||0)>=2)return;
+    sessionStorage.setItem(K,reason);
+    sessionStorage.setItem(C,String(Number(sessionStorage.getItem(C)||0)+1));
+  }catch(e){return;}
+  window.location.reload();
+}
+function check(){
+  var now=Date.now();
+  if(now-last<5000)return;
+  last=now;
+  try{fetch("/api/version",{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(d){
+    if(!d||!d.build||d.build===build)return;
+    reloadOnce(d.build);
+  }).catch(function(){});}catch(e){}
+}
 check();
 document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")check();});
 window.addEventListener("pageshow",function(e){if(e.persisted)check();});
 window.addEventListener("error",function(e){
-var m=(e&&(e.message||(e.error&&e.error.message)))||"";
-if(/hydration|did not match|Minified React error #(418|423|425)/i.test(m))reload("hydration");
+  var m=(e&&(e.message||(e.error&&e.error.message)))||"";
+  if(/hydration|did not match|Minified React error #(418|423|425)/i.test(m))reloadOnce("hydration");
 });
 }catch(e){}})();`;
 }
