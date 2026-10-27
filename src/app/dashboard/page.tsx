@@ -6,19 +6,11 @@ import { orders, walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { formatNaira, serviceMap } from "@/lib/catalog";
-import {
-  ArrowRight,
-  Chat,
-  Clock,
-  Plus,
-  Receipt,
-  Shield,
-  Sparkle,
-  Wallet,
-} from "@/components/icons";
+import { ArrowRight, Chat, Clock, Receipt, Shield } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { LiveCodeCard, type LiveCode } from "@/components/dashboard/LiveCodeCard";
 import { EmptyState } from "@/components/dashboard/EmptyState";
+import { BalanceHero } from "@/components/dashboard/BalanceHero";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -49,14 +41,14 @@ function firstName(name: string | null | undefined) {
 export default async function DashboardOverviewPage() {
   const user = await requireUser("/dashboard");
 
-  const [recentOrders, recentTx, liveOrderRows, [orderCount], [activeCount], [refundedRow]] =
+  const [recentOrders, recentTx, activeOrderRows, [orderCount], [activeCount], [refundedRow]] =
     await Promise.all([
       db
         .select()
         .from(orders)
         .where(eq(orders.userId, user.id))
         .orderBy(desc(orders.createdAt))
-        .limit(5),
+        .limit(4),
       db
         .select()
         .from(walletTransactions)
@@ -80,15 +72,13 @@ export default async function DashboardOverviewPage() {
         .where(and(eq(orders.userId, user.id), eq(orders.status, "refunded"))),
     ]);
 
-  // Aggregate at the database, never over a `limit(5)` slice: the old headline
-  // numbers were computed from the five rows rendered below them.
+  // Aggregates, never a slice: headline numbers must describe the whole account.
   const totalOrders = Number(orderCount?.value ?? 0);
   const activeOrders = Number(activeCount?.value ?? 0);
   const refundedToWallet = Number(refundedRow?.value ?? 0);
 
-  const liveCodes: LiveCode[] = liveOrderRows
+  const liveCodes: LiveCode[] = activeOrderRows
     .filter((order) => {
-      if (order.status !== "active") return false;
       if (!order.expiresAt) return Boolean(order.otpCode);
       return new Date(order.expiresAt).getTime() > Date.now();
     })
@@ -106,36 +96,20 @@ export default async function DashboardOverviewPage() {
     }));
 
   return (
-    <div className="grid gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-lav-700">
-            <Sparkle className="h-3 w-3" /> Overview
-          </p>
-          <h1 className="mt-1.5 text-[1.5rem] font-medium tracking-tight sm:text-[1.7rem]">
-            Welcome back, {firstName(user.name)}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard/wallet" className="btn btn-primary !px-4 !py-2.5 !text-[0.78rem]">
-            <Plus className="h-3.5 w-3.5" /> Top up
-          </Link>
-          <Link
-            href="/dashboard/wallet#withdraw"
-            className="btn border border-line bg-white !px-4 !py-2.5 !text-[0.78rem] text-ink hover:border-lav-200"
-          >
-            Withdraw
-          </Link>
-        </div>
-      </div>
+    <div className="grid gap-4">
+      {/* 1 — money first, with the two actions attached to it */}
+      <BalanceHero
+        name={firstName(user.name)}
+        balance={user.walletBalance}
+        preview={isPreviewDatabase()}
+        stats={[
+          { label: "Active", value: String(activeOrders), note: "orders live" },
+          { label: "Codes ready", value: String(liveCodes.length), note: "waiting on you" },
+          { label: "Refunded", value: formatNaira(refundedToWallet), note: "back to wallet" },
+        ]}
+      />
 
-      <p className="inline-flex w-fit items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-[0.68rem] text-ink-3">
-        <Shield className="h-3 w-3 text-lav-600" />
-        {isPreviewDatabase()
-          ? "Preview mode · orders and balances here are simulated"
-          : "Live purchasing is paused while provider integrations are reviewed"}
-      </p>
-
+      {/* 2 — then whatever is on a timer */}
       {liveCodes.length > 0 ? (
         <LiveCodeCard codes={liveCodes} />
       ) : (
@@ -147,38 +121,9 @@ export default async function DashboardOverviewPage() {
         />
       )}
 
-      <section className="grid gap-2.5 rounded-[1.5rem] border border-ink bg-ink p-5 text-white sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="flex items-center gap-1.5 text-[0.64rem] uppercase tracking-[0.14em] text-white/55">
-              <Wallet className="h-3.5 w-3.5" /> Wallet balance
-            </p>
-            <p className="mt-2 text-[1.9rem] font-semibold leading-none sm:text-[2.2rem]">
-              {formatNaira(user.walletBalance)}
-            </p>
-            <p className="mt-2 text-[0.74rem] text-white/55">
-              Spendable right now · refunds land here automatically
-            </p>
-          </div>
-          <div className="grid w-full grid-cols-3 gap-2 sm:w-auto sm:min-w-[19rem]">
-            {[
-              { label: "Active", value: String(activeOrders) },
-              { label: "All orders", value: String(totalOrders) },
-              { label: "Refunded", value: formatNaira(refundedToWallet) },
-            ].map((stat) => (
-              <div key={stat.label} className="rounded-xl bg-white/10 px-3 py-2.5">
-                <p className="text-[0.6rem] uppercase tracking-[0.12em] text-white/50">
-                  {stat.label}
-                </p>
-                <p className="mt-1 truncate text-[0.92rem] font-semibold">{stat.value}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_0.6fr]">
-        <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
+      <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+        {/* 3 — recent orders */}
+        <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-[1rem] font-semibold">Recent orders</h2>
             <Link
@@ -190,19 +135,11 @@ export default async function DashboardOverviewPage() {
           </div>
 
           {recentOrders.length === 0 ? (
-            <div className="mt-4 rounded-2xl border border-dashed border-line bg-cream/50 p-6 text-center">
-              <p className="text-[0.9rem] font-medium text-ink">No orders yet</p>
-              <p className="mx-auto mt-1 max-w-xs text-[0.8rem] text-ink-3">
-                Start with a {formatNaira(serviceMap["email-otp"].fromPrice)} temporary inbox or a{" "}
-                {formatNaira(serviceMap.numbers.fromPrice)} Nigerian verification number.
-              </p>
-              <Link href="/pricing" className="btn btn-primary mt-4 !px-4 !py-2.5 !text-[0.78rem]">
-                Browse services
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
+            <p className="mt-3 rounded-xl border border-dashed border-line bg-cream/50 px-4 py-6 text-center text-[0.82rem] text-ink-3">
+              Your first purchase appears here instantly, with its code.
+            </p>
           ) : (
-            <div className="mt-3 divide-y divide-line/80">
+            <div className="mt-2 divide-y divide-line/80">
               {recentOrders.map((order) => (
                 <Link
                   key={order.id}
@@ -218,7 +155,6 @@ export default async function DashboardOverviewPage() {
                       {new Date(order.createdAt).toLocaleDateString("en-NG", {
                         day: "numeric",
                         month: "short",
-                        year: "numeric",
                       })}
                     </p>
                   </div>
@@ -234,80 +170,108 @@ export default async function DashboardOverviewPage() {
               ))}
             </div>
           )}
-        </div>
+        </section>
 
-        <div className="grid gap-4">
-          <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-[1rem] font-semibold">Wallet activity</h2>
-              <Link
-                href="/dashboard/wallet"
-                className="text-[0.72rem] font-semibold text-lav-700 hover:underline"
-              >
-                Details
-              </Link>
-            </div>
-            {recentTx.length === 0 ? (
-              <p className="mt-3 text-[0.8rem] text-ink-3">No transactions yet.</p>
-            ) : (
-              <div className="mt-3 grid gap-2">
-                {recentTx.map((tx) => (
-                  <div key={tx.id} className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-[0.78rem] font-medium text-ink">{tx.description}</p>
-                      <p className="text-[0.64rem] text-ink-3">
-                        {tx.reference} · Bal. {formatNaira(tx.balanceAfter)}
-                      </p>
-                    </div>
-                    <span
-                      className={`shrink-0 text-[0.78rem] font-semibold ${
-                        tx.type === "debit" ? "text-ink-2" : "text-emerald-600"
-                      }`}
-                    >
-                      {tx.type === "debit" ? "−" : "+"}
-                      {formatNaira(tx.amount)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* 4 — what to do next */}
+        <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[1rem] font-semibold">Buy again</h2>
             <Link
-              href="/dashboard/support"
-              className="mt-4 flex items-center gap-2 rounded-xl bg-lav-50 px-3 py-2.5 text-[0.76rem] font-semibold text-lav-800"
+              href="/pricing"
+              className="inline-flex items-center gap-1 text-[0.72rem] font-semibold text-lav-700 hover:underline"
             >
-              <Chat className="h-3.5 w-3.5" /> Need a hand? Message support
+              <Receipt className="h-3 w-3" /> Prices
             </Link>
           </div>
-        </div>
+          <div className="mt-2.5 grid gap-1.5">
+            {quickBuys.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className="group flex items-center gap-2.5 rounded-xl border border-line bg-white px-3 py-2.5 transition-all hover:border-lav-200"
+              >
+                <ServiceIcon service={item.service} size="sm" />
+                <span className="flex-1">
+                  <span className="block text-[0.8rem] font-semibold text-ink">{item.label}</span>
+                  <span className="block text-[0.66rem] text-ink-3">{item.note}</span>
+                </span>
+                <ArrowRight className="h-3.5 w-3.5 text-ink-3 transition-colors group-hover:text-lav-600" />
+              </Link>
+            ))}
+          </div>
+        </section>
       </div>
 
-      <section className="grid gap-2.5">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[1rem] font-semibold">Buy again</h2>
-          <Link
-            href="/pricing"
-            className="inline-flex items-center gap-1 text-[0.74rem] font-semibold text-lav-700 hover:underline"
-          >
-            <Receipt className="h-3 w-3" /> Full price list
-          </Link>
-        </div>
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          {quickBuys.map((item) => (
+      {/* 5 — the ledger, and a way out if something is wrong */}
+      <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+        <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[1rem] font-semibold">Wallet activity</h2>
             <Link
-              key={item.label}
-              href={item.href}
-              className="group flex items-center gap-2.5 rounded-xl border border-line bg-white px-3 py-2.5 transition-all hover:border-lav-200"
+              href="/dashboard/wallet"
+              className="text-[0.72rem] font-semibold text-lav-700 hover:underline"
             >
-              <ServiceIcon service={item.service} size="sm" />
-              <span className="flex-1">
-                <span className="block text-[0.8rem] font-semibold text-ink">{item.label}</span>
-                <span className="block text-[0.66rem] text-ink-3">{item.note}</span>
-              </span>
-              <ArrowRight className="h-3.5 w-3.5 text-ink-3 transition-colors group-hover:text-lav-600" />
+              Statement
             </Link>
-          ))}
-        </div>
-      </section>
+          </div>
+          {recentTx.length === 0 ? (
+            <p className="mt-3 text-[0.8rem] text-ink-3">No transactions yet.</p>
+          ) : (
+            <div className="mt-2 divide-y divide-line/80">
+              {recentTx.map((tx) => (
+                <div key={tx.id} className="flex items-start justify-between gap-2 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-[0.8rem] font-medium text-ink">{tx.description}</p>
+                    <p className="text-[0.66rem] text-ink-3">
+                      {tx.reference} · Bal. {formatNaira(tx.balanceAfter)}
+                    </p>
+                  </div>
+                  <span
+                    className={`shrink-0 text-[0.8rem] font-semibold ${
+                      tx.type === "debit" ? "text-ink-2" : "text-emerald-600"
+                    }`}
+                  >
+                    {tx.type === "debit" ? "−" : "+"}
+                    {formatNaira(tx.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="grid gap-2.5 rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
+          <p className="flex items-center gap-2 text-[0.92rem] font-semibold text-ink">
+            <Shield className="h-4 w-4 text-lav-700" /> Nothing arrives? Nothing lost.
+          </p>
+          <p className="text-[0.8rem] leading-relaxed text-ink-2">
+            If a code doesn&apos;t come through inside its window, the amount is refunded to this
+            balance automatically — you don&apos;t have to ask.
+          </p>
+          <div className="mt-1 grid gap-1.5">
+            <Link
+              href="/dashboard/orders"
+              className="flex items-center justify-between rounded-lg bg-white/80 px-3 py-2 text-[0.78rem] font-medium text-ink-2 hover:text-lav-700"
+            >
+              Find an order code <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+            <Link
+              href="/dashboard/support"
+              className="flex items-center justify-between rounded-lg bg-white/80 px-3 py-2 text-[0.78rem] font-medium text-ink-2 hover:text-lav-700"
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <Chat className="h-3.5 w-3.5" /> Message support
+              </span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </section>
+      </div>
+
+      <p className="text-center text-[0.7rem] text-ink-3">
+        {totalOrders} order{totalOrders === 1 ? "" : "s"} with Pryva · wallet valid 90 days from last
+        activity
+      </p>
     </div>
   );
 }

@@ -87,3 +87,33 @@ describe("dashboard pages", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe("overview layout", () => {
+  const overview = readFileSync(join(root, "app/dashboard/page.tsx"), "utf8");
+
+  it("leads with the wallet balance", () => {
+    // The balance is the reason people open this page, so it is the first block.
+    const heroIndex = overview.indexOf("<BalanceHero");
+    expect(heroIndex).toBeGreaterThan(-1);
+
+    for (const later of ["<LiveCodeCard", "<EmptyState", "Recent orders", "Wallet activity"]) {
+      const index = overview.indexOf(later);
+      if (index === -1) continue;
+      expect(index, `${later} must come after the balance`).toBeGreaterThan(heroIndex);
+    }
+  });
+
+  it("keeps the money actions attached to the balance, not in a separate header", () => {
+    const hero = readFileSync(join(root, "components/dashboard/BalanceHero.tsx"), "utf8");
+    expect(hero).toContain("/dashboard/wallet");
+    expect(hero).toContain("/dashboard/wallet#withdraw");
+    expect(hero).toContain("formatNaira(balance)");
+    // The old header repeated the greeting and the buttons above the balance.
+    expect(overview).not.toContain("Welcome back");
+  });
+
+  it("describes the account with aggregates, never with the visible slice", () => {
+    expect(overview).toContain("count()");
+    expect(overview).toContain("sum(orders.amount)");
+  });
+});
