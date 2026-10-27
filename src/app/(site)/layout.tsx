@@ -9,8 +9,16 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
         <div className="absolute left-1/2 top-[-18rem] h-[38rem] w-[52rem] -translate-x-1/2 rounded-full bg-lav-200/35 blur-[130px]" />
         <div className="absolute right-[-10rem] top-[30rem] h-[26rem] w-[26rem] rounded-full bg-peach/40 blur-[120px]" />
       </div>
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[70] focus:rounded-full focus:bg-ink focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+      >
+        Skip to content
+      </a>
       <SiteHeader />
-      <main className="flex-1">{children}</main>
+      <main id="main" className="flex-1">
+        {children}
+      </main>
       <SiteFooter />
     </div>
   );
