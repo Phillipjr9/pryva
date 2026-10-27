@@ -68,12 +68,19 @@ const sizeMap = {
 
 export function ServiceIcon({ service, size = "md", className = "" }: ServiceIconProps) {
   const pixelSize = sizeMap[size];
+  const imageSrc = serviceImages[service];
+  const altText = serviceNames[service];
+
+  // Return null if no image is found to avoid empty src warnings
+  if (!imageSrc) {
+    return null;
+  }
 
   return (
     <div className={`relative ${className}`} style={{ width: pixelSize, height: pixelSize }}>
       <Image
-        src={serviceImages[service]}
-        alt={serviceNames[service]}
+        src={imageSrc}
+        alt={altText}
         width={pixelSize}
         height={pixelSize}
         className="rounded-lg object-cover"
