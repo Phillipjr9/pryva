@@ -129,6 +129,8 @@ ratings**, **coupons** (marketplace promos are supplier-side only), **support ti
 | U5 | No loading skeletons on most dashboard screens |
 | U6 | Facebook/Instagram hero showcase on the homepage (#10 in PLAN) |
 | U7 | Country flags were emoji only (rendered as "NG" on Windows) | **Fixed** — 60 real flags + `CountryFlag` on pricing, checkout, numbers and eSIM pages |
+| U8 | The site had **no logo anywhere** — header, footer, dashboard and emails were text-only | **Fixed** — the owner's mark is now the brand everywhere (see §5) |
+| U9 | Homepage hero stacked three overlapping cards on phones; services grid cramped at 2-up | **Fixed** — single clean hero card, snap-scroll service rail, sticky thumb-reach CTA |
 
 ---
 
@@ -188,6 +190,26 @@ single flag (Africa, Global, "Any domain").
 identify the product being sold — the same way a shop shelf label works. The icon *data* is
 permissively licensed; the logos are not Pryva's to relicense. Re-extract with
 `scripts/extract-brand-marks.mjs` after bumping the icon packages.
+
+### Brand
+
+The owner supplied the mark (glossy 3D violet "P"). It was cut out of the supplied
+PNG — white background flooded away, the soft drop shadow dropped (light + neutral
+pixels), the largest remaining component kept — and saved transparent, so it reads
+on cream, white and the dark panels.
+
+| Asset | Where |
+|---|---|
+| `public/images/brand/pryva-mark.png` (256) | UI lockups, email header |
+| `public/images/brand/pryva-mark-512.png` | master for future crops |
+| `public/icon.png` (512), `src/app/icon.png` (180), `public/apple-icon.png` (180), `public/favicon.ico` (16/32/48) | browser + install icons |
+
+`BrandLockup` / `BrandMark` (`src/components/brand/BrandLockup.tsx`) is the single
+source: site header (which previously had **no** brand at all), mobile menu, footer,
+dashboard top bar and sidebar, admin nav, auth header, 404 and all six email
+templates. `logo-removal.test.tsx` used to assert the opposite of this (it encoded an
+earlier pass that deleted a placeholder logo); it now asserts the mark + name are
+present everywhere and that the icon files exist.
 
 ### Code
 
