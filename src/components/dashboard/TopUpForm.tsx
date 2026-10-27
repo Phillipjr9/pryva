@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Card, Check, Clock, Lock, Wallet } from "@/components/icons";
 import { formatNaira } from "@/lib/catalog";
+import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
+import { PaymentLoading } from "@/components/ui/PaymentLoading";
 
 const presets = [2000, 5000, 10000, 25000, 50000];
 
@@ -49,7 +51,16 @@ export function TopUpForm({ balance }: { balance: number }) {
   }
 
   return (
-    <form onSubmit={submit} className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 sm:p-6">
+    <>
+      <PaymentLoading show={pending} message="Processing your top-up..." />
+      <PaymentSuccess
+        show={!!success}
+        title="Wallet Topped Up!"
+        message={`${formatNaira(success?.amount || 0)} has been added to your wallet.`}
+        redirectUrl="/dashboard"
+        redirectDelay={2500}
+      />
+      <form onSubmit={submit} className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 sm:p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-[1.05rem] font-semibold">Fund your wallet</h2>
         <span className="rounded-full bg-cream px-2.5 py-1 text-[0.66rem] font-medium text-ink-2">
@@ -165,5 +176,6 @@ export function TopUpForm({ balance }: { balance: number }) {
         Wallet balance stays valid for 90 days from your last activity.
       </p>
     </form>
+    </>
   );
 }

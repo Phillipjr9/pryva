@@ -1,4 +1,4 @@
-export type ServiceSlug = "numbers" | "esim" | "proxies" | "email-otp";
+export type ServiceSlug = "numbers" | "esim" | "proxies" | "email-otp" | "data" | "gift-cards" | "bulk" | "scheduled";
 
 export type ServiceKey = ServiceSlug;
 
@@ -239,6 +239,190 @@ export const services: Service[] = [
       },
     ],
   },
+  {
+    slug: "data",
+    name: "Data Plans",
+    shortName: "Data",
+    href: "/dashboard/data",
+    eyebrow: "Airtime & data",
+    tagline: "Buy data for any Nigerian network.",
+    description:
+      "Purchase MTN, Airtel, Glo and 9mobile data plans instantly. Pay with your wallet, get data delivered to any Nigerian number in seconds.",
+    intro:
+      "Skip the bank app and buy data directly from your Pryva wallet. Choose from 500MB to 10GB bundles across all major Nigerian networks, delivered instantly to any phone number.",
+    fromPrice: 500,
+    unit: "per plan",
+    icon: "phone",
+    highlights: [
+      {
+        title: "All networks",
+        body: "MTN, Airtel, Glo and 9mobile data plans available.",
+      },
+      {
+        title: "Instant delivery",
+        body: "Data arrives on the target number within seconds of purchase.",
+      },
+      {
+        title: "Pay with wallet",
+        body: "Use your existing Pryva wallet balance, no card needed.",
+      },
+    ],
+    included: [
+      "Data delivered to any Nigerian number",
+      "All major networks supported",
+      "Instant delivery after payment",
+      "Purchase history in your dashboard",
+    ],
+    goodFor: ["Personal use", "Family", "Team members", "Quick top-ups"],
+    faqs: [
+      {
+        q: "How long does delivery take?",
+        a: "Data is delivered instantly after payment. The recipient will receive a confirmation SMS from their network.",
+      },
+      {
+        q: "Can I buy data for someone else?",
+        a: "Yes. Enter any Nigerian phone number during checkout and the data will be delivered to that number.",
+      },
+    ],
+  },
+  {
+    slug: "gift-cards",
+    name: "Gift Cards",
+    shortName: "Gift Cards",
+    href: "/dashboard/gift-cards",
+    eyebrow: "Send value",
+    tagline: "Send Pryva credit to anyone.",
+    description:
+      "Create gift cards from ₦1,000 to ₦500,000. Share the code with friends, family or team members. They redeem it into their Pryva wallet instantly.",
+    intro:
+      "Send Pryva wallet credit to anyone with a simple code. Purchase a gift card, share the code via email or message, and the recipient redeems it into their wallet with one click. Perfect for birthdays, rewards or team allowances.",
+    fromPrice: 1000,
+    unit: "per card",
+    icon: "gift",
+    highlights: [
+      {
+        title: "Any amount",
+        body: "Create gift cards from ₦1,000 to ₦500,000.",
+      },
+      {
+        title: "Instant redemption",
+        body: "Recipients enter the code and the credit appears in their wallet immediately.",
+      },
+      {
+        title: "Valid for 1 year",
+        body: "Gift cards stay active for 12 months from purchase.",
+      },
+    ],
+    included: [
+      "Unique gift card code",
+      "Optional recipient email and message",
+      "1 year validity",
+      "Purchase history in your dashboard",
+    ],
+    goodFor: ["Birthdays", "Team rewards", "Allowances", "Thank you gifts"],
+    faqs: [
+      {
+        q: "Can I cancel or refund a gift card?",
+        a: "No. Gift cards are non-refundable once purchased. Make sure the amount and recipient details are correct before confirming.",
+      },
+      {
+        q: "Can I redeem my own gift card?",
+        a: "No. You can only redeem gift cards purchased by other users. This prevents circular transactions.",
+      },
+    ],
+  },
+  {
+    slug: "bulk",
+    name: "Bulk Orders",
+    shortName: "Bulk",
+    href: "/dashboard/bulk-orders",
+    eyebrow: "Buy in bulk",
+    tagline: "Discounted multi-buy orders.",
+    description:
+      "Order 10+ items and save 5%, or 20+ items and save 10%. Perfect for teams, resellers and agencies running multiple accounts.",
+    intro:
+      "Need multiple virtual numbers, eSIMs or proxy packs? Buy them all at once and unlock automatic discounts. 10+ items gets you 5% off, 20+ items gets you 10% off. All items delivered instantly to your dashboard.",
+    fromPrice: 12000,
+    unit: "per order",
+    icon: "package",
+    highlights: [
+      {
+        title: "Automatic discounts",
+        body: "5% off for 10+ items, 10% off for 20+ items.",
+      },
+      {
+        title: "Mix and match",
+        body: "Combine any services: numbers, eSIMs, proxies, email OTP.",
+      },
+      {
+        title: "Instant delivery",
+        body: "All items appear in your dashboard immediately after purchase.",
+      },
+    ],
+    included: [
+      "Automatic quantity discounts",
+      "Mix any services in one order",
+      "All items delivered instantly",
+      "Unified order history",
+    ],
+    goodFor: ["Teams", "Resellers", "Agencies", "QA departments"],
+    faqs: [
+      {
+        q: "How do discounts work?",
+        a: "Add 10 or more items to your cart and 5% is automatically deducted. Add 20 or more items and the discount increases to 10%.",
+      },
+      {
+        q: "Can I mix different services?",
+        a: "Yes. You can combine virtual numbers, eSIMs, proxies and email OTP in a single bulk order.",
+      },
+    ],
+  },
+  {
+    slug: "scheduled",
+    name: "Scheduled Purchases",
+    shortName: "Scheduled",
+    href: "/dashboard/scheduled",
+    eyebrow: "Auto-recurring",
+    tagline: "Set it and forget it.",
+    description:
+      "Schedule automatic purchases of any service on a daily, weekly, biweekly or monthly basis. Pause or cancel anytime.",
+    intro:
+      "Need a fresh virtual number every week? A monthly eSIM top-up? Schedule any Pryva service to purchase automatically on your preferred frequency. The cost is deducted from your wallet each time. Pause, resume or cancel whenever you need.",
+    fromPrice: 1200,
+    unit: "per schedule",
+    icon: "calendar",
+    highlights: [
+      {
+        title: "Flexible frequency",
+        body: "Daily, weekly, biweekly or monthly schedules.",
+      },
+      {
+        title: "Full control",
+        body: "Pause, resume or cancel any scheduled order at any time.",
+      },
+      {
+        title: "Wallet deduction",
+        body: "Cost is automatically deducted from your wallet on each run.",
+      },
+    ],
+    included: [
+      "Automatic recurring purchases",
+      "Pause/resume/cancel anytime",
+      "Email notifications before each run",
+      "Full purchase history",
+    ],
+    goodFor: ["Regular verifications", "Monthly travel", "Ongoing research", "Team accounts"],
+    faqs: [
+      {
+        q: "What happens if my wallet is empty?",
+        a: "The scheduled purchase will be skipped if your wallet balance is insufficient. You'll receive a notification to top up.",
+      },
+      {
+        q: "Can I change the frequency?",
+        a: "Yes. Cancel the existing schedule and create a new one with your preferred frequency.",
+      },
+    ],
+  },
 ];
 
 export const serviceMap: Record<ServiceSlug, Service> = services.reduce(
@@ -417,6 +601,10 @@ export const serviceIcons: Record<ServiceSlug, string> = {
   esim: "sim",
   proxies: "globe",
   "email-otp": "mail",
+  data: "phone",
+  "gift-cards": "gift",
+  bulk: "package",
+  scheduled: "calendar",
 };
 
 export function orderStatusLabel(status: string): string {

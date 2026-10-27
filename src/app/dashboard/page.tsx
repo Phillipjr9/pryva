@@ -10,25 +10,22 @@ import {
   ArrowRight,
   Chat,
   Clock,
-  Globe,
-  Mail,
-  Phone,
   Plus,
   Receipt,
   Shield,
-  Sim,
   Sparkle,
   Wallet,
 } from "@/components/icons";
+import { ServiceIcon } from "@/components/ServiceIcon";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
 
 const quickBuys = [
-  { label: "Virtual number", note: "From ₦1,200", href: "/virtual-numbers#buy", icon: Phone },
-  { label: "eSIM data", note: "From ₦4,500", href: "/esim#buy", icon: Sim },
-  { label: "Residential proxy", note: "From ₦3,500", href: "/proxies#buy", icon: Globe },
-  { label: "Email OTP", note: "From ₦700", href: "/email-otp#buy", icon: Mail },
+  { label: "Virtual number", note: "From ₦1,200", href: "/virtual-numbers#buy", service: "numbers" as const },
+  { label: "eSIM data", note: "From ₦4,500", href: "/esim#buy", service: "esim" as const },
+  { label: "Residential proxy", note: "From ₦3,500", href: "/proxies#buy", service: "proxies" as const },
+  { label: "Email OTP", note: "From ₦700", href: "/email-otp#buy", service: "email-otp" as const },
 ];
 
 function statusStyle(status: string) {
@@ -232,16 +229,13 @@ export default async function DashboardOverviewPage() {
             <h2 className="text-[1rem] font-semibold">Quick buy</h2>
             <div className="mt-3 grid gap-1.5">
               {quickBuys.map((item) => {
-                const Icon = item.icon;
                 return (
                   <Link
                     key={item.label}
                     href={item.href}
                     className="group flex items-center gap-2.5 rounded-xl border border-line bg-white px-3 py-2.5 transition-all hover:border-lav-200"
                   >
-                    <span className="grid h-7 w-7 place-items-center rounded-lg bg-lav-50 text-lav-700">
-                      <Icon className="h-3.5 w-3.5" />
-                    </span>
+                    <ServiceIcon service={item.service} size="sm" />
                     <span className="flex-1">
                       <span className="block text-[0.8rem] font-semibold text-ink">{item.label}</span>
                       <span className="block text-[0.66rem] text-ink-3">{item.note}</span>

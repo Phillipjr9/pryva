@@ -98,21 +98,21 @@ export function AuthForm({
         <form
           action="/api/auth/demo-web"
           method="post"
-          onSubmit={submitDemo}
           className="mt-2.5"
         >
           <input type="hidden" name="next" value={next} />
           <button
             type="submit"
             disabled={pending !== null}
-            className="btn w-full border border-transparent bg-lav-100 !py-3.5 !text-[0.85rem] text-lav-800 hover:bg-lav-200/80 disabled:opacity-60"
+            className="btn w-full border-2 border-lav-400 bg-gradient-to-r from-lav-100 to-lav-50 !py-4 !text-[0.9rem] font-semibold text-lav-800 hover:from-lav-200 hover:to-lav-100 disabled:opacity-60 shadow-sm transition-all"
+            onClick={() => setPending("demo")}
           >
-            <Sparkle className="h-4 w-4" />
-            {pending === "demo" ? "Opening the demo…" : "Try the live demo — no signup"}
+            <Sparkle className="h-5 w-5" />
+            {pending === "demo" ? "Opening the demo…" : "⚡ One-Click Demo Login"}
           </button>
         </form>
-        <p className="mt-2 text-center text-[0.7rem] text-ink-3">
-          Demo starts signed in with ₦25,000 wallet credit.
+        <p className="mt-2 text-center text-[0.72rem] text-ink-3">
+          Demo starts signed in with ₦25,000 wallet credit · No signup required
         </p>
 
         <div className="my-5 flex items-center gap-3">

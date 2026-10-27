@@ -1,71 +1,47 @@
-import { useId } from "react";
+import Image from "next/image";
 import Link from "next/link";
 
 type LogoProps = {
   className?: string;
   variant?: "lockup" | "monogram";
-  tone?: "color" | "mono";
   tagline?: boolean;
   href?: string | null;
 };
 
 export function Monogram({
   className = "h-10 w-10",
-  tone = "color",
 }: {
   className?: string;
-  tone?: "color" | "mono";
 }) {
-  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
-  const gradientId = `pryva-mono-gradient-${uid}`;
-  const maskId = `pryva-mono-mask-${uid}`;
-
   return (
-    <svg
-      viewBox="0 0 64 64"
+    <Image
+      src="/pryva-logo.png"
+      alt="Pryva"
+      width={40}
+      height={40}
       className={className}
-      aria-hidden="true"
-      role="presentation"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <defs>
-        {tone === "color" && (
-          <linearGradient id={gradientId} x1="0.15" y1="0" x2="0.85" y2="1">
-            <stop offset="0%" stopColor="#D6C7F5" />
-            <stop offset="38%" stopColor="#B49CE7" />
-            <stop offset="100%" stopColor="#8266C9" />
-          </linearGradient>
-        )}
-        <mask id={maskId}>
-          <rect x="0" y="0" width="64" height="64" fill="white" />
-          <ellipse cx="37.4" cy="26.4" rx="6.4" ry="7.1" fill="black" />
-        </mask>
-      </defs>
-      <g mask={`url(#${maskId})`} fill={tone === "color" ? `url(#${gradientId})` : "currentColor"}>
-        <rect x="15" y="11" width="16.5" height="44" rx="8.25" />
-        <circle cx="36.5" cy="26.5" r="14.5" />
-      </g>
-    </svg>
+    />
   );
 }
 
 export function Logo({
   className = "",
   variant = "lockup",
-  tone = "color",
   tagline = false,
   href = "/",
 }: LogoProps) {
   const content = (
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
-      <Monogram className="h-9 w-9 shrink-0" tone={tone} />
+      <Image
+        src="/pryva-logo.png"
+        alt="Pryva"
+        width={36}
+        height={36}
+        className="h-9 w-9 shrink-0"
+      />
       {variant === "lockup" && (
         <span className="flex flex-col leading-none">
-          <span
-            className={`text-[1.45rem] font-medium tracking-[-0.04em] ${
-              tone === "color" ? "text-lav-600" : "text-ink"
-            }`}
-          >
+          <span className="text-[1.45rem] font-medium tracking-[-0.04em] text-lav-600">
             Pryva
           </span>
           {tagline && (

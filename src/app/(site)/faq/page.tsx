@@ -1,190 +1,188 @@
-import type { Metadata } from "next";
+import { Metadata } from "next";
 import Link from "next/link";
-import { Reveal } from "@/components/ui/Reveal";
-import { FaqAccordion, type FaqItem } from "@/components/ui/FaqAccordion";
-import { ArrowRight, Chat, Mail, Shield } from "@/components/icons";
+import { Logo } from "@/components/brand/Logo";
+import { Accordion, AccordionItem } from "@/components/ui/Accordion";
 
 export const metadata: Metadata = {
-  title: "FAQ — answers before you buy",
-  description:
-    "Answers about Pryva virtual numbers, rentals, eSIM data, residential proxies, email OTP, Naira payments, wallet top-ups and automatic refunds.",
+  title: "FAQ",
+  description: "Frequently asked questions about Pryva services.",
 };
 
-const groups: { title: string; description: string; items: FaqItem[] }[] = [
+const faqCategories = [
   {
-    title: "Getting started",
-    description: "Accounts, payments and what you actually need to begin.",
-    items: [
+    title: "General",
+    questions: [
       {
-        q: "Do I need a dollar card to use Pryva?",
-        a: "No. Everything is priced and paid in Naira. Fund your wallet with a Nigerian bank transfer or a local debit card, then pay for orders from that balance.",
+        q: "What is Pryva?",
+        a: "Pryva is a digital services platform that provides virtual phone numbers, eSIM data plans, residential proxies, email OTP services, and more. We make it easy for Nigerians to access global digital services with Naira payments.",
       },
       {
-        q: "Is there a minimum top-up?",
-        a: "Yes — ₦2,000. That is enough for a temporary inbox, a Nigerian verification number and a little left over to test another country.",
+        q: "How do I create an account?",
+        a: "Simply click the 'Get Started' button, enter your name and email, create a password, and verify your email. You can then top up your wallet and start using our services immediately.",
       },
       {
-        q: "Do I need to verify my identity?",
-        a: "No BVN, passport or selfie is required to create a Pryva account. You only need a name, an email address and a password.",
-      },
-      {
-        q: "Can I use Pryva on my phone?",
-        a: "Yes. The site is built mobile-first, so buying a number, copying a code or funding your wallet works comfortably from a phone browser.",
+        q: "Is Pryva safe to use?",
+        a: "Yes! We use industry-standard encryption, secure payment processing, and never store sensitive payment information. Your privacy and security are our top priorities.",
       },
     ],
   },
   {
-    title: "Virtual numbers & rentals",
-    description: "What works, what doesn't, and how refunds are decided.",
-    items: [
+    title: "Virtual Numbers",
+    questions: [
       {
-        q: "Are the numbers real or VoIP?",
-        a: "They are real, carrier-grade numbers sourced through our provider Fleexa. Being non-VoIP is why verification codes from WhatsApp, Telegram, Google and most fintech platforms arrive reliably.",
+        q: "How quickly will I receive my virtual number?",
+        a: "Virtual numbers are delivered instantly after payment. You'll see the number in your dashboard immediately and can start receiving SMS codes right away.",
       },
       {
-        q: "What's the difference between buying and renting?",
-        a: "Buying covers a single verification with a 20-minute code window. Renting keeps the same number active for 7, 30 or 90 days so you can receive multiple codes and keep a consistent identity.",
+        q: "Which platforms do your virtual numbers work with?",
+        a: "Our non-VoIP numbers work with WhatsApp, Telegram, Google, Binance, PayPal, and 500+ other platforms. Check the specific platform's requirements if you're unsure.",
       },
       {
-        q: "Can I choose a specific Nigerian number?",
-        a: "Numbers are allocated from a live pool, so exact digits can't be reserved. If a platform rejects the line you received, request an auto-refund and buy another attempt — or message support for a replacement.",
+        q: "What's the difference between buying and renting a number?",
+        a: "Buying gives you a number for a single verification (20-minute window), while renting keeps the number active for 7, 30, or 90 days for multiple verifications.",
       },
       {
-        q: "When is an order refundable?",
-        a: "Number orders are refundable whenever the delivery window closes without a verification code. Tap Request auto-refund on the order page and the amount returns to your wallet instantly.",
-      },
-      {
-        q: "Which platforms work best?",
-        a: "WhatsApp, Telegram, Google, TikTok, Binance, Discord, PayPal and most marketplaces work well. Some platforms aggressively block shared numbers; if that happens, the order is refundable, so you can try a rental instead.",
+        q: "What if my virtual number doesn't receive the code?",
+        a: "If you don't receive the expected SMS code within the service window, you'll receive an automatic refund to your wallet. No questions asked.",
       },
     ],
   },
   {
-    title: "eSIM, proxies & email OTP",
-    description: "The details for our data, bandwidth and inbox products.",
-    items: [
+    title: "eSIM & Data",
+    questions: [
       {
-        q: "Will an eSIM work with my phone?",
-        a: "Most phones released from 2020 onward support eSIM — iPhone XS and newer, recent Samsung flagships, Pixel 4 and newer, and many iPads. Check your device settings for “Add eSIM” before buying.",
+        q: "How do I activate my eSIM?",
+        a: "After purchasing an eSIM, you'll receive a QR code and activation instructions in your dashboard. Simply scan the QR code with your compatible device's camera.",
       },
       {
-        q: "Can I keep my Nigerian WhatsApp number while using a Pryva eSIM?",
-        a: "Yes. Pryva eSIMs are data-only, so they run alongside your existing SIM. Keep WhatsApp, bank alerts and calls on your primary line and use the eSIM for data abroad.",
+        q: "Which phones support eSIM?",
+        a: "Most phones released from 2020 onward support eSIM, including iPhone XS and newer, Samsung Galaxy S20 and newer, Google Pixel 3 and newer, and many others.",
       },
       {
-        q: "What is a residential proxy, exactly?",
-        a: "It routes your traffic through a real consumer connection rather than a data center, so websites see a genuine local IP. Pryva offers rotating requests and sticky sessions of up to 30 minutes.",
-      },
-      {
-        q: "Do proxy credits expire?",
-        a: "Bandwidth is available for 30 days from purchase. Unused gigabytes are not refundable after that window, so start with a 1GB pack if you're testing a workflow.",
-      },
-      {
-        q: "How long does a temporary inbox last?",
-        a: "Choose 24 hours for a single signup, or 30 days for a long-term address. Inboxes receive verification mail live in your dashboard with full message previews.",
+        q: "Can I keep my WhatsApp number when using an eSIM?",
+        a: "Yes! Pryva eSIMs are data-only, so they run alongside your existing SIM. You can keep your WhatsApp and other apps on your primary line while using the eSIM for data.",
       },
     ],
   },
   {
-    title: "Wallet, refunds & support",
-    description: "How money moves and how to reach a person.",
-    items: [
+    title: "Payments & Wallet",
+    questions: [
       {
-        q: "How do refunds reach me?",
-        a: "Refunds go straight back into your Pryva wallet, along with a transaction reference in your wallet history. From there you can spend it or ask support to review a bank payout.",
+        q: "How do I top up my wallet?",
+        a: "Go to your dashboard, click on 'Wallet', and choose your preferred payment method. We accept bank transfers, card payments, and other popular Nigerian payment methods.",
       },
       {
-        q: "Does my wallet balance expire?",
-        a: "Unused wallet balance stays valid for 90 days from your last activity. Plan credits follow the same rule, so there is no monthly scramble.",
+        q: "Are there any fees for wallet top-up?",
+        a: "We don't charge any fees for wallet top-ups. You pay exactly the amount you want to add to your wallet.",
       },
       {
-        q: "How do I speak to a human?",
-        a: "Email support@pryva.ng, message us on WhatsApp, or use the contact form. Support runs 9am–8pm WAT, Monday to Saturday, with most replies inside two working hours.",
+        q: "Can I withdraw money from my wallet?",
+        a: "Currently, wallet balances can only be used for purchasing Pryva services. We're working on withdrawal functionality for the future.",
       },
       {
-        q: "Do you offer business accounts and invoices?",
-        a: "Yes. Pryva Business includes a shared team wallet, a dedicated Nigerian proxy pool, monthly invoices and an account manager. Get in touch with your expected monthly volume.",
+        q: "Do wallet balances expire?",
+        a: "No, your wallet balance never expires. You can use it whenever you need to purchase services.",
+      },
+    ],
+  },
+  {
+    title: "Gift Cards",
+    questions: [
+      {
+        q: "How do gift cards work?",
+        a: "You purchase a gift card with a specific amount, receive a unique code, and share it with the recipient. They enter the code in their Pryva account to redeem the credit.",
+      },
+      {
+        q: "Can I cancel or refund a gift card?",
+        a: "No, gift cards are non-refundable once purchased. Please ensure the amount and recipient details are correct before confirming.",
+      },
+      {
+        q: "How long are gift cards valid?",
+        a: "Gift cards are valid for 12 months from the date of purchase.",
       },
     ],
   },
 ];
 
-export default function FaqPage() {
+export default function FAQPage() {
   return (
-    <>
-      <section className="relative grain overflow-hidden pb-10 pt-12 sm:pt-16">
-        <div className="pointer-events-none absolute left-1/2 top-[-10rem] h-[24rem] w-[36rem] -translate-x-1/2 rounded-full bg-lav-200/40 blur-[120px]" />
-        <div className="shell relative">
-          <div className="mx-auto max-w-3xl text-center">
-            <Reveal>
-              <span className="eyebrow justify-center">Questions &amp; answers</span>
-            </Reveal>
-            <Reveal delay={60}>
-              <h1 className="mt-4 text-[2.5rem] font-medium leading-[1.03] tracking-[-0.035em] sm:text-[3.3rem]">
-                Ask away.
-                <br />
-                <span className="text-display italic text-lav-700">Nothing is too small.</span>
-              </h1>
-            </Reveal>
-            <Reveal delay={120}>
-              <p className="mx-auto mt-5 max-w-xl text-[1rem] leading-relaxed text-ink-2">
-                Everything we get asked most, grouped so you can find it fast. If your question
-                isn&apos;t here, support will answer personally.
-              </p>
-            </Reveal>
+    <div className="min-h-screen bg-cream">
+      {/* Header */}
+      <header className="border-b border-line bg-white">
+        <div className="shell flex h-16 items-center justify-between">
+          <Link href="/">
+            <Logo />
+          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/signup"
+              className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700"
+            >
+              Get Started
+            </Link>
           </div>
+        </div>
+      </header>
+
+      {/* Hero */}
+      <section className="py-16">
+        <div className="shell text-center">
+          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem]">
+            Frequently Asked Questions
+          </h1>
+          <p className="mt-4 text-[1.1rem] text-ink-2 max-w-2xl mx-auto">
+            Find answers to common questions about Pryva and our services.
+          </p>
         </div>
       </section>
 
-      <section className="pb-12">
-        <div className="shell grid gap-10 lg:grid-cols-[1fr_2fr] lg:items-start">
-          <div className="lg:sticky lg:top-24">
-            <div className="rounded-2xl border border-line bg-white/70 p-5">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-lav-50 text-lav-700">
-                <Chat className="h-4 w-4" />
-              </span>
-              <h2 className="mt-3.5 text-[1rem] font-semibold">Still stuck?</h2>
-              <p className="mt-1.5 text-[0.83rem] leading-relaxed text-ink-2">
-                Message a real person in Lagos. Most questions get a reply within two working hours.
-              </p>
-              <Link href="/contact" className="btn btn-primary mt-4 w-full !py-3 !text-[0.82rem]">
-                Contact support
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-              <a
-                href="mailto:support@pryva.ng"
-                className="mt-2.5 flex items-center justify-center gap-1.5 text-[0.76rem] font-medium text-ink-2 hover:text-lav-700"
-              >
-                <Mail className="h-3.5 w-3.5" /> support@pryva.ng
-              </a>
-            </div>
-            <div className="mt-3 rounded-2xl border border-lav-200 bg-lav-50/70 p-5">
-              <p className="flex items-center gap-2 text-[0.83rem] font-semibold text-ink">
-                <Shield className="h-4 w-4 text-lav-700" />
-                Refund promise
-              </p>
-              <p className="mt-2 text-[0.8rem] leading-relaxed text-ink-2">
-                No code inside the delivery window? The amount returns to your wallet automatically —
-                no ticket required.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-8">
-            {groups.map((group, groupIndex) => (
-              <Reveal key={group.title} delay={groupIndex * 50}>
-                <div>
-                  <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-                    <h2 className="text-[1.2rem] font-medium">{group.title}</h2>
-                    <p className="text-[0.76rem] text-ink-3">{group.description}</p>
-                  </div>
-                  <FaqAccordion items={group.items} defaultOpen={groupIndex === 0 ? 0 : null} />
-                </div>
-              </Reveal>
+      {/* FAQ Content */}
+      <section className="pb-16">
+        <div className="shell max-w-3xl">
+          <div className="space-y-8">
+            {faqCategories.map((category) => (
+              <div key={category.title}>
+                <h2 className="text-[1.5rem] font-semibold text-ink mb-4">
+                  {category.title}
+                </h2>
+                <Accordion>
+                  {category.questions.map((faq, index) => (
+                    <AccordionItem key={index} title={faq.q}>
+                      {faq.a}
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </div>
             ))}
           </div>
         </div>
       </section>
-    </>
+
+      {/* Contact CTA */}
+      <section className="pb-16">
+        <div className="shell">
+          <div className="max-w-2xl mx-auto rounded-2xl border border-line bg-white p-8 text-center">
+            <h2 className="text-[1.5rem] font-semibold text-ink mb-3">
+              Still have questions?
+            </h2>
+            <p className="text-[0.95rem] text-ink-2 mb-6">
+              Can't find what you're looking for? Our support team is here to help.
+            </p>
+            <Link
+              href="/contact"
+              className="inline-flex items-center gap-2 rounded-xl bg-lav-600 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-700"
+            >
+              Contact Support
+            </Link>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }

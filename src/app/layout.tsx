@@ -49,7 +49,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <style>{`.reveal{opacity:1 !important;transform:none !important}`}</style>
         </noscript>
       </head>
-      <body className="min-h-screen bg-cream text-ink antialiased">{children}</body>
+      <body className="min-h-screen bg-cream text-ink antialiased">
+        {children}
+      </body>
     </html>
   );
 }
