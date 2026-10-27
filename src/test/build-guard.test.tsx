@@ -60,6 +60,30 @@ async function flush() {
   await new Promise((resolve) => setImmediate(resolve));
 }
 
+type FakeNode = {
+  id?: string;
+  textContent?: string;
+  type?: string;
+  style?: { cssText?: string };
+  children: FakeNode[];
+  appendChild: (child: FakeNode) => FakeNode;
+  setAttribute: () => void;
+  onclick?: () => void;
+};
+
+function makeNode(): FakeNode {
+  const node: FakeNode = {
+    style: {},
+    children: [],
+    appendChild: (child) => {
+      node.children.push(child);
+      return child;
+    },
+    setAttribute: () => {},
+  };
+  return node;
+}
+
 describe("stale-build guard behaviour", () => {
   it("reloads when the tab is older than the server", async () => {
     const { reload } = runGuard({ pageBuild: "build-old", serverBuild: "build-new" });
@@ -187,6 +211,57 @@ describe("stale-build guard: no reload loop", () => {
     await flush();
 
     expect(reload).not.toHaveBeenCalled();
+  });
+
+  it("offers a tap-to-refresh notice when storage blocks the guard", async () => {
+    // In a partitioned preview iframe sessionStorage throws, so the guard must
+    // not reload — but staying silent leaves the visitor on an old build with no
+    // way out. A banner with a button hands the decision back to them.
+    const reload = vi.fn();
+    const appended: FakeNode[] = [];
+    const context: Record<string, unknown> = {
+      fetch: async () => ({ ok: true, json: async () => ({ build: "new" }) }),
+      sessionStorage: {
+        getItem: () => {
+          throw new Error("blocked");
+        },
+        setItem: () => {
+          throw new Error("blocked");
+        },
+      },
+      window: { location: { reload }, addEventListener: () => {} },
+      document: {
+        readyState: "loading",
+        visibilityState: "visible",
+        addEventListener: () => {},
+        getElementById: () => null,
+        createElement: () => makeNode(),
+        body: {
+          appendChild: (node: FakeNode) => {
+            appended.push(node);
+            return node;
+          },
+        },
+      },
+      Number,
+      String,
+      JSON,
+      Promise,
+      Date,
+      setTimeout: (fn: () => void) => fn(),
+    };
+
+    runInNewContext(staleBuildScript("old"), context);
+    await flush();
+
+    expect(reload).not.toHaveBeenCalled();
+    const box = appended.find((node) => node.id === "pryva-stale-notice");
+    expect(box).toBeTruthy();
+    const button = box!.children.find((node) => node.textContent === "Refresh");
+    expect(button).toBeTruthy();
+    // The tap is the visitor's own gesture, so reloading here cannot loop.
+    button!.onclick?.();
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 
   it("throttles version checks so a focus storm cannot hammer the endpoint", async () => {
