@@ -58,6 +58,25 @@ fromSimple("siHbomax", "hbo-max", "#002BE7");
 
 fromSimple("siCrunchyroll", "crunchyroll", "#FF5E00");
 
+// Also commonly sold / verified on the accounts marketplace.
+fromSimple("siBinance", "binance", "#F0B90B");
+fromSimple("siOkx", "okx", "#000000");
+fromSimple("siPaypal", "paypal", "#003087");
+fromSimple("siUber", "uber", "#000000");
+fromSimple("siSnapchat", "snapchat", "#FFFC00");
+fromSimple("siTinder", "tinder", "#FF6B6B");
+fromSimple("siCoinbase", "coinbase", "#0052FF");
+fromSimple("siRevolut", "revolut", "#000000");
+fromSimple("siCashapp", "cashapp", "#00C244");
+fromSimple("siVenmo", "venmo", "#008CFF");
+fromSimple("siPinterest", "pinterest", "#BD081C");
+fromSimple("siReddit", "reddit", "#FF4500");
+fromSimple("siTwitch", "twitch", "#9146FF");
+fromSimple("siAirbnb", "airbnb", "#FF5A5F");
+fromSimple("siBookingdotcom", "booking", "#003B95");
+fromSimple("siWechat", "wechat", "#07C160");
+fromSimple("siZoom", "zoom", "#0B5CFF");
+
 fromLogos("openai-icon", "chatgpt", "#10A37F", "ChatGPT");
 // Gmail: the plain red "M" silhouette. The multi-colour artwork on the icon
 // sets relies on fixed SVG gradient ids, and duplicate ids break the moment two

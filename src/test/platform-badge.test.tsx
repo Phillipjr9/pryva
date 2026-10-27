@@ -1,6 +1,9 @@
 import React from "react";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { BrandIcon } from "@/components/BrandIcon";
+import { BRAND_MARKS } from "@/lib/brand-marks";
+import { PLATFORM_SHOWCASE } from "@/lib/platform-showcase";
 import {
   PlatformBadge,
   PlatformStrip,
@@ -79,5 +82,17 @@ describe("platform marks", () => {
     expect(html).toContain("Facebook");
     expect(html).toContain("Instagram");
     expect(html).toContain("Gmail");
+  });
+
+  it("gives every platform in the homepage strip its own real mark", () => {
+    const missing = PLATFORM_SHOWCASE.filter((platform) => !BRAND_MARKS[platform.brand]);
+    expect(missing.map((platform) => platform.brand)).toEqual([]);
+
+    const marks = new Set(
+      PLATFORM_SHOWCASE.map((platform) =>
+        renderToStaticMarkup(<BrandIcon brand={platform.brand} size={20} variant="tile" decorative />),
+      ),
+    );
+    expect(marks.size).toBe(PLATFORM_SHOWCASE.length);
   });
 });

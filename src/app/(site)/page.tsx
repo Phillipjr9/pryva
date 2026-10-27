@@ -5,6 +5,8 @@ import { PHOTOS } from "@/lib/photos";
 import { Reveal } from "@/components/ui/Reveal";
 import { FaqAccordion } from "@/components/ui/FaqAccordion";
 import { ServiceIcon } from "@/components/ServiceIcon";
+import { BrandIcon } from "@/components/BrandIcon";
+import { PLATFORM_SHOWCASE } from "@/lib/platform-showcase";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -77,24 +79,6 @@ const shortcuts = [
   },
 ];
 
-const platforms = [
-  "WhatsApp",
-  "Telegram",
-  "Google",
-  "Binance",
-  "TikTok",
-  "Instagram",
-  "PayPal",
-  "Discord",
-  "Uber",
-  "X",
-  "Netflix",
-  "Snapchat",
-  "Tinder",
-  "OKX",
-  "Facebook",
-  "Spotify",
-];
 
 const features = [
   {
@@ -517,12 +501,13 @@ export default function HomePage() {
       {/* ---------- PLATFORM MARQUEE ---------- */}
       <section className="overflow-hidden border-y border-line/70 bg-white/40 py-5">
         <div className="flex w-max marquee-track items-center gap-3">
-          {[...platforms, ...platforms].map((platform, index) => (
+          {[...PLATFORM_SHOWCASE, ...PLATFORM_SHOWCASE].map((platform, index) => (
             <span
-              key={`${platform}-${index}`}
-              className="inline-flex items-center gap-2 rounded-full border border-line bg-cream/80 px-3.5 py-1.5 text-[0.76rem] font-medium text-ink-2"
+              key={`${platform.brand}-${index}`}
+              className="inline-flex items-center gap-2 rounded-full border border-line bg-cream/80 py-1.5 pl-1.5 pr-3.5 text-[0.76rem] font-medium text-ink-2"
             >
-              {platform}
+              <BrandIcon brand={platform.brand} size={20} variant="tile" decorative />
+              {platform.label}
             </span>
           ))}
         </div>

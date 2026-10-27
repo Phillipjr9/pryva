@@ -96,12 +96,15 @@ export function BrandIcon({
   const tray = variant === "tile";
   const radius = Math.round(size * 0.28);
   const colourOnLight = COLOUR_ON_LIGHT.has(brand as BrandSlug);
+  const lightTile = isLightColor(mark.hex);
   const fill = selfColoured
     ? undefined
     : tray
       ? colourOnLight
         ? mark.hex || "#111827"
-        : "#ffffff"
+        : lightTile
+          ? "#111827"
+          : "#ffffff"
       : mark.hex || "#111827";
 
   return (
@@ -143,6 +146,21 @@ export function BrandIcon({
       </svg>
     </span>
   );
+}
+
+/**
+ * Yellow and lime marks (Snapchat, Binance) disappear as white-on-brand. The
+ * official tiles draw those glyphs in black, so mirror that instead of guessing.
+ */
+function isLightColor(hex: string): boolean {
+  const value = hex.replace("#", "");
+  if (value.length !== 6) return false;
+  const r = parseInt(value.slice(0, 2), 16) / 255;
+  const g = parseInt(value.slice(2, 4), 16) / 255;
+  const b = parseInt(value.slice(4, 6), 16) / 255;
+  const toLinear = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const luminance = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+  return luminance > 0.55;
 }
 
 /** Convenience: does this slug have a real mark? */
