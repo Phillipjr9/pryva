@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AccountsBrowser } from "./AccountsBrowser";
+import { PlatformStrip } from "@/components/PlatformBadge";
 
 export const metadata: Metadata = {
   title: "Verified Digital Accounts — Facebook, Instagram, Gmail & More | Pryva",
@@ -33,6 +34,23 @@ export default function AccountsPage() {
               stock, buy from your wallet, and receive the credentials instantly. If delivery fails, the
               amount returns to your wallet automatically.
             </p>
+            <PlatformStrip
+              className="mt-6"
+              size={30}
+              platforms={[
+                "facebook",
+                "instagram",
+                "gmail",
+                "outlook",
+                "tiktok",
+                "x",
+                "telegram",
+                "discord",
+                "netflix",
+                "spotify",
+              ]}
+            />
+
             <div className="mt-6 flex flex-wrap items-center gap-3 text-[0.82rem] text-ink-3">
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Instant delivery

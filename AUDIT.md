@@ -121,9 +121,9 @@ ratings**, **coupons** (marketplace promos are supplier-side only), **support ti
 
 | # | Missing |
 |---|---|
-| U1 | Dashboard sidebar uses generic line icons for Wallet/Orders/Data/Scheduled/Bulk |
-| U2 | Provider logos (MTN/Airtel/Glo/9mobile) absent — text only |
-| U3 | Platform logos (Facebook, Instagram, TikTok…) absent on `/accounts` |
+| U1 | ~~Dashboard sidebar uses generic line icons for Wallet/Orders/Data/Scheduled/Bulk~~ **Fixed** — 3D product art per nav item |
+| U2 | ~~Provider logos (MTN/Airtel/Glo/9mobile) absent — text only~~ **Fixed** — hand-authored SVG marks (`NetworkBadge`) |
+| U3 | ~~Platform logos (Facebook, Instagram, TikTok…) absent on `/accounts`~~ **Fixed** — hand-authored SVG marks (`PlatformBadge`) on cards + hero strip |
 | U4 | Withdrawal screen still uses default form styling, not the site's design language |
 | U5 | No loading skeletons on most dashboard screens |
 | U6 | Facebook/Instagram hero showcase on the homepage (#10 in PLAN) |
@@ -179,7 +179,7 @@ cream background, in the lavender/violet palette, no baked-in text, every file n
 | `categories/music.png` | ✅ 3D headphones + soundwave |
 | `categories/gaming.png` | ✅ 3D gamepad + dice + joystick |
 | `categories/productivity.png` | ✅ 3D notebook + pencil + sticky notes |
-| `email/hero-*.jpg` (6) | ⏳ unchanged — email headers, next pass |
+| `email/hero-*.jpg` (6) | ✅ already 3D in the last pass — **re-cut this pass** from 1024² squares to 1200×600 banners so the email header reads as a header instead of a full-width square (396 KB total) |
 
 Every digital product now has its **own** artwork (previously Netflix, YouTube and Disney+ all
 shared one category image). The art is original 3D illustration themed around each product rather
@@ -189,6 +189,14 @@ distinct file per service" instead of "no per-service art".
 
 **Optimisation:** centre-cropped to square and resized to 512×512 with PNG optimisation.
 **18 MB → 4.0 MB** across 19 files (−78%) with no visible quality loss at the 20–64 px sizes the UI renders them.
+The six email heroes are 1200×600 at q86 (396 KB for all six, down from 725 KB) and render at 600×300 inside the 600 px email column.
+
+**Brand marks are never AI-generated.** Two hand-authored SVG sets cover the marks that must be
+accurate: `src/components/NetworkBadge.tsx` (MTN / Airtel / Glo / 9mobile — distinct shapes, not one
+generic oval) and `src/components/PlatformBadge.tsx` (Facebook, Instagram, TikTok, Gmail, Outlook,
+X, Telegram, WhatsApp, Discord, YouTube, Netflix, Spotify, Steam). The second one also includes a
+title/category matcher so a live listing titled "Instagram 5k followers" picks up the Instagram mark
+on its card, with a neutral fallback for platforms we don't draw.
 
 ### Code
 
@@ -225,7 +233,7 @@ distinct file per service" instead of "no per-service art".
 6. Styled withdrawal screen.
 
 **Week 3 — credibility & growth**
-7. Remaining images (music/gaming/productivity, provider logos, platform logos, dashboard icons).
+7. ~~Remaining images~~ **Done** — 3D set complete, carrier + platform marks hand-authored. Next art gap: homepage Facebook/Instagram showcase (U6).
 8. Referrals + reviews (the two that move revenue).
 9. CI workflow running `typecheck` + `test` + `build` on every PR.
 

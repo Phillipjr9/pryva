@@ -6,6 +6,7 @@ import { formatNaira } from "@/lib/catalog";
 import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
 import type { PublicUser } from "@/lib/auth";
+import { NetworkBadge } from "@/components/NetworkBadge";
 
 interface DataPlansFormProps {
   user: PublicUser;
@@ -85,12 +86,13 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
                 setSelectedProvider(provider.id);
                 setSelectedPlan(null);
               }}
-              className={`rounded-xl border p-4 text-center transition-colors ${
+              className={`flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-colors ${
                 selectedProvider === provider.id
                   ? "border-lav-600 bg-lav-50 text-lav-700"
                   : "border-line bg-white text-ink hover:bg-cream"
               }`}
             >
+              <NetworkBadge provider={provider.id} size={36} />
               <span className="text-[0.9rem] font-semibold">{provider.name}</span>
             </button>
           ))}
