@@ -15,11 +15,12 @@ export function Monogram({
 }) {
   return (
     <Image
-      src="/pryva-logo.png?v=2"
+      src="/pryva-logo.png?v=3"
       alt="Pryva"
       width={40}
       height={40}
       className={className}
+      style={{ background: 'transparent' }}
     />
   );
 }
@@ -33,13 +34,14 @@ export function Logo({
   const content = (
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
       <Image
-        src="/pryva-logo.png?v=2"
+        src="/pryva-logo.png?v=3"
         alt="Pryva"
         width={36}
         height={36}
         className="h-9 w-9 shrink-0"
         loading="eager"
         priority
+        style={{ background: 'transparent' }}
       />
       {variant === "lockup" && (
         <span className="flex flex-col leading-none">
