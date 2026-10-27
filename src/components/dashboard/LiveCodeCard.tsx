@@ -74,7 +74,13 @@ export function LiveCodeCard({ codes }: { codes: LiveCode[] }) {
   }
 
   return (
-    <section aria-labelledby="live-codes-heading" className="grid gap-2.5">
+    <section
+      aria-labelledby="live-codes-heading"
+      /* One explicit column: a bare `grid` sizes its track from the widest
+         child's min-content (here the phone number plus its countdown chip), so
+         the cards grew past the page and pushed the copy button off-screen. */
+      className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2.5"
+    >
       <div className="flex items-center justify-between">
         <h2 id="live-codes-heading" className="text-[1rem] font-semibold">
           Live now

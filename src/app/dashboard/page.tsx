@@ -96,7 +96,12 @@ export default async function DashboardOverviewPage() {
     }));
 
   return (
-    <div className="grid gap-4">
+    /* A single explicit column. `grid` alone lets the track size itself from a
+       child's min-content, which on a 390px phone resolved to 445px — the card
+       then hung off the right edge and took Withdraw and the copy button with
+       it. minmax(0,1fr) pins the track to the container so overflow has to be
+       handled inside each card, where it can be seen. */
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       {/* 1 — money first, with the two actions attached to it */}
       <BalanceHero
         name={firstName(user.name)}
@@ -121,7 +126,7 @@ export default async function DashboardOverviewPage() {
         />
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
         {/* 3 — recent orders */}
         <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
           <div className="flex items-center justify-between">
@@ -203,7 +208,7 @@ export default async function DashboardOverviewPage() {
       </div>
 
       {/* 5 — the ledger, and a way out if something is wrong */}
-      <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
         <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-[1rem] font-semibold">Wallet activity</h2>
