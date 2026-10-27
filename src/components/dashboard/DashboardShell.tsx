@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/brand/Logo";
+import { CommandPalette, CommandPaletteTrigger } from "@/components/command/CommandPalette";
 import {
   ArrowRight,
   Chat,
@@ -22,6 +23,10 @@ const navItems = [
   { href: "/dashboard", label: "Overview", icon: Grid },
   { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
   { href: "/dashboard/orders", label: "Orders", icon: Receipt },
+  { href: "/dashboard/data", label: "Data Plans", icon: Receipt },
+  { href: "/dashboard/gift-cards", label: "Gift Cards", icon: Sparkle },
+  { href: "/dashboard/bulk-orders", label: "Bulk Orders", icon: Receipt },
+  { href: "/dashboard/scheduled", label: "Scheduled", icon: Receipt },
   { href: "/dashboard/support", label: "Support", icon: Chat },
 ];
 
@@ -61,6 +66,7 @@ export function DashboardShell({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const initials = user.name
     .split(" ")
     .map((part) => part[0])
@@ -185,6 +191,7 @@ export function DashboardShell({
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <CommandPaletteTrigger onClick={() => setCommandPaletteOpen(true)} />
               <Link
                 href="/dashboard/wallet"
                 className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[0.74rem] font-semibold text-ink-2 sm:hidden"
@@ -226,6 +233,8 @@ export function DashboardShell({
           </div>
         </div>
       )}
+
+      <CommandPalette isOpen={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
     </div>
   );
 }
