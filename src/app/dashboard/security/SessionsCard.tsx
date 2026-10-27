@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
+import { Loader2, Shield } from "@/components/icons";
 
 type Session = {
   id: string;
@@ -71,23 +71,34 @@ export function SessionsCard() {
   const others = sessions.filter((session) => !session.isCurrent).length;
 
   return (
-    <div className="rounded-2xl border border-line bg-white p-5">
+    <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 sm:col-span-2">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="text-[1rem] font-semibold text-ink">Active sessions</h3>
-          <p className="mt-1 text-[0.84rem] text-ink-2">
-            Every device currently signed in to your account.
-          </p>
+        <div className="flex items-start gap-2.5">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-lav-50 text-lav-700">
+            <Shield className="h-4 w-4" />
+          </span>
+          <div>
+            <h2 className="text-[0.95rem] font-semibold">Active sessions</h2>
+            <p className="mt-0.5 text-[0.8rem] text-ink-2">
+              Every device currently signed in to this account.
+            </p>
+          </div>
         </div>
         {others > 0 && (
-          <Button
-            variant="secondary"
-            size="sm"
-            loading={busy === "all"}
+          <button
+            type="button"
             onClick={() => void revoke(undefined, true)}
+            disabled={busy === "all"}
+            className="btn border border-line bg-white !px-3 !py-1.5 !text-[0.74rem] text-ink hover:border-lav-200 disabled:opacity-50"
           >
-            Sign out other devices
-          </Button>
+            {busy === "all" ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" /> Signing out…
+              </>
+            ) : (
+              "Sign out other devices"
+            )}
+          </button>
         )}
       </div>
 
@@ -117,18 +128,18 @@ export function SessionsCard() {
               </p>
             </div>
             {!session.isCurrent && (
-              <Button
-                variant="ghost"
-                size="sm"
-                loading={busy === session.id}
+              <button
+                type="button"
                 onClick={() => void revoke(session.id)}
+                disabled={busy === session.id}
+                className="rounded-full px-2.5 py-1 text-[0.72rem] font-semibold text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50"
               >
-                Sign out
-              </Button>
+                {busy === session.id ? "Signing out…" : "Sign out"}
+              </button>
             )}
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

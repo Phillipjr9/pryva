@@ -48,7 +48,8 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "Buy",
     items: [
-      { href: "/accounts", label: "Accounts", art: "accounts" },
+      { href: "/dashboard/accounts", label: "Accounts", art: "accounts" },
+      { href: "/dashboard/digital", label: "Digital", art: "accounts" },
       { href: "/dashboard/data", label: "Data Plans", art: "data" },
       { href: "/dashboard/gift-cards", label: "Gift Cards", art: "gift-cards" },
       { href: "/dashboard/bulk-orders", label: "Bulk Orders", art: "bulk" },
