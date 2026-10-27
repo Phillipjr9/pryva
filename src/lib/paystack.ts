@@ -1,3 +1,5 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
+
 const PAYSTACK_BASE_URL = "https://api.paystack.co";
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || "";
 
@@ -176,8 +178,23 @@ export async function resolveBankAccount(
   return response.json();
 }
 
-export function verifyWebhookSignature(payload: string, signature: string): boolean {
-  const crypto = require("crypto");
-  const hash = crypto.createHmac("sha512", PAYSTACK_SECRET_KEY).update(payload).digest("hex");
-  return hash === signature;
+/**
+ * Paystack signs the raw request body with HMAC-SHA512 using the secret key.
+ *
+ * Fails closed: with no secret key configured there is no way to tell a real
+ * webhook from a forged one, so every webhook is rejected.
+ */
+export function verifyWebhookSignature(payload: string, signature: string | null): boolean {
+  if (!PAYSTACK_SECRET_KEY || !signature) return false;
+
+  const expected = createHmac("sha512", PAYSTACK_SECRET_KEY).update(payload).digest("hex");
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  const providedBuffer = Buffer.from(signature, "utf8");
+
+  if (expectedBuffer.length !== providedBuffer.length) return false;
+  return timingSafeEqual(expectedBuffer, providedBuffer);
+}
+
+export function isPaystackConfigured(): boolean {
+  return Boolean(PAYSTACK_SECRET_KEY);
 }

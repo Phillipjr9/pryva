@@ -118,7 +118,7 @@ const features = [
   },
   {
     title: "Real non-VoIP lines",
-    body: "Carrier-grade numbers from Fleexa's network, not recycled VoIP stock.",
+    body: "Carrier-grade numbers from vetted carrier partners, not recycled VoIP stock.",
     icon: Phone,
     span: "md:col-span-2",
     tone: "white" as const,
@@ -235,7 +235,7 @@ const faqs = [
   },
   {
     q: "Are the virtual numbers real or VoIP?",
-    a: "They are real, carrier-grade numbers sourced through our provider Fleexa. Being non-VoIP is precisely why platforms like WhatsApp, Telegram and Google accept them far more reliably.",
+    a: "They are real, carrier-grade numbers sourced through vetted carrier partners. Being non-VoIP is precisely why platforms like WhatsApp, Telegram and Google accept them far more reliably.",
   },
   {
     q: "Can I keep the same number for longer than one code?",
@@ -1070,7 +1070,7 @@ export default function HomePage() {
                     { label: "Wallet funding", value: "Bank transfer or card, in Naira" },
                     { label: "Delivery", value: "Instant, inside your dashboard" },
                     { label: "Protection", value: "Auto-refund on undelivered codes" },
-                    { label: "Built with", value: "Fleexa for numbers, eSIM, proxies" },
+                    { label: "Infrastructure", value: "Carrier-grade routing for numbers, eSIM, proxies" },
                   ].map((item) => (
                     <div
                       key={item.label}

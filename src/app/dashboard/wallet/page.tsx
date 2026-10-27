@@ -6,13 +6,20 @@ import { walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/catalog";
 import { TopUpForm } from "@/components/dashboard/TopUpForm";
+import { WithdrawalDashboard } from "./WithdrawalDashboard";
+import { TopUpReturn } from "./TopUpReturn";
 import { ArrowRight, Card, Check, Clock, Refresh, Shield, Wallet } from "@/components/icons";
 
 export const metadata: Metadata = { title: "Wallet" };
 export const dynamic = "force-dynamic";
 
-export default async function WalletPage() {
+export default async function WalletPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ topup?: string; reference?: string; trxref?: string }>;
+}) {
   const user = await requireUser("/dashboard/wallet");
+  const params = await searchParams;
 
   const transactions = await db
     .select()
@@ -36,6 +43,8 @@ export default async function WalletPage() {
           Fund in Naira, spend on any Pryva service. Refunds land back here automatically.
         </p>
       </div>
+
+      <TopUpReturn status={params.topup} reference={params.reference ?? params.trxref} />
 
       <div className="grid gap-2.5 sm:grid-cols-3">
         <div className="rounded-2xl bg-ink p-5 text-white">
@@ -140,6 +149,7 @@ export default async function WalletPage() {
           </div>
         </div>
       </div>
+      <WithdrawalDashboard />
     </div>
   );
 }

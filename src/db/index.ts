@@ -253,10 +253,18 @@ function evaluateAggregateExpression(
   return null;
 }
 
-function withLimit<T>(items: T[]): T[] & { limit: (count: number) => T[] } {
+type Pageable<T> = T[] & {
+  limit: (count: number) => Pageable<T>;
+  offset: (start: number) => Pageable<T>;
+};
+
+function withLimit<T>(items: T[]): Pageable<T> {
   return Object.assign([...items], {
     limit(count: number) {
-      return items.slice(0, count);
+      return withLimit(items.slice(0, count));
+    },
+    offset(start: number) {
+      return withLimit(items.slice(start));
     },
   });
 }
@@ -357,7 +365,10 @@ function buildQueryResult(
         return withLimit([aggregateRow]);
       },
       limit(count: number) {
-        return [aggregateRow].slice(0, count);
+        return withLimit([aggregateRow].slice(0, count));
+      },
+      offset() {
+        return withLimit([aggregateRow]);
       },
     });
   }
@@ -369,7 +380,10 @@ function buildQueryResult(
       return withLimit(sorted);
     },
     limit(count: number) {
-      return projected.slice(0, count);
+      return withLimit(projected.slice(0, count));
+    },
+    offset(start: number) {
+      return withLimit(projected.slice(start));
     },
   });
 }
