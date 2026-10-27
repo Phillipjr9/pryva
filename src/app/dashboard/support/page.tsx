@@ -23,7 +23,7 @@ export default async function SupportPage() {
   return (
     <div className="grid gap-4">
       <div>
-        <h1 className="text-[1.5rem] font-medium tracking-tight">Support</h1>
+        <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Support</h1>
         <p className="mt-1 text-[0.86rem] text-ink-2">
           A real person from the Lagos team replies to these messages, usually within two working
           hours.

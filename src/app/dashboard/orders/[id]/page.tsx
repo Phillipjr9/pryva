@@ -1,16 +1,16 @@
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { requireAuth } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { formatNaira } from "@/lib/catalog";
 import Link from "next/link";
 import { ArrowLeft } from "@/components/icons";
 import { CredentialList } from "./CredentialList";
+import { OrderActions } from "@/components/dashboard/OrderActions";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -27,8 +27,7 @@ function parseAccounts(raw: string | null): string[] {
 }
 
 export default async function OrderDetailsPage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await requireAuth();
-  if (!user) redirect("/login?next=/dashboard/orders");
+  const user = await requireUser("/dashboard/orders");
 
   // Credentials live on this page: never cache the HTML anywhere.
   await connection();
@@ -54,8 +53,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
   } as const;
 
   return (
-    <DashboardShell user={user}>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="flex items-center gap-4">
           <Link
             href="/dashboard/orders"
@@ -64,7 +62,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div>
-            <h1 className="text-[1.75rem] font-medium tracking-tight text-ink">
+            <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">
               Order Details
             </h1>
             <p className="text-[0.9rem] text-ink-2">{order.reference}</p>
@@ -163,40 +161,19 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
               </Card>
             )}
 
-            {order.referenceCode && credentials.length === 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Service Details</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div>
-                    <p className="text-[0.82rem] text-ink-3 mb-2">Reference Code</p>
-                    <p className="text-[1.1rem] font-mono font-semibold text-ink">
-                      {order.referenceCode}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {order.otpCode && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>OTP Code</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div>
-                    <p className="text-[0.82rem] text-ink-3 mb-2">Verification Code</p>
-                    <p className="text-[2rem] font-mono font-bold text-lav-600">
-                      {order.otpCode}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
 
           <div className="space-y-6">
+            <OrderActions
+              orderId={order.id}
+              status={order.status}
+              expiresAt={order.expiresAt ? new Date(order.expiresAt).toISOString() : null}
+              amount={order.amount}
+              referenceCode={order.referenceCode ?? null}
+              otpCode={order.otpCode ?? null}
+              service={order.service}
+              provider={order.provider ?? null}
+            />
             <Card>
               <CardHeader>
                 <CardTitle>Timeline</CardTitle>
@@ -228,7 +205,6 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
             </Card>
           </div>
         </div>
-      </div>
-    </DashboardShell>
+    </div>
   );
 }

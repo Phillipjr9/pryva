@@ -38,7 +38,7 @@ export default async function WalletPage({
   return (
     <div className="grid gap-4">
       <div>
-        <h1 className="text-[1.5rem] font-medium tracking-tight">Wallet</h1>
+        <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Wallet</h1>
         <p className="mt-1 text-[0.86rem] text-ink-2">
           Fund in Naira, spend on any Pryva service. Refunds land back here automatically.
         </p>
@@ -149,7 +149,9 @@ export default async function WalletPage({
           </div>
         </div>
       </div>
-      <WithdrawalDashboard />
+      <div id="withdraw" className="scroll-mt-24">
+        <WithdrawalDashboard />
+      </div>
     </div>
   );
 }

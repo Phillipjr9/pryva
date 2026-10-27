@@ -23,7 +23,7 @@ export default async function NotificationsPage() {
     <div className="grid gap-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-[1.5rem] font-medium tracking-tight">Notifications</h1>
+          <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Notifications</h1>
           <p className="mt-1 text-[0.86rem] text-ink-2">
             {unreadCount > 0
               ? `You have ${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
