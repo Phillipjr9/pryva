@@ -5,8 +5,8 @@
 > Copy it freely. Nothing here is dropped — if something is impossible or not mine to decide, it stays on the
 > list with a note.
 >
-> **Last updated:** 2026-10-27 (build repaired + money safety pass 1 + marketplace shipped)
-> **Branch:** `arena/045f0b51-pryva` (based on `main` @ `d9927c1`)
+> **Last updated:** 2026-10-27 (main merged; money paths unified; marketplace shipped)
+> **Branch:** `arena/045f0b51-pryva` (merged up to `main` @ `5153fd4`)
 > **Repo audit method:** every status below was verified by reading files in the checkout — not from memory,
 > not from the earlier chat log.
 
@@ -81,11 +81,11 @@
 | # | Item | Status | Evidence / what's actually left |
 |---|------|--------|--------------------------------|
 | **0** | **The app didn't compile** | ✅ | `tsc --noEmit` had **113 errors across 58 files** and `next build` failed — the merged PR #2/#3 shipped against helpers that don't exist (`fulfillPlan`, `cancelUpstream`, `FleexaError`, `checkFleexaSms`…), a mock DB missing 6 tables, `cookies()` called synchronously, and `db` typed as `any`. All fixed: typecheck **0 errors**, `next build` **passes**, 12 test files / 89 tests **pass**. |
-| **1** | **Paystack webhook no longer mints money** | ✅ | Rewritten: HMAC-SHA512 signature verified against the raw body (fails closed when no secret), `charge.success` handled (was `payment.success`), amounts come only from the signed payload in kobo, crediting is idempotent per reference, `transfer.success/failed` settle withdrawals and auto-refund failures. `verifyWebhookSignature()` now uses `timingSafeEqual`. |
-| **2** | **Top-up verification endpoint** | ✅ | New `POST /api/wallet/topup/verify` — asks Paystack's verify API, checks currency + that the payer email matches the signed-in user, credits once. New `TopUpReturn` client component on `/dashboard/wallet` picks up `?topup=success&reference=…` and refreshes the balance. |
-| **3** | **Admin APIs locked down** | ✅ | New `requireAdminApi()` in `lib/auth.ts` (returns null instead of redirecting). Applied to **all 11** `/api/admin/*` handlers — 8 of them previously had **no auth at all**, the rest only checked "is logged in". |
-| **4** | **Every balance change goes through `debitWallet`/`creditWallet`** | 🟡 | Fixed: `orders/purchase`, `wallet/withdraw`, `digital/purchase` now debit via the atomic helper (balance guard inside the SQL `WHERE`). `airtime/purchase` and `orders/bulk` still do read-modify-write → **remaining work**. |
-| **5** | **Rate-limit auth & payment endpoints** | 🟡 | `lib/rate-limit.ts` exists and is used by the marketplace purchase route; login/signup/demo/topup and the webhook still need it. |
+| **1** | **Paystack webhook no longer mints money** | ✅ | Signature verified against the raw body (fails closed without a secret; constant-time compare). Only `charge.success` credits, and only against a matching `payment_topups` row — status change, credit and ledger row commit together. Unifying pass: a second credit path introduced while this branch was open was removed, so a payment confirmed by both the webhook and the browser callback credits **once** (`lib/topups.ts`). |
+| **2** | **Top-up verification endpoint** | ✅ | `POST /api/wallet/topup/verify` asks Paystack, checks currency and that the payer email matches the signed-in user, then completes the top-up through the same `completeTopUp()` the webhook uses. `TopUpReturn` on `/dashboard/wallet` reads Paystack's `trxref`/`reference` params and refreshes the balance. |
+| **3** | **Admin APIs locked down** | ✅ | Every `/api/admin/*` handler goes through `authorizeAdminApi()` (`lib/admin-auth.ts`): 401 anonymous, 403 non-admin, 403 cross-origin mutation. The demo identity can never be an admin, and admin emails come from `ADMIN_EMAILS` only. |
+| **4** | **Every balance change goes through `debitWallet`/`creditWallet`** | 🟡 | `orders/purchase`, `wallet/withdraw`, `digital/purchase` debit atomically (balance guard in the SQL `WHERE`). `airtime/purchase` and `orders/bulk` still do read-modify-write → **remaining work**. |
+| **5** | **Rate-limit auth & payment endpoints** | 🟡 | `lib/rate-limit.ts` exists; the marketplace purchase route uses it, and top-up/webhook now enforce same-origin + strict validation. Login/signup/demo are still unthrottled. |
 | **6** | **Security headers / CSP** | ⬜ | `next.config.ts` has **no** headers — CSP, HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy all missing. |
 
 ### 🟠 TIER 2 — The accounts marketplace (your R1, R2, R5, R6, R10)
@@ -139,7 +139,7 @@
 | **41** | Dark mode + ⌘K command palette | ✅ | `components/theme/*` and `components/command/CommandPalette.tsx` (mounted in `DashboardShell`). |
 | **42** | PWA (installable, offline, icons) | ⬜ | No `manifest.json`, `sw.js`, `offline.html`, no PWA meta, `public/` only holds images + logo. |
 | **43** | Analytics (GA4 / Web Vitals) | ⬜ | Nothing. |
-| **44** | Automated tests that can actually run | ✅ | Vitest installed + `vitest.config.ts` + `npm test`. **12 files / 89 tests pass**, including new pricing and webhook-signature suites. Two stale assertions were fixed (naira rounding, a date-dependent scheduler test). |
+| **44** | Automated tests that can actually run | ✅ | Vitest installed + `vitest.config.ts` + `npm test`. **22 files / 156 tests pass**, including pricing, webhook-signature, admin-authorization and withdrawal-security suites. |
 | **45** | Security suite: rate limiting, validation, anti-RE, sanitisation | 🟡 | ✅ `rate-limit`, `validation`, `security`, `protection`, `anti-reverse-engineering`, `sanitize`, `logger`, `errors`, `proxy` (middleware), ✅ signed webhook, ✅ admin authz, ✅ constant-time signature compare. ⬜ no `audit.ts` (audit trail), ⬜ no bot detection, ⬜ no CSP (#6). |
 | **46** | Docs: README, RUNBOOK, .env.example, payment-flow doc | 🟡 | ✅ `PLAN.md`, ✅ `.env.example` (all keys documented incl. FX + markup). ⬜ README, ⬜ RUNBOOK, ⬜ payment-flow doc. |
 | **47** | CI/CD, Dockerfile, migrations hygiene | ⬜ | No `.github/`, no Dockerfile. 5 SQL migrations vs 11 tables → still drift. |
@@ -153,8 +153,8 @@
 
 **Stack** — Next.js 16 (App Router) · React 19 · TypeScript · Tailwind 4 · Drizzle ORM + Postgres (mock DB fallback when `DATABASE_URL` is unset) · `canvas-confetti` · `simple-icons` · `pg`.
 
-**Database (11 tables)** — `users`, `sessions`, `orders` (now with an `accounts` credential store), `wallet_transactions`, `contact_messages`, `gift_cards`, `scheduled_orders`, `notifications`, `security_violations`, `withdrawals`, `bank_accounts`.
-Migrations: `001_add_gift_cards`, `002_add_scheduled_orders`, `003_add_security_violations`, `004_add_withdrawals`, `005_add_marketplace_accounts`.
+**Database (12 tables)** — `users`, `sessions`, `orders` (now with an `accounts` credential store), `wallet_transactions`, `contact_messages`, `gift_cards`, `scheduled_orders`, `notifications`, `security_violations`, `withdrawals`, `bank_accounts`.
+Migrations: `001_add_gift_cards`, `002_add_scheduled_orders`, `003_add_security_violations`, `004_add_withdrawals`, `005_create_payment_topups`, `006_add_marketplace_accounts`.
 
 **Public site (18 pages)** — Home, About, Blog, Contact, Digital Services, Email OTP, eSIM, FAQ, Help, How it works, **Accounts (marketplace)**, Pricing, Privacy, Proxies, Status, Terms, Testimonials, Virtual Numbers.
 
@@ -172,7 +172,7 @@ Migrations: `001_add_gift_cards`, `002_add_scheduled_orders`, `003_add_security_
 **UI kit (22)** — Accordion, Alert, Badge, Button, Card, Checkbox, Confetti, DataTable, Dropdown, FaqAccordion, Input, Loading, Modal, PaymentLoading, PaymentSuccess, Reveal, Select, Skeleton, Tabs, Textarea, Toast, Tooltip.
 Plus theme provider/toggle, command palette, site header/footer/nav, auth forms, brand logo, purchase flow.
 
-**Tests** — 12 files / 89 assertions, runnable via `npm test` (vitest).
+**Tests** — 22 files / 156 assertions, runnable via `npm test` (vitest).
 
 **Assets** — brand logo, 13 service images, 4 category images, 6 email heroes.
 
@@ -251,6 +251,7 @@ Verified facts:
 | 2026-10-27 | **Money safety pass 1.** Webhook signature + `charge.success` + idempotency; new top-up verify route + client; `requireAdminApi()` on all 11 admin routes; atomic debits for orders/withdrawals/digital; withdrawal UI wired up; demo-login cookie bug fixed. | #1, #2, #3, #4 (partial) |
 | 2026-10-27 | **Marketplace built.** Supplier client, FX with cache/fallback, pricing engine (markup + premiums + volume + floor), migration 005, four neutral `/api/accounts/*` routes, `/accounts` browse+buy UI with promo codes, credential viewer on order detail, supplier-name purge. | #7–#13 |
 | 2026-10-27 | **Tests run.** Vitest + config + `npm test`: 12 files / 89 tests green, incl. new pricing (8) and webhook-signature (2) suites. | #44 |
+| 2026-10-27 | **Merged `main` (PR #4, `5153fd4`) and unified the money paths.** Both branches had fixed the same holes; kept main's `payment_topups` model and `authorizeAdminApi()`, re-applied the marketplace on top. Found and closed a **double-credit window** created by the merge (webhook and browser callback each credited). Renumbered this branch's migration to `006`, restored mock-DB `.offset()` for withdrawal history, put `Accounts` back in the nav. 22 files / 156 tests green. | #1–#3, #44 |
 
 ---
 
