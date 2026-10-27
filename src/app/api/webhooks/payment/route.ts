@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, sql } from "drizzle-orm";
-import { db } from "@/db";
-import { paymentTopups, users, walletTransactions } from "@/db/schema";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { verifyPaystackSignature } from "@/lib/paystack-webhook";
+import { completeTopUp } from "@/lib/topups";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
-
-class PaymentMismatchError extends Error {}
 
 /** Verify the raw Paystack payload and credit only a matching pending top-up. */
 export async function POST(request: NextRequest) {
@@ -62,54 +58,16 @@ export async function POST(request: NextRequest) {
   const amount = kobo / 100;
 
   try {
-    const result = await db.transaction(async (tx) => {
-      // The conditional update serializes concurrent deliveries of the same
-      // event. The status change, wallet credit and ledger row all commit or
-      // roll back together.
-      const [topup] = await tx
-        .update(paymentTopups)
-        .set({ status: "completed", paidAt: new Date() })
-        .where(and(
-          eq(paymentTopups.reference, reference),
-          eq(paymentTopups.userId, userId),
-          eq(paymentTopups.amount, amount),
-          eq(paymentTopups.status, "pending"),
-        ))
-        .returning();
+    const result = await completeTopUp({ reference, userId, amount });
 
-      if (!topup) {
-        const [previous] = await tx.select().from(paymentTopups)
-          .where(eq(paymentTopups.reference, reference)).limit(1);
-        if (previous?.status === "completed" && previous.userId === userId && previous.amount === amount) {
-          return "duplicate" as const;
-        }
-        throw new PaymentMismatchError("No matching pending top-up");
-      }
-
-      const [updatedUser] = await tx.update(users)
-        .set({ walletBalance: sql`${users.walletBalance} + ${amount}` })
-        .where(eq(users.id, userId))
-        .returning({ balance: users.walletBalance });
-      if (!updatedUser) throw new Error("Top-up user not found");
-
-      await tx.insert(walletTransactions).values({
-        userId,
-        type: "credit",
-        amount,
-        balanceAfter: updatedUser.balance,
-        description: "Paystack wallet top-up",
-        reference,
-      });
-      return "credited" as const;
-    });
+    if (result === "mismatch") {
+      logger.warn("Paystack event did not match a pending top-up", { reference });
+      return NextResponse.json({ error: "Payment does not match a pending top-up" }, { status: 400 });
+    }
 
     logger.info("Paystack webhook processed", { reference, result });
     return NextResponse.json({ ok: true, duplicate: result === "duplicate" });
   } catch (error) {
-    if (error instanceof PaymentMismatchError) {
-      logger.warn("Paystack event did not match a pending top-up", { reference });
-      return NextResponse.json({ error: "Payment does not match a pending top-up" }, { status: 400 });
-    }
     logger.error("Payment webhook processing failed", { error, reference });
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
   }

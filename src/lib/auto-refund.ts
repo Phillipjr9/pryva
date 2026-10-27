@@ -3,6 +3,7 @@ import { orders, walletTransactions, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { isTimedOut } from "./service-timeouts";
 import { isRefundEligible } from "./gift-cards";
+import type { Transaction } from "@/lib/db-types";
 
 export async function processAutoRefunds(): Promise<number> {
   const pendingOrders = await db.query.orders.findMany({
@@ -24,7 +25,7 @@ export async function processAutoRefunds(): Promise<number> {
       }
 
       // Process refund
-      await db.transaction(async (tx: typeof db) => {
+      await db.transaction(async (tx: Transaction) => {
         const user = await tx.query.users.findFirst({
           where: eq(users.id, order.userId),
         });

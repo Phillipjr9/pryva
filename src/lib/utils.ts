@@ -6,6 +6,11 @@ type ClassValue =
   | Record<string, boolean>
   | ClassValue[];
 
+/** Naira formatter used by the withdrawal screens. */
+export function formatCurrency(value: number): string {
+  return `₦${new Intl.NumberFormat("en-NG", { maximumFractionDigits: 0 }).format(Number(value) || 0)}`;
+}
+
 export function cn(...classes: ClassValue[]): string {
   const output: string[] = [];
 

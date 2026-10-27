@@ -1,8 +1,8 @@
 /* eslint-disable @next/next/no-page-custom-font -- fonts are loaded once in the shared App Router root layout. */
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { ToastProvider } from "@/components/ui/Toast";
 import "./globals.css";
+import { ToastProvider } from "@/components/ui/Toast";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://pryva.ng"),

@@ -5,7 +5,10 @@ import { services } from "@/lib/catalog";
 const columns = [
   {
     title: "Services",
-    links: services.map((service) => ({ href: service.href, label: service.name })),
+    links: [
+      { href: "/accounts", label: "Digital accounts" },
+      ...services.map((service) => ({ href: service.href, label: service.name })),
+    ],
   },
   {
     title: "Company",
@@ -77,7 +80,7 @@ export function SiteFooter() {
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/80 px-2.5 py-1.5">
                 <Shield className="h-3.5 w-3.5 text-lav-600" />
-                Powered by Fleexa
+                Instant delivery
               </span>
             </div>
           </div>

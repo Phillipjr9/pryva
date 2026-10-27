@@ -51,6 +51,8 @@ export const orders = pgTable(
     providerRequestId: varchar("provider_request_id", { length: 160 }),
     referenceCode: text("reference_code"),
     otpCode: varchar("otp_code", { length: 12 }),
+    /** JSON array of delivered credential strings (marketplace accounts only). */
+    accounts: text("accounts"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     refundedAt: timestamp("refunded_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
