@@ -5,10 +5,13 @@ import { services } from "@/lib/catalog";
 const columns = [
   {
     title: "Services",
+    // Accounts first, then the catalogue — de-duplicated because `services`
+    // also contains the accounts entry (a duplicate React key used to be
+    // logged for "/accounts" on every page).
     links: [
       { href: "/accounts", label: "Digital accounts" },
       ...services.map((service) => ({ href: service.href, label: service.name })),
-    ],
+    ].filter((link, index, all) => all.findIndex((entry) => entry.href === link.href) === index),
   },
   {
     title: "Company",

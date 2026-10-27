@@ -117,6 +117,18 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
   return toPublicUser(row.user);
 }
 
+/**
+ * API-safe auth check.
+ *
+ * `requireAuth()` calls `redirect()`, which throws NEXT_REDIRECT. Inside a route
+ * handler that becomes a 500 (or a 307 to an HTML page for `fetch` callers),
+ * never the 401 JSON a client can act on. Every `/api/*` route must use this
+ * instead and return its own 401.
+ */
+export async function requireAuthApi(): Promise<PublicUser | null> {
+  return getCurrentUser();
+}
+
 export async function requireAuth(
   requestOrPath?: Request | string,
   nextPath = "/dashboard",

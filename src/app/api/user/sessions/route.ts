@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { sessions } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { cookies } from "next/headers";
-import { SESSION_COOKIE, requireAuth } from "@/lib/auth";
+import { SESSION_COOKIE, getCurrentUser } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,9 @@ export const dynamic = "force-dynamic";
 // GET /api/user/sessions - List user's active sessions
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
+    // `requireAuth()` redirects (it throws NEXT_REDIRECT inside a route
+    // handler and turns into a 500). API callers need a 401.
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -46,7 +48,9 @@ export async function GET(request: NextRequest) {
 // DELETE /api/user/sessions - Revoke a session
 export async function DELETE(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
+    // `requireAuth()` redirects (it throws NEXT_REDIRECT inside a route
+    // handler and turns into a 500). API callers need a 401.
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

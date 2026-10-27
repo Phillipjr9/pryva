@@ -1,13 +1,13 @@
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthApi } from "@/lib/auth";
 import { createScheduledOrder, getUserScheduledOrders, pauseScheduledOrder, resumeScheduledOrder, cancelScheduledOrder } from "@/lib/scheduled-orders";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
+    const user = await requireAuthApi();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
+    const user = await requireAuthApi();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
+    const user = await requireAuthApi();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

@@ -2,7 +2,7 @@ import { isPreviewDatabase } from "@/lib/demo-policy";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthApi } from "@/lib/auth";
 import { findDataPlan } from "@/lib/airtime";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
 import {
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   let userId: string | null = null;
 
   try {
-    const user = await requireAuth(request);
+    const user = await requireAuthApi();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

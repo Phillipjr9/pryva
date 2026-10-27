@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { bankAccounts } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthApi } from "@/lib/auth";
 import { resolveBankAccount, createTransferRecipient } from "@/lib/paystack";
 import { logger } from "@/lib/logger";
 
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
+    const user = await requireAuthApi();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
+    const user = await requireAuthApi();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
+    const user = await requireAuthApi();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

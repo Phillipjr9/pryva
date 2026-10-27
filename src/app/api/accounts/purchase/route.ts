@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthApi } from "@/lib/auth";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
 import { debitWallet, creditWallet, makeReference, InsufficientFundsError } from "@/lib/wallet";
 import {
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Accounts are temporarily unavailable." }, { status: 503 });
   }
 
-  const user = await requireAuth(request);
+  const user = await requireAuthApi();
   if (!user) {
     return NextResponse.json({ error: "Please sign in to buy accounts." }, { status: 401 });
   }

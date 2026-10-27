@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { AccsZoneError, isAccsZoneConfigured, validatePromo } from "@/lib/accszone";
 import { getListing } from "@/lib/accszone";
 import { applyPromoDiscount, priceMarketplaceListing } from "@/lib/marketplace-pricing";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthApi } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ valid: false, message: "Promo codes are unavailable right now." }, { status: 200 });
   }
 
-  const user = await requireAuth(request);
+  const user = await requireAuthApi();
   if (!user) {
     return NextResponse.json({ error: "Please sign in to use a promo code." }, { status: 401 });
   }
