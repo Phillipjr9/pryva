@@ -1,4 +1,13 @@
-export type ServiceSlug = "numbers" | "esim" | "proxies" | "email-otp" | "data" | "gift-cards" | "bulk" | "scheduled";
+export type ServiceSlug =
+  | "numbers"
+  | "esim"
+  | "proxies"
+  | "email-otp"
+  | "accounts"
+  | "data"
+  | "gift-cards"
+  | "bulk"
+  | "scheduled";
 
 export type ServiceKey = ServiceSlug;
 
@@ -41,7 +50,7 @@ export type Service = {
   intro: string;
   fromPrice: number;
   unit: string;
-  icon: "phone" | "sim" | "globe" | "mail" | "gift" | "package" | "calendar";
+  icon: "phone" | "sim" | "globe" | "mail" | "accounts" | "gift" | "package" | "calendar";
   highlights: { title: string; body: string }[];
   included: string[];
   goodFor: string[];
@@ -236,6 +245,52 @@ export const services: Service[] = [
       {
         q: "Is this a catch-all domain?",
         a: "Each inbox gets a unique Pryva address on a dedicated domain. You can create multiple inboxes and label them per project.",
+      },
+    ],
+  },
+  {
+    slug: "accounts",
+    name: "Digital Accounts",
+    shortName: "Accounts",
+    href: "/accounts",
+    eyebrow: "Marketplace",
+    tagline: "Verified accounts, ready in seconds.",
+    description:
+      "Facebook, Instagram, Gmail, TikTok, gaming and streaming accounts — live stock, Naira pricing and instant credential delivery from your wallet.",
+    intro:
+      "The fastest way to get a working account. Browse live stock by category, buy with your Pryva wallet and receive the credentials immediately. If a seller can't deliver, the amount returns to your wallet automatically.",
+    fromPrice: 800,
+    unit: "per account",
+    icon: "accounts",
+    highlights: [
+      {
+        title: "Every category",
+        body: "Facebook, Instagram, Gmail, Outlook, TikTok, gaming and streaming — one catalogue.",
+      },
+      {
+        title: "Live stock counts",
+        body: "See exactly how many are available before you buy. Bundles up to 50 with volume discounts.",
+      },
+      {
+        title: "Refund if it fails",
+        body: "Credentials not delivered? The full amount goes back to your wallet automatically.",
+      },
+    ],
+    included: [
+      "Live stock and instant delivery",
+      "Naira pricing from your wallet",
+      "Volume discounts on 5, 10 and 25+ accounts",
+      "Automatic refund if delivery fails",
+    ],
+    goodFor: ["Marketing teams", "Social managers", "Testing", "Resellers"],
+    faqs: [
+      {
+        q: "How are the credentials delivered?",
+        a: "Straight to the screen and your order history the moment the payment clears. Copy them with one tap.",
+      },
+      {
+        q: "What if an account doesn't work?",
+        a: "If the seller fails to deliver, your wallet is refunded automatically — you don't need to ask.",
       },
     ],
   },
@@ -601,6 +656,7 @@ export const serviceIcons: Record<ServiceSlug, string> = {
   esim: "sim",
   proxies: "globe",
   "email-otp": "mail",
+  accounts: "accounts",
   data: "phone",
   "gift-cards": "gift",
   bulk: "package",

@@ -23,7 +23,8 @@ const columns = [
     title: "Support",
     links: [
       { href: "/contact", label: "Contact support" },
-      { href: "/contact#refunds", label: "Refund policy" },
+      { href: "/refund-policy", label: "Refund policy" },
+      { href: "/cookie-policy", label: "Cookie policy" },
       { href: "/login", label: "Sign in" },
       { href: "/signup", label: "Create account" },
     ],
