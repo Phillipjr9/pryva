@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Card, Shield, Check } from "@/components/icons";
 import { services } from "@/lib/catalog";
+import { BrandLockup } from "@/components/brand/BrandLockup";
 
 const columns = [
   {
@@ -89,7 +90,26 @@ export function SiteFooter() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
+          <div className="mt-10 flex flex-col gap-3 border-t border-line/70 pt-8 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <BrandLockup size="md" />
+              <p className="mt-2 max-w-xs text-[0.82rem] leading-relaxed text-ink-2">
+                Nigerian digital services — numbers, data, proxies and accounts, priced in Naira.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 text-[0.76rem] text-ink-3">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/80 px-2.5 py-1.5">
+                <Shield className="h-3.5 w-3.5 text-lav-600" />
+                Paystack secured
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/80 px-2.5 py-1.5">
+                <Check className="h-3.5 w-3.5 text-lav-600" />
+                Naira only
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-8 grid grid-cols-2 gap-8 sm:grid-cols-3">
             {columns.map((column) => (
               <div key={column.title}>
                 <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-ink-3">

@@ -17,6 +17,7 @@ import {
   Wallet,
 } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
+import { BrandLockup } from "@/components/brand/BrandLockup";
 import { formatNaira } from "@/lib/catalog";
 
 /**
@@ -92,7 +93,8 @@ export function DashboardShell({
 
   const sidebar = (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-end lg:hidden">
+      <div className="flex items-center justify-between lg:hidden">
+        <BrandLockup size="sm" />
         <button
           type="button"
           onClick={() => setOpen(false)}
@@ -101,6 +103,10 @@ export function DashboardShell({
         >
           <Close className="h-4 w-4" />
         </button>
+      </div>
+
+      <div className="mt-5 hidden lg:block">
+        <BrandLockup size="sm" />
       </div>
 
       <Link
@@ -199,6 +205,9 @@ export function DashboardShell({
               >
                 <Menu className="h-4 w-4" />
               </button>
+              <span className="lg:hidden">
+                <BrandLockup size="xs" />
+              </span>
               <div>
                 <p className="text-[0.68rem] uppercase tracking-[0.16em] text-ink-3">Dashboard</p>
                 <p className="text-[0.88rem] font-semibold leading-tight text-ink">

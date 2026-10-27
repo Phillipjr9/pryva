@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowRight, ChevronDown, Close, Menu } from "@/components/icons";
 import { formatNaira, services } from "@/lib/catalog";
+import { BrandLockup } from "@/components/brand/BrandLockup";
 
 type NavUser = { name: string; walletBalance: number } | null;
 
@@ -57,7 +58,9 @@ export function HeaderNav({ user }: { user: NavUser }) {
             : "border-b border-transparent bg-transparent"
         }`}
       >
-      <div className="shell flex h-[74px] items-center justify-between gap-4">
+      <div className="shell flex h-[66px] items-center gap-3 sm:h-[74px] sm:gap-5">
+        <BrandLockup size="sm" priority />
+
         <nav className="hidden items-center gap-1 lg:flex">
           <div className="relative" ref={dropdownRef}>
             <button
@@ -120,7 +123,7 @@ export function HeaderNav({ user }: { user: NavUser }) {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-2.5 lg:flex">
+        <div className="ml-auto hidden items-center gap-2.5 lg:flex">
           {user ? (
             <>
               <Link
@@ -164,7 +167,8 @@ export function HeaderNav({ user }: { user: NavUser }) {
 
       {open && (
         <div className="fixed inset-0 z-[60] bg-cream lg:hidden">
-          <div className="shell flex h-[74px] items-center justify-between">
+          <div className="shell flex h-[66px] items-center justify-between sm:h-[74px]">
+            <BrandLockup size="sm" />
             <button
               type="button"
               onClick={() => setOpen(false)}
