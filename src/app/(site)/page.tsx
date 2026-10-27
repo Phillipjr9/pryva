@@ -29,6 +29,7 @@ import {
 import { formatNaira, plansFor, services } from "@/lib/catalog";
 import { CountryFlag } from "@/components/CountryFlag";
 import { hasCountryFlag } from "@/lib/countries";
+import { BrandMark } from "@/components/brand/BrandLockup";
 
 export const metadata: Metadata = {
   title: "Pryva — Virtual numbers, eSIMs and proxies for Nigeria",
@@ -240,192 +241,153 @@ export default function HomePage() {
   return (
     <>
       {/* ---------- HERO ---------- */}
-      <section className="relative grain overflow-hidden pb-16 pt-10 sm:pt-16">
-        <div className="pointer-events-none absolute left-[-12rem] top-[-6rem] h-[30rem] w-[30rem] rounded-full bg-lav-200/45 blur-[110px]" />
-        <div className="pointer-events-none absolute right-[-8rem] top-[16rem] h-[26rem] w-[26rem] rounded-full bg-peach/50 blur-[100px]" />
+      <section className="relative overflow-hidden pb-10 pt-5 sm:pb-16 sm:pt-12">
+        {/* soft brand glows, kept behind everything and cheap to paint on phones */}
+        <div className="pointer-events-none absolute -left-32 -top-24 h-[22rem] w-[22rem] rounded-full bg-lav-200/50 blur-[90px]" />
+        <div className="pointer-events-none absolute -right-24 top-56 h-[20rem] w-[20rem] rounded-full bg-peach/40 blur-[90px]" />
 
         <div className="shell relative">
-          <div className="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr]">
-            <div>
+          <div className="grid items-center gap-8 sm:gap-12 lg:grid-cols-[1.03fr_0.97fr] lg:gap-14">
+            {/* --- copy --- */}
+            <div className="text-center lg:text-left">
               <Reveal>
-                <span className="inline-flex items-center gap-2 rounded-full border border-lav-200 bg-white/70 px-3.5 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-lav-700 backdrop-blur">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="absolute inline-flex h-full w-full animate-ring rounded-full bg-lav-500" />
-                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-lav-600" />
-                  </span>
-                  Simple. Secure. Scalable.
+                <span className="inline-flex items-center gap-2 rounded-full border border-lav-200 bg-white/75 py-1 pl-1 pr-3 text-[0.64rem] font-semibold uppercase tracking-[0.12em] text-lav-700 backdrop-blur sm:text-[0.68rem]">
+                  <BrandMark size="xs" />
+                  Pryva · Nigerian digital services
                 </span>
               </Reveal>
 
-              <Reveal delay={80}>
-                <h1 className="mt-6 text-[clamp(2.25rem,6vw,3.9rem)] font-medium leading-[1.03] tracking-[-0.035em]">
-                  Numbers, data and
-                  <br className="hidden sm:block" /> proxies —{" "}
+              <Reveal delay={70}>
+                <h1 className="mt-5 text-[clamp(2rem,8.2vw,3.9rem)] font-medium leading-[1.04] tracking-[-0.035em] sm:mt-6">
+                  Numbers, data and proxies
+                  <br className="hidden sm:block" />{" "}
                   <span className="text-display italic text-lav-700">without the friction.</span>
                 </h1>
               </Reveal>
 
-              <Reveal delay={140}>
-                <p className="mt-6 max-w-xl text-[1rem] leading-relaxed text-ink-2 sm:text-[1.06rem]">
-                  Pryva is the calm way for Nigerians to verify accounts, stay connected abroad and
-                  run research. Real virtual numbers, eSIM data, residential proxies and temporary
-                  inboxes — all paid in Naira, delivered in seconds.
+              <Reveal delay={130}>
+                <p className="mx-auto mt-4 max-w-xl text-[0.95rem] leading-relaxed text-ink-2 sm:mt-6 sm:text-[1.05rem] lg:mx-0">
+                  Real virtual numbers, eSIM data, residential proxies and temporary inboxes — priced
+                  in Naira, delivered in seconds, refunded automatically when a code never arrives.
                 </p>
               </Reveal>
 
-              <Reveal delay={200}>
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <Link href="/signup" className="btn btn-primary !px-6 !py-3.5">
+              <Reveal delay={190}>
+                <div className="mt-6 flex flex-col gap-2.5 sm:mt-8 sm:flex-row sm:items-center sm:justify-center lg:justify-start">
+                  <Link
+                    href="/signup"
+                    className="btn btn-primary w-full !py-4 !text-[0.95rem] sm:w-auto sm:!px-6 sm:!py-3.5"
+                  >
                     Create your account
                     <ArrowRight className="h-4 w-4" />
                   </Link>
-                  <Link href="/pricing" className="btn btn-ghost !px-6 !py-3.5">
+                  <Link
+                    href="/pricing"
+                    className="btn btn-ghost w-full !py-4 !text-[0.95rem] sm:w-auto sm:!px-6 sm:!py-3.5"
+                  >
                     Explore services
                     <ArrowUpRight className="h-4 w-4" />
                   </Link>
                 </div>
               </Reveal>
 
-              <Reveal delay={260}>
-                <ul className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-[0.8rem] text-ink-2">
-                  {[
-                    "Instant delivery",
-                    "Auto-refund if no code",
-                    "Real non-VoIP numbers",
-                  ].map((item) => (
+              <Reveal delay={240}>
+                <ul className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[0.78rem] text-ink-2 sm:mt-7 sm:gap-x-5 sm:text-[0.8rem] lg:justify-start">
+                  {["Instant delivery", "Auto-refund if no code", "Real non-VoIP numbers"].map((item) => (
                     <li key={item} className="inline-flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-lav-600" />
+                      <Check className="h-3.5 w-3.5 shrink-0 text-lav-600" />
                       {item}
                     </li>
                   ))}
                 </ul>
               </Reveal>
 
-              <Reveal delay={320}>
-                <div className="mt-9 flex items-center gap-4 border-t border-line/80 pt-5">
+              <Reveal delay={290}>
+                <div className="mt-6 flex items-center justify-center gap-3 border-t border-line/70 pt-5 sm:mt-7 lg:justify-start">
                   <div className="flex -space-x-2.5">
-                    {PHOTOS.socialProof.map((photo) => (
+                    {PHOTOS.socialProof.slice(0, 4).map((photo) => (
                       <Image
                         key={photo.url}
                         src={photo.url}
                         alt={photo.alt}
                         width={72}
                         height={72}
-                        className="h-9 w-9 rounded-full border-2 border-cream object-cover shadow-sm"
+                        className="h-8 w-8 rounded-full border-2 border-cream object-cover shadow-sm sm:h-9 sm:w-9"
                       />
                     ))}
                   </div>
-                  <div>
+                  <div className="text-left">
                     <div className="flex items-center gap-1 text-lav-500">
                       {Array.from({ length: 5 }).map((_, index) => (
                         <Star key={index} className="h-3 w-3" />
                       ))}
                       <span className="ml-1 text-[0.72rem] font-semibold text-ink">4.9/5</span>
                     </div>
-                    <p className="text-[0.74rem] text-ink-3">
-                      4,200+ numbers delivered · Lagos, Abuja, Port Harcourt
+                    <p className="text-[0.72rem] text-ink-3 sm:text-[0.74rem]">
+                      4,200+ numbers delivered across Nigeria
                     </p>
                   </div>
                 </div>
               </Reveal>
             </div>
 
-            {/* hero visual */}
-            <Reveal delay={180} className="relative">
-              <div className="relative mx-auto max-w-[26rem] lg:max-w-[30rem]">
-                <div className="absolute inset-x-6 top-8 bottom-24 rounded-[2.5rem] bg-gradient-to-br from-lav-200/70 via-white/40 to-peach/50 blur-[2px]" />
+            {/* --- visual --- */}
+            <Reveal delay={160} className="relative">
+              <div className="relative mx-auto w-full max-w-[21rem] sm:max-w-[26rem] lg:max-w-[30rem]">
+                <div className="absolute inset-x-5 top-6 bottom-20 rounded-[2.5rem] bg-gradient-to-br from-lav-300/60 via-white/30 to-peach/50 blur-sm" />
 
-                <div className="relative overflow-hidden rounded-[2.1rem] border border-white shadow-[var(--shadow-float)]">
+                <div className="relative overflow-hidden rounded-[1.75rem] border border-white shadow-[var(--shadow-float)] sm:rounded-[2.1rem]">
                   <Image
                     src={PHOTOS.hero.url}
                     alt={PHOTOS.hero.alt}
                     width={1080}
                     height={1260}
                     priority
-                    className="aspect-[4/4.4] w-full object-cover sm:aspect-[4/4.25] lg:aspect-[4/4.6]"
+                    sizes="(max-width: 640px) 88vw, (max-width: 1024px) 26rem, 30rem"
+                    className="aspect-[4/4.3] w-full object-cover sm:aspect-[4/4.25] lg:aspect-[4/4.6]"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-ink/25 via-transparent to-transparent" />
-                  <div className="absolute inset-0 bg-gradient-to-br from-lav-200/20 via-transparent to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-ink/35 via-transparent to-transparent" />
 
-                  <span className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/85 px-3 py-2 shadow-sm backdrop-blur-md sm:left-5 sm:top-5">
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="absolute inline-flex h-full w-full animate-ring rounded-full bg-emerald-500" />
-                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-600" />
-                    </span>
-                    <span className="text-[0.66rem] font-semibold text-ink">
+                  {/* status pill */}
+                  <span className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/90 py-1.5 pl-2 pr-2.5 shadow-sm backdrop-blur-md sm:left-4 sm:top-4">
+                    <BrandMark size="xs" />
+                    <span className="text-[0.62rem] font-semibold text-ink sm:text-[0.66rem]">
                       Adaeze · Surulere — verified in 9s
                     </span>
                   </span>
 
-                </div>
-
-                {/* floating wallet card */}
-                <div className="absolute -left-1 top-14 z-20 hidden w-[9.5rem] rounded-2xl border border-white bg-white/95 p-3.5 shadow-[var(--shadow-soft)] backdrop-blur sm:block lg:-left-4">
-                  <div className="flex items-center justify-between">
-                    <Wallet className="h-4 w-4 text-lav-600" />
-                    <span className="text-[0.55rem] font-semibold text-emerald-600">Funded</span>
-                  </div>
-                  <p className="mt-2 text-[0.55rem] uppercase tracking-[0.12em] text-ink-3">
-                    Wallet balance
-                  </p>
-                  <p className="text-[0.95rem] font-semibold">{formatNaira(12500)}</p>
-                </div>
-
-                <div className="relative z-10 -mt-24 mx-3 rounded-[1.75rem] border border-white/90 bg-white/85 p-5 shadow-[var(--shadow-float)] backdrop-blur-xl sm:-mt-28 sm:mx-5 lg:ml-8 lg:-mr-2">
-                  <div className="flex items-center justify-between">
-                    <span className="inline-flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-ink-3">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                      Live verification
-                    </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-lav-50 px-2 py-1 text-[0.62rem] font-semibold text-lav-700">
-                      <Clock className="h-2.5 w-2.5" /> 00:19
-                    </span>
-                  </div>
-
-                  <div className="mt-4 rounded-2xl border border-line bg-cream/70 p-4">
+                  {/* one card on phones keeps the story without the clutter */}
+                  <div className="absolute inset-x-2.5 bottom-2.5 rounded-[1.25rem] border border-white/90 bg-white/95 p-3 shadow-[var(--shadow-soft)] backdrop-blur-xl sm:inset-x-3 sm:bottom-3 sm:p-4">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-[1rem] shadow-sm">
-                          🇳🇬
-                        </span>
-                        <div>
-                          <p className="text-[0.92rem] font-semibold tracking-tight">
+                      <span className="inline-flex items-center gap-1.5 text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-ink-3">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                        Live verification
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-lav-50 px-2 py-0.5 text-[0.58rem] font-semibold text-lav-700">
+                        <Clock className="h-2.5 w-2.5" /> 00:19
+                      </span>
+                    </div>
+
+                    <div className="mt-2.5 flex items-center justify-between rounded-xl border border-line bg-cream/70 px-2.5 py-2">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <CountryFlag code="ng" size={24} decorative />
+                        <div className="min-w-0">
+                          <p className="truncate text-[0.82rem] font-semibold tracking-tight">
                             +234 812 445 9081
                           </p>
-                          <p className="text-[0.68rem] text-ink-3">
+                          <p className="truncate text-[0.62rem] text-ink-3">
                             Nigeria · non-VoIP · WhatsApp ready
                           </p>
                         </div>
                       </div>
-                      <Copy className="h-4 w-4 text-ink-3" />
+                      <Copy className="h-3.5 w-3.5 shrink-0 text-ink-3" />
                     </div>
-                  </div>
 
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {["WhatsApp", "Telegram", "Google", "Binance"].map((platform) => (
-                      <span
-                        key={platform}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-2.5 py-1 text-[0.64rem] font-medium text-ink-2"
-                      >
-                        {platform}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="mt-4 rounded-2xl bg-gradient-to-br from-lav-50 to-white p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-lav-700">
-                        Verification code
-                      </p>
-                      <span className="inline-flex items-center gap-1 text-[0.65rem] font-medium text-emerald-600">
-                        <Check className="h-3 w-3" /> Arrived in 12s
-                      </span>
-                    </div>
-                    <div className="mt-3 flex gap-1.5">
+                    <div className="mt-2.5 flex gap-1">
                       {["4", "8", "2", "0", "6", "9"].map((digit, index) => (
                         <span
                           key={index}
-                          className={`grid h-10 flex-1 place-items-center rounded-lg border text-[1rem] font-semibold ${
+                          className={`grid h-8 flex-1 place-items-center rounded-md border text-[0.85rem] font-semibold sm:h-9 sm:text-[0.95rem] ${
                             index === 5
                               ? "border-lav-400 bg-white text-lav-700 shadow-sm"
                               : "border-line bg-white/80 text-ink"
@@ -436,30 +398,19 @@ export default function HomePage() {
                       ))}
                     </div>
                   </div>
-
-                  <div className="mt-3 flex items-center justify-between rounded-xl bg-ink px-3.5 py-2.5 text-white">
-                    <span className="text-[0.72rem] font-medium">Auto-refund protection</span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[0.6rem] font-semibold">
-                      <Shield className="h-2.5 w-2.5" /> Active
-                    </span>
-                  </div>
                 </div>
 
-                {/* floating eSIM card */}
-                <div className="animate-floaty absolute -bottom-7 right-0 z-20 w-[10.5rem] rounded-2xl border border-white bg-white/95 p-3.5 shadow-[var(--shadow-soft)] backdrop-blur sm:right-2">
+                {/* floating wallet card, desktop only — phones stay calm */}
+                <div className="absolute -right-3 top-16 z-20 hidden w-[10rem] rounded-2xl border border-white bg-white/95 p-3 shadow-[var(--shadow-soft)] backdrop-blur md:block">
                   <div className="flex items-center justify-between">
-                    <Sim className="h-4 w-4 text-lav-600" />
-                    <span className="text-[0.55rem] font-bold uppercase tracking-[0.12em] text-ink-3">
-                      eSIM
-                    </span>
+                    <Wallet className="h-4 w-4 text-lav-600" />
+                    <span className="text-[0.55rem] font-semibold text-emerald-600">Funded</span>
                   </div>
-                  <p className="mt-2 text-[0.78rem] font-semibold">Europe · 5GB</p>
-                  <p className="text-[0.62rem] text-ink-3">Installed · 30 days</p>
-                  <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-lav-100">
-                    <div className="h-full w-[72%] rounded-full bg-gradient-to-r from-lav-400 to-lav-600" />
-                  </div>
+                  <p className="mt-1.5 text-[0.55rem] uppercase tracking-[0.12em] text-ink-3">
+                    Wallet balance
+                  </p>
+                  <p className="text-[0.95rem] font-semibold">{formatNaira(12500)}</p>
                 </div>
-
               </div>
             </Reveal>
           </div>
@@ -513,7 +464,7 @@ export default function HomePage() {
       </section>
 
       {/* ---------- SERVICES ---------- */}
-      <section className="py-20 sm:py-24">
+      <section className="py-14 sm:py-24">
         <div className="shell">
           <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div className="max-w-2xl">
@@ -544,14 +495,18 @@ export default function HomePage() {
             </Reveal>
           </div>
 
-          <div className="mt-10 grid gap-4 md:grid-cols-2">
+          <div className="-mx-5 mt-8 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-3 sm:mx-0 sm:mt-10 sm:grid sm:snap-none sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0">
             {services.map((service, index) => {
               const popular = plansFor(service.slug).find((plan) => plan.popular);
               return (
-                <Reveal key={service.slug} delay={index * 70}>
+                <Reveal
+                  key={service.slug}
+                  delay={index * 70}
+                  className="w-[84vw] max-w-[20rem] shrink-0 snap-center sm:w-auto sm:max-w-none"
+                >
                   <Link
                     href={service.href}
-                    className="group relative flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-line bg-[#fffdfa] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-lav-200 hover:shadow-[var(--shadow-card)] sm:p-7"
+                    className="group relative flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 transition-all duration-300 hover:-translate-y-1 hover:border-lav-200 hover:shadow-[var(--shadow-card)] sm:rounded-[1.75rem] sm:p-7"
                   >
                     <div className="relative flex items-start justify-between gap-4">
                       <ServiceIcon service={service.slug as any} size="md" />
@@ -667,7 +622,7 @@ export default function HomePage() {
       </section>
 
       {/* ---------- DASHBOARD ---------- */}
-      <section className="py-20 sm:py-28">
+      <section className="py-14 sm:py-24">
         <div className="shell">
           <div className="relative overflow-hidden rounded-[2.25rem] border border-lav-200/70 bg-gradient-to-br from-lav-100/80 via-cream to-cream-2 px-5 py-10 sm:px-10 sm:py-14">
             <div className="relative max-w-3xl">
@@ -769,7 +724,7 @@ export default function HomePage() {
       </section>
 
       {/* ---------- PRICING TEASER ---------- */}
-      <section className="py-20 sm:py-24">
+      <section className="py-14 sm:py-24">
         <div className="shell">
           <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
             <div className="max-w-xl">
@@ -889,7 +844,7 @@ export default function HomePage() {
       </section>
 
       {/* ---------- FAQ ---------- */}
-      <section className="py-20 sm:py-24">
+      <section className="py-14 sm:py-24">
         <div className="shell grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
           <div className="lg:sticky lg:top-28">
             <Reveal>
@@ -921,6 +876,7 @@ export default function HomePage() {
         </div>
       </section>
 
+
       {/* ---------- CTA ---------- */}
       <section className="pb-6">
         <div className="shell">
@@ -928,11 +884,14 @@ export default function HomePage() {
             <div className="relative overflow-hidden rounded-[2.25rem] bg-ink px-6 py-12 text-white sm:px-12 sm:py-16">
               <div className="pointer-events-none absolute -left-20 -top-24 h-72 w-72 rounded-full bg-lav-500/30 blur-[90px]" />
               <div className="pointer-events-none absolute -bottom-24 right-0 h-72 w-72 rounded-full bg-lav-400/25 blur-[90px]" />
+              <div className="pointer-events-none absolute -right-10 -top-8 hidden opacity-[0.16] sm:block">
+                <BrandMark size="xl" className="drop-shadow-[0_24px_60px_rgba(139,92,246,0.45)]" />
+              </div>
 
               <div className="relative grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
                 <div>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-white/80">
-                    <Sparkle className="h-3 w-3" />
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 py-1 pl-1 pr-3 text-[0.64rem] font-semibold uppercase tracking-[0.14em] text-white/80">
+                    <BrandMark size="xs" />
                     Ready when you are
                   </span>
                   <h2 className="mt-5 max-w-lg text-[2rem] font-medium leading-[1.06] sm:text-[2.7rem]">
@@ -987,6 +946,21 @@ export default function HomePage() {
           </Reveal>
         </div>
       </section>
+
+      {/* ---------- MOBILE STICKY CTA (phones only) ---------- */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line/80 bg-cream/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl lg:hidden">
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[0.78rem] font-semibold text-ink">Start with ₦1,200</p>
+            <p className="truncate text-[0.66rem] text-ink-3">Instant delivery · auto-refund</p>
+          </div>
+          <Link href="/signup" className="btn btn-primary !px-5 !py-3 !text-[0.86rem]">
+            Get started
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </div>
+      <div className="h-20 lg:hidden" aria-hidden="true" />
     </>
   );
 }

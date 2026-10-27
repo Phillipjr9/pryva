@@ -1,10 +1,11 @@
 import React from "react";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { SiteFooter } from "@/components/site/SiteFooter";
+import { BrandLockup, BrandMark } from "@/components/brand/BrandLockup";
 import NotFound from "@/app/not-found";
 import {
   giftCardEmail,
@@ -15,27 +16,56 @@ import {
   welcomeEmail,
 } from "@/lib/email-templates";
 
-describe("logo-free presentation", () => {
-  it("removes the site's logo component, image, and favicon", () => {
-    expect(existsSync("public/pryva-logo.png")).toBe(false);
-    expect(existsSync("src/app/icon.svg")).toBe(false);
-    expect(existsSync("src/components/brand/Logo.tsx")).toBe(false);
-    expect(existsSync("src/components/brand/BrandMark.tsx")).toBe(false);
-    expect(renderToStaticMarkup(<SiteFooter />)).not.toContain("pryva-logo.png");
-    expect(renderToStaticMarkup(<NotFound />)).not.toContain("pryva-logo.png");
+/**
+ * Brand presentation.
+ *
+ * History: this file used to assert the opposite — that Pryva had NO logo
+ * (no `public/pryva-logo.png`, no `icon.svg`, no `<BrandLockup>` in the footer),
+ * because an earlier pass removed a placeholder mark. The owner has since
+ * supplied the real mark, so the tests now protect the new intent: the logo and
+ * the "Pryva" name appear wherever the brand should, and the assets the app
+ * points at actually exist.
+ */
+describe("brand presentation", () => {
+  it("ships the mark, the favicon and the apple touch icon", () => {
+    for (const file of [
+      "public/images/brand/pryva-mark.png",
+      "public/icon.png",
+      "src/app/icon.png",
+      "public/apple-icon.png",
+    ]) {
+      expect(existsSync(file), `${file} is missing`).toBe(true);
+      expect(statSync(file).size).toBeGreaterThan(2000);
+    }
   });
 
-  it("keeps Google sign-in available without a logo", () => {
+  it("renders the mark and the name in the lockup", () => {
+    const html = decodeURIComponent(renderToStaticMarkup(<BrandLockup size="md" />));
+    expect(html).toContain("/images/brand/pryva-mark.png");
+    expect(html).toContain("Pryva");
+    expect(html).toContain('aria-label="Pryva home"');
+
+    const markOnly = decodeURIComponent(renderToStaticMarkup(<BrandMark size="sm" />));
+    expect(markOnly).toContain("/images/brand/pryva-mark.png");
+    // Decorative on its own — the wordmark carries the name.
+    expect(markOnly).toContain('aria-hidden="true"');
+  });
+
+  it("puts the brand in the footer and on the 404 page", () => {
+    expect(decodeURIComponent(renderToStaticMarkup(<SiteFooter />))).toContain("/images/brand/pryva-mark.png");
+    expect(decodeURIComponent(renderToStaticMarkup(<NotFound />))).toContain("/images/brand/pryva-mark.png");
+  });
+
+  it("keeps Google sign-in working next to the brand", () => {
     const html = renderToStaticMarkup(<AuthForm mode="login" next="/dashboard" />);
     const googleLink = html.match(/<a[^>]*href="\/api\/auth\/google[^>]*>[\s\S]*?<\/a>/)?.[0];
     expect(googleLink).toContain("Continue with Google");
-    expect(googleLink).not.toMatch(/<svg|<img/);
+    // The Google button must keep Google's own mark, never ours.
+    expect(googleLink).not.toContain("pryva-mark");
   });
 
   it("gives every digital service its real brand mark", () => {
-    // Third-party products show their official logo now, not generated art.
-    // What must stay true: each product renders its OWN mark (no sharing), the
-    // mark is drawn SVG (no bitmap), and the accessible name matches the brand.
+    // Third-party products show their official logo, not generated art.
     const names: Record<string, string> = {
       netflix: "Netflix",
       spotify: "Spotify",
@@ -64,12 +94,14 @@ describe("logo-free presentation", () => {
     // There is no official logo for "virtual numbers" — those keep the 3D set.
     for (const service of ["numbers", "esim", "proxies", "email-otp", "data", "gift-cards"] as const) {
       const html = decodeURIComponent(renderToStaticMarkup(<ServiceIcon service={service} />));
-      expect(html).toContain(`/images/services/`);
-      expect(existsSync(`public/images/services/${service === "numbers" ? "virtual-numbers" : service}.png`)).toBe(true);
+      expect(html).toContain("/images/services/");
+      expect(
+        existsSync(`public/images/services/${service === "numbers" ? "virtual-numbers" : service}.png`),
+      ).toBe(true);
     }
   });
 
-  it("removes the logo from every email template", () => {
+  it("puts the brand header in every email template", () => {
     const templates = [
       welcomeEmail("Ada"),
       orderConfirmationEmail({ reference: "R1", productName: "Number", amount: 1000, service: "numbers" }),
@@ -79,8 +111,8 @@ describe("logo-free presentation", () => {
       passwordResetEmail("Ada", "https://pryva.ng/reset"),
     ];
     for (const template of templates) {
-      expect(template.html).not.toContain("pryva-logo.png");
-      expect(template.html).not.toContain("logoUrl");
+      expect(template.html).toContain("pryva-mark.png");
+      expect(template.html).toContain("Pryva");
     }
   });
 });

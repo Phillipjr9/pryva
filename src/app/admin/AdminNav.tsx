@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BrandLockup } from "@/components/brand/BrandLockup";
 
 const LINKS = [
   { href: "/admin/dashboard", label: "Overview" },
@@ -18,9 +19,12 @@ export function AdminNav() {
   return (
     <header className="border-b border-line bg-white">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
-        <Link href="/admin/dashboard" className="text-[0.95rem] font-semibold text-ink">
-          Pryva admin
-        </Link>
+        <span className="flex items-center gap-2">
+          <BrandLockup size="xs" />
+          <span className="rounded-full bg-lav-100 px-2 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-lav-800">
+            Admin
+          </span>
+        </span>
 
         <nav className="flex flex-1 flex-wrap items-center gap-1">
           {LINKS.map((link) => {
