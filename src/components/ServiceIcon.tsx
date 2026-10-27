@@ -71,13 +71,16 @@ const sizeMap = {
 
 export function ServiceIcon({ service, size = "md", className = "" }: ServiceIconProps) {
   const pixelSize = sizeMap[size];
-  const imageSrc = serviceImages[service] || FALLBACK_IMAGE;
+  const imageSrc = serviceImages[service];
   const altText = serviceNames[service] || service;
+
+  // Use fallback if imageSrc is undefined, null, or empty string
+  const finalImageSrc = imageSrc && imageSrc.length > 0 ? imageSrc : FALLBACK_IMAGE;
 
   return (
     <div className={`relative ${className}`} style={{ width: pixelSize, height: pixelSize }}>
       <Image
-        src={imageSrc}
+        src={finalImageSrc}
         alt={altText}
         width={pixelSize}
         height={pixelSize}
