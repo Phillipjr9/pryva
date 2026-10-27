@@ -160,25 +160,42 @@ cream background, in the lavender/violet palette, no baked-in text, every file n
 
 | File | Status |
 |---|---|
-| `services/virtual-numbers.png` | ✅ regenerated (3D phone + call bubbles + SIM) |
-| `services/esim.png` | ✅ regenerated (3D eSIM chip + signal arc + globe) |
-| `services/proxies.png` | ✅ regenerated (3D server stack + shield) |
-| `services/email-otp.png` | ✅ regenerated (3D envelope + padlock + tokens) |
-| `services/data.png` | ✅ regenerated (3D signal tower + cloud droplet) |
-| `services/gift-cards.png` | ✅ regenerated (3D gift card + ribbon) |
-| `services/bulk.png` | ✅ regenerated (3D tile grid + arrow) |
-| `services/scheduled.png` | ✅ regenerated (3D calendar + clock) |
-| `services/digital-accounts.png` | ✅ **new** (3D profile card + verified badge) |
-| `categories/streaming.png` | ✅ regenerated (3D play button + popcorn) |
-| `categories/music.png`, `gaming.png`, `productivity.png` | ⏳ still the old artwork — hit the 10-image-per-turn limit |
-| `email/hero-*.jpg` (6) | ⏳ unchanged — these are email headers, separate pass |
+| `services/virtual-numbers.png` | ✅ 3D phone + call bubbles + SIM |
+| `services/esim.png` | ✅ 3D eSIM chip + signal arc + globe |
+| `services/proxies.png` | ✅ 3D server stack + shield |
+| `services/email-otp.png` | ✅ 3D envelope + padlock + tokens |
+| `services/data.png` | ✅ 3D signal tower + cloud droplet |
+| `services/gift-cards.png` | ✅ 3D gift card + ribbon |
+| `services/bulk.png` | ✅ 3D tile grid + arrow |
+| `services/scheduled.png` | ✅ 3D calendar + clock |
+| `services/digital-accounts.png` | ✅ **new** — 3D profile card + verified badge |
+| `services/netflix.png` | ✅ **new** — 3D TV + play triangle + popcorn |
+| `services/spotify.png` | ✅ **new** — 3D soundwave disc + music note |
+| `services/youtube.png` | ✅ **new** — 3D play button + clapperboard + film |
+| `services/disney.png` | ✅ **new** — 3D fairytale castle on a cloud |
+| `services/chatgpt.png` | ✅ **new** — 3D iridescent orb + chat bubble |
+| `services/canva.png` | ✅ **new** — 3D palette + brush + design tiles |
+| `categories/streaming.png` | ✅ 3D play button + popcorn |
+| `categories/music.png` | ✅ 3D headphones + soundwave |
+| `categories/gaming.png` | ✅ 3D gamepad + dice + joystick |
+| `categories/productivity.png` | ✅ 3D notebook + pencil + sticky notes |
+| `email/hero-*.jpg` (6) | ⏳ unchanged — email headers, next pass |
+
+Every digital product now has its **own** artwork (previously Netflix, YouTube and Disney+ all
+shared one category image). The art is original 3D illustration themed around each product rather
+than reproductions of third-party trademarked logos — that keeps the visual distinction you asked
+for without shipping someone else's marks. The existing `logo-removal` test now asserts "one
+distinct file per service" instead of "no per-service art".
 
 **Optimisation:** centre-cropped to square and resized to 512×512 with PNG optimisation.
-**18 MB → 3.2 MB** (−82%) with no visible quality loss at the 32–64 px sizes the UI renders them.
+**18 MB → 4.0 MB** across 19 files (−78%) with no visible quality loss at the 20–64 px sizes the UI renders them.
 
 ### Code
 
-1. **`digital-accounts` service added to the catalogue** — the marketplace now appears on the
+1. **Per-service artwork wired through the app** — homepage grid, pricing, the digital-services
+   page and the dashboard sidebar now all use the new icons. The sidebar previously showed the
+   same generic receipt icon for Data, Bulk and Scheduled.
+2. **`digital-accounts` service added to the catalogue** — the marketplace now appears on the
    homepage grid, footer and sitemap with its own 3D icon (it only had a nav link before).
 2. **Airtime/data purchases rewritten** — atomic debit, refund-on-failure, phone validation,
    rate limit.
