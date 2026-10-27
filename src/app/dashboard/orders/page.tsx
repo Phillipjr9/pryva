@@ -4,7 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira, serviceMap } from "@/lib/catalog";
 import { ArrowRight, ArrowUpRight, Clock, Receipt, Shield, Sparkle } from "@/components/icons";
 
 export const metadata: Metadata = { title: "Orders" };
@@ -64,8 +64,9 @@ export default async function OrdersPage() {
           </span>
           <h2 className="mt-4 text-[1.1rem] font-medium">No orders yet</h2>
           <p className="mx-auto mt-1.5 max-w-sm text-[0.84rem] text-ink-2">
-            Your first purchase appears here instantly. Numbers start at ₦1,200 and temporary inboxes
-            at ₦700.
+            Your first purchase appears here instantly. Numbers start at{" "}
+            {formatNaira(serviceMap.numbers.fromPrice)} and temporary inboxes at{" "}
+            {formatNaira(serviceMap["email-otp"].fromPrice)}.
           </p>
           <Link href="/pricing" className="btn btn-primary mt-5 !px-5 !py-3 !text-[0.8rem]">
             Browse pricing

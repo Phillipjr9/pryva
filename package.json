@@ -7,7 +7,9 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "pricing:build": "node --experimental-strip-types scripts/build-prices.mjs",
+    "pricing:audit": "node --experimental-strip-types scripts/build-prices.mjs --audit"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",

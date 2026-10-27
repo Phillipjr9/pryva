@@ -3,6 +3,8 @@
  * Netflix, Spotify, and other digital service accounts
  */
 
+import { DIGITAL_PRICES } from "@/lib/prices.generated";
+
 export type DigitalServiceCategory = "streaming" | "music" | "gaming" | "productivity" | "other";
 
 export interface DigitalService {
@@ -18,6 +20,7 @@ export interface DigitalPlan {
   id: string;
   name: string;
   duration: string;
+  /** Generated from the supplier cost sheet — see scripts/build-prices.mjs. */
   price: number;
   compareAt?: number;
   features: string[];
@@ -25,7 +28,11 @@ export interface DigitalPlan {
   badge?: string;
 }
 
-export const digitalServices: DigitalService[] = [
+type DigitalServiceDefinition = Omit<DigitalService, "plans"> & {
+  plans: Omit<DigitalPlan, "price">[];
+};
+
+const digitalServiceDefinitions: DigitalServiceDefinition[] = [
   {
     slug: "netflix",
     name: "Netflix",
@@ -37,7 +44,6 @@ export const digitalServices: DigitalService[] = [
         id: "netflix-1month",
         name: "Netflix Premium - 1 Month",
         duration: "30 days",
-        price: 3500,
         compareAt: 6500,
         features: [
           "4K Ultra HD streaming",
@@ -52,7 +58,6 @@ export const digitalServices: DigitalService[] = [
         id: "netflix-3months",
         name: "Netflix Premium - 3 Months",
         duration: "90 days",
-        price: 9500,
         compareAt: 19500,
         features: [
           "4K Ultra HD streaming",
@@ -66,7 +71,6 @@ export const digitalServices: DigitalService[] = [
         id: "netflix-6months",
         name: "Netflix Premium - 6 Months",
         duration: "180 days",
-        price: 17500,
         compareAt: 39000,
         features: [
           "4K Ultra HD streaming",
@@ -90,7 +94,6 @@ export const digitalServices: DigitalService[] = [
         id: "spotify-1month",
         name: "Spotify Premium - 1 Month",
         duration: "30 days",
-        price: 2000,
         compareAt: 3500,
         features: [
           "Ad-free music streaming",
@@ -104,7 +107,6 @@ export const digitalServices: DigitalService[] = [
         id: "spotify-3months",
         name: "Spotify Premium - 3 Months",
         duration: "90 days",
-        price: 5500,
         compareAt: 10500,
         features: [
           "Ad-free music streaming",
@@ -118,7 +120,6 @@ export const digitalServices: DigitalService[] = [
         id: "spotify-6months",
         name: "Spotify Premium - 6 Months",
         duration: "180 days",
-        price: 10000,
         compareAt: 21000,
         features: [
           "Ad-free music streaming",
@@ -142,7 +143,6 @@ export const digitalServices: DigitalService[] = [
         id: "youtube-1month",
         name: "YouTube Premium - 1 Month",
         duration: "30 days",
-        price: 2500,
         compareAt: 4500,
         features: [
           "Ad-free videos",
@@ -156,7 +156,6 @@ export const digitalServices: DigitalService[] = [
         id: "youtube-3months",
         name: "YouTube Premium - 3 Months",
         duration: "90 days",
-        price: 6500,
         compareAt: 13500,
         features: [
           "Ad-free videos",
@@ -179,7 +178,6 @@ export const digitalServices: DigitalService[] = [
         id: "disney-1month",
         name: "Disney+ Premium - 1 Month",
         duration: "30 days",
-        price: 3000,
         compareAt: 5500,
         features: [
           "4K Ultra HD streaming",
@@ -193,7 +191,6 @@ export const digitalServices: DigitalService[] = [
         id: "disney-3months",
         name: "Disney+ Premium - 3 Months",
         duration: "90 days",
-        price: 8000,
         compareAt: 16500,
         features: [
           "4K Ultra HD streaming",
@@ -216,7 +213,6 @@ export const digitalServices: DigitalService[] = [
         id: "chatgpt-1month",
         name: "ChatGPT Plus - 1 Month",
         duration: "30 days",
-        price: 8000,
         compareAt: 15000,
         features: [
           "GPT-4 access",
@@ -231,7 +227,6 @@ export const digitalServices: DigitalService[] = [
         id: "chatgpt-3months",
         name: "ChatGPT Plus - 3 Months",
         duration: "90 days",
-        price: 22000,
         compareAt: 45000,
         features: [
           "GPT-4 access",
@@ -254,7 +249,6 @@ export const digitalServices: DigitalService[] = [
         id: "canva-1month",
         name: "Canva Pro - 1 Month",
         duration: "30 days",
-        price: 2500,
         compareAt: 5000,
         features: [
           "100+ million premium assets",
@@ -268,7 +262,6 @@ export const digitalServices: DigitalService[] = [
         id: "canva-3months",
         name: "Canva Pro - 3 Months",
         duration: "90 days",
-        price: 6500,
         compareAt: 15000,
         features: [
           "100+ million premium assets",
@@ -281,6 +274,29 @@ export const digitalServices: DigitalService[] = [
     ],
   },
 ];
+
+/**
+ * Same rule as the main catalogue: the price comes from the supplier cost sheet,
+ * inside the 30–50% band. Subscriptions sit at the digital target (40%) because
+ * they are price-checked against the platforms' own Naira rates.
+ */
+export const digitalServices: DigitalService[] = digitalServiceDefinitions.map((service) => ({
+  ...service,
+  plans: service.plans.map((plan) => {
+    const generated = DIGITAL_PRICES[plan.id];
+    if (!generated) {
+      throw new Error(
+        `No generated price for "${plan.id}". Add its supplier cost to ` +
+          `data/supplier-costs.json and run \`npm run pricing:build\`.`,
+      );
+    }
+    return {
+      ...plan,
+      price: generated.price,
+      compareAt: plan.compareAt && plan.compareAt > generated.price ? plan.compareAt : undefined,
+    };
+  }),
+}));
 
 export function getDigitalService(slug: string): DigitalService | undefined {
   return digitalServices.find((s) => s.slug === slug);

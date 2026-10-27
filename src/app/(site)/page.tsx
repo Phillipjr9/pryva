@@ -26,7 +26,7 @@ import {
   Star,
   Wallet,
 } from "@/components/icons";
-import { formatNaira, plansFor, services } from "@/lib/catalog";
+import { formatNaira, plansFor, serviceMap, services } from "@/lib/catalog";
 import { CountryFlag } from "@/components/CountryFlag";
 import { hasCountryFlag } from "@/lib/countries";
 import { BrandMark } from "@/components/brand/BrandLockup";
@@ -148,7 +148,7 @@ const tiers = [
     blurb: "For one-off verifications and testing a new market.",
     features: [
       "Any number, eSIM or proxy pack",
-      "Wallet top-ups from ₦2,000",
+      "Wallet top-ups from ₦1,000",
       "Auto-refund protection",
       "Email support",
     ],
@@ -740,7 +740,8 @@ export default function HomePage() {
             </div>
             <Reveal delay={100}>
               <p className="max-w-sm text-[0.88rem] leading-relaxed text-ink-3">
-                Pay as you go from ₦700, or let a monthly plan discount everything you buy. No
+                Pay as you go from {formatNaira(serviceMap["email-otp"].fromPrice)}, or let a monthly plan
+                discount everything you buy. No
                 hidden conversions, no surprise fees.
               </p>
             </Reveal>
@@ -951,7 +952,9 @@ export default function HomePage() {
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line/80 bg-cream/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl lg:hidden">
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[0.78rem] font-semibold text-ink">Start with ₦1,200</p>
+            <p className="truncate text-[0.78rem] font-semibold text-ink">
+              Start with {formatNaira(serviceMap["email-otp"].fromPrice)}
+            </p>
             <p className="truncate text-[0.66rem] text-ink-3">Instant delivery · auto-refund</p>
           </div>
           <Link href="/signup" className="btn btn-primary !px-5 !py-3 !text-[0.86rem]">

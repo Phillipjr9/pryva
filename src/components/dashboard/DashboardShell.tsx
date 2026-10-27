@@ -18,7 +18,7 @@ import {
 } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { BrandLockup } from "@/components/brand/BrandLockup";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira, serviceMap } from "@/lib/catalog";
 
 /**
  * Sidebar entries. Product rows carry their own 3D artwork (`art`) so the nav
@@ -154,7 +154,8 @@ export function DashboardShell({
           <Sparkle className="h-3 w-3" /> New order
         </span>
         <p className="mt-2 text-[0.78rem] leading-relaxed text-ink-2">
-          Numbers, eSIMs, proxies and inboxes start from ₦700.
+          Numbers, eSIMs, proxies and inboxes start from{" "}
+            {formatNaira(serviceMap["email-otp"].fromPrice)}.
         </p>
         <Link
           href="/pricing"

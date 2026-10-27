@@ -1,0 +1,213 @@
+{
+  "_readme": "Supplier cost sheet. `cost` is the fixed amount we pay per unit, in naira. Edit a cost here, run `npm run pricing:build`, and every price follows (30-50% markup, see src/lib/pricing.ts). `label` is for humans only.",
+  "_updated": "2026-10-27",
+  "catalog": {
+    "email-24": {
+      "service": "email-otp",
+      "label": "1 inbox · 24 hours",
+      "cost": 540
+    },
+    "email-30": {
+      "service": "email-otp",
+      "label": "1 inbox · 30 days",
+      "cost": 4230
+    },
+    "email-bundle": {
+      "service": "email-otp",
+      "label": "5 inboxes · 7 days",
+      "cost": 1380
+    },
+    "email-team": {
+      "service": "email-otp",
+      "label": "20 inboxes · 30 days",
+      "cost": 9620
+    },
+    "esim-africa": {
+      "service": "esim",
+      "label": "3GB · 15 days",
+      "cost": 9230
+    },
+    "esim-europe": {
+      "service": "esim",
+      "label": "5GB · 30 days",
+      "cost": 14230
+    },
+    "esim-global": {
+      "service": "esim",
+      "label": "20GB · 30 days",
+      "cost": 36920
+    },
+    "esim-ng-1": {
+      "service": "esim",
+      "label": "1GB · 7 days",
+      "cost": 3460
+    },
+    "esim-ng-5": {
+      "service": "esim",
+      "label": "5GB · 30 days",
+      "cost": 11150
+    },
+    "esim-us": {
+      "service": "esim",
+      "label": "10GB · 30 days",
+      "cost": 18460
+    },
+    "proxy-eu-10": {
+      "service": "proxies",
+      "label": "10GB · EU",
+      "cost": 24620
+    },
+    "proxy-ng-1": {
+      "service": "proxies",
+      "label": "1GB · Nigeria",
+      "cost": 2690
+    },
+    "proxy-ng-25": {
+      "service": "proxies",
+      "label": "25GB · Nigeria",
+      "cost": 50000
+    },
+    "proxy-ng-5": {
+      "service": "proxies",
+      "label": "5GB · Nigeria",
+      "cost": 11540
+    },
+    "proxy-us-5": {
+      "service": "proxies",
+      "label": "5GB · US",
+      "cost": 13460
+    },
+    "rent-ng-30": {
+      "service": "numbers",
+      "label": "NG · 30 days",
+      "cost": 5770
+    },
+    "rent-ng-7": {
+      "service": "numbers",
+      "label": "NG · 7 days",
+      "cost": 2920
+    },
+    "rent-ng-90": {
+      "service": "numbers",
+      "label": "NG · 90 days",
+      "cost": 15000
+    },
+    "rent-uk-30": {
+      "service": "numbers",
+      "label": "UK · 30 days",
+      "cost": 8080
+    },
+    "rent-us-30": {
+      "service": "numbers",
+      "label": "US · 30 days",
+      "cost": 7310
+    },
+    "vn-ca": {
+      "service": "numbers",
+      "label": "Canada number",
+      "cost": 1540
+    },
+    "vn-de": {
+      "service": "numbers",
+      "label": "Germany number",
+      "cost": 1690
+    },
+    "vn-gh": {
+      "service": "numbers",
+      "label": "Ghana number",
+      "cost": 1080
+    },
+    "vn-ng": {
+      "service": "numbers",
+      "label": "Nigeria number",
+      "cost": 920
+    },
+    "vn-otp-5": {
+      "service": "numbers",
+      "label": "5 verifications",
+      "cost": 4230
+    },
+    "vn-uk": {
+      "service": "numbers",
+      "label": "UK number",
+      "cost": 1380
+    },
+    "vn-us": {
+      "service": "numbers",
+      "label": "US number",
+      "cost": 1150
+    }
+  },
+  "digital": {
+    "canva-1month": {
+      "service": "digital",
+      "label": "Canva Pro - 1 Month",
+      "cost": 1920
+    },
+    "canva-3months": {
+      "service": "digital",
+      "label": "Canva Pro - 3 Months",
+      "cost": 5000
+    },
+    "chatgpt-1month": {
+      "service": "digital",
+      "label": "ChatGPT Plus - 1 Month",
+      "cost": 6150
+    },
+    "chatgpt-3months": {
+      "service": "digital",
+      "label": "ChatGPT Plus - 3 Months",
+      "cost": 16920
+    },
+    "disney-1month": {
+      "service": "digital",
+      "label": "Disney+ Premium - 1 Month",
+      "cost": 2310
+    },
+    "disney-3months": {
+      "service": "digital",
+      "label": "Disney+ Premium - 3 Months",
+      "cost": 6150
+    },
+    "netflix-1month": {
+      "service": "digital",
+      "label": "Netflix Premium - 1 Month",
+      "cost": 2690
+    },
+    "netflix-3months": {
+      "service": "digital",
+      "label": "Netflix Premium - 3 Months",
+      "cost": 7310
+    },
+    "netflix-6months": {
+      "service": "digital",
+      "label": "Netflix Premium - 6 Months",
+      "cost": 13460
+    },
+    "spotify-1month": {
+      "service": "digital",
+      "label": "Spotify Premium - 1 Month",
+      "cost": 1540
+    },
+    "spotify-3months": {
+      "service": "digital",
+      "label": "Spotify Premium - 3 Months",
+      "cost": 4230
+    },
+    "spotify-6months": {
+      "service": "digital",
+      "label": "Spotify Premium - 6 Months",
+      "cost": 7690
+    },
+    "youtube-1month": {
+      "service": "digital",
+      "label": "YouTube Premium - 1 Month",
+      "cost": 1920
+    },
+    "youtube-3months": {
+      "service": "digital",
+      "label": "YouTube Premium - 3 Months",
+      "cost": 5000
+    }
+  }
+}

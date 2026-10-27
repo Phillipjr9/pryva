@@ -423,7 +423,7 @@ export async function ServicePageTemplate({ service }: { service: Service }) {
                 ))}
               </div>
               <p className="mt-5 text-[0.8rem] leading-relaxed text-ink-2">
-                Provisioned through Fleexa&apos;s infrastructure and monitored by the Pryva team in
+                Provisioned through Pryva&apos;s supply partners and monitored by our team in
                 Lagos.
               </p>
             </div>
