@@ -86,7 +86,7 @@
 | **3** | **Admin APIs locked down** | ✅ | Every `/api/admin/*` handler goes through `authorizeAdminApi()` (`lib/admin-auth.ts`): 401 anonymous, 403 non-admin, 403 cross-origin mutation. The demo identity can never be an admin, and admin emails come from `ADMIN_EMAILS` only. |
 | **4** | **Every balance change goes through `debitWallet`/`creditWallet`** | ✅ | `orders/purchase`, `wallet/withdraw`, `digital/purchase`, `airtime/purchase` and `orders/bulk` all debit atomically (balance guard in the SQL `WHERE`) and refund on failure. |
 | **5** | **Rate-limit auth & payment endpoints** | ✅ | `lib/rate-limit.ts` + `lib/auth-rate-limit.ts`: login **5 / 15 min per account** and **30 / 15 min per IP**, signup **10 / hour per IP**, all returning `429` + `Retry-After`; the budget is cleared on a successful sign-in. Purchase routes keep their own buckets. In-process counters — move to Redis if the app ever runs more than one instance. |
-| **6** | **Security headers / CSP** | ⬜ | `next.config.ts` has **no** headers — CSP, HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy all missing. |
+| **6** | **Security headers / CSP** | 🟡 | Headers were already shipping from `src/proxy.ts` (HSTS, nosniff, Referrer-Policy, Permissions-Policy, preview-aware X-Frame-Options) — the earlier note in this plan was wrong. This pass also removed a wildcard `Access-Control-Allow-Origin: *` from every `/api/*` response, forced `Cache-Control: no-store` on the API and turned off `x-powered-by`. ⬜ **CSP still open** — needs a browser harness before shipping, see the reason in `next.config.ts`. |
 
 ### 🟠 TIER 2 — The accounts marketplace (your R1, R2, R5, R6, R10)
 
@@ -253,6 +253,7 @@ Verified facts:
 | 2026-10-27 | **Tests run.** Vitest + config + `npm test`: 12 files / 89 tests green, incl. new pricing (8) and webhook-signature (2) suites. | #44 |
 | 2026-10-27 | **Merged `main` (PR #4, `5153fd4`) and unified the money paths.** Both branches had fixed the same holes; kept main's `payment_topups` model and `authorizeAdminApi()`, re-applied the marketplace on top. Found and closed a **double-credit window** created by the merge (webhook and browser callback each credited). Renumbered this branch's migration to `006`, restored mock-DB `.offset()` for withdrawal history, put `Accounts` back in the nav. 22 files / 156 tests green. | #1–#3, #44 |
 | 2026-10-27 | **Audit + fulfilment safety + 3D art.** Full system audit (`AUDIT.md`), base migration `0000`, atomic airtime/bulk debits, auto-refund cron, sessions screen, refund/cookie policies, complete 3D icon set (19 PNGs, one per service), per-service artwork wiring, carrier marks, platform marks. | #4, #5, #20, #41, #44–#46 |
+| 2026-10-27 | **API contract + hardening.** `requireAuthApi()` added and 22 route handlers migrated (signed-out callers were getting 500/307 instead of 401), wildcard CORS removed from `/api/*`, `no-store` on all API responses, footer `/accounts` duplicate key fixed. 26 files / 168 tests green. | #6 (partial), #45 |
 | 2026-10-27 | **Auth throttling + admin console.** Per-IP/per-account login limits, per-IP signup limit (verified live: 6th bad attempt → 429), `/admin/users`, `/admin/orders`, shared admin nav. 23 files / 165 tests green, `next build` clean. | #5, #42, #45 |
 
 ---

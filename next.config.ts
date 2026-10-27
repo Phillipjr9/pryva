@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Security headers live in src/proxy.ts (they must know whether the request
+  // is inside an embedded preview, so they cannot be static here).
+  poweredByHeader: false,
   allowedDevOrigins: [
     "localhost",
     "127.0.0.1",

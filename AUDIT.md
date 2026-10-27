@@ -111,10 +111,11 @@ ratings**, **coupons** (marketplace promos are supplier-side only), **support ti
 | O1 | Email sender (`lib/email-templates.ts` has 6 designed templates, nothing sends them) |
 | O2 | PWA: no manifest, service worker, offline page |
 | O3 | Analytics: no GA4/Plausible/Web Vitals |
-| O4 | CI: no `.github/workflows` — 156 tests exist but never run automatically |
+| O4 | CI: no `.github/workflows` — 168 tests exist but never run automatically |
 | O5 | Dockerfile / deploy config |
 | O6 | Cookie consent banner |
 | O7 | Admin messages screen (`/api/admin/messages` has no page) |
+| O9 | **Correction to an earlier note in this audit:** security headers were already shipping from `src/proxy.ts` (HSTS, nosniff, Referrer-Policy, Permissions-Policy, preview-aware X-Frame-Options). Only CSP is still open. |
 | O8 | Base database migration | **Fixed in this pass** — see §5 |
 
 ### 3.6 UX / design
@@ -221,7 +222,17 @@ on its card, with a neutral fallback for platforms we don't draw.
    per-IP bucket on signup, cleared on a successful sign-in so real users never lock themselves out.
    Verified live: attempts 1–5 return 401, attempt 6 returns `429` with `Retry-After`.
    Counters are in-process, so a multi-instance deploy needs Redis/Postgres — noted in the file.
-10. **Admin console** — real `/admin/users` and `/admin/orders` screens plus a shared admin nav
+10. **API auth contract fixed (bug)** — 22 authenticated route handlers called `requireAuth()`,
+    which *redirects*. Signed-out callers got a 500 (or a 307 to an HTML login page) instead of
+    `401 {"error":"Unauthorized"}`. Added `requireAuthApi()` and migrated every route; verified
+    five endpoints went from 500 → 401 and the signed-in demo still gets 200. Guarded by
+    `src/test/api-auth.test.ts`.
+11. **API traffic hardened** — `src/proxy.ts` was sending `Access-Control-Allow-Origin: *` and
+    wildcard methods/headers on every `/api/*` response. Removed (same-origin only) and every API
+    response is now `Cache-Control: no-store`. `x-powered-by` is off.
+12. **Footer duplicate key fixed** — `/accounts` was rendered twice in the Services column (React
+    logged a duplicate-key warning on every page). De-duplicated by href.
+13. **Admin console** — real `/admin/users` and `/admin/orders` screens plus a shared admin nav
     (the stat tiles linked to pages that did not exist). Both are server-rendered, `requireAdmin`
     gated, paginated and searchable. **Not smoke-tested here**: preview mode has no `ADMIN_EMAILS`
     entry and the demo identity is barred from admin by design, so verifying them needs an

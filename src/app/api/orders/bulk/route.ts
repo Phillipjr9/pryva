@@ -2,7 +2,7 @@ import { isPreviewDatabase } from "@/lib/demo-policy";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthApi } from "@/lib/auth";
 import { calculateBulkOrder, type BulkOrderItem } from "@/lib/bulk-orders";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
 import {
@@ -27,7 +27,7 @@ const MAX_UNITS = 200;
  */
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
+    const user = await requireAuthApi();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthApi } from "@/lib/auth";
 import { isPaystackConfigured, getBanks } from "@/lib/paystack";
 import { FALLBACK_BANKS, type Bank } from "@/lib/banks";
 import { logger } from "@/lib/logger";
@@ -18,7 +18,7 @@ const CACHE_TTL_MS = 60 * 60 * 1000;
  * whole withdrawal screen unusable.
  */
 export async function GET(request: NextRequest) {
-  const user = await requireAuth(request);
+  const user = await requireAuthApi();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
