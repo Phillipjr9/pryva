@@ -15,6 +15,17 @@ const GOOGLE_ERRORS: Record<string, string> = {
   "demo-failed": "The demo could not open right now. Please try again in a moment.",
 };
 
+/**
+ * Sign-in / sign-up card.
+ *
+ * Keep *conditional, request-dependent* markup OUT of this component. It is a
+ * client component, so a browser holding an older bundle cannot render nodes
+ * that were added here later — the server includes them, the client doesn't, and
+ * React reports a hydration mismatch. That is not hypothetical: the "landed back
+ * here" notice lived here and produced exactly that error on a stale tab.
+ * Notices that depend on server-side state belong in the page (a server
+ * component), where a stale bundle doesn't need to know about them.
+ */
 export function AuthForm({
   mode,
   next,

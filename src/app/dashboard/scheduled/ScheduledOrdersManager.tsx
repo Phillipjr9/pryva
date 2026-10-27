@@ -222,10 +222,10 @@ export function ScheduledOrdersManager({ user }: ScheduledOrdersManagerProps) {
                     <span
                       className={`rounded-full px-3 py-1 text-[0.75rem] font-semibold ${
                         order.status === "active"
-                          ? "bg-green-100 text-green-700"
+                          ? "bg-emerald-50 text-emerald-700"
                           : order.status === "paused"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-gray-100 text-gray-700"
+                            ? "bg-amber-50 text-amber-700"
+                            : "bg-ink/5 text-ink-2"
                       }`}
                     >
                       {order.status.charAt(0).toUpperCase() + order.status.slice(1)}

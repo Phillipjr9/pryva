@@ -8,6 +8,17 @@ import { requestProto } from "@/lib/net";
 import { isDemoEmail, isPreviewDatabase } from "@/lib/demo-policy";
 
 export const SESSION_COOKIE = "pryva_session";
+/**
+ * Fallback copy of the same token for embedded previews.
+ *
+ * The Arena/VS Code preview renders the app inside a third-party iframe. Browsers
+ * drop `SameSite=Lax` cookies there, and `SameSite=None` is only accepted
+ * together with `Secure` — which older logic could fail to set when the
+ * forwarding proxy hid `x-forwarded-proto` and reported a `localhost` host. When
+ * that happened the demo login "worked" (303 into /dashboard) and then bounced
+ * straight back to /login, because the browser had thrown the cookie away.
+ */
+export const SESSION_COOKIE_EMBEDDED = "pryva_session_3p";
 const SESSION_DAYS = 30;
 
 /**
@@ -85,25 +96,57 @@ export async function createSession(userId: string, request?: Request): Promise<
 
   await db.insert(sessions).values({ token, userId, expiresAt });
 
-  const secure = request ? requestProto(request) === "https" : await requestIsSecure();
-  const useCrossSiteCookie = secure && (await isCrossSiteIframeRequest(request));
+  const proto = request ? requestProto(request) : (await requestIsSecure()) ? "https" : "http";
+  const embedded = await isCrossSiteIframeRequest(request);
+  // An embedded page is served over TLS even when the proxy doesn't say so;
+  // without `Secure` the browser discards a `SameSite=None` cookie outright.
+  const secure = proto === "https" || embedded;
+
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    sameSite: useCrossSiteCookie ? "none" : "lax",
+    sameSite: embedded ? "none" : "lax",
     secure,
-    ...(useCrossSiteCookie ? { partitioned: true } : {}),
+    ...(embedded ? { partitioned: true } : {}),
     path: "/",
     expires: expiresAt,
   });
+
+  if (embedded) {
+    // Browsers without CHIPS support still need a plain Lax copy for when the
+    // preview is opened as its own tab; the reader accepts either name.
+    jar.set(SESSION_COOKIE_EMBEDDED, token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure,
+      path: "/",
+      expires: expiresAt,
+    });
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    console.info("[auth] session issued", {
+      embedded,
+      secure,
+      proto,
+      host: request?.headers.get("x-forwarded-host") ?? request?.headers.get("host") ?? "-",
+      dest: request?.headers.get("sec-fetch-dest") ?? "-",
+      site: request?.headers.get("sec-fetch-site") ?? "-",
+    });
+  }
 
   return token;
 }
 
 export async function getCurrentUser(): Promise<PublicUser | null> {
   const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
+  const token = jar.get(SESSION_COOKIE)?.value ?? jar.get(SESSION_COOKIE_EMBEDDED)?.value;
+  if (!token) {
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[auth] no session cookie on this request");
+    }
+    return null;
+  }
 
   const rows = await db
     .select({ user: users })
@@ -136,7 +179,10 @@ export async function requireAuth(
   const destination = typeof requestOrPath === "string" ? requestOrPath : nextPath;
   const user = await getCurrentUser();
   if (!user) {
-    redirect(`/login?next=${encodeURIComponent(destination)}`);
+    // `bounced` lets the sign-in page explain itself: landing back here right
+    // after a successful-looking sign-in means the browser refused the session
+    // cookie (embedded previews do this), not that the button was broken.
+    redirect(`/login?next=${encodeURIComponent(destination)}&bounced=1`);
   }
   return user;
 }
@@ -172,17 +218,25 @@ export async function requireAdmin(nextPath = "/admin/dashboard"): Promise<Publi
 
 export async function destroySession(): Promise<void> {
   const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
+  const token =
+    jar.get(SESSION_COOKIE)?.value ?? jar.get(SESSION_COOKIE_EMBEDDED)?.value;
   if (token) {
     await db.delete(sessions).where(eq(sessions.token, token));
   }
-  const secure = await requestIsSecure();
-  const useCrossSiteCookie = secure && (await isCrossSiteIframeRequest());
+  const secure = (await requestIsSecure()) || (await isCrossSiteIframeRequest());
+  const embedded = await isCrossSiteIframeRequest();
   jar.set(SESSION_COOKIE, "", {
     httpOnly: true,
-    sameSite: useCrossSiteCookie ? "none" : "lax",
+    sameSite: embedded ? "none" : "lax",
     secure,
-    ...(useCrossSiteCookie ? { partitioned: true } : {}),
+    ...(embedded ? { partitioned: true } : {}),
+    path: "/",
+    maxAge: 0,
+  });
+  jar.set(SESSION_COOKIE_EMBEDDED, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure,
     path: "/",
     maxAge: 0,
   });

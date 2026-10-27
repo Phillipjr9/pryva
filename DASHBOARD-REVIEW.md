@@ -320,3 +320,126 @@ states, ledger consistency to the naira, aggregate correctness, unread count) ·
 - `/dashboard/digital` is not in the navigation (public `/digital` covers it).
 - `/accounts` still leaves the shell for the marketing page.
 - Wallet/withdrawal styling (U4) and loading skeletons (U5) from `AUDIT.md`.
+
+---
+
+## 11. Round two — what is still rough
+
+Four phases are in. Walking the signed-in app again, these are the remaining
+gaps, in the order I'd fix them.
+
+### A. Wallet and money (biggest visual break)
+
+`wallet/WithdrawalDashboard.tsx` is 540 lines of `purple-600`, `gray-200`,
+`rounded-xl` and default `Input` components — a different design system from
+every other page. It also repeats the balance card the wallet page already
+renders, and hides withdrawal status behind `bg-yellow-100` chips.
+**Fix:** restyle to the shell's cards (`rounded-[1.5rem] border-line #fffdfa`),
+drop the duplicate balance, show requests as a dated list with the four real
+states (pending → processing → completed / failed), and keep the amount + bank
+account flow intact.
+
+Also in `wallet/page.tsx`: "added" and "spent" are summed from a `limit(40)`
+slice — the same bug class as the overview stats. Should use `count`/`sum`.
+
+### B. Security and settings (off-brand, thin)
+
+Both pages still use `rounded-2xl border bg-white` with purple icon tiles and a
+generic `Card`, so they look like a different product. Settings is 22 lines and
+points at `SettingsForm`; Security is 118 lines of that generic markup.
+**Fix:** bring both into the same section layout as Wallet/Orders, keep the
+functionality, add "active sessions" to Security in the same card language.
+
+### C. No loading states
+
+Nothing under `/dashboard` has a `loading.tsx`, so every navigation is a blank
+pause. **Fix:** a shared skeleton component plus `loading.tsx` for overview,
+orders, wallet and the generic group — so the shell stays and only the content
+shimmers.
+
+### D. Navigation completeness
+
+- `/dashboard/digital` exists (56 lines) but is in no nav list.
+- `/accounts` still leaves the shell for the marketing page.
+
+### E. Support page pass
+
+124 lines, older markup; needs the same H1 scale and card treatment as the rest.
+
+### Verification for each step
+
+typecheck → tests → `next build` → signed-in crawl of every `/dashboard` route
+plus the new ones, checking for one `<aside>` per page (the nested-shell bug from
+round one).
+
+### Shipped (round two)
+
+| Area | Before | Now |
+| --- | --- | --- |
+| Withdrawal | 540 lines of `purple-600`/`gray-200`, duplicate balance card, no loading state | brand cards, balance passed in as a prop, segmented tabs, preset amounts, status pills for pending/processing/completed/failed, real empty states |
+| Wallet totals | "added" and "spent" summed the newest 40 rows | `sum()` aggregates over the whole ledger, charges counted with `count()` |
+| Settings | generic `Card`/`Input`/`Alert` set, 22-line page | brand sections, labelled fields, inline notices, disabled-until-changed save |
+| Security | green/orange icon tiles, "Coming Soon" gray pills | launcher cards for password + 2FA, sessions card in brand style, two honest lists ("what we do" / "what keeps an account safe") |
+| Loading | nothing | `loading.tsx` for the dashboard, orders and wallet, plus a shared `Skeleton` set |
+| Accounts | nav item dumped you on the marketing page | `/dashboard/accounts` reuses `AccountsBrowser` inside the shell |
+| Digital | in no nav list, and `?service=` never worked (searchParams read synchronously on a Next 16 promise) | in the sidebar, detail view reachable, renamed "Premium subscriptions" so it doesn't clash with Accounts |
+| Gift cards / Scheduled | `green-100`/`yellow-100`/`gray-100` pills | emerald/amber/ink-toned pills |
+
+Guard tests added (`dashboard-shell.test.ts`):
+- every sidebar href resolves to a real page, and Accounts points inside the shell
+- the ten important dashboard routes are reachable from the navigation
+- the bottom bar has exactly five tabs
+- no dashboard file reintroduces `purple-`/`indigo-`/`gray-` classes — this is
+  what caught the two stragglers in gift cards and scheduled orders
+
+Support page needed nothing: it was already on the brand palette and H1 scale.
+
+---
+
+## 12. "The preview didn't update" — what it actually was
+
+Reported twice: after the overview rebuild and after the top-bar balance, a
+refresh showed the old page. The code was not the problem. This is the record of
+how that was established, and what now prevents it from being ambiguous again.
+
+### What the server was serving
+
+| Probe | Result |
+| --- | --- |
+| `GET /dashboard` with a demo session | `200`, `Cache-Control: no-cache, must-revalidate` |
+| `Available to spend` in that HTML | present (twice) |
+| `aria-label="Wallet balance …"` | present |
+| `Welcome back` / `Your Pryva wallet is ready` (old copy) | absent |
+| `BalanceHero.tsx` on `origin/main` (`3d3cf5f`) | **absent** |
+| Vercel projects named `pryva` | **none** — so no hosted deploy was involved |
+
+Conclusion: the page on port 3000 is the new one. What was stale was the
+**document already open in the browser** — an embedded preview keeps the
+JavaScript it loaded, and after the reload-loop fix (see §13) the guard
+deliberately refuses to reload a tab whose brakes it cannot record. So a stale
+embedded tab had no way back to a current build, and no way to say so.
+
+That silence was the bug worth fixing. Two changes:
+
+1. **`build-id.ts` → `offerRefresh()`.** When storage is blocked the guard still
+   must not reload itself, but it now shows a small fixed notice — "A newer
+   version of Pryva is ready." with a **Refresh** button. A tap is the visitor's
+   own gesture, so it cannot loop.
+2. **A build stamp in the dashboard footer (development only).**
+   `build dev-<pid>-<started>` renders on every dashboard page, and
+   `/api/version` returns the same string. If the two ever disagree, the tab is
+   old — that question is now answerable by looking, not by guessing.
+
+### If a preview looks old again
+
+1. Check the footer stamp against `/api/version`. Same value → the page is
+   current and the problem is elsewhere.
+2. Different value → tap **Refresh** in the notice (or hard-reload the preview,
+   or open it in its own tab — an embedded frame is the environment that blocks
+   the brakes in the first place).
+3. Rule for reports: say which build is being served before saying anything is
+   fixed. Local `curl` proving the server is right is not evidence about what a
+   browser is showing.
+
+Tests: `build-guard.test.tsx` now covers the notice path — storage blocked, no
+reload, notice rendered, and the button's own click reloads exactly once.

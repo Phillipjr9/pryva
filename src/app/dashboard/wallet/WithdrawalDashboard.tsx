@@ -1,12 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { formatCurrency } from "@/lib/format";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+import { formatNaira } from "@/lib/catalog";
 import { useToast } from "@/components/ui/Toast";
-import { Loader2, Plus, Trash2, ArrowUpRight } from "@/components/icons";
+import { EmptyState } from "@/components/dashboard/EmptyState";
+import {
+  AlertCircle,
+  ArrowUpRight,
+  Card,
+  Check,
+  Loader2,
+  Plus,
+  Receipt,
+  Shield,
+  Trash2,
+  Wallet,
+} from "@/components/icons";
 
 interface BankAccount {
   id: string;
@@ -37,53 +46,75 @@ interface Bank {
   code: string;
 }
 
-export function WithdrawalDashboard() {
+type Tab = "withdraw" | "history" | "accounts";
+
+const statusStyles: Record<string, string> = {
+  pending: "bg-amber-50 text-amber-700",
+  processing: "bg-lav-50 text-lav-700",
+  completed: "bg-emerald-50 text-emerald-700",
+  failed: "bg-rose-50 text-rose-700",
+};
+
+const statusLabels: Record<string, string> = {
+  pending: "Awaiting approval",
+  processing: "On its way",
+  completed: "Paid out",
+  failed: "Failed",
+};
+
+function StatusPill({ status }: { status: string }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[0.64rem] font-semibold ${
+        statusStyles[status] ?? "bg-lav-50 text-lav-700"
+      }`}
+    >
+      {statusLabels[status] ?? status}
+    </span>
+  );
+}
+
+/**
+ * Money leaving the wallet.
+ *
+ * Previously this rendered its own purple gradient balance card, gray tabs and
+ * default form controls — a different design system from the rest of the
+ * dashboard, and a second, independently-fetched copy of a balance the page
+ * already shows. Now it uses the shell's cards, one set of controls and the
+ * wallet page's balance, which it receives as a prop.
+ */
+export function WithdrawalDashboard({ balance }: { balance: number }) {
   const { addToast } = useToast();
-  const [activeTab, setActiveTab] = useState<"withdraw" | "history" | "accounts">("withdraw");
-  const [balance, setBalance] = useState(0);
+  const [activeTab, setActiveTab] = useState<Tab>("withdraw");
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
-  // Withdrawal form state
   const [amount, setAmount] = useState("");
   const [selectedBankAccountId, setSelectedBankAccountId] = useState("");
 
-  // Add bank account form state
   const [bankCode, setBankCode] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [accountName, setAccountName] = useState("");
   const [verifyingAccount, setVerifyingAccount] = useState(false);
 
   useEffect(() => {
-    fetchBalance();
     fetchBankAccounts();
     fetchWithdrawalHistory();
     fetchBanks();
   }, []);
 
-  async function fetchBalance() {
-    try {
-      const response = await fetch("/api/user/profile");
-      const data = await response.json();
-      if (data.ok) {
-        setBalance(data.user.walletBalance);
-      }
-    } catch (error) {
-      console.error("Failed to fetch balance:", error);
-    }
-  }
-
   async function fetchBankAccounts() {
     try {
       const response = await fetch("/api/wallet/bank-accounts");
       const data = await response.json();
-      if (data.ok) {
-        setBankAccounts(data.bankAccounts);
-      }
+      if (data.ok) setBankAccounts(data.bankAccounts);
     } catch (error) {
       console.error("Failed to fetch bank accounts:", error);
+    } finally {
+      setLoaded(true);
     }
   }
 
@@ -91,9 +122,7 @@ export function WithdrawalDashboard() {
     try {
       const response = await fetch("/api/wallet/withdraw/history");
       const data = await response.json();
-      if (data.ok) {
-        setWithdrawals(data.withdrawals);
-      }
+      if (data.ok) setWithdrawals(data.withdrawals);
     } catch (error) {
       console.error("Failed to fetch withdrawal history:", error);
     }
@@ -103,9 +132,7 @@ export function WithdrawalDashboard() {
     try {
       const response = await fetch("/api/wallet/banks");
       const data = await response.json();
-      if (data.ok) {
-        setBanks(data.banks);
-      }
+      if (data.ok) setBanks(data.banks);
     } catch (error) {
       console.error("Failed to fetch banks:", error);
     }
@@ -126,16 +153,15 @@ export function WithdrawalDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bankCode, accountNumber }),
       });
-
       const data = await response.json();
 
       if (data.ok) {
         setAccountName(data.accountName);
-        addToast({ type: "success", message: "Account verified successfully" });
+        addToast({ type: "success", message: "Account verified" });
       } else {
         addToast({ type: "error", message: data.error || "Failed to verify account" });
       }
-    } catch (error) {
+    } catch {
       addToast({ type: "error", message: "Failed to verify account" });
     } finally {
       setVerifyingAccount(false);
@@ -149,7 +175,6 @@ export function WithdrawalDashboard() {
     }
 
     setLoading(true);
-
     try {
       const response = await fetch("/api/wallet/bank-accounts", {
         method: "POST",
@@ -160,11 +185,10 @@ export function WithdrawalDashboard() {
           setDefault: bankAccounts.length === 0,
         }),
       });
-
       const data = await response.json();
 
       if (data.ok) {
-        addToast({ type: "success", message: "Bank account added successfully" });
+        addToast({ type: "success", message: "Bank account added" });
         setBankCode("");
         setAccountNumber("");
         setAccountName("");
@@ -172,7 +196,7 @@ export function WithdrawalDashboard() {
       } else {
         addToast({ type: "error", message: data.error || "Failed to add bank account" });
       }
-    } catch (error) {
+    } catch {
       addToast({ type: "error", message: "Failed to add bank account" });
     } finally {
       setLoading(false);
@@ -180,25 +204,23 @@ export function WithdrawalDashboard() {
   }
 
   async function deleteBankAccount(accountId: string) {
-    if (!confirm("Are you sure you want to delete this bank account?")) {
+    if (!confirm("Remove this bank account? Payouts already in progress are not affected.")) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/wallet/bank-accounts?id=${accountId}`, {
-        method: "DELETE",
-      });
-
+      const response = await fetch(`/api/wallet/bank-accounts?id=${accountId}`, { method: "DELETE" });
       const data = await response.json();
 
       if (data.ok) {
-        addToast({ type: "success", message: "Bank account deleted" });
+        addToast({ type: "success", message: "Bank account removed" });
+        if (selectedBankAccountId === accountId) setSelectedBankAccountId("");
         fetchBankAccounts();
       } else {
-        addToast({ type: "error", message: data.error || "Failed to delete bank account" });
+        addToast({ type: "error", message: data.error || "Failed to remove bank account" });
       }
-    } catch (error) {
-      addToast({ type: "error", message: "Failed to delete bank account" });
+    } catch {
+      addToast({ type: "error", message: "Failed to remove bank account" });
     }
   }
 
@@ -209,212 +231,226 @@ export function WithdrawalDashboard() {
       addToast({ type: "error", message: "Minimum withdrawal amount is ₦1,000" });
       return;
     }
-
     if (withdrawAmount > balance) {
-      addToast({ type: "error", message: "Insufficient balance" });
+      addToast({ type: "error", message: "That's more than your available balance" });
       return;
     }
-
     if (!selectedBankAccountId) {
-      addToast({ type: "error", message: "Please select a bank account" });
+      addToast({ type: "error", message: "Choose a bank account first" });
       return;
     }
 
     setLoading(true);
-
     try {
       const response = await fetch("/api/wallet/withdraw", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: withdrawAmount,
-          bankAccountId: selectedBankAccountId,
-        }),
+        body: JSON.stringify({ amount: withdrawAmount, bankAccountId: selectedBankAccountId }),
       });
-
       const data = await response.json();
 
       if (data.ok) {
-        addToast({ type: "success", message: "Withdrawal request submitted successfully" });
+        addToast({ type: "success", message: "Withdrawal requested — we'll approve it shortly" });
         setAmount("");
         setSelectedBankAccountId("");
-        fetchBalance();
         fetchWithdrawalHistory();
         setActiveTab("history");
       } else {
         addToast({ type: "error", message: data.error || "Failed to process withdrawal" });
       }
-    } catch (error) {
+    } catch {
       addToast({ type: "error", message: "Failed to process withdrawal" });
     } finally {
       setLoading(false);
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    const styles = {
-      pending: "bg-yellow-100 text-yellow-800",
-      processing: "bg-blue-100 text-blue-800",
-      completed: "bg-green-100 text-green-800",
-      failed: "bg-red-100 text-red-800",
-    };
-    return styles[status as keyof typeof styles] || "bg-gray-100 text-gray-800";
-  };
+  const tabs: Array<{ key: Tab; label: string }> = [
+    { key: "withdraw", label: "Withdraw" },
+    { key: "history", label: `Requests${withdrawals.length ? ` (${withdrawals.length})` : ""}` },
+    { key: "accounts", label: `Bank accounts${bankAccounts.length ? ` (${bankAccounts.length})` : ""}` },
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Balance Card */}
-      <div className="bg-gradient-to-br from-purple-600 to-indigo-700 rounded-xl p-6 text-white">
-        <p className="text-sm opacity-80">Available Balance</p>
-        <p className="text-3xl font-bold mt-1">{formatCurrency(balance)}</p>
+    <section id="withdraw" className="grid gap-3 scroll-mt-24">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-[1.05rem] font-semibold">Withdraw to your bank</h2>
+          <p className="mt-0.5 text-[0.8rem] text-ink-2">
+            Requests are reviewed, then paid out through Paystack Transfers.
+          </p>
+        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-[0.68rem] text-ink-3">
+          <Wallet className="h-3 w-3 text-lav-600" /> {formatNaira(balance)} available
+        </span>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200">
-        <button
-          onClick={() => setActiveTab("withdraw")}
-          className={`px-4 py-2 font-medium transition-colors ${
-            activeTab === "withdraw"
-              ? "border-b-2 border-purple-600 text-purple-600"
-              : "text-gray-600 hover:text-gray-900"
-          }`}
-        >
-          Withdraw
-        </button>
-        <button
-          onClick={() => setActiveTab("history")}
-          className={`px-4 py-2 font-medium transition-colors ${
-            activeTab === "history"
-              ? "border-b-2 border-purple-600 text-purple-600"
-              : "text-gray-600 hover:text-gray-900"
-          }`}
-        >
-          History
-        </button>
-        <button
-          onClick={() => setActiveTab("accounts")}
-          className={`px-4 py-2 font-medium transition-colors ${
-            activeTab === "accounts"
-              ? "border-b-2 border-purple-600 text-purple-600"
-              : "text-gray-600 hover:text-gray-900"
-          }`}
-        >
-          Bank Accounts
-        </button>
-      </div>
-
-      {/* Withdraw Tab */}
-      {activeTab === "withdraw" && (
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Amount
-            </label>
-            <Input
-              type="number"
-              placeholder="Enter amount"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              min="1000"
-              max={balance}
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Minimum: ₦1,000 • Fee: 1% for amounts above ₦5,000
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Bank Account
-            </label>
-            {bankAccounts.length === 0 ? (
-              <div className="text-center py-8 bg-gray-50 rounded-lg">
-                <p className="text-gray-600 mb-4">No bank accounts added yet</p>
-                <Button onClick={() => setActiveTab("accounts")}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Bank Account
-                </Button>
-              </div>
-            ) : (
-              <Select
-                value={selectedBankAccountId}
-                onChange={(e) => setSelectedBankAccountId(e.target.value)}
-              >
-                <option value="">Select bank account</option>
-                {bankAccounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.bankName} - {account.accountNumber} ({account.accountName})
-                  </option>
-                ))}
-              </Select>
-            )}
-          </div>
-
-          <Button
-            onClick={requestWithdrawal}
-            disabled={loading || !amount || !selectedBankAccountId}
-            className="w-full"
+      <div className="flex gap-1.5 overflow-x-auto">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            aria-pressed={activeTab === tab.key}
+            className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[0.76rem] font-semibold transition-colors ${
+              activeTab === tab.key
+                ? "border-ink bg-ink text-white"
+                : "border-line bg-white/70 text-ink-2 hover:border-lav-200"
+            }`}
           >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <ArrowUpRight className="w-4 h-4 mr-2" />
-                Request Withdrawal
-              </>
-            )}
-          </Button>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "withdraw" && (
+        <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
+          {bankAccounts.length === 0 ? (
+            <EmptyState
+              icon={Card}
+              title="Add a bank account first"
+              body="Payouts need a verified Nigerian bank account in your own name. It takes one step."
+              action={{ label: "Add a bank account", href: "#bank-accounts" }}
+              className="!border-0 !bg-transparent !py-6"
+            />
+          ) : (
+            <div className="grid gap-3.5">
+              <div>
+                <label htmlFor="withdraw-amount" className="field-label">
+                  Amount to withdraw
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[0.9rem] text-ink-3">
+                    ₦
+                  </span>
+                  <input
+                    id="withdraw-amount"
+                    type="number"
+                    inputMode="numeric"
+                    min="1000"
+                    max={balance}
+                    placeholder="0"
+                    value={amount}
+                    onChange={(event) => setAmount(event.target.value)}
+                    className="field !pl-8"
+                  />
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {[5000, 10000, 25000].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setAmount(String(Math.min(preset, balance)))}
+                      disabled={balance < preset}
+                      className="rounded-full border border-line bg-white px-2.5 py-1 text-[0.68rem] font-semibold text-ink-2 hover:border-lav-200 disabled:opacity-40"
+                    >
+                      {formatNaira(preset)}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setAmount(String(balance))}
+                    className="rounded-full bg-lav-50 px-2.5 py-1 text-[0.68rem] font-semibold text-lav-800"
+                  >
+                    All {formatNaira(balance)}
+                  </button>
+                </div>
+                <p className="mt-1.5 text-[0.7rem] text-ink-3">
+                  Minimum ₦1,000 · paid in Naira to the account you choose
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="withdraw-bank" className="field-label">
+                  Pay out to
+                </label>
+                <select
+                  id="withdraw-bank"
+                  value={selectedBankAccountId}
+                  onChange={(event) => setSelectedBankAccountId(event.target.value)}
+                  className="field"
+                >
+                  <option value="">Choose a bank account</option>
+                  {bankAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.bankName} · {account.accountNumber} ({account.accountName})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={requestWithdrawal}
+                disabled={loading || !amount || !selectedBankAccountId}
+                className="btn btn-primary w-full !py-3 !text-[0.82rem] disabled:opacity-50"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Requesting…
+                  </>
+                ) : (
+                  <>
+                    <ArrowUpRight className="h-4 w-4" /> Request withdrawal
+                  </>
+                )}
+              </button>
+
+              <p className="flex items-start gap-2 rounded-xl bg-lav-50 px-3 py-2.5 text-[0.74rem] leading-relaxed text-lav-800">
+                <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                Approved payouts usually land within one working day. If a payout fails, the
+                amount returns to your wallet automatically.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
-      {/* History Tab */}
       {activeTab === "history" && (
-        <div className="space-y-4">
+        <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
           {withdrawals.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <p className="text-gray-600">No withdrawal history yet</p>
-            </div>
+            <EmptyState
+              icon={Receipt}
+              title="No withdrawal requests yet"
+              body="Once you request a payout it appears here with its reference and status."
+              action={{ label: "Request a withdrawal", href: "#withdraw" }}
+              className="!border-0 !bg-transparent !py-6"
+            />
           ) : (
-            <div className="space-y-3">
+            <div className="grid gap-2">
               {withdrawals.map((withdrawal) => (
                 <div
                   key={withdrawal.id}
-                  className="bg-white border border-gray-200 rounded-lg p-4"
+                  className="rounded-xl border border-line bg-white px-3.5 py-3"
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <p className="font-semibold">{formatCurrency(withdrawal.amount)}</p>
-                      <p className="text-sm text-gray-600">
-                        {withdrawal.bankName} • {withdrawal.accountNumber}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[0.9rem] font-semibold text-ink">
+                        {formatNaira(withdrawal.amount)}
+                      </p>
+                      <p className="truncate text-[0.72rem] text-ink-2">
+                        {withdrawal.bankName} · {withdrawal.accountNumber}
                       </p>
                     </div>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(
-                        withdrawal.status
-                      )}`}
-                    >
-                      {withdrawal.status}
+                    <StatusPill status={withdrawal.status} />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.66rem] text-ink-3">
+                    <span>Ref {withdrawal.reference}</span>
+                    {withdrawal.fee > 0 && <span>Fee {formatNaira(withdrawal.fee)}</span>}
+                    <span>
+                      {new Date(withdrawal.createdAt).toLocaleDateString("en-NG", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 space-y-1">
-                    <p>Reference: {withdrawal.reference}</p>
-                    <p>Fee: {formatCurrency(withdrawal.fee)}</p>
-                    <p>
-                      {new Date(withdrawal.createdAt).toLocaleDateString("en-NG", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                  {withdrawal.failureReason && (
+                    <p className="mt-1.5 flex items-start gap-1.5 text-[0.7rem] text-rose-600">
+                      <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+                      {withdrawal.failureReason}
                     </p>
-                    {withdrawal.failureReason && (
-                      <p className="text-red-600">Error: {withdrawal.failureReason}</p>
-                    )}
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -422,112 +458,126 @@ export function WithdrawalDashboard() {
         </div>
       )}
 
-      {/* Bank Accounts Tab */}
       {activeTab === "accounts" && (
-        <div className="space-y-6">
-          {/* Add New Account Form */}
-          <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-            <h3 className="font-semibold">Add New Bank Account</h3>
+        <div id="bank-accounts" className="grid gap-3 lg:grid-cols-2">
+          <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
+            <p className="text-[0.95rem] font-semibold">Add a bank account</p>
+            <p className="mt-0.5 text-[0.76rem] text-ink-2">
+              We verify the name on the account before saving it.
+            </p>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Bank
-              </label>
-              <Select value={bankCode} onChange={(e) => setBankCode(e.target.value)}>
-                <option value="">Select bank</option>
-                {banks.map((bank) => (
-                  <option key={bank.code} value={bank.code}>
-                    {bank.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Account Number
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  placeholder="10-digit account number"
-                  value={accountNumber}
-                  onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                  maxLength={10}
-                />
-                <Button
-                  onClick={verifyAccount}
-                  disabled={verifyingAccount || !bankCode || accountNumber.length !== 10}
-                  variant="secondary"
+            <div className="mt-3.5 grid gap-3">
+              <div>
+                <label htmlFor="bank" className="field-label">
+                  Bank
+                </label>
+                <select
+                  id="bank"
+                  value={bankCode}
+                  onChange={(event) => {
+                    setBankCode(event.target.value);
+                    setAccountName("");
+                  }}
+                  className="field"
                 >
-                  {verifyingAccount ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    "Verify"
-                  )}
-                </Button>
+                  <option value="">Choose a bank</option>
+                  {banks.map((bank) => (
+                    <option key={bank.code} value={bank.code}>
+                      {bank.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
 
-            {accountName && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                <p className="text-sm font-medium text-green-800">
-                  Account Name: {accountName}
+              <div>
+                <label htmlFor="account-number" className="field-label">
+                  Account number
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="account-number"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="10 digits"
+                    value={accountNumber}
+                    onChange={(event) => {
+                      setAccountNumber(event.target.value.replace(/\D/g, "").slice(0, 10));
+                      setAccountName("");
+                    }}
+                    maxLength={10}
+                    className="field"
+                  />
+                  <button
+                    type="button"
+                    onClick={verifyAccount}
+                    disabled={verifyingAccount || !bankCode || accountNumber.length !== 10}
+                    className="btn shrink-0 border border-line bg-white !px-3.5 !py-2.5 !text-[0.78rem] text-ink hover:border-lav-200 disabled:opacity-50"
+                  >
+                    {verifyingAccount ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Verify"}
+                  </button>
+                </div>
+              </div>
+
+              {accountName && (
+                <p className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[0.78rem] font-medium text-emerald-800">
+                  <Check className="h-3.5 w-3.5" /> {accountName}
                 </p>
-              </div>
-            )}
-
-            <Button
-              onClick={addBankAccount}
-              disabled={loading || !bankCode || !accountNumber || !accountName}
-              className="w-full"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Adding...
-                </>
-              ) : (
-                <>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Bank Account
-                </>
               )}
-            </Button>
+
+              <button
+                type="button"
+                onClick={addBankAccount}
+                disabled={loading || !bankCode || !accountNumber || !accountName}
+                className="btn btn-primary w-full !py-2.5 !text-[0.8rem] disabled:opacity-50"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Saving…
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" /> Save bank account
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
-          {/* Saved Accounts */}
-          <div>
-            <h3 className="font-semibold mb-4">Saved Bank Accounts</h3>
-            {bankAccounts.length === 0 ? (
-              <div className="text-center py-8 bg-gray-50 rounded-lg">
-                <p className="text-gray-600">No bank accounts saved yet</p>
-              </div>
+          <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
+            <p className="text-[0.95rem] font-semibold">Saved accounts</p>
+            {!loaded ? (
+              <p className="mt-3 text-[0.8rem] text-ink-3">Loading…</p>
+            ) : bankAccounts.length === 0 ? (
+              <p className="mt-3 rounded-xl border border-dashed border-line bg-cream/50 px-4 py-5 text-center text-[0.8rem] text-ink-3">
+                Nothing saved yet. Add one and it can be used for every payout.
+              </p>
             ) : (
-              <div className="space-y-3">
+              <div className="mt-3 grid gap-2">
                 {bankAccounts.map((account) => (
                   <div
                     key={account.id}
-                    className="bg-white border border-gray-200 rounded-lg p-4 flex justify-between items-center"
+                    className="flex items-start justify-between gap-3 rounded-xl border border-line bg-white px-3.5 py-3"
                   >
-                    <div>
-                      <p className="font-semibold">{account.bankName}</p>
-                      <p className="text-sm text-gray-600">{account.accountNumber}</p>
-                      <p className="text-sm text-gray-600">{account.accountName}</p>
-                      {account.isDefault && (
-                        <span className="inline-block mt-1 px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded-full">
-                          Default
-                        </span>
-                      )}
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-1.5 text-[0.84rem] font-semibold text-ink">
+                        {account.bankName}
+                        {account.isDefault && (
+                          <span className="rounded-full bg-lav-50 px-2 py-0.5 text-[0.6rem] font-semibold text-lav-700">
+                            Default
+                          </span>
+                        )}
+                      </p>
+                      <p className="truncate text-[0.72rem] text-ink-2">{account.accountNumber}</p>
+                      <p className="truncate text-[0.72rem] text-ink-3">{account.accountName}</p>
                     </div>
-                    <Button
+                    <button
+                      type="button"
                       onClick={() => deleteBankAccount(account.id)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      aria-label={`Remove ${account.bankName} account`}
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-ink-3 transition-colors hover:bg-rose-50 hover:text-rose-600"
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -535,6 +585,6 @@ export function WithdrawalDashboard() {
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

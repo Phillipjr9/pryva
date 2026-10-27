@@ -47,3 +47,31 @@ describe("one-click demo login", () => {
     expect(html).toContain("/api/auth/demo-web?next=%2Fdashboard");
   });
 });
+
+describe("login page resilience to a stale client bundle", () => {
+  const loginPageSource = readFileSync(
+    fileURLToPath(new URL("../app/(auth)/login/page.tsx", import.meta.url)),
+    "utf8",
+  );
+
+  it("keeps request-dependent notices out of the client AuthForm", () => {
+    // A browser holding an older AuthForm bundle cannot render nodes added to
+    // that component later: the server includes them, the client does not, and
+    // React reports a hydration mismatch. The "landed back here" notice caused
+    // exactly that, so it now lives in the server page.
+    expect(source).not.toContain("bounced");
+    expect(source).not.toContain("Just signed in and landed back here");
+  });
+
+  it("renders the bounce notice from the server page instead", () => {
+    expect(loginPageSource).toContain("function BounceNotice");
+    expect(loginPageSource).toContain('bounced === "1"');
+    expect(loginPageSource).toContain("/api/auth/whoami");
+  });
+
+  it("passes AuthForm the same three props it has always taken", () => {
+    expect(loginPageSource).toMatch(
+      /<AuthForm\s+mode="login"\s+next=\{safeNext\}\s+errorParam=\{error \?\? null\}\s*\/>/,
+    );
+  });
+});
