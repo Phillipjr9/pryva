@@ -18,6 +18,7 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<{ amount: number; reference?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const providers: { id: AirtimeProvider; name: string }[] = [
@@ -38,6 +39,7 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
     setLoading(true);
     setError(null);
     setSuccess(null);
+    setReceipt(null);
 
     try {
       const response = await fetch("/api/airtime/purchase", {
@@ -53,6 +55,13 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
       }
 
       setSuccess(data.message);
+      // The endpoint already returns the order it created; the receipt shows that
+      // rather than a generic "success", so the figure and reference on screen are
+      // the ones support will ask for.
+      setReceipt({
+        amount: typeof data.order?.amount === "number" ? data.order.amount : 0,
+        reference: typeof data.order?.reference === "string" ? data.order.reference : undefined,
+      });
       setSelectedPlan(null);
       setPhoneNumber("");
     } catch (err) {
@@ -64,12 +73,14 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
 
   return (
     <>
-      <PaymentLoading show={loading} message="Processing your data plan purchase..." />
+      <PaymentLoading show={loading} message="Processing your data plan purchase…" />
       <PaymentSuccess
         show={!!success}
-        title="Data Plan Purchased!"
-        message={success || "Your data plan has been activated successfully."}
-        redirectUrl="/dashboard"
+        title="Data plan purchased"
+        message={success || "Your data plan has been activated."}
+        amount={receipt?.amount || undefined}
+        reference={receipt?.reference}
+        redirectUrl="/dashboard/orders"
         redirectDelay={2500}
       />
       <div className="space-y-6">

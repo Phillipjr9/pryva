@@ -85,11 +85,15 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
 
   return (
     <>
-      <PaymentLoading show={pending} message="Processing your order..." />
+      {/* The amount and the reference are what the member checks on the receipt,
+          so they are passed through rather than left to a generic thank-you. */}
+      <PaymentLoading show={pending} message={selected ? `Charging your wallet ${formatNaira(selected.price)}…` : "Processing your order…"} />
       <PaymentSuccess
         show={!!success}
-        title="Order Placed Successfully!"
-        message={`${success?.name} is now in your dashboard.`}
+        title="Order placed"
+        message={`${success?.name} is ready in your dashboard.`}
+        amount={selected?.price}
+        reference={success?.reference}
         redirectUrl={`/dashboard/orders/${success?.id}`}
         redirectDelay={2500}
       />

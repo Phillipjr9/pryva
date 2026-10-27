@@ -90,12 +90,12 @@ export function BalanceHero({
         </dl>
 
         {preview ? (
-          <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[0.66rem] text-white/65">
-            <Shield className="h-3 w-3" /> Preview mode — balances and orders here are simulated
+          <p className="mt-4 inline-flex items-start gap-1.5 rounded-xl bg-white/10 px-2.5 py-1.5 text-[0.66rem] leading-snug text-white/65 sm:items-center sm:rounded-full sm:py-1">
+            <Shield className="mt-0.5 h-3 w-3 shrink-0 sm:mt-0" /> Preview mode — balances and orders here are simulated
           </p>
         ) : (
-          <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[0.66rem] text-white/65">
-            <Shield className="h-3 w-3" /> Live purchasing is paused while integrations are reviewed
+          <p className="mt-4 inline-flex items-start gap-1.5 rounded-xl bg-white/10 px-2.5 py-1.5 text-[0.66rem] leading-snug text-white/65 sm:items-center sm:rounded-full sm:py-1">
+            <Shield className="mt-0.5 h-3 w-3 shrink-0 sm:mt-0" /> Live purchasing is paused while integrations are reviewed
           </p>
         )}
 

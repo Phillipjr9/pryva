@@ -22,7 +22,6 @@ import {
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { BrandLockup } from "@/components/brand/BrandLockup";
 import { formatNaira, serviceMap } from "@/lib/catalog";
-import { BUILD_ID } from "@/lib/build-id";
 
 /**
  * Sidebar entries are grouped by what the customer is trying to do — manage what
@@ -114,7 +113,7 @@ export function DashboardShell({
   children,
   user,
   unreadNotifications = 0,
-  buildId = BUILD_ID,
+  buildId,
 }: {
   children: ReactNode;
   user: { name: string; email: string; walletBalance: number };
@@ -313,7 +312,7 @@ export function DashboardShell({
 
           <div className="pb-24 lg:pb-10">{children}</div>
 
-          {process.env.NODE_ENV !== "production" && (
+          {process.env.NODE_ENV !== "production" && buildId && (
             /* In development only. If a page looks unchanged after a deploy,
                this line is the fastest way to tell a stale tab from a real bug:
                compare it with /api/version. */
