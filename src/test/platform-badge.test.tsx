@@ -62,8 +62,10 @@ describe("platform marks", () => {
     const shapes = new Set<string>();
     for (const slug of slugs) {
       const html = renderToStaticMarkup(<PlatformBadge platform={slug} />);
-      const inner = html.slice(html.indexOf("<svg"), html.lastIndexOf("</svg>"));
-      expect(inner.length).toBeGreaterThan(60);
+      // Either a drawn mark or a wordmark tile — never empty, never shared.
+      const inner = html.replace(/width:\d+px;height:\d+px/g, "");
+      expect(inner).toContain('role="img"');
+      expect(inner.length).toBeGreaterThan(120);
       shapes.add(inner);
       expect(platformName(slug)).not.toBe("Digital account");
     }

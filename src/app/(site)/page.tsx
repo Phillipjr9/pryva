@@ -26,6 +26,8 @@ import {
   Wallet,
 } from "@/components/icons";
 import { formatNaira, plansFor, services } from "@/lib/catalog";
+import { CountryFlag } from "@/components/CountryFlag";
+import { hasCountryFlag } from "@/lib/countries";
 
 export const metadata: Metadata = {
   title: "Pryva — Virtual numbers, eSIMs and proxies for Nigeria",
@@ -598,7 +600,10 @@ export default function HomePage() {
                         </span>{" "}
                         <span className="text-[0.72rem]">{service.unit}</span>
                         {popular && (
-                          <span className="mt-1 block text-[0.7rem] text-ink-3">
+                          <span className="mt-1 flex items-center gap-1.5 text-[0.7rem] text-ink-3">
+                            {hasCountryFlag(popular.region) && (
+                              <CountryFlag region={popular.region} size={14} decorative />
+                            )}
                             Popular: {popular.planLabel} · {formatNaira(popular.price)}
                           </span>
                         )}
