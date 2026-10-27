@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
+import { VersionGuard } from "@/components/system/VersionGuard";
+import { BUILD_ID } from "@/lib/build-id";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://pryva.ng"),
@@ -62,6 +64,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </noscript>
       </head>
       <body className="min-h-screen bg-cream text-ink antialiased">
+        <VersionGuard buildId={BUILD_ID} />
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
