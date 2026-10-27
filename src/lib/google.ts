@@ -85,6 +85,6 @@ export async function fetchGoogleUser(accessToken: string): Promise<GoogleUser> 
     sub: data.sub,
     email: data.email.toLowerCase(),
     name: data.name ?? data.email.split("@")[0],
-    emailVerified: Boolean(data.email_verified ?? true),
+    emailVerified: data.email_verified === true,
   };
 }

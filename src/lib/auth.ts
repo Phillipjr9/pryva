@@ -5,6 +5,7 @@ import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
 import { requestProto } from "@/lib/net";
+import { isDemoEmail, isPreviewDatabase } from "@/lib/demo-policy";
 
 export const SESSION_COOKIE = "pryva_session";
 const SESSION_DAYS = 30;
@@ -112,7 +113,8 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
     .limit(1);
 
   const row = rows[0];
-  return row ? toPublicUser(row.user) : null;
+  if (!row || (isDemoEmail(row.user.email) && !isPreviewDatabase())) return null;
+  return toPublicUser(row.user);
 }
 
 export async function requireAuth(
@@ -127,16 +129,19 @@ export async function requireAuth(
   return user;
 }
 
-export function isAdminUser(user: Pick<User, "email"> | PublicUser | null): boolean {
-  if (!user) return false;
-
-  const normalized = user.email.trim().toLowerCase();
-  const admins = (process.env.ADMIN_EMAILS ?? "admin@pryva.ng,demo@pryva.ng")
+export function isConfiguredAdminEmail(email: string): boolean {
+  const normalized = email.trim().toLowerCase();
+  return (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
+    .filter(Boolean)
+    .includes(normalized);
+}
 
-  return admins.includes(normalized) || normalized === "demo@pryva.ng";
+export function isAdminUser(user: Pick<User, "email"> | PublicUser | null): boolean {
+  // The one-click demo identity must never become an administrator, even if
+  // it is accidentally added to the allowlist.
+  return Boolean(user && !isDemoEmail(user.email) && isConfiguredAdminEmail(user.email));
 }
 
 export async function requireUser(nextPath = "/dashboard"): Promise<PublicUser> {

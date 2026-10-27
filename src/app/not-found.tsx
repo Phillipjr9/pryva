@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Logo, Monogram } from "@/components/brand/Logo";
 import { ArrowRight } from "@/components/icons";
 
 export default function NotFound() {
@@ -7,11 +6,7 @@ export default function NotFound() {
     <div className="relative grid min-h-screen place-items-center overflow-hidden bg-cream px-5">
       <div className="pointer-events-none absolute left-1/2 top-0 h-[30rem] w-[40rem] -translate-x-1/2 rounded-full bg-lav-200/40 blur-[120px]" />
       <div className="relative w-full max-w-lg text-center">
-        <div className="flex justify-center">
-          <Logo />
-        </div>
-        <div className="relative mt-8 overflow-hidden rounded-[1.75rem] border border-line bg-[#fffdfa] px-6 py-10 shadow-[var(--shadow-card)]">
-          <Monogram className="pointer-events-none absolute -right-8 -top-10 h-40 w-40 opacity-[0.07]" />
+        <div className="relative overflow-hidden rounded-[1.75rem] border border-line bg-[#fffdfa] px-6 py-10 shadow-[var(--shadow-card)]">
           <p className="eyebrow justify-center">404 · Page not found</p>
           <h1 className="mt-3 text-[2rem] font-medium leading-[1.1]">
             This page took

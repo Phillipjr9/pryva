@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
-import type { User } from "@/db/schema";
+import type { PublicUser } from "@/lib/auth";
 
 interface SettingsFormProps {
-  user: User;
+  user: PublicUser;
 }
 
 export function SettingsForm({ user }: SettingsFormProps) {

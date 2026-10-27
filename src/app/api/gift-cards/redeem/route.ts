@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { redeemGiftCard } from "@/lib/gift-cards";
-import { requireAuth } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
+import { isSameOriginMutation } from "@/lib/net";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!isSameOriginMutation(request)) {
+      return NextResponse.json({ error: "Cross-origin request denied" }, { status: 403 });
     }
 
     const body = await request.json();

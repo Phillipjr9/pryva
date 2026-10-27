@@ -7,12 +7,12 @@ import { createSession, hashPassword } from "@/lib/auth";
 import { exchangeGoogleCode, fetchGoogleUser, googleConfigured } from "@/lib/google";
 import { relativeRedirect } from "@/lib/net";
 import { creditWallet } from "@/lib/wallet";
+import { isDemoEmail, isPreviewDatabase, PREVIEW_WELCOME_CREDIT } from "@/lib/demo-policy";
 
 export const dynamic = "force-dynamic";
 
 const STATE_COOKIE = "pryva_google_state";
 const NEXT_COOKIE = "pryva_google_next";
-const WELCOME_CREDIT = 5000;
 
 function goToLogin(error: string): Response {
   return new Response(null, {
@@ -50,6 +50,9 @@ export async function GET(request: Request) {
   try {
     const accessToken = await exchangeGoogleCode(request, code);
     const profile = await fetchGoogleUser(accessToken);
+    if (!profile.emailVerified || isDemoEmail(profile.email)) {
+      return clearCookies(goToLogin("google-exchange"));
+    }
 
     let [user] = await db
       .select()
@@ -69,12 +72,12 @@ export async function GET(request: Request) {
         .returning();
       user = created;
 
-      if (user) {
+      if (user && isPreviewDatabase()) {
         await creditWallet({
           userId: user.id,
-          amount: WELCOME_CREDIT,
+          amount: PREVIEW_WELCOME_CREDIT,
           type: "credit",
-          description: "Welcome credit — Google sign-up",
+          description: "Preview welcome credit — Google sign-up",
         });
       }
     }

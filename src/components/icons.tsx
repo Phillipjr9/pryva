@@ -572,6 +572,22 @@ export function Settings(props: IconProps) {
   );
 }
 
+export function Trash2(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 7h16M10 4h4M6 7l1 13h10l1-13M10 11v6M14 11v6" />
+    </svg>
+  );
+}
+
+export function Filter(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 5h16l-6.5 7.5v5.5l-3 1.5v-7z" />
+    </svg>
+  );
+}
+
 export const serviceIconMap = {
   phone: Phone,
   sim: Sim,

@@ -15,12 +15,12 @@ interface ServiceIconProps {
 }
 
 const digitalServiceImages: Record<DigitalServiceType, string> = {
-  netflix: "/images/services/netflix.png",
-  spotify: "/images/services/spotify.png",
-  youtube: "/images/services/youtube.png",
-  disney: "/images/services/disney.png",
-  chatgpt: "/images/services/chatgpt.png",
-  canva: "/images/services/canva.png",
+  netflix: "/images/categories/streaming.png",
+  spotify: "/images/categories/music.png",
+  youtube: "/images/categories/streaming.png",
+  disney: "/images/categories/streaming.png",
+  chatgpt: "/images/categories/productivity.png",
+  canva: "/images/categories/productivity.png",
 };
 
 const coreServiceImages: Record<CoreServiceType, string> = {

@@ -47,6 +47,27 @@ export function publicOrigin(request: Request): string {
   }
 }
 
+/** Reject cross-origin browser mutations, including iframe-originated requests. */
+export function isSameOriginMutation(request: Request): boolean {
+  if (["GET", "HEAD", "OPTIONS"].includes(request.method.toUpperCase())) return true;
+
+  const site = request.headers.get("sec-fetch-site");
+  if (site === "cross-site" || site === "same-site") return false;
+
+  const origin = request.headers.get("origin");
+  if (!origin) return true; // Non-browser clients do not necessarily send Origin.
+
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  try {
+    const expectedOrigin = host
+      ? new URL(`${requestProto(request)}://${host}`).origin
+      : new URL(request.url).origin;
+    return new URL(origin).origin === expectedOrigin;
+  } catch {
+    return false;
+  }
+}
+
 /** A relative redirect — bulletproof across proxies, http(s) and host rewrites. */
 export function relativeRedirect(path: string, status = 303): Response {
   return new Response(null, { status, headers: { Location: path } });
