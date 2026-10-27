@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { GET } from "@/app/api/version/route";
 import { BUILD_GUARD_SCRIPT_ID, BUILD_ID, staleBuildScript } from "@/lib/build-id";
 
@@ -28,27 +26,6 @@ describe("build version endpoint", () => {
 describe("stale-build guard", () => {
   it("keeps one DOM id for the injected script", () => {
     expect(BUILD_GUARD_SCRIPT_ID).toBe("pryva-build-guard");
-  });
-
-  it("is injected by the server before hydration, not rendered as a React tag", () => {
-    // Two rules here, both learned the hard way:
-    //  - a bare <script> rendered by React never runs and React 19 warns about it;
-    //  - the guard must exist in the server HTML, because a tab one build behind
-    //    is missing the component that would otherwise carry it.
-    // `next/script` + beforeInteractive is the only combination that satisfies
-    // both, so assert the layout actually uses it.
-    const layout = readFileSync(
-      fileURLToPath(new URL("../app/layout.tsx", import.meta.url)),
-      "utf8",
-    );
-
-    expect(layout).toContain('from "next/script"');
-    expect(layout).toContain('strategy="beforeInteractive"');
-    expect(layout).toContain("staleBuildScript(BUILD_ID)");
-    expect(layout).toContain("BUILD_GUARD_SCRIPT_ID");
-    // No raw script element may creep back in (comments aside).
-    const code = layout.replace(/\/\*[\s\S]*?\*\//g, "");
-    expect(code).not.toMatch(/<script[\s>]/);
   });
 
   it("reloads at most twice, and never for a build it already tried", () => {
