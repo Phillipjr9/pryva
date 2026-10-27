@@ -393,3 +393,53 @@ Guard tests added (`dashboard-shell.test.ts`):
   what caught the two stragglers in gift cards and scheduled orders
 
 Support page needed nothing: it was already on the brand palette and H1 scale.
+
+---
+
+## 12. "The preview didn't update" — what it actually was
+
+Reported twice: after the overview rebuild and after the top-bar balance, a
+refresh showed the old page. The code was not the problem. This is the record of
+how that was established, and what now prevents it from being ambiguous again.
+
+### What the server was serving
+
+| Probe | Result |
+| --- | --- |
+| `GET /dashboard` with a demo session | `200`, `Cache-Control: no-cache, must-revalidate` |
+| `Available to spend` in that HTML | present (twice) |
+| `aria-label="Wallet balance …"` | present |
+| `Welcome back` / `Your Pryva wallet is ready` (old copy) | absent |
+| `BalanceHero.tsx` on `origin/main` (`3d3cf5f`) | **absent** |
+| Vercel projects named `pryva` | **none** — so no hosted deploy was involved |
+
+Conclusion: the page on port 3000 is the new one. What was stale was the
+**document already open in the browser** — an embedded preview keeps the
+JavaScript it loaded, and after the reload-loop fix (see §13) the guard
+deliberately refuses to reload a tab whose brakes it cannot record. So a stale
+embedded tab had no way back to a current build, and no way to say so.
+
+That silence was the bug worth fixing. Two changes:
+
+1. **`build-id.ts` → `offerRefresh()`.** When storage is blocked the guard still
+   must not reload itself, but it now shows a small fixed notice — "A newer
+   version of Pryva is ready." with a **Refresh** button. A tap is the visitor's
+   own gesture, so it cannot loop.
+2. **A build stamp in the dashboard footer (development only).**
+   `build dev-<pid>-<started>` renders on every dashboard page, and
+   `/api/version` returns the same string. If the two ever disagree, the tab is
+   old — that question is now answerable by looking, not by guessing.
+
+### If a preview looks old again
+
+1. Check the footer stamp against `/api/version`. Same value → the page is
+   current and the problem is elsewhere.
+2. Different value → tap **Refresh** in the notice (or hard-reload the preview,
+   or open it in its own tab — an embedded frame is the environment that blocks
+   the brakes in the first place).
+3. Rule for reports: say which build is being served before saying anything is
+   fixed. Local `curl` proving the server is right is not evidence about what a
+   browser is showing.
+
+Tests: `build-guard.test.tsx` now covers the notice path — storage blocked, no
+reload, notice rendered, and the button's own click reloads exactly once.
