@@ -45,7 +45,8 @@ export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
   }
 
   const result = calculateBulkOrder(items);
-  const discountMessage = getBulkDiscountMessage(items.reduce((sum, item) => sum + item.quantity, 0));
+  const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+  const discountMessage = getBulkDiscountMessage(totalQuantity, result.discountPercent);
 
   async function handlePurchase() {
     if (items.length === 0) {

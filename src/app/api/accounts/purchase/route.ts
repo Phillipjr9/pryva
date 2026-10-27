@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthApi } from "@/lib/auth";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
 import { debitWallet, creditWallet, makeReference, InsufficientFundsError } from "@/lib/wallet";
 import {
@@ -15,7 +15,9 @@ import {
   type AccsZonePurchase,
 } from "@/lib/accszone";
 import { applyPromoDiscount, priceMarketplaceListing } from "@/lib/marketplace-pricing";
+import { MIN_ORDER_NGN } from "@/lib/pricing";
 import { logger } from "@/lib/logger";
+import { formatNaira } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Accounts are temporarily unavailable." }, { status: 503 });
   }
 
-  const user = await requireAuth(request);
+  const user = await requireAuthApi();
   if (!user) {
     return NextResponse.json({ error: "Please sign in to buy accounts." }, { status: 401 });
   }
@@ -169,6 +171,19 @@ export async function POST(request: NextRequest) {
       // Code stopped working between validation and checkout — charge normal price.
       logger.info("Marketplace promo dropped at checkout", { promoCode, userId: user.id });
     }
+  }
+
+  // Payment fees are fixed, so a tiny basket clears the margin band but not the
+  // fee. Refuse it here rather than lose money on every micro-order.
+  if (price.totalNgn < MIN_ORDER_NGN) {
+    return NextResponse.json(
+      {
+        error: `Minimum order is ${formatNaira(MIN_ORDER_NGN)}. Add a second unit or pick a bigger listing.`,
+        minimumOrderNgn: MIN_ORDER_NGN,
+        totalNgn: price.totalNgn,
+      },
+      { status: 400 },
+    );
   }
 
   // 2. Debit first — if the wallet can't cover it, nothing else happens.

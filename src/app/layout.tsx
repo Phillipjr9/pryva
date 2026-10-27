@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
+import { VersionGuard } from "@/components/system/VersionGuard";
+import { BUILD_ID } from "@/lib/build-id";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://pryva.ng"),
@@ -21,18 +23,28 @@ export const metadata: Metadata = {
     "pay with Naira",
   ],
   openGraph: {
-    title: "Pryva — Simple. Secure. Scalable.",
+    title: "Pryva — Virtual numbers, eSIMs and proxies for Nigeria",
     description:
-      "Virtual numbers, eSIMs, residential proxies and email OTP. Naira payments, instant delivery and built-in refunds.",
+      "Virtual numbers, eSIMs, residential proxies, email OTP and digital accounts. Naira payments, instant delivery and built-in refunds.",
+    url: "/",
     type: "website",
     locale: "en_NG",
     siteName: "Pryva",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Pryva — numbers, eSIMs and proxies, priced in Naira",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Pryva — Simple. Secure. Scalable.",
+    title: "Pryva — Virtual numbers, eSIMs and proxies for Nigeria",
     description:
-      "Nigeria's calm way to buy virtual numbers, eSIMs, proxies and email OTP.",
+      "Nigeria's calm way to buy virtual numbers, eSIMs, proxies, inboxes and accounts — in Naira.",
+    images: ["/og.png"],
   },
 };
 
@@ -52,6 +64,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </noscript>
       </head>
       <body className="min-h-screen bg-cream text-ink antialiased">
+        <VersionGuard buildId={BUILD_ID} />
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

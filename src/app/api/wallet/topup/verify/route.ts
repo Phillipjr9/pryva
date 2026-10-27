@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthApi } from "@/lib/auth";
 import { isPaystackConfigured, verifyPayment } from "@/lib/paystack";
 import { completeTopUp } from "@/lib/topups";
 import { logger } from "@/lib/logger";
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  * confirmed twice still credits once.
  */
 export async function POST(request: NextRequest) {
-  const user = await requireAuth(request);
+  const user = await requireAuthApi();
   if (!user) {
     return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   }

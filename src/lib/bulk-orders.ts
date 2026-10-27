@@ -1,4 +1,5 @@
 import { findPlan } from "./catalog";
+import { CATALOG_PRICES } from "./prices.generated";
 
 export interface BulkOrderItem {
   productSlug: string;
@@ -45,28 +46,43 @@ export function calculateBulkOrder(items: BulkOrderItem[]): BulkOrderResult {
     result.subtotal += subtotal;
   }
 
-  // Calculate discount based on total quantity
+  // Discount is a courtesy, not a loss-leader: the basket may only give away as
+  // much headroom as its thinnest-margin line can afford (30% floor).
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
-  
+
+  let tierPercent = 0;
   if (totalQuantity >= 20) {
-    result.discountPercent = 10;
+    tierPercent = 10;
   } else if (totalQuantity >= 10) {
-    result.discountPercent = 5;
+    tierPercent = 5;
   }
 
+  const headroom = result.items.reduce((lowest, item) => {
+    const generated = CATALOG_PRICES[item.productSlug];
+    const allowed = generated ? generated.maxDiscountPercent : 0;
+    return Math.min(lowest, allowed);
+  }, tierPercent);
+
+  result.discountPercent = Math.min(tierPercent, Math.max(0, headroom));
   result.discount = Math.round(result.subtotal * (result.discountPercent / 100));
   result.total = result.subtotal - result.discount;
 
   return result;
 }
 
-export function getBulkDiscountMessage(quantity: number): string | null {
+export function getBulkDiscountMessage(quantity: number, appliedPercent?: number): string | null {
+  const tier = quantity >= 20 ? 10 : quantity >= 10 ? 5 : 0;
+  const capped =
+    tier > 0 && appliedPercent !== undefined && appliedPercent < tier
+      ? ` — ${appliedPercent}% on this basket to keep every line profitable`
+      : "";
+
   if (quantity >= 20) {
-    return "10% discount applied for 20+ items";
+    return `10% discount for 20+ items${capped}`;
   } else if (quantity >= 10) {
-    return "5% discount applied for 10+ items";
+    return `5% discount for 10+ items${capped}`;
   } else if (quantity >= 5) {
-    return `Add ${10 - quantity} more items for 5% discount`;
+    return `Add ${10 - quantity} more items for a 5% discount`;
   }
   return null;
 }

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { plans, services, formatNaira } from "@/lib/catalog";
 import { Check } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
+import { CountryFlag } from "@/components/CountryFlag";
+import { hasCountryFlag } from "@/lib/countries";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -82,7 +84,8 @@ export default function PricingPage() {
                         </span>
                       </div>
                     )}
-                    <h3 className="text-[1.1rem] font-semibold text-ink mb-2">
+                    <h3 className="mb-2 flex items-center gap-2 text-[1.1rem] font-semibold text-ink">
+                      {hasCountryFlag(plan.region) && <CountryFlag region={plan.region} size={20} decorative />}
                       {plan.name}
                     </h3>
                     <p className="text-[0.86rem] text-ink-2 mb-4">

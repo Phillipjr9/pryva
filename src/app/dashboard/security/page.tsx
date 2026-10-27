@@ -1,18 +1,16 @@
-import { redirect } from "next/navigation";
-import { requireAuth } from "@/lib/auth";
-import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { requireUser } from "@/lib/auth";
+import { SessionsCard } from "./SessionsCard";
 import { Shield } from "@/components/icons";
 import Link from "next/link";
 
+// Shell comes from the dashboard layout; this page supplies content only.
 export default async function SecurityPage() {
-  const user = await requireAuth();
-  if (!user) redirect("/login?next=/dashboard/security");
+  await requireUser("/dashboard/security");
 
   return (
-    <DashboardShell user={user}>
       <div className="space-y-6">
         <div>
-          <h1 className="text-[1.75rem] font-medium tracking-tight text-ink">
+          <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">
             Security
           </h1>
           <p className="mt-2 text-[0.95rem] text-ink-2">
@@ -64,25 +62,7 @@ export default async function SecurityPage() {
             </div>
           </div>
 
-          {/* Active Sessions */}
-          <div className="rounded-2xl border border-line bg-white p-6">
-            <div className="flex items-start gap-4">
-              <div className="grid h-12 w-12 place-items-center rounded-xl bg-blue-100 text-blue-600">
-                <Shield className="h-6 w-6" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-[1rem] font-semibold text-ink mb-2">
-                  Active Sessions
-                </h3>
-                <p className="text-[0.86rem] text-ink-2 mb-4">
-                  View and manage your active login sessions across devices.
-                </p>
-                <span className="inline-flex items-center gap-2 rounded-xl bg-gray-100 px-4 py-2 text-[0.86rem] font-semibold text-gray-500">
-                  Coming Soon
-                </span>
-              </div>
-            </div>
-          </div>
+          <SessionsCard />
 
           {/* Login History */}
           <div className="rounded-2xl border border-line bg-white p-6">
@@ -134,6 +114,5 @@ export default async function SecurityPage() {
           </ul>
         </div>
       </div>
-    </DashboardShell>
   );
 }
