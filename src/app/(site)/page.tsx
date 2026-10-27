@@ -6,6 +6,7 @@ import { BrandMark, hasBrand } from "@/components/brand/BrandMark";
 import { Reveal } from "@/components/ui/Reveal";
 import { FaqAccordion } from "@/components/ui/FaqAccordion";
 import { Monogram } from "@/components/brand/Logo";
+import { ServiceIcon } from "@/components/ServiceIcon";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -51,28 +52,28 @@ const shortcuts = [
     price: plansFor("numbers")[0]?.price ?? 1200,
     note: "Buy or rent",
     href: "/virtual-numbers",
-    icon: Phone,
+    service: "numbers" as const,
   },
   {
     label: "eSIM data",
     price: plansFor("esim")[0]?.price ?? 4500,
     note: "190+ destinations",
     href: "/esim",
-    icon: Sim,
+    service: "esim" as const,
   },
   {
     label: "Residential proxies",
     price: plansFor("proxies")[0]?.price ?? 3500,
     note: "Nigeria-first pool",
     href: "/proxies",
-    icon: Globe,
+    service: "proxies" as const,
   },
   {
     label: "Email OTP",
     price: plansFor("email-otp")[0]?.price ?? 700,
     note: "Temporary inboxes",
     href: "/email-otp",
-    icon: Mail,
+    service: "email-otp" as const,
   },
 ];
 
@@ -488,7 +489,6 @@ export default function HomePage() {
         <div className="shell">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {shortcuts.map((item, index) => {
-              const Icon = item.icon;
               return (
                 <Reveal key={item.label} delay={index * 60}>
                   <Link
@@ -496,9 +496,7 @@ export default function HomePage() {
                     className="group flex h-full flex-col justify-between rounded-2xl border border-line bg-white/70 p-4 backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-lav-200 hover:bg-white hover:shadow-[var(--shadow-soft)]"
                   >
                     <div className="flex items-start justify-between">
-                      <span className="grid h-9 w-9 place-items-center rounded-xl bg-lav-50 text-lav-700 transition-colors group-hover:bg-lav-100">
-                        <Icon className="h-4 w-4" />
-                      </span>
+                      <ServiceIcon service={item.service} size="sm" />
                       <ArrowUpRight className="h-4 w-4 text-ink-3 transition-colors group-hover:text-lav-600" />
                     </div>
                     <div className="mt-4">
@@ -568,7 +566,6 @@ export default function HomePage() {
 
           <div className="mt-10 grid gap-4 md:grid-cols-2">
             {services.map((service, index) => {
-              const Icon = serviceIcons[service.slug];
               const popular = plansFor(service.slug).find((plan) => plan.popular);
               return (
                 <Reveal key={service.slug} delay={index * 70}>
@@ -578,9 +575,7 @@ export default function HomePage() {
                   >
                     <Monogram className="pointer-events-none absolute -right-6 -top-8 h-40 w-40 opacity-[0.05] transition-opacity group-hover:opacity-[0.09]" />
                     <div className="relative flex items-start justify-between gap-4">
-                      <span className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-lav-100 to-lav-200/60 text-lav-700">
-                        <Icon className="h-5 w-5" />
-                      </span>
+                      <ServiceIcon service={service.slug as any} size="md" />
                       <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/80 px-2.5 py-1 text-[0.66rem] font-medium text-ink-3">
                         <Sparkle className="h-2.5 w-2.5 text-lav-500" />
                         {service.eyebrow}
