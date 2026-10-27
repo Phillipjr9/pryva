@@ -46,6 +46,11 @@ export const BUILD_GUARD_SCRIPT_ID = "pryva-build-guard";
  * Honest limit: this cannot rescue the tab that is *already* stale — it has the
  * old JavaScript, so it has the old copy of this script. It guarantees that once
  * a tab has loaded a build containing this guard, later drift heals itself.
+ *
+ * Second honest limit: when the brakes cannot be recorded (partitioned preview
+ * iframes block sessionStorage) reloading is unsafe, so the tab stays stale
+ * forever and silently. For that case the guard offers a one-tap "Refresh"
+ * notice instead: the visitor becomes the brake, and a tap can never loop.
  */
 export function staleBuildScript(buildId: string): string {
   return `(function(){try{
@@ -61,8 +66,30 @@ function reloadOnce(reason){
     if(Number(sessionStorage.getItem(C)||0)>=2)return;
     sessionStorage.setItem(K,reason);
     sessionStorage.setItem(C,String(Number(sessionStorage.getItem(C)||0)+1));
-  }catch(e){return;}
+  }catch(e){offerRefresh();return;}
   window.location.reload();
+}
+function offerRefresh(){
+  // Storage is blocked, so auto-reload is off the table. Say so plainly and let
+  // a tap do what the guard may not do by itself.
+  try{
+    if(document.getElementById("pryva-stale-notice"))return;
+    var box=document.createElement("div");
+    box.id="pryva-stale-notice";
+    box.setAttribute("role","status");
+    box.style.cssText="position:fixed;left:12px;right:12px;bottom:12px;z-index:2147483647;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:#14110f;color:#fff;font:500 13px/1.4 ui-sans-serif,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.28)";
+    var text=document.createElement("span");
+    text.style.cssText="flex:1";
+    text.textContent="A newer version of Pryva is ready.";
+    var button=document.createElement("button");
+    button.type="button";
+    button.textContent="Refresh";
+    button.style.cssText="appearance:none;border:0;border-radius:999px;background:#fff;color:#14110f;font:600 13px ui-sans-serif,system-ui,sans-serif;padding:8px 16px;cursor:pointer";
+    button.onclick=function(){window.location.reload();};
+    box.appendChild(text);
+    box.appendChild(button);
+    (document.body||document.documentElement).appendChild(box);
+  }catch(e){}
 }
 function check(){
   var now=Date.now();
