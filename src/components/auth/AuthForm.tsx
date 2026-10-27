@@ -60,6 +60,7 @@ export function AuthForm({
 
   async function submitDemo(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending === "demo") return;
     setPending("demo");
     setError(null);
     try {
@@ -93,17 +94,31 @@ export function AuthForm({
           Continue with Google
         </a>
 
+        {/*
+          `action`/`method` keep the demo working without JavaScript: the server
+          answers with a 303 straight to the dashboard. With JavaScript, onSubmit
+          takes over so a failure (e.g. demo disabled on a real database) can be
+          shown in place instead of bouncing through a redirect.
+
+          The button must NOT be `disabled` on click: a submit button disabled
+          inside its own click handler is removed before the browser performs the
+          default form submission, so the form never posts and the visitor is left
+          looking at "Opening the demo…" forever.
+        */}
         <form
           action="/api/auth/demo-web"
           method="post"
           className="mt-2.5"
+          onSubmit={submitDemo}
         >
           <input type="hidden" name="next" value={next} />
           <button
             type="submit"
-            disabled={pending !== null}
-            className="btn w-full border-2 border-lav-400 bg-gradient-to-r from-lav-100 to-lav-50 !py-4 !text-[0.9rem] font-semibold text-lav-800 hover:from-lav-200 hover:to-lav-100 disabled:opacity-60 shadow-sm transition-all"
-            onClick={() => setPending("demo")}
+            aria-busy={pending === "demo"}
+            aria-disabled={pending !== null}
+            className={`btn w-full border-2 border-lav-400 bg-gradient-to-r from-lav-100 to-lav-50 !py-4 !text-[0.9rem] font-semibold text-lav-800 hover:from-lav-200 hover:to-lav-100 shadow-sm transition-all ${
+              pending !== null ? "pointer-events-none opacity-70" : ""
+            }`}
           >
             <Sparkle className="h-5 w-5" />
             {pending === "demo" ? "Opening the demo…" : "⚡ One-Click Demo Login"}
