@@ -15,17 +15,25 @@ const GOOGLE_ERRORS: Record<string, string> = {
   "demo-failed": "The demo could not open right now. Please try again in a moment.",
 };
 
+/**
+ * Sign-in / sign-up card.
+ *
+ * Keep *conditional, request-dependent* markup OUT of this component. It is a
+ * client component, so a browser holding an older bundle cannot render nodes
+ * that were added here later — the server includes them, the client doesn't, and
+ * React reports a hydration mismatch. That is not hypothetical: the "landed back
+ * here" notice lived here and produced exactly that error on a stale tab.
+ * Notices that depend on server-side state belong in the page (a server
+ * component), where a stale bundle doesn't need to know about them.
+ */
 export function AuthForm({
   mode,
   next,
   errorParam,
-  bounced = false,
 }: {
   mode: Mode;
   next: string;
   errorParam?: string | null;
-  /** The visitor asked for a signed-in page and arrived here instead. */
-  bounced?: boolean;
 }) {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [pending, setPending] = useState<"form" | "demo" | null>(null);
@@ -119,27 +127,6 @@ export function AuthForm({
             Button not responding? Open the demo directly
           </a>
         </p>
-
-        {bounced && (
-          <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5 text-[0.76rem] text-ink">
-            <summary className="cursor-pointer font-semibold text-amber-900">
-              Just signed in and landed back here?
-            </summary>
-            <p className="mt-1.5 leading-relaxed text-ink-2">
-              The sign-in worked — this browser context threw the session cookie
-              away. Previews embedded inside another site often do that. Open the
-              preview in its own browser tab and sign in once there.
-            </p>
-            <p className="mt-1.5">
-              <a
-                href="/api/auth/whoami"
-                className="font-semibold text-lav-700 underline underline-offset-2"
-              >
-                Check what the server sees
-              </a>
-            </p>
-          </details>
-        )}
 
         <div className="my-5 flex items-center gap-3">
           <span className="h-px flex-1 bg-line" />
