@@ -75,6 +75,25 @@ Regression tests (5 in `demo-login.test.tsx`) assert the form still posts, the
 button is never rendered disabled, **nothing intercepts the submit with a
 client-side request**, and the fallback link is present.
 
+### 1c. Why the tab kept serving old JavaScript
+
+The follow-up symptom was a hydration mismatch on `/login`: the server markup
+had the new "Open the demo directly" paragraph while the client tree expected the
+old markup, and the click handler came from a bundle compiled before the change.
+Two builds were live at once inside one tab.
+
+`/login` itself is correctly dynamic (`cookies()` in `getCurrentUser`, plus
+`searchParams`), so the HTML is fresh on every request — the stale half was the
+JavaScript the tab had already loaded.
+
+Fix: `src/lib/build-id.ts` + `VersionGuard`. The server renders a build id
+(`VERCEL_GIT_COMMIT_SHA` in production, a per-process id in dev), exposes it at
+`/api/version`, and the client compares on mount and whenever the tab regains
+focus. If the tab is older than the server it reloads **once** — with two brakes
+(build remembered, max two reloads per session) so a half-finished deploy can
+never ping-pong a tab. Result: a deploy or a dev-server restart heals open tabs
+instead of leaving a button that renders but does nothing.
+
 ---
 
 ## 2. What the demo account actually shows — nothing
