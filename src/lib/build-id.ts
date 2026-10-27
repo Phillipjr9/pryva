@@ -26,30 +26,47 @@ function resolveBuildId(): string {
 
 export const BUILD_ID: string = (globalForBuild.__pryvaBuildId ??= resolveBuildId());
 
-/**
- * Inline, framework-free version check.
- *
- * This runs as plain HTML script, *not* as a React component, for one reason: a
- * stale tab has stale JavaScript, so a React-based guard is missing from exactly
- * the tabs that need it. The HTML, however, is always freshly rendered, so this
- * snippet is current even when every component on the page is a build behind.
- *
- * Fetches /api/version, compares it with the id baked into this page, and reloads
- * once if the tab is older than the server. Two brakes (remembered build + max
- * two reloads per session) stop a bad deploy from looping a tab.
- */
 export const BUILD_GUARD_SCRIPT_ID = "pryva-build-guard";
 
+/**
+ * Inline, framework-free staleness check, injected server-side.
+ *
+ * Two failures look identical to a visitor and need different detection:
+ *
+ * 1. **Cached HTML.** The document itself is a build behind the server. Visible
+ *    by comparing the build id in the HTML with /api/version.
+ * 2. **Stale JavaScript.** The document is fresh but the executing bundle is not
+ *    — a tab restored from bfcache, or one that kept its modules across a dev
+ *    server restart. No build id can reveal this (the HTML is current), so the
+ *    only signal is the failure itself: React throwing a hydration mismatch.
+ *
+ * Both paths reload once, behind two brakes (a remembered target + a hard cap of
+ * two reloads per session) so a genuinely broken deploy can't trap a tab.
+ *
+ * Honest limit: this cannot rescue the tab that is *already* stale — it has the
+ * old JavaScript, so it has the old copy of this script. It guarantees that once
+ * a tab has loaded a build containing this guard, later drift heals itself.
+ */
 export function staleBuildScript(buildId: string): string {
   return `(function(){try{
-var build=${JSON.stringify(buildId)},K="pryva:reloaded-for",C="pryva:version-reloads";
+var build=${JSON.stringify(buildId)},K="pryva:reloaded-for",C="pryva:reloads";
+function reload(reason){try{
+if(sessionStorage.getItem(K)===reason&&reason==="hydration")return;
+var n=Number(sessionStorage.getItem(C)||0);if(n>=2)return;
+sessionStorage.setItem(C,String(n+1));
+if(reason==="hydration")sessionStorage.setItem(K,reason);else sessionStorage.setItem(K,String(build));
+}catch(e){}
+window.location.reload();}
 function check(){try{fetch("/api/version",{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(d){
 if(!d||!d.build||d.build===build)return;
-try{if(sessionStorage.getItem(K)===d.build)return;var n=Number(sessionStorage.getItem(C)||0);if(n>=2)return;
-sessionStorage.setItem(K,d.build);sessionStorage.setItem(C,String(n+1));}catch(e){}
-window.location.reload();}).catch(function(){});}catch(e){}}
+try{if(sessionStorage.getItem(K)===d.build)return;}catch(e){}
+reload("version");}).catch(function(){});}catch(e){}}
 check();
 document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")check();});
 window.addEventListener("pageshow",function(e){if(e.persisted)check();});
+window.addEventListener("error",function(e){
+var m=(e&&(e.message||(e.error&&e.error.message)))||"";
+if(/hydration|did not match|Minified React error #(418|423|425)/i.test(m))reload("hydration");
+});
 }catch(e){}})();`;
 }
