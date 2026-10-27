@@ -2,6 +2,8 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { serviceMap, plansFor, formatNaira } from "@/lib/catalog";
 import { ArrowRight } from "@/components/icons";
+import { CountryFlag } from "@/components/CountryFlag";
+import { hasCountryFlag } from "@/lib/countries";
 
 export const metadata: Metadata = {
   title: "Residential Proxies",
@@ -58,7 +60,10 @@ export default function ProxiesPage() {
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {plans.slice(0, 6).map((plan) => (
               <div key={plan.slug} className={`rounded-2xl border p-6 ${plan.popular ? "border-lav-600 bg-white shadow-[var(--shadow-card)]" : "border-line bg-white"}`}>
-                <h3 className="text-[1.1rem] font-semibold text-ink mb-2">{plan.name}</h3>
+                <h3 className="mb-2 flex items-center gap-2 text-[1.1rem] font-semibold text-ink">
+                  {hasCountryFlag(plan.region) && <CountryFlag region={plan.region} size={20} decorative />}
+                  {plan.name}
+                </h3>
                 <p className="text-[0.86rem] text-ink-2 mb-4">{plan.planLabel}</p>
                 <div className="mb-4"><span className="text-[2rem] font-bold text-ink">{formatNaira(plan.price)}</span></div>
                 <Link href={`/signup?plan=${plan.slug}`} className="block w-full rounded-xl bg-lav-600 px-4 py-3 text-center text-[0.9rem] font-semibold text-white hover:bg-lav-700">Get Started</Link>

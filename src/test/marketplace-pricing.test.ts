@@ -20,11 +20,12 @@ describe("marketplace pricing", () => {
     expect(price.profitNgn).toBeGreaterThanOrEqual(200);
   });
 
-  it("applies the ₦200 minimum profit floor to very cheap listings", async () => {
+  it("keeps a micro-listing at the band ceiling when ₦200 would breach it", async () => {
     const price = await priceMarketplaceListing({ unitPriceUsd: "0.05", quantity: 1 });
 
     expect(price.costNgn).toBe(80);
-    expect(price.profitNgn).toBeGreaterThanOrEqual(200);
+    expect(price.markupPercent).toBeLessThanOrEqual(50);
+    expect(price.markupPercent).toBeGreaterThanOrEqual(30);
   });
 
   it("adds a larger premium for Facebook and Instagram", async () => {
@@ -48,9 +49,12 @@ describe("marketplace pricing", () => {
     expect(bulk.profitNgn).toBeGreaterThanOrEqual(200);
   });
 
-  it("rounds totals to a tidy ₦50 boundary", async () => {
-    const price = await priceMarketplaceListing({ unitPriceUsd: "0.37", quantity: 3 });
-    expect(price.totalNgn % 50).toBe(0);
+  it("rounds to the step that fits the cost", async () => {
+    const cheap = await priceMarketplaceListing({ unitPriceUsd: "0.37", quantity: 3 });
+    expect(cheap.totalNgn % 10).toBe(0);
+
+    const expensive = await priceMarketplaceListing({ unitPriceUsd: "19.99", quantity: 2 });
+    expect(expensive.totalNgn % 50).toBe(0);
   });
 
   it("handles zero quantity safely by treating it as one unit", async () => {
@@ -66,11 +70,12 @@ describe("marketplace pricing", () => {
     expect(discounted.profitNgn).toBeGreaterThanOrEqual(200);
   });
 
-  it("ignores an oversized promo discount instead of going negative", async () => {
+  it("caps an oversized promo discount at the minimum chargeable order", async () => {
     const base = await priceMarketplaceListing({ unitPriceUsd: "1.00", quantity: 1 });
     const discounted = applyPromoDiscount(base, "99.00");
 
-    expect(discounted.totalNgn).toBeGreaterThanOrEqual(discounted.costNgn + 200);
-    expect(discounted.totalNgn).toBeGreaterThan(0);
+    expect(discounted.totalNgn).toBeGreaterThanOrEqual(500);
+    expect(discounted.totalNgn).toBeLessThanOrEqual(base.totalNgn);
+    expect(discounted.profitNgn).toBeGreaterThanOrEqual(0);
   });
 });

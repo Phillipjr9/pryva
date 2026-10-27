@@ -37,7 +37,7 @@ const detailedSteps = [
     n: "02",
     title: "Fund your wallet in Naira",
     body: "Top up with a Nigerian bank transfer or a local card. The balance is available the moment the payment confirms, and unused funds stay yours for 90 days.",
-    detail: "Top-ups from ₦2,000. Balance visible in the header on every page.",
+    detail: "Top-ups from ₦1,000. Balance visible in the header on every page.",
     icon: Card,
   },
   {

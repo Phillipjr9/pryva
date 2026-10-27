@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Check, Shield, Sparkle } from "@/components/icons";
+import { BrandLockup } from "@/components/brand/BrandLockup";
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -8,7 +9,8 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <div className="pointer-events-none absolute left-[-10rem] top-[-10rem] h-[30rem] w-[30rem] rounded-full bg-lav-200/45 blur-[120px]" />
       <div className="pointer-events-none absolute bottom-[-12rem] right-[-6rem] h-[28rem] w-[28rem] rounded-full bg-peach/50 blur-[120px]" />
 
-      <header className="shell relative flex h-[76px] items-center justify-end">
+      <header className="shell relative flex h-[68px] items-center justify-between sm:h-[76px]">
+        <BrandLockup size="sm" priority />
         <Link
           href="/"
           className="text-[0.8rem] font-medium text-ink-2 transition-colors hover:text-lav-700"

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Lock, Shield, Sparkle } from "@/components/icons";
 import { formatNaira, type Plan } from "@/lib/catalog";
 import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
+import { CountryFlag } from "@/components/CountryFlag";
+import { hasCountryFlag } from "@/lib/countries";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
 
 type Group = { label: string; plans: Plan[] };
@@ -166,7 +168,9 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <span className="flex items-center gap-2 text-[0.95rem] font-semibold text-ink">
-                        {plan.flag && <span aria-hidden="true">{plan.flag}</span>}
+                        {hasCountryFlag(plan.region) && (
+                          <CountryFlag region={plan.region} size={20} decorative />
+                        )}
                         {plan.name}
                       </span>
                       <span className="mt-1 block text-[0.76rem] text-ink-3">{plan.planLabel}</span>

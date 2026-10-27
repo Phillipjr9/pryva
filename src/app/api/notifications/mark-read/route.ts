@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthApi } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 // POST /api/notifications/mark-read - Mark notifications as read
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
+    const user = await requireAuthApi();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

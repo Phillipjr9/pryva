@@ -1,4 +1,15 @@
-export type ServiceSlug = "numbers" | "esim" | "proxies" | "email-otp" | "data" | "gift-cards" | "bulk" | "scheduled";
+import { CATALOG_PRICES } from "@/lib/prices.generated";
+
+export type ServiceSlug =
+  | "numbers"
+  | "esim"
+  | "proxies"
+  | "email-otp"
+  | "accounts"
+  | "data"
+  | "gift-cards"
+  | "bulk"
+  | "scheduled";
 
 export type ServiceKey = ServiceSlug;
 
@@ -21,6 +32,7 @@ export type Plan = {
   region: string;
   flag?: string;
   duration: string;
+  /** Generated from the supplier cost sheet — see scripts/build-prices.mjs. */
   price: number;
   compareAt?: number;
   popular?: boolean;
@@ -41,7 +53,7 @@ export type Service = {
   intro: string;
   fromPrice: number;
   unit: string;
-  icon: "phone" | "sim" | "globe" | "mail" | "gift" | "package" | "calendar";
+  icon: "phone" | "sim" | "globe" | "mail" | "accounts" | "gift" | "package" | "calendar";
   highlights: { title: string; body: string }[];
   included: string[];
   goodFor: string[];
@@ -54,7 +66,7 @@ export function formatNaira(value: number): string {
   return `${NGN}${new Intl.NumberFormat("en-NG", { maximumFractionDigits: 0 }).format(value)}`;
 }
 
-export const services: Service[] = [
+const serviceDefinitions: Service[] = [
   {
     slug: "numbers",
     name: "Virtual Numbers",
@@ -66,17 +78,17 @@ export const services: Service[] = [
       "Buy a number for a single verification, or rent one for the long term. Non-VoIP lines across 40+ countries, delivered in seconds.",
     intro:
       "Every line is a real carrier number — never VoIP — so codes from WhatsApp, Telegram, Google, Binance, Tinder, PayPal and 500+ platforms land without friction. Pay in Naira, receive the number instantly, and get an automatic refund if a code never arrives.",
-    fromPrice: 1200,
+    fromPrice: 1340,
     unit: "per verification",
     icon: "phone",
     highlights: [
       {
         title: "Buy once or rent",
-        body: "One-time verification from ₦1,200, or keep the same number for 7, 30 or 90 days.",
+        body: "One-time verification on a real carrier line, or keep the same number for 7, 30 or 90 days.",
       },
       {
         title: "Non-VoIP lines",
-        body: "Sourced through Fleexa's carrier network, so verification codes actually arrive.",
+        body: "Sourced through Pryva's carrier partners, so verification codes actually arrive.",
       },
       {
         title: "Auto-refund built in",
@@ -112,7 +124,7 @@ export const services: Service[] = [
       "Scan once and get data in 190+ destinations. Perfect for travel, remote work and any phone that supports eSIM.",
     intro:
       "Skip the airport SIM queue. Buy a Pryva eSIM in Naira, scan the QR code in your dashboard, and your data plan installs instantly. Works on iPhone XS and newer, most modern Samsung, Pixel and iPad models — no physical SIM swap.",
-    fromPrice: 4500,
+    fromPrice: 4700,
     unit: "per data bundle",
     icon: "sim",
     highlights: [
@@ -158,7 +170,7 @@ export const services: Service[] = [
       "Ethically sourced residential proxy bandwidth with Nigerian, US, UK and EU exits. Built for sneaker drops, ads verification and research.",
     intro:
       "Pryva's residential proxy network routes through real consumer devices, so your traffic looks like any other local connection. Rotate per request or hold a sticky session for up to 30 minutes, with authentication ready in your dashboard the moment you buy.",
-    fromPrice: 3500,
+    fromPrice: 3650,
     unit: "per GB",
     icon: "globe",
     highlights: [
@@ -204,7 +216,7 @@ export const services: Service[] = [
       "Disposable email addresses that receive verification mail in real time. Protect your primary inbox from noise and spam.",
     intro:
       "Spin up a temporary address, paste it into any signup form, and watch verification mail arrive in your Pryva dashboard. No forwarding, no app, no inbox clutter. Choose a 24-hour inbox for a quick trial or keep a dedicated address for 30 days.",
-    fromPrice: 700,
+    fromPrice: 790,
     unit: "per inbox",
     icon: "mail",
     highlights: [
@@ -236,6 +248,52 @@ export const services: Service[] = [
       {
         q: "Is this a catch-all domain?",
         a: "Each inbox gets a unique Pryva address on a dedicated domain. You can create multiple inboxes and label them per project.",
+      },
+    ],
+  },
+  {
+    slug: "accounts",
+    name: "Digital Accounts",
+    shortName: "Accounts",
+    href: "/accounts",
+    eyebrow: "Marketplace",
+    tagline: "Verified accounts, ready in seconds.",
+    description:
+      "Facebook, Instagram, Gmail, TikTok, gaming and streaming accounts — live stock, Naira pricing and instant credential delivery from your wallet.",
+    intro:
+      "The fastest way to get a working account. Browse live stock by category, buy with your Pryva wallet and receive the credentials immediately. If a seller can't deliver, the amount returns to your wallet automatically.",
+    fromPrice: 800,
+    unit: "per account",
+    icon: "accounts",
+    highlights: [
+      {
+        title: "Every category",
+        body: "Facebook, Instagram, Gmail, Outlook, TikTok, gaming and streaming — one catalogue.",
+      },
+      {
+        title: "Live stock counts",
+        body: "See exactly how many are available before you buy. Bundles up to 50 with volume discounts.",
+      },
+      {
+        title: "Refund if it fails",
+        body: "Credentials not delivered? The full amount goes back to your wallet automatically.",
+      },
+    ],
+    included: [
+      "Live stock and instant delivery",
+      "Naira pricing from your wallet",
+      "Volume discounts on 5, 10 and 25+ accounts",
+      "Automatic refund if delivery fails",
+    ],
+    goodFor: ["Marketing teams", "Social managers", "Testing", "Resellers"],
+    faqs: [
+      {
+        q: "How are the credentials delivered?",
+        a: "Straight to the screen and your order history the moment the payment clears. Copy them with one tap.",
+      },
+      {
+        q: "What if an account doesn't work?",
+        a: "If the seller fails to deliver, your wallet is refunded automatically — you don't need to ask.",
       },
     ],
   },
@@ -425,164 +483,219 @@ export const services: Service[] = [
   },
 ];
 
-export const serviceMap: Record<ServiceSlug, Service> = services.reduce(
-  (acc, service) => ({ ...acc, [service.slug]: service }),
-  {} as Record<ServiceSlug, Service>,
-);
 
-export const plans: Plan[] = [
+type PlanDefinition = Omit<Plan, "price" | "compareAt"> & { compareAt?: number };
+
+const planDefinitions: PlanDefinition[] = [
   // Virtual numbers — one-time verification
   {
     slug: "vn-ng", service: "numbers", name: "Nigeria", planLabel: "Nigeria number",
-    region: "Nigeria", flag: "🇳🇬", duration: "Single verification · 20 min window", price: 1200,
+    region: "Nigeria", flag: "🇳🇬", duration: "Single verification · 20 min window",
     popular: true, badge: "Most popular", highlight: "Best for WhatsApp, Telegram & local apps",
     features: ["Real non-VoIP line", "Instant delivery", "Auto-refund if no code"],provider: {app: "whatsapp", country: "us"}
   },
   {
     slug: "vn-us", service: "numbers", name: "United States", planLabel: "US number",
-    region: "United States", flag: "🇺🇸", duration: "Single verification · 20 min window", price: 1500,
+    region: "United States", flag: "🇺🇸", duration: "Single verification · 20 min window",
     features: ["Non-VoIP carrier line", "Instant delivery", "Auto-refund if no code"],provider: {app: "whatsapp", country: "us"}
   },
   {
     slug: "vn-uk", service: "numbers", name: "United Kingdom", planLabel: "UK number",
-    region: "United Kingdom", flag: "🇬🇧", duration: "Single verification · 20 min window", price: 1800,
+    region: "United Kingdom", flag: "🇬🇧", duration: "Single verification · 20 min window",
     features: ["Non-VoIP carrier line", "Instant delivery", "Auto-refund if no code"],provider: {app: "whatsapp", country: "uk"}
   },
   {
     slug: "vn-ca", service: "numbers", name: "Canada", planLabel: "Canada number",
-    region: "Canada", flag: "🇨🇦", duration: "Single verification · 20 min window", price: 2000,
+    region: "Canada", flag: "🇨🇦", duration: "Single verification · 20 min window",
     features: ["Non-VoIP carrier line", "Instant delivery", "Auto-refund if no code"],provider: {app: "whatsapp", country: "ca"}
   },
   {
     slug: "vn-de", service: "numbers", name: "Germany", planLabel: "Germany number",
-    region: "Germany", flag: "🇩🇪", duration: "Single verification · 20 min window", price: 2200,
+    region: "Germany", flag: "🇩🇪", duration: "Single verification · 20 min window",
     features: ["Non-VoIP carrier line", "Instant delivery", "Auto-refund if no code"],provider: {app: "google", country: "uk"}
   },
   {
     slug: "vn-gh", service: "numbers", name: "Ghana", planLabel: "Ghana number",
-    region: "Ghana", flag: "🇬🇭", duration: "Single verification · 20 min window", price: 1400,
+    region: "Ghana", flag: "🇬🇭", duration: "Single verification · 20 min window",
     features: ["Non-VoIP carrier line", "Instant delivery", "Auto-refund if no code"],provider: {app: "telegram", country: "us"}
   },
   {
     slug: "vn-otp-5", service: "numbers", name: "Verification pack", planLabel: "5 verifications",
-    region: "Any 5 countries", flag: "🎟️", duration: "5 codes · valid 7 days", price: 5500,
+    region: "Any 5 countries", flag: "🎟️", duration: "5 codes · valid 7 days",
     compareAt: 7000, badge: "Save 20%", highlight: "Buy a bundle of codes for launch week",
     features: ["5 verification windows", "Mix any country", "7 days to use them"],provider: {app: "whatsapp", country: "us"}
   },
   // Virtual numbers — rentals
   {
     slug: "rent-ng-7", service: "numbers", name: "Nigeria rental", planLabel: "NG · 7 days",
-    region: "Nigeria", flag: "🇳🇬", duration: "Rent for 7 days", price: 3800, badge: "Rent",
+    region: "Nigeria", flag: "🇳🇬", duration: "Rent for 7 days", badge: "Rent",
     highlight: "Keep the line for a full week",
     features: ["Reusable for many codes", "Incoming SMS all week", "Renew any time"],provider: {country: "us", months: 1}
   },
   {
     slug: "rent-ng-30", service: "numbers", name: "Nigeria rental", planLabel: "NG · 30 days",
-    region: "Nigeria", flag: "🇳🇬", duration: "Rent for 30 days", price: 7500, popular: true,
+    region: "Nigeria", flag: "🇳🇬", duration: "Rent for 30 days", popular: true,
     badge: "Best value", highlight: "Monthly identity for business accounts",
     features: ["Reusable for many codes", "Incoming SMS all month", "Priority replacement"],provider: {country: "us", months: 1}
   },
   {
     slug: "rent-us-30", service: "numbers", name: "US rental", planLabel: "US · 30 days",
-    region: "United States", flag: "🇺🇸", duration: "Rent for 30 days", price: 9500,
+    region: "United States", flag: "🇺🇸", duration: "Rent for 30 days",
     features: ["Reusable for many codes", "Incoming SMS all month", "Priority replacement"],provider: {country: "us", months: 1}
   },
   {
     slug: "rent-uk-30", service: "numbers", name: "UK rental", planLabel: "UK · 30 days",
-    region: "United Kingdom", flag: "🇬🇧", duration: "Rent for 30 days", price: 10500,
+    region: "United Kingdom", flag: "🇬🇧", duration: "Rent for 30 days",
     features: ["Reusable for many codes", "Incoming SMS all month", "Priority replacement"],provider: {country: "uk", months: 1}
   },
   {
     slug: "rent-ng-90", service: "numbers", name: "Nigeria rental", planLabel: "NG · 90 days",
-    region: "Nigeria", flag: "🇳🇬", duration: "Rent for 90 days", price: 19500,
+    region: "Nigeria", flag: "🇳🇬", duration: "Rent for 90 days",
     compareAt: 22500, badge: "Save 13%",
     features: ["Reusable for many codes", "Quarterly business line", "Priority replacement"],provider: {country: "us", months: 3}
   },
   // eSIM
   {
     slug: "esim-ng-1", service: "esim", name: "Nigeria Lite", planLabel: "1GB · 7 days",
-    region: "Nigeria", flag: "🇳🇬", duration: "Valid 7 days", price: 4500,
+    region: "Nigeria", flag: "🇳🇬", duration: "Valid 7 days",
     highlight: "Quick local data when you land in Lagos",
     features: ["1GB high-speed data", "QR + manual activation", "Data-only"],
   },
   {
     slug: "esim-ng-5", service: "esim", name: "Nigeria Plus", planLabel: "5GB · 30 days",
-    region: "Nigeria", flag: "🇳🇬", duration: "Valid 30 days", price: 14500, popular: true,
+    region: "Nigeria", flag: "🇳🇬", duration: "Valid 30 days", popular: true,
     features: ["5GB high-speed data", "QR + manual activation", "Data-only"],
   },
   {
     slug: "esim-africa", service: "esim", name: "Africa Regional", planLabel: "3GB · 15 days",
-    region: "Africa (12 countries)", flag: "🌍", duration: "Valid 15 days", price: 12000,
+    region: "Africa (12 countries)", flag: "🌍", duration: "Valid 15 days",
     badge: "Regional", highlight: "One plan across 12 African countries",
     features: ["3GB across the region", "Covers 12 countries", "QR + manual activation"],
   },
   {
     slug: "esim-europe", service: "esim", name: "Europe Regional", planLabel: "5GB · 30 days",
-    region: "Europe (38 countries)", flag: "🇪🇺", duration: "Valid 30 days", price: 18500,
+    region: "Europe (38 countries)", flag: "🇪🇺", duration: "Valid 30 days",
     features: ["5GB across 38 countries", "Keep your WhatsApp", "QR + manual activation"],
   },
   {
     slug: "esim-us", service: "esim", name: "United States", planLabel: "10GB · 30 days",
-    region: "United States", flag: "🇺🇸", duration: "Valid 30 days", price: 24000,
+    region: "United States", flag: "🇺🇸", duration: "Valid 30 days",
     badge: "Heavy use", features: ["10GB high-speed data", "Works on 5G", "QR + manual activation"],
   },
   {
     slug: "esim-global", service: "esim", name: "Global", planLabel: "20GB · 30 days",
-    region: "Global (120+ countries)", flag: "🌐", duration: "Valid 30 days", price: 48000,
+    region: "Global (120+ countries)", flag: "🌐", duration: "Valid 30 days",
     features: ["20GB across the world", "120+ destinations", "QR + manual activation"],
   },
   // Proxies
   {
     slug: "proxy-ng-1", service: "proxies", name: "Nigeria Starter", planLabel: "1GB · Nigeria",
-    region: "Nigeria", flag: "🇳🇬", duration: "7 days to use", price: 3500,
+    region: "Nigeria", flag: "🇳🇬", duration: "7 days to use",
     highlight: "Test the Nigerian pool before scaling",
     features: ["1GB residential traffic", "HTTP/SOCKS5", "Rotating or sticky"],
   },
   {
     slug: "proxy-ng-5", service: "proxies", name: "Nigeria Growth", planLabel: "5GB · Nigeria",
-    region: "Nigeria", flag: "🇳🇬", duration: "30 days to use", price: 15000, popular: true,
+    region: "Nigeria", flag: "🇳🇬", duration: "30 days to use", popular: true,
     compareAt: 17500, badge: "Best value",
     features: ["5GB residential traffic", "City-level targeting", "HTTP/SOCKS5"],
   },
   {
     slug: "proxy-us-5", service: "proxies", name: "United States", planLabel: "5GB · US",
-    region: "United States", flag: "🇺🇸", duration: "30 days to use", price: 17500,
+    region: "United States", flag: "🇺🇸", duration: "30 days to use",
     features: ["5GB US residential traffic", "Sticky sessions", "HTTP/SOCKS5"],
   },
   {
     slug: "proxy-eu-10", service: "proxies", name: "Europe", planLabel: "10GB · EU",
-    region: "Europe", flag: "🇪🇺", duration: "30 days to use", price: 32000,
+    region: "Europe", flag: "🇪🇺", duration: "30 days to use",
     features: ["10GB EU residential traffic", "City + country targeting", "HTTP/SOCKS5"],
   },
   {
     slug: "proxy-ng-25", service: "proxies", name: "Nigeria Scale", planLabel: "25GB · Nigeria",
-    region: "Nigeria", flag: "🇳🇬", duration: "30 days to use", price: 65000,
+    region: "Nigeria", flag: "🇳🇬", duration: "30 days to use",
     badge: "Scale", features: ["25GB residential traffic", "Priority pool", "HTTP/SOCKS5"],
   },
   // Email OTP
   {
     slug: "email-24", service: "email-otp", name: "Quick inbox", planLabel: "1 inbox · 24 hours",
-    region: "Any domain", flag: "✉️", duration: "Expires after 24 hours", price: 700,
+    region: "Any domain", flag: "✉️", duration: "Expires after 24 hours",
     popular: true, highlight: "Ideal for a single signup or trial",
     features: ["Unique address instantly", "Live OTP view", "No forwarding"],provider: {emailProduct: "auto"}
   },
   {
     slug: "email-30", service: "email-otp", name: "Long inbox", planLabel: "1 inbox · 30 days",
-    region: "Any domain", flag: "✉️", duration: "Active for 30 days", price: 5500,
+    region: "Any domain", flag: "✉️", duration: "Active for 30 days",
     features: ["Keep the same address", "Unlimited signups", "Live OTP view"],provider: {emailProduct: "auto"}
   },
   {
     slug: "email-bundle", service: "email-otp", name: "Inbox bundle", planLabel: "5 inboxes · 7 days",
-    region: "Any domain", flag: "📬", duration: "Active for 7 days", price: 1800,
+    region: "Any domain", flag: "📬", duration: "Active for 7 days",
     compareAt: 3500, badge: "Save 48%",
     features: ["5 isolated inboxes", "Label by project", "Live OTP view"],provider: {emailProduct: "auto"}
   },
   {
     slug: "email-team", service: "email-otp", name: "Team bundle", planLabel: "20 inboxes · 30 days",
-    region: "Any domain", flag: "📬", duration: "Active for 30 days", price: 12500,
+    region: "Any domain", flag: "📬", duration: "Active for 30 days",
     badge: "For QA teams", features: ["20 isolated inboxes", "Shared team access", "Live OTP view"],provider: {emailProduct: "auto"}
   },
 ];
+
+/**
+ * Selling prices are generated, never typed.
+ *
+ * `data/supplier-costs.json` holds the supplier's fixed amount per plan and
+ * `scripts/build-prices.mjs` bakes the result of `priceFromCost()` — 30–50%
+ * markup, rounded up to the price step — into `prices.generated.ts`. The costs
+ * themselves stay out of this module on purpose: it is imported by client
+ * components, and buying prices must not ship to the browser.
+ *
+ * `compareAt` is kept only when it is genuinely above the price we charge (a
+ * strike-through below the price is a lie, and one a regulator would enjoy
+ * reading).
+ */
+export const plans: Plan[] = planDefinitions.map((definition) => {
+  const generated = CATALOG_PRICES[definition.slug];
+  if (!generated) {
+    throw new Error(
+      `No generated price for plan "${definition.slug}". Add its supplier cost to ` +
+        `data/supplier-costs.json and run \`npm run pricing:build\`.`,
+    );
+  }
+  return {
+    ...definition,
+    price: generated.price,
+    compareAt:
+      definition.compareAt && definition.compareAt > generated.price ? definition.compareAt : undefined,
+  };
+});
+
+/**
+ * `fromPrice` is a promise to the customer — "you can buy this from ₦X" — so it
+ * is computed from real plan prices wherever plans exist. Hand-set values remain
+ * only for the services priced elsewhere: accounts (live marketplace listings),
+ * data plans and gift cards (sold at face value — see PRICING.md), where a
+ * 30–50% markup above face value is not a thing the market allows.
+ */
+export const services: Service[] = serviceDefinitions.map((service) => {
+  const candidates = plans
+    .filter((plan) => plan.service === service.slug)
+    .map((plan) => plan.price);
+
+  // Bulk and scheduled purchases are ordinary catalogue plans bought in bulk or
+  // on a schedule, so their floor is the cheapest catalogue plan.
+  if (candidates.length === 0 && (service.slug === "bulk" || service.slug === "scheduled")) {
+    candidates.push(...plans.map((plan) => plan.price));
+  }
+
+  return candidates.length > 0
+    ? { ...service, fromPrice: Math.min(...candidates) }
+    : service;
+});
+
+export const serviceMap: Record<ServiceSlug, Service> = services.reduce(
+  (acc, service) => ({ ...acc, [service.slug]: service }),
+  {} as Record<ServiceSlug, Service>,
+);
 
 export function plansFor(service: ServiceSlug): Plan[] {
   return plans.filter((plan) => plan.service === service);
@@ -601,6 +714,7 @@ export const serviceIcons: Record<ServiceSlug, string> = {
   esim: "sim",
   proxies: "globe",
   "email-otp": "mail",
+  accounts: "accounts",
   data: "phone",
   "gift-cards": "gift",
   bulk: "package",

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { formatNaira } from "@/lib/catalog";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+import { PlatformBadge, platformFor } from "@/components/PlatformBadge";
 
 type Category = { id: number; title: string; slug: string };
 type Subcategory = { id: number; title: string; slug: string };
@@ -398,7 +399,13 @@ export function AccountsBrowser() {
             {listings.map((listing) => (
               <article key={listing.id} className="flex flex-col rounded-2xl border border-line bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-[0.9rem] font-semibold leading-snug text-ink">{listing.title}</h3>
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <PlatformBadge
+                      platform={platformFor(listing.title, listing.category, listing.subcategory)}
+                      size={34}
+                    />
+                    <h3 className="text-[0.9rem] font-semibold leading-snug text-ink">{listing.title}</h3>
+                  </div>
                   <span className="shrink-0 rounded-full bg-lav-50 px-2 py-0.5 text-[0.68rem] font-semibold text-lav-800">
                     {listing.stock > 0 ? `${listing.stock} in stock` : "Out of stock"}
                   </span>

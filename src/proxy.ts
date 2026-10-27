@@ -16,13 +16,12 @@ export function proxy(request: NextRequest) {
   response.headers.set("Referrer-Policy", "origin-when-cross-origin");
   response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
 
-  // Never make privileged responses publicly cacheable or cross-origin readable.
-  if (request.nextUrl.pathname.startsWith("/api/admin/")) {
+  // API responses are per-user and must never be cached by a proxy or CDN.
+  // No CORS headers are set on purpose: every caller is the app itself, so a
+  // wildcard `Access-Control-Allow-Origin` only served to make authenticated
+  // reads reachable from other origins if a browser ever sent credentials.
+  if (request.nextUrl.pathname.startsWith("/api/")) {
     response.headers.set("Cache-Control", "no-store");
-  } else if (request.nextUrl.pathname.startsWith("/api/")) {
-    response.headers.set("Access-Control-Allow-Origin", "*");
-    response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   }
 
   return response;

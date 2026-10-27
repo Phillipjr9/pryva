@@ -9,7 +9,7 @@ export default async function DataPlansPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[1.5rem] font-medium tracking-tight">Data Plans</h1>
+        <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Data Plans</h1>
         <p className="mt-1 text-[0.86rem] text-ink-2">
           Purchase MTN, Airtel, Glo and 9mobile data plans instantly.
         </p>

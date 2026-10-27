@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { ArrowRight } from "@/components/icons";
+import { BrandLockup } from "@/components/brand/BrandLockup";
 
 export default function NotFound() {
   return (
     <div className="relative grid min-h-screen place-items-center overflow-hidden bg-cream px-5">
       <div className="pointer-events-none absolute left-1/2 top-0 h-[30rem] w-[40rem] -translate-x-1/2 rounded-full bg-lav-200/40 blur-[120px]" />
       <div className="relative w-full max-w-lg text-center">
+        <div className="mb-6 flex justify-center">
+          <BrandLockup size="md" />
+        </div>
         <div className="relative overflow-hidden rounded-[1.75rem] border border-line bg-[#fffdfa] px-6 py-10 shadow-[var(--shadow-card)]">
           <p className="eyebrow justify-center">404 · Page not found</p>
           <h1 className="mt-3 text-[2rem] font-medium leading-[1.1]">

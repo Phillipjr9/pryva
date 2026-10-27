@@ -4,6 +4,7 @@ import { users } from "@/db/schema";
 import { createSession, hashPassword, isConfiguredAdminEmail, isValidEmail, normalizeEmail } from "@/lib/auth";
 import { creditWallet } from "@/lib/wallet";
 import { isDemoEmail, isPreviewDatabase, PREVIEW_WELCOME_CREDIT } from "@/lib/demo-policy";
+import { checkAuthRateLimit } from "@/lib/auth-rate-limit";
 
 export async function POST(request: Request) {
   try {
@@ -16,6 +17,9 @@ export async function POST(request: Request) {
     const name = (body.name ?? "").trim();
     const email = normalizeEmail(body.email ?? "");
     const password = body.password ?? "";
+
+    const limited = await checkAuthRateLimit(request, "signup", email || undefined);
+    if (limited) return limited;
 
     if (name.length < 2) {
       return Response.json({ ok: false, error: "Please enter your full name." }, { status: 400 });

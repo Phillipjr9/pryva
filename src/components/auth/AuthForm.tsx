@@ -58,25 +58,6 @@ export function AuthForm({
     }
   }
 
-  async function submitDemo(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPending("demo");
-    setError(null);
-    try {
-      const response = await fetch("/api/auth/demo", { method: "POST" });
-      const data = (await response.json()) as { ok?: boolean; error?: string };
-      if (!response.ok || !data.ok) {
-        setError(data.error ?? "The demo could not open right now. Please try again.");
-        setPending(null);
-        return;
-      }
-      window.location.replace(next);
-    } catch {
-      setError("Network hiccup. Please try again.");
-      setPending(null);
-    }
-  }
-
   return (
     <div>
       <div className="mb-6">
@@ -93,17 +74,32 @@ export function AuthForm({
           Continue with Google
         </a>
 
+        {/*
+          The demo is a *plain* form post on purpose. The server route answers
+          with a 303 straight into the dashboard, so the browser navigates even
+          if the client bundle is stale, a privacy extension blocks fetch, or a
+          request hangs. An earlier version intercepted this submit with
+          onSubmit and a client-side request to the JSON demo endpoint; when that
+          request completed but the follow-up navigation didn't, the visitor sat
+          on "Opening the demo…" forever. Never intercept this submit, and never disable the button on
+          click: a submit button that becomes `disabled` inside its own handler
+          is removed before the browser posts the form.
+        */}
         <form
           action="/api/auth/demo-web"
           method="post"
           className="mt-2.5"
+          onSubmit={() => setPending("demo")}
         >
           <input type="hidden" name="next" value={next} />
           <button
             type="submit"
-            disabled={pending !== null}
-            className="btn w-full border-2 border-lav-400 bg-gradient-to-r from-lav-100 to-lav-50 !py-4 !text-[0.9rem] font-semibold text-lav-800 hover:from-lav-200 hover:to-lav-100 disabled:opacity-60 shadow-sm transition-all"
             onClick={() => setPending("demo")}
+            aria-busy={pending === "demo"}
+            aria-disabled={pending !== null}
+            className={`btn w-full border-2 border-lav-400 bg-gradient-to-r from-lav-100 to-lav-50 !py-4 !text-[0.9rem] font-semibold text-lav-800 hover:from-lav-200 hover:to-lav-100 shadow-sm transition-all ${
+              pending !== null ? "opacity-70" : ""
+            }`}
           >
             <Sparkle className="h-5 w-5" />
             {pending === "demo" ? "Opening the demo…" : "⚡ One-Click Demo Login"}
@@ -111,6 +107,14 @@ export function AuthForm({
         </form>
         <p className="mt-2 text-center text-[0.72rem] text-ink-3">
           Demo starts signed in with ₦25,000 wallet credit · No signup required
+        </p>
+        <p className="mt-1.5 text-center">
+          <a
+            href={`/api/auth/demo-web?next=${encodeURIComponent(next)}`}
+            className="text-[0.7rem] font-semibold text-lav-700 underline underline-offset-2"
+          >
+            Button not responding? Open the demo directly
+          </a>
         </p>
 
         <div className="my-5 flex items-center gap-3">
