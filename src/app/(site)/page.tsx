@@ -20,7 +20,6 @@ import {
   Mail,
   Phone,
   Receipt,
-  Refresh,
   Shield,
   Sim,
   Sparkle,
@@ -667,138 +666,46 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ---------- DASHBOARD PREVIEW ---------- */}
+      {/* ---------- DASHBOARD ---------- */}
       <section className="py-20 sm:py-28">
         <div className="shell">
           <div className="relative overflow-hidden rounded-[2.25rem] border border-lav-200/70 bg-gradient-to-br from-lav-100/80 via-cream to-cream-2 px-5 py-10 sm:px-10 sm:py-14">
-            <div className="relative grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
-              <div>
-                <Reveal>
-                  <span className="eyebrow">03 / Your dashboard</span>
-                </Reveal>
-                <Reveal delay={60}>
-                  <h2 className="mt-4 text-[2rem] font-medium leading-[1.08] sm:text-[2.55rem]">
-                    Everything you bought,
-                    <br />
-                    <span className="text-display italic text-lav-700">still within reach.</span>
-                  </h2>
-                </Reveal>
-                <Reveal delay={120}>
-                  <p className="mt-4 max-w-md text-[0.95rem] leading-relaxed text-ink-2">
-                    Codes, activation QR details and proxy credentials never disappear into an SMS
-                    you forgot to screenshot. Your wallet, orders and refunds live in one calm place.
-                  </p>
-                </Reveal>
-                <Reveal delay={180}>
-                  <ul className="mt-6 space-y-3">
-                    {[
-                      "Live OTP codes with expiry timers",
-                      "Wallet top-ups and a full transaction ledger",
-                      "One-tap auto-refund on undelivered codes",
-                      "Order history you can copy from any device",
-                    ].map((item) => (
-                      <li key={item} className="flex items-start gap-2.5 text-[0.88rem] text-ink-2">
-                        <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white text-lav-700 shadow-sm">
-                          <Check className="h-3 w-3" />
-                        </span>
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </Reveal>
-              </div>
-
-              <Reveal delay={140}>
-                <div className="relative">
-                  <div className="rounded-[1.75rem] border border-white bg-white/85 p-4 shadow-[var(--shadow-float)] backdrop-blur-xl sm:p-5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[0.72rem] font-semibold text-ink">Dashboard</span>
-                      </div>
-                      <span className="rounded-full bg-cream px-2.5 py-1 text-[0.62rem] font-medium text-ink-2">
-                        pryva.ng
+            <div className="relative max-w-3xl">
+              <Reveal>
+                <span className="eyebrow">03 / Your dashboard</span>
+              </Reveal>
+              <Reveal delay={60}>
+                <h2 className="mt-4 text-[2rem] font-medium leading-[1.08] sm:text-[2.55rem]">
+                  Everything you bought,
+                  <br />
+                  <span className="text-display italic text-lav-700">still within reach.</span>
+                </h2>
+              </Reveal>
+              <Reveal delay={120}>
+                <p className="mt-4 max-w-xl text-[0.95rem] leading-relaxed text-ink-2">
+                  Codes, activation QR details and proxy credentials never disappear into an SMS you
+                  forgot to screenshot. Your wallet, orders and refunds live in one calm place.
+                </p>
+              </Reveal>
+              <Reveal delay={180}>
+                <ul className="mt-7 grid gap-3 sm:grid-cols-2">
+                  {[
+                    "Live OTP codes with expiry timers",
+                    "Wallet top-ups and a full transaction ledger",
+                    "One-tap auto-refund on undelivered codes",
+                    "Order history you can copy from any device",
+                  ].map((item) => (
+                    <li
+                      key={item}
+                      className="flex items-start gap-2.5 rounded-xl border border-line/70 bg-white/60 px-3.5 py-3 text-[0.88rem] text-ink-2"
+                    >
+                      <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white text-lav-700 shadow-sm">
+                        <Check className="h-3 w-3" />
                       </span>
-                    </div>
-
-                    <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
-                      <div className="rounded-2xl bg-ink p-4 text-white">
-                        <p className="text-[0.6rem] uppercase tracking-[0.16em] text-white/60">
-                          Wallet balance
-                        </p>
-                        <p className="mt-1.5 text-[1.5rem] font-semibold leading-none">
-                          {formatNaira(18500)}
-                        </p>
-                        <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-1 text-[0.6rem] font-medium">
-                          <Wallet className="h-2.5 w-2.5" /> Top up
-                        </span>
-                      </div>
-                      <div className="rounded-2xl border border-line bg-cream/60 p-4">
-                        <p className="text-[0.6rem] uppercase tracking-[0.16em] text-ink-3">
-                          This month
-                        </p>
-                        <p className="mt-1.5 text-[1.5rem] font-semibold leading-none">7 orders</p>
-                        <p className="mt-2 text-[0.66rem] text-ink-3">2 refunds · ₦2,400 returned</p>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 space-y-2">
-                      {[
-                        {
-                          name: "Nigeria · 30-day rental",
-                          meta: "PRY-8H42KD · +234 812 445 9081",
-                          amount: 7500,
-                          status: "Active",
-                        },
-                        {
-                          name: "Europe eSIM · 5GB",
-                          meta: "PRY-2M91QP · QR ready",
-                          amount: 18500,
-                          status: "Delivered",
-                        },
-                        {
-                          name: "US verification",
-                          meta: "PRY-7K30VF · auto-refunded",
-                          amount: 1500,
-                          status: "Refunded",
-                        },
-                      ].map((order) => (
-                        <div
-                          key={order.meta}
-                          className="flex items-center justify-between gap-3 rounded-xl border border-line bg-white px-3.5 py-2.5"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-[0.78rem] font-semibold text-ink">
-                              {order.name}
-                            </p>
-                            <p className="truncate text-[0.62rem] text-ink-3">{order.meta}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-[0.78rem] font-semibold">{formatNaira(order.amount)}</p>
-                            <span
-                              className={`text-[0.58rem] font-semibold ${
-                                order.status === "Refunded"
-                                  ? "text-amber-600"
-                                  : order.status === "Active"
-                                    ? "text-emerald-600"
-                                    : "text-lav-600"
-                              }`}
-                            >
-                              {order.status}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="absolute -bottom-5 -left-3 rounded-xl border border-white bg-white px-3.5 py-2.5 shadow-[var(--shadow-soft)]">
-                    <p className="flex items-center gap-1.5 text-[0.65rem] font-semibold text-ink">
-                      <Refresh className="h-3 w-3 text-lav-600" />
-                      Refund completed
-                    </p>
-                    <p className="text-[0.58rem] text-ink-3">₦1,500 back to wallet</p>
-                  </div>
-                </div>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
               </Reveal>
             </div>
           </div>
