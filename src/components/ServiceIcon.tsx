@@ -4,7 +4,8 @@ import Image from "next/image";
 
 type DigitalServiceType = "netflix" | "spotify" | "youtube" | "disney" | "chatgpt" | "canva";
 type CoreServiceType = "numbers" | "esim" | "proxies" | "email-otp";
-type ServiceType = DigitalServiceType | CoreServiceType;
+type AdditionalServiceType = "data" | "gift-cards" | "bulk" | "scheduled";
+type ServiceType = DigitalServiceType | CoreServiceType | AdditionalServiceType;
 type CategoryType = "streaming" | "music" | "gaming" | "productivity";
 
 interface ServiceIconProps {
@@ -29,9 +30,17 @@ const coreServiceImages: Record<CoreServiceType, string> = {
   "email-otp": "/images/services/email-otp.png",
 };
 
+const additionalServiceImages: Record<AdditionalServiceType, string> = {
+  data: "/images/services/data.png",
+  "gift-cards": "/images/services/gift-cards.png",
+  bulk: "/images/services/bulk.png",
+  scheduled: "/images/services/scheduled.png",
+};
+
 const serviceImages: Record<ServiceType, string> = {
   ...digitalServiceImages,
   ...coreServiceImages,
+  ...additionalServiceImages,
 };
 
 const serviceNames: Record<ServiceType, string> = {
@@ -45,6 +54,10 @@ const serviceNames: Record<ServiceType, string> = {
   esim: "eSIM Data",
   proxies: "Residential Proxies",
   "email-otp": "Email OTP",
+  data: "Data Plans",
+  "gift-cards": "Gift Cards",
+  bulk: "Bulk Orders",
+  scheduled: "Scheduled Purchases",
 };
 
 const sizeMap = {
