@@ -1,17 +1,15 @@
-import { redirect } from "next/navigation";
-import { requireAuth } from "@/lib/auth";
-import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { requireUser } from "@/lib/auth";
 import { SettingsForm } from "./SettingsForm";
 
+// The dashboard layout already provides the shell — nesting it here rendered a
+// second sidebar inside the content column.
 export default async function SettingsPage() {
-  const user = await requireAuth();
-  if (!user) redirect("/login?next=/dashboard/settings");
+  const user = await requireUser("/dashboard/settings");
 
   return (
-    <DashboardShell user={user}>
       <div className="space-y-6">
         <div>
-          <h1 className="text-[1.75rem] font-medium tracking-tight text-ink">
+          <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">
             Settings
           </h1>
           <p className="mt-2 text-[0.95rem] text-ink-2">
@@ -20,6 +18,5 @@ export default async function SettingsPage() {
         </div>
         <SettingsForm user={user} />
       </div>
-    </DashboardShell>
   );
 }

@@ -222,17 +222,25 @@ function evaluateAggregateExpression(
   contexts: TableRowContext[],
   defaultTable: string,
 ): unknown {
-  const queryName = (spec.name ?? "").toLowerCase();
   const flattened = flattenSqlChunks(spec);
   const columnToken = flattened.find((token) => token.kind === "col");
   const columnName = columnToken?.prop || "";
   const tableName = columnToken?.table || defaultTable;
 
-  if (queryName.includes("count") || queryName.includes("count")) {
+  // Drizzle's count()/sum()/avg() helpers carry no `.name`; the function only
+  // exists in the rendered SQL, so read it from there. Without this every
+  // aggregate silently returned null and the preview reported 0 orders/₦0.
+  const rendered = flattened
+    .map((token) => (token.kind === "op" ? token.text : token.kind === "col" ? " # " : ""))
+    .join("")
+    .toLowerCase();
+  const queryName = (spec.name ?? "").toLowerCase();
+
+  if (queryName.includes("count") || /count\s*\(/.test(rendered)) {
     return contexts.length;
   }
 
-  if (queryName.includes("sum") || queryName.includes("total")) {
+  if (queryName.includes("sum") || queryName.includes("total") || /sum\s*\(/.test(rendered)) {
     return contexts.reduce((sum, ctx) => {
       const row = (ctx[tableName] ?? ctx[defaultTable] ?? {}) as Record<string, unknown>;
       const value = row[columnName];
@@ -240,7 +248,7 @@ function evaluateAggregateExpression(
     }, 0);
   }
 
-  if (queryName.includes("avg")) {
+  if (queryName.includes("avg") || /avg\s*\(/.test(rendered)) {
     if (contexts.length === 0) return 0;
     const total = contexts.reduce((sum, ctx) => {
       const row = (ctx[tableName] ?? ctx[defaultTable] ?? {}) as Record<string, unknown>;
@@ -314,29 +322,198 @@ if (!databaseUrl) {
   globalForDb.__arenaPryvaMockState = mockState;
 }
 
+/**
+ * A demo account with nothing in it demonstrates nothing. This seeds the states
+ * a real account passes through — a live code on a timer, a rental that is
+ * still running, an eSIM, a refunded order and a gift card — plus the wallet
+ * ledger that matches them, so the dashboard's live-codes block, refund flow and
+ * history all have something to show on first sign-in.
+ *
+ * The ledger is kept balanced: the credits and debits below end at exactly the
+ * demo balance (₦25,000), so "balance" and "sum of transactions" can never
+ * disagree in the preview.
+ */
 function ensureDemoUser() {
   const state = mockState.users;
-  if (!state.some((user) => user.email === "demo@pryva.ng")) {
-    const demoUserId = "demo-user";
-    state.push({
-      id: demoUserId,
-      name: "Ada Demo",
-      email: "demo@pryva.ng",
-      passwordHash: hashPassword("pryva-demo-2026"),
-      walletBalance: 25000,
-      createdAt: new Date(),
-    });
-    mockState.walletTransactions.push({
-      id: "demo-welcome-credit",
+  const demoUserId = "demo-user";
+  const now = Date.now();
+  const daysAgo = (days: number) => new Date(now - days * 24 * 60 * 60 * 1000);
+  const minutesFromNow = (minutes: number) => new Date(now + minutes * 60 * 1000);
+
+  // Seed per row, not "if the user exists, stop": a preview process that signed
+  // in before the orders were added must still pick them up on the next render.
+  const seedOnce = (key: keyof MockState, row: Record<string, unknown>) => {
+    if (!mockState[key].some((existing) => existing.id === row.id)) {
+      mockState[key].push(row);
+    }
+  };
+
+  const hasDemoUser = state.some((user) => user.email === "demo@pryva.ng");
+  if (!hasDemoUser) state.push({
+    id: demoUserId,
+    name: "Ada Demo",
+    email: "demo@pryva.ng",
+    passwordHash: hashPassword("pryva-demo-2026"),
+    walletBalance: 25000,
+    createdAt: daysAgo(14),
+  });
+
+  const demoOrders: Array<Record<string, unknown>> = [
+    {
+      id: "demo-order-live",
+      reference: "PV-DEMO0001",
+      userId: demoUserId,
+      service: "numbers",
+      productSlug: "vn-ng",
+      productName: "Virtual Numbers",
+      planLabel: "Nigeria number",
+      region: "Nigeria",
+      duration: "Single verification · 20 min window",
+      amount: 1340,
+      status: "active",
+      provider: "simulated",
+      providerRequestId: null,
+      referenceCode: "+234 812 445 9081",
+      otpCode: "482069",
+      accounts: null,
+      expiresAt: minutesFromNow(18),
+      refundedAt: null,
+      createdAt: new Date(now - 2 * 60 * 1000),
+    },
+    {
+      id: "demo-order-rental",
+      reference: "PV-DEMO0002",
+      userId: demoUserId,
+      service: "numbers",
+      productSlug: "rent-ng-7",
+      productName: "Virtual Numbers",
+      planLabel: "7-day Nigeria rental",
+      region: "Nigeria",
+      duration: "7 days",
+      amount: 4250,
+      status: "active",
+      provider: "simulated",
+      providerRequestId: null,
+      referenceCode: "+234 812 445 9081",
+      otpCode: null,
+      accounts: null,
+      expiresAt: new Date(now + 4 * 24 * 60 * 60 * 1000),
+      refundedAt: null,
+      createdAt: daysAgo(3),
+    },
+    {
+      id: "demo-order-esim",
+      reference: "PV-DEMO0003",
+      userId: demoUserId,
+      service: "esim",
+      productSlug: "esim-ng-1",
+      productName: "eSIM",
+      planLabel: "Nigeria · 1GB · 30 days",
+      region: "Nigeria",
+      duration: "30 days",
+      amount: 4700,
+      status: "active",
+      provider: "simulated",
+      providerRequestId: null,
+      referenceCode: "LPA:1$rsp.truphone.com$PRYVA-DEMO-1GB-NG",
+      otpCode: null,
+      accounts: null,
+      expiresAt: new Date(now + 24 * 24 * 60 * 60 * 1000),
+      refundedAt: null,
+      createdAt: daysAgo(6),
+    },
+    {
+      id: "demo-order-refunded",
+      reference: "PV-DEMO0004",
+      userId: demoUserId,
+      service: "numbers",
+      productSlug: "vn-us",
+      productName: "Virtual Numbers",
+      planLabel: "United States number",
+      region: "United States",
+      duration: "Single verification · 20 min window",
+      amount: 1670,
+      status: "refunded",
+      provider: "simulated",
+      providerRequestId: null,
+      referenceCode: null,
+      otpCode: null,
+      accounts: null,
+      expiresAt: null,
+      refundedAt: daysAgo(9),
+      createdAt: daysAgo(9),
+    },
+    {
+      id: "demo-order-gift",
+      reference: "PV-DEMO0005",
+      userId: demoUserId,
+      service: "gift-cards",
+      productSlug: "gift-5000",
+      productName: "Gift Cards",
+      planLabel: "₦5,000 gift card",
+      region: "Nigeria",
+      duration: "90 days to redeem",
+      amount: 5000,
+      status: "active",
+      provider: "simulated",
+      providerRequestId: null,
+      referenceCode: "PRYVA-DEMO-4F2K",
+      otpCode: null,
+      accounts: null,
+      expiresAt: new Date(now + 80 * 24 * 60 * 60 * 1000),
+      refundedAt: null,
+      createdAt: daysAgo(12),
+    },
+  ];
+  for (const order of demoOrders) seedOnce("orders", order);
+
+  const ledger: Array<[string, string, number, number, string, string, Date]> = [
+    // id, description, amount (+/-), balanceAfter, reference, type, createdAt
+    ["demo-welcome-credit", "Demo starter wallet credit", 25000, 25000, "TOP-DEMO01", "credit", daysAgo(14)],
+    ["demo-tx-gift", "Gift card purchase — ₦5,000", -5000, 20000, "PV-DEMO0005", "debit", daysAgo(12)],
+    ["demo-tx-us-number", "US number purchase", -1670, 18330, "PV-DEMO0004", "debit", daysAgo(9)],
+    ["demo-tx-refund", "Auto-refund — US number (no code)", 1670, 20000, "RF-DEMO0004", "credit", daysAgo(9)],
+    ["demo-tx-esim", "eSIM purchase — Nigeria 1GB", -4700, 15300, "PV-DEMO0003", "debit", daysAgo(6)],
+    ["demo-tx-topup", "Wallet top-up — bank transfer", 15290, 30590, "TOP-DEMO02", "credit", daysAgo(4)],
+    ["demo-tx-rental", "Nigeria 7-day rental", -4250, 26340, "PV-DEMO0002", "debit", daysAgo(3)],
+    ["demo-tx-live", "Nigeria number purchase", -1340, 25000, "PV-DEMO0001", "debit", new Date(now - 2 * 60 * 1000)],
+  ];
+
+  for (const [id, description, amount, balanceAfter, reference, type, createdAt] of ledger) {
+    seedOnce("walletTransactions", {
+      id,
       userId: demoUserId,
       orderId: null,
-      type: "credit",
-      amount: 25000,
-      balanceAfter: 25000,
-      description: "Demo starter wallet credit",
-      reference: "TOP-DEMO01",
-      createdAt: new Date(),
+      type,
+      amount: Math.abs(amount),
+      balanceAfter,
+      description,
+      reference,
+      createdAt,
     });
+  }
+
+  for (const notification of [
+    {
+      id: "demo-notification-1",
+      userId: demoUserId,
+      title: "Your Nigeria number is live",
+      message: "Code 482069 arrived on +234 812 445 9081. It expires in 20 minutes.",
+      type: "order",
+      read: 0,
+      createdAt: new Date(now - 2 * 60 * 1000),
+    },
+    {
+      id: "demo-notification-2",
+      userId: demoUserId,
+      title: "Refund completed",
+      message: "₦1,670 returned to your wallet — the US number never delivered a code.",
+      type: "refund",
+      read: 1,
+      createdAt: daysAgo(9),
+    },
+  ]) {
+    seedOnce("notifications", notification);
   }
 }
 

@@ -17,7 +17,7 @@ export default async function DigitalServicesPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[1.5rem] font-medium tracking-tight">Digital Accounts</h1>
+        <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Digital Accounts</h1>
         <p className="mt-1 text-[0.86rem] text-ink-2">
           Buy premium accounts for Netflix, Spotify, ChatGPT, and more.
         </p>

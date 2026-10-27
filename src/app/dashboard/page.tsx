@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, sum } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
@@ -17,6 +17,8 @@ import {
   Wallet,
 } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
+import { LiveCodeCard, type LiveCode } from "@/components/dashboard/LiveCodeCard";
+import { EmptyState } from "@/components/dashboard/EmptyState";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -39,113 +41,141 @@ function statusStyle(status: string) {
   }
 }
 
+function firstName(name: string | null | undefined) {
+  const first = (name ?? "").trim().split(/\s+/)[0];
+  return first || "there";
+}
+
 export default async function DashboardOverviewPage() {
   const user = await requireUser("/dashboard");
 
-  const [recentOrders, recentTx] = await Promise.all([
-    db.select().from(orders).where(eq(orders.userId, user.id)).orderBy(desc(orders.createdAt)).limit(5),
-    db
-      .select()
-      .from(walletTransactions)
-      .where(eq(walletTransactions.userId, user.id))
-      .orderBy(desc(walletTransactions.createdAt))
-      .limit(4),
-  ]);
+  const [recentOrders, recentTx, liveOrderRows, [orderCount], [activeCount], [refundedRow]] =
+    await Promise.all([
+      db
+        .select()
+        .from(orders)
+        .where(eq(orders.userId, user.id))
+        .orderBy(desc(orders.createdAt))
+        .limit(5),
+      db
+        .select()
+        .from(walletTransactions)
+        .where(eq(walletTransactions.userId, user.id))
+        .orderBy(desc(walletTransactions.createdAt))
+        .limit(4),
+      db
+        .select()
+        .from(orders)
+        .where(and(eq(orders.userId, user.id), eq(orders.status, "active")))
+        .orderBy(desc(orders.createdAt))
+        .limit(4),
+      db.select({ value: count() }).from(orders).where(eq(orders.userId, user.id)),
+      db
+        .select({ value: count() })
+        .from(orders)
+        .where(and(eq(orders.userId, user.id), eq(orders.status, "active"))),
+      db
+        .select({ value: sum(orders.amount) })
+        .from(orders)
+        .where(and(eq(orders.userId, user.id), eq(orders.status, "refunded"))),
+    ]);
 
-  const activeOrders = recentOrders.filter((order: { status: string }) => order.status === "active").length;
-  const refunded = recentOrders
-    .filter((order: { status: string }) => order.status === "refunded")
-    .reduce((sum: number, order: { amount: number }) => sum + order.amount, 0);
+  // Aggregate at the database, never over a `limit(5)` slice: the old headline
+  // numbers were computed from the five rows rendered below them.
+  const totalOrders = Number(orderCount?.value ?? 0);
+  const activeOrders = Number(activeCount?.value ?? 0);
+  const refundedToWallet = Number(refundedRow?.value ?? 0);
 
-  const stats = [
-    {
-      label: "Wallet balance",
-      value: formatNaira(user.walletBalance),
-      note: "Spendable right now",
-      icon: Wallet,
-      accent: true,
-    },
-    {
-      label: "Active orders",
-      value: String(activeOrders),
-      note: "Codes and credentials live",
-      icon: Clock,
-    },
-    {
-      label: "Orders this view",
-      value: String(recentOrders.length),
-      note: "Across all services",
-      icon: Receipt,
-    },
-    {
-      label: "Refunded to wallet",
-      value: formatNaira(refunded),
-      note: "Auto-refund protection",
-      icon: Shield,
-    },
-  ];
+  const liveCodes: LiveCode[] = liveOrderRows
+    .filter((order) => {
+      if (order.status !== "active") return false;
+      if (!order.expiresAt) return Boolean(order.otpCode);
+      return new Date(order.expiresAt).getTime() > Date.now();
+    })
+    .slice(0, 2)
+    .map((order) => ({
+      id: order.id,
+      productName: order.productName,
+      planLabel: order.planLabel,
+      region: order.region ?? "Nigeria",
+      amount: order.amount,
+      referenceCode: order.referenceCode ?? null,
+      otpCode: order.otpCode ?? null,
+      expiresAt: order.expiresAt ? new Date(order.expiresAt).toISOString() : null,
+      createdAt: new Date(order.createdAt).toISOString(),
+    }));
 
   return (
-    <div className="grid gap-4">
-      <div className="rounded-[1.5rem] border border-lav-200/70 bg-gradient-to-br from-lav-100/80 via-[#fbf7ff] to-white p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <span className="inline-flex items-center gap-1.5 text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-lav-700">
-              <Sparkle className="h-3 w-3" /> Welcome back
-            </span>
-            <h1 className="mt-2 text-[1.6rem] font-medium leading-tight sm:text-[1.9rem]">
-              Your Pryva wallet is ready.
-            </h1>
-            <p className="mt-1.5 max-w-md text-[0.86rem] leading-relaxed text-ink-2">
-              {isPreviewDatabase()
-                ? "Explore the dashboard with simulated orders and a preview wallet."
-                : "Review your wallet and orders while live purchasing is temporarily unavailable."}
-            </p>
-          </div>
-          <Link href="/dashboard/wallet" className="btn btn-primary !px-5 !py-3 !text-[0.8rem]">
-            <Plus className="h-4 w-4" /> Top up wallet
+    <div className="grid gap-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-lav-700">
+            <Sparkle className="h-3 w-3" /> Overview
+          </p>
+          <h1 className="mt-1.5 text-[1.5rem] font-medium tracking-tight sm:text-[1.7rem]">
+            Welcome back, {firstName(user.name)}
+          </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href="/dashboard/wallet" className="btn btn-primary !px-4 !py-2.5 !text-[0.78rem]">
+            <Plus className="h-3.5 w-3.5" /> Top up
+          </Link>
+          <Link
+            href="/dashboard/wallet#withdraw"
+            className="btn border border-line bg-white !px-4 !py-2.5 !text-[0.78rem] text-ink hover:border-lav-200"
+          >
+            Withdraw
           </Link>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-[0.8rem] text-ink">
+      <p className="inline-flex w-fit items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-[0.68rem] text-ink-3">
+        <Shield className="h-3 w-3 text-lav-600" />
         {isPreviewDatabase()
-          ? "Preview mode: orders and wallet balances are simulated and do not deliver real services."
-          : "Live purchasing is temporarily unavailable while payment and provider integrations are reviewed."}
-      </div>
+          ? "Preview mode · orders and balances here are simulated"
+          : "Live purchasing is paused while provider integrations are reviewed"}
+      </p>
 
-      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div
-              key={stat.label}
-              className={`rounded-2xl border p-4 ${
-                stat.accent
-                  ? "border-ink bg-ink text-white"
-                  : "border-line bg-[#fffdfa] text-ink"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <p
-                  className={`text-[0.64rem] uppercase tracking-[0.14em] ${
-                    stat.accent ? "text-white/55" : "text-ink-3"
-                  }`}
-                >
+      {liveCodes.length > 0 ? (
+        <LiveCodeCard codes={liveCodes} />
+      ) : (
+        <EmptyState
+          icon={Clock}
+          title="No code waiting right now"
+          body={`When a verification code arrives it lands here first, with a live timer. Nigerian numbers start at ${formatNaira(serviceMap.numbers.fromPrice)}.`}
+          action={{ label: "Buy a number", href: "/virtual-numbers#buy" }}
+        />
+      )}
+
+      <section className="grid gap-2.5 rounded-[1.5rem] border border-ink bg-ink p-5 text-white sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="flex items-center gap-1.5 text-[0.64rem] uppercase tracking-[0.14em] text-white/55">
+              <Wallet className="h-3.5 w-3.5" /> Wallet balance
+            </p>
+            <p className="mt-2 text-[1.9rem] font-semibold leading-none sm:text-[2.2rem]">
+              {formatNaira(user.walletBalance)}
+            </p>
+            <p className="mt-2 text-[0.74rem] text-white/55">
+              Spendable right now · refunds land here automatically
+            </p>
+          </div>
+          <div className="grid w-full grid-cols-3 gap-2 sm:w-auto sm:min-w-[19rem]">
+            {[
+              { label: "Active", value: String(activeOrders) },
+              { label: "All orders", value: String(totalOrders) },
+              { label: "Refunded", value: formatNaira(refundedToWallet) },
+            ].map((stat) => (
+              <div key={stat.label} className="rounded-xl bg-white/10 px-3 py-2.5">
+                <p className="text-[0.6rem] uppercase tracking-[0.12em] text-white/50">
                   {stat.label}
                 </p>
-                <Icon className={`h-3.5 w-3.5 ${stat.accent ? "text-lav-200" : "text-lav-600"}`} />
+                <p className="mt-1 truncate text-[0.92rem] font-semibold">{stat.value}</p>
               </div>
-              <p className="mt-2 text-[1.4rem] font-semibold leading-none">{stat.value}</p>
-              <p
-                className={`mt-1.5 text-[0.68rem] ${stat.accent ? "text-white/55" : "text-ink-3"}`}
-              >
-                {stat.note}
-              </p>
-            </div>
-          );
-        })}
-      </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-[1.4fr_0.6fr]">
         <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
@@ -173,7 +203,7 @@ export default async function DashboardOverviewPage() {
             </div>
           ) : (
             <div className="mt-3 divide-y divide-line/80">
-              {recentOrders.map((order: { id: string; productName: string; planLabel: string; reference: string; amount: number; status: string; createdAt: Date | string }) => (
+              {recentOrders.map((order) => (
                 <Link
                   key={order.id}
                   href={`/dashboard/orders/${order.id}`}
@@ -208,28 +238,6 @@ export default async function DashboardOverviewPage() {
 
         <div className="grid gap-4">
           <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
-            <h2 className="text-[1rem] font-semibold">Quick buy</h2>
-            <div className="mt-3 grid gap-1.5">
-              {quickBuys.map((item) => {
-                return (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    className="group flex items-center gap-2.5 rounded-xl border border-line bg-white px-3 py-2.5 transition-all hover:border-lav-200"
-                  >
-                    <ServiceIcon service={item.service} size="sm" />
-                    <span className="flex-1">
-                      <span className="block text-[0.8rem] font-semibold text-ink">{item.label}</span>
-                      <span className="block text-[0.66rem] text-ink-3">{item.note}</span>
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-ink-3 transition-colors group-hover:text-lav-600" />
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
             <div className="flex items-center justify-between">
               <h2 className="text-[1rem] font-semibold">Wallet activity</h2>
               <Link
@@ -243,11 +251,13 @@ export default async function DashboardOverviewPage() {
               <p className="mt-3 text-[0.8rem] text-ink-3">No transactions yet.</p>
             ) : (
               <div className="mt-3 grid gap-2">
-                {recentTx.map((tx: { id: string; description: string; amount: number; type: string; balanceAfter: number; reference: string; createdAt: Date | string }) => (
+                {recentTx.map((tx) => (
                   <div key={tx.id} className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-[0.78rem] font-medium text-ink">{tx.description}</p>
-                      <p className="text-[0.64rem] text-ink-3">{tx.reference}</p>
+                      <p className="text-[0.64rem] text-ink-3">
+                        {tx.reference} · Bal. {formatNaira(tx.balanceAfter)}
+                      </p>
                     </div>
                     <span
                       className={`shrink-0 text-[0.78rem] font-semibold ${
@@ -270,6 +280,34 @@ export default async function DashboardOverviewPage() {
           </div>
         </div>
       </div>
+
+      <section className="grid gap-2.5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[1rem] font-semibold">Buy again</h2>
+          <Link
+            href="/pricing"
+            className="inline-flex items-center gap-1 text-[0.74rem] font-semibold text-lav-700 hover:underline"
+          >
+            <Receipt className="h-3 w-3" /> Full price list
+          </Link>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {quickBuys.map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className="group flex items-center gap-2.5 rounded-xl border border-line bg-white px-3 py-2.5 transition-all hover:border-lav-200"
+            >
+              <ServiceIcon service={item.service} size="sm" />
+              <span className="flex-1">
+                <span className="block text-[0.8rem] font-semibold text-ink">{item.label}</span>
+                <span className="block text-[0.66rem] text-ink-3">{item.note}</span>
+              </span>
+              <ArrowRight className="h-3.5 w-3.5 text-ink-3 transition-colors group-hover:text-lav-600" />
+            </Link>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
