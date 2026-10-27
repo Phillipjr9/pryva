@@ -99,13 +99,35 @@ export function AuthForm({
           action="/api/auth/demo-web"
           method="post"
           className="mt-2.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setPending("demo");
+            const form = e.currentTarget;
+            const formData = new FormData(form);
+            fetch(form.action, {
+              method: "POST",
+              body: formData,
+              redirect: "follow",
+            }).then((response) => {
+              if (response.redirected) {
+                window.location.href = response.url;
+              } else if (response.ok) {
+                window.location.href = next;
+              } else {
+                setError("The demo could not open right now. Please try again.");
+                setPending(null);
+              }
+            }).catch(() => {
+              setError("Network hiccup. Please try again.");
+              setPending(null);
+            });
+          }}
         >
           <input type="hidden" name="next" value={next} />
           <button
             type="submit"
             disabled={pending !== null}
             className="btn w-full border-2 border-lav-400 bg-gradient-to-r from-lav-100 to-lav-50 !py-4 !text-[0.9rem] font-semibold text-lav-800 hover:from-lav-200 hover:to-lav-100 disabled:opacity-60 shadow-sm transition-all"
-            onClick={() => setPending("demo")}
           >
             <Sparkle className="h-5 w-5" />
             {pending === "demo" ? "Opening the demo…" : "⚡ One-Click Demo Login"}
