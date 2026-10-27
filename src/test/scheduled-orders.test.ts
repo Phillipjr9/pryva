@@ -33,13 +33,13 @@ describe("Scheduled Orders", () => {
       expect(next.getMonth()).toBe((now.getMonth() + 1) % 12);
     });
 
-    it("should handle year rollover for monthly", () => {
-      const december = new Date(2024, 11, 15); // December 15, 2024
+    it("should always move forward and roll over the year", () => {
+      const now = new Date();
       const next = calculateNextRun("monthly");
-      // Should be January 2025
-      if (december.getMonth() === 11) {
-        expect(next.getFullYear()).toBe(2025);
-        expect(next.getMonth()).toBe(0);
+      expect(next.getTime()).toBeGreaterThan(now.getTime());
+      expect(next.getMonth()).toBe((now.getMonth() + 1) % 12);
+      if (now.getMonth() === 11) {
+        expect(next.getFullYear()).toBe(now.getFullYear() + 1);
       }
     });
   });

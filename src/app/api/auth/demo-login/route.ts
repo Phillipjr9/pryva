@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, sessions } from "@/db/schema";
+import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { hashPassword } from "@/lib/auth";
+import { createSession, hashPassword } from "@/lib/auth";
 import { logger } from "@/lib/logger";
-import { cookies } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
@@ -43,25 +42,9 @@ export async function POST() {
       logger.info("Demo user created", { userId: demoUser.id });
     }
 
-    // Create session
-    const sessionToken = `demo_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
-
-    await db.insert(sessions).values({
-      userId: demoUser.id,
-      token: sessionToken,
-      expiresAt,
-    });
-
-    // Set session cookie
-    cookies().set("session", sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: "/",
-    });
+    // Create session — createSession() sets the correct httpOnly cookie
+    // (`pryva_session`, the name every reader uses).
+    await createSession(demoUser.id);
 
     logger.info("Demo login successful", { userId: demoUser.id });
 

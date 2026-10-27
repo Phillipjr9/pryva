@@ -1,4 +1,4 @@
-import { db } from "@/db";
+import { db, type Transaction } from "@/db";
 import { giftCards, users, walletTransactions } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
@@ -45,7 +45,7 @@ export async function createGiftCard(params: {
   const expiresAt = new Date();
   expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-  await db.transaction(async (tx: typeof db) => {
+  await db.transaction(async (tx: Transaction) => {
     const newBalance = user.walletBalance - amount;
 
     await tx.update(users).set({ walletBalance: newBalance }).where(eq(users.id, userId));
@@ -108,7 +108,7 @@ export async function redeemGiftCard(params: {
     throw new Error("User not found");
   }
 
-  await db.transaction(async (tx: typeof db) => {
+  await db.transaction(async (tx: Transaction) => {
     const newBalance = user.walletBalance + card.amount;
 
     await tx.update(users).set({ walletBalance: newBalance }).where(eq(users.id, userId));

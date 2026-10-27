@@ -213,7 +213,7 @@ export async function processScheduledOrders(): Promise<number> {
   return processed;
 }
 
-function calculateNextRun(frequency: Frequency): Date {
+export function calculateNextRun(frequency: Frequency): Date {
   const now = new Date();
   switch (frequency) {
     case "daily":

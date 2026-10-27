@@ -2,18 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { desc, count } from "drizzle-orm";
-import { requireAuth } from "@/lib/auth";
+import { requireAdminApi } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  try {
-    const user = await requireAuth(request);
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const admin = await requireAdminApi();
+    if (!admin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+  try {
 
-    // TODO: Add admin role check here
 
     const limit = parseInt(request.nextUrl.searchParams.get("limit") || "50");
     const offset = parseInt(request.nextUrl.searchParams.get("offset") || "0");

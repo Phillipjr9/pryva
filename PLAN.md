@@ -5,7 +5,7 @@
 > Copy it freely. Nothing here is dropped — if something is impossible or not mine to decide, it stays on the
 > list with a note.
 >
-> **Last updated:** 2026-10-27
+> **Last updated:** 2026-10-27 (build repaired + money safety pass 1 + marketplace shipped)
 > **Branch:** `arena/045f0b51-pryva` (based on `main` @ `d9927c1`)
 > **Repo audit method:** every status below was verified by reading files in the checkout — not from memory,
 > not from the earlier chat log.
@@ -80,31 +80,32 @@
 
 | # | Item | Status | Evidence / what's actually left |
 |---|------|--------|--------------------------------|
-| **1** | **Fix Paystack webhook — it currently mints free money** | 🟡 **BROKEN + EXPLOITABLE** | `src/app/api/webhooks/payment/route.ts`: signature check is **commented out**; body is trusted; credits `walletBalance + amount` for **any** POST. Also listens for `payment.success` while Paystack sends `charge.success`, so real payments never credit. Fix: verify HMAC (`verifyWebhookSignature` already exists in `paystack.ts`), use `charge.success`, credit via `creditWallet()`, idempotent reference. |
-| **2** | **Add the missing top-up verification endpoint** | ⬜ | `wallet/topup` redirects back to `?topup=success`, but **no** `/api/wallet/topup/verify` route exists and `dashboard/wallet/page.tsx` never reads `searchParams`. So a user can pay and see no balance change. Needs verify route + client verification UI. |
-| **3** | **Lock down admin APIs (no authz)** | ⬜ | `api/admin/{orders,stats,users}/route.ts` literally contain `// TODO: Add admin role check here`. Any logged-in user can read all users/orders. Needs one shared `requireAdmin()` helper applied to every `/api/admin/*` route + `/admin/*` pages. |
-| **4** | **Route every balance change through `debitWallet`/`creditWallet`** | 🟡 | Airtime purchase does a raw `update(users).set({ walletBalance })` with no row lock, no idempotency (`api/airtime/purchase`). `gift-cards`, `digital/purchase`, `orders` already use the helpers. Needs migration + locking + unique reference on airtime. |
-| **5** | **Rate-limit + bot-check the auth & payment endpoints** | 🟡 | `lib/rate-limit.ts` exists; verify it is applied to login/signup/demo/topup/webhook (not all routes). |
-| **6** | **Security headers / CSP** | ⬜ | `next.config.ts` has **no** headers at all — no CSP, HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy. |
+| **0** | **The app didn't compile** | ✅ | `tsc --noEmit` had **113 errors across 58 files** and `next build` failed — the merged PR #2/#3 shipped against helpers that don't exist (`fulfillPlan`, `cancelUpstream`, `FleexaError`, `checkFleexaSms`…), a mock DB missing 6 tables, `cookies()` called synchronously, and `db` typed as `any`. All fixed: typecheck **0 errors**, `next build` **passes**, 12 test files / 89 tests **pass**. |
+| **1** | **Paystack webhook no longer mints money** | ✅ | Rewritten: HMAC-SHA512 signature verified against the raw body (fails closed when no secret), `charge.success` handled (was `payment.success`), amounts come only from the signed payload in kobo, crediting is idempotent per reference, `transfer.success/failed` settle withdrawals and auto-refund failures. `verifyWebhookSignature()` now uses `timingSafeEqual`. |
+| **2** | **Top-up verification endpoint** | ✅ | New `POST /api/wallet/topup/verify` — asks Paystack's verify API, checks currency + that the payer email matches the signed-in user, credits once. New `TopUpReturn` client component on `/dashboard/wallet` picks up `?topup=success&reference=…` and refreshes the balance. |
+| **3** | **Admin APIs locked down** | ✅ | New `requireAdminApi()` in `lib/auth.ts` (returns null instead of redirecting). Applied to **all 11** `/api/admin/*` handlers — 8 of them previously had **no auth at all**, the rest only checked "is logged in". |
+| **4** | **Every balance change goes through `debitWallet`/`creditWallet`** | 🟡 | Fixed: `orders/purchase`, `wallet/withdraw`, `digital/purchase` now debit via the atomic helper (balance guard inside the SQL `WHERE`). `airtime/purchase` and `orders/bulk` still do read-modify-write → **remaining work**. |
+| **5** | **Rate-limit auth & payment endpoints** | 🟡 | `lib/rate-limit.ts` exists and is used by the marketplace purchase route; login/signup/demo/topup and the webhook still need it. |
+| **6** | **Security headers / CSP** | ⬜ | `next.config.ts` has **no** headers — CSP, HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy all missing. |
 
-### 🟠 TIER 2 — The AccsZone marketplace (your R1, R2, R5, R6, R10)
+### 🟠 TIER 2 — The accounts marketplace (your R1, R2, R5, R6, R10)
 
 | # | Item | Status | What's left |
 |---|------|--------|-------------|
-| **7** | AccsZone API client (`categories`, `subcategories`, `listings`, `purchase`, `orders`, `balance`, `promo`) | ⬜ | Nothing exists. Earlier attempt was **PR #1, which was CLOSED, not merged** — see §6. Must be rebuilt on this branch. |
-| **8** | DB support for marketplace orders (stored credentials, provider order id) + migration | ⬜ | No such columns; `orders` has no credential store. |
-| **9** | `/accounts` browse page: categories → subcategories → listings → search/sort → purchase modal → credential display | ⬜ | No `(site)/accounts` page, no `/api/accounts/*` routes. |
-| **10** | Add "Digital Accounts" marketplace to catalog, dashboard nav, homepage showcase (**Facebook + Instagram featured**) | 🟡 | `/dashboard/digital` + `lib/digital-services.ts` already sell **6 own-catalog accounts** (Netflix, Spotify, YouTube, Disney+, ChatGPT, Canva). The *AccsZone* feed and the FB/IG showcase are missing. |
-| **11** | Profitable pricing engine (base markup + category premium + volume discount + min-profit floor) | ⬜ | Nowhere. Current prices are static Naira in `lib/catalog.ts`. |
-| **12** | Automatic USD→NGN rate with cache + fallback providers | ⬜ | Nowhere; no `exchange-rates` lib, no FX env vars. |
-| **13** | Hide supplier names everywhere (no "AccsZone", no "Fleexa") | 🟡 **5 leaks live** | `(auth)/layout.tsx:62`, `how-it-works:71`, `(site)/page.tsx:123,240,1088`, `dashboard/page.tsx:121–130`, `components/dashboard/OrderActions.tsx:137`. Also `/api/integrations/fleexa` exposes the name in a URL. |
+| **7** | Marketplace API client (categories, subcategories, listings, listing detail, purchase, orders, balance, promo) | ✅ | `src/lib/accszone.ts` — 20s timeouts, typed errors carrying `code`/`status`/`retryAfter`/`requestId`, 30-minute cache on categories, honours the 30 req/min supplier cap. **Untested against the live API** (no key in this sandbox) — first call must be read-only. |
+| **8** | DB support for marketplace orders + migration | ✅ | `orders.accounts` (JSON array of credentials) + `orders_provider_request_idx`; `migrations/005_add_marketplace_accounts.sql`. |
+| **9** | `/accounts` browse flow: categories → subcategories → search/sort → paginated grid → quantity + promo → credential delivery | ✅ | `src/app/(site)/accounts/page.tsx` + `AccountsBrowser.tsx`; `/api/accounts/{categories,listings,purchase,promo}`. Prices are always computed server-side; the client never sends a price. |
+| **10** | Marketplace in nav / homepage; **Facebook + Instagram featured** | 🟡 | ✅ `Accounts` in the header nav, `Digital accounts` first in the footer service column, `/accounts` in the sitemap-able route list. ⬜ dedicated FB/IG showcase section on the homepage. |
+| **11** | Profitable pricing engine | ✅ | `src/lib/marketplace-pricing.ts` — 30% base markup, category premiums (FB/IG +15, X/TikTok +10, email +5), volume tiers 5/10/25 → 5/8/10%, ₦200 minimum profit floor, ₦50 rounding, promo pass-through that never breaks the floor. **8 tests in `src/test/marketplace-pricing.test.ts`.** |
+| **12** | Automatic USD→NGN rate with cache + fallbacks | ✅ | `src/lib/exchange-rate.ts` — env pin → 1h cache → open.er-api.com → exchangerate-api → `USD_NGN_FALLBACK` (1600). |
+| **13** | Hide supplier names everywhere | ✅ | All user-facing mentions removed (auth layout, how-it-works, homepage ×3, service template, footer "Powered by Fleexa", order badges, and the dashboard provider/balance banner is gone entirely). Supplier names remain only in backend code and comments. |
 
 ### 🟡 TIER 3 — Platform features you asked for
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
 | **14** | Paystack wallet top-up (init → pay → verify → credit) | 🟡 | Init exists; **verify + credit broken** (see #1, #2). |
-| **15** | Wallet withdrawal to bank (user request → admin approval → Paystack transfer → webhook) | 🟡 | API + `withdrawals` table + migration 004 + `paystack.ts` transfer functions exist. **Missing:** any withdrawal UI in `/dashboard/wallet`, and an admin approve/reject route (`admin/withdrawals/[id]/process`). |
+| **15** | Wallet withdrawal to bank (user request → admin approval → Paystack transfer → webhook) | 🟡 | API + `withdrawals` table + migration 004 + `paystack.ts` transfers exist; the withdrawal screen is now **mounted** on `/dashboard/wallet` (it was orphaned before), the debit is atomic, and `transfer.success/failed` webhooks settle or refund. **Missing:** admin role gate on the page itself is done, but no `admin/withdrawals/[id]/process` single-item route. |
 | **16** | Payment integrity (atomic, row-locked, idempotent, audited) | 🟡 | `lib/payment-integrity.ts` + `wallet.ts` helpers exist. **Missing:** admin `/admin/payment-audit` view, and adoption by airtime (#4). |
 | **17** | OTP / product timeouts + automatic refunds | 🟡 | `lib/service-timeouts.ts`, `lib/auto-refund.ts` exist. **Missing:** the cron route that calls them (only `cron/scheduled-orders` exists) + admin failed-orders page. |
 | **18** | Demo login works | ✅ | Three demo routes (`auth/demo`, `demo-login`, `demo-web`) + mock-DB persistence fix. Verified routes exist. |
@@ -138,13 +139,13 @@
 | **41** | Dark mode + ⌘K command palette | ✅ | `components/theme/*` and `components/command/CommandPalette.tsx` (mounted in `DashboardShell`). |
 | **42** | PWA (installable, offline, icons) | ⬜ | No `manifest.json`, `sw.js`, `offline.html`, no PWA meta, `public/` only holds images + logo. |
 | **43** | Analytics (GA4 / Web Vitals) | ⬜ | Nothing. |
-| **44** | Automated tests that can actually run | 🟡 | **10 test files exist** (`airtime`, `bulk-orders` ×2, `catalog` ×2, `gift-cards` ×2, `order-status`, `scheduled-orders`, `validation`) but **no test runner installed and no `test` script** — so they never run. |
-| **45** | Security suite: rate limiting, validation, anti-RE, sanitisation | 🟡 | ✅ `rate-limit`, `validation`, `security`, `protection`, `anti-reverse-engineering`, `sanitize`, `logger`, `errors`, `middleware`. ⬜ no `audit.ts` (audit trail), ⬜ no bot detection, ⬜ no CSP (#6), ⬜ unsigned webhook (#1). |
-| **46** | Docs: README, RUNBOOK, .env.example, payment-flow doc | ⬜ | Only `PLAN.md` exists. |
-| **47** | CI/CD, Dockerfile, migrations hygiene | ⬜ | No `.github/`, no Dockerfile. Only 4 SQL migrations while the schema has 11 tables → schema drift; several tables (airtime, reviews…) have no migration. |
+| **44** | Automated tests that can actually run | ✅ | Vitest installed + `vitest.config.ts` + `npm test`. **12 files / 89 tests pass**, including new pricing and webhook-signature suites. Two stale assertions were fixed (naira rounding, a date-dependent scheduler test). |
+| **45** | Security suite: rate limiting, validation, anti-RE, sanitisation | 🟡 | ✅ `rate-limit`, `validation`, `security`, `protection`, `anti-reverse-engineering`, `sanitize`, `logger`, `errors`, `proxy` (middleware), ✅ signed webhook, ✅ admin authz, ✅ constant-time signature compare. ⬜ no `audit.ts` (audit trail), ⬜ no bot detection, ⬜ no CSP (#6). |
+| **46** | Docs: README, RUNBOOK, .env.example, payment-flow doc | 🟡 | ✅ `PLAN.md`, ✅ `.env.example` (all keys documented incl. FX + markup). ⬜ README, ⬜ RUNBOOK, ⬜ payment-flow doc. |
+| **47** | CI/CD, Dockerfile, migrations hygiene | ⬜ | No `.github/`, no Dockerfile. 5 SQL migrations vs 11 tables → still drift. |
 | **48** | Preview / public URL for you to actually see the app | 🚫 | Blocked in this sandbox: tunnel tools (localtunnel/cloudflared/ngrok) can't reach the network, and the Arena preview panel didn't render. I can start the server here; still needs your side or a deploy (Vercel) to view. |
 
-**Tally:** ✅ 11 done · 🟡 20 partial · ⬜ 16 not started · 🚫 1 blocked · ❓ 5 open questions.
+**Tally:** ✅ 22 done · 🟡 14 partial · ⬜ 11 not started · 🚫 1 blocked · ❓ 1 open (Q5).
 
 ---
 
@@ -152,10 +153,10 @@
 
 **Stack** — Next.js 16 (App Router) · React 19 · TypeScript · Tailwind 4 · Drizzle ORM + Postgres (mock DB fallback when `DATABASE_URL` is unset) · `canvas-confetti` · `simple-icons` · `pg`.
 
-**Database (11 tables)** — `users`, `sessions`, `orders`, `wallet_transactions`, `contact_messages`, `gift_cards`, `scheduled_orders`, `notifications`, `security_violations`, `withdrawals`, `bank_accounts`.
-Migrations: `001_add_gift_cards`, `002_add_scheduled_orders`, `003_add_security_violations`, `004_add_withdrawals`.
+**Database (11 tables)** — `users`, `sessions`, `orders` (now with an `accounts` credential store), `wallet_transactions`, `contact_messages`, `gift_cards`, `scheduled_orders`, `notifications`, `security_violations`, `withdrawals`, `bank_accounts`.
+Migrations: `001_add_gift_cards`, `002_add_scheduled_orders`, `003_add_security_violations`, `004_add_withdrawals`, `005_add_marketplace_accounts`.
 
-**Public site (17 pages)** — Home, About, Blog, Contact, Digital Services, Email OTP, eSIM, FAQ, Help, How it works, Pricing, Privacy, Proxies, Status, Terms, Testimonials, Virtual Numbers.
+**Public site (18 pages)** — Home, About, Blog, Contact, Digital Services, Email OTP, eSIM, FAQ, Help, How it works, **Accounts (marketplace)**, Pricing, Privacy, Proxies, Status, Terms, Testimonials, Virtual Numbers.
 
 **Auth** — login, signup, logout, Google OAuth (start + callback), 3 demo flows, sessions, password change, profile, account delete, data export.
 ⚠️ No password reset, no email verification, no 2FA.
@@ -164,44 +165,44 @@ Migrations: `001_add_gift_cards`, `002_add_scheduled_orders`, `003_add_security_
 
 **Admin** — Dashboard, Analytics, Security, Withdrawals. ⚠️ No role checks.
 
-**API** — 52 route handlers across auth, orders, wallet, gift cards, airtime, digital, scheduled, notifications, admin, user, webhooks, health, search, cron.
+**API** — 59 route handlers, now including `/api/accounts/{categories,listings,purchase,promo}` (neutral URLs) and `/api/wallet/topup/verify`.
 
 **Libraries (~5.2k lines + additions)** — catalog, email-templates (6), anti-reverse-engineering, digital-services, security, payment-integrity, protection, paystack (init/verify/transfers/banks/webhook-signature), auth, fleexa, gift-cards, service-timeouts, auto-refund, scheduled-orders, airtime, bulk-orders, wallet, validation, rate-limit, sanitize, logger, errors, cache, net, google, format, utils.
 
 **UI kit (22)** — Accordion, Alert, Badge, Button, Card, Checkbox, Confetti, DataTable, Dropdown, FaqAccordion, Input, Loading, Modal, PaymentLoading, PaymentSuccess, Reveal, Select, Skeleton, Tabs, Textarea, Toast, Tooltip.
 Plus theme provider/toggle, command palette, site header/footer/nav, auth forms, brand logo, purchase flow.
 
-**Tests** — 10 files (cannot run — no runner).
+**Tests** — 12 files / 89 assertions, runnable via `npm test` (vitest).
 
 **Assets** — brand logo, 13 service images, 4 category images, 6 email heroes.
 
 ---
 
-## 4. HARD BUGS FOUND IN THIS AUDIT (fix before launch)
+## 4. HARD BUGS FOUND IN THIS AUDIT
 
-1. 🔴 **Free-money webhook** — unauthenticated `/api/webhooks/payment` credits any wallet with any amount; signature verification commented out. (#1)
-2. 🔴 **Top-ups never credit** — callback lands on `?topup=success` with no verify route and no client handler; the webhook that should save it listens for the wrong event name. (#2)
-3. 🔴 **Admin data is public to any logged-in user** — `// TODO: Add admin role check here` in three admin routes. (#3)
-4. 🟠 **Airtime bypasses the safe wallet path** — raw balance write, no lock/idempotency. (#4)
-5. 🟠 **No security headers at all** — `next.config.ts` ships none. (#6)
-6. 🟠 **Withdrawal has no UI and no approval route** — API exists, unusable end-to-end. (#15)
-7. 🟡 **Auto-refund never runs** — the logic exists but nothing schedules it. (#17)
-8. 🟡 **Tests are dead weight** — 10 suites, no runner. (#44)
-9. 🟡 **Supplier names still visible** in 6+ user-facing places. (#13)
-10. 🟡 **Schema drift** — 11 tables, 4 migrations.
+Fixed since the first audit (kept here so nothing gets re-introduced):
 
----
+1. ✅ **Free-money webhook** — was: unauthenticated endpoint crediting any amount. Now signature-verified + idempotent (#1).
+2. ✅ **Top-ups never credited** — wrong event name, no verify route, page ignored the callback. All three fixed (#2).
+3. ✅ **Admin data readable by any logged-in user** — 8 admin routes had *no auth at all*. Now `requireAdminApi()` everywhere (#3).
+4. ✅ **Demo login never worked** — it set a cookie named `session` while every reader looks for `pryva_session`. Now uses `createSession()`.
+5. ✅ **Build was broken** — 113 type errors; `db` was `any`, the mock DB was missing 6 tables and had no `.offset()`, `params` weren't awaited (Next 16 requires promises). Fixed.
+6. ✅ **`db.query.*` would crash on real Postgres** — `drizzle()` was called without `{ schema }`, so the relational query API didn't exist. Fixed.
+7. ✅ **Supplier names in 8 user-facing places** — purged (#13).
+8. 🟠 **Airtime + bulk orders still write balances directly** — no atomic guard, no idempotency (#4).
+9. 🟠 **No security headers at all** (#6).
+10. 🟠 **Auto-refund never runs** — logic exists, nothing schedules it (#17).
+11. 🟡 **Schema drift** — 11 tables, 5 migrations.
 
 ## 5. WHAT'S GENUINELY LEFT (short version)
 
-1. Money safety (#1–#6) — this is the only thing standing between you and real losses.
-2. AccsZone marketplace end-to-end (#7–#13) — rebuild it; the old PR was closed.
-3. Referrals, wishlist, reviews, coupons, tickets, SMS/WhatsApp, 2FA, PWA, analytics (#19–#28, #42–#43).
-4. Real icons for every feature + provider/platform logos (#39).
-5. Landing-page clarity for all 7 offerings (#38).
-6. Docs, CI, migrations, runnable tests (#44–#47).
-
----
+1. **Finish money safety** — airtime + bulk orders onto the atomic wallet helpers (#4), rate limits on auth/payment (#5), security headers (#6). *Start here.*
+2. **First live marketplace call** — add `ACCSZONE_API_KEY` to `.env`, then hit `GET /api/accounts/categories` and `GET /user/balance` (read-only) before buying anything.
+3. **Marketplace polish** — FB/IG showcase on the homepage (#10), marketplace entry in the dashboard/digital page, order-detail credential view (done) and admin visibility of marketplace orders.
+4. **Withdrawals end-to-end** — restyle the withdrawal screen to the site's design language, admin approve/reject single-item route.
+5. Features: referrals, wishlist, reviews, coupons, tickets, SMS/WhatsApp, 2FA, PWA, analytics (#19–#28, #42–#43).
+6. Real per-feature icons + provider/platform logos (#39); landing-page clarity for all offerings (#38).
+7. Docs, CI, Docker, migrations hygiene (#46–#47).
 
 ## 6. IMPORTANT: DIVERGENCE FROM THE EARLIER SESSION
 
@@ -216,7 +217,18 @@ Verified facts:
 
 ---
 
-## 7. OPEN QUESTIONS (I need these answered before building Tier 2)
+## 7. ANSWERS YOU GAVE (questions closed)
+
+| # | Question | Your answer |
+|---|----------|-------------|
+| Q1 | Is the marketplace still required? | **Yes** — rebuild it (#7–#13). |
+| Q2 | Do you have the supplier API key? | **Yes**, and it may resell every category. Key lives in `.env` as `ACCSZONE_API_KEY` — never in chat. |
+| Q3 | Facebook/Instagram chargeback risk? | **Risk accepted.** Every category, FB/IG included. No re-litigating it. |
+| Q4 | Money-safety before marketplace? | Followed: build fixed → money safety → marketplace. |
+| Q5 | Keep all Tier-3 features? | Still open — assume yes until you say otherwise. |
+| Q6 | Email + KYC? | Dropped/deferred as you instructed (no KYC, email waits for a domain). |
+
+### Still open
 
 | # | Question | Why it matters |
 |---|----------|----------------|
@@ -235,6 +247,10 @@ Verified facts:
 |------|--------|-----------------|
 | 2026-10-27 | Created plan file + first codebase inventory | — |
 | 2026-10-27 | Loaded the full request log (R1–R42); verified every item against the checkout; discovered PR #1 was closed and most "done" features are absent; found 10 real bugs incl. a free-money webhook | — |
+| 2026-10-27 | **Repaired the build.** 113 type errors → 0; `next build` passes. Typed `db` against the real schema, gave the mock DB the 6 missing tables plus `.offset()`, awaited Next 16's promise `params`, added the missing provider/fulfillment helpers, replaced the `lucide-react` imports with the in-house icon set, mounted the toast provider. | #0 |
+| 2026-10-27 | **Money safety pass 1.** Webhook signature + `charge.success` + idempotency; new top-up verify route + client; `requireAdminApi()` on all 11 admin routes; atomic debits for orders/withdrawals/digital; withdrawal UI wired up; demo-login cookie bug fixed. | #1, #2, #3, #4 (partial) |
+| 2026-10-27 | **Marketplace built.** Supplier client, FX with cache/fallback, pricing engine (markup + premiums + volume + floor), migration 005, four neutral `/api/accounts/*` routes, `/accounts` browse+buy UI with promo codes, credential viewer on order detail, supplier-name purge. | #7–#13 |
+| 2026-10-27 | **Tests run.** Vitest + config + `npm test`: 12 files / 89 tests green, incl. new pricing (8) and webhook-signature (2) suites. | #44 |
 
 ---
 

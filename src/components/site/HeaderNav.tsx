@@ -10,6 +10,7 @@ import { formatNaira, services } from "@/lib/catalog";
 type NavUser = { name: string; walletBalance: number } | null;
 
 const primaryLinks = [
+  { href: "/accounts", label: "Accounts" },
   { href: "/pricing", label: "Pricing" },
   { href: "/how-it-works", label: "How it works" },
   { href: "/faq", label: "FAQ" },

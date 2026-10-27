@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { getDigitalPlan } from "@/lib/digital-services";
-import { debitWallet } from "@/lib/wallet";
+import { debitWallet, InsufficientFundsError } from "@/lib/wallet";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { logger } from "@/lib/logger";
@@ -57,14 +57,27 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    // Debit wallet
-    await debitWallet({
-      userId: user.id,
-      orderId: order.id,
-      amount: plan.price,
-      description: `${plan.name} purchase`,
-      reference,
-    });
+    // Debit wallet. If the balance can't cover it, remove the order row so a
+    // stale "processing" order is never left behind.
+    try {
+      await debitWallet({
+        userId: user.id,
+        type: "debit",
+        orderId: order.id,
+        amount: plan.price,
+        description: `${plan.name} purchase`,
+        reference,
+      });
+    } catch (error) {
+      await db.delete(orders).where(eq(orders.id, order.id));
+      if (error instanceof InsufficientFundsError) {
+        return NextResponse.json(
+          { error: "Insufficient wallet balance.", balance: error.balance, required: error.required },
+          { status: 402 },
+        );
+      }
+      throw error;
+    }
 
     logger.info("Digital service purchased", {
       userId: user.id,

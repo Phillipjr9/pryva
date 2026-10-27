@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
+import type { SafeUser } from "@/lib/auth-types";
 import { sessions, users, type User } from "@/db/schema";
 import { requestProto } from "@/lib/net";
 
@@ -66,7 +67,7 @@ export function verifyPassword(password: string, stored: string): boolean {
   return timingSafeEqual(derived, expected);
 }
 
-export type PublicUser = Pick<User, "id" | "name" | "email" | "walletBalance" | "createdAt">;
+export type PublicUser = SafeUser;
 
 function toPublicUser(user: User): PublicUser {
   return {
@@ -124,6 +125,18 @@ export async function requireAuth(
   if (!user) {
     redirect(`/login?next=${encodeURIComponent(destination)}`);
   }
+  return user;
+}
+
+/**
+ * Admin guard for API routes.
+ *
+ * Unlike requireAuth/requireAdmin it never redirects — a route handler needs a
+ * 401/403 it can return, not a navigation.
+ */
+export async function requireAdminApi(): Promise<PublicUser | null> {
+  const user = await getCurrentUser();
+  if (!user || !isAdminUser(user)) return null;
   return user;
 }
 

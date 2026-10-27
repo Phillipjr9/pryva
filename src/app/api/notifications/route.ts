@@ -32,9 +32,8 @@ export async function GET(request: NextRequest) {
         type: n.type,
         title: n.title,
         message: n.message,
-        read: n.read,
+        read: Boolean(n.read),
         createdAt: n.createdAt.toISOString(),
-        data: n.data,
       })),
       unreadCount,
       total: userNotifications.length,
@@ -58,12 +57,12 @@ export async function PATCH(request: NextRequest) {
     if (markAllRead) {
       await db
         .update(notifications)
-        .set({ read: true })
+        .set({ read: 1 })
         .where(eq(notifications.userId, user.id));
     } else if (notificationId) {
       await db
         .update(notifications)
-        .set({ read: true })
+        .set({ read: 1 })
         .where(eq(notifications.id, notificationId));
     } else {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });

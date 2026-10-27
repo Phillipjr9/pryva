@@ -5,10 +5,11 @@ import { formatNaira } from "@/lib/catalog";
 import { Gift, Copy, Check } from "@/components/icons";
 import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
-import type { User, GiftCard } from "@/db/schema";
+import type { GiftCard } from "@/db/schema";
+import type { SafeUser } from "@/lib/auth-types";
 
 interface GiftCardsManagerProps {
-  user: User;
+  user: SafeUser;
 }
 
 type Tab = "create" | "redeem" | "history";

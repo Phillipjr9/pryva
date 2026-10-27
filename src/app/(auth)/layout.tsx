@@ -59,7 +59,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
 
             <p className="mt-6 flex items-center gap-2 text-[0.72rem] text-ink-3">
               <Shield className="h-3.5 w-3.5 text-lav-600" />
-              Provisioned with Fleexa · operated from Lagos, Nigeria
+              Carrier-grade infrastructure · operated from Lagos, Nigeria
             </p>
           </div>
         </div>

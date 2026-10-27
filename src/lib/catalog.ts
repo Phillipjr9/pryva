@@ -51,7 +51,8 @@ export type Service = {
 export const NGN = "₦";
 
 export function formatNaira(value: number): string {
-  return `${NGN}${new Intl.NumberFormat("en-NG").format(value)}`;
+  const amount = Number.isFinite(value) ? Math.round(value) : 0;
+  return `${NGN}${new Intl.NumberFormat("en-NG", { maximumFractionDigits: 0 }).format(amount)}`;
 }
 
 export const services: Service[] = [
