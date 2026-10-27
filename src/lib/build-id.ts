@@ -38,6 +38,8 @@ export const BUILD_ID: string = (globalForBuild.__pryvaBuildId ??= resolveBuildI
  * once if the tab is older than the server. Two brakes (remembered build + max
  * two reloads per session) stop a bad deploy from looping a tab.
  */
+export const BUILD_GUARD_SCRIPT_ID = "pryva-build-guard";
+
 export function staleBuildScript(buildId: string): string {
   return `(function(){try{
 var build=${JSON.stringify(buildId)},K="pryva:reloaded-for",C="pryva:version-reloads";
