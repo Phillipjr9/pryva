@@ -259,7 +259,7 @@ export function DashboardShell({
               >
                 <Menu className="h-4 w-4" />
               </button>
-              <span className="lg:hidden">
+              <span className="hidden sm:inline-flex lg:hidden">
                 <BrandLockup size="xs" />
               </span>
               <div className="hidden lg:block">
@@ -273,6 +273,16 @@ export function DashboardShell({
               <div className="hidden sm:block">
                 <CommandPaletteTrigger onClick={() => setCommandPaletteOpen(true)} />
               </div>
+              {/* The balance belongs at the top of every dashboard page, on every
+                  width — it is the number people come back to check. */}
+              <Link
+                href="/dashboard/wallet"
+                aria-label={`Wallet balance ${formatNaira(user.walletBalance)} — open wallet`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-lav-200 bg-lav-50 px-2.5 py-1.5 text-[0.74rem] font-semibold text-lav-800 transition-colors hover:border-lav-300 hover:bg-lav-100 sm:px-3"
+              >
+                <Wallet className="h-3.5 w-3.5 text-lav-600" />
+                {formatNaira(user.walletBalance)}
+              </Link>
               <Link
                 href="/dashboard/notifications"
                 className="relative grid h-9 w-9 place-items-center rounded-full border border-line bg-white text-ink-2 transition-colors hover:text-ink"
@@ -289,13 +299,7 @@ export function DashboardShell({
                   </span>
                 )}
               </Link>
-              <Link
-                href="/dashboard/wallet"
-                className="hidden items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-1.5 text-[0.76rem] font-semibold text-ink-2 md:inline-flex"
-              >
-                <Wallet className="h-3.5 w-3.5 text-lav-600" />
-                {formatNaira(user.walletBalance)}
-              </Link>
+
               <Link href="/pricing" className="btn btn-primary !px-3.5 !py-2 !text-[0.76rem]">
                 Buy
                 <ArrowRight className="h-3 w-3" />
