@@ -3,8 +3,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
-import { VersionGuard } from "@/components/system/VersionGuard";
-import { BUILD_ID } from "@/lib/build-id";
+import { BUILD_ID, staleBuildScript } from "@/lib/build-id";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://pryva.ng"),
@@ -62,9 +61,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <noscript>
           <style>{`.reveal{opacity:1 !important;transform:none !important}`}</style>
         </noscript>
+        {/*
+          Plain inline script on purpose — see staleBuildScript(). A tab running an
+          older build has older components, so a React version guard cannot be
+          relied on to exist there. This HTML always is.
+        */}
+        <script
+          data-pryva-build={BUILD_ID}
+          dangerouslySetInnerHTML={{ __html: staleBuildScript(BUILD_ID) }}
+        />
       </head>
       <body className="min-h-screen bg-cream text-ink antialiased">
-        <VersionGuard buildId={BUILD_ID} />
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
