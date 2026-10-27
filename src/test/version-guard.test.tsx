@@ -32,7 +32,7 @@ describe("stale-build guard", () => {
     const script = staleBuildScript("build-abc");
 
     expect(script).toContain("pryva:reloaded-for");
-    expect(script).toContain("pryva:version-reloads");
+    expect(script).toContain("pryva:reloads");
     expect(script).toMatch(/n\s*>=\s*2/); // hard cap
     expect(script).toContain("location.reload()");
     expect(script).toContain('"build-abc"');

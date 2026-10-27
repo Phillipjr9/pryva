@@ -17,11 +17,11 @@ function runGuard(options: {
   rememberedBuild?: string | null;
 }) {
   const store = new Map<string, string>();
-  if (options.reloads !== undefined) store.set("pryva:version-reloads", String(options.reloads));
+  if (options.reloads !== undefined) store.set("pryva:reloads", String(options.reloads));
   if (options.rememberedBuild) store.set("pryva:reloaded-for", options.rememberedBuild);
 
   const reload = vi.fn();
-  const listeners: Record<string, () => void> = {};
+  const listeners: Record<string, (event?: unknown) => void> = {};
 
   const context = {
     fetch: async () => ({ ok: true, json: async () => ({ build: options.serverBuild }) }),
@@ -31,7 +31,7 @@ function runGuard(options: {
     },
     window: {
       location: { reload },
-      addEventListener: (name: string, handler: () => void) => {
+      addEventListener: (name: string, handler: (event?: unknown) => void) => {
         listeners[name] = handler;
       },
     },
@@ -122,5 +122,37 @@ describe("stale-build guard behaviour", () => {
 
   it("targets the running build", () => {
     expect(staleBuildScript(BUILD_ID)).toContain(JSON.stringify(BUILD_ID));
+  });
+});
+
+describe("stale-build guard: hydration recovery", () => {
+  it("reloads once when React reports a hydration mismatch", async () => {
+    // The case a build id can never catch: fresh HTML, stale executing bundle.
+    const { reload, listeners } = runGuard({ pageBuild: "same", serverBuild: "same" });
+    await flush();
+    expect(reload).not.toHaveBeenCalled();
+
+    listeners.error({ message: "Hydration failed because the server rendered HTML didn't match the client." });
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("recognises minified React hydration codes too", async () => {
+    const { reload, listeners } = runGuard({ pageBuild: "same", serverBuild: "same" });
+    await flush();
+
+    listeners.error({ message: "Minified React error #418; visit https://react.dev/errors/418" });
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores unrelated errors and never loops on repeat hydration errors", async () => {
+    const { reload, listeners } = runGuard({ pageBuild: "same", serverBuild: "same" });
+    await flush();
+
+    listeners.error({ message: "NetworkError when attempting to fetch resource." });
+    expect(reload).not.toHaveBeenCalled();
+
+    listeners.error({ message: "Hydration failed because the server rendered HTML didn't match the client." });
+    listeners.error({ message: "Hydration failed because the server rendered HTML didn't match the client." });
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 });
