@@ -127,7 +127,7 @@ ratings**, **coupons** (marketplace promos are supplier-side only), **support ti
 | U3 | ~~Platform logos (Facebook, Instagram, TikTok…) absent on `/accounts`~~ **Fixed** — real brand marks on cards, hero strip and every product tile |
 | U4 | Withdrawal screen still uses default form styling, not the site's design language |
 | U5 | No loading skeletons on most dashboard screens |
-| U6 | Facebook/Instagram hero showcase on the homepage (#10 in PLAN) |
+| U6 | ~~Facebook/Instagram hero showcase on the homepage (#10 in PLAN)~~ | **Fixed** — accounts marketplace band with real FB/IG/TikTok/X marks + `/digital-services` strip |
 | U7 | Country flags were emoji only (rendered as "NG" on Windows) | **Fixed** — 60 real flags + `CountryFlag` on pricing, checkout, numbers and eSIM pages |
 | U8 | The site had **no logo anywhere** — header, footer, dashboard and emails were text-only | **Fixed** — the owner's mark is now the brand everywhere (see §5) |
 | U9 | Homepage hero stacked three overlapping cards on phones; services grid cramped at 2-up | **Fixed** — single clean hero card, snap-scroll service rail, sticky thumb-reach CTA |
@@ -306,3 +306,16 @@ are what shipped.
 
 `PLAN.md` remains the numbered backlog (48 items, statuses kept current).
 This file is the *state of the system*; `PLAN.md` is the *task list*.
+
+---
+
+## 8. HOMEPAGE PASS (2026-10-27)
+
+Full findings live in `HOMEPAGE-REVIEW.md`. Closed in this pass: the 2-column
+services grid at every width, the bento squeezed into 55% of the page, the empty
+half of the dashboard panel, the inconsistent vertical rhythm, the marquee seam,
+"Four services" over nine cards, four cards (and footer links) that bounced guests
+to `/login`, the unimplemented Plus/Business pricing tiers, invented "4.9/5" and
+"4,200+ delivered" claims, the orphaned `/digital-services` page, the missing OG
+image, the missing FAQ structured data, the glued H2 word breaks, and the sticky
+CTA covering the closing CTA.

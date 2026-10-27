@@ -11,7 +11,15 @@ const columns = [
     // logged for "/accounts" on every page).
     links: [
       { href: "/accounts", label: "Digital accounts" },
-      ...services.map((service) => ({ href: service.href, label: service.name })),
+      // Services fulfilled inside the app link through sign-in, so a signed-out
+      // visitor is asked to log in instead of being bounced by a redirect.
+      ...services.map((service) => ({
+        href: service.href.startsWith("/dashboard")
+          ? `/login?next=${encodeURIComponent(service.href)}`
+          : service.href,
+        label: service.name,
+      })),
+      { href: "/digital-services", label: "Streaming & subscriptions" },
     ].filter((link, index, all) => all.findIndex((entry) => entry.href === link.href) === index),
   },
   {
