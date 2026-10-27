@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, ne, sum } from "drizzle-orm";
 import { db } from "@/db";
 import { walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
@@ -21,19 +21,34 @@ export default async function WalletPage({
   const user = await requireUser("/dashboard/wallet");
   const params = await searchParams;
 
-  const transactions = await db
-    .select()
-    .from(walletTransactions)
-    .where(eq(walletTransactions.userId, user.id))
-    .orderBy(desc(walletTransactions.createdAt))
-    .limit(40);
+  // Headline totals come from aggregates, not from the visible slice: the old
+  // version summed the newest 40 rows and labelled them "in total".
+  const [transactions, [addedRow], [spentRow], [debitCount]] = await Promise.all([
+    db
+      .select()
+      .from(walletTransactions)
+      .where(eq(walletTransactions.userId, user.id))
+      .orderBy(desc(walletTransactions.createdAt))
+      .limit(40),
+    db
+      .select({ value: sum(walletTransactions.amount) })
+      .from(walletTransactions)
+      .where(
+        and(eq(walletTransactions.userId, user.id), ne(walletTransactions.type, "debit")),
+      ),
+    db
+      .select({ value: sum(walletTransactions.amount) })
+      .from(walletTransactions)
+      .where(and(eq(walletTransactions.userId, user.id), eq(walletTransactions.type, "debit"))),
+    db
+      .select({ value: count() })
+      .from(walletTransactions)
+      .where(and(eq(walletTransactions.userId, user.id), eq(walletTransactions.type, "debit"))),
+  ]);
 
-  const added = transactions
-    .filter((tx: { type: string }) => tx.type !== "debit")
-    .reduce((sum: number, tx: { amount: number }) => sum + tx.amount, 0);
-  const spent = transactions
-    .filter((tx: { type: string }) => tx.type === "debit")
-    .reduce((sum: number, tx: { amount: number }) => sum + tx.amount, 0);
+  const added = Number(addedRow?.value ?? 0);
+  const spent = Number(spentRow?.value ?? 0);
+  const spendCount = Number(debitCount?.value ?? 0);
 
   return (
     <div className="grid gap-4">
@@ -71,7 +86,7 @@ export default async function WalletPage({
             <Refresh className="h-4 w-4 text-lav-600" />
           </div>
           <p className="mt-2 text-[1.55rem] font-semibold leading-none">{formatNaira(spent)}</p>
-          <p className="mt-2 text-[0.68rem] text-ink-3">Across {transactions.filter((tx: { type: string }) => tx.type === "debit").length} orders</p>
+          <p className="mt-2 text-[0.68rem] text-ink-3">Across {spendCount} charges</p>
         </div>
       </div>
 
@@ -149,9 +164,7 @@ export default async function WalletPage({
           </div>
         </div>
       </div>
-      <div id="withdraw" className="scroll-mt-24">
-        <WithdrawalDashboard />
-      </div>
+      <WithdrawalDashboard balance={user.walletBalance} />
     </div>
   );
 }
