@@ -1,9 +1,10 @@
 /* eslint-disable @next/next/no-page-custom-font -- fonts are loaded once in the shared App Router root layout. */
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import Script from "next/script";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
-import { BUILD_ID, staleBuildScript } from "@/lib/build-id";
+import { BUILD_GUARD_SCRIPT_ID, BUILD_ID, staleBuildScript } from "@/lib/build-id";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://pryva.ng"),
@@ -62,14 +63,16 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <style>{`.reveal{opacity:1 !important;transform:none !important}`}</style>
         </noscript>
         {/*
-          Plain inline script on purpose — see staleBuildScript(). A tab running an
-          older build has older components, so a React version guard cannot be
-          relied on to exist there. This HTML always is.
+          `next/script` with beforeInteractive — not a raw script element. React
+          never executes a script tag it renders on the client (and warns about
+          it); this one is placed in the server HTML and run by the Next runtime
+          before hydration. Running *before* hydration is the whole point: a tab
+          left open across a deploy reloads instead of reporting a mismatch it
+          cannot otherwise fix.
         */}
-        <script
-          data-pryva-build={BUILD_ID}
-          dangerouslySetInnerHTML={{ __html: staleBuildScript(BUILD_ID) }}
-        />
+        <Script id={BUILD_GUARD_SCRIPT_ID} strategy="beforeInteractive">
+          {staleBuildScript(BUILD_ID)}
+        </Script>
       </head>
       <body className="min-h-screen bg-cream text-ink antialiased">
         <ToastProvider>{children}</ToastProvider>
