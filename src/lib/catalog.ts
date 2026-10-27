@@ -41,7 +41,7 @@ export type Service = {
   intro: string;
   fromPrice: number;
   unit: string;
-  icon: "phone" | "sim" | "globe" | "mail";
+  icon: "phone" | "sim" | "globe" | "mail" | "gift" | "package" | "calendar";
   highlights: { title: string; body: string }[];
   included: string[];
   goodFor: string[];

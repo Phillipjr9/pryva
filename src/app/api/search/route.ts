@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
         )
         .limit(20);
 
-      results.giftCards = userGiftCards.map((g) => ({
+      results.giftCards = userGiftCards.map((g: typeof giftCards.$inferSelect) => ({
         id: g.id,
         code: g.code,
         amount: g.amount,

@@ -115,11 +115,41 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
   return row ? toPublicUser(row.user) : null;
 }
 
-export async function requireUser(nextPath = "/dashboard"): Promise<PublicUser> {
+export async function requireAuth(
+  requestOrPath?: Request | string,
+  nextPath = "/dashboard",
+): Promise<PublicUser> {
+  const destination = typeof requestOrPath === "string" ? requestOrPath : nextPath;
   const user = await getCurrentUser();
   if (!user) {
-    redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+    redirect(`/login?next=${encodeURIComponent(destination)}`);
   }
+  return user;
+}
+
+export function isAdminUser(user: Pick<User, "email"> | PublicUser | null): boolean {
+  if (!user) return false;
+
+  const normalized = user.email.trim().toLowerCase();
+  const admins = (process.env.ADMIN_EMAILS ?? "admin@pryva.ng,demo@pryva.ng")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  return admins.includes(normalized) || normalized === "demo@pryva.ng";
+}
+
+export async function requireUser(nextPath = "/dashboard"): Promise<PublicUser> {
+  return requireAuth(nextPath);
+}
+
+export async function requireAdmin(nextPath = "/admin/dashboard"): Promise<PublicUser> {
+  const user = await requireAuth(nextPath);
+
+  if (!isAdminUser(user)) {
+    redirect(`/dashboard?error=admin-required`);
+  }
+
   return user;
 }
 

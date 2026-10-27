@@ -211,6 +211,46 @@ function projectRow(
   return result;
 }
 
+function isDrizzleSqlExpression(value: unknown): value is { queryChunks?: unknown[]; decoder?: unknown; name?: string } {
+  return !!value && typeof value === "object" && ("queryChunks" in value || "decoder" in value || "shouldInlineParams" in value);
+}
+
+function evaluateAggregateExpression(
+  spec: { queryChunks?: unknown[]; decoder?: unknown; name?: string },
+  contexts: TableRowContext[],
+  defaultTable: string,
+): unknown {
+  const queryName = (spec.name ?? "").toLowerCase();
+  const flattened = flattenSqlChunks(spec);
+  const columnToken = flattened.find((token) => token.kind === "col");
+  const columnName = columnToken?.prop || "";
+  const tableName = columnToken?.table || defaultTable;
+
+  if (queryName.includes("count") || queryName.includes("count")) {
+    return contexts.length;
+  }
+
+  if (queryName.includes("sum") || queryName.includes("total")) {
+    return contexts.reduce((sum, ctx) => {
+      const row = (ctx[tableName] ?? ctx[defaultTable] ?? {}) as Record<string, unknown>;
+      const value = row[columnName];
+      return sum + Number(value ?? 0);
+    }, 0);
+  }
+
+  if (queryName.includes("avg")) {
+    if (contexts.length === 0) return 0;
+    const total = contexts.reduce((sum, ctx) => {
+      const row = (ctx[tableName] ?? ctx[defaultTable] ?? {}) as Record<string, unknown>;
+      const value = row[columnName];
+      return sum + Number(value ?? 0);
+    }, 0);
+    return total / contexts.length;
+  }
+
+  return null;
+}
+
 function withLimit<T>(items: T[]): T[] & { limit: (count: number) => T[] } {
   return Object.assign([...items], {
     limit(count: number) {
@@ -286,6 +326,29 @@ function buildQueryResult(
   selection: Record<string, unknown> | undefined,
   defaultTable: string,
 ) {
+  const hasAggregateSelection =
+    !!selection && Object.values(selection).some((spec) => isDrizzleSqlExpression(spec));
+
+  if (hasAggregateSelection) {
+    const aggregateRow = {} as Record<string, unknown>;
+    for (const [key, spec] of Object.entries(selection ?? {})) {
+      if (isDrizzleSqlExpression(spec)) {
+        aggregateRow[key] = evaluateAggregateExpression(spec, contexts, defaultTable);
+      } else {
+        aggregateRow[key] = spec;
+      }
+    }
+
+    return Object.assign([aggregateRow], {
+      orderBy() {
+        return withLimit([aggregateRow]);
+      },
+      limit(count: number) {
+        return [aggregateRow].slice(0, count);
+      },
+    });
+  }
+
   const projected = contexts.map((ctx) => projectRow(selection, ctx, defaultTable));
   return Object.assign([...projected], {
     orderBy() {
@@ -298,7 +361,61 @@ function buildQueryResult(
   });
 }
 
+function sortQueryRows<T extends Record<string, unknown>>(rows: T[], orderBy: unknown): T[] {
+  const candidates = Array.isArray(orderBy) ? orderBy : [orderBy];
+  if (candidates.some((entry) => entry && typeof entry === "object" && "name" in entry)) {
+    return sortDescendingByCreatedAt(rows);
+  }
+  return sortDescendingByCreatedAt(rows);
+}
+
+function applyQueryOptions<T extends Record<string, unknown>>(
+  rows: T[],
+  options: Record<string, unknown> = {},
+  tableKey: string,
+): T[] {
+  let filtered = rows;
+
+  if (options.where) {
+    filtered = filtered.filter((row) =>
+      matchesConditionInContext({ [tableKey]: row }, tableKey, options.where),
+    );
+  }
+
+  if (options.orderBy) {
+    filtered = sortQueryRows(filtered, options.orderBy);
+  }
+
+  if (typeof options.offset === "number") {
+    filtered = filtered.slice(options.offset as number);
+  }
+
+  if (typeof options.limit === "number") {
+    filtered = filtered.slice(0, options.limit as number);
+  }
+
+  return filtered;
+}
+
+const mockQuery = Object.fromEntries(
+  (Object.keys(mockState) as Array<keyof MockState>).map((tableKey) => [
+    tableKey,
+    {
+      async findMany(options: Record<string, unknown> = {}) {
+        const rows = applyQueryOptions((mockState[tableKey] ?? []) as Record<string, unknown>[], options, tableKey);
+        return rows.map((row) => projectRow(options.columns as Record<string, unknown> | undefined, { [tableKey]: row }, tableKey));
+      },
+      async findFirst(options: Record<string, unknown> = {}) {
+        const rows = applyQueryOptions((mockState[tableKey] ?? []) as Record<string, unknown>[], options, tableKey);
+        const row = rows[0];
+        return row ? projectRow(options.columns as Record<string, unknown> | undefined, { [tableKey]: row }, tableKey) : null;
+      },
+    },
+  ]),
+) as Record<string, any>;
+
 const mockDb: any = {
+  query: mockQuery,
   async execute() {
     return [{ "?column?": 1 }];
   },
