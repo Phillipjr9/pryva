@@ -289,23 +289,15 @@ export default async function HomePage() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-ink/35 via-transparent to-transparent" />
 
-                  {/* status pill */}
-                  <span className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/90 py-1.5 pl-2 pr-2.5 shadow-sm backdrop-blur-md sm:left-4 sm:top-4">
-                    <BrandMark size="xs" />
-                    <span className="text-[0.62rem] font-semibold text-ink sm:text-[0.66rem]">
-                      Example order · Lagos
-                    </span>
-                  </span>
-
                   {/* one card on phones keeps the story without the clutter */}
                   <div className="absolute inset-x-2.5 bottom-2.5 rounded-[1.25rem] border border-white/90 bg-white/95 p-3 shadow-[var(--shadow-soft)] backdrop-blur-xl sm:inset-x-3 sm:bottom-3 sm:p-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="inline-flex items-center gap-1.5 text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-ink-3">
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
                         Live verification
                       </span>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-lav-50 px-2 py-0.5 text-[0.58rem] font-semibold text-lav-700">
-                        <Clock className="h-2.5 w-2.5" /> 00:19
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[0.58rem] font-semibold text-emerald-700">
+                        <Bolt className="h-2.5 w-2.5" /> Delivered in 9s
                       </span>
                     </div>
 
@@ -317,7 +309,7 @@ export default async function HomePage() {
                             +234 812 445 9081
                           </p>
                           <p className="truncate text-[0.62rem] text-ink-3">
-                            Nigeria · non-VoIP · WhatsApp ready
+                            Nigeria · non-VoIP line
                           </p>
                         </div>
                       </div>
@@ -337,6 +329,16 @@ export default async function HomePage() {
                           {digit}
                         </span>
                       ))}
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between text-[0.58rem] font-medium text-ink-3">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="h-2.5 w-2.5" /> Expires in 00:19
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <BrandIcon brand="whatsapp" size={12} variant="bare" decorative />
+                        WhatsApp-ready
+                      </span>
                     </div>
                   </div>
                 </div>

@@ -26,6 +26,9 @@ noted as open at the end.
 
 ### What changed
 
+- Hero photo has **one** overlay instead of two: the "Example order · Lagos"
+  pill is gone, the live-code card keeps "Live verification · Delivered in 9s",
+  and the timer sits at the bottom with the WhatsApp mark beside it.
 - Hero rebuilt as three ordered blocks (copy+CTA → photo → proof) so on a phone the
   CTA and the product shot both land above the fold; desktop stays two columns via
   explicit grid placement.
