@@ -39,11 +39,11 @@ export default async function DashboardPlanPage({
         <p className="mt-1 text-[0.84rem] text-ink-2">{plan.planLabel} · {plan.duration}</p>
       </div>
       <div role="note" className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-[0.78rem] leading-relaxed text-amber-900">
-        Supplier stock is unknown and remaining service units are not tracked. This catalog region does not confirm live coverage.
+        Live stock is unknown and remaining service units are not tracked. This catalog region does not confirm live coverage.
         {" "}Live fulfillment is paused, so this plan cannot be purchased.
       </div>
       <div className="rounded-2xl border border-line bg-white p-6 text-[0.84rem] text-ink-2">
-        Live ordering will remain unavailable until the supplier integration and coverage are verified.
+        Live ordering will remain unavailable until the live integration and coverage are verified.
       </div>
     </div>
   );

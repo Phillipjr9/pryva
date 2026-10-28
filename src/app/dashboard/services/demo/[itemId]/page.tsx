@@ -48,7 +48,7 @@ export default async function DemoServicePage({ params, searchParams }: { params
                 </div>)}
               </dl>
               <div className="mt-5"><UnitsStatus demo stock={counts.stock} owned={counts.owned} /></div>
-              <p className="mt-3 text-[0.72rem] leading-relaxed text-ink-3">These are fictional demo units. The selected country and catalog region do not confirm real supplier stock or coverage.</p>
+              <p className="mt-3 text-[0.72rem] leading-relaxed text-ink-3">These are fictional demo units. The selected country and catalog region do not confirm real stock or coverage.</p>
             </div>
           </section>
           <section aria-labelledby="demo-delivery-title" className="rounded-[1.5rem] border border-line bg-white p-5 sm:p-6">
