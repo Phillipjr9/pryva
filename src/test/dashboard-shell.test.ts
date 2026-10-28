@@ -24,9 +24,11 @@ describe("dashboard navigation", () => {
     expect(broken).toEqual([]);
   });
 
-  it("keeps accounts inside the dashboard instead of the marketing page", () => {
-    expect(shell).toContain('{ href: "/dashboard/accounts", label: "Accounts"');
+  it("routes accounts through the country-first dashboard hub instead of the marketing page", () => {
+    expect(shell).toContain('{ href: "/dashboard/services", label: "Accounts", art: "accounts", category: "accounts"');
     expect(shell).not.toContain('{ href: "/accounts"');
+    const explorer = readFileSync(join(root, "lib/service-explorer.ts"), "utf8");
+    expect(explorer).toContain('href: "/dashboard/accounts"');
   });
 
   it("links every dashboard page that has content worth reaching", () => {
@@ -35,8 +37,9 @@ describe("dashboard navigation", () => {
       "/dashboard",
       "/dashboard/orders",
       "/dashboard/wallet",
-      "/dashboard/accounts",
-      "/dashboard/digital",
+      "/dashboard/services",
+      "/dashboard/bulk-orders",
+      "/dashboard/scheduled",
       "/dashboard/notifications",
       "/dashboard/security",
       "/dashboard/settings",
@@ -44,6 +47,13 @@ describe("dashboard navigation", () => {
     ]) {
       expect(linked.has(href), `${href} should be in the sidebar`).toBe(true);
     }
+  });
+
+  it("exposes the major shopping categories through the country-first hub", () => {
+    for (const category of ["verification", "social", "numbers", "esim", "proxies", "email", "accounts", "subscriptions", "data", "gift-cards"]) {
+      expect(shell, `${category} should have a hub shortcut`).toContain(`category: "${category}"`);
+    }
+    expect(shell).toContain('label: "Services", icon: Sparkle');
   });
 
   it("gives the bottom bar exactly five thumb-reach tabs", () => {

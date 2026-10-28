@@ -9,6 +9,7 @@ import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
 import { CountryFlag } from "@/components/CountryFlag";
 import { hasCountryFlag } from "@/lib/countries";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
+import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
 
 type Group = { label: string; plans: Plan[] };
 
@@ -17,9 +18,11 @@ type Props = {
   signedIn: boolean;
   walletBalance: number | null;
   nextPath: string;
+  /** Explicitly label preview checkout so it cannot be mistaken for live delivery. */
+  previewOnly?: boolean;
 };
 
-export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Props) {
+export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previewOnly = false }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState(0);
   const plans = useMemo(() => groups[tab]?.plans ?? [], [groups, tab]);
@@ -62,7 +65,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
       };
 
       if (response.status === 401) {
-        window.location.href = `/login?next=${encodeURIComponent(nextPath)}`;
+        router.push(`/login?next=${encodeURIComponent(nextPath)}`);
         return;
       }
       if (!response.ok || !data.ok || !data.order) {
@@ -88,8 +91,8 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
       <PaymentLoading show={pending} message="Processing your order..." />
       <PaymentSuccess
         show={!!success}
-        title="Order Placed Successfully!"
-        message={`${success?.name} is now in your dashboard.`}
+        title="Preview Order Complete"
+        message={`${success?.name} is simulated and is now in your dashboard.`}
         redirectUrl={`/dashboard/orders/${success?.id}`}
         redirectDelay={2500}
       />
@@ -100,9 +103,9 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
           <span className="grid h-12 w-12 place-items-center rounded-full bg-lav-100 text-lav-700">
             <Check className="h-6 w-6" />
           </span>
-          <h3 className="mt-5 text-2xl font-medium">Delivered. It&apos;s ready.</h3>
+          <h3 className="mt-5 text-2xl font-medium">Preview order complete.</h3>
           <p className="mt-2 max-w-md text-[0.92rem] leading-relaxed text-ink-2">
-            <span className="font-semibold text-ink">{success.name}</span> is now in your dashboard.
+            <span className="font-semibold text-ink">{success.name}</span> is simulated; no live service was delivered. The preview order is now in your dashboard.
             Order reference{" "}
             <span className="rounded-md bg-lav-50 px-1.5 py-0.5 font-mono text-[0.8rem] text-lav-700">
               {success.reference}
@@ -197,6 +200,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
                     )}
                   </div>
                   <span className="mt-1.5 text-[0.74rem] text-ink-3">{plan.duration}</span>
+                  <span className="mt-3 block w-full"><UnitsStatus /></span>
 
                   <ul className="mt-4 space-y-1.5">
                     {plan.features.map((feature) => (
@@ -228,7 +232,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
               </p>
               <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.74rem] text-ink-3">
                 <span className="inline-flex items-center gap-1">
-                  <Shield className="h-3 w-3 text-lav-500" /> Auto-refund protection
+                  <Shield className="h-3 w-3 text-lav-500" /> Support for delivery issues
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <Lock className="h-3 w-3 text-lav-500" /> Secure Naira checkout
@@ -255,7 +259,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
                   disabled={pending || !selected}
                   className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
-                  {pending ? "Delivering…" : "Pay from wallet"}
+                  {pending ? "Processing…" : previewOnly ? "Create simulated order" : "Pay from wallet"}
                   {!pending && <ArrowRight className="h-4 w-4" />}
                 </button>
               ) : (

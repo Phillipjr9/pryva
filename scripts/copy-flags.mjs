@@ -7,12 +7,12 @@
  *
  * Run: `npm i --no-save flag-icons && node scripts/copy-flags.mjs`
  */
-import { copyFileSync, mkdirSync, existsSync } from "node:fs";
+import { copyFileSync, mkdirSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-/** ISO-3166 alpha-2 codes: the markets in the catalogue plus the wider set the
- *  number/eSIM copy advertises ("40+ countries"), so new plans need no new art. */
-export const FLAG_CODES = [
+/** ISO country/territory artwork is for the picker, not a coverage claim. */
+const isoCountries = JSON.parse(readFileSync(new URL("../data/iso-countries.json", import.meta.url), "utf8"));
+export const FLAG_CODES = [...new Set([
   // launch markets
   "ng", "us", "gb", "ca", "de", "gh",
   // Africa
@@ -25,11 +25,13 @@ export const FLAG_CODES = [
   "vn", "jp", "kr", "cn",
   // Americas / Oceania
   "mx", "br", "ar", "cl", "co", "au", "nz",
-];
+  ...isoCountries.map((country) => country.code.toLowerCase()),
+])];
 
 const src = "node_modules/flag-icons/flags/4x3";
 const dest = "public/images/flags";
 mkdirSync(dest, { recursive: true });
+copyFileSync("node_modules/flag-icons/LICENSE", join(dest, "LICENSE.txt"));
 
 let copied = 0;
 const missing = [];

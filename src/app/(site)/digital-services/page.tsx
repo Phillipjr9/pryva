@@ -5,7 +5,7 @@ import { ServiceIcon, CategoryIcon } from "@/components/ServiceIcon";
 
 export const metadata = {
   title: "Digital Accounts — Netflix, Spotify, ChatGPT & More | Pryva",
-  description: "Buy premium accounts for Netflix, Spotify, YouTube Premium, Disney+, ChatGPT Plus, and more. Instant delivery, Naira payments, full warranty.",
+  description: "Explore the digital-services catalog. Live fulfillment is currently paused.",
 };
 
 export default function DigitalServicesPage() {
@@ -28,7 +28,7 @@ export default function DigitalServicesPage() {
           Netflix, Spotify, ChatGPT & More
         </h1>
         <p className="text-lg text-ink-2 max-w-2xl mx-auto">
-          Premium accounts at Nigerian prices. Instant delivery, full warranty, and no dollar card needed.
+          Explore the catalog in Naira. Live digital-service fulfillment is currently paused; preview orders are simulated.
         </p>
       </div>
 
@@ -76,7 +76,7 @@ export default function DigitalServicesPage() {
                       <ServiceIcon service={service.slug as any} size="lg" />
                       <div>
                         <h3 className="text-xl font-bold text-ink">{service.name}</h3>
-                        <p className="text-sm text-ink-3">{service.plans.length} plans available</p>
+                        <p className="text-sm text-ink-3">{service.plans.length} plans listed</p>
                       </div>
                     </div>
                   </div>
@@ -100,7 +100,7 @@ export default function DigitalServicesPage() {
                     href={`/dashboard/digital?service=${service.slug}`}
                     className="btn btn-primary w-full"
                   >
-                    Buy {service.name}
+                    View {service.name} plans
                   </Link>
                 </div>
               ))}
@@ -111,27 +111,27 @@ export default function DigitalServicesPage() {
 
       {/* Trust Badges */}
       <div className="card p-8 mt-16">
-        <h2 className="text-2xl font-bold text-ink text-center mb-8">Why Buy From Pryva?</h2>
+        <h2 className="text-2xl font-bold text-ink text-center mb-8">Before you order</h2>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <div className="text-center">
             <div className="text-4xl mb-3">⚡</div>
-            <h3 className="font-semibold text-ink mb-2">Instant Delivery</h3>
-            <p className="text-sm text-ink-2">Get your account credentials within minutes</p>
+            <h3 className="font-semibold text-ink mb-2">Live fulfillment paused</h3>
+            <p className="text-sm text-ink-2">Preview orders do not provide working accounts or credentials.</p>
           </div>
           <div className="text-center">
             <div className="text-4xl mb-3">🛡️</div>
-            <h3 className="font-semibold text-ink mb-2">Full Warranty</h3>
-            <p className="text-sm text-ink-2">Free replacement if account stops working</p>
+            <h3 className="font-semibold text-ink mb-2">Review uncertain orders</h3>
+            <p className="text-sm text-ink-2">Contact support with your reference; provider outcomes must be reviewed.</p>
           </div>
           <div className="text-center">
             <div className="text-4xl mb-3">💳</div>
             <h3 className="font-semibold text-ink mb-2">Naira Payments</h3>
-            <p className="text-sm text-ink-2">No dollar card needed, pay in local currency</p>
+            <p className="text-sm text-ink-2">Catalog prices are shown in Nigerian Naira.</p>
           </div>
           <div className="text-center">
             <div className="text-4xl mb-3">💬</div>
-            <h3 className="font-semibold text-ink mb-2">24/7 Support</h3>
-            <p className="text-sm text-ink-2">Get help anytime via chat or email</p>
+            <h3 className="font-semibold text-ink mb-2">Support requests</h3>
+            <p className="text-sm text-ink-2">Use the contact page for an existing order or wallet issue.</p>
           </div>
         </div>
       </div>

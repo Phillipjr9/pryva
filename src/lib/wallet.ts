@@ -1,16 +1,17 @@
-import { randomBytes } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
+import { randomBytes, randomInt } from "node:crypto";
+import { and, eq, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { users, walletTransactions } from "@/db/schema";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 
 export function makeReference(prefix = "PRY"): string {
   const stamp = Date.now().toString(36).toUpperCase().slice(-5);
-  const rand = randomBytes(2).toString("hex").toUpperCase();
+  const rand = randomBytes(8).toString("hex").toUpperCase();
   return `${prefix}-${stamp}${rand}`;
 }
 
 export function generateOtp(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(randomInt(100000, 1_000_000));
 }
 
 export type WalletEntryInput = {
@@ -29,15 +30,27 @@ export class InsufficientFundsError extends Error {
   }
 }
 
+const MAX_DATABASE_INTEGER = 2_147_483_647;
+
+function validateWalletEntry(input: WalletEntryInput, direction: "credit" | "debit"): void {
+  if (!Number.isSafeInteger(input.amount) || input.amount <= 0 || input.amount > MAX_DATABASE_INTEGER) {
+    throw new Error("Wallet amount must be a positive whole-naira value");
+  }
+  if (direction === "credit" ? !["credit", "refund"].includes(input.type) : input.type !== "debit") {
+    throw new Error("Wallet transaction type does not match its direction");
+  }
+}
+
 export async function creditWallet(input: WalletEntryInput): Promise<number> {
-  return db.transaction(async (tx: any) => {
+  validateWalletEntry(input, "credit");
+  const balance = await db.transaction(async (tx: any) => {
     const [updated] = await tx
       .update(users)
       .set({ walletBalance: sql`${users.walletBalance} + ${input.amount}` })
-      .where(eq(users.id, input.userId))
+      .where(and(eq(users.id, input.userId), lte(users.walletBalance, MAX_DATABASE_INTEGER - input.amount)))
       .returning({ balance: users.walletBalance });
 
-    if (!updated) throw new Error("User not found");
+    if (!updated) throw new Error("User not found or wallet balance would exceed its limit");
 
     await tx.insert(walletTransactions).values({
       userId: input.userId,
@@ -51,10 +64,13 @@ export async function creditWallet(input: WalletEntryInput): Promise<number> {
 
     return updated.balance;
   });
+  scheduleWalletEmails();
+  return balance;
 }
 
 export async function debitWallet(input: WalletEntryInput): Promise<number> {
-  return db.transaction(async (tx: any) => {
+  validateWalletEntry(input, "debit");
+  const balance = await db.transaction(async (tx: any) => {
     const [updated] = await tx
       .update(users)
       .set({ walletBalance: sql`${users.walletBalance} - ${input.amount}` })
@@ -82,4 +98,6 @@ export async function debitWallet(input: WalletEntryInput): Promise<number> {
 
     return updated.balance;
   });
+  scheduleWalletEmails();
+  return balance;
 }

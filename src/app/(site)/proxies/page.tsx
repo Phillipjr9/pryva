@@ -7,7 +7,7 @@ import { hasCountryFlag } from "@/lib/countries";
 
 export const metadata: Metadata = {
   title: "Residential Proxies",
-  description: "High-quality residential proxies from 40+ countries. Rotating and static IPs available.",
+  description: "Explore proxy plans. Live proxy fulfillment is paused.",
 };
 
 export default function ProxiesPage() {

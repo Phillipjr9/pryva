@@ -38,8 +38,8 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             <div className="mt-7 grid gap-2.5">
               {[
                 { title: "Pay in Naira", body: "Bank transfer or local card, no dollar cards." },
-                { title: "Instant delivery", body: "Codes and credentials appear immediately." },
-                { title: "Auto-refund", body: "No code? The amount returns to your wallet." },
+                { title: "Preview mode", body: "Preview balances and orders are simulated." },
+                { title: "Order support", body: "Contact us when a delivery needs review." },
               ].map((item) => (
                 <div
                   key={item.title}
@@ -58,7 +58,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
 
             <p className="mt-6 flex items-center gap-2 text-[0.72rem] text-ink-3">
               <Shield className="h-3.5 w-3.5 text-lav-600" />
-              Carrier-grade infrastructure · operated from Lagos, Nigeria
+              Support for account and order questions
             </p>
           </div>
         </div>

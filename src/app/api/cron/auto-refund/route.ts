@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processAutoRefunds } from "@/lib/auto-refund";
+import { isPreviewDatabase } from "@/lib/demo-policy";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -7,18 +8,19 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/cron/auto-refund
  *
- * Sweeps active orders whose product never arrived and refunds the wallet. The
- * logic lived in `lib/auto-refund.ts` with nothing calling it, which meant the
- * "automatic refund" promise on every product page was never actually kept.
- *
- * Schedule it every 5–10 minutes (Vercel Cron, a systemd timer, or any
- * scheduler that can send an Authorization header).
+ * Only simulated, code-less single-number orders can be swept. Live provider
+ * orders must be reconciled manually until cancellation and delivery semantics
+ * have been verified; no production refund sweep should be scheduled yet.
  */
 export async function POST(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret || request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
     logger.warn("Unauthorized auto-refund cron attempt");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isPreviewDatabase()) {
+    return NextResponse.json({ error: "Live automatic refunds require provider reconciliation" }, { status: 503 });
   }
 
   try {

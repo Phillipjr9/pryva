@@ -1,6 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { paymentTopups, users, walletTransactions } from "@/db/schema";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 
 export type TopUpOutcome = "credited" | "duplicate" | "mismatch";
 
@@ -22,7 +23,7 @@ export async function completeTopUp(input: {
 }): Promise<TopUpOutcome> {
   const { reference, userId, amount } = input;
 
-  return db.transaction(async (tx) => {
+  const outcome = await db.transaction(async (tx) => {
     const [topup] = await tx
       .update(paymentTopups)
       .set({ status: "completed", paidAt: new Date() })
@@ -69,4 +70,8 @@ export async function completeTopUp(input: {
 
     return "credited" as const;
   });
+  // Also drain on a duplicate callback: a previous response may have been lost
+  // after the ledger and its outbox row committed.
+  if (outcome !== "mismatch") scheduleWalletEmails();
+  return outcome;
 }

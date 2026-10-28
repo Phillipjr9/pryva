@@ -1,25 +1,31 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { plans, formatNaira, findPlan } from "@/lib/catalog";
 import { calculateBulkOrder, getBulkDiscountMessage, type BulkOrderItem } from "@/lib/bulk-orders";
-import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
 import type { PublicUser } from "@/lib/auth";
 
 interface BulkOrdersFormProps {
   user: PublicUser;
+  preview: boolean;
 }
 
-export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
+export function BulkOrdersForm({ user, preview }: BulkOrdersFormProps) {
+  const router = useRouter();
   const [items, setItems] = useState<BulkOrderItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<{ total: number; discount: number; discountPercent: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [unconfirmed, setUnconfirmed] = useState(false);
 
   const allPlans = plans.filter((p) => ["numbers", "esim", "proxies", "email-otp"].includes(p.service));
 
   function addItem(productSlug: string) {
+    if (totalQuantity >= 200) { setError("A basket can contain at most 200 items."); return; }
+    setError(null);
     const existing = items.find((item) => item.productSlug === productSlug);
     if (existing) {
       setItems(items.map((item) =>
@@ -31,6 +37,9 @@ export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
   }
 
   function updateQuantity(productSlug: string, quantity: number) {
+    const current = items.find((item) => item.productSlug === productSlug)?.quantity ?? 0;
+    if (totalQuantity - current + quantity > 200) { setError("A basket can contain at most 200 items."); return; }
+    setError(null);
     if (quantity <= 0) {
       setItems(items.filter((item) => item.productSlug !== productSlug));
     } else {
@@ -49,6 +58,7 @@ export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
   const discountMessage = getBulkDiscountMessage(totalQuantity, result.discountPercent);
 
   async function handlePurchase() {
+    if (!preview || unconfirmed) return;
     if (items.length === 0) {
       setError("Please add at least one item to your order");
       return;
@@ -59,16 +69,21 @@ export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
     setSuccess(null);
 
     try {
-      const response = await fetch("/api/orders/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items }),
-      });
+      const [response] = await Promise.all([
+        fetch("/api/orders/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items }) }),
+        new Promise((resolve) => setTimeout(resolve, 1600)),
+      ]);
 
       const data = await response.json();
 
       if (!response.ok || !data.ok) {
-        throw new Error(data.error || "Purchase failed");
+        if (response.status >= 500) {
+          setUnconfirmed(true);
+          setError("The simulation may have been recorded. Check your orders before trying again.");
+        } else {
+          setError(data.error || "Purchase failed");
+        }
+        return;
       }
 
       setSuccess({
@@ -77,8 +92,10 @@ export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
         discountPercent: data.discountPercent,
       });
       setItems([]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Purchase failed");
+      router.refresh();
+    } catch {
+      setUnconfirmed(true);
+      setError("The simulation may have been recorded. Check your orders before trying again.");
     } finally {
       setLoading(false);
     }
@@ -87,14 +104,10 @@ export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
   return (
     <>
       <PaymentLoading show={loading} message="Processing your bulk order..." />
-      <PaymentSuccess
-        show={!!success}
-        title="Bulk Order Completed!"
-        message={`Total: ${formatNaira(success?.total || 0)}${success?.discount ? ` (${success.discountPercent}% discount applied)` : ''}`}
-        redirectUrl="/dashboard"
-        redirectDelay={2500}
-      />
       <div className="space-y-6">
+      <div role="status" className={`rounded-xl border p-4 text-sm ${preview ? "border-lav-200 bg-lav-50 text-lav-800" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+        {preview ? "Demo basket: each item creates a simulated order with fictional delivery details." : "Live bulk purchasing is currently unavailable."}
+      </div>
       {/* Add Items */}
       <div>
         <label className="block text-[0.86rem] font-medium text-ink mb-3">
@@ -209,21 +222,24 @@ export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.9rem] text-red-700">
           {error}
+          {unconfirmed && <div className="mt-2 flex gap-4"><Link href="/dashboard/orders" className="font-semibold underline">Check orders</Link><button type="button" className="font-semibold underline" onClick={() => { setUnconfirmed(false); setError(null); }}>I checked; start another simulation</button></div>}
         </div>
       )}
 
       {success && (
-        <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center">
+        <div className="demo-arrive rounded-xl border border-green-200 bg-green-50 p-6 text-center">
           <p className="text-[1.1rem] font-semibold text-green-700 mb-2">
-            Order Completed!
+            Simulated order recorded
           </p>
           <p className="text-[0.9rem] text-green-600">
             Total: {formatNaira(success.total)}
             {success.discount > 0 && ` (${success.discountPercent}% discount applied)`}
           </p>
           <p className="mt-2 text-[0.86rem] text-green-600">
-            All items delivered to your dashboard
+            Your demo orders are ready. Number and inbox codes arrive in their order details; no real service was delivered.
           </p>
+          <Link href="/dashboard/orders" className="mt-3 inline-block font-semibold underline">View orders</Link>
+          <button type="button" className="ml-4 mt-3 font-semibold underline" onClick={() => setSuccess(null)}>Start another simulation</button>
         </div>
       )}
 
@@ -231,10 +247,10 @@ export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
       {!success && items.length > 0 && (
         <button
           onClick={handlePurchase}
-          disabled={loading}
+          disabled={loading || !preview || unconfirmed}
           className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? "Processing..." : `Purchase Order for ${formatNaira(result.total)}`}
+          {loading ? "Processing..." : `Simulate order for ${formatNaira(result.total)}`}
         </button>
       )}
     </div>

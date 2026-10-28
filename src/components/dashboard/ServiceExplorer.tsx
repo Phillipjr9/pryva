@@ -1,0 +1,271 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { BrandIcon } from "@/components/BrandIcon";
+import { CountryFlag } from "@/components/CountryFlag";
+import { CountrySelector } from "@/components/dashboard/CountrySelector";
+import { NetworkBadge } from "@/components/NetworkBadge";
+import { ServiceIcon } from "@/components/ServiceIcon";
+import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
+import { ArrowRight, Globe, Search, Shield, Sparkle } from "@/components/icons";
+import { formatNaira } from "@/lib/catalog";
+import { demoServiceTerms, type DemoInventory } from "@/lib/demo-service-catalog";
+import {
+  buildServiceExplorer,
+  EXPLORER_CATEGORIES,
+  explorerCategory,
+  explorerCountry,
+  filterExplorerItems,
+  interleaveExplorerItems,
+  type ExplorerFilter,
+  type ExplorerItem,
+} from "@/lib/service-explorer";
+
+const PAGE_SIZE = 12;
+const VERIFICATION_TAGS = ["Social", "Messaging", "Finance", "Travel", "Entertainment", "Work & other", "Other"];
+const SOCIAL_TAGS = ["Followers", "Likes", "Views", "Subscribers"];
+
+function itemArt(item: ExplorerItem) {
+  switch (item.artwork.kind) {
+    case "brand": return <BrandIcon brand={item.artwork.name} size={42} decorative />;
+    case "network": return <NetworkBadge provider={item.artwork.name} size={42} />;
+    case "service": return <ServiceIcon service={item.artwork.name} size="md" />;
+  }
+}
+
+function ServiceCard({ item, countryName, countryCode, preview, counts, loading }: { item: ExplorerItem; countryName: string; countryCode: string; preview: boolean; counts?: { stock: number; owned: number }; loading: boolean }) {
+  const terms = preview ? demoServiceTerms(item) : null;
+  const coverage = preview
+    ? (item.coverage === "not-country-specific" ? "Demo · not country-specific" : `Demo selection · ${countryName}`)
+    : item.source === "supplier"
+      ? (item.coverage === "catalog-country" ? `Supplier-reported region: ${countryName}` : "Not country-specific")
+      : item.coverage === "catalog-country" ? `Catalog region: ${countryName}` : item.coverage === "unconfirmed" ? "Country coverage unconfirmed" : "Not filtered by country";
+  const noAction = item.source === "supplier" ? "Ordering paused" : item.source === "example" ? "Not connected" : "Not available";
+  const action = terms ? { label: "Try demo", href: `/dashboard/services/demo/${encodeURIComponent(item.id)}?country=${encodeURIComponent(countryCode)}` } : item.action;
+  const price = terms?.price ?? item.price;
+
+  return (
+    <article className="group flex h-full min-w-0 flex-col rounded-2xl border border-line bg-white p-4 transition-colors hover:border-lav-200">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-lav-50/70">{itemArt(item)}</div>
+        <span className={`rounded-full px-2 py-1 text-[0.59rem] font-bold uppercase tracking-[0.08em] ${item.source === "example" ? "bg-lav-50 text-lav-700" : "bg-cream-2 text-ink-2"}`}>
+          {preview && item.source !== "tool" ? "Demo" : item.source === "supplier" ? "Supplier listing" : item.source === "example" ? "Example" : item.source === "tool" ? "Tool" : "Catalog"}
+        </span>
+      </div>
+      <div className="mt-3 min-w-0">
+        <h3 className="break-words text-[0.91rem] font-semibold leading-snug text-ink">{item.name}</h3>
+        <p className="mt-1 text-[0.71rem] text-ink-3">{item.description} · <span className="capitalize">{item.tag}</span></p>
+      </div>
+      <p className="mt-3 text-[0.68rem] leading-relaxed text-ink-3">{coverage}</p>
+      <div className="mt-auto pt-3">
+        <p className="min-h-[1.2rem] text-[0.73rem] font-semibold text-ink-2">
+          {price !== null ? `${preview ? "Demo" : item.source === "supplier" ? "Indicative" : "Preview"} ${item.priceFrom ? "from " : "price "}${formatNaira(price)}` : item.source === "example" && !preview ? "Price not connected" : "See details"}
+        </p>
+        <div className="mt-2"><UnitsStatus demo={preview} loading={(!!terms || item.category === "subscriptions") && loading} stock={preview ? counts?.stock ?? null : item.stock} owned={preview ? counts?.owned ?? null : item.myUnits} /></div>
+        {action ? (
+          <Link href={action.href} className="mt-3 flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-lav-200 bg-lav-50 px-3 py-2 text-center text-[0.75rem] font-semibold text-lav-800 transition-colors hover:border-lav-400 hover:bg-lav-100">
+            {action.label} <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        ) : (
+          <button type="button" disabled className="mt-3 flex min-h-10 w-full items-center justify-center rounded-xl border border-line bg-cream/60 px-3 py-2 text-[0.75rem] font-semibold text-ink-3/80 disabled:cursor-not-allowed">
+            {noAction}
+          </button>
+        )}
+      </div>
+    </article>
+  );
+}
+
+/** Keep the selected country in a shareable URL without a full page reload. */
+function writeSelection(country: string, category: ExplorerFilter) {
+  const params = new URLSearchParams();
+  if (country) params.set("country", country);
+  if (category !== "all") params.set("category", category);
+  const query = params.toString();
+  window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+}
+
+export function ServiceExplorer({ initialCountry, initialCategory, preview = false }: { initialCountry: string | null; initialCategory: string | null; preview?: boolean }) {
+  const [country, setCountry] = useState(() => explorerCountry(initialCountry)?.code ?? "");
+  const [category, setCategory] = useState<ExplorerFilter>(() => explorerCategory(initialCategory));
+  const [search, setSearch] = useState("");
+  const [tag, setTag] = useState("all");
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  const [inventoryState, setInventoryState] = useState<{ country: string; counts: DemoInventory | null } | null>(null);
+  const [inventoryRevision, setInventoryRevision] = useState(0);
+  const [supplierState, setSupplierState] = useState<{ country: string; items: ExplorerItem[]; partial: boolean; failed: boolean; fetchedAt: string | null } | null>(null);
+  const [supplierRevision, setSupplierRevision] = useState(0);
+  const selectedCountry = explorerCountry(country);
+  const items = useMemo(() => {
+    const base = buildServiceExplorer(country);
+    return !preview && supplierState?.country === country && supplierState.items.length
+      ? interleaveExplorerItems([...supplierState.items, ...base]) : base;
+  }, [country, preview, supplierState]);
+  const filtered = useMemo(() => filterExplorerItems(items, category, search, tag), [items, category, search, tag]);
+  const tags = category === "verification" ? VERIFICATION_TAGS : category === "social" ? SOCIAL_TAGS : [];
+
+  // Demo counts are per-user and per-country, never a claim about supplier stock.
+  useEffect(() => {
+    if (!preview || !country) return;
+    const controller = new AbortController();
+    fetch(`/api/demo/services/inventory?country=${encodeURIComponent(country)}`, { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        const data = await response.json() as { ok?: boolean; simulated?: boolean; country?: string; inventory?: DemoInventory };
+        if (!response.ok || !data.ok || !data.simulated || data.country !== country || !data.inventory) throw new Error("Demo counts unavailable");
+        if (!controller.signal.aborted) setInventoryState({ country, counts: data.inventory });
+      })
+      .catch(() => { if (!controller.signal.aborted) setInventoryState({ country, counts: null }); });
+    return () => controller.abort();
+  }, [country, preview, inventoryRevision]);
+
+  // Real supplier listings are read-only and never fetched by the public demo.
+  useEffect(() => {
+    if (preview || !country) return;
+    const controller = new AbortController();
+    fetch(`/api/services/catalog?country=${encodeURIComponent(country)}${supplierRevision ? "&refresh=1" : ""}`, { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        const data = await response.json() as { ok?: boolean; country?: string; partial?: boolean; fetchedAt?: string; items?: ExplorerItem[] };
+        if (!response.ok || !data.ok || data.country !== country || !Array.isArray(data.items)) throw new Error("Catalog unavailable");
+        const fetchedAt = typeof data.fetchedAt === "string" && Number.isFinite(Date.parse(data.fetchedAt)) ? data.fetchedAt : null;
+        if (!controller.signal.aborted) setSupplierState({ country, items: data.items, partial: Boolean(data.partial), failed: false, fetchedAt });
+      })
+      .catch(() => { if (!controller.signal.aborted) setSupplierState({ country, items: [], partial: false, failed: true, fetchedAt: null }); });
+    return () => controller.abort();
+  }, [country, preview, supplierRevision]);
+
+  // Handle browser back/forward when a history entry from another page is restored.
+  useEffect(() => {
+    function restoreSelection() {
+      const params = new URLSearchParams(window.location.search);
+      setCountry(explorerCountry(params.get("country"))?.code ?? "");
+      setCategory(explorerCategory(params.get("category")));
+      setSearch("");
+      setTag("all");
+      setVisible(PAGE_SIZE);
+    }
+    window.addEventListener("popstate", restoreSelection);
+    return () => window.removeEventListener("popstate", restoreSelection);
+  }, []);
+
+  function chooseCountry(code: string) {
+    const next = explorerCountry(code)?.code ?? "";
+    setCountry(next);
+    if (next !== country) { setInventoryState(null); setSupplierRevision(0); }
+    setTag("all");
+    setSearch("");
+    setVisible(PAGE_SIZE);
+    writeSelection(next, category);
+  }
+
+  function chooseCategory(next: ExplorerFilter) {
+    setCategory(next);
+    setTag("all");
+    setSearch("");
+    setVisible(PAGE_SIZE);
+    writeSelection(country, next);
+  }
+
+  return (
+    <div className="grid gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[0.65rem] font-bold uppercase tracking-[0.16em] text-lav-700">Explore Pryva</p>
+          <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">Your service hub</h1>
+          <p className="mt-1.5 max-w-2xl text-[0.82rem] leading-relaxed text-ink-2">Choose a country, then browse categories and service examples in one place.</p>
+        </div>
+        <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-[0.76rem] font-semibold text-lav-700 hover:underline">My orders <ArrowRight className="h-3.5 w-3.5" /></Link>
+      </div>
+
+      <section aria-labelledby="choose-country-title" className="relative overflow-hidden rounded-[1.5rem] border border-lav-200/80 bg-[#f6f1fc] p-5 sm:p-6">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 h-48 w-48 rounded-full bg-lav-300/30 blur-3xl" />
+        <div className="relative grid gap-4 md:grid-cols-[1fr_1.1fr] md:items-center">
+          <div>
+            <p className="inline-flex items-center gap-1.5 text-[0.64rem] font-bold uppercase tracking-[0.16em] text-lav-700"><Globe className="h-3.5 w-3.5" /> Step 01</p>
+            <h2 id="choose-country-title" className="mt-2 text-[1.25rem] font-semibold text-ink">Start with a country.</h2>
+            <p className="mt-1.5 max-w-sm text-[0.78rem] leading-relaxed text-ink-2">{preview ? "Select a country to explore the demo services available in your sandbox." : "Select where you need the service. Coverage and availability still need supplier confirmation."}</p>
+          </div>
+          <div className="rounded-2xl border border-white/80 bg-white/60 p-4 shadow-sm">
+            <CountrySelector id="service-country" value={country} onChange={chooseCountry} />
+          </div>
+        </div>
+      </section>
+
+      {!selectedCountry ? (
+        <div className="rounded-[1.5rem] border border-dashed border-lav-200 bg-white/70 px-6 py-10 text-center">
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-lav-50 text-lav-700"><Globe className="h-5 w-5" /></span>
+          <h2 className="mt-3 text-[1rem] font-semibold text-ink">Choose a country to explore</h2>
+          <p className="mx-auto mt-1.5 max-w-md text-[0.8rem] leading-relaxed text-ink-2">We&apos;ll show the service categories and example plans after you make your selection.</p>
+        </div>
+      ) : (
+        <>
+          <section aria-labelledby="categories-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-[0.64rem] font-bold uppercase tracking-[0.16em] text-lav-700">Step 02</p>
+                <h2 id="categories-title" className="mt-1 text-[1.05rem] font-semibold text-ink">Choose a category</h2>
+              </div>
+              <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-[0.72rem] font-semibold text-ink-2">
+                <CountryFlag code={selectedCountry.code} size={18} decorative radius={9} /> {selectedCountry.name}
+              </span>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2" aria-label="Service categories">
+              <button type="button" onClick={() => chooseCategory("all")} aria-pressed={category === "all"} className={`rounded-full border px-3.5 py-2 text-[0.73rem] font-semibold transition-colors ${category === "all" ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}>All categories</button>
+              {EXPLORER_CATEGORIES.map((entry) => (
+                <button key={entry.id} type="button" title={entry.description} onClick={() => chooseCategory(entry.id)} aria-pressed={category === entry.id} className={`rounded-full border px-3.5 py-2 text-[0.73rem] font-semibold transition-colors ${category === entry.id ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}>
+                  {entry.label}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-[0.73rem] leading-relaxed ${preview ? "border-lav-200 bg-lav-50/70 text-lav-800" : "border-amber-200 bg-amber-50/70 text-amber-900"}`}>
+            <Shield className="mt-0.5 h-4 w-4 shrink-0" />
+            {preview ? <p><strong>Demo catalog.</strong> Prices, stock, units and delivery are simulated. Use fictional details only.</p> : supplierState?.country === country && !supplierState.failed ? <p><strong>Supplier listings are read-only.</strong> Prices and stock are indicative, and coverage must be confirmed before ordering. Examples are separate, purchased units aren&apos;t tracked here yet, and live fulfillment remains paused. {supplierState.partial && "Some listing types are temporarily unavailable. "}<Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p> : <p><strong>Examples, not a verified supplier catalog.</strong> Stock is unknown and purchased service units aren&apos;t tracked yet. Country coverage is unverified; live fulfillment remains paused. <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
+          </div>
+
+          <section aria-labelledby="services-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 sm:p-6">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="inline-flex items-center gap-1.5 text-[0.64rem] font-bold uppercase tracking-[0.16em] text-lav-700"><Sparkle className="h-3.5 w-3.5" /> Step 03</p>
+                <h2 id="services-title" className="mt-1 text-[1.05rem] font-semibold text-ink">Explore services</h2>
+                <p aria-live="polite" className="mt-1 text-[0.71rem] text-ink-3">{filtered.length} {preview ? `demo service${filtered.length === 1 ? "" : "s"}` : `listing${filtered.length === 1 ? "" : "s"} and examples`} · {selectedCountry.name} selected</p>
+                {!preview && supplierState?.country === country && supplierState.fetchedAt && <p className="mt-1 text-[0.68rem] text-ink-3">Supplier checked: <time dateTime={supplierState.fetchedAt}>{new Date(supplierState.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
+              </div>
+              <div className="relative w-full sm:max-w-[260px]">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
+                <input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setVisible(PAGE_SIZE); }} aria-label="Search services" placeholder="Search services or platforms" className="min-h-11 w-full rounded-xl border border-line bg-white py-2 pl-9 pr-3 text-[0.78rem] text-ink outline-none placeholder:text-ink-3 focus:border-lav-400 focus:ring-4 focus:ring-lav-100" />
+              </div>
+            </div>
+
+            {tags.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-1.5 border-t border-line pt-4" aria-label="Service types">
+                <button type="button" onClick={() => { setTag("all"); setVisible(PAGE_SIZE); }} aria-pressed={tag === "all"} className={`rounded-lg px-2.5 py-1.5 text-[0.68rem] font-semibold ${tag === "all" ? "bg-lav-100 text-lav-800" : "text-ink-3 hover:bg-cream"}`}>All types</button>
+                {tags.map((type) => <button key={type} type="button" onClick={() => { setTag(type); setVisible(PAGE_SIZE); }} aria-pressed={tag === type} className={`rounded-lg px-2.5 py-1.5 text-[0.68rem] font-semibold ${tag === type ? "bg-lav-100 text-lav-800" : "text-ink-3 hover:bg-cream"}`}>{type}</button>)}
+              </div>
+            )}
+
+            {preview && inventoryState?.country === country && inventoryState.counts === null && <p role="status" className="mt-4 text-[0.72rem] text-ink-3">Demo counts could not be loaded. <button type="button" className="font-semibold text-lav-700 underline" onClick={() => { setInventoryState(null); setInventoryRevision((value) => value + 1); }}>Retry</button></p>}
+            {!preview && supplierState?.country === country && (supplierState.failed || supplierState.partial) && <p role="status" className="mt-4 text-[0.72rem] text-amber-800">Some supplier listings couldn&apos;t be loaded. <button type="button" className="font-semibold underline" onClick={() => setSupplierRevision((value) => value + 1)}>Retry</button></p>}
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {filtered.slice(0, visible).map((item) => <ServiceCard key={item.id} item={item} countryName={selectedCountry.name} countryCode={selectedCountry.code} preview={preview} counts={inventoryState?.country === country ? inventoryState.counts?.[item.id] : undefined} loading={preview && inventoryState?.country !== country} />)}
+            </div>
+            {filtered.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-line bg-cream/50 p-8 text-center">
+                <p className="text-[0.88rem] font-semibold text-ink">No examples match these filters</p>
+                <p className="mt-1 text-[0.76rem] text-ink-2">{preview ? "Try another search, category or country." : "Try another search, category or country. This doesn't indicate live supplier availability."}</p>
+                {(search || tag !== "all") && <button type="button" onClick={() => { setSearch(""); setTag("all"); setVisible(PAGE_SIZE); }} className="mt-3 text-[0.75rem] font-semibold text-lav-700 underline underline-offset-2">Clear filters</button>}
+              </div>
+            )}
+            {visible < filtered.length && (
+              <div className="mt-5 text-center">
+                <button type="button" onClick={() => setVisible((current) => current + PAGE_SIZE)} className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2.5 text-[0.76rem] font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-lav-700">Show more <span className="text-ink-3">({filtered.length - visible} remaining)</span></button>
+              </div>
+            )}
+            <p className="mt-5 border-t border-line pt-4 text-[0.69rem] leading-relaxed text-ink-3">{preview ? "Demo stock is fictional inventory. My demo units are unused simulated units; a dash means that type is not counted in the demo." : "Stock means supplier inventory. My units means your remaining purchased units. Unknown and not tracked are not the same as zero. Examples do not imply platform support or verified coverage."}</p>
+          </section>
+        </>
+      )}
+    </div>
+  );
+}

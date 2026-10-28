@@ -1,7 +1,7 @@
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { scheduledOrders, orders } from "@/db/schema";
+import { scheduledOrders } from "@/db/schema";
 import { eq, lte, and } from "drizzle-orm";
 import { processScheduledOrder } from "@/lib/scheduled-orders";
 import { logger } from "@/lib/logger";
@@ -48,8 +48,8 @@ export async function POST(request: NextRequest) {
 
     for (const scheduled of dueOrders) {
       try {
-        await processScheduledOrder(scheduled);
-        results.processed++;
+        if (await processScheduledOrder(scheduled)) results.processed++;
+        else results.skipped++;
       } catch (error) {
         logger.error("Failed to process scheduled order", {
           scheduledOrderId: scheduled.id,

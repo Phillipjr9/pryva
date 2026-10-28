@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -47,7 +46,7 @@ export default function ContactPage() {
         throw new Error(data.error || "Failed to send message");
       }
 
-      setSuccess("Your message has been sent successfully! We'll get back to you within 24 hours.");
+      setSuccess("Your message was received for support review.");
       setFormData({ name: "", email: "", topic: "general", message: "" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send message");
@@ -58,26 +57,6 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-cream">
-      {/* Header */}
-      <header className="border-b border-line bg-white">
-        <div className="shell flex h-16 items-center justify-between">
-          <div className="ml-auto flex items-center gap-3">
-            <Link
-              href="/login"
-              className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/signup"
-              className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700"
-            >
-              Get Started
-            </Link>
-          </div>
-        </div>
-      </header>
-
       {/* Hero */}
       <section className="py-16">
         <div className="shell text-center">
@@ -105,15 +84,15 @@ export default function ContactPage() {
               <div className="grid h-12 w-12 place-items-center rounded-xl bg-green-100 text-green-600 mx-auto mb-4">
                 <MessageCircle className="h-6 w-6" />
               </div>
-              <h3 className="text-[1rem] font-semibold text-ink mb-2">Live Chat</h3>
-              <p className="text-[0.86rem] text-ink-2">Available 9AM-6PM WAT</p>
+              <h3 className="text-[1rem] font-semibold text-ink mb-2">Message form</h3>
+              <p className="text-[0.86rem] text-ink-2">Send a message below</p>
             </div>
             <div className="rounded-2xl border border-line bg-white p-6 text-center">
               <div className="grid h-12 w-12 place-items-center rounded-xl bg-blue-100 text-blue-600 mx-auto mb-4">
                 <Clock className="h-6 w-6" />
               </div>
               <h3 className="text-[1rem] font-semibold text-ink mb-2">Response Time</h3>
-              <p className="text-[0.86rem] text-ink-2">Within 24 hours</p>
+              <p className="text-[0.86rem] text-ink-2">Response times may vary</p>
             </div>
           </div>
 

@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CommandPalette, CommandPaletteTrigger } from "@/components/command/CommandPalette";
 import {
   ArrowRight,
@@ -17,12 +17,15 @@ import {
   Settings,
   Shield,
   Sparkle,
+  Phone,
+  Users,
   Wallet,
 } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { BrandLockup } from "@/components/brand/BrandLockup";
-import { formatNaira, serviceMap } from "@/lib/catalog";
-import { BUILD_ID } from "@/lib/build-id";
+import { formatNaira } from "@/lib/catalog";
+import { EXPLORER_COUNTRIES } from "@/lib/explorer-countries";
+import type { ExplorerCategory } from "@/lib/service-explorer";
 
 /**
  * Sidebar entries are grouped by what the customer is trying to do — manage what
@@ -34,7 +37,9 @@ type NavItem = {
   href: string;
   label: string;
   icon?: (props: { className?: string }) => ReactNode;
-  art?: "accounts" | "data" | "gift-cards" | "bulk" | "scheduled" | "proxies";
+  art?: "numbers" | "esim" | "email-otp" | "accounts" | "data" | "gift-cards" | "bulk" | "scheduled" | "proxies";
+  /** Category links enter the country-first hub, rather than bypassing it. */
+  category?: ExplorerCategory;
 };
 
 const navGroups: Array<{ label: string; items: NavItem[] }> = [
@@ -49,10 +54,17 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "Buy",
     items: [
-      { href: "/dashboard/accounts", label: "Accounts", art: "accounts" },
-      { href: "/dashboard/digital", label: "Digital", art: "accounts" },
-      { href: "/dashboard/data", label: "Data Plans", art: "data" },
-      { href: "/dashboard/gift-cards", label: "Gift Cards", art: "gift-cards" },
+      { href: "/dashboard/services", label: "All services", icon: Sparkle },
+      { href: "/dashboard/services", label: "App verification", icon: Phone, category: "verification" },
+      { href: "/dashboard/services", label: "Social promotion", icon: Users, category: "social" },
+      { href: "/dashboard/services", label: "Number plans", art: "numbers", category: "numbers" },
+      { href: "/dashboard/services", label: "eSIM", art: "esim", category: "esim" },
+      { href: "/dashboard/services", label: "Proxies", art: "proxies", category: "proxies" },
+      { href: "/dashboard/services", label: "Email OTP", art: "email-otp", category: "email" },
+      { href: "/dashboard/services", label: "Accounts", art: "accounts", category: "accounts" },
+      { href: "/dashboard/services", label: "Subscriptions", art: "accounts", category: "subscriptions" },
+      { href: "/dashboard/services", label: "Data Plans", art: "data", category: "data" },
+      { href: "/dashboard/services", label: "Gift Cards", art: "gift-cards", category: "gift-cards" },
       { href: "/dashboard/bulk-orders", label: "Bulk Orders", art: "bulk" },
       { href: "/dashboard/scheduled", label: "Scheduled", art: "scheduled" },
     ],
@@ -73,34 +85,44 @@ const mobileTabs: Array<{ href: string; label: string; icon: NavItem["icon"] }> 
   { href: "/dashboard", label: "Home", icon: Grid },
   { href: "/dashboard/orders", label: "Orders", icon: Receipt },
   { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
-  { href: "/pricing", label: "Buy", icon: Sparkle },
+  { href: "/dashboard/services", label: "Services", icon: Sparkle },
   { href: "/dashboard/support", label: "Support", icon: Chat },
 ];
 
 function LogoutButton({ compact = false }: { compact?: boolean }) {
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
 
   async function signOut() {
     setPending(true);
+    setError("");
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
-    } finally {
-      window.location.href = "/";
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+      if (!response.ok) throw new Error("Sign out failed");
+      router.replace("/");
+      router.refresh();
+    } catch {
+      setError("Could not sign out. Please try again.");
+      setPending(false);
     }
   }
 
   return (
-    <button
-      type="button"
-      onClick={signOut}
-      disabled={pending}
-      className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[0.78rem] font-medium text-ink-3 transition-colors hover:bg-white hover:text-ink disabled:opacity-60 ${
-        compact ? "" : "w-full"
-      }`}
-    >
-      <Logout className="h-3.5 w-3.5" />
-      {pending ? "Signing out…" : "Sign out"}
-    </button>
+    <div>
+      <button
+        type="button"
+        onClick={signOut}
+        disabled={pending}
+        className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[0.78rem] font-medium text-ink-3 transition-colors hover:bg-white hover:text-ink disabled:opacity-60 ${
+          compact ? "" : "w-full"
+        }`}
+      >
+        <Logout className="h-3.5 w-3.5" />
+        {pending ? "Signing out…" : "Sign out"}
+      </button>
+      {error && <p role="alert" className="px-3 text-xs text-rose-700">{error}</p>}
+    </div>
   );
 }
 
@@ -114,15 +136,18 @@ export function DashboardShell({
   children,
   user,
   unreadNotifications = 0,
-  buildId = BUILD_ID,
+  buildId,
 }: {
   children: ReactNode;
   user: { name: string; email: string; walletBalance: number };
   unreadNotifications?: number;
-  /** Shown in dev only: which build this page came from. */
-  buildId?: string;
+  /** The server's build ID, passed as a prop so hydration sees the same value. */
+  buildId: string;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const selectedCountry = EXPLORER_COUNTRIES.some((country) => country.code === searchParams.get("country")) ? searchParams.get("country") : null;
+  const selectedCategory = searchParams.get("category");
   const [open, setOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const initials = user.name
@@ -164,7 +189,7 @@ export function DashboardShell({
         </span>
       </Link>
 
-      <nav className="mt-5 grid gap-4 overflow-y-auto">
+      <nav aria-label="Dashboard navigation" className="mt-5 grid min-h-0 flex-1 content-start gap-4 overflow-y-auto">
         {navGroups.map((group) => (
           <div key={group.label} className="grid gap-0.5">
             <p className="px-3 text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
@@ -172,22 +197,27 @@ export function DashboardShell({
             </p>
             {group.items.map((item) => {
               const Icon = item.icon;
-              const active = isRouteActive(pathname, item.href);
+              const active = isRouteActive(pathname, item.href) &&
+                (item.href !== "/dashboard/services" || (item.category ? item.category === selectedCategory : !selectedCategory));
+              const categoryParams = new URLSearchParams();
+              if (selectedCountry) categoryParams.set("country", selectedCountry);
+              if (item.category) categoryParams.set("category", item.category);
+              const href = item.href === "/dashboard/services" && categoryParams.size > 0 ? `${item.href}?${categoryParams}` : item.href;
               const badge =
                 item.href === "/dashboard/notifications" && unreadNotifications > 0
                   ? unreadNotifications
                   : null;
               return (
                 <Link
-                  key={item.href}
-                  href={item.href}
+                  key={`${item.href}:${item.category ?? "all"}`}
+                  href={href}
                   onClick={() => setOpen(false)}
                   className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-[0.84rem] font-medium transition-colors ${
                     active ? "bg-lav-100/80 text-lav-800" : "text-ink-2 hover:bg-white hover:text-ink"
                   }`}
                 >
                   {item.art ? (
-                    <ServiceIcon service={item.art} size="xs" className="overflow-hidden rounded-[5px]" />
+                    <span aria-hidden="true"><ServiceIcon service={item.art} size="xs" className="overflow-hidden rounded-[5px]" /></span>
                   ) : (
                     Icon && <Icon className={`h-4 w-4 ${active ? "text-lav-700" : "text-ink-3"}`} />
                   )}
@@ -211,11 +241,10 @@ export function DashboardShell({
           <Sparkle className="h-3 w-3" /> New order
         </span>
         <p className="mt-2 text-[0.78rem] leading-relaxed text-ink-2">
-          Numbers, eSIMs, proxies and inboxes start from{" "}
-          {formatNaira(serviceMap["email-otp"].fromPrice)}.
+          Choose a country and explore numbers, social services and more.
         </p>
         <Link
-          href="/pricing"
+          href="/dashboard/services"
           onClick={() => setOpen(false)}
           className="mt-3 inline-flex items-center gap-1 text-[0.76rem] font-semibold text-lav-700 hover:underline"
         >
@@ -304,14 +333,14 @@ export function DashboardShell({
                 )}
               </Link>
 
-              <Link href="/pricing" className="btn btn-primary !px-3.5 !py-2 !text-[0.76rem]">
-                Buy
+              <Link href="/dashboard/services" className="btn btn-primary !px-3.5 !py-2 !text-[0.76rem]">
+                Services
                 <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
           </div>
 
-          <div className="pb-24 lg:pb-10">{children}</div>
+          <main className="pb-24 lg:pb-10">{children}</main>
 
           {process.env.NODE_ENV !== "production" && (
             /* In development only. If a page looks unchanged after a deploy,

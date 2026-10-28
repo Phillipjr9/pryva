@@ -4,10 +4,13 @@ import { users, orders, walletTransactions, giftCards, scheduledOrders } from "@
 import { eq } from "drizzle-orm";
 import { requireAuthApi } from "@/lib/auth";
 import { logger } from "@/lib/logger";
+import { userExportRateLimiter } from "@/lib/rate-limit";
+
+const MAX_EXPORT_ROWS_PER_CATEGORY = 5_000;
 
 export const dynamic = "force-dynamic";
 
-// GET /api/user/export - Export user data (GDPR compliance)
+// GET /api/user/export - Download selected account activity; not a complete privacy-access export.
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuthApi();
@@ -15,6 +18,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const limit = await userExportRateLimiter(`user-export:${user.id}`);
+    if (limit.unavailable) return NextResponse.json({ error: "Export is temporarily unavailable" }, { status: 503 });
+    if (!limit.allowed) return NextResponse.json({ error: "Too many export requests. Try again later." }, { status: 429 });
     logger.info("User data export requested", { userId: user.id });
 
     // Fetch all user data
@@ -24,27 +30,37 @@ export async function GET(request: NextRequest) {
 
     const userOrders = await db.query.orders.findMany({
       where: eq(orders.userId, user.id),
+      limit: MAX_EXPORT_ROWS_PER_CATEGORY + 1,
     });
 
     const userTransactions = await db.query.walletTransactions.findMany({
       where: eq(walletTransactions.userId, user.id),
+      limit: MAX_EXPORT_ROWS_PER_CATEGORY + 1,
     });
 
     const userGiftCards = await db.query.giftCards.findMany({
       where: eq(giftCards.purchasedBy, user.id),
+      limit: MAX_EXPORT_ROWS_PER_CATEGORY + 1,
     });
 
     const redeemedGiftCards = await db.query.giftCards.findMany({
       where: eq(giftCards.redeemedBy, user.id),
+      limit: MAX_EXPORT_ROWS_PER_CATEGORY + 1,
     });
 
     const userScheduledOrders = await db.query.scheduledOrders.findMany({
       where: eq(scheduledOrders.userId, user.id),
+      limit: MAX_EXPORT_ROWS_PER_CATEGORY + 1,
     });
+
+    if ([userOrders, userTransactions, userGiftCards, redeemedGiftCards, userScheduledOrders].some((rows) => rows.length > MAX_EXPORT_ROWS_PER_CATEGORY)) {
+      return NextResponse.json({ error: "This export is too large. Contact support for a complete data request." }, { status: 413 });
+    }
 
     // Format export data
     const exportData = {
       exportDate: new Date().toISOString(),
+      scope: "Selected account activity only; contact support for a complete personal-data request. This file may contain redeemable gift-card codes.",
       user: {
         id: userData?.id,
         name: userData?.name,
@@ -107,11 +123,15 @@ export async function GET(request: NextRequest) {
 
     // Return as downloadable JSON
     const jsonString = JSON.stringify(exportData, null, 2);
+    if (Buffer.byteLength(jsonString, "utf8") > 10_000_000) {
+      return NextResponse.json({ error: "This export is too large. Contact support for a complete data request." }, { status: 413 });
+    }
     const blob = new Blob([jsonString], { type: "application/json" });
 
     return new NextResponse(blob, {
       headers: {
         "Content-Type": "application/json",
+        "Cache-Control": "private, no-store",
         "Content-Disposition": `attachment; filename="pryva-data-export-${new Date().toISOString().split("T")[0]}.json"`,
       },
     });

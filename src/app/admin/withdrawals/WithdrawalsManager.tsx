@@ -19,6 +19,8 @@ interface Withdrawal {
   accountName: string;
   status: string;
   reference: string;
+  paystackReference?: string | null;
+  transferReference?: string | null;
   failureReason?: string;
   createdAt: string;
   processedAt?: string;
@@ -64,7 +66,10 @@ export function WithdrawalsManager() {
   }, [fetchWithdrawals]);
 
   async function processWithdrawal(id: string, action: "approve" | "reject") {
-    if (!confirm(`Are you sure you want to ${action} this withdrawal?`)) {
+    const confirmation = action === "approve"
+      ? "Approve this request and initiate a Paystack transfer? Initiation is not settlement. Check Paystack for any merchant authorization and final status before retrying or refunding."
+      : "Reject this pending request and refund its reserved wallet amount?";
+    if (!confirm(confirmation)) {
       return;
     }
 
@@ -79,23 +84,25 @@ export function WithdrawalsManager() {
 
       const data = await response.json();
 
-      if (data.ok) {
-        addToast({ type: "success", message: `Withdrawal ${action}d successfully` });
-        fetchWithdrawals();
+      if (response.ok && data.ok) {
+        addToast({ type: data.needsReview ? "warning" : "success", message: data.message || (action === "approve" ? "Transfer initiated; settlement still requires verification." : "Withdrawal rejected and refunded.") });
+        void fetchWithdrawals();
       } else {
-        addToast({ type: "error", message: data.error || `Failed to ${action} withdrawal` });
+        addToast({ type: "error", message: data.error || (action === "approve" ? "Transfer outcome unconfirmed. Check Paystack before retrying or refunding." : "Rejection outcome unconfirmed. Refresh the request before trying again.") });
+        void fetchWithdrawals();
       }
-    } catch (error) {
-      addToast({ type: "error", message: `Failed to ${action} withdrawal` });
+    } catch {
+      addToast({ type: "error", message: action === "approve" ? "Transfer outcome unconfirmed. Check Paystack before retrying or refunding." : "Rejection outcome unconfirmed. Refresh the request before trying again." });
+      void fetchWithdrawals();
     } finally {
       setProcessing(null);
     }
   }
 
   async function completeWithdrawal(id: string) {
-    if (!confirm("Mark this withdrawal as completed?")) {
-      return;
-    }
+    const note = prompt("After checking Paystack, enter the settlement reference or reconciliation note (do not include personal details):");
+    if (!note?.trim()) return;
+    if (!confirm("Have you verified the transfer's final settlement, amount and recipient in Paystack?")) return;
 
     setProcessing(id);
 
@@ -103,7 +110,7 @@ export function WithdrawalsManager() {
       const response = await fetch("/api/admin/withdrawals", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action: "complete" }),
+        body: JSON.stringify({ id, action: "complete", reconciliationConfirmed: true, reason: note.trim() }),
       });
 
       const data = await response.json();
@@ -114,8 +121,9 @@ export function WithdrawalsManager() {
       } else {
         addToast({ type: "error", message: data.error || "Failed to complete withdrawal" });
       }
-    } catch (error) {
-      addToast({ type: "error", message: "Failed to complete withdrawal" });
+    } catch {
+      addToast({ type: "error", message: "Completion outcome unconfirmed. Refresh the request and check Paystack before trying again." });
+      void fetchWithdrawals();
     } finally {
       setProcessing(null);
     }
@@ -257,17 +265,29 @@ export function WithdrawalsManager() {
                   <p className="font-medium">{formatCurrency(withdrawal.fee)}</p>
                 </div>
                 <div>
-                  <p className="text-gray-600">Net Amount</p>
+                  <p className="text-gray-600">Total wallet deduction (payout + fee)</p>
                   <p className="font-medium text-green-600">
-                    {formatCurrency(withdrawal.amount - withdrawal.fee)}
+                    {formatCurrency(withdrawal.amount + withdrawal.fee)}
                   </p>
                 </div>
               </div>
 
+              {withdrawal.paystackReference && (
+                <p className="mb-2 text-xs text-gray-600">Paystack reference: <span className="font-mono">{withdrawal.paystackReference}</span></p>
+              )}
+              {withdrawal.status === "processing" && !withdrawal.paystackReference && (
+                <p className="mb-2 text-xs text-red-800">Legacy transfer: the Paystack reference was not saved by this version. Check Paystack manually using the original request details.</p>
+              )}
+              {withdrawal.transferReference && (
+                <p className="mb-3 text-xs text-gray-600">Paystack transfer code: <span className="font-mono">{withdrawal.transferReference}</span></p>
+              )}
+              {withdrawal.status === "processing" && !withdrawal.transferReference && (
+                <p className="mb-3 text-sm text-red-800">Transfer outcome is unconfirmed. Reconcile it manually; do not retry or refund while it may be in flight.</p>
+              )}
               {withdrawal.failureReason && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-sm text-red-800">
-                    <strong>Failure Reason:</strong> {withdrawal.failureReason}
+                    <strong>{withdrawal.status === "processing" ? "Review note:" : "Failure reason:"}</strong> {withdrawal.failureReason}
                   </p>
                 </div>
               )}
@@ -301,7 +321,7 @@ export function WithdrawalsManager() {
                     </Button>
                   </>
                 )}
-                {withdrawal.status === "processing" && (
+                {withdrawal.status === "processing" && withdrawal.transferReference && (
                   <Button
                     onClick={() => completeWithdrawal(withdrawal.id)}
                     disabled={processing === withdrawal.id}

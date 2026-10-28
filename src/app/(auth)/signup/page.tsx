@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
 export const metadata: Metadata = {
   title: "Create your account",
@@ -16,7 +17,7 @@ export default async function SignupPage({
 }) {
   const user = await getCurrentUser();
   const { next, error } = await searchParams;
-  const safeNext = next && next.startsWith("/") ? next : "/dashboard";
+  const safeNext = safeRedirectPath(next);
 
   if (user) redirect(safeNext);
 

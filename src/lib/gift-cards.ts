@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { giftCards, users, walletTransactions } from "@/db/schema";
 import { eq, and, gte, gt, ne, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 
 export function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -60,6 +61,7 @@ export async function createGiftCard(params: {
     });
   });
 
+  scheduleWalletEmails();
   return { code, amount, expiresAt };
 }
 
@@ -69,7 +71,7 @@ export async function redeemGiftCard(params: {
 }): Promise<{ amount: number }> {
   const { userId, code } = params;
 
-  return db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     // Claim the active card before crediting the recipient. A concurrent
     // redemption can no longer claim it once the first transaction commits.
     const now = new Date();
@@ -101,6 +103,8 @@ export async function redeemGiftCard(params: {
     });
     return { amount: card.amount };
   });
+  scheduleWalletEmails();
+  return result;
 }
 
 export async function getUserGiftCards(userId: string) {

@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, count, desc, eq, ne, sum } from "drizzle-orm";
+import { and, count, desc, eq, sum } from "drizzle-orm";
 import { db } from "@/db";
 import { walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/catalog";
+import { walletEntryDirection, walletEntrySign } from "@/lib/wallet-activity";
+import { isPreviewDatabase } from "@/lib/demo-policy";
 import { TopUpForm } from "@/components/dashboard/TopUpForm";
 import { WithdrawalDashboard } from "./WithdrawalDashboard";
+import { DemoWithdrawal } from "@/components/dashboard/DemoWithdrawal";
+import { demoWithdrawalHistory } from "@/lib/demo-withdrawal";
 import { TopUpReturn } from "./TopUpReturn";
 import { ArrowRight, Card, Check, Clock, Refresh, Shield, Wallet } from "@/components/icons";
 
@@ -20,10 +24,12 @@ export default async function WalletPage({
 }) {
   const user = await requireUser("/dashboard/wallet");
   const params = await searchParams;
+  const preview = isPreviewDatabase();
+  const paystackTestMode = !preview && (process.env.PAYSTACK_SECRET_KEY?.trim().startsWith("sk_test_") ?? false);
 
   // Headline totals come from aggregates, not from the visible slice: the old
   // version summed the newest 40 rows and labelled them "in total".
-  const [transactions, [addedRow], [spentRow], [debitCount]] = await Promise.all([
+  const [transactions, [creditRow], [refundRow], [spentRow], [debitCount]] = await Promise.all([
     db
       .select()
       .from(walletTransactions)
@@ -34,8 +40,12 @@ export default async function WalletPage({
       .select({ value: sum(walletTransactions.amount) })
       .from(walletTransactions)
       .where(
-        and(eq(walletTransactions.userId, user.id), ne(walletTransactions.type, "debit")),
+        and(eq(walletTransactions.userId, user.id), eq(walletTransactions.type, "credit")),
       ),
+    db
+      .select({ value: sum(walletTransactions.amount) })
+      .from(walletTransactions)
+      .where(and(eq(walletTransactions.userId, user.id), eq(walletTransactions.type, "refund"))),
     db
       .select({ value: sum(walletTransactions.amount) })
       .from(walletTransactions)
@@ -46,7 +56,7 @@ export default async function WalletPage({
       .where(and(eq(walletTransactions.userId, user.id), eq(walletTransactions.type, "debit"))),
   ]);
 
-  const added = Number(addedRow?.value ?? 0);
+  const added = Number(creditRow?.value ?? 0) + Number(refundRow?.value ?? 0);
   const spent = Number(spentRow?.value ?? 0);
   const spendCount = Number(debitCount?.value ?? 0);
 
@@ -55,11 +65,12 @@ export default async function WalletPage({
       <div>
         <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Wallet</h1>
         <p className="mt-1 text-[0.86rem] text-ink-2">
-          Fund in Naira, spend on any Pryva service. Refunds land back here automatically.
+          Manage your balance and review your wallet activity.
         </p>
       </div>
 
-      <TopUpReturn status={params.topup} reference={params.reference ?? params.trxref} />
+      {paystackTestMode && <p role="note" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8rem] leading-relaxed text-amber-900"><strong>Paystack test mode.</strong> Checkout and transfers are simulated by Paystack; no real payment is made. Use test data and a separate staging database.</p>}
+      {!preview && <TopUpReturn key={`${params.topup ?? ""}:${params.reference ?? params.trxref ?? ""}`} status={params.topup} reference={params.reference ?? params.trxref} userId={user.id} testMode={paystackTestMode} />}
 
       <div className="grid gap-2.5 sm:grid-cols-3">
         <div className="rounded-2xl bg-ink p-5 text-white">
@@ -70,7 +81,7 @@ export default async function WalletPage({
           <p className="mt-2 text-[1.9rem] font-semibold leading-none">
             {formatNaira(user.walletBalance)}
           </p>
-          <p className="mt-2 text-[0.68rem] text-white/55">Valid for 90 days from last activity</p>
+          <p className="mt-2 text-[0.68rem] text-white/55">See transaction history below</p>
         </div>
         <div className="rounded-2xl border border-line bg-[#fffdfa] p-5">
           <div className="flex items-center justify-between">
@@ -78,7 +89,7 @@ export default async function WalletPage({
             <Card className="h-4 w-4 text-lav-600" />
           </div>
           <p className="mt-2 text-[1.55rem] font-semibold leading-none">{formatNaira(added)}</p>
-          <p className="mt-2 text-[0.68rem] text-ink-3">Top-ups, welcome and refund credits</p>
+          <p className="mt-2 text-[0.68rem] text-ink-3">Credits and refunds (including gift-card redemptions)</p>
         </div>
         <div className="rounded-2xl border border-line bg-[#fffdfa] p-5">
           <div className="flex items-center justify-between">
@@ -86,12 +97,12 @@ export default async function WalletPage({
             <Refresh className="h-4 w-4 text-lav-600" />
           </div>
           <p className="mt-2 text-[1.55rem] font-semibold leading-none">{formatNaira(spent)}</p>
-          <p className="mt-2 text-[0.68rem] text-ink-3">Across {spendCount} charges</p>
+          <p className="mt-2 text-[0.68rem] text-ink-3">{spendCount} purchase or gift-card charge{spendCount === 1 ? "" : "s"}; excludes withdrawals</p>
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-        <TopUpForm balance={user.walletBalance} />
+        <TopUpForm balance={user.walletBalance} preview={preview} userId={user.id} testMode={paystackTestMode} />
 
         <div className="grid gap-4">
           <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
@@ -122,10 +133,10 @@ export default async function WalletPage({
                     <div className="shrink-0 text-right">
                       <p
                         className={`text-[0.82rem] font-semibold ${
-                          tx.type === "debit" ? "text-ink-2" : "text-emerald-600"
+                          walletEntryDirection(tx.type) === "in" ? "text-emerald-600" : "text-ink-2"
                         }`}
                       >
-                        {tx.type === "debit" ? "−" : "+"}
+                        {walletEntrySign(tx.type)}
                         {formatNaira(tx.amount)}
                       </p>
                       <p className="text-[0.64rem] text-ink-3">Bal. {formatNaira(tx.balanceAfter)}</p>
@@ -143,15 +154,15 @@ export default async function WalletPage({
             <ul className="mt-2.5 grid gap-2 text-[0.8rem] text-ink-2">
               <li className="flex items-start gap-2">
                 <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
-                Bank transfer or local card. No dollar card needed.
+                {preview ? "Add demo funds using the simulated checkout." : "When configured, top-ups use Paystack checkout."}
               </li>
               <li className="flex items-start gap-2">
                 <Refresh className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
-                Refunds are automatic when a code doesn&apos;t arrive.
+                {preview ? "Demo orders and refunds appear in your wallet history." : "Live order refunds require support review."}
               </li>
               <li className="flex items-start gap-2">
                 <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
-                Balance stays valid for 90 days from last activity.
+                {preview ? "All wallet activity uses simulated funds." : "Withdrawal requests reserve funds; rejected requests can be refunded."}
               </li>
             </ul>
             <Link
@@ -164,7 +175,7 @@ export default async function WalletPage({
           </div>
         </div>
       </div>
-      <WithdrawalDashboard balance={user.walletBalance} />
+      {preview ? <DemoWithdrawal balance={user.walletBalance} userId={user.id} initialHistory={demoWithdrawalHistory(user.id)} /> : <WithdrawalDashboard balance={user.walletBalance} userId={user.id} testMode={paystackTestMode} />}
     </div>
   );
 }

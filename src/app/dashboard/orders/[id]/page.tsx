@@ -11,6 +11,8 @@ import Link from "next/link";
 import { ArrowLeft } from "@/components/icons";
 import { CredentialList } from "./CredentialList";
 import { OrderActions } from "@/components/dashboard/OrderActions";
+import { isPreviewDatabase } from "@/lib/demo-policy";
+import { isPreviewSingleNumberWithoutCode } from "@/lib/refund-policy";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -43,10 +45,16 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
   }
 
   const credentials = parseAccounts(order.accounts);
+  const demoUnitsValue = (order as typeof order & { demoUnitsRemaining?: unknown }).demoUnitsRemaining;
+  const demoUnitsRemaining = isPreviewDatabase() && typeof demoUnitsValue === "number" && Number.isSafeInteger(demoUnitsValue) && demoUnitsValue >= 0 ? demoUnitsValue : null;
+  // Share the request-time clock with the client for hydration-safe countdowns.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
 
   const statusColors = {
     active: "info",
     processing: "info",
+    review: "warning",
     delivered: "success",
     refunded: "warning",
     expired: "error",
@@ -70,7 +78,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
+          <div className="order-2 space-y-6 lg:order-1 lg:col-span-2">
             <Card>
               <CardHeader>
                 <CardTitle>Order Information</CardTitle>
@@ -120,10 +128,10 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
             {credentials.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Account credentials ({credentials.length})</CardTitle>
+                  <CardTitle>{isPreviewDatabase() && order.provider === "simulated" ? "Demo account samples" : "Account credentials"} ({credentials.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <CredentialList accounts={credentials} />
+                  <CredentialList accounts={credentials} demo={isPreviewDatabase() && order.provider === "simulated"} />
                 </CardContent>
               </Card>
             )}
@@ -135,27 +143,26 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                 </CardHeader>
                 <CardContent>
                   <p className="text-[0.88rem] text-ink-2">
-                    {formatNaira(order.amount)} was returned to your wallet automatically. Refunded or
-                    replaced credentials are masked by the seller and are no longer usable.
+                    {formatNaira(order.amount)} was returned to your wallet.
                   </p>
                   {credentials.length > 0 && (
                     <div className="mt-3">
-                      <CredentialList accounts={credentials} />
+                      <CredentialList accounts={credentials} demo={isPreviewDatabase() && order.provider === "simulated"} />
                     </div>
                   )}
                 </CardContent>
               </Card>
             )}
 
-            {order.status === "processing" && credentials.length === 0 && (
+            {(order.status === "processing" || order.status === "review") && !(isPreviewDatabase() && order.provider === "simulated" && order.service === "social") && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Delivery in progress</CardTitle>
+                  <CardTitle>{order.status === "review" ? "Order needs review" : "Delivery in progress"}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-[0.88rem] text-ink-2">
-                    We&apos;re still waiting on the seller. If nothing arrives, the amount is refunded to
-                    your wallet automatically — you don&apos;t need to ask.
+                    Delivery has not been confirmed. Please don&apos;t place this order again; contact support
+                    with your reference if you need help. Refunds require verification.
                   </p>
                 </CardContent>
               </Card>
@@ -163,8 +170,9 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
 
           </div>
 
-          <div className="space-y-6">
+          <div className="order-1 space-y-6 lg:order-2">
             <OrderActions
+              key={order.id}
               orderId={order.id}
               status={order.status}
               expiresAt={order.expiresAt ? new Date(order.expiresAt).toISOString() : null}
@@ -173,6 +181,10 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
               otpCode={order.otpCode ?? null}
               service={order.service}
               provider={order.provider ?? null}
+              preview={isPreviewDatabase()}
+              demoUnitsRemaining={demoUnitsRemaining}
+              canRequestPreviewRefund={isPreviewDatabase() && isPreviewSingleNumberWithoutCode(order)}
+              initialNow={now}
             />
             <Card>
               <CardHeader>
