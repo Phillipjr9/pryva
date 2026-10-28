@@ -24,7 +24,14 @@ vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => false }));
  *    === "fleexa"` is a routing key, not a sentence anybody reads.
  */
 const VENDORS = ["fleexa", "accszone", "bulkacc", "freshbulkacc", "resellacc", "accsbulk"];
-const DISCLOSURE = ["reseller", "wholesale", "supplier", "upstream", "vendor", "dropship", "drop-ship"];
+const DISCLOSURE = [
+  "reseller", "resell", "wholesale", "upstream", "vendor", "dropship", "drop-ship",
+  // Every inflection, not just the noun: "supplier" alone let "delivered exactly
+  // as supplied" and "our supply partners" render on customer-facing pages.
+  "supplier", "supplied", "supplies", "supplying", "supply",
+  // Sourcing phrased as an action rather than a role.
+  "sourced from", "source of our", "procured", "stockist", "distributor",
+];
 
 /**
  * Marketing surfaces plus the catalogue copy that renders on them, and the
@@ -33,9 +40,9 @@ const DISCLOSURE = ["reseller", "wholesale", "supplier", "upstream", "vendor", "
 const USER_FACING = [
   "src/app/(site)",
   "src/app/(auth)",
+  "src/app/dashboard",
   "src/components/site",
-  "src/components/dashboard/ServiceExplorer.tsx",
-  "src/components/dashboard/OrderActions.tsx",
+  "src/components/dashboard",
   "src/lib/catalog.ts",
   "src/lib/digital-services.ts",
   "src/lib/service-explorer.ts",
