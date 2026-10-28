@@ -3,6 +3,7 @@ import { AuthForm } from "@/components/auth/AuthForm";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { safeRedirectPath } from "@/lib/safe-redirect";
+import { planDestination } from "@/lib/plan-destination";
 
 export const metadata: Metadata = {
   title: "Create your account",
@@ -13,11 +14,16 @@ export const metadata: Metadata = {
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; error?: string }>;
+  searchParams: Promise<{ next?: string; error?: string; plan?: string }>;
 }) {
   const user = await getCurrentUser();
-  const { next, error } = await searchParams;
-  const safeNext = safeRedirectPath(next);
+  const { next, error, plan } = await searchParams;
+  // `?plan=` arrives from every "Get started" button on the catalog pages. An
+  // explicit `next` still wins; otherwise the chosen plan decides where the
+  // visitor lands, so their selection survives signup instead of being dropped.
+  const safeNext = next
+    ? safeRedirectPath(next)
+    : safeRedirectPath(planDestination(plan), "/dashboard");
 
   if (user) redirect(safeNext);
 

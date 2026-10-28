@@ -78,6 +78,38 @@ describe("demo service orders and inventory", () => {
     expect(await database.db.query.walletTransactions.findMany({ where: eq(schema.walletTransactions.userId, id) })).toHaveLength(1);
   });
 
+  it("keeps a rented demo number and its active unit across multiple simulated codes", async () => {
+    const id = await user();
+    const itemId = "plan-rent-ng-7";
+    const before = services.demoInventory(id, "ng")[itemId];
+    const result = services.purchaseDemoService({ userId: id, itemId, countryCode: "ng", requestId: randomUUID() });
+    const first = delivery.advanceDemoOtp(id, result.orderId, Date.now() + 9000);
+    expect(first?.otpCode).toMatch(/^\d{6}$/);
+    const firstOrder = await database.db.query.orders.findFirst({ where: eq(schema.orders.id, result.orderId) });
+    expect(services.demoInventory(id, "ng")[itemId]).toEqual({ stock: before.stock - 1, owned: 1 });
+    expect(firstOrder?.referenceCode).toMatch(/^\+000 /);
+
+    const path = `/api/demo/orders/${result.orderId}/next`;
+    const params = { params: Promise.resolve({ id: result.orderId }) };
+    const body = { requestId: randomUUID() };
+    expect((await nextCode.POST(request(path, body), params)).status).toBe(200);
+    expect((await nextCode.POST(request(path, body), params)).status).toBe(200);
+    const waiting = await database.db.query.orders.findFirst({ where: eq(schema.orders.id, result.orderId) });
+    expect(waiting?.referenceCode).toBe(firstOrder?.referenceCode);
+    expect(waiting?.otpCode).toBeNull();
+    const second = delivery.advanceDemoOtp(id, result.orderId, Date.now() + 9000);
+    expect(second?.otpCode).toMatch(/^\d{6}$/);
+    expect(services.demoInventory(id, "ng")[itemId].owned).toBe(1);
+    expect(await database.db.query.walletTransactions.findMany({ where: eq(schema.walletTransactions.userId, id) })).toHaveLength(1);
+
+    database.mutatePreviewDatabase((draft) => {
+      const order = draft.orders.find((row) => row.id === result.orderId)!;
+      order.expiresAt = new Date(Date.now() - 1);
+    });
+    expect((await nextCode.POST(request(path, { requestId: randomUUID() }), params)).status).toBe(409);
+    expect(services.demoInventory(id, "ng")[itemId].owned).toBe(0);
+  });
+
   it("rejects unsupported items, invalid countries, cross-origin and live-database requests", async () => {
     await user();
     const body = { itemId: "verification-whatsapp", country: "ng", requestId: randomUUID() };

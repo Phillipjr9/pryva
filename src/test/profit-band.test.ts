@@ -23,7 +23,7 @@ const { priceMarketplaceListing, applyPromoDiscount } = await import("@/lib/mark
 /** The owner-editable supplier price sheet — the single source of every price. */
 type CostRow = { service: string; label: string; cost: number };
 const sheet = JSON.parse(
-  readFileSync(path.join(process.cwd(), "data/supplier-costs.json"), "utf8"),
+  readFileSync(path.join(process.cwd(), "data/cost-sheet.json"), "utf8"),
 ) as { catalog: Record<string, CostRow>; digital: Record<string, CostRow> };
 
 /** The owner's standing rule: every service earns 30–50% over its fixed cost. */

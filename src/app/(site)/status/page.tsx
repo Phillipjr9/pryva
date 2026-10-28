@@ -33,7 +33,7 @@ export default function StatusPage() {
             {
               name: "Account marketplace checkout",
               status: marketplaceEnabled ? "Enabled; provider health unknown" : "Paused",
-              detail: marketplaceEnabled ? "Checkout is configured, but this page does not monitor the supplier." : "Live checkout is unavailable in this environment.",
+              detail: marketplaceEnabled ? "Checkout is configured, but this page does not monitor live fulfillment." : "Live checkout is unavailable in this environment.",
             },
             {
               name: "Wallet, payments and bank transfers",

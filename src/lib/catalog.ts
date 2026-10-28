@@ -1,4 +1,5 @@
 import { CATALOG_PRICES } from "@/lib/prices.generated";
+import { missingPriceError } from "@/lib/pricing-diagnostics";
 
 export type ServiceSlug =
   | "numbers"
@@ -130,18 +131,18 @@ const serviceDefinitions: Service[] = [
   {
     slug: "accounts", name: "Digital Accounts", shortName: "Accounts", href: "/accounts",
     eyebrow: "Marketplace", tagline: "Explore account listings.",
-    description: "Browse supplier account listings when available. Checkout is disabled by default and uncertain orders require review.",
-    intro: "Account marketplace checkout is disabled by default. Supplier availability and credentials are not guaranteed; uncertain purchases require review.",
+    description: "Browse live account listings when available, priced in naira. Orders that cannot be confirmed go to review instead of charging you twice.",
+    intro: "Account listings, stock and prices are read live. Availability and credentials are not guaranteed; a purchase that cannot be confirmed is held for review.",
     fromPrice: 800, unit: "per account", icon: "accounts",
     highlights: [
-      { title: "Listings", body: "Listings and stock depend on the supplier's current response." },
-      { title: "Checkout controls", body: "Live checkout is disabled by default and cannot use preview balances." },
+      { title: "Listings", body: "Listings and stock are read live, so what you see is what is available now." },
+      { title: "Checkout controls", body: "Every order is priced in naira and debited once, from your wallet or a card top-up." },
       { title: "Order review", body: "Contact support if delivery cannot be confirmed; do not repeat an uncertain purchase." },
     ],
-    included: ["Supplier listings when configured", "Naira pricing", "Support review for uncertain orders"],
+    included: ["Live listings", "Naira pricing", "Support review for uncertain orders"],
     goodFor: ["Listing comparison", "Catalog browsing", "Order support"],
     faqs: [
-      { q: "Can I purchase accounts now?", a: "Checkout is disabled by default. Check the marketplace for current availability." },
+      { q: "Can I purchase accounts now?", a: "Yes, for any listing shown as available. Items without live stock cannot be ordered." },
       { q: "What if delivery is uncertain?", a: "Keep the reference and contact support before ordering again." },
     ],
   },
@@ -377,7 +378,7 @@ const planDefinitions: PlanDefinition[] = [
 /**
  * Selling prices are generated, never typed.
  *
- * `data/supplier-costs.json` holds the supplier's fixed amount per plan and
+ * `data/cost-sheet.json` holds the fixed amount we pay per plan and
  * `scripts/build-prices.mjs` bakes the result of `priceFromCost()` — 30–50%
  * markup, rounded up to the price step — into `prices.generated.ts`. The costs
  * themselves stay out of this module on purpose: it is imported by client
@@ -389,10 +390,7 @@ const planDefinitions: PlanDefinition[] = [
 export const plans: Plan[] = planDefinitions.map((definition) => {
   const generated = CATALOG_PRICES[definition.slug];
   if (!generated) {
-    throw new Error(
-      `No generated price for plan "${definition.slug}". Add its supplier cost to ` +
-        `data/supplier-costs.json and run \`npm run pricing:build\`.`,
-    );
+    throw missingPriceError(`plan "${definition.slug}"`);
   }
   return {
     ...definition,

@@ -5,6 +5,7 @@ import { contactMessages } from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { isMessageStatus } from "@/lib/support-messages";
 
 export const dynamic = "force-dynamic";
 
@@ -79,7 +80,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Message ID and status are required" }, { status: 400 });
     }
 
-    if (!["open", "in_progress", "resolved", "closed"].includes(status)) {
+    if (!isMessageStatus(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 

@@ -4,7 +4,7 @@
  * Why generate instead of computing in the app: `src/lib/catalog.ts` is imported
  * by client components, so anything it contains ships to the browser. Supplier
  * costs must not — they are our buying prices and they reveal the margin. The
- * cost sheet (`data/supplier-costs.json`) therefore stays server-side and this
+ * cost sheet (`data/cost-sheet.json`) therefore stays server-side and this
  * script bakes the finished prices into `src/lib/prices.generated.ts`.
  *
  * Run:   npm run pricing:build      (regenerate prices)
@@ -17,7 +17,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { priceFromCost, maxDiscountPercentFor, PROFIT_BAND } from "../src/lib/pricing.ts";
 
-const SHEET = "data/supplier-costs.json";
+const SHEET = "data/cost-sheet.json";
 const OUTPUT = "src/lib/prices.generated.ts";
 
 const sheet = JSON.parse(readFileSync(SHEET, "utf8"));
@@ -79,11 +79,11 @@ if (process.argv.includes("--audit")) {
 const header = `/**
  * GENERATED FILE — do not edit.
  *
- * Produced by \`scripts/build-prices.mjs\` from \`data/supplier-costs.json\`.
- * Change a supplier cost there and run \`npm run pricing:build\`.
+ * Produced by \`scripts/build-prices.mjs\` from \`data/cost-sheet.json\`.
+ * Change a cost there and run \`npm run pricing:build\`.
  *
- * Prices only: supplier costs are deliberately absent from this file so they
- * never reach the browser bundle.
+ * Prices only: costs are deliberately absent from this file so they never
+ * reach the browser bundle.
  */
 
 export type GeneratedPrice = {

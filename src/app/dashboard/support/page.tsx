@@ -23,7 +23,7 @@ export default async function SupportPage() {
     .limit(10);
 
   return (
-    <div className="grid gap-4">
+    <div className="grid min-w-0 grid-cols-1 gap-4">
       <div>
         <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Support</h1>
         <p className="mt-1 text-[0.86rem] text-ink-2">
@@ -55,7 +55,7 @@ export default async function SupportPage() {
         })}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start">
         <ContactForm defaultName={preview ? "Demo Visitor" : user.name} defaultEmail={preview ? "demo@example.test" : user.email} signedIn preview={preview} />
 
         <div className="grid gap-4">

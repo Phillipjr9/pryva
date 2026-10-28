@@ -104,8 +104,11 @@ export default async function DashboardOverviewPage() {
       provider: order.provider,
     }));
 
+  // min-w-0 plus minmax(0,…) tracks: an implicit auto grid track is sized to its
+  // items' min-content, and a truncated order reference is long enough to push
+  // the whole overview past a 375px viewport once an order exists.
   return (
-    <div className="grid gap-4">
+    <div className="grid min-w-0 grid-cols-1 gap-4">
       {/* 1 — money first, with the two actions attached to it */}
       <BalanceHero
         name={firstName(user.name)}
@@ -133,7 +136,7 @@ export default async function DashboardOverviewPage() {
         />
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
         {/* 3 — recent orders */}
         <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
           <div className="flex items-center justify-between">
@@ -215,7 +218,7 @@ export default async function DashboardOverviewPage() {
       </div>
 
       {/* 5 — the ledger, and a way out if something is wrong */}
-      <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
         <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-[1rem] font-semibold">Wallet activity</h2>

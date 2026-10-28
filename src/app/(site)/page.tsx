@@ -445,7 +445,7 @@ export default async function HomePage() {
                     <div className="relative mt-5 flex items-end justify-between gap-3 border-t border-line/80 pt-4">
                       <div className="min-w-0">
                         <p className="text-[0.78rem] text-ink-3">
-                          {service.slug === "accounts" ? "See supplier listings" : <>
+                          {service.slug === "accounts" ? "See live listings" : <>
                             Catalog from{" "}
                             <span className="text-[1rem] font-semibold text-ink">{formatNaira(service.fromPrice)}</span>{" "}
                             <span className="text-[0.72rem]">{service.unit}</span>

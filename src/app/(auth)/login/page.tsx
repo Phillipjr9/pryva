@@ -3,6 +3,7 @@ import { AuthForm } from "@/components/auth/AuthForm";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { safeRedirectPath } from "@/lib/safe-redirect";
+import { planDestination } from "@/lib/plan-destination";
 import { headers } from "next/headers";
 import { isArenaPreviewHost } from "@/lib/net";
 
@@ -47,11 +48,15 @@ function BounceNotice({ arenaPreview }: { arenaPreview: boolean }) {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; error?: string; bounced?: string }>;
+  searchParams: Promise<{ next?: string; error?: string; bounced?: string; plan?: string }>;
 }) {
   const user = await getCurrentUser();
-  const { next, error, bounced } = await searchParams;
-  const safeNext = safeRedirectPath(next);
+  const { next, error, bounced, plan } = await searchParams;
+  // Catalog links carry `?plan=`; keep that choice as the post-sign-in
+  // destination when no explicit `next` was supplied.
+  const safeNext = next
+    ? safeRedirectPath(next)
+    : safeRedirectPath(planDestination(plan), "/dashboard");
   const headerList = await headers();
   const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
 

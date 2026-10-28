@@ -61,6 +61,25 @@ describe("additional demo workflows", () => {
     expect((await db.db.query.orders.findFirst({ where: eq(schema.orders.id, a.orderId) }))?.referenceCode).toContain("no account access");
   });
 
+  it("retains a selected subscription and browsing country without accepting a different retry", async () => {
+    const id = await user();
+    const path = "/api/demo/digital";
+    const body = { planId: "spotify-1month", country: "ng", requestId: randomUUID() };
+    const first = await digitalRoute.POST(request(path, body));
+    expect(first.status).toBe(200);
+    const result = await first.json();
+    const order = await db.db.query.orders.findFirst({ where: eq(schema.orders.id, result.orderId) });
+    expect(order).toMatchObject({ productSlug: "spotify", productName: "Spotify Premium - 1 Month", region: "Nigeria", provider: "simulated" });
+    const retry = await digitalRoute.POST(request(path, { ...body, country: "NG" }));
+    expect((await retry.json()).orderId).toBe(result.orderId);
+    expect((await digitalRoute.POST(request(path, { ...body, country: "us" }))).status).toBe(409);
+    expect((await digitalRoute.POST(request(path, { ...body, planId: "netflix-1month" }))).status).toBe(409);
+    expect((await digitalRoute.POST(request(path, { ...body, country: "not-a-country", requestId: randomUUID() }))).status).toBe(400);
+    expect(services.demoInventory(id, "ng")["subscription-spotify"].owned).toBe(1);
+    expect(services.demoInventory(id, "gb")["subscription-spotify"].owned).toBe(1);
+    expect(await db.db.query.walletTransactions.findMany({ where: eq(schema.walletTransactions.userId, id) })).toHaveLength(1);
+  });
+
   it("manually runs an owned schedule as a simulated order, with a stable retry", async () => {
     const id = await user();
     const scheduleId = randomUUID();

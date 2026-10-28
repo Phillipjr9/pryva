@@ -28,7 +28,7 @@ export default function DashboardLoading() {
 
       <SkeletonCard rows={2} />
 
-      <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
         <SkeletonCard rows={4} />
         <SkeletonCard rows={4} />
       </div>

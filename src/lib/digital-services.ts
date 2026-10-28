@@ -4,6 +4,7 @@
  */
 
 import { DIGITAL_PRICES } from "@/lib/prices.generated";
+import { missingPriceError } from "@/lib/pricing-diagnostics";
 
 export type DigitalServiceCategory = "streaming" | "music" | "gaming" | "productivity" | "other";
 
@@ -285,10 +286,7 @@ export const digitalServices: DigitalService[] = digitalServiceDefinitions.map((
   plans: service.plans.map((plan) => {
     const generated = DIGITAL_PRICES[plan.id];
     if (!generated) {
-      throw new Error(
-        `No generated price for "${plan.id}". Add its supplier cost to ` +
-          `data/supplier-costs.json and run \`npm run pricing:build\`.`,
-      );
+      throw missingPriceError(`"${plan.id}"`);
     }
     return {
       ...plan,

@@ -15,21 +15,24 @@ interface DigitalServicesFormProps {
   service: DigitalService;
   preview: boolean;
   inventory?: DemoDigitalInventory;
+  countryCode?: string;
+  backHref?: string;
 }
 
-export function DigitalServicesForm({ user, service, preview, inventory = {} }: DigitalServicesFormProps) {
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+export function DigitalServicesForm({ user, service, preview, inventory = {}, countryCode, backHref = "/dashboard/digital" }: DigitalServicesFormProps) {
+  const [selection, setSelection] = useState<{ service: string; country: string | undefined; plan: string } | null>(null);
+  const selectedPlan = selection?.service === service.slug && selection.country === countryCode ? selection.plan : null;
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const attempt = useRef<{ planId: string; requestId: string } | null>(null);
+  const attempt = useRef<{ planId: string; requestId: string; country?: string } | null>(null);
   const inFlight = useRef(false);
 
   const selectedPlanData = service.plans.find((p) => p.id === selectedPlan);
 
   async function handlePurchase() {
-    if (!preview || !selectedPlan || inFlight.current) return;
-    if (attempt.current && attempt.current.planId !== selectedPlan) {
+    if (!preview || !selectedPlanData || inFlight.current) return;
+    if (attempt.current && (attempt.current.planId !== selectedPlanData.id || attempt.current.country !== countryCode)) {
       setError("Check your orders and retry the previous demo plan before starting another.");
       return;
     }
@@ -37,7 +40,7 @@ export function DigitalServicesForm({ user, service, preview, inventory = {} }: 
     setLoading(true);
     setError(null);
     try {
-      attempt.current ??= { planId: selectedPlan, requestId: crypto.randomUUID() };
+      attempt.current ??= { planId: selectedPlanData.id, requestId: crypto.randomUUID(), ...(countryCode ? { country: countryCode } : {}) };
       const [response] = await Promise.all([
         fetch("/api/demo/digital", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(attempt.current) }),
         new Promise((resolve) => setTimeout(resolve, 1600)),
@@ -70,7 +73,7 @@ export function DigitalServicesForm({ user, service, preview, inventory = {} }: 
       />
       <div className="space-y-6">
         <div className="flex items-center gap-4 mb-6">
-        <a href="/dashboard/digital" className="text-ink-3 hover:text-ink">
+        <a href={backHref} className="text-ink-3 hover:text-ink">
           ← Back
         </a>
         <div className="flex items-center gap-4">
@@ -93,7 +96,8 @@ export function DigitalServicesForm({ user, service, preview, inventory = {} }: 
               key={plan.id}
               type="button"
               aria-pressed={selectedPlan === plan.id}
-              onClick={() => setSelectedPlan(plan.id)}
+              disabled={loading || !!success}
+              onClick={() => setSelection({ service: service.slug, country: countryCode, plan: plan.id })}
               className={`card p-6 text-left transition-all ${
                 selectedPlan === plan.id
                   ? "ring-2 ring-lav-600 scale-[1.02]"
@@ -156,10 +160,10 @@ export function DigitalServicesForm({ user, service, preview, inventory = {} }: 
       {/* Purchase Button */}
       <button
         onClick={handlePurchase}
-        disabled={!preview || loading || !selectedPlan || (inventory[selectedPlan]?.stock === 0)}
+        disabled={!preview || loading || !!success || !selectedPlanData || (inventory[selectedPlanData.id]?.stock === 0)}
         className="btn btn-primary w-full text-lg py-4 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? "Processing..." : !preview ? "Live purchases paused" : selectedPlan && inventory[selectedPlan]?.stock === 0 ? "Demo stock exhausted" : selectedPlan ? `Pay ${formatNaira(selectedPlanData?.price || 0)} with demo wallet` : "Select a plan"}
+        {loading ? "Processing..." : !preview ? "Live purchases paused" : selectedPlanData && inventory[selectedPlanData.id]?.stock === 0 ? "Demo stock exhausted" : selectedPlanData ? `Pay ${formatNaira(selectedPlanData.price)} with demo wallet` : "Select a plan"}
       </button>
     </div>
     </>

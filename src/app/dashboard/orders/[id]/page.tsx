@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
@@ -13,6 +13,8 @@ import { CredentialList } from "./CredentialList";
 import { OrderActions } from "@/components/dashboard/OrderActions";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { isPreviewSingleNumberWithoutCode } from "@/lib/refund-policy";
+import { isDemoNumberRental } from "@/lib/demo-service-catalog";
+import { LIVE_OTP_PROVIDER, SIMULATED_PROVIDER } from "@/lib/order-providers";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -41,7 +43,10 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
   });
 
   if (!order) {
-    redirect("/dashboard/orders");
+    // A wrong or stale order link used to bounce silently to the order list,
+    // which looked like the order had vanished. Say so instead: the global 404
+    // already offers a way back to the dashboard.
+    notFound();
   }
 
   const credentials = parseAccounts(order.accounts);
@@ -98,10 +103,15 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                     </p>
                   </div>
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 mb-1">Region</p>
+                    <p className="text-[0.82rem] text-ink-3 mb-1">Plan / package</p>
+                    <p className="text-[0.95rem] font-medium text-ink">{order.planLabel}</p>
+                  </div>
+                  <div>
+                    <p className="text-[0.82rem] text-ink-3 mb-1">{isPreviewDatabase() && order.provider === "simulated" && order.service === "digital" ? "Browsing country" : "Region"}</p>
                     <p className="text-[0.95rem] font-medium text-ink">
                       {order.region}
                     </p>
+                    {isPreviewDatabase() && order.provider === "simulated" && order.service === "digital" && order.region !== "Demo" && <p className="mt-1 text-[0.7rem] text-ink-3">Demo selection, not confirmed coverage.</p>}
                   </div>
                   <div>
                     <p className="text-[0.82rem] text-ink-3 mb-1">Duration</p>
@@ -180,9 +190,11 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
               referenceCode={order.referenceCode ?? null}
               otpCode={order.otpCode ?? null}
               service={order.service}
-              provider={order.provider ?? null}
+              refreshableCode={order.provider === LIVE_OTP_PROVIDER}
+              demoOrder={order.provider === SIMULATED_PROVIDER}
               preview={isPreviewDatabase()}
               demoUnitsRemaining={demoUnitsRemaining}
+              reusableDemoNumber={isPreviewDatabase() && isDemoNumberRental(order)}
               canRequestPreviewRefund={isPreviewDatabase() && isPreviewSingleNumberWithoutCode(order)}
               initialNow={now}
             />

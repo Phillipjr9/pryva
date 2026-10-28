@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { DataPlansForm } from "./DataPlansForm";
 import { requireUser } from "@/lib/auth";
 import { findDataPlan } from "@/lib/airtime";
@@ -10,6 +11,7 @@ export default async function DataPlansPage({ searchParams }: { searchParams: Pr
   const user = await requireUser("/dashboard/data");
   const { plan } = await searchParams;
   const initialPlan = typeof plan === "string" ? findDataPlan(plan) : undefined;
+  if (plan !== undefined && !initialPlan) notFound();
   const preview = isPreviewDatabase();
 
   return (
@@ -20,7 +22,7 @@ export default async function DataPlansPage({ searchParams }: { searchParams: Pr
           {preview ? "Explore simulated data plans and try a demo checkout." : "Browse data plans. Live fulfillment is paused."}
         </p>
       </div>
-      <DataPlansForm user={user} initialPlanId={initialPlan?.id} preview={preview} inventory={preview ? demoInventory(user.id, "ng") : undefined} />
+      <DataPlansForm key={initialPlan?.id ?? "all"} user={user} initialPlanId={initialPlan?.id} preview={preview} inventory={preview ? demoInventory(user.id, "ng") : undefined} />
     </div>
   );
 }

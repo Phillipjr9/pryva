@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { DemoDigitalStockError, purchaseDemoDigital } from "@/lib/demo-digital";
 import { getDigitalPlan } from "@/lib/digital-services";
+import { explorerCountry } from "@/lib/service-explorer";
 import { DemoBalanceError, DemoConflict, DEMO_REQUEST_ID } from "@/lib/demo-wallet";
 import { isSameOriginMutation } from "@/lib/net";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
@@ -23,9 +24,10 @@ export async function POST(request: NextRequest) {
   try { value = await readJsonWithLimit(request, 1_024); }
   catch (error) { return NextResponse.json({ error: "Invalid request." }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 }); }
   if (!value || typeof value !== "object" || Array.isArray(value)) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
-  const { planId, requestId } = value as { planId?: unknown; requestId?: unknown };
-  if (typeof planId !== "string" || planId.length > 100 || !getDigitalPlan(planId) || typeof requestId !== "string" || !DEMO_REQUEST_ID.test(requestId)) return NextResponse.json({ error: "Invalid demo plan or request ID." }, { status: 400 });
-  try { return NextResponse.json({ ok: true, simulated: true, ...purchaseDemoDigital({ userId: user.id, planId, requestId }) }, { headers: { "Cache-Control": "private, no-store" } }); }
+  const { planId, requestId, country } = value as { planId?: unknown; requestId?: unknown; country?: unknown };
+  const selectedCountry = country === undefined ? null : explorerCountry(country);
+  if (typeof planId !== "string" || planId.length > 100 || !getDigitalPlan(planId) || typeof requestId !== "string" || !DEMO_REQUEST_ID.test(requestId) || (country !== undefined && !selectedCountry)) return NextResponse.json({ error: "Invalid demo plan, country or request ID." }, { status: 400 });
+  try { return NextResponse.json({ ok: true, simulated: true, ...purchaseDemoDigital({ userId: user.id, planId, requestId, countryCode: selectedCountry?.code }) }, { headers: { "Cache-Control": "private, no-store" } }); }
   catch (error) {
     if (error instanceof DemoBalanceError) return NextResponse.json({ error: error.message }, { status: 402 });
     if (error instanceof DemoDigitalStockError || error instanceof DemoConflict) return NextResponse.json({ error: error.message }, { status: 409 });

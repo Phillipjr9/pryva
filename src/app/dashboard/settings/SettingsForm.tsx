@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Loader2, Lock, Shield, User } from "@/components/icons";
 import type { PublicUser } from "@/lib/auth";
+import { AccountDataPanel } from "./AccountDataPanel";
 
 interface SettingsFormProps {
   user: PublicUser;
@@ -252,7 +253,7 @@ export function SettingsForm({ user, sharedDemo = false }: SettingsFormProps) {
         </button>
       </Section>}
 
-      <Section icon={Shield} title="Account" note="Read-only details about this account.">
+      <Section icon={Shield} title="Account" note="Read-only details. Your data can be downloaded below.">
         <dl className="grid gap-2 text-[0.82rem] sm:grid-cols-2">
           <div className="flex items-center justify-between rounded-xl border border-line bg-white px-3.5 py-2.5">
             <dt className="text-ink-2">Member since</dt>
@@ -270,6 +271,8 @@ export function SettingsForm({ user, sharedDemo = false }: SettingsFormProps) {
           </div>
         </dl>
       </Section>
+
+      <AccountDataPanel sharedDemo={sharedDemo} />
     </div>
   );
 }

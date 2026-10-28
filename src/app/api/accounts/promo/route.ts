@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AccsZoneError, isAccsZoneConfigured, validatePromo } from "@/lib/accszone";
-import { getListing } from "@/lib/accszone";
+import { AccsZoneError, validatePromo } from "@/lib/accszone";
+import {
+  getMarketplaceListing,
+  isMarketplaceCatalogAvailable,
+  MarketplaceError,
+  supportsPromoCodes,
+} from "@/lib/marketplace-suppliers";
+import { usdCents } from "@/lib/supplier-money";
 import { applyPromoDiscount, priceMarketplaceListing } from "@/lib/marketplace-pricing";
 import { requireAuthApi } from "@/lib/auth";
 import { logger } from "@/lib/logger";
@@ -27,7 +33,7 @@ export async function POST(request: NextRequest) {
   }
   if (!isSameOriginMutation(request)) return NextResponse.json({ valid: false, message: "Invalid origin." }, { status: 403 });
   if (!isJsonRequest(request)) return NextResponse.json({ valid: false, message: "Expected JSON." }, { status: 415 });
-  if (!isMarketplacePurchaseEnabled() || !isAccsZoneConfigured()) {
+  if (!isMarketplacePurchaseEnabled() || !isMarketplaceCatalogAvailable()) {
     return NextResponse.json({ valid: false, message: "Promo codes are unavailable right now." }, { status: 200 });
   }
   const limit = await purchaseRateLimiter(`accounts-promo:${user.id}`);
@@ -56,18 +62,24 @@ export async function POST(request: NextRequest) {
   if (!slug) {
     return NextResponse.json({ valid: false, message: "Choose an account first." }, { status: 400 });
   }
+  // Only one source publishes a promo API. Say so here rather than at checkout,
+  // after the customer has been shown a discount that cannot be honoured.
+  if (!supportsPromoCodes(slug)) {
+    return NextResponse.json({ valid: false, message: "Promo codes do not apply to this item." }, { status: 200 });
+  }
 
   try {
-    const listing = await getListing(slug);
+    const listing = await getMarketplaceListing(slug);
     const breakdown = await priceMarketplaceListing({
-      unitPriceUsd: listing.price,
+      unitPriceUsd: listing.priceUsd,
       quantity,
-      categoryTitle: listing.category?.title,
-      subcategoryTitle: listing.subcategory?.title,
+      categoryTitle: listing.category ?? undefined,
+      subcategoryTitle: listing.subcategory ?? undefined,
     });
 
-    // The provider validates against the USD basket amount.
-    const basketUsd = ((Number(listing.price) * quantity) || 0).toFixed(2);
+    // The provider validates against the USD basket amount. Integer cents first,
+    // so a sub-cent wholesale price cannot drift the basket it is checked on.
+    const basketUsd = (usdCents(listing.priceUsd) * quantity / 100).toFixed(2);
     const promo = await validatePromo(code, Number(basketUsd));
     const final = applyPromoDiscount(breakdown, promo.discount);
 
@@ -87,6 +99,15 @@ export async function POST(request: NextRequest) {
       message: `Code applied — you saved ₦${(breakdown.totalNgn - final.totalNgn).toLocaleString("en-NG")}.`,
     });
   } catch (error) {
+    if (error instanceof MarketplaceError) {
+      const message = error.code === "listing_not_found"
+        ? "That listing is no longer available."
+        : "We couldn't check that code. Please try again.";
+      if (error.code !== "listing_not_found") {
+        logger.error("Marketplace promo validation failed", { code: error.code, status: error.status });
+      }
+      return NextResponse.json({ valid: false, message }, { status: 200 });
+    }
     if (error instanceof AccsZoneError) {
       // `promo_invalid` is a normal outcome, not an incident.
       if (error.code === "promo_invalid" || error.status === 400) {
