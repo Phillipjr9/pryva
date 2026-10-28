@@ -35,6 +35,18 @@ const WARRANTY_DAYS_BY_GROUP: Record<string, number> = {
   Other: 30,
 };
 
+/**
+ * The groups that have an explicit warranty row.
+ *
+ * Exported so a test can check this against the group labels the catalog layer
+ * emits. A label with no row here silently inherits the 30-day default, which is
+ * how a streaming product would end up promising one month instead of four
+ * without anyone deciding that.
+ */
+export const WARRANTY_GROUPS: readonly string[] = Object.freeze(
+  Object.keys(WARRANTY_DAYS_BY_GROUP).sort(),
+);
+
 /** Warranty days for a group label, clamped to something sane. */
 export function warrantyDaysForGroup(group: string | null | undefined): number {
   if (typeof group !== "string") return DEFAULT_WARRANTY_DAYS;
