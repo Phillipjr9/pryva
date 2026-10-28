@@ -4,45 +4,27 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Cookie Policy",
   description:
-    "The cookies Pryva sets, what each one is for, and how to control them. We use no advertising or cross-site tracking cookies.",
+    "Learn about the cookies and browser storage used by Pryva.",
   alternates: { canonical: "/cookie-policy" },
 };
 
 const cookies = [
-  {
-    name: "pryva_session",
-    purpose: "Keeps you signed in. Without it you'd be logged out on every page.",
-    type: "Essential",
-    duration: "30 days",
-  },
-  {
-    name: "pryva_theme",
-    purpose: "Remembers whether you prefer light or dark mode.",
-    type: "Preference",
-    duration: "1 year",
-  },
-  {
-    name: "pryva_csrf",
-    purpose: "Protects forms and purchases from cross-site request forgery.",
-    type: "Essential",
-    duration: "Session",
-  },
+  { name: "pryva_session", purpose: "Keeps you signed in.", type: "Essential", duration: "Up to 30 days" },
+  { name: "pryva_session_3p", purpose: "Session fallback for embedded previews when used.", type: "Essential", duration: "Up to 30 days" },
+  { name: "pryva_google_state", purpose: "Protects the Google sign-in flow.", type: "Essential", duration: "10 minutes" },
+  { name: "pryva_google_next", purpose: "Remembers where to return after Google sign-in.", type: "Essential", duration: "10 minutes" },
 ];
 
 export default function CookiePolicyPage() {
   return (
-    <main>
+    <div>
       <section className="border-b border-line/70 bg-gradient-to-b from-cream to-white">
         <div className="shell py-14 sm:py-16">
           <h1 className="text-[2.2rem] font-semibold tracking-tight text-ink sm:text-[2.6rem]">
             Cookie Policy
           </h1>
           <p className="mt-3 max-w-2xl text-[0.98rem] leading-relaxed text-ink-2">
-            Short version: we use only what Pryva needs to work. No advertising cookies, no
-            cross-site trackers, nothing sold to third parties.
-          </p>
-          <p className="mt-4 text-[0.82rem] text-ink-3">
-            Last updated: {new Date().toLocaleDateString("en-NG", { year: "numeric", month: "long", day: "numeric" })}
+            Pryva uses session and sign-in cookies. Third-party services may use their own cookies under their policies.
           </p>
         </div>
       </section>
@@ -81,18 +63,14 @@ export default function CookiePolicyPage() {
           <div className="rounded-2xl border border-line bg-white p-5">
             <h2 className="text-[1rem] font-semibold text-ink">Payments</h2>
             <p className="mt-2 max-w-3xl text-[0.88rem] leading-relaxed text-ink-2">
-              Wallet top-ups open a checkout page hosted by our payment processor. That page sets its own
-              cookies to prevent fraud, under their privacy policy and only while you are on it. Pryva
-              never sees or stores your card details.
+              Configured live wallet top-ups open a Paystack checkout. Paystack and other third-party services may use their own cookies; consult their policies for details.
             </p>
           </div>
 
           <div className="rounded-2xl border border-line bg-white p-5">
             <h2 className="text-[1rem] font-semibold text-ink">Managing cookies</h2>
             <p className="mt-2 max-w-3xl text-[0.88rem] leading-relaxed text-ink-2">
-              You can clear or block cookies in your browser settings. Blocking the essential ones will
-              sign you out and break checkout, because the session cookie is what ties a purchase to your
-              wallet. Everything else on the site keeps working.
+              You can clear or block cookies in your browser settings. Blocking session cookies can prevent sign-in and authenticated features. Browser local storage holds the “pryva-theme” preference and, during an unresolved withdrawal request, a user-scoped request ID, amount and internal bank-account ID to support safe retries. It does not store bank details there. Clearing this recovery record does not cancel a withdrawal; check your requests or contact support before submitting another.
             </p>
           </div>
 
@@ -112,6 +90,6 @@ export default function CookiePolicyPage() {
           </div>
         </div>
       </section>
-    </main>
+    </div>
   );
 }

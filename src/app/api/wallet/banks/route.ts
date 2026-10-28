@@ -3,6 +3,7 @@ import { requireAuthApi } from "@/lib/auth";
 import { isPaystackConfigured, getBanks } from "@/lib/paystack";
 import { FALLBACK_BANKS, type Bank } from "@/lib/banks";
 import { logger } from "@/lib/logger";
+import { isPreviewDatabase } from "@/lib/demo-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true, banks: cache.banks, count: cache.banks.length, source: cache.source });
   }
 
-  if (isPaystackConfigured()) {
+  if (!isPreviewDatabase() && isPaystackConfigured()) {
     try {
       const banks = await getBanks();
       if (banks.length > 0) {

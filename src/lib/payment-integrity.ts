@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { walletTransactions, orders, users } from "@/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
+import { walletEntryDirection } from "./wallet-activity";
 
 export interface IntegrityCheckResult {
   valid: boolean;
@@ -28,11 +29,10 @@ export async function checkWalletIntegrity(userId: string): Promise<IntegrityChe
 
   let calculatedBalance = 0;
   for (const tx of transactions) {
-    if (tx.type === "credit") {
-      calculatedBalance += tx.amount;
-    } else if (tx.type === "debit") {
-      calculatedBalance -= tx.amount;
-    }
+    const direction = walletEntryDirection(tx.type);
+    if (direction === "in") calculatedBalance += tx.amount;
+    else if (direction === "out") calculatedBalance -= tx.amount;
+    else issues.push(`Unknown transaction type: ${tx.type}`);
   }
 
   if (calculatedBalance !== user.walletBalance) {
@@ -72,7 +72,7 @@ export async function checkOrderIntegrity(orderId: string): Promise<IntegrityChe
 
   // Check for corresponding transaction
   const transaction = await db.query.walletTransactions.findFirst({
-    where: eq(walletTransactions.orderId, orderId),
+    where: and(eq(walletTransactions.orderId, orderId), eq(walletTransactions.type, "debit")),
   });
 
   if (!transaction && order.status !== "refunded") {
@@ -90,12 +90,14 @@ export async function checkOrderIntegrity(orderId: string): Promise<IntegrityChe
     const refundTx = await db.query.walletTransactions.findFirst({
       where: and(
         eq(walletTransactions.orderId, orderId),
-        eq(walletTransactions.type, "credit")
+        eq(walletTransactions.type, "refund")
       ),
     });
 
     if (!refundTx) {
       issues.push("Refunded order missing refund transaction");
+    } else if (refundTx.amount !== order.amount) {
+      issues.push(`Refund amount mismatch: order ${order.amount}, transaction ${refundTx.amount}`);
     }
   }
 
@@ -138,7 +140,7 @@ export async function runFullIntegrityCheck(): Promise<{
 }
 
 export function validateTransactionAmount(amount: number): boolean {
-  return Number.isInteger(amount) && amount > 0 && amount <= 10000000; // Max 10M kobo
+  return Number.isSafeInteger(amount) && amount > 0 && amount <= 10000000; // Maximum 10M naira
 }
 
 export function validateWalletBalance(balance: number): boolean {

@@ -72,7 +72,7 @@ export function CountryFlag({
     <img
       src={flagSrc(resolved.code)}
       alt={decorative ? "" : `${resolved.name} flag`}
-      title={resolved.name}
+      title={decorative ? undefined : resolved.name}
       width={size}
       height={size}
       loading="lazy"

@@ -12,6 +12,7 @@ const STATUS_FILTERS = [
   { value: "", label: "All" },
   { value: "active", label: "Active" },
   { value: "processing", label: "Processing" },
+  { value: "review", label: "Needs review" },
   { value: "delivered", label: "Delivered" },
   { value: "failed", label: "Failed" },
   { value: "refunded", label: "Refunded" },
@@ -21,6 +22,7 @@ const STATUS_FILTERS = [
 const STATUS_STYLES: Record<string, string> = {
   active: "bg-blue-50 text-blue-700",
   processing: "bg-amber-50 text-amber-700",
+  review: "bg-amber-50 text-amber-700",
   delivered: "bg-emerald-50 text-emerald-700",
   failed: "bg-red-50 text-red-700",
   refunded: "bg-lav-50 text-lav-800",
@@ -75,6 +77,8 @@ export default async function AdminOrdersPage({
       service: orders.service,
       productName: orders.productName,
       planLabel: orders.planLabel,
+      provider: orders.provider,
+      providerRequestId: orders.providerRequestId,
       amount: orders.amount,
       status: orders.status,
       createdAt: orders.createdAt,
@@ -195,6 +199,9 @@ export default async function AdminOrdersPage({
                   <p className="text-[0.74rem] text-ink-3">
                     {row.service} · {row.planLabel}
                   </p>
+                  {row.provider === "accounts" && row.providerRequestId && (
+                    <p className="mt-1 break-all font-mono text-[0.68rem] text-ink-3">Provider reference: {row.providerRequestId}</p>
+                  )}
                 </td>
                 <td className="px-4 py-3 font-medium">{formatNaira(row.amount)}</td>
                 <td className="px-4 py-3">

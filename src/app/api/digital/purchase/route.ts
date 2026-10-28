@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { requireAuthApi } from "@/lib/auth";
 import { getDigitalPlan } from "@/lib/digital-services";
-import { debitWallet } from "@/lib/wallet";
+import { debitWallet, makeReference, InsufficientFundsError } from "@/lib/wallet";
+import { isSameOriginMutation } from "@/lib/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { purchaseRateLimiter } from "@/lib/rate-limit";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { logger } from "@/lib/logger";
@@ -17,16 +20,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+    if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
     // No account provider is connected yet. Never debit a real wallet for a
     // placeholder delivery; the flow is available only with preview data.
     if (!isPreviewDatabase()) {
       return NextResponse.json({ error: "Digital purchases are temporarily unavailable." }, { status: 503 });
     }
+    const limit = await purchaseRateLimiter(`digital:${user.id}`);
+    if (limit.unavailable) return NextResponse.json({ error: "Purchases are temporarily unavailable." }, { status: 503 });
+    if (!limit.allowed) return NextResponse.json({ error: "Too many purchase attempts. Try again later." }, { status: 429 });
 
-    const body = await request.json();
-    const { planId } = body;
+    let body: unknown;
+    try {
+      body = await readJsonWithLimit(request, 2_048);
+    } catch (error) {
+      return NextResponse.json({ error: "Invalid request" }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
+    }
+    const planId = body && typeof body === "object" && !Array.isArray(body) ? (body as { planId?: unknown }).planId : null;
 
-    if (!planId) {
+    if (typeof planId !== "string" || !planId || planId.length > 100) {
       return NextResponse.json({ error: "Plan ID required" }, { status: 400 });
     }
 
@@ -45,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create order
-    const reference = `DIG-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    const reference = makeReference("DIG");
 
     const [order] = await db
       .insert(orders)
@@ -60,19 +73,28 @@ export async function POST(request: NextRequest) {
         duration: plan.duration,
         amount: plan.price,
         status: "processing",
-        provider: "manual",
+        provider: "simulated",
       })
       .returning();
 
-    // Debit wallet
-    await debitWallet({
-      userId: user.id,
-      orderId: order.id,
-      amount: plan.price,
-      type: "debit",
-      description: `${plan.name} purchase`,
-      reference,
-    });
+    // Preview storage has no rollback; only remove the placeholder when no
+    // debit was made. Keep it for inspection on an unexpected partial failure.
+    try {
+      await debitWallet({
+        userId: user.id,
+        orderId: order.id,
+        amount: plan.price,
+        type: "debit",
+        description: `${plan.name} purchase`,
+        reference,
+      });
+    } catch (error) {
+      if (error instanceof InsufficientFundsError) {
+        await db.delete(orders).where(eq(orders.id, order.id));
+        return NextResponse.json({ error: "Insufficient wallet balance." }, { status: 402 });
+      }
+      throw error;
+    }
 
     logger.info("Digital service purchased", {
       userId: user.id,
@@ -82,19 +104,18 @@ export async function POST(request: NextRequest) {
       reference,
     });
 
-    // TODO: Integrate with account provider to fetch credentials
-    // For now, mark as delivered with placeholder
+    // This is explicitly a simulated delivery, not working credentials.
     await db
       .update(orders)
       .set({
         status: "delivered",
-        referenceCode: `Account credentials will be sent to your email within 5 minutes. Order: ${reference}`,
+        referenceCode: `Simulated preview only; no credentials were delivered. Order: ${reference}`,
       })
       .where(eq(orders.id, order.id));
 
     return NextResponse.json({
       ok: true,
-      message: "Purchase successful! Check your email for account credentials.",
+      message: "Simulated preview order complete. No working credentials will be sent.",
       order: {
         id: order.id,
         reference: order.reference,
@@ -102,10 +123,9 @@ export async function POST(request: NextRequest) {
         amount: plan.price,
       },
     });
-  } catch (error) {
-    logger.error("Digital service purchase failed", { error });
-    const message = error instanceof Error ? error.message : "Purchase failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    logger.error("Digital service purchase failed");
+    return NextResponse.json({ error: "Purchase could not be completed." }, { status: 500 });
   }
 }
 

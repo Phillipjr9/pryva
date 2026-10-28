@@ -61,6 +61,7 @@ export function fireConfetti(options?: {
     particleCount,
     spread,
     origin,
+    disableForReducedMotion: true,
     colors: ["#8266C9", "#B49CE7", "#D6C7F5", "#4caf50", "#ff9800"],
   });
 }

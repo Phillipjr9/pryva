@@ -1,24 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { dataPlans, type AirtimeProvider } from "@/lib/airtime";
+import { dataPlans, findDataPlan, type AirtimeProvider } from "@/lib/airtime";
 import { formatNaira } from "@/lib/catalog";
-import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
-import { PaymentLoading } from "@/components/ui/PaymentLoading";
+import { useRouter } from "next/navigation";
+import type { DemoInventory } from "@/lib/demo-service-catalog";
 import type { PublicUser } from "@/lib/auth";
 import { NetworkBadge } from "@/components/NetworkBadge";
+import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
 
 interface DataPlansFormProps {
   user: PublicUser;
+  initialPlanId?: string;
+  preview: boolean;
+  inventory?: DemoInventory;
 }
 
-export function DataPlansForm({ user }: DataPlansFormProps) {
-  const [selectedProvider, setSelectedProvider] = useState<AirtimeProvider>("mtn");
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export function DataPlansForm({ user, initialPlanId, preview, inventory = {} }: DataPlansFormProps) {
+  const router = useRouter();
+  const initialPlan = initialPlanId ? findDataPlan(initialPlanId) : undefined;
+  const [selectedProvider, setSelectedProvider] = useState<AirtimeProvider>(initialPlan?.provider ?? "mtn");
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(initialPlan?.id ?? null);
 
   const providers: { id: AirtimeProvider; name: string }[] = [
     { id: "mtn", name: "MTN" },
@@ -29,50 +31,12 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
 
   const filteredPlans = dataPlans.filter((plan) => plan.provider === selectedProvider);
 
-  async function handlePurchase() {
-    if (!selectedPlan || !phoneNumber) {
-      setError("Please select a plan and enter a phone number");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const response = await fetch("/api/airtime/purchase", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId: selectedPlan, phoneNumber }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error || "Purchase failed");
-      }
-
-      setSuccess(data.message);
-      setSelectedPlan(null);
-      setPhoneNumber("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Purchase failed");
-    } finally {
-      setLoading(false);
-    }
+  function handlePurchase() {
+    if (preview && selectedPlan) router.push(`/dashboard/services/demo/data-${encodeURIComponent(selectedPlan)}?country=ng`);
   }
 
   return (
-    <>
-      <PaymentLoading show={loading} message="Processing your data plan purchase..." />
-      <PaymentSuccess
-        show={!!success}
-        title="Data Plan Purchased!"
-        message={success || "Your data plan has been activated successfully."}
-        redirectUrl="/dashboard"
-        redirectDelay={2500}
-      />
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Provider Selection */}
       <div>
         <label className="block text-[0.86rem] font-medium text-ink mb-3">
@@ -108,6 +72,8 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
           {filteredPlans.map((plan) => (
             <button
               key={plan.id}
+              type="button"
+              aria-pressed={selectedPlan === plan.id}
               onClick={() => setSelectedPlan(plan.id)}
               className={`rounded-xl border p-4 text-left transition-colors ${
                 selectedPlan === plan.id
@@ -124,24 +90,13 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
                   {formatNaira(plan.price)}
                 </p>
               </div>
+              <span className="mt-3 block"><UnitsStatus demo={preview} stock={inventory[`data-${plan.id}`]?.stock} owned={inventory[`data-${plan.id}`]?.owned} /></span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Phone Number */}
-      <div>
-        <label className="block text-[0.86rem] font-medium text-ink mb-2">
-          Phone Number
-        </label>
-        <input
-          type="tel"
-          value={phoneNumber}
-          onChange={(e) => setPhoneNumber(e.target.value)}
-          placeholder="08012345678"
-          className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.95rem] text-ink outline-none transition-colors focus:border-lav-600"
-        />
-      </div>
+      {preview && <p className="rounded-xl bg-lav-50 p-3 text-[0.76rem] text-lav-800">The demo uses a fictional mobile destination. No phone number is needed and no data is sent.</p>}
 
       {/* Wallet Balance */}
       <div className="rounded-xl border border-line bg-cream p-4">
@@ -151,22 +106,14 @@ export function DataPlansForm({ user }: DataPlansFormProps) {
         </p>
       </div>
 
-      {/* Messages */}
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.9rem] text-red-700">
-          {error}
-        </div>
-      )}
-
       {/* Purchase Button */}
       <button
         onClick={handlePurchase}
-        disabled={loading || !selectedPlan || !phoneNumber}
+        disabled={!preview || !selectedPlan}
         className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? "Processing..." : "Purchase Data Plan"}
+        {preview ? "Continue to demo checkout" : "Live data purchases paused"}
       </button>
     </div>
-    </>
   );
 }

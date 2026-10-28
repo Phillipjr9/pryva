@@ -8,6 +8,7 @@ import { exchangeGoogleCode, fetchGoogleUser, googleConfigured } from "@/lib/goo
 import { relativeRedirect } from "@/lib/net";
 import { creditWallet } from "@/lib/wallet";
 import { isDemoEmail, isPreviewDatabase, PREVIEW_WELCOME_CREDIT } from "@/lib/demo-policy";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
 export const dynamic = "force-dynamic";
 
@@ -30,9 +31,9 @@ export async function GET(request: Request) {
   const jar = await cookies();
   const expectedState = jar.get(STATE_COOKIE)?.value;
   const storedNext = jar.get(NEXT_COOKIE)?.value;
-  const decodedNext = storedNext ? decodeURIComponent(storedNext) : "/dashboard";
-  const next =
-    decodedNext.startsWith("/") && !decodedNext.startsWith("//") ? decodedNext : "/dashboard";
+  let decodedNext: string | undefined;
+  try { decodedNext = storedNext ? decodeURIComponent(storedNext) : undefined; } catch { /* Invalid cookie: use the default. */ }
+  const next = safeRedirectPath(decodedNext);
 
   const clearCookies = (response: Response): Response => {
     const base = "Path=/; HttpOnly; SameSite=Lax; Max-Age=0";
@@ -50,22 +51,27 @@ export async function GET(request: Request) {
   try {
     const accessToken = await exchangeGoogleCode(request, code);
     const profile = await fetchGoogleUser(accessToken);
-    if (!profile.emailVerified || isDemoEmail(profile.email)) {
+    if (!profile.emailVerified || isDemoEmail(profile.email) || !profile.sub || profile.sub.length > 255) {
       return clearCookies(goToLogin("google-exchange"));
     }
 
-    let [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, profile.email))
-      .limit(1);
-
+    // A verified Google email does not prove ownership of an existing local
+    // account: local email signups do not yet verify their addresses. Only a
+    // previously bound Google subject may sign into an existing account.
+    let [user] = await db.select().from(users).where(eq(users.googleSubject, profile.sub)).limit(1);
+    if (user && user.email.toLowerCase() !== profile.email.toLowerCase()) {
+      return clearCookies(goToLogin("google-account-exists"));
+    }
     if (!user) {
+      const [existingEmail] = await db.select().from(users).where(eq(users.email, profile.email)).limit(1);
+      if (existingEmail) return clearCookies(goToLogin("google-account-exists"));
+
       const [created] = await db
         .insert(users)
         .values({
           name: profile.name,
           email: profile.email,
+          googleSubject: profile.sub,
           passwordHash: hashPassword(randomBytes(24).toString("hex")),
           walletBalance: 0,
         })

@@ -1,7 +1,7 @@
 /**
- * Fleexa developer API client.
+ * Fleexa developer API client (historical endpoint shapes are unverified).
  *
- * Docs: https://fleexa.com.ng/docs — single REST API for
+ * Overview: https://fleexa.com.ng/docs. Existing attempted routes include
  *   • SMS OTP     — GET /sms4/apps, GET /sms4/prices, POST /sms4/buy,
  *                   GET /sms4/check/:requestId, POST /sms4/cancel
  *   • Email OTP   — GET /email/products, POST /email/buy,
@@ -17,8 +17,16 @@
  * Poll OTP endpoints every 20–30 seconds.
  */
 
+import "server-only";
+import { isPreviewDatabase } from "@/lib/demo-policy";
+import { createRateLimiter } from "@/lib/rate-limit";
+import { readJsonWithLimit } from "@/lib/request-body";
+
 const DEFAULT_BASE_URL = "https://fleexa.com.ng/developer";
 const REQUEST_TIMEOUT_MS = 20_000;
+// Fleexa documents 60 requests/minute/key. The 25-per-window shared budget
+// leaves boundary headroom, but cannot account for manual calls or network delay.
+const supplierBudget = createRateLimiter({ windowMs: 60_000, maxRequests: 25 });
 
 export class FleexaError extends Error {
   constructor(
@@ -41,7 +49,15 @@ export function isFleexaConfigured(): boolean {
 }
 
 function baseUrl(): string {
-  return (process.env.FLEEXA_BASE_URL?.trim() || process.env.FLEEXA_API_URL?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, "");
+  const value = (process.env.FLEEXA_BASE_URL?.trim() || process.env.FLEEXA_API_URL?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, "");
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.hostname !== "fleexa.com.ng" || url.port || url.username || url.password ||
+        url.pathname !== "/developer" || url.search || url.hash) throw new Error("Invalid URL");
+    return url.origin + url.pathname;
+  } catch {
+    throw new FleexaError("Invalid provider configuration", 503, "INVALID_BASE_URL");
+  }
 }
 
 type Envelope = {
@@ -57,13 +73,22 @@ async function fleexaFetch(
   path: string,
   init: { method?: "GET" | "POST"; body?: Record<string, unknown> } = {},
 ): Promise<Record<string, unknown>> {
+  // Historical purchase/cancellation contracts are unverified. Do not send
+  // paid or state-changing requests until they are explicitly reviewed.
+  if ((init.method ?? "GET") !== "GET") throw new FleexaError("Live supplier actions are unavailable", 503, "ACTIONS_DISABLED");
   const key = fleexaApiKey();
-  if (!key) throw new FleexaError("FLEEXA_API_KEY is not configured", 500, "NO_API_KEY");
+  if (!key) throw new FleexaError("FLEEXA_API_KEY is not configured", 503, "NO_API_KEY");
+  if (isPreviewDatabase()) throw new FleexaError("Provider access is disabled in the demo", 503, "PREVIEW_DISABLED");
+  const base = baseUrl();
+  const budget = await supplierBudget("fleexa:shared-key-budget");
+  if (budget.unavailable) throw new FleexaError("Provider rate limit is unavailable", 503, "RATE_LIMIT_UNAVAILABLE");
+  if (!budget.allowed) throw new FleexaError("Provider rate limit reached", 429, "RATE_LIMITED");
 
   let response: Response;
   try {
-    response = await fetch(`${baseUrl()}${path}`, {
+    response = await fetch(`${base}${path}`, {
       method: init.method ?? "GET",
+      redirect: "error",
       headers: {
         Authorization: `Bearer ${key}`,
         "X-API-Key": key,
@@ -83,29 +108,24 @@ async function fleexaFetch(
     );
   }
 
-  let payload: Envelope | null = null;
-  try {
-    payload = (await response.json()) as Envelope;
-  } catch {
-    payload = null;
-  }
-
   if (!response.ok) {
-    throw new FleexaError(
-      payload?.message ?? `Fleexa request failed (HTTP ${response.status})`,
-      response.status,
-      payload?.error_code,
-    );
+    await response.body?.cancel().catch(() => {});
+    throw new FleexaError("Provider request failed", response.status === 429 ? 429 : 502, response.status === 429 ? "RATE_LIMITED" : "UPSTREAM_ERROR");
   }
-  if (payload && payload.success === false) {
-    throw new FleexaError(
-      payload.message ?? "Fleexa rejected the request",
-      typeof payload.http_code === "number" ? payload.http_code : 400,
-      payload.error_code,
-    );
+  let payload: unknown;
+  try {
+    payload = await readJsonWithLimit(response, 1_048_576);
+  } catch {
+    throw new FleexaError("Invalid provider response", 502, "INVALID_RESPONSE");
+  }
+  if (!payload || typeof payload !== "object") throw new FleexaError("Invalid provider response", 502, "INVALID_RESPONSE");
+  const envelope = payload as Envelope;
+  // Never expose arbitrary upstream error text, keys, or account details.
+  if (envelope.success === false) {
+    throw new FleexaError("Provider request failed", 502, "UPSTREAM_ERROR");
   }
 
-  return payload ?? {};
+  return payload as Record<string, unknown>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -145,21 +165,27 @@ function pickNumber(source: unknown, keyPaths: string[][]): number | null {
   for (const keyPath of keyPaths) {
     const value = unwrap(keyPath, record);
     if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string") {
-      const parsed = Number(value);
+    if (typeof value === "string" && /^-?(?:\d+(?:\.\d+)?|\.\d+)$/.test(value.trim())) {
+      const parsed = Number(value.trim());
       if (Number.isFinite(parsed)) return parsed;
     }
   }
   return null;
 }
 
-function listFrom(source: unknown, keys: string[] = ["data","apps","services","products","items","numbers","list","rows"]): UnknownRecord[] {
+function listFrom(source: unknown, keys: string[] = ["data","apps","services","products","items","numbers","list","rows"], required = false): UnknownRecord[] {
   if (Array.isArray(source)) return source.map((item) => asRecord(item));
   const record = asRecord(source);
   for (const key of keys) {
     const value = record[key];
     if (Array.isArray(value)) return value.map((item) => asRecord(item));
   }
+  // Some responses wrap a resource-specific list in a `data` object.
+  const nested = asRecord(record.data);
+  for (const key of keys) {
+    if (Array.isArray(nested[key])) return (nested[key] as unknown[]).map((item) => asRecord(item));
+  }
+  if (required) throw new FleexaError("Unexpected catalog response", 502, "INVALID_CATALOG");
   return [];
 }
 
@@ -206,9 +232,9 @@ export type FleexaSmsService = {
 
 export async function listFleexaSmsServices(): Promise<FleexaSmsService[]> {
   const res = await fleexaFetch("/sms4/apps");
-  return listFrom(res).map((item) => ({
-    id: pickString(item, [["id"], ["app_id"], ["service_id"], ["code"], ["slug"]]),
-    name: pickString(item, [["name"], ["app_name"], ["service"], ["title"]]),
+  return listFrom(res, undefined, true).map((item) => ({
+    id: pickString(item, [["id"], ["app_id"], ["service_id"], ["code"], ["slug"], ["serviceName"]]),
+    name: pickString(item, [["name"], ["app_name"], ["service"], ["title"], ["serviceName"]]),
     country: pickString(item, [["country"], ["country_code"]]),
     priceNgn: pickNumber(item, [["price_ngn"], ["price"], ["rate"], ["amount"]]),
     stock: pickNumber(item, [["stock"], ["available"], ["count"], ["quantity"]]),
@@ -254,13 +280,13 @@ export async function buyFleexaSmsNumber(params: {
     ["phone_number"], ["phone"], ["number"], ["msisdn"], ["virtual_number"], ["sim_number"],
   ]);
 
-  if (!requestId) throw new FleexaError("Fleexa did not return a request id", 502, "NO_REQUEST_ID");
+  if (!requestId || !number) throw new FleexaError("Provider receipt is incomplete and needs reconciliation", 502, "INCOMPLETE_RECEIPT");
 
   return {
     requestId,
-    number: number ?? "Assigned — refresh in a moment",
-    service: pickString(data, [["service"], ["app_name"], ["app"]]) ?? params.app ?? null,
-    country: pickString(data, [["country"], ["country_code"]]) ?? params.country ?? null,
+    number,
+    service: pickString(data, [["service"], ["app_name"], ["app"]]),
+    country: pickString(data, [["country"], ["country_code"]]),
     priceNgn: pickNumber(data, [["price_ngn"], ["price"], ["rate"], ["amount"]]),
     expiresAt: pickString(data, [["expires_at"], ["deadline"], ["valid_until"]]),
     raw: data,
@@ -307,7 +333,7 @@ export type FleexaEmailProduct = {
 
 export async function listFleexaEmailProducts(): Promise<FleexaEmailProduct[]> {
   const res = await fleexaFetch("/email/products");
-  return listFrom(res).map((item) => ({
+  return listFrom(res, undefined, true).map((item) => ({
     id: pickString(item, [["id"], ["product_id"], ["code"], ["slug"]]),
     name: pickString(item, [["name"], ["product_name"], ["title"]]),
     domain: pickString(item, [["domain"], ["email_domain"]]),
@@ -333,10 +359,10 @@ export async function buyFleexaEmail(params: { product?: string } = {}): Promise
   const emailId = pickString(data, [["email_id"], ["emailId"], ["id"], ["request_id"]]);
   const address = pickString(data, [["email"], ["address"], ["email_address"], ["mail"]]);
 
-  if (!address) throw new FleexaError("Fleexa did not return an email address", 502, "NO_EMAIL");
+  if (!emailId || !address) throw new FleexaError("Provider receipt is incomplete and needs reconciliation", 502, "INCOMPLETE_RECEIPT");
 
   return {
-    emailId: emailId ?? address,
+    emailId,
     address,
     expiresAt: pickString(data, [["expires_at"], ["valid_until"], ["deadline"]]),
     raw: data,
@@ -393,9 +419,9 @@ export type FleexaRentArea = {
 
 export async function listFleexaRentAreas(): Promise<FleexaRentArea[]> {
   const res = await fleexaFetch("/rent/sms4/areas");
-  return listFrom(res, ["areas", "countries", "data", "items"]).map((item) => ({
+  return listFrom(res, ["areas", "countries", "data", "items"], true).map((item) => ({
     id: pickString(item, [["id"], ["area_id"], ["code"], ["country_code"], ["country"]]),
-    country: pickString(item, [["country"], ["name"], ["country_name"]]),
+    country: pickString(item, [["country_code"], ["country"], ["country_name"], ["name"]]),
     pricePerMonthNgn: pickNumber(item, [["price_ngn"], ["price"], ["rate"], ["monthly_price"]]),
     stock: pickNumber(item, [["stock"], ["available"], ["count"]]),
   }));
@@ -427,11 +453,11 @@ export async function buyFleexaRental(params: {
     ["phone_number"], ["phone"], ["number"], ["msisdn"], ["rental_number"],
   ]);
 
-  if (!rentalId) throw new FleexaError("Fleexa did not return a rental id", 502, "NO_RENTAL_ID");
+  if (!rentalId || !number) throw new FleexaError("Provider receipt is incomplete and needs reconciliation", 502, "INCOMPLETE_RECEIPT");
 
   return {
     rentalId,
-    number: number ?? "Assigned — refresh in a moment",
+    number,
     months: params.months ?? 1,
     expiresAt: pickString(data, [["expires_at"], ["end_date"], ["valid_until"]]),
     raw: data,

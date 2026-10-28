@@ -6,6 +6,7 @@ import type { PublicUser } from "@/lib/auth";
 
 interface SettingsFormProps {
   user: PublicUser;
+  sharedDemo?: boolean;
 }
 
 function Notice({ kind, children }: { kind: "error" | "success"; children: string }) {
@@ -57,8 +58,9 @@ function Section({
  * styles instead of the older generic Card/Input set, which made this page look
  * like a different product.
  */
-export function SettingsForm({ user }: SettingsFormProps) {
+export function SettingsForm({ user, sharedDemo = false }: SettingsFormProps) {
   const [name, setName] = useState(user.name);
+  const [savedDemoName, setSavedDemoName] = useState(user.name);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -68,9 +70,18 @@ export function SettingsForm({ user }: SettingsFormProps) {
   const [error, setError] = useState<string | null>(null);
 
   async function handleProfileUpdate() {
-    setSavingProfile(true);
     setError(null);
     setSuccess(null);
+    if (sharedDemo) {
+      if (name.trim().length < 2 || name.trim().length > 120) {
+        setError("Use a fictional name between 2 and 120 characters.");
+      } else {
+        setSavedDemoName(name.trim());
+        setSuccess("Demo profile updated in this view only. The shared account is unchanged.");
+      }
+      return;
+    }
+    setSavingProfile(true);
 
     try {
       const response = await fetch("/api/user/profile", {
@@ -128,7 +139,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
       {error && <Notice kind="error">{error}</Notice>}
       {success && <Notice kind="success">{success}</Notice>}
 
-      <Section icon={User} title="Profile" note="The name shown on orders and support replies.">
+      <Section icon={User} title="Profile" note={sharedDemo ? "Try a fictional name. Changes stay in this view only." : "The name shown on orders and support replies."}>
         <div>
           <label htmlFor="profile-name" className="field-label">
             Name
@@ -153,13 +164,13 @@ export function SettingsForm({ user }: SettingsFormProps) {
             className="field disabled:opacity-60"
           />
           <p id="profile-email-hint" className="mt-1 text-[0.7rem] text-ink-3">
-            Email can&apos;t be changed here — message support if you need to move accounts.
+            {sharedDemo ? "This address identifies the shared demo, not a personal inbox." : "Email can't be changed here — message support if you need to move accounts."}
           </p>
         </div>
         <button
           type="button"
           onClick={handleProfileUpdate}
-          disabled={savingProfile || name.trim() === user.name}
+          disabled={savingProfile || name.trim() === (sharedDemo ? savedDemoName : user.name)}
           className="btn btn-primary w-fit !px-4 !py-2.5 !text-[0.8rem] disabled:opacity-50"
         >
           {savingProfile ? (
@@ -172,7 +183,11 @@ export function SettingsForm({ user }: SettingsFormProps) {
         </button>
       </Section>
 
-      <Section
+      {sharedDemo ? (
+        <Section icon={Lock} title="Shared demo access" note="No password is needed for the shared demo. Do not enter real passwords or other secrets here.">
+          <p className="text-[0.8rem] text-ink-2">Use Sign out to end your own session. Profile and security changes do not affect other visitors.</p>
+        </Section>
+      ) : <Section
         icon={Lock}
         title="Password"
         note="Use something you don't use anywhere else. At least 8 characters."
@@ -235,7 +250,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
             "Change password"
           )}
         </button>
-      </Section>
+      </Section>}
 
       <Section icon={Shield} title="Account" note="Read-only details about this account.">
         <dl className="grid gap-2 text-[0.82rem] sm:grid-cols-2">

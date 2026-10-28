@@ -1,0 +1,938 @@
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFile } from "node:fs/promises";
+import { createHmac } from "node:crypto";
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle, type PgliteDatabase } from "drizzle-orm/pglite";
+import { eq } from "drizzle-orm";
+import { NextRequest } from "next/server";
+import * as schema from "@/db/schema";
+
+// This runs real SQL in embedded PostgreSQL/WASM. Providers and authentication
+// are mocked; it is not a multi-server PostgreSQL or live-provider test.
+const mocks = vi.hoisted(() => ({
+  db: undefined as unknown,
+  user: vi.fn(),
+  session: vi.fn(),
+  cookies: vi.fn(),
+  getListing: vi.fn(),
+  purchase: vi.fn(),
+  price: vi.fn(),
+  promo: vi.fn(),
+  getBanks: vi.fn(),
+  resolveBank: vi.fn(),
+  createRecipient: vi.fn(),
+  initializePayment: vi.fn(),
+  verifyPayment: vi.fn(),
+  initiateTransfer: vi.fn(),
+  checkSms: vi.fn(),
+  rentalSms: vi.fn(),
+  destroySession: vi.fn(),
+  googleProfile: vi.fn(),
+  exchange: vi.fn(),
+  log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
+vi.mock("@/lib/auth", () => ({
+  requireAuthApi: mocks.user, getCurrentUser: mocks.user,
+  createSession: mocks.session, destroySession: mocks.destroySession, hashPassword: () => "test-password-hash",
+  verifyPassword: (password: string, hash: string) => password === hash,
+  SESSION_COOKIE: "pryva_session", SESSION_COOKIE_EMBEDDED: "pryva_session_3p",
+}));
+vi.mock("@/lib/admin-auth", () => ({
+  authorizeAdminApi: async () => ({ user: { id: "admin-id" }, response: null }),
+}));
+vi.mock("@/lib/logger", () => ({ logger: mocks.log }));
+vi.mock("next/headers", () => ({ cookies: mocks.cookies }));
+vi.mock("@/lib/google", () => ({
+  googleConfigured: () => true, exchangeGoogleCode: mocks.exchange, fetchGoogleUser: mocks.googleProfile,
+}));
+vi.mock("@/lib/wallet", () => ({ creditWallet: vi.fn() }));
+vi.mock("@/lib/rate-limit", () => ({
+  purchaseRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
+  giftCardIpRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
+  giftCardUserRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
+  contactRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
+  createRateLimiter: () => async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
+  resetRateLimit: async () => {},
+}));
+vi.mock("@/lib/accszone", async (original) => {
+  const actual = await original<typeof import("@/lib/accszone")>();
+  return { ...actual, isAccsZoneConfigured: () => true, getListing: mocks.getListing, purchaseAccounts: mocks.purchase, validatePromo: mocks.promo };
+});
+vi.mock("@/lib/fleexa", async (original) => {
+  const actual = await original<typeof import("@/lib/fleexa")>();
+  return { ...actual, checkFleexaSms: mocks.checkSms, getFleexaRentalSms: mocks.rentalSms };
+});
+vi.mock("@/lib/marketplace-pricing", () => ({
+  priceMarketplaceListing: mocks.price,
+  applyPromoDiscount: (price: unknown) => price,
+}));
+vi.mock("@/lib/paystack", () => ({
+  isPaystackConfigured: () => true, getBanks: mocks.getBanks,
+  resolveBankAccount: mocks.resolveBank, createTransferRecipient: mocks.createRecipient,
+  initializePayment: mocks.initializePayment, verifyPayment: mocks.verifyPayment, initiateTransfer: mocks.initiateTransfer,
+}));
+
+const USER = "f5ca2925-6050-49d2-ab89-fc324953ed11";
+const REQUEST_ID = "da16d859-1301-4851-a124-b9dddf107333";
+const OTHER_REQUEST_ID = "47a7c568-8781-416b-8393-57ed13b89d42";
+let pg: PGlite;
+let database: PgliteDatabase<typeof schema>;
+let purchaseRoute: typeof import("@/app/api/accounts/purchase/route");
+let refundRoute: typeof import("@/app/api/admin/refunds/route");
+let bankRoute: typeof import("@/app/api/wallet/bank-accounts/route");
+let verifyBankRoute: typeof import("@/app/api/wallet/verify-account/route");
+let googleRoute: typeof import("@/app/api/auth/google/callback/route");
+let contactRoute: typeof import("@/app/api/contact/route");
+let deleteRoute: typeof import("@/app/api/user/delete/route");
+let passwordRoute: typeof import("@/app/api/user/password/route");
+let sessionsRoute: typeof import("@/app/api/user/sessions/route");
+let giftPurchaseRoute: typeof import("@/app/api/gift-cards/purchase/route");
+let giftCheckRoute: typeof import("@/app/api/gift-cards/check/route");
+let giftRedeemRoute: typeof import("@/app/api/gift-cards/redeem/route");
+let topUpRoute: typeof import("@/app/api/wallet/topup/route");
+let verifyTopUpRoute: typeof import("@/app/api/wallet/topup/verify/route");
+let webhookRoute: typeof import("@/app/api/webhooks/payment/route");
+let profileRoute: typeof import("@/app/api/user/profile/route");
+let notificationsRoute: typeof import("@/app/api/notifications/route");
+let markReadRoute: typeof import("@/app/api/notifications/mark-read/route");
+let logoutRoute: typeof import("@/app/api/auth/logout/route");
+let syncRoute: typeof import("@/app/api/orders/[id]/sync/route");
+let scheduledRoute: typeof import("@/app/api/scheduled-orders/route");
+let promoRoute: typeof import("@/app/api/accounts/promo/route");
+let withdrawalRoute: typeof import("@/app/api/wallet/withdraw/route");
+let adminWithdrawalRoute: typeof import("@/app/api/admin/withdrawals/route");
+let integrity: typeof import("@/lib/payment-integrity");
+let autoRefund: typeof import("@/lib/auto-refund");
+
+function purchaseRequest(id = REQUEST_ID, origin = "https://pryva.test", type = "application/json") {
+  return new NextRequest("https://pryva.test/api/accounts/purchase", {
+    method: "POST", headers: { host: "pryva.test", "x-forwarded-proto": "https", origin, "content-type": type },
+    body: JSON.stringify({ slug: "listing", quantity: 1, requestId: id }),
+  });
+}
+function adminRefund(orderId: string, extra: Record<string, unknown> = {}) {
+  return new NextRequest("https://pryva.test/api/admin/refunds", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ orderId, ...extra }),
+  });
+}
+function bankRequest(origin = "https://pryva.test", type = "application/json") {
+  return new NextRequest("https://pryva.test/api/wallet/bank-accounts", {
+    method: "POST", headers: { host: "pryva.test", "x-forwarded-proto": "https", origin, "content-type": type },
+    body: JSON.stringify({ bankCode: "044", accountNumber: "1234567890", setDefault: true, bankName: "Spoofed Bank" }),
+  });
+}
+function googleRequest() {
+  return new Request("https://pryva.test/api/auth/google/callback?code=test&state=valid");
+}
+
+beforeAll(async () => {
+  pg = new PGlite();
+  await pg.exec(await readFile("migrations/0000_base_schema.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0001_google_subject.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0002_shared_rate_limits.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0003_withdrawal_idempotency.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0004_paystack_transfer_reference.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0005_wallet_email_outbox.sql", "utf8"));
+  database = drizzle(pg, { schema });
+  mocks.db = database;
+  [purchaseRoute, refundRoute, bankRoute, verifyBankRoute, googleRoute, contactRoute, deleteRoute, passwordRoute, sessionsRoute, autoRefund, giftPurchaseRoute, giftCheckRoute, giftRedeemRoute, topUpRoute, verifyTopUpRoute, webhookRoute, profileRoute, notificationsRoute, markReadRoute, logoutRoute, syncRoute, scheduledRoute, promoRoute, withdrawalRoute, adminWithdrawalRoute, integrity] = await Promise.all([
+    import("@/app/api/accounts/purchase/route"), import("@/app/api/admin/refunds/route"),
+    import("@/app/api/wallet/bank-accounts/route"), import("@/app/api/wallet/verify-account/route"),
+    import("@/app/api/auth/google/callback/route"), import("@/app/api/contact/route"),
+    import("@/app/api/user/delete/route"), import("@/app/api/user/password/route"),
+    import("@/app/api/user/sessions/route"), import("@/lib/auto-refund"),
+    import("@/app/api/gift-cards/purchase/route"), import("@/app/api/gift-cards/check/route"), import("@/app/api/gift-cards/redeem/route"),
+    import("@/app/api/wallet/topup/route"), import("@/app/api/wallet/topup/verify/route"), import("@/app/api/webhooks/payment/route"),
+    import("@/app/api/user/profile/route"), import("@/app/api/notifications/route"),
+    import("@/app/api/notifications/mark-read/route"), import("@/app/api/auth/logout/route"),
+    import("@/app/api/orders/[id]/sync/route"), import("@/app/api/scheduled-orders/route"), import("@/app/api/accounts/promo/route"), import("@/app/api/wallet/withdraw/route"), import("@/app/api/admin/withdrawals/route"), import("@/lib/payment-integrity"),
+  ]);
+}, 30_000);
+
+afterAll(async () => { await pg?.close(); });
+afterEach(() => vi.unstubAllEnvs());
+
+beforeEach(async () => {
+  vi.clearAllMocks();
+  mocks.initializePayment.mockReset();
+  mocks.verifyPayment.mockReset();
+  mocks.initiateTransfer.mockReset();
+  mocks.checkSms.mockReset();
+  mocks.rentalSms.mockReset();
+  vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db");
+  vi.stubEnv("MARKETPLACE_LIVE_PURCHASES", "true");
+  vi.stubEnv("PAYSTACK_SECRET_KEY", "test-secret");
+  await pg.exec('TRUNCATE TABLE "users" CASCADE');
+  await database.insert(schema.users).values({ id: USER, name: "Buyer", email: "buyer@example.com", passwordHash: "hash", walletBalance: 10000 });
+  mocks.user.mockResolvedValue({ id: USER, email: "buyer@example.com", name: "Buyer", walletBalance: 10000 });
+  mocks.getListing.mockResolvedValue({ id: 7, slug: "listing", title: "Test listing", price: "1.00", available_stock: 10, category: null, subcategory: null });
+  mocks.price.mockResolvedValue({ totalNgn: 2000, unitNgn: 2000, discountNgn: 0, profitNgn: 500 });
+  mocks.purchase.mockResolvedValue({ order_id: 42, accounts: ["user:secret"] });
+  mocks.getBanks.mockResolvedValue([{ code: "044", name: "Access Bank" }]);
+  mocks.resolveBank.mockResolvedValue({ status: true, data: { account_name: "Verified Person", account_number: "1234567890", bank_id: 1 } });
+  mocks.createRecipient.mockResolvedValue({ status: true, data: { recipient_code: "RCP-test" } });
+  mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_google_state" ? { value: "valid" } : undefined });
+  mocks.exchange.mockResolvedValue("access-token");
+  mocks.googleProfile.mockResolvedValue({ sub: "google-subject-1", email: "new@example.com", name: "Google User", emailVerified: true });
+  mocks.session.mockResolvedValue("session");
+});
+
+describe("withdrawal request idempotency on embedded PostgreSQL", () => {
+  const BANK_ID = "6db3231e-312b-4f81-82a2-2d078e784b6f";
+  const ALT_BANK_ID = "b64ac036-949b-4013-94c5-1839db204d6e";
+
+  function withdrawalRequest(requestId = REQUEST_ID, amount = 6000, bankAccountId = BANK_ID) {
+    return new NextRequest("https://pryva.test/api/wallet/withdraw", {
+      method: "POST", headers: { host: "pryva.test", "x-forwarded-proto": "https", origin: "https://pryva.test", "content-type": "application/json" },
+      body: JSON.stringify({ requestId, amount, bankAccountId }),
+    });
+  }
+  async function addBank(id = BANK_ID, userId = USER) {
+    await database.insert(schema.bankAccounts).values({ id, userId, bankName: "Test Bank", bankCode: "044", accountNumber: "1234567890", accountName: "Test Customer", recipientCode: "RCP-test" });
+  }
+
+  it("persists a Paystack-compliant transfer reference before contacting the provider", async () => {
+    await addBank();
+    const submitted = await withdrawalRoute.POST(withdrawalRequest());
+    const { withdrawal } = await submitted.json();
+    const expected = `wd-${withdrawal.id.replace(/-/g, "")}`;
+    mocks.initiateTransfer.mockImplementationOnce(async (params: { reference: string; amount: number; currency: string }) => {
+      const [during] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, withdrawal.id));
+      expect(during).toMatchObject({ status: "processing", paystackReference: expected });
+      expect(params).toMatchObject({ reference: expected, amount: 600000, currency: "NGN" });
+      expect(params.reference).toMatch(/^[a-z0-9_-]{16,50}$/);
+      return { status: true, data: { transfer_code: "TRF-test", reference: expected, amount: 600000, currency: "NGN", status: "pending" } };
+    });
+    const approval = new NextRequest("https://pryva.test/api/admin/withdrawals", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: withdrawal.id, action: "approve" }) });
+    const result = await adminWithdrawalRoute.PUT(approval);
+    expect(await result.json()).toMatchObject({ ok: true, needsReview: false, paystackReference: expected, transferCode: "TRF-test" });
+    const [stored] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, withdrawal.id));
+    expect(stored).toMatchObject({ status: "processing", paystackReference: expected, transferReference: "TRF-test" });
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(3940);
+  });
+
+  it("claims one withdrawal only once when two admins approve concurrently", async () => {
+    await addBank();
+    const { withdrawal } = await (await withdrawalRoute.POST(withdrawalRequest())).json();
+    mocks.initiateTransfer.mockImplementation(async ({ reference }: { reference: string }) => ({
+      status: true, data: { transfer_code: "TRF-race", reference, amount: 600000, currency: "NGN", status: "pending" },
+    }));
+    const approve = () => new NextRequest("https://pryva.test/api/admin/withdrawals", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: withdrawal.id, action: "approve" }) });
+    const results = await Promise.all([adminWithdrawalRoute.PUT(approve()), adminWithdrawalRoute.PUT(approve())]);
+    expect(results.map((result) => result.status).sort()).toEqual([200, 409]);
+    expect(mocks.initiateTransfer).toHaveBeenCalledTimes(1);
+    const [stored] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, withdrawal.id));
+    expect(stored).toMatchObject({ status: "processing", paystackReference: `wd-${withdrawal.id.replace(/-/g, "")}`, transferReference: "TRF-race" });
+  });
+
+  it("enforces unique Paystack transfer references in the migrated database", async () => {
+    await addBank();
+    const { withdrawal: first } = await (await withdrawalRoute.POST(withdrawalRequest())).json();
+    const { withdrawal: second } = await (await withdrawalRoute.POST(withdrawalRequest(OTHER_REQUEST_ID, 2000))).json();
+    const reference = `wd-${first.id.replace(/-/g, "")}`;
+    await database.update(schema.withdrawals).set({ paystackReference: reference }).where(eq(schema.withdrawals.id, first.id));
+    await expect(database.update(schema.withdrawals).set({ paystackReference: reference }).where(eq(schema.withdrawals.id, second.id))).rejects.toThrow();
+  });
+
+  it("replays the same request without a second debit, including after the bank is removed", async () => {
+    await addBank();
+    const first = await withdrawalRoute.POST(withdrawalRequest());
+    expect(first.status).toBe(200);
+    const firstReceipt = await first.json();
+    expect(firstReceipt).toMatchObject({ replayed: false, withdrawal: { amount: 6000, fee: 60, status: "pending", createdAt: expect.any(String) } });
+    await database.delete(schema.bankAccounts).where(eq(schema.bankAccounts.id, BANK_ID));
+    const repeated = await withdrawalRoute.POST(withdrawalRequest());
+    expect(repeated.status).toBe(200);
+    expect(await repeated.json()).toMatchObject({ replayed: true, withdrawal: { id: firstReceipt.withdrawal.id, reference: firstReceipt.withdrawal.reference } });
+    expect((await withdrawalRoute.POST(withdrawalRequest(REQUEST_ID, 5000))).status).toBe(409);
+    expect((await withdrawalRoute.POST(withdrawalRequest(REQUEST_ID, 6000, ALT_BANK_ID))).status).toBe(409);
+    const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+    expect(user.walletBalance).toBe(3940);
+    expect(await database.select().from(schema.withdrawals)).toHaveLength(1);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+  });
+
+  it("deduplicates simultaneous requests with the same key", async () => {
+    await addBank();
+    const responses = await Promise.all([
+      withdrawalRoute.POST(withdrawalRequest()),
+      withdrawalRoute.POST(withdrawalRequest()),
+    ]);
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
+    const receipts = await Promise.all(responses.map((response) => response.json()));
+    expect(new Set(receipts.map((entry) => entry.withdrawal.id)).size).toBe(1);
+    expect(receipts.map((entry) => entry.replayed).sort()).toEqual([false, true]);
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(3940);
+    expect(await database.select().from(schema.withdrawals)).toHaveLength(1);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+  });
+
+  it("rolls back the idempotency claim and debit when the ledger fails, allowing a safe retry", async () => {
+    await addBank();
+    await pg.exec("ALTER TABLE wallet_transactions ADD CONSTRAINT fail_withdrawal CHECK (type <> 'withdrawal')");
+    try {
+      expect((await withdrawalRoute.POST(withdrawalRequest())).status).toBe(500);
+      expect((await database.select().from(schema.users))[0].walletBalance).toBe(10000);
+      expect(await database.select().from(schema.withdrawals)).toHaveLength(0);
+    } finally {
+      await pg.exec('ALTER TABLE wallet_transactions DROP CONSTRAINT fail_withdrawal');
+    }
+    expect((await withdrawalRoute.POST(withdrawalRequest())).status).toBe(200);
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(3940);
+  });
+
+  it("scopes keys to the customer rather than sharing them between users", async () => {
+    await addBank();
+    expect((await withdrawalRoute.POST(withdrawalRequest())).status).toBe(200);
+    const otherUser = "a5717bca-15b8-43f0-8ce0-83d795fbd616";
+    await database.insert(schema.users).values({ id: otherUser, name: "Other", email: "other@example.com", passwordHash: "hash", walletBalance: 10000 });
+    await addBank(ALT_BANK_ID, otherUser);
+    mocks.user.mockResolvedValue({ id: otherUser, email: "other@example.com" });
+    expect((await withdrawalRoute.POST(withdrawalRequest(REQUEST_ID, 6000, ALT_BANK_ID))).status).toBe(200);
+    expect(await database.select().from(schema.withdrawals)).toHaveLength(2);
+  });
+});
+
+describe("ledger integrity", () => {
+  it("treats withdrawal entries as debits and refund entries as credits", async () => {
+    await database.update(schema.users).set({ walletBalance: 4500 }).where(eq(schema.users.id, USER));
+    await database.insert(schema.walletTransactions).values([
+      { userId: USER, type: "credit", amount: 10000, balanceAfter: 10000, description: "Top-up", reference: "integrity-credit" },
+      { userId: USER, type: "withdrawal", amount: 6000, balanceAfter: 4000, description: "Withdrawal", reference: "integrity-withdrawal" },
+      { userId: USER, type: "refund", amount: 500, balanceAfter: 4500, description: "Refund", reference: "integrity-refund" },
+    ]);
+    expect(await integrity.checkWalletIntegrity(USER)).toEqual({ valid: true, issues: [] });
+    await database.insert(schema.walletTransactions).values({ userId: USER, type: "unrecognized", amount: 1, balanceAfter: 4500, description: "Unknown", reference: "integrity-unknown" });
+    expect((await integrity.checkWalletIntegrity(USER)).issues).toContain("Unknown transaction type: unrecognized");
+  });
+
+  it("recognizes the actual refund ledger type when checking a refunded order", async () => {
+    const [order] = await database.insert(schema.orders).values({ reference: "integrity-order", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "Nigeria", duration: "Single", amount: 1000, provider: "simulated", status: "refunded" }).returning();
+    await database.insert(schema.walletTransactions).values([
+      { userId: USER, orderId: order.id, type: "debit", amount: 1000, balanceAfter: 9000, description: "Purchase", reference: "integrity-debit" },
+      { userId: USER, orderId: order.id, type: "refund", amount: 1000, balanceAfter: 10000, description: "Refund", reference: "integrity-order-refund" },
+    ]);
+    expect(await integrity.checkOrderIntegrity(order.id)).toEqual({ valid: true, issues: [] });
+  });
+});
+
+describe("marketplace money safety", () => {
+  it("blocks preview funds, default-disabled checkout, cross-origin and non-JSON requests before provider or database writes", async () => {
+    vi.stubEnv("DATABASE_URL", "");
+    expect((await purchaseRoute.POST(purchaseRequest())).status).toBe(503);
+    vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db");
+    vi.stubEnv("MARKETPLACE_LIVE_PURCHASES", "");
+    expect((await purchaseRoute.POST(purchaseRequest())).status).toBe(503);
+    vi.stubEnv("MARKETPLACE_LIVE_PURCHASES", "true");
+    expect((await purchaseRoute.POST(purchaseRequest(REQUEST_ID, "https://evil.pryva.test"))).status).toBe(403);
+    expect((await purchaseRoute.POST(purchaseRequest(REQUEST_ID, "https://pryva.test", "text/plain"))).status).toBe(415);
+    expect(mocks.getListing).not.toHaveBeenCalled();
+    expect(mocks.purchase).not.toHaveBeenCalled();
+    expect(await database.select().from(schema.orders)).toHaveLength(0);
+  });
+
+  it("atomically records the debit, order and ledger; replaying the request returns the same receipt", async () => {
+    const first = await purchaseRoute.POST(purchaseRequest());
+    expect(first.status).toBe(200);
+    const receipt = await first.json();
+    expect(receipt.accounts).toEqual(["user:secret"]);
+    const [order] = await database.select().from(schema.orders);
+    const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+    const [ledger] = await database.select().from(schema.walletTransactions);
+    expect(order).toMatchObject({ status: "delivered", amount: 2000, accounts: '["user:secret"]', referenceCode: "42" });
+    expect(order.reference.length).toBeLessThanOrEqual(32);
+    expect(order.providerRequestId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(user.walletBalance).toBe(8000);
+    expect(ledger).toMatchObject({ orderId: order.id, amount: 2000, type: "debit", balanceAfter: 8000 });
+    const replay = await purchaseRoute.POST(purchaseRequest());
+    expect(replay.status).toBe(200);
+    expect((await replay.json()).order.reference).toBe(receipt.order.reference);
+    expect(mocks.getListing).toHaveBeenCalledTimes(1);
+    expect(mocks.purchase).toHaveBeenCalledTimes(1);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+  });
+
+  it("does not retry or refund an uncertain purchase, and blocks refunds while it is in flight", async () => {
+    let rejectPurchase!: (error: Error) => void;
+    mocks.purchase.mockReturnValueOnce(new Promise((_, reject) => { rejectPurchase = reject; }));
+    const first = purchaseRoute.POST(purchaseRequest());
+    await vi.waitFor(() => expect(mocks.purchase).toHaveBeenCalledTimes(1));
+    const [processing] = await database.select().from(schema.orders);
+    expect(processing.status).toBe("processing");
+    expect((await refundRoute.POST(adminRefund(processing.id))).status).toBe(409);
+    expect((await purchaseRoute.POST(purchaseRequest())).status).toBe(202);
+    const differentIntent = await purchaseRoute.POST(purchaseRequest(OTHER_REQUEST_ID));
+    expect(differentIntent.status).toBe(202);
+    expect((await differentIntent.json()).order.reference).toBe(processing.reference);
+    rejectPurchase(new Error("supplier accepted request but connection dropped"));
+    const response = await first;
+    expect(response.status).toBe(202);
+    expect((await response.json()).pending).toBe(true);
+    expect(mocks.purchase).toHaveBeenCalledTimes(1);
+    const [review] = await database.select().from(schema.orders);
+    expect(review.status).toBe("review");
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(8000);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+    expect((await refundRoute.POST(adminRefund(review.id))).status).toBe(409);
+    expect((await refundRoute.POST(adminRefund(review.id, { reconciliationConfirmed: true }))).status).toBe(400);
+    expect((await refundRoute.POST(adminRefund(review.id, { reconciliationConfirmed: true, reason: "Verified with supplier" }))).status).toBe(200);
+    expect((await refundRoute.POST(adminRefund(review.id, { reconciliationConfirmed: true, reason: "Verified" }))).status).toBe(409);
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(10000);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(2);
+  });
+
+  it("rolls back the debit and order when the ledger insert fails", async () => {
+    await pg.exec('ALTER TABLE "wallet_transactions" ADD CONSTRAINT "test_no_debit" CHECK ("type" <> \'debit\')');
+    try {
+      const response = await purchaseRoute.POST(purchaseRequest());
+      expect(response.status).toBe(202); // A failed COMMIT response must not promise no charge.
+      expect(mocks.purchase).not.toHaveBeenCalled();
+      expect((await database.select().from(schema.users))[0].walletBalance).toBe(10000);
+      expect(await database.select().from(schema.orders)).toHaveLength(0);
+      expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
+    } finally {
+      await pg.exec('ALTER TABLE "wallet_transactions" DROP CONSTRAINT "test_no_debit"');
+    }
+  });
+
+  it("keeps an incomplete receipt for review without crediting the wallet", async () => {
+    mocks.purchase.mockResolvedValueOnce({ order_id: 42, accounts: [] });
+    expect((await purchaseRoute.POST(purchaseRequest())).status).toBe(202);
+    expect((await database.select().from(schema.orders))[0].status).toBe("review");
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(8000);
+  });
+
+  it("returns complete credentials with a warning if saving them fails, without logging the secrets", async () => {
+    await pg.exec('ALTER TABLE "orders" ADD CONSTRAINT "test_no_accounts" CHECK ("accounts" IS NULL)');
+    try {
+      const response = await purchaseRoute.POST(purchaseRequest());
+      const body = await response.json();
+      expect(response.status).toBe(200);
+      expect(body.accounts).toEqual(["user:secret"]);
+      expect(body.warning).toContain("could not save");
+      expect((await database.select().from(schema.orders))[0].status).toBe("review");
+      expect(JSON.stringify(mocks.log.error.mock.calls)).not.toContain("user:secret");
+    } finally {
+      await pg.exec('ALTER TABLE "orders" DROP CONSTRAINT "test_no_accounts"');
+    }
+  });
+
+  it("does not contact the supplier when the wallet lacks funds", async () => {
+    await database.update(schema.users).set({ walletBalance: 1000 }).where(eq(schema.users.id, USER));
+    expect((await purchaseRoute.POST(purchaseRequest())).status).toBe(402);
+    expect(mocks.purchase).not.toHaveBeenCalled();
+    expect(await database.select().from(schema.orders)).toHaveLength(0);
+  });
+});
+
+describe("simulated refund SQL", () => {
+  it("only claims timed-out single numbers without a code and never double-credits", async () => {
+    vi.stubEnv("DATABASE_URL", "");
+    const common = { userId: USER, productSlug: "test", productName: "Test", planLabel: "Test", region: "Nigeria", amount: 1000, status: "active", provider: "simulated", createdAt: new Date(Date.now() - 60 * 60_000) };
+    await database.insert(schema.orders).values([
+      { ...common, reference: "no-code", service: "numbers", duration: "Single verification · 20 min window" },
+      { ...common, reference: "with-code", service: "numbers", duration: "Single verification · 20 min window", otpCode: "123456" },
+      { ...common, reference: "rental", service: "numbers", duration: "7 days" },
+      { ...common, reference: "esim", service: "esim", duration: "30 days" },
+    ]);
+    expect(await autoRefund.processAutoRefunds()).toBe(1);
+    expect(await autoRefund.processAutoRefunds()).toBe(0);
+    const rows = await database.select().from(schema.orders);
+    expect(rows.find((order) => order.reference === "no-code")?.status).toBe("refunded");
+    for (const reference of ["with-code", "rental", "esim"]) {
+      expect(rows.find((order) => order.reference === reference)?.status).toBe("active");
+    }
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(11000);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+  });
+
+  it("rolls back the claim and balance when a refund ledger entry fails", async () => {
+    vi.stubEnv("DATABASE_URL", "");
+    await database.insert(schema.orders).values({ reference: "refund-rollback", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "Nigeria", duration: "Single verification · 20 min window", amount: 1000, provider: "simulated", createdAt: new Date(Date.now() - 60 * 60_000) });
+    await pg.exec('ALTER TABLE "wallet_transactions" ADD CONSTRAINT "test_no_refund" CHECK ("type" <> \'refund\')');
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      expect(await autoRefund.processAutoRefunds()).toBe(0);
+      expect((await database.select().from(schema.orders))[0].status).toBe("active");
+      expect((await database.select().from(schema.users))[0].walletBalance).toBe(10000);
+      expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
+    } finally {
+      consoleError.mockRestore();
+      await pg.exec('ALTER TABLE "wallet_transactions" DROP CONSTRAINT "test_no_refund"');
+    }
+  });
+});
+
+describe("bank recipients", () => {
+  it("verifies bank accounts only with a valid provider response and never in preview", async () => {
+    expect((await verifyBankRoute.POST(bankRequest("https://evil.pryva.test"))).status).toBe(403);
+    vi.stubEnv("DATABASE_URL", "");
+    expect((await verifyBankRoute.POST(bankRequest())).status).toBe(503);
+    expect(mocks.resolveBank).not.toHaveBeenCalled();
+    vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db");
+    mocks.resolveBank.mockResolvedValueOnce({ status: false, data: { account_name: "Fake", account_number: "1234567890" } });
+    expect((await verifyBankRoute.POST(bankRequest())).status).toBe(400);
+    const response = await verifyBankRoute.POST(bankRequest());
+    expect(response.status).toBe(200);
+    expect((await response.json()).accountName).toBe("Verified Person");
+  });
+
+  it("stores the directory name when the documented Paystack resolve response has no bank_name", async () => {
+    const response = await bankRoute.POST(bankRequest());
+    expect(response.status).toBe(200);
+    const [bank] = await database.select().from(schema.bankAccounts);
+    expect(bank).toMatchObject({ userId: USER, bankName: "Access Bank", accountName: "Verified Person", recipientCode: "RCP-test", isDefault: 1 });
+    expect(mocks.createRecipient).toHaveBeenCalledWith({ name: "Verified Person", accountNumber: "1234567890", bankCode: "044" });
+  });
+
+  it("refuses to save when the resolved account name differs from what the customer reviewed", async () => {
+    const requestForName = (expectedAccountName: unknown) => new NextRequest("https://pryva.test/api/wallet/bank-accounts", {
+      method: "POST", headers: { host: "pryva.test", "x-forwarded-proto": "https", origin: "https://pryva.test", "content-type": "application/json" },
+      body: JSON.stringify({ bankCode: "044", accountNumber: "1234567890", expectedAccountName }),
+    });
+    expect((await bankRoute.POST(requestForName("Different Person"))).status).toBe(409);
+    expect((await bankRoute.POST(requestForName(""))).status).toBe(400);
+    expect(mocks.createRecipient).not.toHaveBeenCalled();
+    expect(await database.select().from(schema.bankAccounts)).toHaveLength(0);
+    expect((await bankRoute.POST(requestForName("Verified Person"))).status).toBe(200);
+    expect(mocks.createRecipient).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects cross-origin, non-JSON, preview, and unverified account responses", async () => {
+    expect((await bankRoute.POST(bankRequest("https://evil.pryva.test"))).status).toBe(403);
+    expect((await bankRoute.POST(bankRequest("https://pryva.test", "text/plain"))).status).toBe(415);
+    vi.stubEnv("DATABASE_URL", "");
+    expect((await bankRoute.POST(bankRequest())).status).toBe(503);
+    vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db");
+    mocks.resolveBank.mockResolvedValueOnce({ status: false, data: { account_name: "Bad", account_number: "1234567890" } });
+    expect((await bankRoute.POST(bankRequest())).status).toBe(400);
+    mocks.resolveBank.mockResolvedValueOnce({ status: true, data: { account_name: "Bad", account_number: "0000000000" } });
+    expect((await bankRoute.POST(bankRequest())).status).toBe(400);
+    expect(mocks.createRecipient).not.toHaveBeenCalled();
+    expect(await database.select().from(schema.bankAccounts)).toHaveLength(0);
+  });
+});
+
+describe("Google subject binding and account protection", () => {
+  it("does not link an unverified password signup to a Google identity by email", async () => {
+    mocks.googleProfile.mockResolvedValueOnce({ sub: "victim-subject", email: "buyer@example.com", name: "Victim", emailVerified: true });
+    const response = await googleRoute.GET(googleRequest());
+    expect(response.headers.get("location")).toBe("/login?error=google-account-exists");
+    expect(mocks.session).not.toHaveBeenCalled();
+    const [existing] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+    expect(existing.googleSubject).toBeNull();
+    expect(existing.passwordHash).toBe("hash");
+  });
+
+  it("creates and later signs in only the same verified subject; different subjects and email changes fail closed", async () => {
+    expect((await googleRoute.GET(googleRequest())).headers.get("location")).toBe("/dashboard");
+    const [created] = await database.select().from(schema.users).where(eq(schema.users.email, "new@example.com"));
+    expect(created.googleSubject).toBe("google-subject-1");
+    expect(mocks.session).toHaveBeenCalledWith(created.id, expect.any(Request));
+    expect((await googleRoute.GET(googleRequest())).headers.get("location")).toBe("/dashboard");
+    expect(mocks.session).toHaveBeenCalledTimes(2);
+    mocks.googleProfile.mockResolvedValueOnce({ sub: "different-subject", email: "new@example.com", name: "Other", emailVerified: true });
+    expect((await googleRoute.GET(googleRequest())).headers.get("location")).toBe("/login?error=google-account-exists");
+    mocks.googleProfile.mockResolvedValueOnce({ sub: "google-subject-1", email: "changed@example.com", name: "Other", emailVerified: true });
+    expect((await googleRoute.GET(googleRequest())).headers.get("location")).toBe("/login?error=google-account-exists");
+    mocks.googleProfile.mockResolvedValueOnce({ sub: "another", email: "another@example.com", name: "Other", emailVerified: false });
+    expect((await googleRoute.GET(googleRequest())).headers.get("location")).toBe("/login?error=google-exchange");
+    expect(mocks.session).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects a malicious next cookie even after successful Google authentication", async () => {
+    mocks.cookies.mockResolvedValueOnce({ get: (name: string) => ({ value: name === "pryva_google_state" ? "valid" : "%2F%2Fevil.example" }) });
+    expect((await googleRoute.GET(googleRequest())).headers.get("location")).toBe("/dashboard");
+  });
+
+  it("changes the password and revokes other sessions atomically, including embedded-cookie sessions", async () => {
+    const expiresAt = new Date(Date.now() + 60_000);
+    await database.insert(schema.sessions).values([
+      { userId: USER, token: "current-token", expiresAt },
+      { userId: USER, token: "other-token", expiresAt },
+    ]);
+    mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session_3p" ? { value: "current-token" } : undefined });
+    const request = (origin: string) => new NextRequest("https://pryva.test/api/user/password", {
+      method: "POST", headers: { origin, "content-type": "application/json" },
+      body: JSON.stringify({ currentPassword: "hash", newPassword: "NewPassword123" }),
+    });
+    expect((await passwordRoute.POST(request("https://evil.pryva.test"))).status).toBe(403);
+    expect((await passwordRoute.POST(request("https://pryva.test"))).status).toBe(200);
+    expect((await database.select().from(schema.users))[0].passwordHash).toBe("test-password-hash");
+    expect((await database.select().from(schema.sessions)).map((session) => session.token)).toEqual(["current-token"]);
+  });
+
+  it("prevents cross-origin session revocation and preserves the embedded current session", async () => {
+    const expiresAt = new Date(Date.now() + 60_000);
+    await database.insert(schema.sessions).values([
+      { userId: USER, token: "current-token", expiresAt },
+      { userId: USER, token: "other-token", expiresAt },
+    ]);
+    mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session_3p" ? { value: "current-token" } : undefined });
+    const request = (origin: string) => new NextRequest("https://pryva.test/api/user/sessions", {
+      method: "DELETE", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ revokeAll: true }),
+    });
+    expect((await sessionsRoute.DELETE(request("https://evil.pryva.test"))).status).toBe(403);
+    expect((await sessionsRoute.DELETE(request("https://pryva.test"))).status).toBe(200);
+    expect((await database.select().from(schema.sessions)).map((session) => session.token)).toEqual(["current-token"]);
+  });
+
+  it("refuses self-service deletion and preserves the user and financial records", async () => {
+    await database.insert(schema.orders).values({ reference: "ORDER-1", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "NG", duration: "20 min", amount: 1000 });
+    const request = new NextRequest("https://pryva.test/api/user/delete", { method: "DELETE", headers: { origin: "https://pryva.test" } });
+    expect((await deleteRoute.DELETE(request)).status).toBe(503);
+    expect(await database.select().from(schema.users)).toHaveLength(1);
+    expect(await database.select().from(schema.orders)).toHaveLength(1);
+  });
+
+  it("associates support messages with the authenticated user, not an asserted user ID", async () => {
+    const request = new NextRequest("https://pryva.test/api/contact", { method: "POST", headers: { "content-type": "application/json", origin: "https://pryva.test" }, body: JSON.stringify({ name: "Buyer", email: "buyer@example.com", topic: "Wallet", message: "Please review my purchase.", userId: "someone-else" }) });
+    expect((await contactRoute.POST(request)).status).toBe(200);
+    const [message] = await database.select().from(schema.contactMessages);
+    expect(message.userId).toBe(USER);
+  });
+});
+
+describe("gift-card SQL and bearer-code safety", () => {
+  const RECIPIENT = "04a23636-d857-4a38-bb19-1230fc07c832";
+  function giftRequest(path: string, body: unknown, origin = "https://pryva.test") {
+    return new NextRequest(`https://pryva.test/api/gift-cards/${path}`, {
+      method: "POST", headers: { host: "pryva.test", "x-forwarded-proto": "https", origin, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("debits the purchaser, checks without URL secrets, and credits a card exactly once", async () => {
+    await database.insert(schema.users).values({ id: RECIPIENT, name: "Recipient", email: "recipient@example.com", passwordHash: "hash", walletBalance: 0 });
+    const purchase = await giftPurchaseRoute.POST(giftRequest("purchase", { amount: 1000, recipientEmail: "recipient@example.com" }));
+    expect(purchase.status).toBe(200);
+    expect(purchase.headers.get("cache-control")).toContain("no-store");
+    const { code } = await purchase.json();
+    expect(code).toMatch(/^PRYVA-/);
+    expect((await giftCheckRoute.GET()).status).toBe(405);
+    const checked = await giftCheckRoute.POST(giftRequest("check", { code }));
+    expect(checked.status).toBe(200);
+    expect(checked.headers.get("cache-control")).toContain("no-store");
+    expect(await checked.json()).toMatchObject({ amount: 1000, status: "active" });
+    mocks.user.mockResolvedValue({ id: RECIPIENT, email: "recipient@example.com", name: "Recipient", walletBalance: 0 });
+    expect((await giftRedeemRoute.POST(giftRequest("redeem", { code: code.toLowerCase() }))).status).toBe(200);
+    expect((await giftRedeemRoute.POST(giftRequest("redeem", { code }))).status).toBe(400);
+    const [buyer] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+    const [recipient] = await database.select().from(schema.users).where(eq(schema.users.id, RECIPIENT));
+    expect(buyer.walletBalance).toBe(9000);
+    expect(recipient.walletBalance).toBe(1000);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(2);
+  });
+
+  it("rejects invalid or cross-origin gift-card requests before changing funds", async () => {
+    expect((await giftPurchaseRoute.POST(giftRequest("purchase", { amount: 1000 }, "https://evil.pryva.test"))).status).toBe(403);
+    expect((await giftPurchaseRoute.POST(giftRequest("purchase", { amount: 1000, recipientEmail: "x".repeat(250) }))).status).toBe(400);
+    expect((await giftRedeemRoute.POST(giftRequest("redeem", { code: "not-a-code" }))).status).toBe(400);
+    expect(await database.select().from(schema.giftCards)).toHaveLength(0);
+    const [buyer] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+    expect(buyer.walletBalance).toBe(10000);
+  });
+});
+
+describe("Paystack top-up safety", () => {
+  const request = (path: string, body: unknown, origin = "https://pryva.test", type = "application/json") => new NextRequest(`https://pryva.test/api/wallet/topup${path}`, {
+    method: "POST", headers: { host: "pryva.test", "x-forwarded-proto": "https", origin, "content-type": type },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+
+  it("rejects cross-origin, oversized and preview attempts before contacting Paystack", async () => {
+    expect((await topUpRoute.POST(request("", { amount: 2500 }, "https://evil.pryva.test"))).status).toBe(403);
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference: "TOP-12345" }, "https://evil.pryva.test"))).status).toBe(403);
+    expect((await topUpRoute.POST(request("", "x".repeat(2049)))).status).toBe(413);
+    expect((await verifyTopUpRoute.POST(request("/verify", "x".repeat(2049)))).status).toBe(413);
+    vi.stubEnv("DATABASE_URL", "");
+    expect((await topUpRoute.POST(request("", { amount: 2500 }))).status).toBe(503);
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference: "TOP-12345" }))).status).toBe(503);
+    expect(mocks.initializePayment).not.toHaveBeenCalled();
+    expect(mocks.verifyPayment).not.toHaveBeenCalled();
+    expect(await database.select().from(schema.paymentTopups)).toHaveLength(0);
+  });
+
+  it("does not create a checkout when the configured return origin is unsafe", async () => {
+    for (const value of ["http://public.example", "https://name:password@example.com", "https://pryva.test/path", "https://pryva.test/?x=1", "javascript:alert(1)"]) {
+      vi.stubEnv("NEXT_PUBLIC_APP_URL", value);
+      expect((await topUpRoute.POST(request("", { amount: 2500 }))).status).toBe(503);
+    }
+    expect(mocks.initializePayment).not.toHaveBeenCalled();
+    expect(await database.select().from(schema.paymentTopups)).toHaveLength(0);
+  });
+
+  it("does not silently ignore a selected method and leaves channel choice to Paystack", async () => {
+    const rejected = await topUpRoute.POST(request("", { amount: 2500, method: "card" }));
+    expect(rejected.status).toBe(400);
+    expect((await rejected.json()).error).toContain("Paystack checkout");
+    expect(mocks.initializePayment).not.toHaveBeenCalled();
+    mocks.initializePayment.mockImplementationOnce(async ({ reference }: { reference: string }) => ({
+      status: true, data: { authorization_url: "https://checkout.paystack.com/session", reference },
+    }));
+    expect((await topUpRoute.POST(request("", { amount: 2500 }))).status).toBe(200);
+    const init = mocks.initializePayment.mock.calls[0][0];
+    expect(init).not.toHaveProperty("channels");
+    expect(init.amount).toBe("250000");
+    expect(init.currency).toBe("NGN");
+    expect(init.callback_url).toBe("https://pryva.test/dashboard/wallet?topup=return");
+    expect(JSON.parse(init.metadata)).toMatchObject({ userId: USER, type: "wallet_topup", cancel_action: `${init.callback_url}&reference=${init.reference}` });
+  });
+
+  it("treats in-flight and unknown provider statuses as unconfirmed, not failed or credited", async () => {
+    const reference = "TOP-pending-test";
+    await database.insert(schema.paymentTopups).values({ reference, userId: USER, amount: 2500 });
+    const payment = { reference, amount: 250000, currency: "NGN" };
+    for (const status of ["ongoing", "pending", "processing", "queued", "abandoned", "unexpected"]) {
+      mocks.verifyPayment.mockResolvedValueOnce({ status: true, data: { ...payment, status } });
+      const result = await verifyTopUpRoute.POST(request("/verify", { reference }));
+      expect(result.status).toBe(202);
+      expect(await result.json()).toMatchObject({ ok: true, status: "pending" });
+    }
+    for (const status of ["failed", "reversed"]) {
+      mocks.verifyPayment.mockResolvedValueOnce({ status: true, data: { ...payment, status } });
+      const result = await verifyTopUpRoute.POST(request("/verify", { reference }));
+      expect(result.status).toBe(402);
+      expect(await result.json()).toMatchObject({ ok: false, status: "failed" });
+    }
+    mocks.verifyPayment.mockResolvedValueOnce({ status: false, data: null });
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference }))).status).toBe(502);
+    mocks.verifyPayment.mockResolvedValueOnce({ status: true, data: { ...payment, amount: 100000, status: "pending" } });
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference }))).status).toBe(409);
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(10000);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
+  });
+
+  it("only verifies references belonging to the authenticated customer", async () => {
+    const other = "04a23636-d857-4a38-bb19-1230fc07c832";
+    await database.insert(schema.users).values({ id: other, name: "Other", email: "other@example.com", passwordHash: "hash", walletBalance: 0 });
+    await database.insert(schema.paymentTopups).values({ reference: "TOP-another-user", userId: other, amount: 2500 });
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference: "TOP-another-user" }))).status).toBe(404);
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference: "TOP-unknown-ref" }))).status).toBe(404);
+    expect(mocks.verifyPayment).not.toHaveBeenCalled();
+  });
+
+  it("does not direct users to a non-Paystack or mismatched checkout", async () => {
+    mocks.initializePayment.mockImplementationOnce(async ({ reference }: { reference: string }) => ({
+      status: true, data: { authorization_url: "https://checkout.paystack.com.evil.test/steal", reference },
+    }));
+    expect((await topUpRoute.POST(request("", { amount: 2500 }))).status).toBe(500);
+    mocks.initializePayment.mockResolvedValueOnce({ status: true, data: { authorization_url: "https://checkout.paystack.com/safe", reference: "wrong" } });
+    expect((await topUpRoute.POST(request("", { amount: 2500 }))).status).toBe(500);
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(10000);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
+  });
+
+  it("verifies reference, currency and exact naira amount and deduplicates the signed webhook", async () => {
+    mocks.initializePayment.mockImplementationOnce(async ({ reference }: { reference: string }) => ({
+      status: true, data: { authorization_url: "https://checkout.paystack.com/session", reference },
+    }));
+    const initialized = await topUpRoute.POST(request("", { amount: 2500 }));
+    expect(initialized.status).toBe(200);
+    const { reference } = await initialized.json();
+    expect(reference).toMatch(/^TOP-[0-9a-f]{24}$/);
+    const [pending] = await database.select().from(schema.paymentTopups);
+    expect(pending).toMatchObject({ reference, userId: USER, amount: 2500, status: "pending" });
+
+    const payment = { status: "success", reference, amount: 250000, currency: "NGN", customer: { email: "buyer@example.com" } };
+    for (const invalid of [
+      { currency: undefined }, { currency: "USD" }, { reference: "TOP-other" },
+      { amount: 250001 }, { amount: "250000" }, { amount: 250100 },
+    ]) {
+      mocks.verifyPayment.mockResolvedValueOnce({ status: true, data: { ...payment, ...invalid } });
+      expect((await verifyTopUpRoute.POST(request("/verify", { reference }))).status).toBe(409);
+    }
+    mocks.verifyPayment.mockResolvedValueOnce({ status: true, data: { ...payment, customer: { email: "other@example.com" } } });
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference }))).status).toBe(403);
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(10000);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
+
+    mocks.verifyPayment.mockResolvedValue({ status: true, data: payment });
+    const first = await verifyTopUpRoute.POST(request("/verify", { reference }));
+    const firstBody = await first.json();
+    expect(firstBody).toMatchObject({ ok: true, status: "completed", credited: true, receipt: { reference, amount: 2500, balanceAfter: 12500, creditedAt: expect.any(String) } });
+    const retry = await verifyTopUpRoute.POST(request("/verify", { reference }));
+    expect(await retry.json()).toMatchObject({ ok: true, status: "completed", credited: false, reason: "already_credited", receipt: firstBody.receipt });
+    mocks.verifyPayment.mockResolvedValueOnce({ status: true, data: { ...payment, status: "reversed" } });
+    const reversed = await verifyTopUpRoute.POST(request("/verify", { reference }));
+    expect(reversed.status).toBe(409);
+    expect((await reversed.json()).error).toContain("credited earlier");
+
+    const webhookBody = JSON.stringify({ event: "charge.success", data: { ...payment, metadata: { userId: USER, type: "wallet_topup" } } });
+    const signature = createHmac("sha512", "test-secret").update(webhookBody).digest("hex");
+    const webhook = await webhookRoute.POST(new NextRequest("https://pryva.test/api/webhooks/payment", {
+      method: "POST", headers: { "x-paystack-signature": signature }, body: webhookBody,
+    }));
+    expect(await webhook.json()).toMatchObject({ ok: true, duplicate: true });
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(12500);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+  });
+
+  it("lets a signed webhook credit first and returns the same ledger receipt on callback", async () => {
+    const reference = "TOP-webhook-first";
+    await database.insert(schema.paymentTopups).values({ reference, userId: USER, amount: 2500 });
+    const payment = { status: "success", reference, amount: 250000, currency: "NGN", customer: { email: "buyer@example.com" } };
+    const webhookBody = JSON.stringify({ event: "charge.success", data: { ...payment, metadata: JSON.stringify({ userId: USER, type: "wallet_topup" }) } });
+    const signature = createHmac("sha512", "test-secret").update(webhookBody).digest("hex");
+    const webhook = await webhookRoute.POST(new NextRequest("https://pryva.test/api/webhooks/payment", { method: "POST", headers: { "x-paystack-signature": signature }, body: webhookBody }));
+    expect(await webhook.json()).toMatchObject({ ok: true, duplicate: false });
+    mocks.verifyPayment.mockResolvedValueOnce({ status: true, data: payment });
+    const callback = await verifyTopUpRoute.POST(request("/verify", { reference }));
+    expect(await callback.json()).toMatchObject({ status: "completed", credited: false, reason: "already_credited", receipt: { reference, amount: 2500, balanceAfter: 12500 } });
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(12500);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+  });
+
+  it("rolls back a failed ledger insert and allows a safe retry", async () => {
+    const reference = "TOP-ledger-test";
+    await database.insert(schema.paymentTopups).values({ reference, userId: USER, amount: 2500 });
+    mocks.verifyPayment.mockResolvedValue({ status: true, data: { status: "success", reference, amount: 250000, currency: "NGN" } });
+    await pg.exec('ALTER TABLE "wallet_transactions" ADD CONSTRAINT "test_no_credit" CHECK ("type" <> \'credit\')');
+    try {
+      const failed = await verifyTopUpRoute.POST(request("/verify", { reference }));
+      expect(failed.status).toBe(502);
+      expect((await failed.json()).error).not.toContain("will still arrive");
+      expect((await database.select().from(schema.paymentTopups))[0].status).toBe("pending");
+      expect((await database.select().from(schema.users))[0].walletBalance).toBe(10000);
+      expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
+    } finally {
+      await pg.exec('ALTER TABLE "wallet_transactions" DROP CONSTRAINT "test_no_credit"');
+    }
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference }))).status).toBe(200);
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(12500);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+  });
+});
+
+describe("profile and notification mutation guards", () => {
+  const jsonRequest = (path: string, method: string, body: unknown, origin = "https://pryva.test") => new NextRequest(`https://pryva.test${path}`, {
+    method, headers: { origin, "content-type": "application/json" }, body: JSON.stringify(body),
+  });
+
+  it("validates profile size and origin before updating the account", async () => {
+    expect((await profileRoute.PUT(jsonRequest("/api/user/profile", "PUT", { name: "Attacker" }, "https://evil.pryva.test"))).status).toBe(403);
+    expect((await profileRoute.PUT(jsonRequest("/api/user/profile", "PUT", { name: "x".repeat(121) }))).status).toBe(400);
+    expect((await profileRoute.PUT(jsonRequest("/api/user/profile", "PUT", { name: "x".repeat(2049) }))).status).toBe(413);
+    expect((await profileRoute.PUT(jsonRequest("/api/user/profile", "PUT", { name: "  Updated Buyer  " }))).status).toBe(200);
+    expect((await database.select().from(schema.users))[0].name).toBe("Updated Buyer");
+  });
+
+  it("reports total unread counts across pages and only changes this user's notifications", async () => {
+    const other = "04a23636-d857-4a38-bb19-1230fc07c832";
+    await database.insert(schema.users).values({ id: other, name: "Other", email: "other@example.com", passwordHash: "hash", walletBalance: 0 });
+    const rows = await database.insert(schema.notifications).values([
+      { userId: USER, title: "One", message: "One", read: 0 },
+      { userId: USER, title: "Two", message: "Two", read: 0 },
+      { userId: USER, title: "Three", message: "Three", read: 1 },
+      { userId: other, title: "Private", message: "Private", read: 0 },
+    ]).returning();
+    const page = await notificationsRoute.GET(new NextRequest("https://pryva.test/api/notifications?limit=1&offset=1"));
+    expect(page.headers.get("cache-control")).toContain("no-store");
+    expect(await page.json()).toMatchObject({ notifications: expect.arrayContaining([expect.any(Object)]), total: 3, unreadCount: 2 });
+    expect((await notificationsRoute.GET(new NextRequest("https://pryva.test/api/notifications?limit=99999"))).status).toBe(400);
+    expect((await notificationsRoute.PATCH(jsonRequest("/api/notifications", "PATCH", { markAllRead: true }, "https://evil.pryva.test"))).status).toBe(403);
+    expect((await markReadRoute.POST(jsonRequest("/api/notifications/mark-read", "POST", { markAll: true }, "https://evil.pryva.test"))).status).toBe(403);
+    expect((await markReadRoute.POST(jsonRequest("/api/notifications/mark-read", "POST", { notificationIds: Array(101).fill(rows[0].id) }))).status).toBe(400);
+    expect((await markReadRoute.POST(jsonRequest("/api/notifications/mark-read", "POST", { notificationIds: [rows[0].id, rows[3].id] }))).status).toBe(200);
+    expect((await database.select().from(schema.notifications).where(eq(schema.notifications.id, rows[3].id)))[0].read).toBe(0);
+    expect((await notificationsRoute.PATCH(jsonRequest("/api/notifications", "PATCH", { markAllRead: true }))).status).toBe(200);
+    expect((await database.select().from(schema.notifications).where(eq(schema.notifications.userId, USER))).every((n) => n.read === 1)).toBe(true);
+    expect((await database.select().from(schema.notifications).where(eq(schema.notifications.id, rows[3].id)))[0].read).toBe(0);
+  });
+
+  it("does not log a user out from a cross-origin request", async () => {
+    expect((await logoutRoute.POST(new Request("https://pryva.test/api/auth/logout", { method: "POST", headers: { origin: "https://evil.pryva.test" } }))).status).toBe(403);
+    expect(mocks.destroySession).not.toHaveBeenCalled();
+    expect((await logoutRoute.POST(new Request("https://pryva.test/api/auth/logout", { method: "POST", headers: { origin: "https://pryva.test" } }))).status).toBe(200);
+    expect(mocks.destroySession).toHaveBeenCalledOnce();
+  });
+});
+
+describe("order sync and scheduler safety", () => {
+  it("does not overwrite a refunded order with a stale provider poll", async () => {
+    const [order] = await database.insert(schema.orders).values({
+      reference: "OLD-LIVE-ORDER", userId: USER, service: "numbers", productSlug: "vn-ng", productName: "Number",
+      planLabel: "Single", region: "NG", duration: "20 min", amount: 1000, status: "active",
+      provider: "fleexa", providerRequestId: "provider-123", expiresAt: new Date(Date.now() + 60_000),
+    }).returning();
+    let finish!: (value: unknown) => void;
+    mocks.checkSms.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const syncing = syncRoute.GET(new Request(`https://pryva.test/api/orders/${order.id}/sync`), { params: Promise.resolve({ id: order.id }) });
+    await vi.waitFor(() => expect(mocks.checkSms).toHaveBeenCalledOnce());
+    await database.update(schema.orders).set({ status: "refunded", refundedAt: new Date() }).where(eq(schema.orders.id, order.id));
+    finish({ code: "123456", message: "code 123456", status: "delivered" });
+    const response = await syncing;
+    expect(await response.json()).toMatchObject({ status: "refunded", otpCode: null, synced: false });
+    const [saved] = await database.select().from(schema.orders).where(eq(schema.orders.id, order.id));
+    expect(saved.status).toBe("refunded");
+    expect(saved.otpCode).toBeNull();
+  });
+
+  it("keeps a rental active after a code so a later message can still be synced", async () => {
+    const [order] = await database.insert(schema.orders).values({
+      reference: "OLD-RENTAL-ORDER", userId: USER, service: "numbers", productSlug: "rent-us-30", productName: "Rental",
+      planLabel: "30 days", region: "US", duration: "Rent for 30 days", amount: 1000, status: "active",
+      provider: "fleexa", providerRequestId: "legacy-rental", expiresAt: new Date(Date.now() + 60_000),
+    }).returning();
+    mocks.rentalSms.mockResolvedValueOnce({ messages: [{ code: "111111", body: "First code" }] })
+      .mockResolvedValueOnce({ messages: [{ code: "222222", body: "Second code" }] });
+    const context = { params: Promise.resolve({ id: order.id }) };
+    const url = `https://pryva.test/api/orders/${order.id}/sync`;
+    expect(await (await syncRoute.GET(new Request(url), context)).json()).toMatchObject({ otpCode: "111111", status: "active" });
+    expect(await (await syncRoute.GET(new Request(url), context)).json()).toMatchObject({ otpCode: "222222", status: "active" });
+    const [saved] = await database.select().from(schema.orders).where(eq(schema.orders.id, order.id));
+    expect(saved).toMatchObject({ otpCode: "222222", status: "active" });
+  });
+
+  it("uses timestamps and never overwrites a newer rental code with a stale poll", async () => {
+    const [order] = await database.insert(schema.orders).values({
+      reference: "RACE-RENTAL-ORDER", userId: USER, service: "numbers", productSlug: "rent-us-30", productName: "Rental",
+      planLabel: "30 days", region: "US", duration: "Rent for 30 days", amount: 1000, status: "active",
+      provider: "fleexa", providerRequestId: "legacy-rental", expiresAt: new Date(Date.now() + 60_000),
+    }).returning();
+    let finishOld!: (value: unknown) => void;
+    let finishNew!: (value: unknown) => void;
+    mocks.rentalSms.mockReturnValueOnce(new Promise((resolve) => { finishOld = resolve; }))
+      .mockReturnValueOnce(new Promise((resolve) => { finishNew = resolve; }));
+    const context = { params: Promise.resolve({ id: order.id }) };
+    const url = `https://pryva.test/api/orders/${order.id}/sync`;
+    const oldPoll = syncRoute.GET(new Request(url), context);
+    await vi.waitFor(() => expect(mocks.rentalSms).toHaveBeenCalledTimes(1));
+    const newPoll = syncRoute.GET(new Request(url), context);
+    await vi.waitFor(() => expect(mocks.rentalSms).toHaveBeenCalledTimes(2));
+    finishNew({ messages: [{ code: "111111", at: "2026-01-01T00:00:00Z" }, { code: "222222", at: "2026-01-02T00:00:00Z" }] });
+    expect(await (await newPoll).json()).toMatchObject({ otpCode: "222222", status: "active" });
+    finishOld({ messages: [{ code: "111111", at: "2026-01-01T00:00:00Z" }] });
+    expect(await (await oldPoll).json()).toMatchObject({ otpCode: "222222", status: "active", synced: false });
+  });
+
+  it("validates scheduled orders, protects mutations, and cannot reactivate live fulfillment", async () => {
+    const request = (method: string, body: unknown, origin = "https://pryva.test") => new NextRequest("https://pryva.test/api/scheduled-orders", {
+      method, headers: { origin, "content-type": "application/json" }, body: JSON.stringify(body),
+    });
+    vi.stubEnv("DATABASE_URL", "");
+    expect((await scheduledRoute.POST(request("POST", { service: "numbers", productSlug: "vn-ng", frequency: "daily" }, "https://evil.pryva.test"))).status).toBe(403);
+    expect((await scheduledRoute.POST(request("POST", { service: "numbers", productSlug: "vn-ng", frequency: "immediate" }))).status).toBe(400);
+    expect((await scheduledRoute.POST(request("POST", { service: "esim", productSlug: "vn-ng", frequency: "daily" }))).status).toBe(400);
+    const created = await scheduledRoute.POST(request("POST", { service: "numbers", productSlug: "vn-ng", frequency: "daily" }));
+    expect(created.status).toBe(200);
+    const { id } = await created.json();
+    expect((await scheduledRoute.PATCH(request("PATCH", { orderId: id, action: "pause" }, "https://evil.pryva.test"))).status).toBe(403);
+    expect((await scheduledRoute.PATCH(request("PATCH", { orderId: id, action: "pause" }))).status).toBe(200);
+    vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db");
+    expect((await scheduledRoute.PATCH(request("PATCH", { orderId: id, action: "resume" }))).status).toBe(503);
+    expect((await database.select().from(schema.scheduledOrders))[0].status).toBe("paused");
+  });
+
+  it("does not use supplier promo APIs in preview or for cross-origin requests", async () => {
+    const request = (origin: string) => new NextRequest("https://pryva.test/api/accounts/promo", {
+      method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ slug: "listing", quantity: 1, code: "SAVE" }),
+    });
+    expect((await promoRoute.POST(request("https://evil.pryva.test"))).status).toBe(403);
+    vi.stubEnv("DATABASE_URL", "");
+    expect(await (await promoRoute.POST(request("https://pryva.test"))).json()).toMatchObject({ valid: false });
+    expect(mocks.getListing).not.toHaveBeenCalled();
+    expect(mocks.promo).not.toHaveBeenCalled();
+  });
+});

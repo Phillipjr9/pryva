@@ -33,12 +33,12 @@ import { getCurrentUser } from "@/lib/auth";
 export const metadata: Metadata = {
   title: "Pryva — Virtual numbers, eSIMs and proxies for Nigeria",
   description:
-    "Buy and rent real virtual numbers, eSIM data, residential proxies, email OTP and digital accounts. Pay in Naira, get instant delivery, and enjoy automatic refunds if a code doesn't arrive.",
+    "Explore plans for virtual numbers, eSIM data, residential proxies, email OTP and digital accounts, priced in Naira.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Pryva — Virtual numbers, eSIMs and proxies for Nigeria",
     description:
-      "Real numbers, eSIM data, residential proxies, inboxes and digital accounts. Pay in Naira, delivered in seconds, refunded automatically.",
+      "Explore numbers, eSIM data, residential proxies, inboxes and digital accounts, priced in Naira.",
     url: "/",
     images: [
       {
@@ -57,8 +57,8 @@ const shortcuts = shortcutSlugs.map((slug) => {
   const service = serviceMap[slug];
   const notes: Record<(typeof shortcutSlugs)[number], string> = {
     numbers: "Buy or rent",
-    esim: "190+ destinations",
-    proxies: "Nigeria-first pool",
+    esim: "Plan catalog",
+    proxies: "Plan catalog",
     "email-otp": "Temporary inboxes",
   };
   return {
@@ -73,35 +73,35 @@ const shortcuts = shortcutSlugs.map((slug) => {
 const features = [
   {
     title: "Pay in Naira, properly",
-    body: "Fund your wallet with a Nigerian bank transfer or card. No dollar card, no conversion surprises, no failed checkouts.",
+    body: "Configured live top-ups use Paystack. Preview balances are simulated and real top-ups are disabled.",
     icon: Card,
     span: "md:col-span-3",
     tone: "cream" as const,
   },
   {
-    title: "Auto-refund if no code",
-    body: "If a verification code doesn't arrive in the delivery window, one tap sends the money back to your wallet.",
+    title: "Support for delivery issues",
+    body: "Contact support with your order reference when delivery needs review.",
     icon: Shield,
     span: "md:col-span-3",
     tone: "lav" as const,
   },
   {
-    title: "Instant delivery",
-    body: "Numbers, inboxes and eSIM QR codes appear the moment payment clears.",
+    title: "Live fulfillment paused",
+    body: "Preview orders are simulated and do not deliver working numbers, inboxes or eSIMs.",
     icon: Bolt,
     span: "md:col-span-2",
     tone: "white" as const,
   },
   {
-    title: "Real non-VoIP lines",
-    body: "Carrier-grade numbers from vetted carrier partners, not recycled VoIP stock.",
+    title: "Explore the catalog",
+    body: "Compare plan types and prices; provider compatibility has not been verified.",
     icon: Phone,
     span: "md:col-span-2",
     tone: "white" as const,
   },
   {
-    title: "Built to rent long-term",
-    body: "Keep the same number for 7, 30 or 90 days and receive codes all month.",
+    title: "Review plan details",
+    body: "The catalog lists single-use and rental options, but live number fulfillment is paused.",
     icon: Clock,
     span: "md:col-span-2",
     tone: "white" as const,
@@ -112,77 +112,56 @@ const steps = [
   {
     n: "01",
     title: "Create an account",
-    body: "Sign up with your name and email. It takes less than a minute — no documents needed.",
+    body: "Sign up with your name, email and password, or use an available sign-in option.",
   },
   {
     n: "02",
     title: "Fund your wallet in Naira",
-    body: "Top up by bank transfer or card. Your balance is ready to spend immediately.",
+    body: "Configured live top-ups use Paystack. Preview balances are simulated.",
   },
   {
     n: "03",
     title: "Choose what you need",
-    body: "Pick a number, eSIM bundle, proxy pack, account or temp inbox from the dashboard.",
+    body: "Browse the catalog and check the current feature availability before ordering.",
   },
   {
     n: "04",
-    title: "Get it instantly",
-    body: "Codes, activation details and credentials appear in your dashboard right away.",
+    title: "Keep your reference",
+    body: "Contact support with the reference if an existing delivery needs review.",
   },
 ];
 
 const priceRows = [
   { slug: "numbers", note: "One-time, or rent for 7–90 days" },
-  { slug: "esim", note: "Per destination, QR delivered instantly" },
-  { slug: "proxies", note: "Per proxy pack, Nigeria-first pool" },
+  { slug: "esim", note: "Catalog data plans" },
+  { slug: "proxies", note: "Catalog proxy plans" },
   { slug: "email-otp", note: "From 24 hours to 30 days" },
 ] as const;
-
-const testimonials = [
-  {
-    quote:
-      "The auto-refund is the part that keeps me here. I try a platform, the code doesn't land, money comes back. No support ticket, no arguing.",
-    name: "Tola A.",
-    role: "Growth marketer · Lagos",
-  },
-  {
-    quote:
-      "I bought a Nigerian number on a Friday night to rent for 30 days. It worked first try on WhatsApp Business and I still have it.",
-    name: "Chidera O.",
-    role: "Founder · Enugu",
-  },
-  {
-    quote:
-      "The eSIM installed before my flight finished boarding. Landed in London with data and didn't touch a roaming plan.",
-    name: "Ifeanyi M.",
-    role: "Product designer · Abuja",
-  },
-];
 
 const faqs = [
   {
     q: "Do I need a dollar card to use Pryva?",
-    a: "No. Pryva prices everything in Naira. Fund your wallet with a Nigerian bank transfer or a local card, then pay from that balance. You never need a foreign card.",
+    a: "Catalog prices are shown in Naira. Available payment methods depend on the configured provider; real top-ups are disabled in preview.",
   },
   {
     q: "What happens if a verification code never arrives?",
-    a: "Every number order carries auto-refund protection. If no code arrives within the delivery window, open the order and tap Request auto-refund — the full amount returns to your wallet instantly, no ticket needed.",
+    a: "Contact support with your order reference. Live order refunds require verification of the provider outcome.",
   },
   {
     q: "Are the virtual numbers real or VoIP?",
-    a: "They are real, carrier-grade numbers sourced through vetted carrier partners. Being non-VoIP is precisely why platforms like WhatsApp, Telegram and Google accept them far more reliably.",
+    a: "Live number fulfillment is paused. Preview numbers are simulated and compatibility with any platform is not guaranteed.",
   },
   {
     q: "Can I keep the same number for longer than one code?",
-    a: "Yes. Choose a 7, 30 or 90-day rental. The line stays yours, so you can receive multiple SMS codes, keep a business identity consistent and renew whenever you need.",
+    a: "The catalog lists rental plans, but live fulfillment is paused and preview numbers cannot receive real messages.",
   },
   {
     q: "How quickly does delivery happen?",
-    a: "Instantly, in the same session. Number orders display the line and codes in your dashboard, eSIMs show a QR code and activation details, and account credentials are issued immediately after payment.",
+    a: "Live number, eSIM, proxy, email, data, bulk and scheduled fulfillment is paused. Preview orders are simulated.",
   },
   {
     q: "Which platforms work best with Pryva numbers?",
-    a: "WhatsApp, Telegram, Google, TikTok, Binance, Discord and most fintech apps work well with our Nigerian and international lines. A few platforms block shared numbers; if that happens, your order is refundable.",
+    a: "Compatibility varies by platform and cannot be guaranteed. Live number fulfillment is currently paused.",
   },
 ];
 
@@ -246,9 +225,8 @@ export default async function HomePage() {
 
               <Reveal delay={130}>
                 <p className="mx-auto mt-4 max-w-xl text-[0.95rem] leading-relaxed text-ink-2 sm:mt-6 sm:text-[1.05rem] lg:mx-0">
-                  Real virtual numbers, eSIM data, residential proxies, temporary inboxes and digital
-                  accounts — priced in Naira, delivered in seconds, refunded automatically when a
-                  code never arrives.
+                  Explore virtual numbers, eSIM data, residential proxies, temporary inboxes and
+                  digital accounts priced in Naira. Live fulfillment is currently paused.
                 </p>
               </Reveal>
 
@@ -294,10 +272,10 @@ export default async function HomePage() {
                     <div className="flex items-center justify-between gap-2">
                       <span className="inline-flex items-center gap-1.5 text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-ink-3">
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                        Live verification
+                        Example verification
                       </span>
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[0.58rem] font-semibold text-emerald-700">
-                        <Bolt className="h-2.5 w-2.5" /> Delivered in 9s
+                        <Bolt className="h-2.5 w-2.5" /> Sample only
                       </span>
                     </div>
 
@@ -306,10 +284,10 @@ export default async function HomePage() {
                         <CountryFlag code="ng" size={24} decorative />
                         <div className="min-w-0">
                           <p className="truncate text-[0.82rem] font-semibold tracking-tight">
-                            +234 812 445 9081
+                            +234 ••• ••• ••••
                           </p>
                           <p className="truncate text-[0.62rem] text-ink-3">
-                            Nigeria · non-VoIP line
+                            Nigeria · sample number
                           </p>
                         </div>
                       </div>
@@ -337,7 +315,7 @@ export default async function HomePage() {
                       </span>
                       <span className="inline-flex items-center gap-1">
                         <BrandIcon brand="whatsapp" size={12} variant="bare" decorative />
-                        WhatsApp-ready
+                        Example only
                       </span>
                     </div>
                   </div>
@@ -349,7 +327,7 @@ export default async function HomePage() {
             <div className="order-3 lg:col-start-1 lg:row-start-2">
               <Reveal delay={220}>
                 <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[0.78rem] text-ink-2 sm:gap-x-5 sm:text-[0.8rem] lg:justify-start">
-                  {["Instant delivery", "Auto-refund if no code", "Real non-VoIP numbers"].map((item) => (
+                  {["Naira pricing", "Support for delivery issues", "Explore number plans"].map((item) => (
                     <li key={item} className="inline-flex items-center gap-1.5">
                       <Check className="h-3.5 w-3.5 shrink-0 text-lav-600" />
                       {item}
@@ -357,7 +335,7 @@ export default async function HomePage() {
                   ))}
                 </ul>
                 <p className="mt-3 text-center text-[0.76rem] text-ink-3 lg:text-left">
-                  Pay in Naira · no dollar card · no documents needed
+                  Catalog prices in Naira · check service availability
                 </p>
               </Reveal>
             </div>
@@ -410,8 +388,7 @@ export default async function HomePage() {
               </Reveal>
               <Reveal delay={120}>
                 <p className="mt-4 max-w-lg text-[0.95rem] leading-relaxed text-ink-2">
-                  Nine ways to buy in Naira from a single wallet. Pay once, or keep a number, proxy
-                  pack or inbox running for as long as you need it.
+                  Explore nine catalog categories in one dashboard. Several live fulfillment paths are paused; preview orders are simulated.
                 </p>
               </Reveal>
             </div>
@@ -468,11 +445,11 @@ export default async function HomePage() {
                     <div className="relative mt-5 flex items-end justify-between gap-3 border-t border-line/80 pt-4">
                       <div className="min-w-0">
                         <p className="text-[0.78rem] text-ink-3">
-                          From{" "}
-                          <span className="text-[1rem] font-semibold text-ink">
-                            {formatNaira(service.fromPrice)}
-                          </span>{" "}
-                          <span className="text-[0.72rem]">{service.unit}</span>
+                          {service.slug === "accounts" ? "See supplier listings" : <>
+                            Catalog from{" "}
+                            <span className="text-[1rem] font-semibold text-ink">{formatNaira(service.fromPrice)}</span>{" "}
+                            <span className="text-[0.72rem]">{service.unit}</span>
+                          </>}
                         </p>
                         {popular && !inDashboard && (
                           <p className="mt-1 flex items-center gap-1.5 text-[0.7rem] text-ink-3">
@@ -545,9 +522,8 @@ export default async function HomePage() {
                     <br className="hidden sm:block" /> and TikTok accounts.
                   </h2>
                   <p className="mt-3 text-[0.92rem] leading-relaxed text-ink-2">
-                    Live stock with the price and expiry shown before you pay. Credentials land in
-                    your dashboard seconds after checkout, and a dead account is refunded — not
-                    argued about.
+                    Browse listings priced in Naira. Purchases may be paused, and uncertain
+                    delivery must be reviewed by support.
                   </p>
                   <div className="mt-5 flex flex-wrap items-center gap-2">
                     {["facebook", "instagram", "tiktok", "x"].map((brand) => (
@@ -564,10 +540,10 @@ export default async function HomePage() {
 
                 <div className="w-full max-w-sm rounded-2xl border border-line bg-white/85 p-5">
                   <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-ink-3">
-                    Accounts from
+                    Account marketplace
                   </p>
                   <p className="mt-1 text-[2rem] font-medium tracking-tight">
-                    {formatNaira(serviceMap.accounts.fromPrice)}
+                    Browse listings
                   </p>
                   <p className="mt-1 text-[0.78rem] text-ink-3">
                     Final price depends on the platform, age and follower count — always shown before
@@ -674,16 +650,15 @@ export default async function HomePage() {
                 </Reveal>
                 <Reveal delay={120}>
                   <p className="mt-4 max-w-xl text-[0.95rem] leading-relaxed text-ink-2">
-                    Codes, activation QR details and account credentials never disappear into an SMS
-                    you forgot to screenshot. Your wallet, orders and refunds live in one calm place.
+                    Your dashboard brings wallet transactions and order references together. Preview balances and orders are simulated.
                   </p>
                 </Reveal>
                 <Reveal delay={180}>
                   <ul className="mt-6 grid gap-3 sm:grid-cols-2">
                     {[
-                      "Live OTP codes with expiry timers",
+                      "Preview order details and expiry timers",
                       "Wallet top-ups and a full transaction ledger",
-                      "One-tap auto-refund on undelivered codes",
+                      "Order references for support review",
                       "Order history you can copy from any device",
                     ].map((item) => (
                       <li
@@ -706,11 +681,11 @@ export default async function HomePage() {
                   <div className="rounded-[1.5rem] border border-line bg-white p-4 shadow-[var(--shadow-card)]">
                     <div className="flex items-center justify-between">
                       <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-3">
-                        Order PV-2291
+                        Example Order PV-2291
                       </p>
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[0.6rem] font-semibold text-emerald-700">
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                        Live code
+                        Sample code
                       </span>
                     </div>
 
@@ -718,8 +693,8 @@ export default async function HomePage() {
                       <div className="flex min-w-0 items-center gap-2.5">
                         <CountryFlag code="ng" size={22} decorative />
                         <div className="min-w-0">
-                          <p className="truncate text-[0.82rem] font-semibold">+234 812 445 9081</p>
-                          <p className="text-[0.64rem] text-ink-3">Nigeria · non-VoIP</p>
+                          <p className="truncate text-[0.82rem] font-semibold">+234 ••• ••• ••••</p>
+                          <p className="text-[0.64rem] text-ink-3">Nigeria · sample number</p>
                         </div>
                       </div>
                       <Copy className="h-3.5 w-3.5 text-ink-3" />
@@ -753,9 +728,9 @@ export default async function HomePage() {
                       <Shield className="h-4 w-4" />
                     </span>
                     <div>
-                      <p className="text-[0.78rem] font-semibold">Auto-refund armed</p>
+                      <p className="text-[0.78rem] font-semibold">Order support</p>
                       <p className="text-[0.7rem] leading-relaxed text-ink-3">
-                        No code in the window? {formatNaira(1340)} returns to your wallet by itself.
+                        If delivery is uncertain, contact support with your order reference.
                       </p>
                     </div>
                   </div>
@@ -819,9 +794,8 @@ export default async function HomePage() {
               <p className="flex items-start gap-3 text-[0.86rem] text-ink-2">
                 <Shield className="mt-0.5 h-5 w-5 shrink-0 text-lav-600" />
                 <span>
-                  <span className="font-semibold text-ink">Refund promise:</span> if a code never
-                  arrives, you don&apos;t keep a support tab open for days. The amount returns to
-                  your wallet automatically.
+                  <span className="font-semibold text-ink">Refund review:</span> contact support
+                  with your order reference when delivery cannot be confirmed.
                 </span>
               </p>
               <Link href="/signup" className="btn btn-primary shrink-0 !px-5 !py-2.5 !text-[0.82rem]">
@@ -850,8 +824,7 @@ export default async function HomePage() {
             </div>
             <Reveal delay={100}>
               <p className="max-w-sm text-[0.88rem] leading-relaxed text-ink-3">
-                Every price is quoted in Naira and shown before you confirm. No dollar card, no
-                conversion fee, no subscription you forgot about.
+                Catalog prices are quoted in Naira. Review provider payment terms and service availability before confirming.
               </p>
             </Reveal>
           </div>
@@ -894,9 +867,9 @@ export default async function HomePage() {
                 <div>
                   <ul className="space-y-3">
                     {[
-                      "No monthly fee, ever",
+                      "Review prices before checkout",
                       "Wallet top-ups from ₦1,000",
-                      "Auto-refund on undelivered codes",
+                      "Support for delivery issues",
                       "Prices fixed in Naira at checkout",
                     ].map((item) => (
                       <li
@@ -910,8 +883,7 @@ export default async function HomePage() {
                   </ul>
                   <p className="mt-4 flex items-start gap-2 rounded-xl border border-line/70 bg-white/70 px-3 py-2.5 text-[0.74rem] leading-relaxed text-ink-3">
                     <Receipt className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
-                    Every price above comes from the same catalogue you buy from — nothing on this
-                    page is a placeholder.
+                    Catalog prices are shown for comparison. Live fulfillment is paused for these products.
                   </p>
                 </div>
                 <Link href="/pricing" className="btn btn-primary mt-6 w-full">
@@ -920,49 +892,6 @@ export default async function HomePage() {
                 </Link>
               </div>
             </Reveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ---------- TESTIMONIALS ---------- */}
-      <section className="pb-16 sm:pb-24">
-        <div className="shell">
-          <div className="mx-auto max-w-2xl text-center">
-            <Reveal>
-              <span className="eyebrow">07 / Kind words</span>
-            </Reveal>
-            <Reveal delay={60}>
-              <h2 className="mt-4 text-[2rem] font-medium leading-[1.08] sm:text-[2.6rem]">
-                Calm tools make{" "}
-                <span className="text-display italic text-lav-700">quiet fans.</span>
-              </h2>
-            </Reveal>
-          </div>
-          <div className="mt-10 grid gap-4 md:grid-cols-3">
-            {testimonials.map((item, index) => (
-              <Reveal key={item.name} delay={index * 80}>
-                <figure className="flex h-full flex-col rounded-[1.5rem] border border-line bg-[#fffdfa] p-6">
-                  <span className="text-display text-[2rem] leading-none text-lav-300" aria-hidden="true">
-                    &ldquo;
-                  </span>
-                  <blockquote className="mt-2 flex-1 text-[0.9rem] leading-relaxed text-ink-2">
-                    {item.quote}
-                  </blockquote>
-                  <figcaption className="mt-5 flex items-center gap-3 border-t border-line/80 pt-4">
-                    <span className="grid h-10 w-10 place-items-center rounded-full bg-lav-100 text-[0.78rem] font-semibold text-lav-700">
-                      {item.name
-                        .split(" ")
-                        .map((part) => part[0])
-                        .join("")}
-                    </span>
-                    <div>
-                      <p className="text-[0.82rem] font-semibold">{item.name}</p>
-                      <p className="text-[0.7rem] text-ink-3">{item.role}</p>
-                    </div>
-                  </figcaption>
-                </figure>
-              </Reveal>
-            ))}
           </div>
         </div>
       </section>
@@ -983,13 +912,12 @@ export default async function HomePage() {
             </Reveal>
             <Reveal delay={120}>
               <p className="mt-4 max-w-sm text-[0.9rem] leading-relaxed text-ink-2">
-                Still unsure about something? A real person replies from Lagos, usually within a few
-                hours.
+                Still unsure? Contact support with your question or order reference.
               </p>
             </Reveal>
             <Reveal delay={160}>
               <Link href="/contact" className="btn btn-ghost mt-6">
-                Chat with support
+                Contact support
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Reveal>
@@ -1024,9 +952,8 @@ export default async function HomePage() {
                     <span className="text-display italic text-lav-200">two minutes.</span>
                   </h2>
                   <p className="mt-4 max-w-md text-[0.92rem] leading-relaxed text-white/70">
-                    Create a free account, fund your wallet in Naira, and buy your first number,
-                    eSIM, account or inbox today. Refunds are automatic, so there&apos;s little to
-                    lose.
+                    Create an account to explore the dashboard. Preview balances and orders are
+                    simulated; live service fulfillment is currently paused.
                   </p>
                   <div className="mt-7 flex flex-col gap-2.5 sm:flex-row">
                     <Link
@@ -1062,9 +989,9 @@ export default async function HomePage() {
 
                 <div className="grid gap-2.5">
                   {[
-                    { label: "Delivery", value: "Instant, in your dashboard" },
+                    { label: "Number fulfillment", value: "Paused" },
                     { label: "Payments", value: "Bank transfer or card" },
-                    { label: "Refunds", value: "Automatic if no code" },
+                    { label: "Refunds", value: "Reviewed by support" },
                     { label: "Coverage", value: "Numbers, eSIM, proxies, accounts" },
                   ].map((item) => (
                     <div
@@ -1087,7 +1014,7 @@ export default async function HomePage() {
       </section>
 
       <StickyMobileCta
-        label="Instant delivery · auto-refund"
+        label="Explore plans · Naira pricing"
         price={serviceMap["email-otp"].fromPrice}
         targetId="final-cta"
       />

@@ -139,7 +139,7 @@
 | **41** | Dark mode + ⌘K command palette | ✅ | `components/theme/*` and `components/command/CommandPalette.tsx` (mounted in `DashboardShell`). |
 | **42** | PWA (installable, offline, icons) | ⬜ | No `manifest.json`, `sw.js`, `offline.html`, no PWA meta, `public/` only holds images + logo. |
 | **43** | Analytics (GA4 / Web Vitals) | ⬜ | Nothing. |
-| **44** | Automated tests that can actually run | ✅ | Vitest installed + `vitest.config.ts` + `npm test`. **22 files / 156 tests pass**, including pricing, webhook-signature, admin-authorization and withdrawal-security suites. |
+| **44** | Automated tests that can actually run | ✅ | Vitest installed + `vitest.config.mts` + `npm test`. **22 files / 156 tests pass**, including pricing, webhook-signature, admin-authorization and withdrawal-security suites. |
 | **45** | Security suite: rate limiting, validation, anti-RE, sanitisation | 🟡 | ✅ `rate-limit`, `validation`, `security`, `protection`, `anti-reverse-engineering`, `sanitize`, `logger`, `errors`, `proxy` (middleware), ✅ signed webhook, ✅ admin authz, ✅ constant-time signature compare. ⬜ no `audit.ts` (audit trail), ⬜ no bot detection, ⬜ no CSP (#6). |
 | **46** | Docs: README, RUNBOOK, .env.example, payment-flow doc | 🟡 | ✅ `PLAN.md`, ✅ `.env.example` (all keys documented incl. FX + markup). ⬜ README, ⬜ RUNBOOK, ⬜ payment-flow doc. |
 | **47** | CI/CD, Dockerfile, migrations hygiene | ⬜ | No `.github/`, no Dockerfile. 5 SQL migrations vs 11 tables → still drift. |

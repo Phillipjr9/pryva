@@ -4,6 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import { isPreviewDatabase } from "@/lib/demo-policy";
 import { formatNaira, serviceMap } from "@/lib/catalog";
 import { ArrowRight, ArrowUpRight, Clock, Receipt, Search, Sparkle } from "@/components/icons";
 import { EmptyState } from "@/components/dashboard/EmptyState";
@@ -101,7 +102,7 @@ export default async function OrdersPage({
             Every number, eSIM, proxy pack and inbox you&apos;ve bought — with codes kept safe.
           </p>
         </div>
-        <Link href="/pricing" className="btn btn-primary !px-4 !py-2.5 !text-[0.78rem]">
+        <Link href={isPreviewDatabase() ? "/dashboard/services" : "/pricing"} className="btn btn-primary !px-4 !py-2.5 !text-[0.78rem]">
           <Sparkle className="h-3.5 w-3.5" /> New order
         </Link>
       </div>
@@ -146,8 +147,8 @@ export default async function OrdersPage({
         <EmptyState
           icon={Receipt}
           title="No orders yet"
-          body={`Your first purchase appears here instantly, with its code and timer. Numbers start at ${formatNaira(serviceMap.numbers.fromPrice)} and temporary inboxes at ${formatNaira(serviceMap["email-otp"].fromPrice)}.`}
-          action={{ label: "Browse pricing", href: "/pricing" }}
+          body={isPreviewDatabase() ? "Your simulated orders and demo codes will appear here." : `Orders and their references appear here. Live number and inbox fulfillment is paused; catalog prices start at ${formatNaira(serviceMap.numbers.fromPrice)} and ${formatNaira(serviceMap["email-otp"].fromPrice)} respectively.`}
+          action={isPreviewDatabase() ? { label: "Explore demo services", href: "/dashboard/services" } : { label: "Browse pricing", href: "/pricing" }}
         />
       ) : matches.length === 0 ? (
         <EmptyState

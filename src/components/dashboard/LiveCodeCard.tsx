@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Clock, Copy } from "@/components/icons";
 import { CountryFlag } from "@/components/CountryFlag";
 import { formatNaira } from "@/lib/catalog";
+import { useDemoOtp } from "@/components/dashboard/useDemoOtp";
 
 export type LiveCode = {
   id: string;
@@ -16,6 +18,8 @@ export type LiveCode = {
   otpCode: string | null;
   expiresAt: string | null;
   createdAt: string;
+  service?: string;
+  provider?: string | null;
 };
 
 function remainingSeconds(expiresAt: string | null, now: number): number | null {
@@ -35,13 +39,41 @@ function formatCountdown(seconds: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
 }
 
+function DemoCodeWatcher({ orderId, enabled }: { orderId: string; enabled: boolean }) {
+  const { code, retrying } = useDemoOtp(orderId, enabled, null);
+  const [copied, setCopied] = useState(false);
+  const router = useRouter();
+  useEffect(() => { if (code) router.refresh(); }, [code, router]);
+  async function copyCode() {
+    if (!code) return;
+    try { await navigator.clipboard.writeText(code); setCopied(true); }
+    catch { setCopied(false); }
+  }
+  if (!enabled && !code) return null;
+  return (
+    <div role="status" aria-live="polite" className="mt-3 rounded-xl border border-lav-100 bg-lav-50/60 p-3">
+      <p className="text-[0.68rem] font-semibold text-lav-700">{code ? "Demo code received" : retrying ? "Checking again shortly…" : "Waiting for your demo code…"}</p>
+      {code ? (
+        <div className="mt-2 flex items-stretch gap-2">
+          <div className="flex flex-1 gap-1" aria-label={`Demo code ${code}`}>
+            {code.split("").map((digit, index) => <span key={index} aria-hidden="true" className="otp-arrive grid h-10 flex-1 place-items-center rounded-lg border border-lav-200 bg-white font-mono text-[1.05rem] font-semibold text-ink" style={{ animationDelay: `${index * 70}ms` }}>{digit}</span>)}
+          </div>
+          <button type="button" onClick={() => void copyCode()} className="rounded-lg bg-ink px-3 text-[0.72rem] font-semibold text-white">{copied ? "Copied" : "Copy"}</button>
+        </div>
+      ) : <div aria-hidden="true" className="mt-2 h-1.5 overflow-hidden rounded-full bg-lav-100"><div className="demo-progress h-full w-1/3 rounded-full bg-lav-500" /></div>}
+    </div>
+  );
+}
+
 /**
  * The reason someone opens this dashboard: a code is on a timer and they need to
  * paste it somewhere. It gets its own card, a live countdown and a one-tap copy —
  * no navigating through Orders → order → copy.
  */
-export function LiveCodeCard({ codes }: { codes: LiveCode[] }) {
-  const [now, setNow] = useState(() => Date.now());
+export function LiveCodeCard({ codes, initialNow, preview = false }: { codes: LiveCode[]; initialNow: number; preview?: boolean }) {
+  // The server timestamp is serialized with the page, so the first browser
+  // render agrees with the HTML even if hydration happens seconds later.
+  const [now, setNow] = useState(initialNow);
   const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
@@ -77,7 +109,7 @@ export function LiveCodeCard({ codes }: { codes: LiveCode[] }) {
     <section aria-labelledby="live-codes-heading" className="grid gap-2.5">
       <div className="flex items-center justify-between">
         <h2 id="live-codes-heading" className="text-[1rem] font-semibold">
-          Live now
+          {preview ? "Demo codes" : "Live now"}
         </h2>
         <Link
           href="/dashboard/orders"
@@ -129,13 +161,17 @@ export function LiveCodeCard({ codes }: { codes: LiveCode[] }) {
               )}
             </div>
 
+            {!code.otpCode && preview && code.provider === "simulated" && (code.service === "numbers" || code.service === "email-otp") && (
+              <DemoCodeWatcher orderId={code.id} enabled={!expired} />
+            )}
             {code.otpCode && (
               <div className="mt-3 flex items-stretch gap-2">
                 <div className="flex flex-1 gap-1">
                   {code.otpCode.split("").map((digit, index) => (
                     <span
                       key={`${code.id}-${index}`}
-                      className="grid h-10 flex-1 place-items-center rounded-lg border border-line bg-white text-[1.05rem] font-semibold tabular-nums text-ink"
+                      className="otp-arrive grid h-10 flex-1 place-items-center rounded-lg border border-line bg-white text-[1.05rem] font-semibold tabular-nums text-ink"
+                      style={{ animationDelay: `${index * 70}ms` }}
                     >
                       {digit}
                     </span>
@@ -167,9 +203,9 @@ export function LiveCodeCard({ codes }: { codes: LiveCode[] }) {
               >
                 Open order
               </Link>
-              {expired && !code.otpCode && (
+              {expired && !code.otpCode && !preview && (
                 <span className="text-[0.7rem] text-ink-3">
-                  Auto-refund releases the amount back to your wallet.
+                  Contact support to review refund eligibility.
                 </span>
               )}
             </div>

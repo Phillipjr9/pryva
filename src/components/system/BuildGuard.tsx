@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useServerInsertedHTML } from "next/navigation";
 import { staleBuildScript } from "@/lib/build-id";
 
@@ -23,13 +24,32 @@ import { staleBuildScript } from "@/lib/build-id";
  * document server-side and never becomes part of the client tree.
  */
 export function BuildGuard({ buildId }: { buildId: string }) {
-  useServerInsertedHTML(() => (
-    <script
-      id="pryva-build-guard"
-      data-build={buildId}
-      dangerouslySetInnerHTML={{ __html: staleBuildScript(buildId) }}
-    />
-  ));
+  useEffect(() => {
+    // Existing preview sessions should pick up bridge security fixes promptly.
+    // This only updates our worker if it is already installed; it never
+    // registers a worker for other environments.
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.getRegistration("/").then((registration) => {
+      const script = registration?.active?.scriptURL;
+      if (script && new URL(script).origin === window.location.origin && new URL(script).pathname === "/preview-demo-bridge.js") {
+        return registration.update();
+      }
+    }).catch(() => {});
+  }, []);
+  const inserted = useRef(false);
+  useServerInsertedHTML(() => {
+    // Next can flush server-inserted HTML multiple times while streaming a page.
+    // Install one guard, not a fresh set of listeners and version requests per flush.
+    if (inserted.current) return null;
+    inserted.current = true;
+    return (
+      <script
+        id="pryva-build-guard"
+        data-build={buildId}
+        dangerouslySetInnerHTML={{ __html: staleBuildScript(buildId) }}
+      />
+    );
+  });
 
   return null;
 }

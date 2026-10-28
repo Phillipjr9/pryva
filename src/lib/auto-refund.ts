@@ -1,135 +1,73 @@
+import { randomBytes } from "node:crypto";
+import { and, eq, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { orders, walletTransactions, users } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
-import { isTimedOut } from "./service-timeouts";
-import { isRefundEligible } from "./gift-cards";
-import type { Transaction } from "@/lib/db-types";
+import { orders, users, walletTransactions } from "@/db/schema";
+import { isPreviewDatabase } from "@/lib/demo-policy";
+import { SERVICE_TIMEOUTS } from "@/lib/service-timeouts";
+import { PREVIEW_SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
 
+/**
+ * Refund timed-out, code-less *simulated* single-number orders only.
+ *
+ * Live provider cancellation and delivery semantics are not verified. Never use
+ * this sweep for a persistent database: those orders need manual reconciliation.
+ * The order claim, balance increment and ledger entry are one transaction so a
+ * concurrent sweep or manual refund cannot credit an order twice.
+ */
 export async function processAutoRefunds(): Promise<number> {
-  const pendingOrders = await db.query.orders.findMany({
-    where: eq(orders.status, "active"),
-  });
+  if (!isPreviewDatabase()) {
+    throw new Error("Live automatic refunds require provider reconciliation");
+  }
 
+  const cutoff = new Date(Date.now() - SERVICE_TIMEOUTS.numbers.delivery);
+  const eligible = and(
+    eq(orders.status, "active"),
+    eq(orders.provider, "simulated"),
+    eq(orders.service, "numbers"),
+    eq(orders.duration, PREVIEW_SINGLE_NUMBER_WINDOW),
+    isNull(orders.otpCode),
+    isNull(orders.refundedAt),
+    lte(orders.createdAt, cutoff),
+  );
+  const candidates = await db.select().from(orders).where(eligible).limit(100);
   let refunded = 0;
 
-  for (const order of pendingOrders) {
+  for (const candidate of candidates) {
     try {
-      // Check if order is eligible for refund
-      if (!isRefundEligible({ type: "debit", description: order.productName })) {
-        continue;
-      }
-
-      // Check if order has timed out
-      if (!isTimedOut(order.createdAt, order.service)) {
-        continue;
-      }
-
-      // Process refund
-      await db.transaction(async (tx: Transaction) => {
-        const user = await tx.query.users.findFirst({
-          where: eq(users.id, order.userId),
-        });
-
-        if (!user) return;
-
-        const newBalance = user.walletBalance + order.amount;
-
-        await tx.update(users).set({ walletBalance: newBalance }).where(eq(users.id, order.userId));
-
-        await tx
-          .update(orders)
+      const credited = await db.transaction(async (tx) => {
+        // Repeat every eligibility condition in the UPDATE, not just the
+        // initial SELECT: delivery or another refund may have won the race.
+        const [claimed] = await tx.update(orders)
           .set({ status: "refunded", refundedAt: new Date() })
-          .where(eq(orders.id, order.id));
+          .where(and(eq(orders.id, candidate.id), eligible))
+          .returning();
+        if (!claimed) return false;
+        if (!Number.isSafeInteger(claimed.amount) || claimed.amount <= 0) {
+          throw new Error("Invalid order amount");
+        }
+
+        const [user] = await tx.update(users)
+          .set({ walletBalance: sql`${users.walletBalance} + ${claimed.amount}` })
+          .where(eq(users.id, claimed.userId))
+          .returning({ balance: users.walletBalance });
+        if (!user) throw new Error("Refund user not found");
 
         await tx.insert(walletTransactions).values({
-          userId: order.userId,
-          orderId: order.id,
-          type: "credit",
-          amount: order.amount,
-          balanceAfter: newBalance,
-          description: `Auto-refund: ${order.productName} (delivery timeout)`,
-          reference: `REFUND-${order.reference}`,
+          userId: claimed.userId,
+          orderId: claimed.id,
+          type: "refund",
+          amount: claimed.amount,
+          balanceAfter: user.balance,
+          description: `Auto-refund: ${claimed.productName} (no code)`.slice(0, 200),
+          reference: `RFD-${randomBytes(12).toString("hex")}`,
         });
+        return true;
       });
-
-      refunded++;
+      if (credited) refunded++;
     } catch (error) {
-      console.error(`Failed to process refund for order ${order.id}:`, error);
+      console.error(`Failed to process refund for order ${candidate.id}:`, error);
     }
   }
 
   return refunded;
-}
-
-export async function refundOrder(orderId: string, reason: string = "Manual refund"): Promise<void> {
-  const order = await db.query.orders.findFirst({
-    where: eq(orders.id, orderId),
-  });
-
-  if (!order) {
-    throw new Error("Order not found");
-  }
-
-  if (order.status === "refunded") {
-    throw new Error("Order already refunded");
-  }
-
-  if (!isRefundEligible({ type: "debit", description: order.productName })) {
-    throw new Error("Order not eligible for refund");
-  }
-
-  await db.transaction(async (tx) => {
-    const user = await tx.query.users.findFirst({
-      where: eq(users.id, order.userId),
-    });
-
-    if (!user) throw new Error("User not found");
-
-    const newBalance = user.walletBalance + order.amount;
-
-    await tx.update(users).set({ walletBalance: newBalance }).where(eq(users.id, order.userId));
-
-    await tx
-      .update(orders)
-      .set({ status: "refunded", refundedAt: new Date() })
-      .where(eq(orders.id, order.id));
-
-    await tx.insert(walletTransactions).values({
-      userId: order.userId,
-      orderId: order.id,
-      type: "credit",
-      amount: order.amount,
-      balanceAfter: newBalance,
-      description: `Refund: ${order.productName} (${reason})`,
-      reference: `REFUND-${order.reference}`,
-    });
-  });
-}
-
-export async function getOrderRefundStatus(orderId: string): Promise<{
-  refundable: boolean;
-  reason?: string;
-  timeoutRemaining?: number;
-}> {
-  const order = await db.query.orders.findFirst({
-    where: eq(orders.id, orderId),
-  });
-
-  if (!order) {
-    return { refundable: false, reason: "Order not found" };
-  }
-
-  if (order.status === "refunded") {
-    return { refundable: false, reason: "Already refunded" };
-  }
-
-  if (order.status === "delivered") {
-    return { refundable: false, reason: "Order delivered successfully" };
-  }
-
-  if (!isRefundEligible({ type: "debit", description: order.productName })) {
-    return { refundable: false, reason: "Not eligible for refund" };
-  }
-
-  return { refundable: true };
 }

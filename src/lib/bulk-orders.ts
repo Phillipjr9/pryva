@@ -30,11 +30,16 @@ export function calculateBulkOrder(items: BulkOrderItem[]): BulkOrderResult {
   };
 
   for (const item of items) {
-    const plan = findPlan(item.productSlug);
-    if (!plan) continue;
+    const plan = typeof item?.productSlug === "string" ? findPlan(item.productSlug) : undefined;
+    if (!plan || !Number.isSafeInteger(item.quantity) || item.quantity < 1) {
+      throw new Error("Invalid bulk-order item");
+    }
 
     const subtotal = plan.price * item.quantity;
-    
+    if (!Number.isSafeInteger(subtotal) || !Number.isSafeInteger(result.subtotal + subtotal)) {
+      throw new Error("Bulk-order total is too large");
+    }
+
     result.items.push({
       productSlug: item.productSlug,
       productName: plan.name,
@@ -49,6 +54,7 @@ export function calculateBulkOrder(items: BulkOrderItem[]): BulkOrderResult {
   // Discount is a courtesy, not a loss-leader: the basket may only give away as
   // much headroom as its thinnest-margin line can afford (30% floor).
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+  if (!Number.isSafeInteger(totalQuantity)) throw new Error("Bulk-order quantity is too large");
 
   let tierPercent = 0;
   if (totalQuantity >= 20) {
@@ -68,6 +74,27 @@ export function calculateBulkOrder(items: BulkOrderItem[]): BulkOrderResult {
   result.total = result.subtotal - result.discount;
 
   return result;
+}
+
+// Allocate the basket discount to individual simulated orders so their amounts
+// add up exactly to the wallet deduction, including whole-naira rounding.
+export function expandBulkOrder(result: BulkOrderResult) {
+  if (!Number.isSafeInteger(result.subtotal) || !Number.isSafeInteger(result.discount) || result.subtotal <= 0 || result.discount < 0 || result.discount > result.subtotal || result.total !== result.subtotal - result.discount) {
+    throw new Error("Invalid bulk-order total");
+  }
+  const units = result.items.flatMap((item) => Array.from({ length: item.quantity }, () => {
+    const numerator = BigInt(result.discount) * BigInt(item.unitPrice);
+    return {
+      productSlug: item.productSlug,
+      productName: item.productName,
+      amount: item.unitPrice - Number(numerator / BigInt(result.subtotal)),
+      remainder: numerator % BigInt(result.subtotal),
+    };
+  }));
+  const remaining = units.reduce((sum, item) => sum + item.amount, 0) - result.total;
+  const ranked = [...units].sort((a, b) => a.remainder === b.remainder ? 0 : a.remainder > b.remainder ? -1 : 1);
+  for (let i = 0; i < remaining; i++) ranked[i].amount--;
+  return units.map(({ remainder: _remainder, ...item }) => item);
 }
 
 export function getBulkDiscountMessage(quantity: number, appliedPercent?: number): string | null {

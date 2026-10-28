@@ -3,6 +3,9 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAuthApi } from "@/lib/auth";
+import { isSameOriginMutation } from "@/lib/net";
+import { isSharedPreviewUser } from "@/lib/demo-policy";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +33,7 @@ export async function GET(request: NextRequest) {
         walletBalance: userProfile.walletBalance,
         createdAt: userProfile.createdAt.toISOString(),
       },
-    });
+    }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     console.error("Failed to fetch profile:", error);
     return NextResponse.json({ error: "Failed to fetch profile" }, { status: 500 });
@@ -44,10 +47,18 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { name } = body;
+    if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+    if (isSharedPreviewUser(user)) return NextResponse.json({ error: "The shared demo profile is view-only." }, { status: 403 });
+    if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
+    let body: unknown;
+    try {
+      body = await readJsonWithLimit(request, 2_048);
+    } catch (error) {
+      return NextResponse.json({ error: "Invalid request" }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
+    }
+    const name = body && typeof body === "object" && !Array.isArray(body) ? (body as { name?: unknown }).name : null;
 
-    if (!name || typeof name !== "string" || name.trim().length < 2) {
+    if (typeof name !== "string" || name.trim().length < 2 || name.trim().length > 120) {
       return NextResponse.json({ error: "Invalid name" }, { status: 400 });
     }
 

@@ -9,3 +9,8 @@ export function isPreviewDatabase(): boolean {
 export function isDemoEmail(email: string): boolean {
   return email.trim().toLowerCase() === DEMO_EMAIL;
 }
+
+/** The one-click account is shared by visitors, never a private profile. */
+export function isSharedPreviewUser(user: { email: string }): boolean {
+  return isPreviewDatabase() && typeof user.email === "string" && isDemoEmail(user.email);
+}

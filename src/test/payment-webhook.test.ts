@@ -140,6 +140,20 @@ describe("Paystack webhook", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
+  it("verifies the exact signed UTF-8 body, including a byte order mark", async () => {
+    const state = fakeDatabase();
+    const body = `\uFEFF${JSON.stringify(payload({ description: "₦ credit ✓" }))}`;
+    expect((await POST(request(body))).status).toBe(200);
+    expect(state.balance).toBe(3000);
+    expect(state.ledger).toHaveLength(1);
+  });
+
+  it("rejects oversized payloads before signature or database processing", async () => {
+    const body = JSON.stringify({ event: "other", padding: "x".repeat(131_072) });
+    expect((await POST(request(body))).status).toBe(413);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
   it("rejects malformed and non-NGN or fractional-naira payments", async () => {
     expect((await POST(request("{"))).status).toBe(400);
     expect((await POST(request(JSON.stringify(payload({ currency: "USD" }))))).status).toBe(400);
@@ -164,6 +178,17 @@ describe("Paystack webhook", () => {
     expect(state.balance).toBe(3000);
     expect(state.ledger).toHaveLength(1);
     expect(state.ledger[0]).toMatchObject({ userId, reference, amount: 2500, balanceAfter: 3000 });
+  });
+
+  it("accepts signed stringified metadata, but rejects malformed or mismatched metadata", async () => {
+    const state = fakeDatabase();
+    for (const metadata of ["not json", "x".repeat(4097), JSON.stringify({ userId, type: "other" }), JSON.stringify([userId])]) {
+      expect((await POST(request(JSON.stringify(payload({ metadata }))))).status).toBe(400);
+    }
+    const response = await POST(request(JSON.stringify(payload({ metadata: JSON.stringify({ userId, type: "wallet_topup" }) }))));
+    expect(response.status).toBe(200);
+    expect(state.balance).toBe(3000);
+    expect(state.ledger).toHaveLength(1);
   });
 
   it("does not credit a payment when its amount differs from the pending record", async () => {

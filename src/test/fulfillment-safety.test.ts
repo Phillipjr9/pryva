@@ -16,6 +16,8 @@ describe("fulfilment safety", () => {
     const fetch = vi.spyOn(globalThis, "fetch");
     const plan = findPlan("vn-ng");
     expect(plan).toBeDefined();
+    // Legacy mappings silently routed some countries to different countries.
+    expect(plan).not.toHaveProperty("provider");
     const result = await fulfillPlan(plan!);
     expect(result.provider).toBe("simulated");
     expect(result.providerRequestId).toBeNull();

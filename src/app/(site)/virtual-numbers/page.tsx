@@ -7,7 +7,7 @@ import { hasCountryFlag } from "@/lib/countries";
 
 export const metadata: Metadata = {
   title: "Virtual Numbers",
-  description: "Buy virtual numbers from 40+ countries for SMS verification. Non-VoIP, instant delivery, auto-refund.",
+  description: "Explore virtual-number plans for SMS verification, priced in Naira.",
 };
 
 export default function VirtualNumbersPage() {
@@ -98,8 +98,7 @@ export default function VirtualNumbersPage() {
         <div className="shell">
           <h2 className="mb-3 text-[1.75rem] font-semibold text-ink">Countries</h2>
           <p className="mb-6 max-w-2xl text-[0.95rem] text-ink-2">
-            Real flags, real numbers. Nigeria, the US, the UK, Canada, Germany and Ghana are
-            live today; the rest of the coverage activates as carriers come online.
+            These regions appear in the catalog. Live number fulfillment is paused and actual coverage requires provider verification.
           </p>
           <CountryChips
             codes={["ng", "us", "gb", "ca", "de", "gh", "ke", "za", "in", "ae", "fr", "nl"]}

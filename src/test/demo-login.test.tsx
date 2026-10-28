@@ -29,7 +29,9 @@ describe("one-click demo login", () => {
 
   it("still reads as a demo and says what it gives you", () => {
     expect(html).toContain("One-Click Demo Login");
-    expect(html).toContain("Demo starts signed in with ₦25,000 wallet credit");
+    expect(html).toContain("Shared public demo with simulated credit");
+    expect(html).toContain("Other visitors can see its activity");
+    expect(html).toContain("do not enter personal information");
   });
 
   it("never intercepts the submit with a client-side request", () => {
@@ -67,6 +69,9 @@ describe("login page resilience to a stale client bundle", () => {
     expect(loginPageSource).toContain("function BounceNotice");
     expect(loginPageSource).toContain('bounced === "1"');
     expect(loginPageSource).toContain("/api/auth/whoami");
+    expect(loginPageSource).toContain('target="_blank"');
+    expect(loginPageSource).toContain("Open sign-in in a new tab");
+    expect(loginPageSource).not.toContain("The sign-in itself worked");
   });
 
   it("passes AuthForm the same three props it has always taken", () => {

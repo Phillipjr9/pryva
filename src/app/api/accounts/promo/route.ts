@@ -4,6 +4,10 @@ import { getListing } from "@/lib/accszone";
 import { applyPromoDiscount, priceMarketplaceListing } from "@/lib/marketplace-pricing";
 import { requireAuthApi } from "@/lib/auth";
 import { logger } from "@/lib/logger";
+import { isSameOriginMutation } from "@/lib/net";
+import { isMarketplacePurchaseEnabled } from "@/lib/marketplace-policy";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { purchaseRateLimiter } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -17,26 +21,34 @@ export const dynamic = "force-dynamic";
  * 200 here so the UI can show inline text instead of an error state.
  */
 export async function POST(request: NextRequest) {
-  if (!isAccsZoneConfigured()) {
-    return NextResponse.json({ valid: false, message: "Promo codes are unavailable right now." }, { status: 200 });
-  }
-
   const user = await requireAuthApi();
   if (!user) {
     return NextResponse.json({ error: "Please sign in to use a promo code." }, { status: 401 });
   }
+  if (!isSameOriginMutation(request)) return NextResponse.json({ valid: false, message: "Invalid origin." }, { status: 403 });
+  if (!isJsonRequest(request)) return NextResponse.json({ valid: false, message: "Expected JSON." }, { status: 415 });
+  if (!isMarketplacePurchaseEnabled() || !isAccsZoneConfigured()) {
+    return NextResponse.json({ valid: false, message: "Promo codes are unavailable right now." }, { status: 200 });
+  }
+  const limit = await purchaseRateLimiter(`accounts-promo:${user.id}`);
+  if (limit.unavailable) return NextResponse.json({ valid: false, message: "Promo codes are temporarily unavailable." }, { status: 503 });
+  if (!limit.allowed) return NextResponse.json({ valid: false, message: "Too many attempts. Try again later." }, { status: 429 });
 
   let body: { code?: unknown; slug?: unknown; quantity?: unknown };
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ valid: false, message: "Invalid request." }, { status: 200 });
+    const value = await readJsonWithLimit(request, 4_096);
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid body");
+    body = value;
+  } catch (error) {
+    return NextResponse.json({ valid: false, message: "Invalid request." }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
   }
 
-  const code = typeof body.code === "string" ? body.code.trim().toUpperCase().slice(0, 40) : "";
-  const slug = typeof body.slug === "string" ? body.slug.trim().slice(0, 200) : "";
-  const quantityRaw = Number(body.quantity);
-  const quantity = Number.isInteger(quantityRaw) && quantityRaw >= 1 && quantityRaw <= 50 ? quantityRaw : 1;
+  const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
+  const slug = typeof body.slug === "string" ? body.slug.trim() : "";
+  const quantity = typeof body.quantity === "number" ? body.quantity : Number(body.quantity);
+  if (code.length > 40 || slug.length > 80 || !Number.isInteger(quantity) || quantity < 1 || quantity > 50) {
+    return NextResponse.json({ valid: false, message: "Invalid promo request." }, { status: 400 });
+  }
 
   if (!code) {
     return NextResponse.json({ valid: false, message: "Enter a promo code." }, { status: 200 });

@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { and, count, eq, desc } from "drizzle-orm";
 import { Bell, Check, Clock } from "@/components/icons";
 import { MarkAllReadButton } from "./MarkAllReadButton";
 
@@ -17,7 +17,8 @@ export default async function NotificationsPage() {
     .orderBy(desc(notifications.createdAt))
     .limit(100);
 
-  const unreadCount = userNotifications.filter((n) => !n.read).length;
+  const [unread] = await db.select({ value: count() }).from(notifications).where(and(eq(notifications.userId, user.id), eq(notifications.read, 0)));
+  const unreadCount = Number(unread?.value ?? 0);
 
   return (
     <div className="grid gap-4">
@@ -38,7 +39,7 @@ export default async function NotificationsPage() {
           <Bell className="mx-auto h-16 w-16 text-ink-3 mb-4" />
           <h2 className="text-[1.1rem] font-semibold text-ink mb-2">No notifications yet</h2>
           <p className="text-[0.9rem] text-ink-2 max-w-md mx-auto">
-            You&apos;ll see notifications here when you receive orders, wallet top-ups, gift card redemptions, and other account activity.
+There are no notifications stored for this account.
           </p>
         </div>
       ) : (
