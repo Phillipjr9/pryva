@@ -1,0 +1,61 @@
+{
+  "_readme": "Hand-prepared catalog. These items have no API, so they are sold as Pryva catalog products and fulfilled through the admin queue (/admin/fulfilment). `costUsd` is what we pay per unit in USD; the selling price is derived from it by src/lib/pricing.ts (30-50% markup with a margin floor) using the live USD/NGN rate, so it is never typed in by hand. `stock` is deliberately absent: nothing publishes a live count for these, so `available` is our own declaration and the storefront says 'confirmed after payment' instead of inventing a number. This file is committed, so it must never contain the name of, or a URL for, anywhere an item is bought — that belongs in a private note outside the repository.",
+  "_updated": "2026-10-28",
+  "_cost_warning": "costUsd values are the rates published at the time of capture, not negotiated rates. Replace each one with what we actually pay before taking live orders, or the margin band is computed from the wrong cost.",
+  "products": {
+    "netflix-standard": {
+      "label": "Netflix Standard (1080p)",
+      "group": "Streaming",
+      "costUsd": "2.50",
+      "warrantyDays": 120,
+      "available": true,
+      "maxQuantity": 5,
+      "note": "4-month replacement window honoured by Pryva."
+    },
+    "netflix-premium": {
+      "label": "Netflix Premium (4K UHD)",
+      "group": "Streaming",
+      "costUsd": "4.00",
+      "warrantyDays": 120,
+      "available": true,
+      "maxQuantity": 5,
+      "note": "4-month replacement window honoured by Pryva."
+    },
+    "spotify-individual": {
+      "label": "Spotify Premium Individual",
+      "group": "Streaming",
+      "costUsd": "1.50",
+      "warrantyDays": 120,
+      "available": true,
+      "maxQuantity": 5,
+      "note": "Distinct from aged Spotify profiles, which are sourced through the catalog API."
+    },
+    "spotify-family": {
+      "label": "Spotify Premium Family",
+      "group": "Streaming",
+      "costUsd": "2.50",
+      "warrantyDays": 120,
+      "available": true,
+      "maxQuantity": 3,
+      "note": "4-month replacement window honoured by Pryva."
+    },
+    "disney-standard": {
+      "label": "Disney+ Standard",
+      "group": "Streaming",
+      "costUsd": "2.00",
+      "warrantyDays": 120,
+      "available": true,
+      "maxQuantity": 5,
+      "note": "4-month replacement window honoured by Pryva."
+    },
+    "disney-premium": {
+      "label": "Disney+ Premium (4K)",
+      "group": "Streaming",
+      "costUsd": "3.50",
+      "warrantyDays": 120,
+      "available": true,
+      "maxQuantity": 5,
+      "note": "4-month replacement window honoured by Pryva."
+    }
+  }
+}

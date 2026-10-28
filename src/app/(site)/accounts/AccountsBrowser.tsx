@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { PlatformBadge, platformFor } from "@/components/PlatformBadge";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
+import { warrantyBadge, warrantyLabel } from "@/lib/warranty";
 
 type Category = { id: number; title: string; slug: string };
 type Subcategory = { id: number; title: string; slug: string };
@@ -15,10 +16,21 @@ type Listing = {
   slug: string;
   title: string;
   stock: number | null;
-  sold: number;
+  sold: number | null;
   category: string | null;
   subcategory: string | null;
   priceNgn: number;
+  /** Pryva's own replacement window for this item. */
+  warrantyDays: number | null;
+  minQuantity: number;
+  maxQuantity: number;
+  /**
+   * Orderable right now. Kept separate from `stock` because a hand-prepared item
+   * has no published count — turning "available" into a number would invent one.
+   */
+  available: boolean;
+  /** "instant" delivers on payment; "manual" is confirmed afterwards. */
+  fulfilment: "instant" | "manual";
 };
 type Meta = { current_page: number; last_page: number; per_page: number; total: number };
 
@@ -28,7 +40,7 @@ const SORTS = [
   { value: "title", label: "A–Z" },
 ] as const;
 
-export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean }) {
+export function AccountsBrowser({ purchaseEnabled, preview = false }: { purchaseEnabled: boolean; preview?: boolean }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [configured, setConfigured] = useState(true);
@@ -52,6 +64,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
   const [buying, setBuying] = useState(false);
   const [buyError, setBuyError] = useState<string | null>(null);
   const [result, setResult] = useState<{ accounts: string[]; reference: string; totalNgn: number; warning?: string } | null>(null);
+  const [preparing, setPreparing] = useState<{ reference?: string; message: string } | null>(null);
   const [pending, setPending] = useState<{ reference?: string; message: string } | null>(null);
   const purchaseRequestId = useRef<string | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
@@ -160,12 +173,23 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
     setPage(1);
   }
 
+  /**
+   * Orderable right now? A hand-prepared item has no published stock count, so
+   * availability — not a number — decides whether it can be bought. Inventing a
+   * count for it would tell the customer something nobody knows.
+   */
+  function canBuy(listing: Listing): boolean {
+    if (!purchaseEnabled || loading || !listing.available) return false;
+    return listing.stock === null ? listing.fulfilment === "manual" : listing.stock >= listing.minQuantity;
+  }
+
   function openBuy(listing: Listing) {
-    if (!purchaseEnabled || loading || listing.stock === null || listing.stock < 1) return;
+    if (!canBuy(listing)) return;
     purchaseRequestId.current = null;
     setPending(null);
+    setPreparing(null);
     setSelected(listing);
-    setQuantity(1);
+    setQuantity(Math.max(1, listing.minQuantity));
     setBuyError(null);
     setResult(null);
     setNeedsSignIn(false);
@@ -242,6 +266,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
         totalNgn?: number;
         error?: string;
         pending?: boolean;
+        preparing?: boolean;
         message?: string;
         warning?: string;
         order?: { reference: string };
@@ -261,6 +286,17 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
       }
       if (!response.ok || !data.ok) {
         setBuyError(data.error ?? "That purchase could not be completed.");
+        return;
+      }
+
+      // A hand-prepared item is paid for but not delivered yet. Showing an empty
+      // credential list would look like a failed order, so it gets its own state.
+      if (data.preparing) {
+        setPreparing({
+          reference: data.order?.reference,
+          message: data.message ?? "Your order is confirmed and being prepared. Your credentials appear on the order page as soon as they are ready.",
+        });
+        void loadListings();
         return;
       }
 
@@ -289,14 +325,24 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
   }
 
   if (!configured) {
+    // In the preview there *is* a working marketplace — a simulated one inside
+    // the dashboard. Sending visitors to an unrelated service page left them at
+    // a dead end with nothing to try.
     return (
       <div className="rounded-2xl border border-line bg-white p-8 text-center">
-        <h2 className="text-[1.05rem] font-semibold text-ink">Accounts are almost ready</h2>
+        <h2 className="text-[1.05rem] font-semibold text-ink">
+          {preview ? "Try the demo marketplace instead" : "Accounts are almost ready"}
+        </h2>
         <p className="mx-auto mt-2 max-w-md text-[0.88rem] leading-relaxed text-ink-2">
-          Our account marketplace is being prepared. You can explore the other services in the meantime.
+          {preview
+            ? "Live listings are not connected here, so this page has no listings to show. The dashboard keeps a fictional marketplace with demo stock, demo prices and simulated delivery."
+            : "Our account marketplace is being prepared. You can explore the other services in the meantime."}
         </p>
-        <Link href="/virtual-numbers" className="btn btn-primary mt-5 inline-flex">
-          Explore other services
+        <Link
+          href={preview ? "/login?next=%2Fdashboard%2Faccounts" : "/virtual-numbers"}
+          className="btn btn-primary mt-5 inline-flex"
+        >
+          {preview ? "Open the demo marketplace" : "Explore other services"}
         </Link>
       </div>
     );
@@ -456,9 +502,33 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
 
                 <p className="mt-1.5 text-[0.74rem] text-ink-3">
                   {[listing.category, listing.subcategory].filter(Boolean).join(" · ") || "Digital account"}
-                  {listing.sold > 0 ? ` · ${listing.sold.toLocaleString("en-NG")} sold` : ""}
+                  {(listing.sold ?? 0) > 0 ? ` · ${(listing.sold as number).toLocaleString("en-NG")} sold` : ""}
                 </p>
-                <div className="mt-3"><UnitsStatus stock={listing.stock} /></div>
+
+                <div className="mt-3">
+                  {listing.stock === null && listing.fulfilment === "manual" ? (
+                    // No published count exists for this item, so say how it is
+                    // delivered instead of showing a number nobody has.
+                    <p className="inline-flex items-center rounded-lg bg-cream px-2 py-1 text-[0.72rem] font-medium text-ink-2">
+                      Confirmed after payment
+                    </p>
+                  ) : (
+                    <UnitsStatus stock={listing.stock} />
+                  )}
+                </div>
+
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {listing.warrantyDays !== null && listing.warrantyDays > 0 && (
+                    <span className="rounded-full bg-lav-50 px-2 py-0.5 text-[0.68rem] font-semibold text-lav-800">
+                      {warrantyBadge(listing.warrantyDays)}
+                    </span>
+                  )}
+                  {listing.fulfilment === "manual" && (
+                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[0.68rem] font-semibold text-amber-800">
+                      Prepared for you
+                    </span>
+                  )}
+                </div>
 
                 <div className="mt-4 flex items-end justify-between gap-3">
                   <div>
@@ -468,7 +538,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                   <Button
                     size="sm"
                     onClick={() => openBuy(listing)}
-                    disabled={!purchaseEnabled || loading || listing.stock === null || listing.stock < 1}
+                    disabled={!canBuy(listing)}
                   >
                     {purchaseEnabled ? "Buy" : "Paused"}
                   </Button>
@@ -509,11 +579,20 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
           className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 backdrop-blur-sm sm:items-center"
           role="dialog"
           aria-modal="true"
-          aria-label={result ? "Purchase complete" : pending ? "Purchase review" : "Buy accounts"}
+          aria-label={
+            result
+              ? "Purchase complete"
+              : preparing
+                ? "Order confirmed"
+                : pending
+                  ? "Purchase review"
+                  : "Buy accounts"
+          }
           onClick={(event) => {
             if (event.target === event.currentTarget && !buying) {
               setSelected(null);
               setResult(null);
+              setPreparing(null);
             }
           }}
         >
@@ -571,6 +650,23 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                   </Link>
                 </div>
               </div>
+            ) : preparing ? (
+              <div>
+                <h3 className="text-[1.02rem] font-semibold text-ink">Order confirmed — being prepared</h3>
+                <p role="status" className="mt-3 text-[0.85rem] leading-relaxed text-ink-2">
+                  {preparing.message}
+                </p>
+                {preparing.reference && (
+                  <p className="mt-2 break-all text-[0.8rem] font-semibold text-ink">
+                    Reference: {preparing.reference}
+                  </p>
+                )}
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <Link href="/dashboard/orders" className="btn btn-primary inline-flex items-center">View orders</Link>
+                  <Link href="/dashboard/support" className="btn btn-secondary inline-flex items-center">Contact support</Link>
+                  <Button variant="ghost" onClick={() => { setSelected(null); setPreparing(null); }}>Close</Button>
+                </div>
+              </div>
             ) : pending ? (
               <div>
                 <h3 className="text-[1.02rem] font-semibold text-ink">Purchase needs review</h3>
@@ -586,8 +682,24 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
               <div>
                 <h3 className="text-[1.02rem] font-semibold text-ink">{selected.title}</h3>
                 <p className="mt-1 text-[0.8rem] text-ink-2">
-                  {formatNaira(selected.priceNgn)} per account · {selected.stock === null ? "Stock unknown" : `${selected.stock} in stock when last checked`}
+                  {formatNaira(selected.priceNgn)} per account ·{" "}
+                  {selected.stock === null
+                    ? selected.fulfilment === "manual"
+                      ? "Confirmed after payment"
+                      : "Stock unknown"
+                    : `${selected.stock} in stock when last checked`}
                 </p>
+                {(selected.warrantyDays ?? 0) > 0 && (
+                  <p className="mt-1 text-[0.76rem] text-ink-3">
+                    {warrantyLabel(selected.warrantyDays)} on this item.
+                  </p>
+                )}
+                {selected.fulfilment === "manual" && (
+                  <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[0.78rem] leading-relaxed text-amber-900">
+                    This item is prepared for you after payment rather than delivered instantly. It
+                    appears on your order page as soon as it is confirmed.
+                  </p>
+                )}
 
                 <div className="mt-4 flex items-center justify-between gap-3">
                   <label htmlFor="quantity" className="text-[0.84rem] font-medium text-ink">
@@ -600,9 +712,9 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                       onClick={() => {
                         setPromo(null);
                         setPromoMessage(null);
-                        setQuantity((q) => Math.max(1, q - 1));
+                        setQuantity((q) => Math.max(selected.minQuantity, q - 1));
                       }}
-                      disabled={quantity <= 1}
+                      disabled={quantity <= selected.minQuantity}
                       aria-label="Decrease quantity"
                     >
                       −
@@ -610,15 +722,15 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                     <input
                       id="quantity"
                       type="number"
-                      min={1}
-                      max={Math.min(50, selected.stock ?? 0)}
+                      min={selected.minQuantity}
+                      max={selected.maxQuantity}
                       value={quantity}
                       onChange={(event) => {
                         const next = Number(event.target.value);
                         if (Number.isFinite(next)) {
                           setPromo(null);
                           setPromoMessage(null);
-                          setQuantity(Math.min(50, Math.max(1, Math.floor(next))));
+                          setQuantity(Math.min(selected.maxQuantity, Math.max(selected.minQuantity, Math.floor(next))));
                         }
                       }}
                       className="w-16 rounded-lg border border-line bg-white px-2 py-1.5 text-center text-[0.85rem] text-ink outline-none focus:border-lav-400"
@@ -629,9 +741,9 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                       onClick={() => {
                         setPromo(null);
                         setPromoMessage(null);
-                        setQuantity((q) => Math.min(50, selected.stock ?? 0, q + 1));
+                        setQuantity((q) => Math.min(selected.maxQuantity, q + 1));
                       }}
-                      disabled={quantity >= Math.min(50, selected.stock ?? 0)}
+                      disabled={quantity >= selected.maxQuantity}
                       aria-label="Increase quantity"
                     >
                       +
@@ -697,7 +809,12 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                 )}
 
                 <div className="mt-5 flex flex-wrap gap-2">
-                  <Button onClick={() => void buy()} loading={buying} disabled={selected.stock === null || selected.stock < 1}>
+                  <Button onClick={() => void buy()} loading={buying} disabled={
+                        !selected.available ||
+                        quantity < selected.minQuantity ||
+                        quantity > selected.maxQuantity ||
+                        (selected.stock !== null && selected.stock < quantity)
+                      }>
                     {buying ? "Buying…" : `Pay ${formatNaira(estimatedTotal)}`}
                   </Button>
                   <Button variant="ghost" onClick={() => setSelected(null)} disabled={buying}>

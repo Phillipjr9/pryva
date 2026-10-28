@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mutatePreviewDatabase } from "@/db";
 import { generateOtpCode } from "@/lib/provision";
+import { isDemoNumberRental } from "@/lib/demo-service-catalog";
 
 /** Wait long enough to demonstrate the delivery animation, not a real SMS delay. */
 export const DEMO_OTP_DELAY_MS = 7000;
@@ -22,7 +23,7 @@ export function advanceDemoOtp(userId: string, orderId: string, now = Date.now()
 
     const code = generateOtpCode();
     order.otpCode = code;
-    if (typeof order.demoUnitsRemaining === "number" && Number.isSafeInteger(order.demoUnitsRemaining)) {
+    if (!isDemoNumberRental(order) && typeof order.demoUnitsRemaining === "number" && Number.isSafeInteger(order.demoUnitsRemaining)) {
       order.demoUnitsRemaining = Math.max(0, order.demoUnitsRemaining - 1);
     }
     draft.notifications.push({

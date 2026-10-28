@@ -1,11 +1,11 @@
 /**
  * GENERATED FILE — do not edit.
  *
- * Produced by `scripts/build-prices.mjs` from `data/supplier-costs.json`.
- * Change a supplier cost there and run `npm run pricing:build`.
+ * Produced by `scripts/build-prices.mjs` from `data/cost-sheet.json`.
+ * Change a cost there and run `npm run pricing:build`.
  *
- * Prices only: supplier costs are deliberately absent from this file so they
- * never reach the browser bundle.
+ * Prices only: costs are deliberately absent from this file so they never
+ * reach the browser bundle.
  */
 
 export type GeneratedPrice = {

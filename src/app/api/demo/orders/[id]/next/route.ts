@@ -4,13 +4,14 @@ import { mutatePreviewDatabase } from "@/db";
 import { getCurrentUser } from "@/lib/auth";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { DEMO_REQUEST_ID } from "@/lib/demo-wallet";
+import { isDemoNumberRental } from "@/lib/demo-service-catalog";
 import { isSameOriginMutation } from "@/lib/net";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
 
-/** Consume the next unit from a demo bundle, without any new charge. */
+/** Use another demo bundle unit, or simulate another code on an active rental. */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isPreviewDatabase()) return NextResponse.json({ error: "Demo orders are unavailable here." }, { status: 404 });
   const user = await getCurrentUser();
@@ -38,9 +39,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       order.demoLastNextId = requestId;
       order.demoOtpRequestedAt = new Date();
       order.otpCode = null;
-      order.referenceCode = order.service === "numbers"
-        ? `+000 555 ${String(randomInt(10000)).padStart(4, "0")}`
-        : `demo-${randomBytes(3).toString("hex")}@example.test`;
+      // Bundle units get a new fictional number/inbox; a rental keeps its number.
+      if (!isDemoNumberRental(order)) {
+        order.referenceCode = order.service === "numbers"
+          ? `+000 555 ${String(randomInt(10000)).padStart(4, "0")}`
+          : `demo-${randomBytes(3).toString("hex")}@example.test`;
+      }
       return "ok";
     });
     if (result === "missing") return NextResponse.json({ error: "Order not found." }, { status: 404 });

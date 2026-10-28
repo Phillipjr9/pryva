@@ -5,6 +5,7 @@ import { findDataPlan } from "@/lib/airtime";
 import { getDigitalService } from "@/lib/digital-services";
 import { demoDigitalInventoryIn } from "@/lib/demo-digital";
 import { demoServiceTerms, type DemoInventory } from "@/lib/demo-service-catalog";
+import { demoServicePresentation } from "@/lib/demo-service-presentation";
 import { buildServiceExplorer, explorerCountry } from "@/lib/service-explorer";
 import { DEMO_REQUEST_ID, DemoBalanceError, DemoConflict, demoReference } from "@/lib/demo-wallet";
 import { expiryForPlan, provisionPlan } from "@/lib/provision";
@@ -19,7 +20,9 @@ export function demoService(itemId: string, countryCode: string) {
   const plan = item.id.startsWith("plan-") ? findPlan(item.id.slice(5)) : undefined;
   const dataPlan = item.id.startsWith("data-") ? findDataPlan(item.id.slice(5)) : undefined;
   if (item.id.startsWith("plan-") && !plan || item.id.startsWith("data-") && !dataPlan) return null;
-  return { country, item, terms, plan, dataPlan };
+  const selection = { country, item, terms, plan, dataPlan };
+  // A category without a faithful demo experience cannot be ordered via API either.
+  return demoServicePresentation(selection) ? selection : null;
 }
 
 function inventoryIn(snapshot: PreviewState, userId: string, countryCode: string): DemoInventory {

@@ -77,7 +77,7 @@ describe("demo code delivery", () => {
     expect(provisionPlan(findPlan("vn-ng")!)).toMatchObject({ referenceCode: expect.stringMatching(/^\+000 /), otpCode: null });
     expect(provisionPlan(findPlan("email-24")!)).toMatchObject({ referenceCode: expect.stringMatching(/@example\.test$/), otpCode: null });
     const props = { orderId: "demo-order", status: "active", expiresAt: new Date(now + 60000).toISOString(), amount: 1000,
-      referenceCode: "+000 555 1234", service: "numbers", provider: "simulated", preview: true, canRequestPreviewRefund: false, initialNow: now };
+      referenceCode: "+000 555 1234", service: "numbers", demoOrder: true, preview: true, canRequestPreviewRefund: false, initialNow: now };
     const waiting = renderToStaticMarkup(<OrderActions {...props} otpCode={null} />);
     expect(waiting).toContain("Waiting for your demo code");
     expect(waiting).toContain("Demo active");
@@ -86,5 +86,9 @@ describe("demo code delivery", () => {
     expect(arrived).toContain("Verification code 123456");
     expect(arrived).toContain("not eligible for a demo refund");
     expect(arrived).not.toContain("Refunds require review");
+    const rental = renderToStaticMarkup(<OrderActions {...props} otpCode="123456" demoUnitsRemaining={1} reusableDemoNumber />);
+    expect(rental).toContain("active rental");
+    expect(rental).toContain("Simulate another code");
+    expect(rental).not.toContain("Use another demo unit");
   });
 });

@@ -27,7 +27,7 @@ gross margin.
 ## 1. Where prices come from
 
 ```
-data/supplier-costs.json          ← the only file an owner edits
+data/cost-sheet.json          ← the only file an owner edits
         │
         ▼  npm run pricing:build
 src/lib/pricing.ts                ← the rule (band, rounding, floors)
@@ -41,7 +41,7 @@ src/lib/catalog.ts · src/lib/digital-services.ts · src/lib/marketplace-pricing
 
 ### Editing a cost
 
-1. Open `data/supplier-costs.json` and change the `cost` for that plan (naira,
+1. Open `data/cost-sheet.json` and change the `cost` for that plan (naira,
    integer — this is what the supplier charges *us*, per unit).
 2. Run `npm run pricing:build`.
 3. Commit both files. `npm run pricing:audit` prints the whole margin table.
@@ -58,7 +58,7 @@ cost sheet and compares it with the generated file, so a stale price cannot ship
 
 `src/lib/catalog.ts` is imported by client components, so everything in it ships
 to the browser. Supplier costs are our buying prices — publishing them publishes
-our margin — so costs stay in `data/supplier-costs.json`, and only the finished
+our margin — so costs stay in `data/cost-sheet.json`, and only the finished
 `price` (plus `maxDiscountPercent`) is baked into the app. A test asserts the
 generated file contains no cost field, and no component can see one.
 
@@ -154,7 +154,7 @@ real supplier invoices — see §6):
 
 ## 6. Open item: the real supplier costs
 
-The costs in `data/supplier-costs.json` are **placeholders**: each was seeded as
+The costs in `data/cost-sheet.json` are **placeholders**: each was seeded as
 "the price we were already charging, divided by 1.3" — the most conservative
 reading of the old hand-typed prices. They keep the catalogue in a sane place,
 but they are not invoices.
