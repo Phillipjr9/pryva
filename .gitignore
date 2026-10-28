@@ -3,6 +3,8 @@ node_modules
 out
 .env
 .env.*
+# The template is documentation, not a secret: keep it tracked.
+!.env.example
 .DS_Store
 npm-debug.log*
 
