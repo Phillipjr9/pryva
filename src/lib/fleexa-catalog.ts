@@ -61,7 +61,7 @@ function retail(cost: number | null, service: "numbers" | "email-otp"): number |
 }
 
 function itemId(kind: string, providerId: string, country: string): string {
-  return `supplier-${kind}-${createHash("sha256").update(`${kind}\0${providerId}\0${country}`).digest("hex").slice(0, 20)}`;
+  return `live-${kind}-${createHash("sha256").update(`${kind}\0${providerId}\0${country}`).digest("hex").slice(0, 20)}`;
 }
 
 /**
@@ -83,7 +83,7 @@ export function supplierItemsForCountry(snapshot: SupplierSnapshot, countryCode:
     add({
       id: itemId("sms", id, country.code), category: "verification", name, description: "SMS verification listing",
       tag: brand?.tag ?? "Other", artwork: brand ? { kind: "brand", name: brand.brand } : { kind: "service", name: "numbers" },
-      source: "supplier", coverage: "catalog-country", stock: safeUnitCount(entry.stock), myUnits: null,
+      source: "live", coverage: "catalog-country", stock: safeUnitCount(entry.stock), myUnits: null,
       price: retail(entry.priceNgn, "numbers"), action: null,
     });
   }
@@ -92,7 +92,7 @@ export function supplierItemsForCountry(snapshot: SupplierSnapshot, countryCode:
     if (!id || !name) continue;
     add({
       id: itemId("email", id, "global"), category: "email", name, description: "Temporary email listing", tag: "Email OTP",
-      artwork: { kind: "service", name: "email-otp" }, source: "supplier", coverage: "not-country-specific",
+      artwork: { kind: "service", name: "email-otp" }, source: "live", coverage: "not-country-specific",
       stock: safeUnitCount(entry.stock), myUnits: null, price: retail(entry.priceNgn, "email-otp"), action: null,
     });
   }
@@ -101,7 +101,7 @@ export function supplierItemsForCountry(snapshot: SupplierSnapshot, countryCode:
     if (!id || !matchesCountry(entry.country, country.code)) continue;
     add({
       id: itemId("rent", id, country.code), category: "numbers", name: "Number rental", description: "Rental listing",
-      tag: "Rental", artwork: { kind: "service", name: "numbers" }, source: "supplier", coverage: "catalog-country",
+      tag: "Rental", artwork: { kind: "service", name: "numbers" }, source: "live", coverage: "catalog-country",
       stock: safeUnitCount(entry.stock), myUnits: null, price: retail(entry.pricePerMonthNgn, "numbers"), action: null,
     });
   }

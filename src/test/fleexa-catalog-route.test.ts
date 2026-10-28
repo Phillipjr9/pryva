@@ -14,7 +14,7 @@ beforeEach(() => {
   vi.clearAllMocks(); state.preview = false; state.user = { id: "buyer" };
   state.limit.mockResolvedValue({ allowed: true });
   state.snapshot.mockResolvedValue({ partial: false, fetchedAt: "2026-01-01T00:00:00Z", privateUpstream: "never exposed" });
-  state.items.mockReturnValue([{ id: "supplier-sms-abcdef", name: "Signal", price: 1250, stock: 2, myUnits: null, action: null, source: "supplier" }]);
+  state.items.mockReturnValue([{ id: "live-sms-abcdef", name: "Signal", price: 1250, stock: 2, myUnits: null, action: null, source: "live" }]);
 });
 
 describe("supplier catalog endpoint", () => {

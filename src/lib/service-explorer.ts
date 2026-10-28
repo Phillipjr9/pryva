@@ -34,9 +34,11 @@ export type ExplorerItem = {
   name: string;
   description: string;
   tag: string;
+  /** Platform identity is separate from the selected promotion type. */
+  platform?: string;
   artwork: ExplorerArtwork;
   /** A sample is only a type of service, not an offering from a supplier. */
-  source: "example" | "catalog" | "tool" | "supplier";
+  source: "example" | "catalog" | "tool" | "live";
   coverage: "catalog-country" | "unconfirmed" | "not-country-specific";
   /** Unknown counts must stay null, never become zero or an invented figure. */
   stock: number | null;
@@ -181,6 +183,7 @@ function exampleItems(): ExplorerItem[] {
     name: platform.name,
     description: "SMS verification",
     tag: platform.tag,
+    platform: platform.name,
     artwork: { kind: "brand", name: platform.brand },
     source: "example",
     coverage: "unconfirmed",
@@ -196,6 +199,7 @@ function exampleItems(): ExplorerItem[] {
       name: `${platform.name} ${type.toLowerCase()}`,
       description: "Social promotion",
       tag: type,
+      platform: platform.name,
       artwork: { kind: "brand", name: platform.brand },
       source: "example",
       coverage: "unconfirmed",
@@ -228,7 +232,7 @@ function additionalItems(country: ExplorerCountry): ExplorerItem[] {
       myUnits: null,
       price: Math.min(...service.plans.map((plan) => plan.price)),
       priceFrom: true,
-      action: { label: "View plans", href: `/dashboard/digital?service=${encodeURIComponent(service.slug)}` },
+      action: { label: "View plans", href: `/dashboard/digital?service=${encodeURIComponent(service.slug)}&country=${country.code}` },
     }];
   });
 
@@ -253,7 +257,7 @@ function additionalItems(country: ExplorerCountry): ExplorerItem[] {
   const other: ExplorerItem[] = [
     {
       id: "account-marketplace", category: "accounts", name: "Account marketplace",
-      description: "Browse supplier listings", tag: "Digital accounts", artwork: { kind: "service", name: "accounts" },
+      description: "Browse live listings", tag: "Digital accounts", artwork: { kind: "service", name: "accounts" },
       source: "catalog", coverage: "unconfirmed", stock: null, myUnits: null, price: null,
       action: { label: "Browse accounts", href: "/dashboard/accounts" },
     },

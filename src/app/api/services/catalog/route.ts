@@ -10,7 +10,7 @@ export const maxDuration = 30;
 
 /** Read-only catalog. Live purchases remain disabled until mappings and reconciliation are verified. */
 export async function GET(request: NextRequest) {
-  if (isPreviewDatabase()) return NextResponse.json({ error: "Supplier catalog unavailable" }, { status: 404 });
+  if (isPreviewDatabase()) return NextResponse.json({ error: "Live catalog unavailable" }, { status: 404 });
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Please sign in" }, { status: 401 });
   const country = explorerCountry(request.nextUrl.searchParams.get("country"));
@@ -22,6 +22,6 @@ export async function GET(request: NextRequest) {
     const snapshot = await readSupplierSnapshot(request.nextUrl.searchParams.get("refresh") === "1");
     return NextResponse.json({ ok: true, country: country.code, partial: snapshot.partial, fetchedAt: snapshot.fetchedAt, items: supplierItemsForCountry(snapshot, country.code) }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
-    return NextResponse.json({ error: "Supplier catalog is temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: "The live catalog is temporarily unavailable" }, { status: 503 });
   }
 }

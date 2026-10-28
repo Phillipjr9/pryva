@@ -24,7 +24,7 @@ const categories = [
     { label: "Service status", href: "/status" },
   ] },
   { title: "Account and billing", description: "Find your wallet, policy and support resources.", icon: Mail, links: [
-    { label: "Wallet and transaction history", href: "/dashboard/wallet" },
+    { label: "Wallet and transaction history", href: "/login?next=%2Fdashboard%2Fwallet" },
     { label: "Gift card guide", href: "/blog/gift-cards-for-teams" },
     { label: "Contact support", href: "/contact" },
   ] },

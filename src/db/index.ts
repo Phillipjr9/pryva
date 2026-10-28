@@ -61,6 +61,14 @@ function flattenSqlChunks(node: unknown, out: FlatToken[] = []): FlatToken[] {
     return out;
   }
 
+  // inArray() hands over a plain array of Param objects. Without this branch
+  // the values vanished, leaving `col in` with no right-hand side — which the
+  // clause evaluator below treats as "no constraint", so every row matched.
+  if (Array.isArray(node)) {
+    for (const entry of node) flattenSqlChunks(entry, out);
+    return out;
+  }
+
   if (isDrizzleColumn(node)) {
     out.push({
       kind: "col",
@@ -93,7 +101,14 @@ function flattenSqlChunks(node: unknown, out: FlatToken[] = []): FlatToken[] {
   return out;
 }
 
-type TableRowContext = Record<string, Record<string, unknown>>;
+/**
+ * One row in flight, keyed by table name.
+ *
+ * A table may map to `undefined`: that is a left join which found no match, and
+ * every reader below already falls back with `?? {}`, so the row survives with
+ * nothing joined onto it rather than disappearing from the result.
+ */
+type TableRowContext = Record<string, Record<string, unknown> | undefined>;
 
 function resolveValue(token: FlatToken, ctx: TableRowContext, defaultTable: string): unknown {
   if (token.kind === "val") return token.value;
@@ -104,12 +119,31 @@ function resolveValue(token: FlatToken, ctx: TableRowContext, defaultTable: stri
   return undefined;
 }
 
+/** SQL LIKE pattern to an anchored RegExp: % is any run, _ is one character. */
+function likeToRegExp(pattern: string, caseInsensitive: boolean): RegExp {
+  const escaped = pattern
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/%/g, ".*")
+    .replace(/_/g, ".");
+  return new RegExp(`^${escaped}$`, caseInsensitive ? "i" : "");
+}
+
 function compareValues(left: unknown, op: string, right: unknown): boolean {
-  const normalizedOp = op.trim();
+  const normalizedOp = op.trim().toLowerCase();
   const lNum = left instanceof Date ? left.getTime() : left;
   const rNum = right instanceof Date ? right.getTime() : right;
 
   switch (normalizedOp) {
+    // Text search. Without these the operator fell through to strict equality,
+    // so every ilike() filter compared the column to the literal "%term%".
+    case "like":
+    case "ilike":
+    case "not like":
+    case "not ilike": {
+      if (typeof left !== "string" || typeof right !== "string") return false;
+      const matched = likeToRegExp(right, normalizedOp.includes("ilike")).test(left);
+      return normalizedOp.startsWith("not") ? !matched : matched;
+    }
     case "=":
       return lNum === rNum;
     case "!=":
@@ -126,6 +160,63 @@ function compareValues(left: unknown, op: string, right: unknown): boolean {
     default:
       return lNum === rNum;
   }
+}
+
+/** Text of a drizzle StringChunk ("(", " and ", " = " …), or null for other nodes. */
+function stringChunkText(node: unknown): string | null {
+  if (!node || typeof node !== "object" || !("value" in node)) return null;
+  const value = (node as { value?: unknown }).value;
+  if (!Array.isArray(value) || "encoder" in node) return null;
+  return value.join("");
+}
+
+/**
+ * Evaluate a condition against one in-memory row.
+ *
+ * The flat walk in `matchesConditionInContext` cannot express grouping: it drops
+ * parentheses and splits only on `and`, so an `or(...)` filter — used by every
+ * admin and dashboard text search — collapsed to its first comparison. Walking
+ * the SQL tree first keeps the grouping the query actually asked for, and leaves
+ * plain comparisons to the existing (deliberately strict) flat evaluator.
+ */
+function evaluateCondition(condition: unknown, ctx: TableRowContext, defaultTable: string): boolean {
+  if (condition && typeof condition === "object" && "queryChunks" in condition) {
+    const chunks = (condition as { queryChunks?: unknown[] }).queryChunks ?? [];
+    const parts: unknown[] = [];
+    let connector: "and" | "or" | null = null;
+    let leaf = false;
+
+    for (const chunk of chunks) {
+      const text = stringChunkText(chunk);
+      if (text === null) {
+        parts.push(chunk);
+        continue;
+      }
+      const trimmed = text.trim();
+      if (trimmed === "" || trimmed === "(" || trimmed === ")") continue;
+      const logical = /^(and|or)$/i.exec(trimmed);
+      // Anything else is a comparison operator: this node is a leaf.
+      if (!logical) {
+        leaf = true;
+        break;
+      }
+      const found = logical[1].toLowerCase() as "and" | "or";
+      // Mixed connectors at one level have no unambiguous flat reading.
+      if (connector !== null && connector !== found) {
+        leaf = true;
+        break;
+      }
+      connector = found;
+    }
+
+    if (!leaf && parts.length === 1) return evaluateCondition(parts[0], ctx, defaultTable);
+    if (!leaf && connector && parts.length >= 2) {
+      return connector === "and"
+        ? parts.every((part) => evaluateCondition(part, ctx, defaultTable))
+        : parts.some((part) => evaluateCondition(part, ctx, defaultTable));
+    }
+  }
+  return matchesConditionInContext(ctx, defaultTable, condition);
 }
 
 function matchesConditionInContext(
@@ -169,6 +260,15 @@ function matchesConditionInContext(
     // clause as automatically true silently ignored refund safety conditions.
     if (operator === "is null") return leftVal == null;
     if (operator === "is not null") return leftVal != null;
+    if (/^(not )?in$/.test(operator)) {
+      const candidates = clause
+        .slice(2)
+        .filter((token) => token.kind === "val")
+        .map((token) => (token as { value: unknown }).value);
+      if (candidates.length === 0) return true;
+      const contained = candidates.some((candidate) => compareValues(leftVal, "=", candidate));
+      return operator.startsWith("not") ? !contained : contained;
+    }
     if (!rightTok) return true;
     const rightVal = resolveValue(rightTok, ctx, defaultTable);
     return compareValues(leftVal, opTok.text, rightVal);
@@ -554,6 +654,45 @@ export function mutatePreviewDatabase<T>(mutation: (draft: PreviewState) => T): 
   return result;
 }
 
+/**
+ * A select() result that can still be narrowed: where(), and inner or left
+ * joins that may themselves be joined or filtered again.
+ *
+ * A left join with no match keeps the base row and joins nothing onto it, which
+ * is what makes an admin queue able to show an order whose customer record is
+ * missing instead of dropping the order.
+ */
+function joinableQuery(
+  contexts: TableRowContext[],
+  selection: Record<string, unknown> | undefined,
+  baseKey: string,
+) {
+  const join = (joinTable: unknown, onCondition: unknown, keepUnmatched: boolean) => {
+    const joinKey = tableNameFor(joinTable) as keyof PreviewState;
+    const joinRows = mockState[joinKey] ?? [];
+    const joined: TableRowContext[] = contexts.flatMap((ctx) => {
+      const matches = joinRows
+        .map((candidate) => ({ ...ctx, [joinKey]: candidate }))
+        .filter((combined) => evaluateCondition(onCondition, combined, baseKey));
+      return matches.length || !keepUnmatched ? matches : [{ ...ctx, [joinKey]: undefined }];
+    });
+    return joinableQuery(joined, selection, baseKey);
+  };
+
+  return Object.assign(buildQueryResult(contexts, selection, baseKey), {
+    where(condition: unknown) {
+      const filtered = contexts.filter((ctx) => evaluateCondition(condition, ctx, baseKey));
+      return buildQueryResult(filtered, selection, baseKey);
+    },
+    innerJoin(joinTable: unknown, onCondition?: unknown) {
+      return join(joinTable, onCondition, false);
+    },
+    leftJoin(joinTable: unknown, onCondition?: unknown) {
+      return join(joinTable, onCondition, true);
+    },
+  });
+}
+
 function buildQueryResult(
   contexts: TableRowContext[],
   selection: Record<string, unknown> | undefined,
@@ -621,7 +760,7 @@ function applyQueryOptions<T extends Record<string, unknown>>(
     : options.where;
   if (condition) {
     filtered = filtered.filter((row) =>
-      matchesConditionInContext({ [tableKey]: row }, tableKey, condition),
+      evaluateCondition(condition, { [tableKey]: row }, tableKey),
     );
   }
 
@@ -679,32 +818,7 @@ const mockDb: any = {
         const baseRows = mockState[baseKey] ?? [];
         const baseContexts: TableRowContext[] = baseRows.map((row) => ({ [baseKey]: row }));
 
-        return Object.assign(buildQueryResult(baseContexts, selection, baseKey), {
-          where(condition: unknown) {
-            const filtered = baseContexts.filter((ctx) =>
-              matchesConditionInContext(ctx, baseKey, condition),
-            );
-            return buildQueryResult(filtered, selection, baseKey);
-          },
-          innerJoin(joinTable: unknown, onCondition?: unknown) {
-            const joinKey = tableNameFor(joinTable) as keyof PreviewState;
-            const joinRows = mockState[joinKey] ?? [];
-            const joinedContexts: TableRowContext[] = baseContexts.flatMap((ctx) =>
-              joinRows
-                .map((candidate) => ({ ...ctx, [joinKey]: candidate }))
-                .filter((combined) => matchesConditionInContext(combined, baseKey, onCondition)),
-            );
-
-            return Object.assign(buildQueryResult(joinedContexts, selection, baseKey), {
-              where(whereCondition: unknown) {
-                const filtered = joinedContexts.filter((ctx) =>
-                  matchesConditionInContext(ctx, baseKey, whereCondition),
-                );
-                return buildQueryResult(filtered, selection, baseKey);
-              },
-            });
-          },
-        });
+        return joinableQuery(baseContexts, selection, baseKey);
       },
     };
   },
@@ -740,7 +854,7 @@ const mockDb: any = {
           where(condition: unknown) {
             const rows = mockState[tableKey] ?? [];
             const matched = rows.filter((row) =>
-              matchesConditionInContext({ [tableKey]: row }, tableKey, condition),
+              evaluateCondition(condition, { [tableKey]: row }, tableKey),
             );
             matched.forEach((row) => {
               for (const [k, v] of Object.entries(updates)) {
@@ -767,7 +881,7 @@ const mockDb: any = {
       where(condition: unknown) {
         const rows = mockState[tableKey] ?? [];
         const survivors = rows.filter(
-          (row) => !matchesConditionInContext({ [tableKey]: row }, tableKey, condition),
+          (row) => !evaluateCondition(condition, { [tableKey]: row }, tableKey),
         );
         mockState[tableKey] = survivors;
         return { rows: survivors };

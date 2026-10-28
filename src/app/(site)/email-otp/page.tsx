@@ -18,15 +18,6 @@ export default function EmailOTPPage() {
 
   return (
     <div className="min-h-screen bg-cream">
-      <header className="border-b border-line bg-white">
-        <div className="shell flex h-16 items-center justify-between">
-          <div className="ml-auto flex items-center gap-3">
-            <Link href="/login" className="text-[0.86rem] font-medium text-ink-2 hover:text-ink">Sign in</Link>
-            <Link href="/signup" className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700">Get Started</Link>
-          </div>
-        </div>
-      </header>
-
       <section className="py-16 sm:py-20">
         <div className="shell">
           <div className="max-w-3xl">

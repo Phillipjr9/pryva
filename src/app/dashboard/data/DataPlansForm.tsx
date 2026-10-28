@@ -46,6 +46,8 @@ export function DataPlansForm({ user, initialPlanId, preview, inventory = {} }: 
           {providers.map((provider) => (
             <button
               key={provider.id}
+              type="button"
+              aria-pressed={selectedProvider === provider.id}
               onClick={() => {
                 setSelectedProvider(provider.id);
                 setSelectedPlan(null);

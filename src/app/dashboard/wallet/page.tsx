@@ -8,6 +8,7 @@ import { formatNaira } from "@/lib/catalog";
 import { walletEntryDirection, walletEntrySign } from "@/lib/wallet-activity";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { TopUpForm } from "@/components/dashboard/TopUpForm";
+import { ExportTransactionsButton } from "@/components/dashboard/ExportTransactionsButton";
 import { WithdrawalDashboard } from "./WithdrawalDashboard";
 import { DemoWithdrawal } from "@/components/dashboard/DemoWithdrawal";
 import { demoWithdrawalHistory } from "@/lib/demo-withdrawal";
@@ -61,7 +62,7 @@ export default async function WalletPage({
   const spendCount = Number(debitCount?.value ?? 0);
 
   return (
-    <div className="grid gap-4">
+    <div className="grid min-w-0 grid-cols-1 gap-4">
       <div>
         <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Wallet</h1>
         <p className="mt-1 text-[0.86rem] text-ink-2">
@@ -101,14 +102,20 @@ export default async function WalletPage({
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+      {/* minmax(0,…) tracks: an implicit auto track is sized to its items’
+          min-content, and a truncated transaction reference is wide enough to
+          push the whole wallet past a 320px viewport. */}
+      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start">
         <TopUpForm balance={user.walletBalance} preview={preview} userId={user.id} testMode={paystackTestMode} />
 
-        <div className="grid gap-4">
+        <div className="grid min-w-0 grid-cols-1 gap-4">
           <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-[1.05rem] font-semibold">Transaction history</h2>
-              <span className="text-[0.68rem] text-ink-3">{transactions.length} entries</span>
+              <div className="flex items-center gap-2.5">
+                <span className="text-[0.68rem] text-ink-3">{transactions.length} newest entries</span>
+                {transactions.length > 0 && <ExportTransactionsButton />}
+              </div>
             </div>
             {transactions.length === 0 ? (
               <p className="mt-4 rounded-xl border border-dashed border-line bg-cream/50 px-4 py-6 text-center text-[0.82rem] text-ink-3">
