@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => ({
   delivered: null as string[] | null,
   purchaseCalls: 0,
   promo: null as { discount: string } | null,
+  promoBaskets: [] as number[],
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
@@ -90,7 +91,8 @@ vi.mock("@/lib/accszone", async (original) => {
   const actual = await original<typeof import("@/lib/accszone")>();
   return {
     ...actual,
-    validatePromo: async () => {
+    validatePromo: async (_code: string, basketUsd: number) => {
+      mocks.promoBaskets.push(basketUsd);
       if (!mocks.promo) throw new Error("promo_invalid");
       return mocks.promo;
     },
@@ -101,6 +103,7 @@ let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
 let purchaseRoute: typeof import("@/app/api/accounts/purchase/route");
 let listingsRoute: typeof import("@/app/api/accounts/listings/route");
+let promoRoute: typeof import("@/app/api/accounts/promo/route");
 
 const USER = "f5ca2925-6050-49d2-ab89-fc324953ed11";
 const START_BALANCE = 5_000_000;
@@ -132,6 +135,11 @@ const purchaseRequest = (body: Record<string, unknown>) => new NextRequest("http
   body: JSON.stringify({ requestId: randomUUID(), quantity: 1, ...body }),
 });
 const listingsRequest = () => new NextRequest("https://pryva.test/api/accounts/listings", { headers: { host: "pryva.test" } });
+const promoRequest = (body: Record<string, unknown>) => new NextRequest("https://pryva.test/api/accounts/promo", {
+  method: "POST",
+  headers: { host: "pryva.test", "x-forwarded-proto": "https", origin: "https://pryva.test", "content-type": "application/json" },
+  body: JSON.stringify(body),
+});
 
 beforeAll(async () => {
   pg = new PGlite();
@@ -143,9 +151,10 @@ beforeAll(async () => {
   }
   database = drizzle(pg, { schema });
   mocks.db = database;
-  [purchaseRoute, listingsRoute] = await Promise.all([
+  [purchaseRoute, listingsRoute, promoRoute] = await Promise.all([
     import("@/app/api/accounts/purchase/route"),
     import("@/app/api/accounts/listings/route"),
+    import("@/app/api/accounts/promo/route"),
   ]);
 }, 30_000);
 
@@ -163,6 +172,7 @@ beforeEach(async () => {
   mocks.listingError = null;
   mocks.purchaseCalls = 0;
   mocks.promo = null;
+  mocks.promoBaskets = [];
   mocks.delivered = null;
 });
 
@@ -349,6 +359,91 @@ describe("checkout with real pricing", () => {
     expect(mocks.purchaseCalls).toBe(1);
   });
 
+describe("the promo quote agrees with what checkout charges", () => {
+  // The quote is shown before payment. If it diverges from checkout, the customer
+  // is promised a discount they do not get — the same class of split-brain the
+  // storefront/checkout invariant above guards against.
+  beforeEach(() => {
+    mocks.listing = listing({ slug: "p2:legacy-1", sourceId: "1" });
+    mocks.promo = { discount: "0.500000" };
+  });
+
+  it("quotes the exact amount checkout later debits", async () => {
+    const quote = await promoRoute.POST(promoRequest({ code: "SAVE50", slug: "p2:legacy-1", quantity: 2 }));
+    expect(quote.status).toBe(200);
+    const quoted = await quote.json();
+    expect(quoted.valid).toBe(true);
+    expect(quoted.code).toBe("SAVE50");
+
+    const charged = await purchaseRoute.POST(purchaseRequest({ slug: "p2:legacy-1", quantity: 2, promoCode: "SAVE50" }));
+    expect(charged.status).toBe(200);
+    const receipt = await charged.json();
+
+    // The promised figure is the debited figure.
+    expect(receipt.totalNgn).toBe(quoted.totalNgn);
+    expect(receipt.discountNgn).toBe(quoted.savedNgn);
+    expect(await balance()).toBe(START_BALANCE - quoted.totalNgn);
+  });
+
+  it("quotes against the same undiscounted base checkout would charge", async () => {
+    const quote = await (await promoRoute.POST(promoRequest({ code: "SAVE50", slug: "p2:legacy-1", quantity: 2 }))).json();
+
+    mocks.promo = null; // no code applied
+    const plain = await purchaseRoute.POST(purchaseRequest({ slug: "p2:legacy-1", quantity: 2 }));
+    expect((await plain.json()).totalNgn).toBe(quote.originalTotalNgn);
+
+    // The saving is the difference between those two, exactly.
+    expect(quote.savedNgn).toBe(quote.originalTotalNgn - quote.totalNgn);
+    expect(quote.savedNgn).toBeGreaterThan(0);
+  });
+
+  it("validates the code against an identical basket in both routes", async () => {
+    // The quote rounds the basket to two decimals and checkout does not. Both are
+    // derived from integer cents, so they cannot differ — but that equivalence is
+    // arithmetic, not intent, and nothing else in the repo would notice a drift.
+    await promoRoute.POST(promoRequest({ code: "SAVE50", slug: "p2:legacy-1", quantity: 7 }));
+    mocks.promoBaskets = [];
+    await purchaseRoute.POST(purchaseRequest({ slug: "p2:legacy-1", quantity: 7, promoCode: "SAVE50" }));
+
+    expect(mocks.promoBaskets.length).toBeGreaterThan(0);
+    for (const basket of mocks.promoBaskets) {
+      expect(Number.isFinite(basket)).toBe(true);
+      expect(basket).toBeGreaterThan(0);
+      // A whole-dollar basket is what the provider is quoted either way.
+      expect(basket).toBeCloseTo(3.48 * 7, 10);
+    }
+  });
+
+  it("refuses a code on a non-promo listing in the quote, before checkout can refuse it", async () => {
+    mocks.listing = listing(); // a p1: listing
+    const quote = await promoRoute.POST(promoRequest({ code: "SAVE50", slug: "p1:300004", quantity: 1 }));
+    expect(quote.status).toBe(200);
+    const body = await quote.json();
+    expect(body.valid).toBe(false);
+    expect(body.message).toBe("Promo codes do not apply to this item.");
+
+    // The customer is told at the quote, so checkout never has to refuse a
+    // discount it already showed. Both routes use the same wording.
+    const checkout = await purchaseRoute.POST(purchaseRequest({ slug: "p1:300004", quantity: 1, promoCode: "SAVE50" }));
+    expect(checkout.status).toBe(409);
+    expect((await checkout.json()).error).toBe(body.message);
+    expect(mocks.purchaseCalls).toBe(0);
+  });
+
+  it("quotes an invalid code as inline text rather than charging anything", async () => {
+    mocks.promo = null; // validatePromo rejects
+    const quote = await promoRoute.POST(promoRequest({ code: "NOPE", slug: "p2:legacy-1", quantity: 1 }));
+    expect(quote.status).toBe(200);
+    const body = await quote.json();
+    expect(body.valid).toBe(false);
+    expect(typeof body.message).toBe("string");
+    expect(await balance()).toBe(START_BALANCE);
+    expect(await orderRows()).toHaveLength(0);
+    expect(mocks.purchaseCalls).toBe(0);
+  });
+});
+
+describe("the purchase response carries no cost or source identity", () => {
   it("never writes a wholesale cost or a source identity into what the customer receives", async () => {
     const response = await purchaseRoute.POST(purchaseRequest({ slug: "p1:300004", quantity: 2 }));
     const body = await response.json();
@@ -367,4 +462,5 @@ describe("checkout with real pricing", () => {
       expect(description, `ledger leaked "${word}"`).not.toContain(word);
     }
   });
+});
 });
