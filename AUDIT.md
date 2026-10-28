@@ -217,7 +217,7 @@ The catalogue used to be a list of hand-typed naira prices with nothing behind
 them — no cost, no margin, no way to answer "do we make money on this?". That is
 now a pipeline, documented in `PRICING.md`:
 
-- `data/supplier-costs.json` is the only place a buyer's cost lives. `npm run pricing:build`
+- `data/cost-sheet.json` is the only place a buyer's cost lives. `npm run pricing:build`
   turns it into prices (30–50% markup on cost, rounded up to a step that fits the
   cost) and writes `src/lib/prices.generated.ts`; `npm run pricing:audit` prints
   the margin table.
@@ -294,7 +294,7 @@ are what shipped.
 
 **Week 3 — credibility & growth**
 7. ~~Remaining images~~ **Done** — 3D set complete, carrier + platform marks hand-authored. Next art gap: homepage Facebook/Instagram showcase (U6).
-8. ~~Real supplier costs into `data/supplier-costs.json`~~ **Open** — engine live, numbers pending invoices. Referrals + reviews next.
+8. ~~Real supplier costs into `data/cost-sheet.json`~~ **Open** — engine live, numbers pending invoices. Referrals + reviews next.
 9. CI workflow running `typecheck` + `test` + `build` on every PR.
 
 **Week 4 — polish**

@@ -14,9 +14,13 @@ type Props = {
   referenceCode: string | null;
   otpCode: string | null;
   service: string;
-  provider?: string | null;
+  /** Server-computed: this order's code can be re-read while the window is open. */
+  refreshableCode?: boolean;
+  /** Server-computed: this order was produced by the demo, not a live delivery. */
+  demoOrder?: boolean;
   preview?: boolean;
   demoUnitsRemaining?: number | null;
+  reusableDemoNumber?: boolean;
   canRequestPreviewRefund: boolean;
   initialNow: number;
 };
@@ -38,9 +42,11 @@ export function OrderActions({
   referenceCode,
   otpCode,
   service,
-  provider = null,
+  refreshableCode = false,
+  demoOrder = false,
   preview = false,
   demoUnitsRemaining = null,
+  reusableDemoNumber = false,
   canRequestPreviewRefund,
   initialNow,
 }: Props) {
@@ -61,18 +67,19 @@ export function OrderActions({
   const nextInFlight = useRef(false);
   const refreshedDemoCode = useRef<string | null>(otpCode);
 
-  const isLiveProvider = provider === "fleexa";
+  const isLiveProvider = refreshableCode;
   const liveWindowOpen = !expiresAt || remaining !== null;
-  const isDemoOtp = preview && provider === "simulated" && (service === "numbers" || service === "email-otp");
+  const isDemoOtp = preview && demoOrder && (service === "numbers" || service === "email-otp");
   const { code: demoOtp, retrying: demoRetrying, resetCode } = useDemoOtp(
     orderId,
     isDemoOtp && settledStatus === "active" && (remaining !== null || expiresAt === null),
     otpCode,
   );
   const displayOtp = isDemoOtp ? demoOtp : liveOtp;
+  const isDemoRental = isDemoOtp && service === "numbers" && reusableDemoNumber;
   const remainingDemoUnits = typeof demoUnitsRemaining === "number" && Number.isSafeInteger(demoUnitsRemaining) && demoUnitsRemaining >= 0
-    ? Math.max(0, demoUnitsRemaining - (demoOtp && demoOtp !== otpCode ? 1 : 0)) : null;
-  const isDemoPromotion = preview && provider === "simulated" && service === "social";
+    ? Math.max(0, demoUnitsRemaining - (!isDemoRental && demoOtp && demoOtp !== otpCode ? 1 : 0)) : null;
+  const isDemoPromotion = preview && demoOrder && service === "social";
   const { finished: demoPromotionFinished, retrying: promotionRetrying } = useDemoPromotion(orderId, isDemoPromotion && settledStatus === "processing");
   const displayedStatus = demoPromotionFinished ? "delivered" : settledStatus;
 
@@ -90,7 +97,7 @@ export function OrderActions({
     return () => clearInterval(interval);
   }, [expiresAt]);
 
-  // Live-sync the code from Fleexa while the order is active.
+  // Re-read the delivered code while the order is active.
   useEffect(() => {
     if (!isLiveProvider || settledStatus !== "active" || !liveWindowOpen) return;
     let cancelled = false;
@@ -213,7 +220,7 @@ export function OrderActions({
                     : "bg-lav-50 text-lav-700"
               }`}
             >
-              {active ? (expired ? "Window closed" : preview && provider === "simulated" ? "Demo active" : "Live") : displayedStatus === "refunded" ? "Refunded" : displayedStatus}
+              {active ? (expired ? "Window closed" : preview && demoOrder ? "Demo active" : "Live") : displayedStatus === "refunded" ? "Refunded" : displayedStatus}
             </span>
           </span>
         </div>
@@ -297,8 +304,8 @@ export function OrderActions({
 
         {isDemoOtp && remainingDemoUnits !== null && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[0.72rem] text-ink-3">
-            <span>My demo units: <strong className="text-ink">{remainingDemoUnits} left</strong></span>
-            {displayOtp && active && !expired && remainingDemoUnits > 0 && <button type="button" disabled={nextPending} onClick={() => void requestNextDemoCode()} className="font-semibold text-lav-700 underline underline-offset-2 disabled:opacity-50">{nextPending ? "Preparing…" : "Use another demo unit"}</button>}
+            <span>My demo units: <strong className="text-ink">{isDemoRental && (!active || expired) ? "0 left" : `${remainingDemoUnits} left`}</strong>{isDemoRental && active && !expired && " · active rental"}</span>
+            {displayOtp && active && !expired && remainingDemoUnits > 0 && <button type="button" disabled={nextPending} onClick={() => void requestNextDemoCode()} className="font-semibold text-lav-700 underline underline-offset-2 disabled:opacity-50">{nextPending ? "Preparing…" : isDemoRental ? "Simulate another code" : "Use another demo unit"}</button>}
           </div>
         )}
         {error && <p role="alert" className="mt-3 text-[0.78rem] font-medium text-rose-600">{error}</p>}
@@ -332,7 +339,7 @@ export function OrderActions({
               </button>
             )}
           </>
-        ) : preview && provider === "simulated" ? (
+        ) : preview && demoOrder ? (
           <p className="mt-2 text-[0.82rem] text-ink-2">
             {displayOtp ? "This demo code was delivered, so it is not eligible for a demo refund." : "This simulated order used demo funds. No real payment or refund is involved."}
           </p>

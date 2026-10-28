@@ -35,7 +35,7 @@ describe("read-only supplier catalog", () => {
     const { supplierItemsForCountry } = await import("@/lib/fleexa-catalog");
     const items = supplierItemsForCountry(snapshot, "us");
     expect(items.map((item) => item.name)).toEqual(["WhatsApp", "Signal", "Temporary inbox", "Number rental"]);
-    expect(items.every((item) => item.source === "supplier" && item.action === null && item.myUnits === null)).toBe(true);
+    expect(items.every((item) => item.source === "live" && item.action === null && item.myUnits === null)).toBe(true);
     expect(items[0]).toMatchObject({ stock: 7, coverage: "catalog-country" });
     expect(items[0].price).toBeGreaterThan(1234);
     expect(items[0]).not.toHaveProperty("priceNgn");

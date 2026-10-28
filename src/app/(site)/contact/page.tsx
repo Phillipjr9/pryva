@@ -1,150 +1,100 @@
-"use client";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { ContactForm } from "@/components/site/ContactForm";
+import { isPreviewDatabase } from "@/lib/demo-policy";
+import { getCurrentUser } from "@/lib/auth";
+import { Clock, Mail, MessageCircle, Shield } from "@/components/icons";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Textarea } from "@/components/ui/Textarea";
-import { Select } from "@/components/ui/Select";
-import { Alert } from "@/components/ui/Alert";
-import { Mail, MessageCircle, Clock } from "@/components/icons";
+export const metadata: Metadata = {
+  title: "Contact support",
+  description:
+    "Message the Pryva support team about an order, a wallet transaction or a service question.",
+  alternates: { canonical: "/contact" },
+};
 
-export default function ContactPage() {
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    topic: "general",
-    message: "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const topics = [
-    { value: "general", label: "General Inquiry" },
-    { value: "support", label: "Technical Support" },
-    { value: "billing", label: "Billing & Payments" },
-    { value: "partnership", label: "Partnership Opportunities" },
-    { value: "feedback", label: "Feedback & Suggestions" },
-  ];
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const response = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error || "Failed to send message");
-      }
-
-      setSuccess("Your message was received for support review.");
-      setFormData({ name: "", email: "", topic: "general", message: "" });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send message");
-    } finally {
-      setLoading(false);
-    }
-  }
+/**
+ * Public contact page.
+ *
+ * This used to be a second, client-side copy of the support form with its own
+ * topic vocabulary ("general", "billing"…) while the dashboard form saved human
+ * labels ("Wallet or refund"). Both wrote to the same table, so the support
+ * inbox showed two inconsistent sets of topics. It now renders the shared form.
+ */
+export default async function ContactPage() {
+  const preview = isPreviewDatabase();
+  const user = await getCurrentUser().catch(() => null);
 
   return (
     <div className="min-h-screen bg-cream">
-      {/* Hero */}
       <section className="py-16">
         <div className="shell text-center">
           <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem]">
             Get in touch
           </h1>
-          <p className="mt-4 text-[1.1rem] text-ink-2 max-w-2xl mx-auto">
-            Have a question or need help? We&apos;re here to assist you.
+          <p className="mx-auto mt-4 max-w-2xl text-[1.1rem] text-ink-2">
+            Have a question or need help? Include your order or wallet reference and we can pick it
+            up faster.
           </p>
         </div>
       </section>
 
-      {/* Contact Options */}
       <section className="pb-16">
         <div className="shell">
-          <div className="grid gap-6 sm:grid-cols-3 mb-12">
+          <div className="mb-12 grid gap-6 sm:grid-cols-3">
             <div className="rounded-2xl border border-line bg-white p-6 text-center">
-              <div className="grid h-12 w-12 place-items-center rounded-xl bg-lav-100 text-lav-600 mx-auto mb-4">
+              <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-lav-100 text-lav-600">
                 <Mail className="h-6 w-6" />
               </div>
-              <h3 className="text-[1rem] font-semibold text-ink mb-2">Email Us</h3>
-              <p className="text-[0.86rem] text-ink-2">support@pryva.ng</p>
+              <h2 className="mb-2 text-[1rem] font-semibold text-ink">Email us</h2>
+              <p className="text-[0.86rem] text-ink-2">
+                <a href="mailto:support@pryva.ng" className="text-lav-700 underline underline-offset-2">
+                  support@pryva.ng
+                </a>
+              </p>
             </div>
             <div className="rounded-2xl border border-line bg-white p-6 text-center">
-              <div className="grid h-12 w-12 place-items-center rounded-xl bg-green-100 text-green-600 mx-auto mb-4">
+              <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-green-100 text-green-600">
                 <MessageCircle className="h-6 w-6" />
               </div>
-              <h3 className="text-[1rem] font-semibold text-ink mb-2">Message form</h3>
-              <p className="text-[0.86rem] text-ink-2">Send a message below</p>
+              <h2 className="mb-2 text-[1rem] font-semibold text-ink">Message form</h2>
+              <p className="text-[0.86rem] text-ink-2">
+                {preview ? "Saves a fictional demo message" : "Send a message below"}
+              </p>
             </div>
             <div className="rounded-2xl border border-line bg-white p-6 text-center">
-              <div className="grid h-12 w-12 place-items-center rounded-xl bg-blue-100 text-blue-600 mx-auto mb-4">
+              <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-blue-100 text-blue-600">
                 <Clock className="h-6 w-6" />
               </div>
-              <h3 className="text-[1rem] font-semibold text-ink mb-2">Response Time</h3>
-              <p className="text-[0.86rem] text-ink-2">Response times may vary</p>
+              <h2 className="mb-2 text-[1rem] font-semibold text-ink">Response time</h2>
+              <p className="text-[0.86rem] text-ink-2">May vary · we reply to the email you give</p>
             </div>
           </div>
 
-          {/* Contact Form */}
-          <div className="max-w-2xl mx-auto">
-            <div className="rounded-2xl border border-line bg-white p-8">
-              <h2 className="text-[1.5rem] font-semibold text-ink mb-6">
-                Send us a message
-              </h2>
+          <div className="mx-auto max-w-2xl">
+            <ContactForm
+              preview={preview}
+              signedIn={Boolean(user)}
+              defaultName={preview ? "Demo Visitor" : (user?.name ?? "")}
+              defaultEmail={preview ? "demo@example.test" : (user?.email ?? "")}
+            />
 
-              {error && <Alert variant="error" className="mb-6">{error}</Alert>}
-              {success && <Alert variant="success" className="mb-6">{success}</Alert>}
-
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <Input
-                  label="Name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Your name"
-                  required
-                />
-
-                <Input
-                  label="Email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="you@example.com"
-                  required
-                />
-
-                <Select
-                  label="Topic"
-                  value={formData.topic}
-                  onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
-                  options={topics}
-                  required
-                />
-
-                <Textarea
-                  label="Message"
-                  value={formData.message}
-                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                  placeholder="How can we help you?"
-                  rows={6}
-                  required
-                />
-
-                <Button type="submit" size="lg" className="w-full" loading={loading} disabled={loading}>
-                  {loading ? "Sending..." : "Send Message"}
-                </Button>
-              </form>
+            <div className="mt-6 grid gap-3 rounded-2xl border border-line bg-white p-6 text-[0.86rem] text-ink-2 sm:grid-cols-2">
+              <p className="flex items-start gap-2">
+                <Shield className="mt-0.5 h-4 w-4 shrink-0 text-lav-600" />
+                Never send passwords, card details, bank logins or verification codes.
+              </p>
+              <p className="flex items-start gap-2">
+                <Shield className="mt-0.5 h-4 w-4 shrink-0 text-lav-600" />
+                Looking for an answer first? Try the{" "}
+                <Link href="/faq" className="font-semibold text-lav-700 underline underline-offset-2">
+                  FAQ
+                </Link>{" "}
+                or the{" "}
+                <Link href="/help" className="font-semibold text-lav-700 underline underline-offset-2">
+                  help centre
+                </Link>
+                .
+              </p>
             </div>
           </div>
         </div>

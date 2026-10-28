@@ -106,7 +106,7 @@ export function LiveCodeCard({ codes, initialNow, preview = false }: { codes: Li
   }
 
   return (
-    <section aria-labelledby="live-codes-heading" className="grid gap-2.5">
+    <section aria-labelledby="live-codes-heading" className="grid min-w-0 grid-cols-1 gap-2.5">
       <div className="flex items-center justify-between">
         <h2 id="live-codes-heading" className="text-[1rem] font-semibold">
           {preview ? "Demo codes" : "Live now"}
@@ -126,9 +126,9 @@ export function LiveCodeCard({ codes, initialNow, preview = false }: { codes: Li
         return (
           <div
             key={code.id}
-            className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-4 sm:p-5"
+            className="min-w-0 rounded-[1.5rem] border border-line bg-[#fffdfa] p-4 sm:p-5"
           >
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
               <div className="flex min-w-0 items-center gap-2.5">
                 <CountryFlag region={code.region} size={24} decorative />
                 <div className="min-w-0">

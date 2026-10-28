@@ -24,7 +24,7 @@ function DemoTopUp({ balance, userId }: { balance: number; userId: string }) {
         <div className="flex items-center gap-2 rounded-xl border border-line bg-white p-3"><Wallet className="h-4 w-4 text-lav-700" /><span className="text-[0.75rem] font-semibold text-ink">Demo transfer</span></div>
         <div className="flex items-center gap-2 rounded-xl border border-line bg-white p-3"><Card className="h-4 w-4 text-lav-700" /><span className="text-[0.75rem] font-semibold text-ink">Demo card</span></div>
       </div>
-      <button type="button" onClick={() => setOpen(true)} className="btn btn-primary mt-4 w-full !py-3.5">Continue to demo payment <ArrowRight className="h-4 w-4" /></button>
+      <button type="button" onClick={() => setOpen(true)} className="btn btn-primary mt-4 w-full !whitespace-normal !py-3.5 !leading-snug">Continue to demo payment <ArrowRight className="h-4 w-4" /></button>
       <p className="mt-3 flex items-start gap-1.5 text-[0.7rem] leading-relaxed text-ink-3"><Lock className="mt-0.5 h-3 w-3 shrink-0 text-lav-500" /> No personal payment details or real money are used.</p>
     </section>
     {open && <DemoMoneyMovement kind="add" balance={balance} userId={userId} onClose={() => setOpen(false)} onCompleted={() => router.refresh()} />}

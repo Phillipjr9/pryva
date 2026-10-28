@@ -303,9 +303,7 @@ export function DashboardShell({
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
-              <div className="hidden sm:block">
-                <CommandPaletteTrigger onClick={() => setCommandPaletteOpen(true)} />
-              </div>
+              <CommandPaletteTrigger onClick={() => setCommandPaletteOpen(true)} />
               {/* The balance belongs at the top of every dashboard page, on every
                   width — it is the number people come back to check. */}
               <Link
@@ -333,7 +331,7 @@ export function DashboardShell({
                 )}
               </Link>
 
-              <Link href="/dashboard/services" className="btn btn-primary !px-3.5 !py-2 !text-[0.76rem]">
+              <Link href="/dashboard/services" className="btn btn-primary !px-3.5 !py-2 !text-[0.76rem] max-[374px]:!hidden">
                 Services
                 <ArrowRight className="h-3 w-3" />
               </Link>
@@ -400,7 +398,10 @@ export function DashboardShell({
         </div>
       </nav>
 
-      <CommandPalette isOpen={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
+      {/* Mounted only while open so each ⌘K starts from an empty query. */}
+      {commandPaletteOpen ? (
+        <CommandPalette isOpen onClose={() => setCommandPaletteOpen(false)} />
+      ) : null}
     </div>
   );
 }

@@ -23,6 +23,12 @@ import {
 } from "@/lib/service-explorer";
 
 const PAGE_SIZE = 12;
+
+/** Echoed link values are untrusted input: keep them short and let React escape them. */
+function truncate(value: string) {
+  const clean = value.trim();
+  return clean.length > 24 ? `${clean.slice(0, 24)}\u2026` : clean;
+}
 const VERIFICATION_TAGS = ["Social", "Messaging", "Finance", "Travel", "Entertainment", "Work & other", "Other"];
 const SOCIAL_TAGS = ["Followers", "Likes", "Views", "Subscribers"];
 
@@ -38,10 +44,10 @@ function ServiceCard({ item, countryName, countryCode, preview, counts, loading 
   const terms = preview ? demoServiceTerms(item) : null;
   const coverage = preview
     ? (item.coverage === "not-country-specific" ? "Demo · not country-specific" : `Demo selection · ${countryName}`)
-    : item.source === "supplier"
-      ? (item.coverage === "catalog-country" ? `Supplier-reported region: ${countryName}` : "Not country-specific")
+    : item.source === "live"
+      ? (item.coverage === "catalog-country" ? `Reported region: ${countryName}` : "Not country-specific")
       : item.coverage === "catalog-country" ? `Catalog region: ${countryName}` : item.coverage === "unconfirmed" ? "Country coverage unconfirmed" : "Not filtered by country";
-  const noAction = item.source === "supplier" ? "Ordering paused" : item.source === "example" ? "Not connected" : "Not available";
+  const noAction = item.source === "live" ? "Ordering paused" : item.source === "example" ? "Not connected" : "Not available";
   const action = terms ? { label: "Try demo", href: `/dashboard/services/demo/${encodeURIComponent(item.id)}?country=${encodeURIComponent(countryCode)}` } : item.action;
   const price = terms?.price ?? item.price;
 
@@ -50,7 +56,7 @@ function ServiceCard({ item, countryName, countryCode, preview, counts, loading 
       <div className="flex items-start justify-between gap-2">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-lav-50/70">{itemArt(item)}</div>
         <span className={`rounded-full px-2 py-1 text-[0.59rem] font-bold uppercase tracking-[0.08em] ${item.source === "example" ? "bg-lav-50 text-lav-700" : "bg-cream-2 text-ink-2"}`}>
-          {preview && item.source !== "tool" ? "Demo" : item.source === "supplier" ? "Supplier listing" : item.source === "example" ? "Example" : item.source === "tool" ? "Tool" : "Catalog"}
+          {preview && item.source !== "tool" ? "Demo" : item.source === "live" ? "Live listing" : item.source === "example" ? "Example" : item.source === "tool" ? "Tool" : "Catalog"}
         </span>
       </div>
       <div className="mt-3 min-w-0">
@@ -60,7 +66,7 @@ function ServiceCard({ item, countryName, countryCode, preview, counts, loading 
       <p className="mt-3 text-[0.68rem] leading-relaxed text-ink-3">{coverage}</p>
       <div className="mt-auto pt-3">
         <p className="min-h-[1.2rem] text-[0.73rem] font-semibold text-ink-2">
-          {price !== null ? `${preview ? "Demo" : item.source === "supplier" ? "Indicative" : "Preview"} ${item.priceFrom ? "from " : "price "}${formatNaira(price)}` : item.source === "example" && !preview ? "Price not connected" : "See details"}
+          {price !== null ? `${preview ? "Demo" : item.source === "live" ? "Indicative" : "Preview"} ${item.priceFrom ? "from " : "price "}${formatNaira(price)}` : item.source === "example" && !preview ? "Price not connected" : "See details"}
         </p>
         <div className="mt-2"><UnitsStatus demo={preview} loading={(!!terms || item.category === "subscriptions") && loading} stock={preview ? counts?.stock ?? null : item.stock} owned={preview ? counts?.owned ?? null : item.myUnits} /></div>
         {action ? (
@@ -77,16 +83,24 @@ function ServiceCard({ item, countryName, countryCode, preview, counts, loading 
   );
 }
 
-/** Keep the selected country in a shareable URL without a full page reload. */
+/** Keep country and category shareable, and allow Back to restore the choice. */
 function writeSelection(country: string, category: ExplorerFilter) {
   const params = new URLSearchParams();
   if (country) params.set("country", country);
   if (category !== "all") params.set("category", category);
   const query = params.toString();
-  window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+  const next = `${window.location.pathname}${query ? `?${query}` : ""}`;
+  if (next !== `${window.location.pathname}${window.location.search}`) window.history.pushState(null, "", next);
 }
 
-export function ServiceExplorer({ initialCountry, initialCategory, preview = false }: { initialCountry: string | null; initialCategory: string | null; preview?: boolean }) {
+export function ServiceExplorer({ initialCountry, initialCategory, preview = false, rejectedCountry = null, rejectedCategory = null }: {
+  initialCountry: string | null;
+  initialCategory: string | null;
+  preview?: boolean;
+  /** Link values the server could not honour, echoed so the reset is visible. */
+  rejectedCountry?: string | null;
+  rejectedCategory?: string | null;
+}) {
   const [country, setCountry] = useState(() => explorerCountry(initialCountry)?.code ?? "");
   const [category, setCategory] = useState<ExplorerFilter>(() => explorerCategory(initialCategory));
   const [search, setSearch] = useState("");
@@ -94,14 +108,15 @@ export function ServiceExplorer({ initialCountry, initialCategory, preview = fal
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [inventoryState, setInventoryState] = useState<{ country: string; counts: DemoInventory | null } | null>(null);
   const [inventoryRevision, setInventoryRevision] = useState(0);
-  const [supplierState, setSupplierState] = useState<{ country: string; items: ExplorerItem[]; partial: boolean; failed: boolean; fetchedAt: string | null } | null>(null);
-  const [supplierRevision, setSupplierRevision] = useState(0);
+  const [liveState, setLiveState] = useState<{ country: string; items: ExplorerItem[]; partial: boolean; failed: boolean; fetchedAt: string | null } | null>(null);
+  const [liveRevision, setLiveRevision] = useState(0);
   const selectedCountry = explorerCountry(country);
+  const selectedCategory = EXPLORER_CATEGORIES.find((entry) => entry.id === category);
   const items = useMemo(() => {
     const base = buildServiceExplorer(country);
-    return !preview && supplierState?.country === country && supplierState.items.length
-      ? interleaveExplorerItems([...supplierState.items, ...base]) : base;
-  }, [country, preview, supplierState]);
+    return !preview && liveState?.country === country && liveState.items.length
+      ? interleaveExplorerItems([...liveState.items, ...base]) : base;
+  }, [country, preview, liveState]);
   const filtered = useMemo(() => filterExplorerItems(items, category, search, tag), [items, category, search, tag]);
   const tags = category === "verification" ? VERIFICATION_TAGS : category === "social" ? SOCIAL_TAGS : [];
 
@@ -123,16 +138,16 @@ export function ServiceExplorer({ initialCountry, initialCategory, preview = fal
   useEffect(() => {
     if (preview || !country) return;
     const controller = new AbortController();
-    fetch(`/api/services/catalog?country=${encodeURIComponent(country)}${supplierRevision ? "&refresh=1" : ""}`, { cache: "no-store", signal: controller.signal })
+    fetch(`/api/services/catalog?country=${encodeURIComponent(country)}${liveRevision ? "&refresh=1" : ""}`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const data = await response.json() as { ok?: boolean; country?: string; partial?: boolean; fetchedAt?: string; items?: ExplorerItem[] };
         if (!response.ok || !data.ok || data.country !== country || !Array.isArray(data.items)) throw new Error("Catalog unavailable");
         const fetchedAt = typeof data.fetchedAt === "string" && Number.isFinite(Date.parse(data.fetchedAt)) ? data.fetchedAt : null;
-        if (!controller.signal.aborted) setSupplierState({ country, items: data.items, partial: Boolean(data.partial), failed: false, fetchedAt });
+        if (!controller.signal.aborted) setLiveState({ country, items: data.items, partial: Boolean(data.partial), failed: false, fetchedAt });
       })
-      .catch(() => { if (!controller.signal.aborted) setSupplierState({ country, items: [], partial: false, failed: true, fetchedAt: null }); });
+      .catch(() => { if (!controller.signal.aborted) setLiveState({ country, items: [], partial: false, failed: true, fetchedAt: null }); });
     return () => controller.abort();
-  }, [country, preview, supplierRevision]);
+  }, [country, preview, liveRevision]);
 
   // Handle browser back/forward when a history entry from another page is restored.
   useEffect(() => {
@@ -151,7 +166,7 @@ export function ServiceExplorer({ initialCountry, initialCategory, preview = fal
   function chooseCountry(code: string) {
     const next = explorerCountry(code)?.code ?? "";
     setCountry(next);
-    if (next !== country) { setInventoryState(null); setSupplierRevision(0); }
+    if (next !== country) { setInventoryState(null); setLiveRevision(0); }
     setTag("all");
     setSearch("");
     setVisible(PAGE_SIZE);
@@ -171,11 +186,23 @@ export function ServiceExplorer({ initialCountry, initialCategory, preview = fal
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[0.65rem] font-bold uppercase tracking-[0.16em] text-lav-700">Explore Pryva</p>
-          <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">Your service hub</h1>
-          <p className="mt-1.5 max-w-2xl text-[0.82rem] leading-relaxed text-ink-2">Choose a country, then browse categories and service examples in one place.</p>
+          <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">{selectedCategory?.label ?? "Your service hub"}</h1>
+          <p className="mt-1.5 max-w-2xl text-[0.82rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Choose a country, then select a service below.` : "Choose a country, then browse categories and service examples in one place."}</p>
         </div>
         <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-[0.76rem] font-semibold text-lav-700 hover:underline">My orders <ArrowRight className="h-3.5 w-3.5" /></Link>
       </div>
+
+      {rejectedCountry || rejectedCategory ? (
+        <p role="status" className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-[0.76rem] leading-relaxed text-amber-900">
+          <Shield className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            That link asked for{rejectedCountry ? <> country <strong className="font-semibold">&ldquo;{truncate(rejectedCountry)}&rdquo;</strong></> : null}
+            {rejectedCountry && rejectedCategory ? " and" : null}
+            {rejectedCategory ? <> category <strong className="font-semibold">&ldquo;{truncate(rejectedCategory)}&rdquo;</strong></> : null},
+            which isn&rsquo;t something we list, so the selection was reset instead of guessing. Pick a country below.
+          </span>
+        </p>
+      ) : null}
 
       <section aria-labelledby="choose-country-title" className="relative overflow-hidden rounded-[1.5rem] border border-lav-200/80 bg-[#f6f1fc] p-5 sm:p-6">
         <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 h-48 w-48 rounded-full bg-lav-300/30 blur-3xl" />
@@ -183,7 +210,7 @@ export function ServiceExplorer({ initialCountry, initialCategory, preview = fal
           <div>
             <p className="inline-flex items-center gap-1.5 text-[0.64rem] font-bold uppercase tracking-[0.16em] text-lav-700"><Globe className="h-3.5 w-3.5" /> Step 01</p>
             <h2 id="choose-country-title" className="mt-2 text-[1.25rem] font-semibold text-ink">Start with a country.</h2>
-            <p className="mt-1.5 max-w-sm text-[0.78rem] leading-relaxed text-ink-2">{preview ? "Select a country to explore the demo services available in your sandbox." : "Select where you need the service. Coverage and availability still need supplier confirmation."}</p>
+            <p className="mt-1.5 max-w-sm text-[0.78rem] leading-relaxed text-ink-2">{preview ? "Select a country to explore the demo services available in your sandbox." : "Select where you need the service. Coverage and availability still need confirmation before ordering."}</p>
           </div>
           <div className="rounded-2xl border border-white/80 bg-white/60 p-4 shadow-sm">
             <CountrySelector id="service-country" value={country} onChange={chooseCountry} />
@@ -221,16 +248,16 @@ export function ServiceExplorer({ initialCountry, initialCategory, preview = fal
 
           <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-[0.73rem] leading-relaxed ${preview ? "border-lav-200 bg-lav-50/70 text-lav-800" : "border-amber-200 bg-amber-50/70 text-amber-900"}`}>
             <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-            {preview ? <p><strong>Demo catalog.</strong> Prices, stock, units and delivery are simulated. Use fictional details only.</p> : supplierState?.country === country && !supplierState.failed ? <p><strong>Supplier listings are read-only.</strong> Prices and stock are indicative, and coverage must be confirmed before ordering. Examples are separate, purchased units aren&apos;t tracked here yet, and live fulfillment remains paused. {supplierState.partial && "Some listing types are temporarily unavailable. "}<Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p> : <p><strong>Examples, not a verified supplier catalog.</strong> Stock is unknown and purchased service units aren&apos;t tracked yet. Country coverage is unverified; live fulfillment remains paused. <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
+            {preview ? <p><strong>Demo catalog.</strong> Prices, stock, units and delivery are simulated. Use fictional details only.</p> : liveState?.country === country && !liveState.failed ? <p><strong>Live listings are read-only.</strong> Prices and stock are indicative, and coverage must be confirmed before ordering. Examples are separate, purchased units aren&apos;t tracked here yet, and live fulfillment remains paused. {liveState.partial && "Some listing types are temporarily unavailable. "}<Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p> : <p><strong>Examples, not a verified live catalog.</strong> Stock is unknown and purchased service units aren&apos;t tracked yet. Country coverage is unverified; live fulfillment remains paused. <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
           </div>
 
           <section aria-labelledby="services-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 sm:p-6">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="inline-flex items-center gap-1.5 text-[0.64rem] font-bold uppercase tracking-[0.16em] text-lav-700"><Sparkle className="h-3.5 w-3.5" /> Step 03</p>
-                <h2 id="services-title" className="mt-1 text-[1.05rem] font-semibold text-ink">Explore services</h2>
+                <h2 id="services-title" className="mt-1 text-[1.05rem] font-semibold text-ink">{selectedCategory ? `Explore ${selectedCategory.label}` : "Explore services"}</h2>
                 <p aria-live="polite" className="mt-1 text-[0.71rem] text-ink-3">{filtered.length} {preview ? `demo service${filtered.length === 1 ? "" : "s"}` : `listing${filtered.length === 1 ? "" : "s"} and examples`} · {selectedCountry.name} selected</p>
-                {!preview && supplierState?.country === country && supplierState.fetchedAt && <p className="mt-1 text-[0.68rem] text-ink-3">Supplier checked: <time dateTime={supplierState.fetchedAt}>{new Date(supplierState.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
+                {!preview && liveState?.country === country && liveState.fetchedAt && <p className="mt-1 text-[0.68rem] text-ink-3">Stock checked: <time dateTime={liveState.fetchedAt}>{new Date(liveState.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
               </div>
               <div className="relative w-full sm:max-w-[260px]">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
@@ -246,14 +273,14 @@ export function ServiceExplorer({ initialCountry, initialCategory, preview = fal
             )}
 
             {preview && inventoryState?.country === country && inventoryState.counts === null && <p role="status" className="mt-4 text-[0.72rem] text-ink-3">Demo counts could not be loaded. <button type="button" className="font-semibold text-lav-700 underline" onClick={() => { setInventoryState(null); setInventoryRevision((value) => value + 1); }}>Retry</button></p>}
-            {!preview && supplierState?.country === country && (supplierState.failed || supplierState.partial) && <p role="status" className="mt-4 text-[0.72rem] text-amber-800">Some supplier listings couldn&apos;t be loaded. <button type="button" className="font-semibold underline" onClick={() => setSupplierRevision((value) => value + 1)}>Retry</button></p>}
+            {!preview && liveState?.country === country && (liveState.failed || liveState.partial) && <p role="status" className="mt-4 text-[0.72rem] text-amber-800">Some live listings couldn&apos;t be loaded. <button type="button" className="font-semibold underline" onClick={() => setLiveRevision((value) => value + 1)}>Retry</button></p>}
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {filtered.slice(0, visible).map((item) => <ServiceCard key={item.id} item={item} countryName={selectedCountry.name} countryCode={selectedCountry.code} preview={preview} counts={inventoryState?.country === country ? inventoryState.counts?.[item.id] : undefined} loading={preview && inventoryState?.country !== country} />)}
             </div>
             {filtered.length === 0 && (
               <div className="rounded-2xl border border-dashed border-line bg-cream/50 p-8 text-center">
                 <p className="text-[0.88rem] font-semibold text-ink">No examples match these filters</p>
-                <p className="mt-1 text-[0.76rem] text-ink-2">{preview ? "Try another search, category or country." : "Try another search, category or country. This doesn't indicate live supplier availability."}</p>
+                <p className="mt-1 text-[0.76rem] text-ink-2">{preview ? "Try another search, category or country." : "Try another search, category or country. This doesn't indicate live availability."}</p>
                 {(search || tag !== "all") && <button type="button" onClick={() => { setSearch(""); setTag("all"); setVisible(PAGE_SIZE); }} className="mt-3 text-[0.75rem] font-semibold text-lav-700 underline underline-offset-2">Clear filters</button>}
               </div>
             )}
@@ -262,7 +289,7 @@ export function ServiceExplorer({ initialCountry, initialCategory, preview = fal
                 <button type="button" onClick={() => setVisible((current) => current + PAGE_SIZE)} className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2.5 text-[0.76rem] font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-lav-700">Show more <span className="text-ink-3">({filtered.length - visible} remaining)</span></button>
               </div>
             )}
-            <p className="mt-5 border-t border-line pt-4 text-[0.69rem] leading-relaxed text-ink-3">{preview ? "Demo stock is fictional inventory. My demo units are unused simulated units; a dash means that type is not counted in the demo." : "Stock means supplier inventory. My units means your remaining purchased units. Unknown and not tracked are not the same as zero. Examples do not imply platform support or verified coverage."}</p>
+            <p className="mt-5 border-t border-line pt-4 text-[0.69rem] leading-relaxed text-ink-3">{preview ? "Demo stock is fictional inventory. My demo units are unused simulated units; a dash means that type is not counted in the demo." : "Stock means available inventory. My units means your remaining purchased units. Unknown and not tracked are not the same as zero. Examples do not imply platform support or verified coverage."}</p>
           </section>
         </>
       )}

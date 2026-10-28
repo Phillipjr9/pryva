@@ -108,7 +108,9 @@ let autoRefund: typeof import("@/lib/auto-refund");
 function purchaseRequest(id = REQUEST_ID, origin = "https://pryva.test", type = "application/json") {
   return new NextRequest("https://pryva.test/api/accounts/purchase", {
     method: "POST", headers: { host: "pryva.test", "x-forwarded-proto": "https", origin, "content-type": type },
-    body: JSON.stringify({ slug: "listing", quantity: 1, requestId: id }),
+    // Listing ids are opaque routing tokens: the prefix says which source owns
+    // the reference, so a purchase can never be sent to the wrong supplier.
+    body: JSON.stringify({ slug: "p2:listing", quantity: 1, requestId: id }),
   });
 }
 function adminRefund(orderId: string, extra: Record<string, unknown> = {}) {
@@ -927,7 +929,7 @@ describe("order sync and scheduler safety", () => {
 
   it("does not use supplier promo APIs in preview or for cross-origin requests", async () => {
     const request = (origin: string) => new NextRequest("https://pryva.test/api/accounts/promo", {
-      method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ slug: "listing", quantity: 1, code: "SAVE" }),
+      method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ slug: "p2:listing", quantity: 1, code: "SAVE" }),
     });
     expect((await promoRoute.POST(request("https://evil.pryva.test"))).status).toBe(403);
     vi.stubEnv("DATABASE_URL", "");

@@ -5,9 +5,18 @@ import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { requireAuthApi } from "@/lib/auth";
 import { isSameOriginMutation } from "@/lib/net";
-import { isMarketplacePurchaseEnabled } from "@/lib/marketplace-policy";
+import {
+  getMarketplaceListing,
+  MarketplaceError,
+  purchaseMarketplaceListing,
+  supportsPromoCodes,
+} from "@/lib/marketplace-suppliers";
+import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
+import { isManualSlug } from "@/lib/manual-catalog";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
-import { AccsZoneError, getListing, isAccsZoneConfigured, purchaseAccounts, usdCents, validatePromo } from "@/lib/accszone";
+import { validatePromo } from "@/lib/accszone";
+import { usdCents } from "@/lib/supplier-money";
+import { fulfilmentLabel } from "@/lib/warranty";
 import { applyPromoDiscount, priceMarketplaceListing } from "@/lib/marketplace-pricing";
 import { MIN_ORDER_NGN } from "@/lib/pricing";
 import { logger } from "@/lib/logger";
@@ -50,6 +59,19 @@ function existingResponse(order: Order, slug: string, quantity: number) {
   if (order.status === "refunded") {
     return NextResponse.json({ error: "This order was refunded. Start a new purchase to try again.", order: { id: order.id, reference: order.reference } }, { status: 409 });
   }
+  // A hand-sourced order in `processing` is not ambiguous — no supplier call was
+  // made, so there is nothing to reconcile. Say it is being prepared instead of
+  // warning that the wallet "may have been charged".
+  if (order.provider === "manual" && order.status === "processing") {
+    return NextResponse.json({
+      ok: true,
+      preparing: true,
+      order: { id: order.id, reference: order.reference },
+      quantity,
+      totalNgn: order.amount,
+      message: "Your order is confirmed and being prepared. Your credentials appear on the order page as soon as they are ready.",
+    });
+  }
   if (order.status === "delivered" && order.accounts) {
     try {
       const accounts: unknown = JSON.parse(order.accounts);
@@ -84,7 +106,7 @@ export async function POST(request: NextRequest) {
   if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get("content-type") ?? "")) {
     return NextResponse.json({ error: "Content-Type must be application/json." }, { status: 415 });
   }
-  if (!isMarketplacePurchaseEnabled() || !isAccsZoneConfigured()) {
+  if (!isMarketplaceCheckoutConfigured()) {
     return NextResponse.json({ error: "Account purchases are temporarily unavailable." }, { status: 503 });
   }
 
@@ -115,6 +137,8 @@ export async function POST(request: NextRequest) {
   const promoCode = typeof body.promoCode === "string" ? body.promoCode.trim().toUpperCase() : "";
   const clientReference = scopedReference(user.id, requestId);
   const reference = `MKT-${clientReference.replace(/-/g, "").slice(0, 28)}`;
+  // Hand-sourced items are recorded and queued; no supplier call is made.
+  const isManual = isManualSlug(slug);
 
   // A repeat of the same request must not call the supplier a second time, even
   // when the listing or provider is no longer available.
@@ -130,22 +154,47 @@ export async function POST(request: NextRequest) {
   let price;
   let appliedPromo: string | undefined;
   try {
-    listing = await getListing(slug);
-    if (!listing || listing.slug !== slug || !Number.isSafeInteger(listing.id) || listing.id <= 0 ||
-        typeof listing.title !== "string" || !listing.title.trim() || listing.title.length > 160 ||
-        !Number.isSafeInteger(listing.available_stock) || listing.available_stock < 0 ||
-        typeof listing.price !== "string" || usdCents(listing.price) <= 0 ||
-        (listing.category?.title?.length ?? 0) > 80) {
+    listing = await getMarketplaceListing(slug);
+    if (!listing.title.trim() || listing.title.length > 160 ||
+        usdCents(listing.priceUsd) <= 0 ||
+        (listing.category?.length ?? 0) > 80 ||
+        !Number.isSafeInteger(listing.minQuantity) || listing.minQuantity < 1 || listing.minQuantity > MAX_QUANTITY) {
       throw new Error("Invalid supplier listing");
     }
-    if (listing.available_stock < quantity) {
-      return NextResponse.json({ error: `Only ${listing.available_stock} left in stock.`, available: listing.available_stock }, { status: 409 });
+    if (quantity < listing.minQuantity) {
+      return NextResponse.json({
+        error: `This item has a minimum order of ${listing.minQuantity}.`,
+        minQuantity: listing.minQuantity,
+      }, { status: 400 });
     }
-    price = await priceMarketplaceListing({ unitPriceUsd: listing.price, quantity, categoryTitle: listing.category?.title, subcategoryTitle: listing.subcategory?.title });
+    if (!listing.available) {
+      return NextResponse.json({ error: "This item is not available right now." }, { status: 409 });
+    }
+    if (quantity > listing.maxQuantity) {
+      return NextResponse.json({
+        error: `The most you can order at once is ${listing.maxQuantity}.`,
+        maxQuantity: listing.maxQuantity,
+      }, { status: 400 });
+    }
+    // `stock === null` is unknown, not zero: the source is still the authority.
+    if (listing.stock !== null && listing.stock < quantity) {
+      return NextResponse.json({ error: `Only ${listing.stock} left in stock.`, available: listing.stock }, { status: 409 });
+    }
+    price = await priceMarketplaceListing({
+      unitPriceUsd: listing.priceUsd,
+      quantity,
+      categoryTitle: listing.category ?? undefined,
+      subcategoryTitle: listing.subcategory ?? undefined,
+    });
     if (promoCode) {
+      // Only one source publishes a promo API. Refuse the code rather than
+      // silently charging the undiscounted price a customer was shown.
+      if (!supportsPromoCodes(slug)) {
+        return NextResponse.json({ error: "Promo codes do not apply to this item." }, { status: 409 });
+      }
       // Do not silently charge the non-discounted price if validation changed.
       try {
-        const promo = await validatePromo(promoCode, usdCents(listing.price) * quantity / 100);
+        const promo = await validatePromo(promoCode, usdCents(listing.priceUsd) * quantity / 100);
         const discounted = applyPromoDiscount(price, promo.discount);
         if (discounted.totalNgn >= price.totalNgn) throw new Error("Promo unavailable");
         price = discounted;
@@ -155,7 +204,7 @@ export async function POST(request: NextRequest) {
       }
     }
   } catch (error) {
-    const status = error instanceof AccsZoneError && error.code === "listing_not_found" ? 404 : 502;
+    const status = error instanceof MarketplaceError && error.code === "listing_not_found" ? 404 : 502;
     return NextResponse.json({ error: "Could not verify this listing. Please try again later." }, { status });
   }
   if (!Number.isSafeInteger(price.totalNgn) || price.totalNgn > 2_147_483_647 || price.totalNgn <= 0) {
@@ -188,9 +237,13 @@ export async function POST(request: NextRequest) {
       const [created] = await tx.insert(orders).values({
         reference, userId: user.id, service: "accounts", productSlug: listing.slug,
         productName: listing.title, planLabel: `${quantity} × account`,
-        region: listing.category?.title ?? "Global", duration: "Instant delivery",
-        amount: price.totalNgn, status: "processing", provider: "accounts",
-        providerRequestId: clientReference,
+        region: listing.group ?? "Global", duration: fulfilmentLabel(listing.fulfilment),
+        amount: price.totalNgn, status: "processing",
+        // A hand-sourced order makes no supplier call, so it carries its own
+        // provider value: the unresolved-purchase guard above exists to stop a
+        // second automated supplier request and must not block these.
+        provider: isManual ? "manual" : "accounts",
+        providerRequestId: isManual ? null : clientReference,
       }).returning({ id: orders.id });
       if (!created) throw new Error("Order insert failed");
       await tx.insert(walletTransactions).values({
@@ -203,6 +256,21 @@ export async function POST(request: NextRequest) {
     if (reservation.previous) return existingResponse(reservation.previous, slug, quantity);
     orderId = reservation.orderId!;
     scheduleWalletEmails();
+    if (isManual) {
+      // No supplier call to make. The order waits in the fulfilment queue and
+      // its credentials appear on the order page once they are confirmed.
+      logger.info("Hand-sourced order recorded", { reference, quantity });
+      return NextResponse.json({
+        ok: true,
+        preparing: true,
+        order: { id: orderId, reference },
+        listing: listing.title,
+        quantity,
+        totalNgn: price.totalNgn,
+        warrantyDays: listing.warrantyDays,
+        message: "Your order is confirmed and being prepared. Your credentials appear on the order page as soon as they are ready.",
+      });
+    }
   } catch (error) {
     if (error instanceof InsufficientBalance) {
       return NextResponse.json({ error: "Insufficient wallet balance.", required: price.totalNgn }, { status: 402 });
@@ -216,10 +284,14 @@ export async function POST(request: NextRequest) {
 
   let purchase;
   try {
-    purchase = await purchaseAccounts({ listingId: listing.id, quantity, clientReference, promoCode: appliedPromo });
+    purchase = await purchaseMarketplaceListing({ listing, quantity, clientReference, promoCode: appliedPromo });
   } catch (error) {
+    // An ambiguous outcome means the supplier may already have taken our money.
+    // Hold the order for review: never retry, never auto-refund.
     logger.warn("Marketplace purchase requires reconciliation", {
-      reference, code: error instanceof AccsZoneError ? error.code : "unknown_error",
+      reference,
+      code: error instanceof MarketplaceError ? error.code : "unknown_error",
+      ambiguous: error instanceof MarketplaceError ? error.ambiguous : false,
     });
     await markForReview(orderId, reference);
     return pendingResponse(reference, orderId);
@@ -230,7 +302,9 @@ export async function POST(request: NextRequest) {
   const accounts = Array.isArray(purchase?.accounts)
     ? purchase.accounts.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
     : [];
-  const supplierOrder = Number.isSafeInteger(purchase?.order_id) && purchase.order_id > 0 ? String(purchase.order_id) : null;
+  const supplierOrder = typeof purchase?.supplierOrder === "string" && purchase.supplierOrder.trim()
+    ? purchase.supplierOrder.trim().slice(0, 160)
+    : null;
   const complete = accounts.length === quantity && supplierOrder !== null;
   try {
     const [saved] = await db.update(orders).set({

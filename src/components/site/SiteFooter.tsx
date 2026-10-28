@@ -29,13 +29,22 @@ const columns = [
       { href: "/how-it-works", label: "How it works" },
       { href: "/pricing", label: "Pricing" },
       { href: "/faq", label: "FAQ" },
+      // The blog, help centre, status page and customer-feedback page all
+      // existed but nothing on the site linked to them — they were reachable
+      // only by typing the URL.
+      { href: "/blog", label: "Guides & blog" },
+      { href: "/testimonials", label: "Customer feedback" },
     ],
   },
   {
     title: "Support",
     links: [
+      { href: "/help", label: "Help center" },
       { href: "/contact", label: "Contact support" },
+      { href: "/status", label: "Service status" },
       { href: "/refund-policy", label: "Refund policy" },
+      { href: "/terms", label: "Terms of service" },
+      { href: "/privacy", label: "Privacy policy" },
       { href: "/cookie-policy", label: "Cookie policy" },
       { href: "/login", label: "Sign in" },
       { href: "/signup", label: "Create account" },

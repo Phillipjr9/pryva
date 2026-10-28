@@ -17,4 +17,11 @@ export function demoServiceTerms(item: ExplorerItem): { price: number; units: nu
   return { price: item.price, units: demoPlanUnits(item.id.slice(5)), stock: 250 };
 }
 
+/** A rental is one active unit, not a single-use verification credit. */
+export function isDemoNumberRental(order: { provider?: unknown; service?: unknown; productSlug?: unknown; demoItemId?: unknown }): boolean {
+  if (order.provider !== "simulated" || order.service !== "numbers") return false;
+  const itemId = typeof order.demoItemId === "string" ? order.demoItemId : order.productSlug;
+  return typeof itemId === "string" && (itemId.startsWith("plan-rent-") || itemId.startsWith("rent-"));
+}
+
 export type DemoInventory = Record<string, { stock: number; owned: number }>;

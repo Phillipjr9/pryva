@@ -8,9 +8,9 @@ import { formatNaira } from "@/lib/catalog";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
 import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
 
-type Props = { itemId: string; country: string; name: string; price: number; units: number; balance: number; stock: number; category: string };
+type Props = { itemId: string; country: string; name: string; price: number; units: number; balance: number; stock: number; summary: string; delivery: string };
 
-export function DemoServiceCheckout({ itemId, country, name, price, units, balance, stock, category }: Props) {
+export function DemoServiceCheckout({ itemId, country, name, price, units, balance, stock, summary, delivery }: Props) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,18 +54,18 @@ export function DemoServiceCheckout({ itemId, country, name, price, units, balan
     <>
       <PaymentLoading show={pending} message="Preparing your demo order and updating your wallet…" />
       <PaymentSuccess show={!!success} title="Demo order complete" message={`${name} is ready in your simulated orders. No real service was purchased.`} redirectUrl={`/dashboard/orders/${success?.orderId ?? ""}`} redirectDelay={2500} />
-      <div className="rounded-[1.5rem] border border-line bg-white p-5 sm:p-6">
+      <div className="min-w-0 rounded-[1.5rem] border border-line bg-white p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div><p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-lav-700">Your demo selection</p><h2 className="mt-1 text-[1.12rem] font-semibold text-ink">{name}</h2><p className="mt-1 text-[0.76rem] text-ink-3">{units} simulated unit{units === 1 ? "" : "s"} · {category === "social" ? "Fictional demo profile" : "Demo delivery"}</p></div>
+          <div><p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-lav-700">Your demo selection</p><h2 className="mt-1 text-[1.12rem] font-semibold text-ink">{name}</h2><p className="mt-1 text-[0.76rem] text-ink-3">{summary}</p></div>
           <p className="text-[1.55rem] font-semibold leading-none text-ink">{formatNaira(price)}</p>
         </div>
         <div className="mt-5 grid gap-2 rounded-xl bg-lav-50/70 p-4 text-[0.76rem] text-ink-2">
           <p className="flex items-center gap-2"><Wallet className="h-4 w-4 text-lav-700" /> Demo wallet balance: <strong>{formatNaira(balance)}</strong></p>
-          <p className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-lav-700" /> {category === "social" ? "Watch a fictional promotion complete in your orders." : "See the demo delivery in your order details."}</p>
+          <p className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-lav-700" /> {delivery}</p>
           <p className="flex items-start gap-2"><Lock className="mt-0.5 h-4 w-4 shrink-0 text-lav-700" /> No real payment or external service is involved.</p>
         </div>
         {error && <p role="alert" className="mt-4 text-[0.77rem] font-medium text-rose-700">{error} {needsFunds && <Link href="/dashboard/wallet" className="underline">Add demo funds</Link>}</p>}
-        <button type="button" onClick={() => void purchase()} disabled={pending || stock < units || !!success} className="btn btn-primary mt-5 w-full !py-3.5 disabled:cursor-not-allowed disabled:opacity-50">
+        <button type="button" onClick={() => void purchase()} disabled={pending || stock < units || !!success} className="btn btn-primary mt-5 w-full !whitespace-normal !px-3 !py-3.5 !leading-snug disabled:cursor-not-allowed disabled:opacity-50">
           {pending ? "Processing…" : stock < units ? "Demo stock exhausted" : `Pay ${formatNaira(price)} with demo wallet`} {!pending && <ArrowRight className="h-4 w-4" />}
         </button>
         {success && <p className="mt-3 text-center text-[0.68rem] text-ink-3">Reference {success.reference}</p>}

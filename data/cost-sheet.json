@@ -1,5 +1,5 @@
 {
-  "_readme": "Supplier cost sheet. `cost` is the fixed amount we pay per unit, in naira. Edit a cost here, run `npm run pricing:build`, and every price follows (30-50% markup, see src/lib/pricing.ts). `label` is for humans only.",
+  "_readme": "Cost sheet. `cost` is the fixed amount we pay per unit, in naira. Edit a cost here, run `npm run pricing:build`, and every price follows (30-50% markup, see src/lib/pricing.ts). `label` is for humans only.",
   "_updated": "2026-10-27",
   "catalog": {
     "email-24": {

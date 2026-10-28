@@ -1,9 +1,9 @@
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/db";
-import { users, orders, walletTransactions } from "@/db/schema";
+import { users, orders, contactMessages } from "@/db/schema";
 import { count, sum, desc, eq } from "drizzle-orm";
 import Link from "next/link";
-import { Users, ShoppingCart, DollarSign, TrendingUp } from "@/components/icons";
+import { Users, ShoppingCart, DollarSign, MessageCircle } from "@/components/icons";
 
 export default async function AdminDashboardPage() {
   await requireAdmin("/admin/dashboard");
@@ -15,6 +15,11 @@ export default async function AdminDashboardPage() {
     .select({ sum: sum(orders.amount) })
     .from(orders)
     .where(eq(orders.status, "delivered"));
+
+  const [openMessages] = await db
+    .select({ count: count() })
+    .from(contactMessages)
+    .where(eq(contactMessages.status, "open"));
 
   const recentOrders = await db.query.orders.findMany({
     orderBy: [desc(orders.createdAt)],
@@ -44,11 +49,13 @@ export default async function AdminDashboardPage() {
       href: "/admin/analytics",
     },
     {
-      label: "Growth",
-      value: "+12%",
-      icon: TrendingUp,
+      // This used to be a hard-coded "+12%" growth figure: an invented number
+      // presented as a metric, linking to a page that does not compute it.
+      label: "Open support messages",
+      value: openMessages?.count || 0,
+      icon: MessageCircle,
       color: "blue",
-      href: "/admin/analytics",
+      href: "/admin/messages",
     },
   ];
 
