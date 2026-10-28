@@ -150,6 +150,19 @@ const GROUP_LABELS: Record<string, string> = {
   Game: "Gaming",
 };
 
+/**
+ * Every Pryva-facing group label this layer can emit.
+ *
+ * Exported so the warranty table can be checked against it: `groupLabelFor`
+ * returns one of these or "Other", and a label with no warranty row would
+ * silently fall back to the 30-day default. Adding a group here should force a
+ * deliberate decision about the replacement window it promises, not a quiet
+ * inheritance of the fallback.
+ */
+export const GROUP_LABEL_VALUES: readonly string[] = Object.freeze(
+  [...new Set([...Object.values(GROUP_LABELS), "Streaming", "Other"])].sort(),
+);
+
 /** Title keywords that mean "streaming" whatever group the source used. */
 const STREAMING_KEYWORDS = [
   "netflix", "spotify", "disney", "hulu", "paramount", "prime video",
