@@ -16,7 +16,7 @@
  */
 
 import { getUsdToNgnRate } from "@/lib/exchange-rate";
-import { usdCents } from "@/lib/accszone";
+import { usdCents } from "@/lib/supplier-money";
 import {
   PROFIT_BAND,
   bandCeilingNgn,
@@ -94,7 +94,7 @@ function clampToBand(percent: number): number {
 /**
  * Price one basket.
  *
- * @param unitPriceUsd listing price as the provider sends it ("0.44")
+ * @param unitPriceUsd listing price as a canonical six-decimal string ("3.480000")
  * @param quantity      units being bought (>= 1)
  * @param categoryTitle used for the category premium
  */
@@ -165,7 +165,7 @@ export async function priceMarketplaceListing(input: {
  * @param discountUsd the `discount` string from the promo validation call
  */
 export function applyPromoDiscount(breakdown: PriceBreakdown, discountUsd: string): PriceBreakdown {
-  const requestedNgn = Math.round((usdCents(discountUsd) * breakdown.fxRate) / 100);
+  const requestedNgn = Math.round((usdCents(discountUsd, "down") * breakdown.fxRate) / 100);
   if (!Number.isFinite(requestedNgn) || requestedNgn <= 0) return breakdown;
 
   const newCostNgn = Math.max(0, breakdown.costNgn - requestedNgn);
