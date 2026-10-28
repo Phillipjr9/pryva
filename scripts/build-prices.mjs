@@ -72,8 +72,11 @@ if (process.argv.includes("--audit")) {
       `thinnest margin ${cheapest.profitNgn} on ${cheapest.id}`,
   );
   console.log(outOfBand.length === 0 ? "All prices inside the band ✓" : `${outOfBand.length} OUT OF BAND`);
-  if (process.argv.includes("--check") && outOfBand.length > 0) process.exitCode = 1;
-  process.exit(0);
+  // process.exit(0) discards a pending process.exitCode, so setting the code and
+  // then exiting 0 made --check a gate that could never fail: it printed
+  // "1 OUT OF BAND" and still reported success. The verdict has to be the exit
+  // status itself.
+  process.exit(process.argv.includes("--check") && outOfBand.length > 0 ? 1 : 0);
 }
 
 const header = `/**

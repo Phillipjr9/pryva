@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A newer push to the same branch supersedes the run in flight.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Nothing here needs secrets: the suite mocks providers and runs PostgreSQL
+      # in-process via PGlite, and the build reads no required env.
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      # Fails if any generated price drifts outside the 30–50% profit band.
+      - name: Pricing band
+        run: npm run pricing:audit -- --check
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # The guarantee the storefront is built on: no customer ever learns where
+      # stock comes from. The unit tests scan source files, but a string can
+      # still reach the browser transitively through a module a client component
+      # imports — which is how an internal error message once shipped in a chunk.
+      # Only the built bundle proves what actually leaves the server, so this
+      # scans build output rather than trusting the source scan.
+      #
+      # src/test/supplier-secrecy.test.ts is the source of truth for this list;
+      # keep the two in step.
+      - name: No sourcing language in the shipped bundle
+        run: |
+          set -u
+          banned="freshbulkacc bulkacc accszone resellacc fleexa
+                  reseller resell wholesale upstream vendor dropship drop-ship
+                  supplier supplied supplies supplying supply
+                  sourced-from procured stockist distributor"
+          status=0
+          for word in $banned; do
+            hits=$(grep -rli "$word" .next/static 2>/dev/null || true)
+            if [ -n "$hits" ]; then
+              echo "::error::Shipped bundle contains '$word':"
+              echo "$hits" | head -5 | sed 's/^/    /'
+              status=1
+            fi
+          done
+          if [ "$status" -eq 0 ]; then
+            echo "Clean: $(find .next/static -type f | wc -l) shipped files contain no sourcing language."
+          fi
+          exit $status
