@@ -6,6 +6,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ push: vi.fn() }),
 }));
 
@@ -20,12 +21,13 @@ describe("navigation without the oversized logo", () => {
 
   it("does not show the oversized image in the dashboard sidebar", () => {
     const html = renderToStaticMarkup(
-      <DashboardShell user={{ name: "Demo User", email: "demo@example.test", walletBalance: 0 }}>
+      <DashboardShell buildId="server-build" user={{ name: "Demo User", email: "demo@example.test", walletBalance: 0 }}>
         <p>Dashboard content</p>
       </DashboardShell>,
     );
     expect(html).not.toContain("pryva-logo.png");
     expect(html).toContain("Dashboard content");
     expect(html).toContain("Overview");
+    expect(html).toContain('data-testid="build-id">server-build</span>');
   });
 });

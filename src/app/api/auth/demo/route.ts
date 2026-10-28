@@ -1,6 +1,9 @@
 import { createSession } from "@/lib/auth";
 import { openDemoAccount } from "@/lib/demo";
 import { isPreviewDatabase } from "@/lib/demo-policy";
+import { isSameOriginMutation } from "@/lib/net";
+import { clientIp } from "@/lib/auth-rate-limit";
+import { demoRateLimiter } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +11,11 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   if (!isPreviewDatabase()) {
     return Response.json({ ok: false, error: "Demo login is available only in preview mode." }, { status: 403 });
+  }
+  if (!isSameOriginMutation(request)) return Response.json({ ok: false, error: "Invalid origin." }, { status: 403 });
+  const limit = await demoRateLimiter(`demo:ip:${clientIp(request)}`);
+  if (!limit.allowed) {
+    return Response.json({ ok: false, error: "Demo login is temporarily unavailable. Please try again later." }, { status: limit.unavailable ? 503 : 429 });
   }
   try {
     const user = await openDemoAccount();

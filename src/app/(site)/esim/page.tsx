@@ -7,7 +7,7 @@ import { hasCountryFlag } from "@/lib/countries";
 
 export const metadata: Metadata = {
   title: "eSIM",
-  description: "Get eSIM data for 190+ destinations. Instant activation, no physical SIM needed.",
+  description: "Explore eSIM data plans. Live eSIM fulfillment is paused.",
 };
 
 export default function ESIMPage() {
@@ -58,8 +58,7 @@ export default function ESIMPage() {
         <div className="shell">
           <h2 className="mb-3 text-[1.75rem] font-semibold text-ink">Destinations</h2>
           <p className="mb-6 max-w-2xl text-[0.95rem] text-ink-2">
-            One eSIM, 190+ destinations. These are the markets with live local plans; the global
-            packages roam everywhere else.
+            The catalog lists plans for these regions. Live eSIM fulfillment is paused and coverage requires provider verification.
           </p>
           <CountryChips codes={["ng", "us", "gb", "ca", "de", "fr", "nl", "ae", "za", "ke", "in", "br"]} />
         </div>

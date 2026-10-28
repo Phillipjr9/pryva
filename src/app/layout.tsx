@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     template: "%s · Pryva",
   },
   description:
-    "Pryva is Nigeria's calm, reliable way to buy and rent virtual numbers, eSIM data, residential proxies and temporary email OTP. Pay in Naira. Instant delivery. Auto-refund if a code doesn't arrive.",
+    "Explore Pryva plans for virtual numbers, eSIM data, residential proxies and temporary email OTP, priced in Naira.",
   keywords: [
     "virtual numbers Nigeria",
     "OTP verification Nigeria",

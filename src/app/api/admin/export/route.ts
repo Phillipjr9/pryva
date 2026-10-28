@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { gte, lte, and } from "drizzle-orm";
 import { logger } from "@/lib/logger";
+import { csvRows } from "@/lib/csv";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,9 @@ export async function GET(request: NextRequest) {
 
     const start = startDate ? new Date(startDate) : new Date(0);
     const end = endDate ? new Date(endDate) : new Date();
+    if ((format !== "csv" && format !== "json") || !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || start > end) {
+      return NextResponse.json({ error: "Invalid export format or date range" }, { status: 400 });
+    }
 
     let data: unknown[] = [];
     let filename = "";
@@ -97,7 +101,8 @@ export async function GET(request: NextRequest) {
 
       return new NextResponse(blob, {
         headers: {
-          "Content-Type": "text/csv",
+          "Content-Type": "text/csv; charset=utf-8",
+          "Cache-Control": "private, no-store",
           "Content-Disposition": `attachment; filename="${filename}.csv"`,
         },
       });
@@ -110,6 +115,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(blob, {
       headers: {
         "Content-Type": "application/json",
+        "Cache-Control": "private, no-store",
         "Content-Disposition": `attachment; filename="${filename}.json"`,
       },
     });
@@ -123,21 +129,5 @@ function convertToCSV(data: Record<string, unknown>[]): string {
   if (data.length === 0) return "";
 
   const headers = Object.keys(data[0]);
-  const csvHeaders = headers.join(",");
-
-  const csvRows = data.map((row) => {
-    return headers
-      .map((header) => {
-        const value = row[header];
-        // Escape quotes and wrap in quotes if contains comma or newline
-        const stringValue = String(value ?? "");
-        if (stringValue.includes(",") || stringValue.includes("\n") || stringValue.includes('"')) {
-          return `"${stringValue.replace(/"/g, '""')}"`;
-        }
-        return stringValue;
-      })
-      .join(",");
-  });
-
-  return [csvHeaders, ...csvRows].join("\n");
+  return csvRows([headers, ...data.map((row) => headers.map((header) => row[header]))]);
 }

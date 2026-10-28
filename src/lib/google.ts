@@ -79,12 +79,17 @@ export async function fetchGoogleUser(accessToken: string): Promise<GoogleUser> 
     email_verified?: boolean;
   };
 
-  if (!data.email || !data.sub) throw new Error("Google did not return an email address");
+  if (typeof data.email !== "string" || typeof data.sub !== "string" ||
+      !data.sub.trim() || data.sub.length > 255) {
+    throw new Error("Google did not return a valid identity");
+  }
+  const email = data.email.trim().toLowerCase();
+  if (email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("Google did not return a valid email address");
+  }
+  const name = typeof data.name === "string" && data.name.trim()
+    ? data.name.trim().slice(0, 120)
+    : email.split("@")[0].slice(0, 120);
 
-  return {
-    sub: data.sub,
-    email: data.email.toLowerCase(),
-    name: data.name ?? data.email.split("@")[0],
-    emailVerified: data.email_verified === true,
-  };
+  return { sub: data.sub, email, name, emailVerified: data.email_verified === true };
 }

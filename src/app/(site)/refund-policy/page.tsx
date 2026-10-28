@@ -4,39 +4,39 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Refund Policy",
   description:
-    "How and when Pryva refunds your wallet — automatic refunds for undelivered numbers, data and accounts, and the products that are non-refundable.",
+    "How Pryva reviews delivery issues and refund requests.",
   alternates: { canonical: "/refund-policy" },
 };
 
 const rows = [
   {
     product: "Virtual numbers & rental numbers",
-    refund: "Automatic",
+    refund: "Review required",
     detail:
-      "If no verification code arrives within the service window, the full amount is returned to your wallet. You don't need to contact us.",
+      "Live orders require provider review. Some simulated single-number orders may be refunded after the window closes without a code.",
   },
   {
     product: "Email OTP inboxes",
-    refund: "Automatic",
-    detail: "Refunded in full if the inbox can't be provisioned or no code is delivered in time.",
+    refund: "Review required",
+    detail: "Contact support to review delivery; live automatic refunds are disabled.",
   },
   {
     product: "eSIM data & residential proxies",
     refund: "Case by case",
     detail:
-      "Refunded if the activation details are never delivered. Once an eSIM is activated or a proxy pack is used, the data has been consumed and can't be refunded.",
+      "Contact support to review delivery and provider status. Issued or consumed goods are not automatically refundable.",
   },
   {
     product: "Digital accounts (marketplace)",
-    refund: "Automatic",
+    refund: "Review required",
     detail:
-      "If the seller can't deliver, the full amount returns to your wallet immediately. Credentials already delivered are not refundable — they've been handed over and can't be recalled.",
+      "Uncertain purchases are held for provider reconciliation. Contact support with your reference and do not place the same order again.",
   },
   {
     product: "Airtime & data bundles",
     refund: "Failed delivery only",
     detail:
-      "Refunded if the network rejects the transfer. Delivered airtime and data can't be reversed, so the number is shown for confirmation before you pay.",
+      "Live purchases are paused. Any legacy transfer requires review before a refund.",
   },
   {
     product: "Gift cards",
@@ -46,26 +46,23 @@ const rows = [
   },
   {
     product: "Bulk & scheduled orders",
-    refund: "All or nothing",
+    refund: "Review required",
     detail:
-      "A bulk basket is charged once and refunded in full if any part fails. Scheduled orders can be paused or cancelled before their next run.",
+      "Live fulfillment is paused. Contact support to reconcile any legacy order.",
   },
 ];
 
 export default function RefundPolicyPage() {
   return (
-    <main>
+    <div>
       <section className="border-b border-line/70 bg-gradient-to-b from-cream to-white">
         <div className="shell py-14 sm:py-16">
           <h1 className="text-[2.2rem] font-semibold tracking-tight text-ink sm:text-[2.6rem]">
             Refund Policy
           </h1>
           <p className="mt-3 max-w-2xl text-[0.98rem] leading-relaxed text-ink-2">
-            Most refunds happen without you asking. When a product doesn&apos;t arrive, the amount
-            goes back to your wallet automatically — you keep the reference, we keep the receipts.
-          </p>
-          <p className="mt-4 text-[0.82rem] text-ink-3">
-            Last updated: {new Date().toLocaleDateString("en-NG", { year: "numeric", month: "long", day: "numeric" })}
+            Live automatic refunds are paused until delivery and provider cancellation can be verified.
+            Contact support with your order reference for review.
           </p>
         </div>
       </section>
@@ -110,10 +107,8 @@ export default function RefundPolicyPage() {
           <div className="rounded-2xl border border-line bg-white p-5">
             <h2 className="text-[0.95rem] font-semibold text-ink">How fast are refunds?</h2>
             <p className="mt-2 text-[0.85rem] leading-relaxed text-ink-2">
-              Wallet refunds are instant — the moment a fulfilment attempt fails it&apos;s credited back
-              and appears in your transaction history. If you paid with a card and want the money off
-              Pryva entirely, contact support; bank reversals take 5–10 business days depending on your
-              bank.
+              A refund is recorded in your wallet after it has been approved and processed. Timing
+              depends on the provider review. Contact support if you need help with a payment.
             </p>
           </div>
           <div className="rounded-2xl border border-line bg-white p-5">
@@ -132,11 +127,10 @@ export default function RefundPolicyPage() {
             <Link href="/contact" className="font-semibold underline underline-offset-2">
               support
             </Link>
-            . We check the fulfilment logs and answer within one business day. Please don&apos;t raise a
-            chargeback before talking to us — it takes longer and freezes your wallet in the meantime.
+            . We will review the available delivery and payment records.
           </p>
         </div>
       </section>
-    </main>
+    </div>
   );
 }

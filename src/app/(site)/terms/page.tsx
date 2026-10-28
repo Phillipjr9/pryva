@@ -35,9 +35,6 @@ export default function TermsPage() {
           <h1 className="text-[2.5rem] font-medium tracking-tight text-ink mb-8">
             Terms of Service
           </h1>
-          <p className="text-[0.9rem] text-ink-2 mb-8">
-            Last updated: {new Date().toLocaleDateString("en-NG", { year: "numeric", month: "long", day: "numeric" })}
-          </p>
 
           <div className="prose prose-lg max-w-none">
             <h2>1. Acceptance of Terms</h2>
@@ -62,7 +59,7 @@ export default function TermsPage() {
 
             <h2>5. Refund Policy</h2>
             <p>
-              We offer automatic refunds for services that fail to deliver within the specified time window. Gift cards are non-refundable once purchased. Manual refunds may be processed at our discretion for valid reasons.
+              Live order refunds require a review of delivery and provider status. Contact support with your order reference. Gift cards are non-refundable once purchased. See the refund policy for details.
             </p>
 
             <h2>6. Prohibited Uses</h2>
@@ -72,7 +69,7 @@ export default function TermsPage() {
 
             <h2>7. Service Availability</h2>
             <p>
-              While we strive for 99.9% uptime, we do not guarantee uninterrupted service. We may perform maintenance or experience outages that temporarily affect service availability.
+              Service availability is not guaranteed. Live fulfillment for several products is currently paused. See the service status page for feature availability.
             </p>
 
             <h2>8. Limitation of Liability</h2>
@@ -87,7 +84,7 @@ export default function TermsPage() {
 
             <h2>10. Changes to Terms</h2>
             <p>
-              We reserve the right to modify these terms at any time. We will notify users of significant changes via email or platform notification.
+              These terms may change. Review the current version before using the service.
             </p>
 
             <h2>11. Contact Information</h2>

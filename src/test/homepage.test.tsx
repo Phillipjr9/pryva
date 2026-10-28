@@ -54,7 +54,7 @@ describe("homepage structure", () => {
   });
 
   it("gives the dashboard section something to look at", () => {
-    expect(html).toContain("Auto-refund armed");
+    expect(html).toContain("Order support");
     expect(html).toContain("Order PV-2291");
   });
 });
@@ -75,13 +75,13 @@ describe("homepage promises", () => {
   it("does not invent ratings or delivery counts", () => {
     expect(html).not.toContain("4.9/5");
     expect(html).not.toContain("4,200+");
-    // The quotes stay, with initials rather than stock portraits.
-    expect(html).toContain("Tola A.");
-    expect(html).toContain("auto-refund is the part");
+    // Do not claim an automatic live refund policy that is currently paused.
+    expect(html).not.toContain("Auto-refund armed");
+    expect(html).not.toContain("auto-refund is the part");
   });
 
-  it("keeps the refund promise and payment reassurance", () => {
-    expect(html).toContain("Refund promise");
+  it("describes refund review and payment reassurance", () => {
+    expect(html).toContain("Refund review");
     expect(html).toContain("Payments via Paystack");
     expect(html).toContain('href="/refund-policy"');
   });

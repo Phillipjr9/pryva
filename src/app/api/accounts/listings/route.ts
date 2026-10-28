@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { AccsZoneError, isAccsZoneConfigured, listListings, type ListingQuery } from "@/lib/accszone";
 import { priceMarketplaceListing } from "@/lib/marketplace-pricing";
 import { logger } from "@/lib/logger";
+import { safeUnitCount } from "@/lib/service-units";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ const ALLOWED_SORTS = new Set(["sort_key", "total_price", "available_stock", "ti
  */
 export async function GET(request: NextRequest) {
   if (!isAccsZoneConfigured()) {
-    return NextResponse.json({ configured: false, listings: [], meta: null });
+    return NextResponse.json({ configured: false, listings: [], meta: null }, { headers: { "Cache-Control": "no-store" } });
   }
 
   const params = request.nextUrl.searchParams;
@@ -51,7 +52,8 @@ export async function GET(request: NextRequest) {
           id: listing.id,
           slug: listing.slug,
           title: listing.title,
-          stock: listing.available_stock,
+          // A missing or malformed inventory figure is unknown, not zero.
+          stock: safeUnitCount(listing.available_stock),
           sold: listing.sold,
           category: listing.category?.title ?? null,
           subcategory: listing.subcategory?.title ?? null,
@@ -60,7 +62,7 @@ export async function GET(request: NextRequest) {
       }),
     );
 
-    return NextResponse.json({ configured: true, listings: priced, meta });
+    return NextResponse.json({ configured: true, listings: priced, meta }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof AccsZoneError) {
       logger.error("Marketplace listings failed", {

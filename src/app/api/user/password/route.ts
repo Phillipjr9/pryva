@@ -1,53 +1,62 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { requireAuthApi } from "@/lib/auth";
-import { hashPassword, verifyPassword } from "@/lib/auth";
+import { users, sessions } from "@/db/schema";
+import { requireAuthApi, hashPassword, verifyPassword, SESSION_COOKIE, SESSION_COOKIE_EMBEDDED } from "@/lib/auth";
+import { isSameOriginMutation } from "@/lib/net";
+import { isSharedPreviewUser } from "@/lib/demo-policy";
+import { validatePassword } from "@/lib/validation";
+import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuthApi();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Cross-origin request denied" }, { status: 403 });
+    if (isSharedPreviewUser(user)) return NextResponse.json({ error: "The shared demo does not use a personal password." }, { status: 403 });
+    if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get("content-type") ?? "")) {
+      return NextResponse.json({ error: "Content-Type must be application/json" }, { status: 415 });
     }
 
-    const body = await request.json();
-    const { currentPassword, newPassword } = body;
-
-    if (!currentPassword || !newPassword) {
+    let body: unknown;
+    try {
+      body = await readJsonWithLimit(request, 8_192);
+    } catch (error) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    const { currentPassword, newPassword } = body as { currentPassword?: unknown; newPassword?: unknown };
+    if (typeof currentPassword !== "string" || !currentPassword || typeof newPassword !== "string") {
       return NextResponse.json({ error: "Current and new password required" }, { status: 400 });
     }
+    const error = validatePassword(newPassword);
+    if (error) return NextResponse.json({ error }, { status: 400 });
+    const jar = await cookies();
+    const currentToken = jar.get(SESSION_COOKIE)?.value ?? jar.get(SESSION_COOKIE_EMBEDDED)?.value;
+    if (!currentToken) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    if (newPassword.length < 8) {
-      return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
-    }
-
-    const userProfile = await db.query.users.findFirst({
-      where: eq(users.id, user.id),
-    });
-
-    if (!userProfile) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    const isValid = await verifyPassword(currentPassword, userProfile.passwordHash);
-    if (!isValid) {
+    const userProfile = await db.query.users.findFirst({ where: eq(users.id, user.id) });
+    if (!userProfile) return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (!verifyPassword(currentPassword, userProfile.passwordHash)) {
       return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 });
     }
 
-    const newHash = await hashPassword(newPassword);
-
-    await db
-      .update(users)
-      .set({ passwordHash: newHash })
-      .where(eq(users.id, user.id));
-
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error("Failed to change password:", error);
+    const newHash = hashPassword(newPassword);
+    const changed = await db.transaction(async (tx) => {
+      // Two simultaneous changes must not both succeed against the same old hash.
+      const [updated] = await tx.update(users).set({ passwordHash: newHash })
+        .where(and(eq(users.id, user.id), eq(users.passwordHash, userProfile.passwordHash)))
+        .returning({ id: users.id });
+      if (!updated) return false;
+      await tx.delete(sessions).where(and(eq(sessions.userId, user.id), ne(sessions.token, currentToken)));
+      return true;
+    });
+    if (!changed) return NextResponse.json({ error: "Password changed elsewhere; sign in again." }, { status: 409 });
+    return NextResponse.json({ ok: true, message: "Password changed; other sessions were signed out." });
+  } catch {
     return NextResponse.json({ error: "Failed to change password" }, { status: 500 });
   }
 }

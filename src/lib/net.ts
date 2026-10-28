@@ -6,23 +6,48 @@
  * browser actually sees — and without them, a non-local host implies HTTPS.
  */
 
-function isLocalHost(host: string): boolean {
-  return (
-    host.startsWith("localhost") ||
-    host.startsWith("127.") ||
-    host.startsWith("[::1") ||
-    host.startsWith("0.0.0.0") ||
-    host.endsWith(".local") ||
-    host.includes(":")
-  );
+export function isLocalHost(host: string): boolean {
+  try {
+    const hostname = new URL(`http://${host}`).hostname.toLowerCase();
+    return hostname === "localhost" || hostname.endsWith(".localhost") || hostname === "[::1]" ||
+      hostname === "0.0.0.0" || /^127(?:\.\d{1,3}){3}$/.test(hostname) || hostname.endsWith(".local");
+  } catch {
+    return false;
+  }
+}
+
+/** The Arena preview gateway serves this sandbox's port hosts over HTTPS. */
+export function isArenaPreviewHost(host: string): boolean {
+  const sandboxId = process.env.E2B_SANDBOX_ID?.trim().toLowerCase();
+  // Never use this preview-specific exception for a persistent deployment, an
+  // unknown sandbox, or a different sandbox's host.
+  if (process.env.DATABASE_URL?.trim() || !sandboxId || !/^[a-z0-9]+$/.test(sandboxId)) return false;
+  try {
+    const url = new URL(`https://${host}`);
+    if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) return false;
+    const suffix = `-${sandboxId}.e2b.app`;
+    const hostname = url.hostname.toLowerCase();
+    if (!hostname.endsWith(suffix)) return false;
+    const port = hostname.slice(0, -suffix.length);
+    return /^\d{1,5}$/.test(port) && Number(port) > 0 && Number(port) <= 65535;
+  } catch {
+    return false;
+  }
 }
 
 export function requestProto(request: Request): "https" | "http" {
-  const forwarded = request.headers.get("x-forwarded-proto");
-  if (forwarded) return forwarded.startsWith("https") ? "https" : "http";
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "";
+  // The Arena gateway terminates HTTPS, but its internal hop can overwrite
+  // X-Forwarded-Proto with "http". Only correct that for this in-memory sandbox.
+  if (isArenaPreviewHost(host)) return "https";
+  const forwarded = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
+  if (forwarded === "https" || forwarded === "http") return forwarded;
+  try {
+    if (new URL(request.url).protocol === "https:") return "https";
+  } catch {
+    // Fall back to the host heuristic below.
+  }
 
-  const host =
-    request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "";
   if (host) return isLocalHost(host) ? "http" : "https";
 
   try {

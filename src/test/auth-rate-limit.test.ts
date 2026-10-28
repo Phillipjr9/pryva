@@ -48,8 +48,18 @@ describe("login throttling", () => {
     }
     expect((await checkAuthRateLimit(req, "login", email))?.status).toBe(429);
 
-    clearAuthRateLimit(req, email);
+    await clearAuthRateLimit(req, email);
     await expect(checkAuthRateLimit(req, "login", email)).resolves.toBeNull();
+  });
+
+  it("does not reset the connection's spray budget on successful sign-ins", async () => {
+    const req = request("198.51.100.5");
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const email = `spray-${attempt}@example.com`;
+      await expect(checkAuthRateLimit(req, "login", email)).resolves.toBeNull();
+      await clearAuthRateLimit(req, email);
+    }
+    expect((await checkAuthRateLimit(req, "login", "another@example.com"))?.status).toBe(429);
   });
 
   it("caps signup creation per connection", async () => {

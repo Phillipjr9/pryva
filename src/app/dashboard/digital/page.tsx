@@ -6,6 +6,9 @@ import { formatNaira } from "@/lib/catalog";
 import { DigitalServicesForm } from "./DigitalServicesForm";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { ArrowRight, Shield } from "@/components/icons";
+import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
+import { isPreviewDatabase } from "@/lib/demo-policy";
+import { demoDigitalInventory } from "@/lib/demo-digital";
 
 export const metadata: Metadata = { title: "Subscriptions" };
 export const dynamic = "force-dynamic";
@@ -21,6 +24,8 @@ export default async function DigitalServicesPage({
   const user = await requireUser("/dashboard/digital");
   const { service: serviceSlug } = await searchParams;
   const selectedService = serviceSlug ? getDigitalService(serviceSlug) : null;
+  const preview = isPreviewDatabase();
+  const inventory = preview ? demoDigitalInventory(user.id) : {};
 
   return (
     <div className="grid gap-4">
@@ -30,9 +35,9 @@ export default async function DigitalServicesPage({
             {selectedService ? selectedService.name : "Premium subscriptions"}
           </h1>
           <p className="mt-1 max-w-xl text-[0.86rem] text-ink-2">
-            {selectedService
-              ? selectedService.description
-              : "Netflix, Spotify, ChatGPT and more — activated from your wallet, priced in Naira."}
+            {preview ? "Explore fictional subscription plans and try a demo checkout." : selectedService
+              ? "Compare catalog plans. Live fulfillment is paused."
+              : "Explore subscription examples. Live fulfillment is paused."}
           </p>
         </div>
         {selectedService ? (
@@ -50,7 +55,7 @@ export default async function DigitalServicesPage({
       </div>
 
       {selectedService ? (
-        <DigitalServicesForm user={user} service={selectedService} />
+        <DigitalServicesForm user={user} service={selectedService} preview={preview} inventory={inventory} />
       ) : (
         <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
           {digitalServices.map((service) => (
@@ -68,12 +73,13 @@ export default async function DigitalServicesPage({
                   </p>
                 </div>
               </div>
-              <p className="mt-3 line-clamp-2 text-[0.8rem] leading-relaxed text-ink-2">
-                {service.description}
+              <p className="mt-3 text-[0.8rem] leading-relaxed text-ink-2">
+                {preview ? "Fictional subscription demo; no account access." : "Country coverage unconfirmed."}
               </p>
+              <div className="mt-3"><UnitsStatus demo={preview} stock={preview ? service.plans.reduce((sum, plan) => sum + (inventory[plan.id]?.stock ?? 0), 0) : null} owned={preview ? service.plans.reduce((sum, plan) => sum + (inventory[plan.id]?.owned ?? 0), 0) : null} /></div>
               <div className="mt-auto flex items-end justify-between gap-2 pt-3.5">
                 <div>
-                  <p className="text-[0.62rem] uppercase tracking-[0.12em] text-ink-3">From</p>
+                  <p className="text-[0.62rem] uppercase tracking-[0.12em] text-ink-3">{preview ? "Demo from" : "Preview from"}</p>
                   <p className="text-[0.95rem] font-semibold text-ink">
                     {formatNaira(Math.min(...service.plans.map((plan) => plan.price)))}
                   </p>

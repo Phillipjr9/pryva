@@ -4,14 +4,23 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+
+export const rateLimitBuckets = pgTable("rate_limit_buckets", {
+  key: varchar("key", { length: 64 }).primaryKey(),
+  count: integer("count").notNull(),
+  resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
+}, (table) => [index("rate_limit_buckets_reset_at_idx").on(table.resetAt)]);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 120 }).notNull(),
   email: varchar("email", { length: 200 }).notNull().unique(),
+  // Google identities are bound by their stable verified subject, never by email alone.
+  googleSubject: varchar("google_subject", { length: 255 }).unique(),
   passwordHash: text("password_hash").notNull(),
   walletBalance: integer("wallet_balance").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -94,6 +103,34 @@ export const paymentTopups = pgTable(
   },
   (table) => [index("payment_topups_user_idx").on(table.userId)],
 );
+
+// Inserted by PostgreSQL triggers alongside wallet ledger/status changes. The
+// Resend worker claims rows with a lease; provider calls happen after commit.
+export const walletEmailOutbox = pgTable("wallet_email_outbox", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  walletTransactionId: uuid("wallet_transaction_id").references(() => walletTransactions.id, { onDelete: "cascade" }),
+  withdrawalId: uuid("withdrawal_id").references(() => withdrawals.id, { onDelete: "cascade" }),
+  orderId: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }),
+  eventKind: varchar("event_kind", { length: 40 }).notNull(),
+  recipient: varchar("recipient", { length: 200 }).notNull(),
+  payload: text("payload"),
+  status: varchar("status", { length: 16 }).notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  availableAt: timestamp("available_at", { withTimezone: true }).notNull().defaultNow(),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  lockToken: uuid("lock_token"),
+  firstAttemptAt: timestamp("first_attempt_at", { withTimezone: true }),
+  providerMessageId: varchar("provider_message_id", { length: 100 }),
+  lastError: varchar("last_error", { length: 80 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("wallet_email_outbox_transaction_idx").on(table.walletTransactionId),
+  uniqueIndex("wallet_email_outbox_withdrawal_event_idx").on(table.withdrawalId, table.eventKind),
+  uniqueIndex("wallet_email_outbox_order_event_idx").on(table.orderId, table.eventKind),
+  index("wallet_email_outbox_due_idx").on(table.status, table.availableAt),
+]);
 
 export const contactMessages = pgTable("contact_messages", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -209,6 +246,13 @@ export const withdrawals = pgTable(
     recipientCode: varchar("recipient_code", { length: 100 }),
     status: varchar("status", { length: 24 }).notNull().default("pending"),
     reference: varchar("reference", { length: 50 }).notNull().unique(),
+    // Optional for legacy rows; all new customer requests supply a per-user key.
+    requestId: uuid("request_id"),
+    // Snapshot of the selected bank-account id, retained even if it is removed.
+    bankAccountId: uuid("bank_account_id"),
+    // The provider reference is saved before initiation; transferReference is
+    // Paystack's returned transfer code. Legacy processing rows remain NULL.
+    paystackReference: varchar("paystack_reference", { length: 50 }),
     transferReference: varchar("transfer_reference", { length: 100 }),
     failureReason: text("failure_reason"),
     processedAt: timestamp("processed_at", { withTimezone: true }),
@@ -219,6 +263,8 @@ export const withdrawals = pgTable(
     index("withdrawals_user_idx").on(table.userId),
     index("withdrawals_status_idx").on(table.status),
     index("withdrawals_reference_idx").on(table.reference),
+    uniqueIndex("withdrawals_user_request_idx").on(table.userId, table.requestId),
+    uniqueIndex("withdrawals_paystack_reference_idx").on(table.paystackReference),
   ],
 );
 

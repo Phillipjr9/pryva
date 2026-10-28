@@ -27,9 +27,9 @@ export async function GET(request: NextRequest) {
         redeemedAt: card.redeemedAt?.toISOString() || null,
         createdAt: card.createdAt.toISOString(),
       })),
-    });
-  } catch (error) {
-    console.error("Gift card history failed:", error);
+    }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch {
+    console.error("Gift card history failed");
     return NextResponse.json({ error: "Failed to fetch history" }, { status: 500 });
   }
 }

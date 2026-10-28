@@ -12,13 +12,9 @@ describe("Bulk Orders Extended", () => {
       expect(result.total).toBe(0);
     });
 
-    it("should handle invalid product slugs gracefully", () => {
-      const items = [
-        { productSlug: "invalid-slug", quantity: 10 },
-      ];
-      const result = calculateBulkOrder(items);
-      expect(result.items.length).toBe(0);
-      expect(result.subtotal).toBe(0);
+    it("rejects invalid product slugs instead of silently pricing an incomplete basket", () => {
+      const items = [{ productSlug: "invalid-slug", quantity: 10 }];
+      expect(() => calculateBulkOrder(items)).toThrow("Invalid bulk-order item");
     });
 
     it("should calculate correctly for mixed products at discount threshold", () => {

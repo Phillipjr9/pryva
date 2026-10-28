@@ -43,7 +43,8 @@ export function SessionsCard() {
   }, []);
 
   useEffect(() => {
-    void load();
+    const timer = setTimeout(() => void load(), 0);
+    return () => clearTimeout(timer);
   }, [load]);
 
   async function revoke(sessionId?: string, all = false) {
@@ -80,7 +81,7 @@ export function SessionsCard() {
           <div>
             <h2 className="text-[0.95rem] font-semibold">Active sessions</h2>
             <p className="mt-0.5 text-[0.8rem] text-ink-2">
-              Every device currently signed in to this account.
+              Showing up to 200 recent active sessions for this account.
             </p>
           </div>
         </div>

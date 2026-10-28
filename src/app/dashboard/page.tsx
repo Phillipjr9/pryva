@@ -5,21 +5,23 @@ import { db } from "@/db";
 import { orders, walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { isPreviewDatabase } from "@/lib/demo-policy";
-import { formatNaira, serviceMap } from "@/lib/catalog";
+import { formatNaira } from "@/lib/catalog";
+import { walletEntryDirection, walletEntrySign } from "@/lib/wallet-activity";
 import { ArrowRight, Chat, Clock, Receipt, Shield } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { LiveCodeCard, type LiveCode } from "@/components/dashboard/LiveCodeCard";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { BalanceHero } from "@/components/dashboard/BalanceHero";
+import { CountryLaunch } from "@/components/dashboard/CountryLaunch";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
 
 const quickBuys = [
-  { label: "Virtual number", note: `From ${formatNaira(serviceMap.numbers.fromPrice)}`, href: "/virtual-numbers#buy", service: "numbers" as const },
-  { label: "eSIM data", note: `From ${formatNaira(serviceMap.esim.fromPrice)}`, href: "/esim#buy", service: "esim" as const },
-  { label: "Residential proxy", note: `From ${formatNaira(serviceMap.proxies.fromPrice)}`, href: "/proxies#buy", service: "proxies" as const },
-  { label: "Email OTP", note: `From ${formatNaira(serviceMap["email-otp"].fromPrice)}`, href: "/email-otp#buy", service: "email-otp" as const },
+  { label: "Number plans", note: "Single-use & rentals", href: "/dashboard/services?category=numbers", service: "numbers" as const },
+  { label: "eSIM data", note: "Travel data previews", href: "/dashboard/services?category=esim", service: "esim" as const },
+  { label: "Residential proxy", note: "Browse catalog plans", href: "/dashboard/services?category=proxies", service: "proxies" as const },
+  { label: "Email OTP", note: "Explore inbox plans", href: "/dashboard/services?category=email", service: "email-otp" as const },
 ];
 
 function statusStyle(status: string) {
@@ -60,7 +62,7 @@ export default async function DashboardOverviewPage() {
         .from(orders)
         .where(and(eq(orders.userId, user.id), eq(orders.status, "active")))
         .orderBy(desc(orders.createdAt))
-        .limit(4),
+        .limit(50),
       db.select({ value: count() }).from(orders).where(eq(orders.userId, user.id)),
       db
         .select({ value: count() })
@@ -77,10 +79,15 @@ export default async function DashboardOverviewPage() {
   const activeOrders = Number(activeCount?.value ?? 0);
   const refundedToWallet = Number(refundedRow?.value ?? 0);
 
+  // This dynamic server timestamp is also passed to the countdown for a stable
+  // first render; the browser clock takes over after hydration.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
   const liveCodes: LiveCode[] = activeOrderRows
     .filter((order) => {
+      if (order.service !== "numbers" && order.service !== "email-otp") return false;
       if (!order.expiresAt) return Boolean(order.otpCode);
-      return new Date(order.expiresAt).getTime() > Date.now();
+      return new Date(order.expiresAt).getTime() > now;
     })
     .slice(0, 2)
     .map((order) => ({
@@ -93,6 +100,8 @@ export default async function DashboardOverviewPage() {
       otpCode: order.otpCode ?? null,
       expiresAt: order.expiresAt ? new Date(order.expiresAt).toISOString() : null,
       createdAt: new Date(order.createdAt).toISOString(),
+      service: order.service,
+      provider: order.provider,
     }));
 
   return (
@@ -103,21 +112,24 @@ export default async function DashboardOverviewPage() {
         balance={user.walletBalance}
         preview={isPreviewDatabase()}
         stats={[
-          { label: "Active", value: String(activeOrders), note: "orders live" },
-          { label: "Codes ready", value: String(liveCodes.length), note: "waiting on you" },
+          { label: "Active", value: String(activeOrders), note: "active orders" },
+          { label: "Shown with code", value: String(liveCodes.filter((order) => order.otpCode).length), note: "in cards below" },
           { label: "Refunded", value: formatNaira(refundedToWallet), note: "back to wallet" },
         ]}
       />
 
+      {/* Country comes before services, whether browsing from Home or the hub. */}
+      <CountryLaunch />
+
       {/* 2 — then whatever is on a timer */}
       {liveCodes.length > 0 ? (
-        <LiveCodeCard codes={liveCodes} />
+        <LiveCodeCard codes={liveCodes} initialNow={now} preview={isPreviewDatabase()} />
       ) : (
         <EmptyState
           icon={Clock}
           title="No code waiting right now"
-          body={`When a verification code arrives it lands here first, with a live timer. Nigerian numbers start at ${formatNaira(serviceMap.numbers.fromPrice)}.`}
-          action={{ label: "Buy a number", href: "/virtual-numbers#buy" }}
+          body="When a verification code arrives it lands here first, with a timer. Preview codes are simulated."
+          action={{ label: "Explore number plans", href: "/dashboard/services?category=numbers" }}
         />
       )}
 
@@ -136,7 +148,7 @@ export default async function DashboardOverviewPage() {
 
           {recentOrders.length === 0 ? (
             <p className="mt-3 rounded-xl border border-dashed border-line bg-cream/50 px-4 py-6 text-center text-[0.82rem] text-ink-3">
-              Your first purchase appears here instantly, with its code.
+              Orders and their references will appear here. Preview orders are simulated.
             </p>
           ) : (
             <div className="mt-2 divide-y divide-line/80">
@@ -175,12 +187,12 @@ export default async function DashboardOverviewPage() {
         {/* 4 — what to do next */}
         <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
           <div className="flex items-center justify-between">
-            <h2 className="text-[1rem] font-semibold">Buy again</h2>
+            <h2 className="text-[1rem] font-semibold">Explore categories</h2>
             <Link
-              href="/pricing"
+              href="/dashboard/services"
               className="inline-flex items-center gap-1 text-[0.72rem] font-semibold text-lav-700 hover:underline"
             >
-              <Receipt className="h-3 w-3" /> Prices
+              <Receipt className="h-3 w-3" /> All services
             </Link>
           </div>
           <div className="mt-2.5 grid gap-1.5">
@@ -228,10 +240,10 @@ export default async function DashboardOverviewPage() {
                   </div>
                   <span
                     className={`shrink-0 text-[0.8rem] font-semibold ${
-                      tx.type === "debit" ? "text-ink-2" : "text-emerald-600"
+                      walletEntryDirection(tx.type) === "in" ? "text-emerald-600" : "text-ink-2"
                     }`}
                   >
-                    {tx.type === "debit" ? "−" : "+"}
+                    {walletEntrySign(tx.type)}
                     {formatNaira(tx.amount)}
                   </span>
                 </div>
@@ -242,11 +254,11 @@ export default async function DashboardOverviewPage() {
 
         <section className="grid gap-2.5 rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
           <p className="flex items-center gap-2 text-[0.92rem] font-semibold text-ink">
-            <Shield className="h-4 w-4 text-lav-700" /> Nothing arrives? Nothing lost.
+            <Shield className="h-4 w-4 text-lav-700" /> Need help with an order?
           </p>
           <p className="text-[0.8rem] leading-relaxed text-ink-2">
-            If a code doesn&apos;t come through inside its window, the amount is refunded to this
-            balance automatically — you don&apos;t have to ask.
+            If a code doesn&apos;t arrive, contact support with your order reference. Refund eligibility
+            and the delivery outcome need to be reviewed.
           </p>
           <div className="mt-1 grid gap-1.5">
             <Link
@@ -269,8 +281,7 @@ export default async function DashboardOverviewPage() {
       </div>
 
       <p className="text-center text-[0.7rem] text-ink-3">
-        {totalOrders} order{totalOrders === 1 ? "" : "s"} with Pryva · wallet valid 90 days from last
-        activity
+        {totalOrders} order{totalOrders === 1 ? "" : "s"} with Pryva
       </p>
     </div>
   );

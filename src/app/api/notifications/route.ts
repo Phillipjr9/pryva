@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
-import { and, eq, desc } from "drizzle-orm";
+import { and, eq, desc, count } from "drizzle-orm";
 import { requireAuthApi } from "@/lib/auth";
+import { isSameOriginMutation } from "@/lib/net";
+import { isPreviewDatabase } from "@/lib/demo-policy";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -13,8 +16,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const limit = parseInt(request.nextUrl.searchParams.get("limit") || "50");
-    const offset = parseInt(request.nextUrl.searchParams.get("offset") || "0");
+    const limitText = request.nextUrl.searchParams.get("limit") ?? "50";
+    const offsetText = request.nextUrl.searchParams.get("offset") ?? "0";
+    if (!/^\d{1,5}$/.test(limitText) || !/^\d{1,5}$/.test(offsetText)) return NextResponse.json({ error: "Invalid pagination" }, { status: 400 });
+    const limit = Number(limitText);
+    const offset = Number(offsetText);
+    if (limit < 1 || limit > 100 || offset > 10_000) return NextResponse.json({ error: "Invalid pagination" }, { status: 400 });
 
     const userNotifications = await db.query.notifications.findMany({
       where: eq(notifications.userId, user.id),
@@ -23,7 +30,8 @@ export async function GET(request: NextRequest) {
       offset,
     });
 
-    const unreadCount = userNotifications.filter((n) => !n.read).length;
+    const [total] = await db.select({ value: count() }).from(notifications).where(eq(notifications.userId, user.id));
+    const [unread] = await db.select({ value: count() }).from(notifications).where(and(eq(notifications.userId, user.id), eq(notifications.read, 0)));
 
     return NextResponse.json({
       ok: true,
@@ -35,9 +43,9 @@ export async function GET(request: NextRequest) {
         read: Boolean(n.read),
         createdAt: n.createdAt.toISOString(),
       })),
-      unreadCount,
-      total: userNotifications.length,
-    });
+      unreadCount: Number(unread?.value ?? 0),
+      total: Number(total?.value ?? 0),
+    }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     console.error("Failed to fetch notifications:", error);
     return NextResponse.json({ error: "Failed to fetch notifications" }, { status: 500 });
@@ -51,15 +59,23 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { notificationId, markAllRead } = body;
+    if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+    if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
+    let body: unknown;
+    try {
+      body = await readJsonWithLimit(request, 2_048);
+    } catch (error) {
+      return NextResponse.json({ error: "Invalid request" }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    const { notificationId, markAllRead } = body as { notificationId?: unknown; markAllRead?: unknown };
 
-    if (markAllRead) {
+    if (markAllRead === true) {
       await db
         .update(notifications)
         .set({ read: 1 })
         .where(eq(notifications.userId, user.id));
-    } else if (notificationId) {
+    } else if (typeof notificationId === "string" && (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(notificationId) || (isPreviewDatabase() && /^[a-z0-9-]{1,64}$/i.test(notificationId)))) {
       await db
         .update(notifications)
         .set({ read: 1 })

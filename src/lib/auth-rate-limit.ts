@@ -1,7 +1,8 @@
+import { isIP } from "node:net";
 import { createRateLimiter, resetRateLimit } from "@/lib/rate-limit";
 
 /**
- * Login / signup / demo-login throttling.
+ * Login and signup throttling (the preview demo has its own IP limiter).
  *
  * Two buckets per request, because they stop different attacks:
  *  - an IP bucket, so one host can't spray thousands of emails at us
@@ -9,10 +10,8 @@ import { createRateLimiter, resetRateLimit } from "@/lib/rate-limit";
  *  - a key bucket, so a botnet spread across IPs still can't grind a single
  *    account's password.
  *
- * The counters live in process memory (`@/lib/rate-limit`). That is honest for
- * a single VPS / single Node process, which is how this app is deployed today.
- * If Pryva ever runs multiple instances or serverless, move `rateLimitStore`
- * to Postgres or Upstash — otherwise each instance gets its own budget.
+ * Persistent deployments use shared PostgreSQL counters; preview counters are
+ * process-local. The trusted edge must overwrite forwarded client-IP headers.
  */
 
 const ipLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, maxRequests: 30 });
@@ -24,9 +23,10 @@ export function clientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
     const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
+    return first && isIP(first) ? first : "unknown";
   }
-  return request.headers.get("x-real-ip")?.trim() || request.headers.get("cf-connecting-ip")?.trim() || "unknown";
+  const fallback = request.headers.get("x-real-ip")?.trim() || request.headers.get("cf-connecting-ip")?.trim();
+  return fallback && isIP(fallback) ? fallback : "unknown";
 }
 
 function tooMany(retryAfterSeconds: number, message: string) {
@@ -34,6 +34,10 @@ function tooMany(retryAfterSeconds: number, message: string) {
     { ok: false, error: message },
     { status: 429, headers: { "Retry-After": String(Math.max(1, retryAfterSeconds)) } },
   );
+}
+
+function unavailable() {
+  return Response.json({ ok: false, error: "Sign-in is temporarily unavailable. Please try again later." }, { status: 503 });
 }
 
 function secondsUntil(resetTime: number) {
@@ -53,6 +57,7 @@ export async function checkAuthRateLimit(
 
   if (scope === "signup") {
     const perIp = await signupIpLimiter(`signup:ip:${ip}`);
+    if (perIp.unavailable) return unavailable();
     if (!perIp.allowed) {
       return tooMany(
         secondsUntil(perIp.resetTime),
@@ -63,6 +68,7 @@ export async function checkAuthRateLimit(
   }
 
   const perIp = await ipLimiter(`login:ip:${ip}`);
+  if (perIp.unavailable) return unavailable();
   if (!perIp.allowed) {
     return tooMany(
       secondsUntil(perIp.resetTime),
@@ -72,6 +78,7 @@ export async function checkAuthRateLimit(
 
   if (identifier) {
     const perKey = await keyLimiter(`login:key:${identifier}`);
+    if (perKey.unavailable) return unavailable();
     if (!perKey.allowed) {
       return tooMany(
         secondsUntil(perKey.resetTime),
@@ -83,8 +90,7 @@ export async function checkAuthRateLimit(
   return null;
 }
 
-/** Clear the throttles after a successful sign-in so legitimate users aren't locked out. */
-export function clearAuthRateLimit(request: Request, identifier = "") {
-  resetRateLimit(`login:ip:${clientIp(request)}`);
-  if (identifier) resetRateLimit(`login:key:${identifier}`);
+/** Successful sign-in clears only the account bucket, not the IP spray budget. */
+export async function clearAuthRateLimit(_request: Request, identifier = "") {
+  if (identifier) await resetRateLimit(`login:key:${identifier}`);
 }

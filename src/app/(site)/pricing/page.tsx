@@ -8,7 +8,7 @@ import { hasCountryFlag } from "@/lib/countries";
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description: "Transparent pricing for all Pryva services. Pay in Naira, no hidden fees.",
+  description: "Explore catalog prices in Naira and review current service availability.",
 };
 
 export default function PricingPage() {
@@ -48,7 +48,7 @@ export default function PricingPage() {
             Simple, transparent pricing
           </h1>
           <p className="mt-4 text-[1.1rem] text-ink-2 max-w-2xl mx-auto">
-            Pay in Naira, no hidden fees, instant delivery. Choose the service that fits your needs.
+            Compare catalog prices in Naira. Live number, eSIM, proxy and inbox fulfillment is paused; preview orders are simulated.
           </p>
         </div>
       </section>
@@ -142,7 +142,7 @@ export default function PricingPage() {
                 Are there any hidden fees?
               </h3>
               <p className="text-[0.9rem] text-ink-2">
-                No. The price you see is the price you pay. No setup fees, no monthly fees, no hidden charges.
+                Review the final amount and any provider fees before confirming a payment.
               </p>
             </div>
             <div className="rounded-2xl border border-line bg-white p-6">
@@ -150,7 +150,7 @@ export default function PricingPage() {
                 What payment methods do you accept?
               </h3>
               <p className="text-[0.9rem] text-ink-2">
-                We accept bank transfers, debit cards, and other popular Nigerian payment methods through Paystack.
+                In a configured live environment, top-ups use Paystack. Available payment methods depend on the provider; top-ups are disabled in preview.
               </p>
             </div>
             <div className="rounded-2xl border border-line bg-white p-6">
@@ -158,7 +158,7 @@ export default function PricingPage() {
                 Can I get a refund?
               </h3>
               <p className="text-[0.9rem] text-ink-2">
-                Yes! If your service doesn&apos;t work as expected, you&apos;ll receive an automatic refund to your wallet.
+                Contact support with your order reference. Refunds require review of the delivery and provider status.
               </p>
             </div>
           </div>

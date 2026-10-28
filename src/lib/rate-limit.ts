@@ -1,58 +1,118 @@
-const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+import { createHash, randomInt } from "node:crypto";
+import { sql } from "drizzle-orm";
+import { db } from "@/db";
+import { isPreviewDatabase } from "@/lib/demo-policy";
 
 interface RateLimitConfig {
   windowMs: number;
   maxRequests: number;
 }
 
-export function createRateLimiter(config: RateLimitConfig) {
-  return async function rateLimit(key: string): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
-    const now = Date.now();
-    const record = rateLimitStore.get(key);
+export type RateLimitResult = {
+  allowed: boolean;
+  remaining: number;
+  resetTime: number;
+  /** The shared store failed; callers must fail closed with a 503. */
+  unavailable?: boolean;
+};
 
-    if (!record || now > record.resetTime) {
-      const resetTime = now + config.windowMs;
-      rateLimitStore.set(key, { count: 1, resetTime });
-      return { allowed: true, remaining: config.maxRequests - 1, resetTime };
-    }
+const previewStore = new Map<string, { count: number; resetTime: number }>();
+const MAX_PREVIEW_KEYS = 10_000;
 
-    if (record.count >= config.maxRequests) {
-      return { allowed: false, remaining: 0, resetTime: record.resetTime };
-    }
-
-    record.count++;
-    return { allowed: true, remaining: config.maxRequests - record.count, resetTime: record.resetTime };
-  };
-}
-
-export const apiRateLimiter = createRateLimiter({
-  windowMs: 60 * 1000, // 1 minute
-  maxRequests: 60,
-});
-
-export const authRateLimiter = createRateLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  maxRequests: 5,
-});
-
-export const purchaseRateLimiter = createRateLimiter({
-  windowMs: 60 * 1000, // 1 minute
-  maxRequests: 10,
-});
-
-/** Drop a key's counter — used after a successful login. */
-export function resetRateLimit(key: string) {
-  rateLimitStore.delete(key);
+function digest(key: string): string {
+  return createHash("sha256").update(key).digest("hex");
 }
 
 export function cleanupRateLimitStore() {
   const now = Date.now();
-  for (const [key, record] of rateLimitStore.entries()) {
-    if (now > record.resetTime) {
-      rateLimitStore.delete(key);
-    }
+  for (const [key, record] of previewStore) {
+    if (now >= record.resetTime) previewStore.delete(key);
   }
 }
 
-// Cleanup every 5 minutes
-setInterval(cleanupRateLimitStore, 5 * 60 * 1000);
+/**
+ * PostgreSQL uses one atomic upsert per bucket, shared by every app instance.
+ * Preview mode is intentionally process-local and is not a production store.
+ * Store failures must not silently fall back to per-instance counters.
+ */
+export function createRateLimiter(config: RateLimitConfig) {
+  if (!Number.isSafeInteger(config.windowMs) || config.windowMs < 1 ||
+      !Number.isSafeInteger(config.maxRequests) || config.maxRequests < 1 || config.maxRequests >= 2_147_483_647) {
+    throw new Error("Invalid rate-limit configuration");
+  }
+
+  return async function rateLimit(key: string): Promise<RateLimitResult> {
+    const hashedKey = digest(key);
+    const now = Date.now();
+    if (isPreviewDatabase()) {
+      const record = previewStore.get(hashedKey);
+      if (!record || now >= record.resetTime) {
+        if (!record && previewStore.size >= MAX_PREVIEW_KEYS) {
+          cleanupRateLimitStore();
+          if (previewStore.size >= MAX_PREVIEW_KEYS) {
+            return { allowed: false, remaining: 0, resetTime: now + config.windowMs, unavailable: true };
+          }
+        }
+        const resetTime = now + config.windowMs;
+        previewStore.set(hashedKey, { count: 1, resetTime });
+        return { allowed: true, remaining: config.maxRequests - 1, resetTime };
+      }
+      record.count = Math.min(record.count + 1, config.maxRequests + 1);
+      return { allowed: record.count <= config.maxRequests, remaining: Math.max(0, config.maxRequests - record.count), resetTime: record.resetTime };
+    }
+
+    try {
+      // The row lock acquired by ON CONFLICT makes the count update atomic
+      // across separate PostgreSQL connections and application instances.
+      const result = await db.execute(sql`
+        INSERT INTO rate_limit_buckets (key, count, reset_at)
+        VALUES (${hashedKey}, 1, now() + ${config.windowMs} * interval '1 millisecond')
+        ON CONFLICT (key) DO UPDATE SET
+          count = CASE WHEN rate_limit_buckets.reset_at <= now() THEN 1
+            ELSE LEAST(rate_limit_buckets.count + 1, ${config.maxRequests + 1}) END,
+          reset_at = CASE WHEN rate_limit_buckets.reset_at <= now()
+            THEN now() + ${config.windowMs} * interval '1 millisecond'
+            ELSE rate_limit_buckets.reset_at END
+        RETURNING count, reset_at
+      `);
+      const rows = (result as unknown as { rows: { count: number; reset_at: Date | string }[] }).rows;
+      const count = rows[0]?.count;
+      const resetTime = new Date(rows[0]?.reset_at).getTime();
+      if (!Number.isInteger(count) || !Number.isFinite(resetTime)) throw new Error("Invalid rate-limit result");
+
+      // Bound stale-row growth without a permanently running worker. This
+      // indexed cleanup is independent of the request's allow/deny decision.
+      if (randomInt(1000) === 0) {
+        try {
+          await db.execute(sql`DELETE FROM rate_limit_buckets WHERE reset_at < now() - interval '1 day'`);
+        } catch {
+          console.error("Rate-limit cleanup failed");
+        }
+      }
+      return { allowed: count <= config.maxRequests, remaining: Math.max(0, config.maxRequests - count), resetTime };
+    } catch {
+      console.error("Shared rate-limit store unavailable");
+      return { allowed: false, remaining: 0, resetTime: now + config.windowMs, unavailable: true };
+    }
+  };
+}
+
+export const apiRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 60 });
+export const demoRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 30 });
+export const authRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 5 });
+export const purchaseRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 10 });
+export const securityReportRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 6 });
+export const userExportRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 2 });
+export const contactRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 5 });
+export const giftCardUserRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 15 });
+export const giftCardIpRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 60 });
+
+/** Drop one key's counter after successful authentication. */
+export async function resetRateLimit(key: string): Promise<void> {
+  const hashedKey = digest(key);
+  if (isPreviewDatabase()) {
+    previewStore.delete(hashedKey);
+    return;
+  }
+  await db.execute(sql`DELETE FROM rate_limit_buckets WHERE key = ${hashedKey}`);
+}

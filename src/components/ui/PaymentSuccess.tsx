@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { CheckCircle } from "@/components/icons";
+import { Check, Sparkle } from "@/components/icons";
 import { fireConfetti } from "@/components/ui/Confetti";
 
 interface PaymentSuccessProps {
@@ -11,78 +11,54 @@ interface PaymentSuccessProps {
   redirectUrl?: string;
   redirectDelay?: number;
   onRedirect?: () => void;
+  /** Keep a receipt on screen when there is no destination to navigate to. */
+  autoRedirect?: boolean;
+  onClose?: () => void;
 }
 
 export function PaymentSuccess({
   show,
-  title = "Payment Successful!",
+  title = "Payment successful",
   message = "Your order has been processed successfully.",
   redirectUrl = "/dashboard",
   redirectDelay = 2000,
   onRedirect,
+  autoRedirect = true,
+  onClose,
 }: PaymentSuccessProps) {
   useEffect(() => {
-    if (show) {
-      // Fire confetti celebration
-      fireConfetti();
-
-      // Redirect after delay
-      const timer = setTimeout(() => {
-        if (onRedirect) {
-          onRedirect();
-        } else {
-          window.location.href = redirectUrl;
-        }
-      }, redirectDelay);
-
-      return () => clearTimeout(timer);
-    }
-  }, [show, redirectUrl, redirectDelay, onRedirect]);
+    if (!show) return;
+    fireConfetti();
+    if (!autoRedirect) return;
+    const timer = setTimeout(() => {
+      if (onRedirect) onRedirect();
+      else window.location.href = redirectUrl;
+    }, redirectDelay);
+    return () => clearTimeout(timer);
+  }, [show, redirectUrl, redirectDelay, onRedirect, autoRedirect]);
 
   if (!show) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="mx-4 max-w-md rounded-2xl bg-white p-8 shadow-2xl animate-in fade-in zoom-in duration-300">
-        <div className="text-center">
-          {/* Animated Checkmark */}
-          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 animate-in zoom-in duration-500 delay-200">
-            <CheckCircle className="h-12 w-12 text-emerald-600 animate-in fade-in duration-500 delay-300" />
-          </div>
-
-          {/* Success Message */}
-          <h2 className="mb-2 text-2xl font-bold text-ink animate-in slide-in-from-bottom duration-500 delay-400">
-            {title}
-          </h2>
-          <p className="mb-6 text-ink-2 animate-in slide-in-from-bottom duration-500 delay-500">
-            {message}
-          </p>
-
-          {/* Redirect Notice */}
-          <div className="animate-in fade-in duration-500 delay-700">
-            <p className="text-sm text-ink-3 mb-3">
-              Redirecting to your dashboard...
-            </p>
-            <div className="mx-auto h-1 w-32 overflow-hidden rounded-full bg-gray-200">
-              <div className="h-full bg-lav-600 animate-progress" />
-            </div>
-          </div>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/55 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="payment-success-title" aria-describedby="payment-success-message">
+      <div className="demo-arrive relative w-full max-w-sm overflow-hidden rounded-[1.75rem] border border-white/80 bg-[#fffdfa] p-7 text-center shadow-float sm:p-9">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-lav-200/60 blur-2xl" />
+        <div aria-hidden="true" className="demo-pop relative mx-auto grid h-20 w-20 place-items-center rounded-[1.6rem] bg-emerald-100 text-emerald-700">
+          <Check className="h-10 w-10" />
+          <Sparkle className="absolute -right-2 -top-2 h-5 w-5 text-lav-600" />
         </div>
+        <p className="mt-6 text-[0.63rem] font-bold uppercase tracking-[0.18em] text-lav-700">All done</p>
+        <h2 id="payment-success-title" className="mt-2 text-[1.45rem] font-semibold text-ink">{title}</h2>
+        <p id="payment-success-message" className="mt-2 text-[0.84rem] leading-relaxed text-ink-2">{message}</p>
+        {autoRedirect ? (
+          <div className="mt-6">
+            <p className="text-[0.7rem] text-ink-3">Opening your details…</p>
+            <div aria-hidden="true" className="mt-3 h-1.5 overflow-hidden rounded-full bg-lav-100"><div className="demo-progress h-full w-1/3 rounded-full bg-lav-600" /></div>
+            <a href={redirectUrl} className="mt-4 inline-flex text-[0.75rem] font-semibold text-lav-700 underline underline-offset-2">Continue now</a>
+          </div>
+        ) : (
+          <button type="button" onClick={onClose} className="btn btn-primary mt-6 w-full">Done</button>
+        )}
       </div>
-
-      <style jsx>{`
-        @keyframes progress {
-          from {
-            width: 0%;
-          }
-          to {
-            width: 100%;
-          }
-        }
-        .animate-progress {
-          animation: progress ${redirectDelay}ms ease-out forwards;
-        }
-      `}</style>
     </div>
   );
 }

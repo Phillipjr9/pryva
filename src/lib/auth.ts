@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
-import { requestProto } from "@/lib/net";
+import { isArenaPreviewHost, isLocalHost, requestProto } from "@/lib/net";
 import { isDemoEmail, isPreviewDatabase } from "@/lib/demo-policy";
 
 export const SESSION_COOKIE = "pryva_session";
@@ -29,35 +29,25 @@ const SESSION_DAYS = 30;
 export async function requestIsSecure(): Promise<boolean> {
   try {
     const headerList = await headers();
-    const proto = headerList.get("x-forwarded-proto");
-    if (proto) return proto.startsWith("https");
     const host = headerList.get("x-forwarded-host") ?? headerList.get("host");
-    if (host) {
-      return !(
-        host.startsWith("localhost") ||
-        host.startsWith("127.") ||
-        host.startsWith("0.0.0.0") ||
-        host.endsWith(".local") ||
-        host.includes(":")
-      );
-    }
+    if (host && isArenaPreviewHost(host)) return true;
+    const proto = headerList.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
+    if (proto === "https" || proto === "http") return proto === "https";
+    if (host) return !isLocalHost(host);
   } catch {
     /* headers() unavailable — fall through */
   }
   return process.env.NODE_ENV === "production";
 }
 
-async function isCrossSiteIframeRequest(request?: Request): Promise<boolean> {
+async function needsEmbeddedSessionCookie(request?: Request): Promise<boolean> {
   try {
-    if (request) {
-      const site = request.headers.get("sec-fetch-site");
-      const dest = request.headers.get("sec-fetch-dest");
-      if (site === "cross-site" || dest === "iframe") return true;
-    }
-    const headerList = await headers();
-    const site = headerList.get("sec-fetch-site");
-    const dest = headerList.get("sec-fetch-dest");
-    return site === "cross-site" || dest === "iframe";
+    const headerList = request?.headers ?? await headers();
+    const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
+    // Fetches from inside an iframe report same-origin/empty, so their headers
+    // do not reveal the embedding. The Arena preview can be embedded even for
+    // those requests; use partitioned cookies for all of its session issuances.
+    return isArenaPreviewHost(host) || headerList.get("sec-fetch-site") === "cross-site" || headerList.get("sec-fetch-dest") === "iframe";
   } catch {
     return false;
   }
@@ -97,7 +87,7 @@ export async function createSession(userId: string, request?: Request): Promise<
   await db.insert(sessions).values({ token, userId, expiresAt });
 
   const proto = request ? requestProto(request) : (await requestIsSecure()) ? "https" : "http";
-  const embedded = await isCrossSiteIframeRequest(request);
+  const embedded = await needsEmbeddedSessionCookie(request);
   // An embedded page is served over TLS even when the proxy doesn't say so;
   // without `Secure` the browser discards a `SameSite=None` cookie outright.
   const secure = proto === "https" || embedded;
@@ -138,26 +128,46 @@ export async function createSession(userId: string, request?: Request): Promise<
   return token;
 }
 
-export async function getCurrentUser(): Promise<PublicUser | null> {
-  const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value ?? jar.get(SESSION_COOKIE_EMBEDDED)?.value;
-  if (!token) {
-    if (process.env.NODE_ENV !== "production") {
-      console.info("[auth] no session cookie on this request");
-    }
-    return null;
-  }
-
+async function sessionUser(token: string): Promise<User | null> {
   const rows = await db
     .select({ user: users })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
     .where(and(eq(sessions.token, token), gt(sessions.expiresAt, new Date())))
     .limit(1);
+  return rows[0]?.user ?? null;
+}
 
-  const row = rows[0];
-  if (!row || (isDemoEmail(row.user.email) && !isPreviewDatabase())) return null;
-  return toPublicUser(row.user);
+async function previewDemoBridgeToken(): Promise<string | null> {
+  try {
+    const headerList = await headers();
+    const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
+    const token = headerList.get("x-pryva-preview-session") ?? "";
+    return isArenaPreviewHost(host) && /^[0-9a-f]{64}$/.test(token) ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getCurrentUser(): Promise<PublicUser | null> {
+  const jar = await cookies();
+  const cookieTokens = new Set([jar.get(SESSION_COOKIE)?.value, jar.get(SESSION_COOKIE_EMBEDDED)?.value].filter((value): value is string => Boolean(value)));
+  for (const token of cookieTokens) {
+    const user = await sessionUser(token);
+    if (user && (!isDemoEmail(user.email) || isPreviewDatabase())) return toPublicUser(user);
+  }
+
+  // The preview proxy can discard Cookie headers. The bridge is a fallback for
+  // the shared public demo only; it can never authenticate a private account.
+  const bridgeToken = await previewDemoBridgeToken();
+  if (bridgeToken) {
+    const user = await sessionUser(bridgeToken);
+    if (user && isDemoEmail(user.email)) return toPublicUser(user);
+  }
+  if (!cookieTokens.size && process.env.NODE_ENV !== "production") {
+    console.info("[auth] no session cookie on this request");
+  }
+  return null;
 }
 
 /**
@@ -218,13 +228,14 @@ export async function requireAdmin(nextPath = "/admin/dashboard"): Promise<Publi
 
 export async function destroySession(): Promise<void> {
   const jar = await cookies();
-  const token =
-    jar.get(SESSION_COOKIE)?.value ?? jar.get(SESSION_COOKIE_EMBEDDED)?.value;
-  if (token) {
+  const tokens = new Set([jar.get(SESSION_COOKIE)?.value, jar.get(SESSION_COOKIE_EMBEDDED)?.value].filter((value): value is string => Boolean(value)));
+  const bridgeToken = await previewDemoBridgeToken();
+  if (bridgeToken && isDemoEmail((await sessionUser(bridgeToken))?.email ?? "")) tokens.add(bridgeToken);
+  for (const token of tokens) {
     await db.delete(sessions).where(eq(sessions.token, token));
   }
-  const secure = (await requestIsSecure()) || (await isCrossSiteIframeRequest());
-  const embedded = await isCrossSiteIframeRequest();
+  const embedded = await needsEmbeddedSessionCookie();
+  const secure = (await requestIsSecure()) || embedded;
   jar.set(SESSION_COOKIE, "", {
     httpOnly: true,
     sameSite: embedded ? "none" : "lax",

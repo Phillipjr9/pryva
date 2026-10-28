@@ -7,7 +7,7 @@ import { hasCountryFlag } from "@/lib/countries";
 
 export const metadata: Metadata = {
   title: "Email OTP",
-  description: "Temporary email addresses for OTP verification. Receive codes instantly, no registration required.",
+  description: "Explore temporary inbox plans. Live email fulfillment is paused.",
 };
 
 export default function EmailOTPPage() {

@@ -12,6 +12,8 @@ import {
   makeReference,
 } from "@/lib/wallet";
 import { logger } from "@/lib/logger";
+import { isSameOriginMutation } from "@/lib/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -37,8 +39,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     userId = user.id;
+    if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+    if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
+    // The demo checkout uses a fixed fictional destination and never accepts a
+    // real phone number. Keep this legacy endpoint out of shared preview use.
+    if (isPreviewDatabase()) return NextResponse.json({ error: "Use the demo data checkout; no phone number is needed." }, { status: 410 });
 
     const limit = await purchaseRateLimiter(`data:${user.id}:${MAX_ORDERS_PER_DAY}`);
+    if (limit.unavailable) return NextResponse.json({ error: "Purchases are temporarily unavailable." }, { status: 503 });
     if (!limit.allowed) {
       const seconds = Math.max(1, Math.ceil((limit.resetTime - Date.now()) / 1000));
       return NextResponse.json(
@@ -47,7 +55,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await readJsonWithLimit(request, 2_048);
+    } catch (error) {
+      return NextResponse.json({ error: "Invalid request" }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     const { planId, phoneNumber } = body as { planId?: unknown; phoneNumber?: unknown };
 
     if (typeof planId !== "string" || !planId) {
@@ -121,7 +135,7 @@ export async function POST(request: NextRequest) {
           duration: plan.duration,
           amount: plan.price,
           status: "delivered",
-          provider: "airtime",
+          provider: "simulated",
           referenceCode: normalized,
         })
         .returning();
@@ -153,7 +167,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      message: `${plan.name} is on its way to ${normalized}.`,
+      message: `Simulated preview order for ${plan.name}; no mobile data was sent.`,
       order: { reference, amount: plan.price, planLabel: `${plan.size} · ${plan.duration}` },
     });
   } catch (error) {

@@ -55,7 +55,7 @@ export function BalanceHero({
               {formatNaira(balance)}
             </h1>
             <p className="mt-2 text-[0.76rem] text-white/55">
-              Hello {name} · refunds land here automatically
+              Hello {name} · your wallet and transaction history
             </p>
           </div>
 

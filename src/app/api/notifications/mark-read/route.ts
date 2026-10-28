@@ -3,6 +3,9 @@ import { db } from "@/db";
 import { notifications } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAuthApi } from "@/lib/auth";
+import { isSameOriginMutation } from "@/lib/net";
+import { isPreviewDatabase } from "@/lib/demo-policy";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -15,10 +18,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { notificationIds, markAll = false } = body;
+    if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+    if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
+    let body: unknown;
+    try {
+      body = await readJsonWithLimit(request, 16_384);
+    } catch (error) {
+      return NextResponse.json({ error: "Invalid request" }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    const { notificationIds, markAll } = body as { notificationIds?: unknown; markAll?: unknown };
 
-    if (markAll) {
+    if (markAll === true) {
       // Mark all user notifications as read
       await db
         .update(notifications)
@@ -30,8 +41,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, message: "All notifications marked as read" });
     }
 
-    if (!notificationIds || !Array.isArray(notificationIds) || notificationIds.length === 0) {
-      return NextResponse.json({ error: "Notification IDs required" }, { status: 400 });
+    if (!Array.isArray(notificationIds) || notificationIds.length === 0 || notificationIds.length > 100 || notificationIds.some((id) =>
+      typeof id !== "string" || !(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) || (isPreviewDatabase() && /^[a-z0-9-]{1,64}$/i.test(id)))
+    )) {
+      return NextResponse.json({ error: "Provide up to 100 valid notification IDs" }, { status: 400 });
     }
 
     // Mark specific notifications as read

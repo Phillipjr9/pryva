@@ -40,6 +40,10 @@ describe("Scheduled Orders", () => {
       expect(next.getMonth()).toBe(0);
     });
 
+    it("rejects an unknown frequency rather than scheduling immediately", () => {
+      expect(() => calculateNextRun("invalid" as Frequency)).toThrow("Invalid frequency");
+    });
+
     it("clamps month-end dates to the final day of the next month", () => {
       const next = calculateNextRun("monthly", new Date(2024, 0, 31));
       expect(next.getFullYear()).toBe(2024);

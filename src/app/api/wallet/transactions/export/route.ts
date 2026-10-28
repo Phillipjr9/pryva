@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { walletTransactions } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { requireAuthApi } from "@/lib/auth";
+import { csvRows as encodeCsvRows } from "@/lib/csv";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     const format = request.nextUrl.searchParams.get("format") || "csv";
+    if (format !== "csv" && format !== "json") return NextResponse.json({ error: "Invalid export format" }, { status: 400 });
 
     const transactions = await db.query.walletTransactions.findMany({
       where: eq(walletTransactions.userId, user.id),
@@ -33,6 +35,7 @@ export async function GET(request: NextRequest) {
       return new NextResponse(JSON.stringify(data, null, 2), {
         headers: {
           "Content-Type": "application/json",
+          "Cache-Control": "private, no-store",
           "Content-Disposition": `attachment; filename="transactions-${new Date().toISOString().split("T")[0]}.json"`,
         },
       });
@@ -45,17 +48,18 @@ export async function GET(request: NextRequest) {
         tx.createdAt.toISOString(),
         tx.description,
         tx.type,
-        tx.amount.toString(),
-        tx.balanceAfter.toString(),
+        tx.amount,
+        tx.balanceAfter,
         tx.reference,
       ]),
     ];
 
-    const csvContent = csvRows.map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n");
+    const csvContent = encodeCsvRows(csvRows);
 
     return new NextResponse(csvContent, {
       headers: {
-        "Content-Type": "text/csv",
+        "Content-Type": "text/csv; charset=utf-8",
+        "Cache-Control": "private, no-store",
         "Content-Disposition": `attachment; filename="transactions-${new Date().toISOString().split("T")[0]}.csv"`,
       },
     });

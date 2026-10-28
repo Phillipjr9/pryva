@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth";
+import { isSharedPreviewUser } from "@/lib/demo-policy";
 import { SettingsForm } from "./SettingsForm";
 
 // The dashboard layout already provides the shell — nesting it here rendered a
@@ -16,7 +17,7 @@ export default async function SettingsPage() {
             Manage your account settings and preferences.
           </p>
         </div>
-        <SettingsForm user={user} />
+        <SettingsForm user={user} sharedDemo={isSharedPreviewUser(user)} />
       </div>
   );
 }

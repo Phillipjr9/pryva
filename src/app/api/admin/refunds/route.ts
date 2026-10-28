@@ -5,6 +5,8 @@ import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { eq, and, isNull, ne, sql } from "drizzle-orm";
 import { logger } from "@/lib/logger";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -58,18 +60,35 @@ export async function POST(request: NextRequest) {
     const access = await authorizeAdminApi(request);
     if (access.response) return access.response;
 
-    const { orderId, reason } = await request.json() as { orderId?: unknown; reason?: unknown };
-    if (typeof orderId !== "string" || !orderId) {
+    if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
+    let body: unknown;
+    try {
+      body = await readJsonWithLimit(request, 2_048);
+    } catch (error) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    const { orderId, reason, reconciliationConfirmed } = body as { orderId?: unknown; reason?: unknown; reconciliationConfirmed?: unknown };
+    if (typeof orderId !== "string" || !/^[a-z0-9-]{1,64}$/i.test(orderId)) {
       return NextResponse.json({ error: "Order ID required" }, { status: 400 });
     }
     if (reason !== undefined && (typeof reason !== "string" || reason.length > 180)) {
       return NextResponse.json({ error: "Invalid reason" }, { status: 400 });
     }
+    if (reconciliationConfirmed === true && (typeof reason !== "string" || !reason.trim())) {
+      return NextResponse.json({ error: "A reconciliation reason is required" }, { status: 400 });
+    }
 
     const result = await db.transaction(async (tx) => {
       const [order] = await tx.update(orders)
         .set({ refundedAt: new Date(), status: "refunded" })
-        .where(and(eq(orders.id, orderId), isNull(orders.refundedAt), ne(orders.status, "refunded")))
+        // A supplier request may still be in flight. Only reconcile/refund it
+        // after it has left processing and its provider outcome is verified.
+        .where(and(
+          eq(orders.id, orderId), isNull(orders.refundedAt),
+          ne(orders.status, "refunded"), ne(orders.status, "processing"),
+          reconciliationConfirmed === true ? undefined : ne(orders.status, "review"),
+        ))
         .returning();
       if (!order) return null;
       if (!Number.isSafeInteger(order.amount) || order.amount <= 0) throw new Error("Invalid order amount");
@@ -93,9 +112,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (!result) {
-      return NextResponse.json({ error: "Order not found or already refunded" }, { status: 409 });
+      return NextResponse.json({ error: "Order not found, already refunded, still processing, or requires confirmed reconciliation" }, { status: 409 });
     }
     logger.info("Manual refund processed", { orderId, amount: result.amount, adminId: access.user.id });
+    scheduleWalletEmails();
     return NextResponse.json({ ok: true, message: "Refund processed successfully", refundAmount: result.amount });
   } catch (error) {
     logger.error("Failed to process refund", { error });

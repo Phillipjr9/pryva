@@ -24,7 +24,7 @@ describe("demo dashboard seed", () => {
 
     const liveCode = rows.find((row) => row.otpCode !== null);
     expect(liveCode?.otpCode).toBe("482069");
-    expect(liveCode?.referenceCode).toBe("+234 812 445 9081");
+    expect(liveCode?.referenceCode).toMatch(/^\+000 555 /);
     expect(new Date(liveCode!.expiresAt!).getTime()).toBeGreaterThan(Date.now());
   });
 

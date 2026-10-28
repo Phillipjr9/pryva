@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 import { orders, users, walletTransactions } from "@/db/schema";
@@ -18,7 +18,8 @@ function request(origin = "https://pryva.test") {
 function fakeDatabase() {
   const state = {
     order: { id: "order-id", userId: "user-id", status: "active", refundedAt: null as Date | null, amount: 1200,
-      provider: "simulated", providerRequestId: null as string | null, service: "numbers", productName: "Test", reference: "ORDER-1" },
+      provider: "simulated", providerRequestId: null as string | null, service: "numbers", productName: "Test", reference: "ORDER-1",
+      duration: "Single verification · 20 min window", otpCode: null as string | null, createdAt: new Date(Date.now() - 21 * 60_000) },
     balance: 500,
     ledger: [] as Array<Record<string, unknown>>,
     failLedger: false,
@@ -77,10 +78,13 @@ function fakeDatabase() {
 }
 
 beforeEach(() => {
+  vi.stubEnv("DATABASE_URL", "");
   mocks.currentUser.mockReset().mockResolvedValue({ id: "user-id" });
   mocks.select.mockReset();
   mocks.transaction.mockReset();
 });
+
+afterEach(() => vi.unstubAllEnvs());
 
 describe("order refund safety", () => {
   it("rejects cross-origin refund attempts", async () => {
@@ -95,6 +99,28 @@ describe("order refund safety", () => {
     expect(state.order.status).toBe("refunded");
     expect(state.balance).toBe(1700);
     expect(state.ledger).toHaveLength(1);
+  });
+
+  it("does not refund delivered codes, rentals, or an unexpired number", async () => {
+    const state = fakeDatabase();
+    state.order.otpCode = "123456";
+    expect((await POST(request(), context)).status).toBe(409);
+    state.order.otpCode = null;
+    state.order.duration = "7 day rental";
+    expect((await POST(request(), context)).status).toBe(409);
+    state.order.duration = "Single verification · 20 min window";
+    state.order.createdAt = new Date();
+    expect((await POST(request(), context)).status).toBe(409);
+    expect(state.balance).toBe(500);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("never automatically credits even simulated orders in a persistent database", async () => {
+    const state = fakeDatabase();
+    vi.stubEnv("DATABASE_URL", "postgres://test/db");
+    expect((await POST(request(), context)).status).toBe(503);
+    expect(state.balance).toBe(500);
+    expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
   it("requires manual reconciliation for legacy live orders", async () => {
