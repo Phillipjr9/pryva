@@ -21,9 +21,9 @@ import { formatNaira, plansFor, services, type Service, type ServiceSlug } from 
 import { getCurrentUser } from "@/lib/auth";
 
 const subtitleByService: Partial<Record<ServiceSlug, string>> = {
-  numbers: "Delivered in seconds.",
+  numbers: "Explore plan options.",
   esim: "Scan once, travel lighter.",
-  proxies: "No data-center tell.",
+  proxies: "Explore plan options.",
   "email-otp": "Not your real inbox.",
 };
 
@@ -36,7 +36,7 @@ function ServiceVisual({ slug, service }: { slug: ServiceSlug; service: Service 
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5 text-[0.64rem] font-semibold uppercase tracking-[0.14em] text-ink-3">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-            Number issued
+            Sample number
           </span>
           <span className="inline-flex items-center gap-1 rounded-full bg-lav-50 px-2 py-1 text-[0.6rem] font-semibold text-lav-700">
             <Clock className="h-2.5 w-2.5" /> 20 min window
@@ -48,8 +48,8 @@ function ServiceVisual({ slug, service }: { slug: ServiceSlug; service: Service 
               🇳🇬
             </span>
             <div>
-              <p className="text-[0.88rem] font-semibold tracking-tight">+234 812 445 9081</p>
-              <p className="text-[0.64rem] text-ink-3">Non-VoIP · reusable rental</p>
+              <p className="text-[0.88rem] font-semibold tracking-tight">+234 ••• ••• ••••</p>
+              <p className="text-[0.64rem] text-ink-3">Illustrative example</p>
             </div>
           </div>
           <Copy className="h-4 w-4 text-ink-3" />
@@ -69,7 +69,7 @@ function ServiceVisual({ slug, service }: { slug: ServiceSlug; service: Service 
             ))}
           </div>
           <p className="mt-2.5 flex items-center gap-1 text-[0.62rem] text-emerald-600">
-            <Check className="h-3 w-3" /> Delivered in 9 seconds
+            <Check className="h-3 w-3" /> Illustrative example
           </p>
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -324,13 +324,13 @@ export async function ServicePageTemplate({ service }: { service: Service }) {
                     <Wallet className="h-3.5 w-3.5 text-lav-600" /> Pay in Naira
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-lav-600" /> Instant delivery
+                    <Clock className="h-3.5 w-3.5 text-lav-600" /> Live fulfillment paused
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    <Shield className="h-3.5 w-3.5 text-lav-600" /> Auto-refund
+                    <Shield className="h-3.5 w-3.5 text-lav-600" /> Support review
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    <Lock className="h-3.5 w-3.5 text-lav-600" /> Secure checkout
+                    <Lock className="h-3.5 w-3.5 text-lav-600" /> Review availability
                   </span>
                 </div>
               </Reveal>
@@ -339,6 +339,7 @@ export async function ServicePageTemplate({ service }: { service: Service }) {
             <Reveal delay={180} className="relative">
               <div className="mx-auto max-w-[25rem]">
                 <div className="absolute inset-x-8 top-6 -z-10 h-full rounded-[2.5rem] bg-gradient-to-br from-lav-200/70 via-white/30 to-peach/50 blur-[2px]" />
+                <p className="mb-2 text-center text-xs font-semibold text-ink-3">Illustrative example — not a live order</p>
                 <ServiceVisual slug={service.slug} service={service} />
               </div>
             </Reveal>

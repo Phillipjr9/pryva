@@ -11,8 +11,8 @@
  *  - Branch on `success` / `error_code`, never on `message` wording.
  *  - Catalogue endpoints are limited to 30 req/min per ACCOUNT (shared across keys).
  *    Categories/subcategories are cached here because they change rarely.
- *  - A purchase must always carry a `client_reference` UUID so a retry returns
- *    the original order instead of buying twice.
+ *  - A purchase carries a stable `client_reference` UUID for reconciliation.
+ *    Provider idempotency is not verified, so we do not automatically retry it.
  *  - `X-Request-Id` is logged so support can trace a bad call.
  *
  * This module must never be imported into a client component: it reads a secret
@@ -23,7 +23,7 @@ import "server-only";
 import { logger } from "@/lib/logger";
 
 const BASE_URL = process.env.ACCSZONE_API_URL || "https://accszone.com/api/v1";
-const API_KEY = process.env.ACCSZONE_API_KEY || "";
+const API_KEY = process.env.ACCSZONE_API_KEY?.trim() ?? "";
 const DEFAULT_TIMEOUT_MS = 20_000;
 
 export type AccsZoneRef = { id: number; title: string; slug: string };
@@ -117,8 +117,7 @@ async function request<T>(path: string, options: FetchOptions = {}): Promise<{ d
     });
   } catch (error) {
     clearTimeout(timeout);
-    // A timeout on /purchase is ambiguous — the caller must retry with the same
-    // client_reference, never with a fresh one.
+    // A timeout on /purchase is ambiguous: preserve the order for review.
     const aborted = error instanceof Error && error.name === "AbortError";
     throw new AccsZoneError(
       aborted ? "Marketplace timed out" : "Marketplace unreachable",
@@ -282,8 +281,8 @@ export async function getListing(slug: string): Promise<AccsZoneListing & { desc
 }
 
 /**
- * Buy accounts. `clientReference` MUST be a UUID and MUST be reused on every retry
- * of the same intended purchase — that is what makes a timeout safe.
+ * Buy accounts. `clientReference` is a stable UUID for reconciliation; do not
+ * automatically retry a purchase until provider idempotency has been verified.
  */
 export async function purchaseAccounts(input: {
   listingId: number;

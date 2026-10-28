@@ -13,9 +13,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const limit = parseInt(request.nextUrl.searchParams.get("limit") || "50");
-    const offset = parseInt(request.nextUrl.searchParams.get("offset") || "0");
+    const limitText = request.nextUrl.searchParams.get("limit") ?? "50";
+    const offsetText = request.nextUrl.searchParams.get("offset") ?? "0";
+    if (!/^\d{1,5}$/.test(limitText) || !/^\d{1,5}$/.test(offsetText)) return NextResponse.json({ error: "Invalid pagination" }, { status: 400 });
+    const limit = Number(limitText);
+    const offset = Number(offsetText);
     const status = request.nextUrl.searchParams.get("status");
+    if (limit < 1 || limit > 100 || offset > 10_000 || (status && !/^[a-z-]{1,24}$/i.test(status))) return NextResponse.json({ error: "Invalid query" }, { status: 400 });
 
     let query = db.query.orders.findMany({
       where: eq(orders.userId, user.id),

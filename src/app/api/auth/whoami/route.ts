@@ -4,7 +4,8 @@ import {
   SESSION_COOKIE_EMBEDDED,
   getCurrentUser,
 } from "@/lib/auth";
-import { requestProto } from "@/lib/net";
+import { isArenaPreviewHost, requestProto } from "@/lib/net";
+import { isDemoEmail } from "@/lib/demo-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,8 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const [user, jar] = await Promise.all([getCurrentUser(), cookies()]);
   const headerList = request.headers;
+  const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
+  const demoBridge = Boolean(user && isDemoEmail(user.email) && isArenaPreviewHost(host) && /^[0-9a-f]{64}$/.test(headerList.get("x-pryva-preview-session") ?? ""));
 
   return Response.json(
     {
@@ -29,18 +32,23 @@ export async function GET(request: Request) {
           headerList.get("cookie")?.match(/pryva_session/),
         ),
       },
+      previewDemoBridge: demoBridge,
       request: {
         proto: requestProto(request),
-        host: headerList.get("x-forwarded-host") ?? headerList.get("host") ?? null,
+        host: host || null,
         forwardedProto: headerList.get("x-forwarded-proto") ?? null,
         secFetchSite: headerList.get("sec-fetch-site") ?? null,
         secFetchDest: headerList.get("sec-fetch-dest") ?? null,
       },
-      hint: user
-        ? "Session is healthy — cookies round-trip in this browser context."
-        : headerList.get("cookie")?.match(/pryva_session/)
+      hint: demoBridge
+        ? "The shared preview demo bridge is active."
+        : user
+          ? "Session is healthy — cookies round-trip in this browser context."
+          : headerList.get("cookie")?.match(/pryva_session/)
           ? "A session cookie reached the server but no live session matched it. Sign in again."
-          : "No session cookie was sent. If you just signed in, this browser context is blocking cookies — open the preview in its own tab.",
+          : isArenaPreviewHost(host)
+            ? "No session reached the server. Refresh the preview inside Arena and try the shared demo again."
+            : "No session cookie was sent. If you just signed in, this browser context may be blocking cookies — try opening the site in its own tab.",
     },
     { headers: { "Cache-Control": "no-store" } },
   );

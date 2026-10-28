@@ -1,17 +1,6 @@
 import { randomBytes, randomInt } from "node:crypto";
 import type { Plan } from "@/lib/catalog";
 
-const regionPrefixes: Record<string, string> = {
-  Nigeria: "+234 812",
-  "United States": "+1 415",
-  "United Kingdom": "+44 7400",
-  Canada: "+1 647",
-  Germany: "+49 1512",
-  Ghana: "+233 24",
-  India: "+91 9810",
-  "Any 5 countries": "+234 812",
-};
-
 function digits(length: number): string {
   return Array.from({ length }, () => randomInt(0, 10)).join("");
 }
@@ -33,20 +22,19 @@ export type Provisioned = {
 export function provisionPlan(plan: Plan): Provisioned {
   switch (plan.service) {
     case "numbers": {
-      const prefix = regionPrefixes[plan.region] ?? "+1 415";
-      const number = `${prefix} ${digits(3)} ${digits(4)}`;
-      return { referenceCode: number, otpCode: generateOtpCode() };
+      // +000 is deliberately non-dialable; a demo must not display someone
+      // else's real phone number. The example code arrives separately later.
+      return { referenceCode: `+000 555 ${digits(4)}`, otpCode: null };
     }
     case "esim": {
       const handle = randomBytes(5).toString("hex").toUpperCase();
       return {
         referenceCode: [
-          "eSIM activation details",
-          `SM-DP+ address: rsp.fleexa.net`,
+          "Demo eSIM details (not an active plan)",
+          `SM-DP+ address: demo.invalid`,
           `Matching ID: ${handle}`,
-          `Activation code: LPA:1$rsp.fleexa.net$${handle}`,
+          `Activation code: LPA:1$demo.invalid$${handle}`,
           `Plan: ${plan.name} · ${plan.planLabel}`,
-          "Scan the QR in the Pryva app (this preview shows the manual details).",
         ].join("\n"),
         otpCode: null,
       };
@@ -56,8 +44,8 @@ export function provisionPlan(plan: Plan): Provisioned {
       const pass = randomBytes(4).toString("hex");
       return {
         referenceCode: [
-          "Residential proxy credentials",
-          `Host: gate.pryva.ng`,
+          "Demo proxy details (not a working connection)",
+          `Host: demo.invalid`,
           `Port: 8000 (HTTP/SOCKS5)`,
           `Username: ${user}`,
           `Password: ${pass}`,
@@ -67,23 +55,12 @@ export function provisionPlan(plan: Plan): Provisioned {
         otpCode: null,
       };
     }
-    default: {
+    case "email-otp": {
       const label = randomBytes(3).toString("hex");
-      const code = generateOtpCode();
-      return {
-        referenceCode: [
-          "Temporary inbox",
-          `Address: ${label}@pryva.ink`,
-          "",
-          "Latest message · Google",
-          "Subject: Verify your email address",
-          `Verification code: ${code}`,
-          "",
-          "Use the address above anywhere you need a signup. New mail appears here live.",
-        ].join("\n"),
-        otpCode: code,
-      };
+      return { referenceCode: `demo-${label}@example.test`, otpCode: null };
     }
+    default:
+      return { referenceCode: "Demo order — no real service was delivered.", otpCode: null };
   }
 }
 

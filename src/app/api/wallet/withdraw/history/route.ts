@@ -18,8 +18,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const pageText = searchParams.get("page") ?? "1";
+    const limitText = searchParams.get("limit") ?? "20";
+    if (!/^\d{1,5}$/.test(pageText) || !/^\d{1,3}$/.test(limitText)) return NextResponse.json({ error: "Invalid pagination" }, { status: 400 });
+    const page = Number(pageText);
+    const limit = Number(limitText);
+    if (page < 1 || page > 10_000 || limit < 1 || limit > 100) return NextResponse.json({ error: "Invalid pagination" }, { status: 400 });
     const offset = (page - 1) * limit;
 
     // Get user's withdrawals

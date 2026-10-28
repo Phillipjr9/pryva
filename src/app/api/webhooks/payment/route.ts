@@ -3,6 +3,7 @@ import { isPreviewDatabase } from "@/lib/demo-policy";
 import { verifyPaystackSignature } from "@/lib/paystack-webhook";
 import { completeTopUp } from "@/lib/topups";
 import { logger } from "@/lib/logger";
+import { readTextWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Payment webhook is not configured" }, { status: 503 });
   }
 
-  const rawBody = await request.text();
+  let rawBody: string;
+  try {
+    rawBody = await readTextWithLimit(request, 131_072);
+  } catch (error) {
+    return NextResponse.json({ error: "Invalid payload" }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
+  }
   if (!verifyPaystackSignature(rawBody, request.headers.get("x-paystack-signature"), secret)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
@@ -25,11 +31,11 @@ export async function POST(request: NextRequest) {
       reference?: unknown;
       amount?: unknown;
       currency?: unknown;
-      metadata?: { userId?: unknown; type?: unknown };
+      metadata?: unknown;
     };
   };
   try {
-    payload = JSON.parse(rawBody);
+    payload = JSON.parse(rawBody.replace(/^\uFEFF/, ""));
   } catch {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
@@ -41,13 +47,20 @@ export async function POST(request: NextRequest) {
   if (payload.event !== "charge.success") return NextResponse.json({ ok: true });
 
   const data = payload.data;
-  const userId = data?.metadata?.userId;
+  // Paystack metadata can be returned as an object or a JSON string. Both
+  // forms are untrusted until the raw-body signature and fields are checked.
+  let metadata: unknown = data?.metadata;
+  if (typeof metadata === "string" && metadata.length <= 4_096) {
+    try { metadata = JSON.parse(metadata); } catch { metadata = null; }
+  }
+  const details = metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata as { userId?: unknown; type?: unknown } : null;
+  const userId = details?.userId;
   const reference = data?.reference;
   const kobo = data?.amount;
   if (
     data?.status !== "success" ||
     data.currency !== "NGN" ||
-    data.metadata?.type !== "wallet_topup" ||
+    details?.type !== "wallet_topup" ||
     typeof userId !== "string" ||
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId) ||
     typeof reference !== "string" || reference.length > 40 || reference.length === 0 ||

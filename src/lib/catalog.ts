@@ -13,17 +13,6 @@ export type ServiceSlug =
 
 export type ServiceKey = ServiceSlug;
 
-export type ProviderMeta = {
-  /** Fleexa app/service to fulfil against, e.g. "whatsapp" */
-  app?: string;
-  /** Fleexa country code, e.g. "us" | "uk" | "ca" */
-  country?: string;
-  /** Preferred Fleexa email product id/name */
-  emailProduct?: string;
-  /** Rental months for Fleexa rentals */
-  months?: number;
-};
-
 export type Plan = {
   slug: string;
   service: ServiceSlug;
@@ -39,7 +28,6 @@ export type Plan = {
   badge?: string;
   highlight?: string;
   features: string[];
-  provider?: ProviderMeta;
 };
 
 export type Service = {
@@ -68,417 +56,163 @@ export function formatNaira(value: number): string {
 
 const serviceDefinitions: Service[] = [
   {
-    slug: "numbers",
-    name: "Virtual Numbers",
-    shortName: "Numbers",
-    href: "/virtual-numbers",
-    eyebrow: "OTP verification",
-    tagline: "Real numbers for the codes you need.",
-    description:
-      "Buy a number for a single verification, or rent one for the long term. Non-VoIP lines across 40+ countries, delivered in seconds.",
-    intro:
-      "Every line is a real carrier number — never VoIP — so codes from WhatsApp, Telegram, Google, Binance, Tinder, PayPal and 500+ platforms land without friction. Pay in Naira, receive the number instantly, and get an automatic refund if a code never arrives.",
-    fromPrice: 1340,
-    unit: "per verification",
-    icon: "phone",
+    slug: "numbers", name: "Virtual Numbers", shortName: "Numbers", href: "/virtual-numbers",
+    eyebrow: "OTP verification", tagline: "Explore virtual number plans.",
+    description: "Browse single-verification and rental number plans. Live fulfillment is paused; preview numbers are simulated.",
+    intro: "Explore number plans priced in Naira. Live fulfillment is paused and preview orders do not provide working phone numbers.",
+    fromPrice: 1340, unit: "per verification", icon: "phone",
     highlights: [
-      {
-        title: "Buy once or rent",
-        body: "One-time verification on a real carrier line, or keep the same number for 7, 30 or 90 days.",
-      },
-      {
-        title: "Non-VoIP lines",
-        body: "Sourced through Pryva's carrier partners, so verification codes actually arrive.",
-      },
-      {
-        title: "Auto-refund built in",
-        body: "If no code lands within the delivery window, the amount returns to your wallet automatically.",
-      },
+      { title: "Plan types", body: "The catalog lists single-verification and rental plans for comparison." },
+      { title: "Compatibility varies", body: "Check the destination platform's rules; number acceptance cannot be guaranteed." },
+      { title: "Support", body: "Contact support with your order reference if an existing delivery needs review." },
     ],
-    included: [
-      "Instant number delivery after payment",
-      "Live OTP visible in your Pryva dashboard",
-      "Refund prompt if the code doesn't arrive",
-      "Reusable history for every verification",
-    ],
-    goodFor: ["WhatsApp", "Telegram", "Google", "Binance", "Tinder", "PayPal", "TikTok", "Discord"],
+    included: ["Catalog prices in Naira", "Simulated preview orders", "Support review for existing orders"],
+    goodFor: ["Verification guides", "Plan comparison", "Preview"],
     faqs: [
-      {
-        q: "Will the number work for WhatsApp and Telegram?",
-        a: "Yes. Our non-VoIP Nigerian, US, UK and EU numbers work for WhatsApp, Telegram, Google and most major platforms. A small number of platforms block shared numbers — in that case you get an instant refund.",
-      },
-      {
-        q: "What is the difference between buying and renting?",
-        a: "Buying covers one verification window, typically 20 minutes of code delivery. Renting keeps the number active for 7 to 90 days so you can receive multiple codes and keep the same identity.",
-      },
+      { q: "Can I receive real SMS codes?", a: "Live number fulfillment is paused. Preview numbers and messages are simulated." },
+      { q: "What is the difference between buying and renting?", a: "The catalog distinguishes single-verification and rental plans. Neither currently provides live fulfillment." },
     ],
   },
   {
-    slug: "esim",
-    name: "eSIM",
-    shortName: "eSIM",
-    href: "/esim",
-    eyebrow: "Travel data",
-    tagline: "Land connected. Leave roaming behind.",
-    description:
-      "Scan once and get data in 190+ destinations. Perfect for travel, remote work and any phone that supports eSIM.",
-    intro:
-      "Skip the airport SIM queue. Buy a Pryva eSIM in Naira, scan the QR code in your dashboard, and your data plan installs instantly. Works on iPhone XS and newer, most modern Samsung, Pixel and iPad models — no physical SIM swap.",
-    fromPrice: 4700,
-    unit: "per data bundle",
-    icon: "sim",
+    slug: "esim", name: "eSIM", shortName: "eSIM", href: "/esim", eyebrow: "Travel data",
+    tagline: "Explore eSIM data plans.",
+    description: "Compare catalog eSIM plans. Live fulfillment is paused; preview details do not activate a real plan.",
+    intro: "Browse eSIM plans by region and data allowance. Live fulfillment is paused, and preview activation details are simulated.",
+    fromPrice: 4700, unit: "per data bundle", icon: "sim",
     highlights: [
-      {
-        title: "Install in under a minute",
-        body: "QR code and manual activation details appear in your dashboard right after checkout.",
-      },
-      {
-        title: "Naira pricing, no card needed",
-        body: "Fund your wallet by transfer, then choose any bundle without a dollar card.",
-      },
-      {
-        title: "Regional or country plans",
-        body: "Single-country bundles for short trips, or regional passes for multi-city travel.",
-      },
+      { title: "Check your device", body: "Confirm eSIM compatibility and carrier unlock requirements with your device and carrier." },
+      { title: "Review coverage", body: "Coverage and availability need provider confirmation before a live purchase." },
+      { title: "Preview only", body: "Preview QR details are simulated and do not activate a data plan." },
     ],
-    included: [
-      "Digital QR + manual activation codes",
-      "Data-only plans with no hidden roaming fees",
-      "Coverage in 190+ destinations",
-      "Top-up any time from your dashboard",
-    ],
-    goodFor: ["Travellers", "Remote teams", "Students abroad", "Digital nomads", "Creators"],
+    included: ["Catalog plan comparisons", "Naira pricing", "Simulated preview"],
+    goodFor: ["Travel planning", "Device compatibility", "Preview"],
     faqs: [
-      {
-        q: "Does my phone support eSIM?",
-        a: "Most phones released from 2020 onward do. On iPhone, check Settings → Cellular → Add eSIM. On Android, look for “Add eSIM” in network settings. If your device doesn't support eSIM, contact support before purchase.",
-      },
-      {
-        q: "Can I keep my WhatsApp number?",
-        a: "Yes. Pryva eSIMs are data-only, so they run alongside your existing SIM. Keep your WhatsApp and bank alerts on your primary line and use the eSIM for data abroad.",
-      },
+      { q: "Does my phone support eSIM?", a: "Compatibility depends on the model, region and carrier. Check your device and carrier documentation." },
+      { q: "Can I activate a live eSIM now?", a: "No. Live eSIM fulfillment is currently paused." },
     ],
   },
   {
-    slug: "proxies",
-    name: "Residential Proxies",
-    shortName: "Proxies",
-    href: "/proxies",
-    eyebrow: "Stable residential IPs",
-    tagline: "Residential IPs that feel local.",
-    description:
-      "Ethically sourced residential proxy bandwidth with Nigerian, US, UK and EU exits. Built for sneaker drops, ads verification and research.",
-    intro:
-      "Pryva's residential proxy network routes through real consumer devices, so your traffic looks like any other local connection. Rotate per request or hold a sticky session for up to 30 minutes, with authentication ready in your dashboard the moment you buy.",
-    fromPrice: 3650,
-    unit: "per GB",
-    icon: "globe",
+    slug: "proxies", name: "Residential Proxies", shortName: "Proxies", href: "/proxies",
+    eyebrow: "Proxy plans", tagline: "Explore proxy plans.",
+    description: "Compare proxy bandwidth plans. Live fulfillment is paused; preview credentials are simulated.",
+    intro: "Browse proxy plan details and pricing. Live fulfillment is paused and preview credentials do not provide network access.",
+    fromPrice: 3650, unit: "per GB", icon: "globe",
     highlights: [
-      {
-        title: "Nigeria-first pool",
-        body: "Local mobile and residential exits for testing Nigerian ads, prices and apps.",
-      },
-      {
-        title: "Sticky or rotating",
-        body: "Choose rotating per-request IPs or sticky sessions that stay put for up to 30 minutes.",
-      },
-      {
-        title: "Traffic you can track",
-        body: "See remaining bandwidth, usage and endpoint credentials in your dashboard.",
-      },
+      { title: "Plan comparison", body: "Review the region, bandwidth and duration shown in the catalog." },
+      { title: "Responsible use", body: "Use any proxy only with authorization and in accordance with applicable terms." },
+      { title: "Preview only", body: "Preview credentials are simulated and do not provide a working proxy." },
     ],
-    included: [
-      "HTTP/SOCKS5 endpoint credentials",
-      "Dashboard usage meter",
-      "Sticky sessions up to 30 minutes",
-      "City-level targeting on request",
-    ],
-    goodFor: ["Ad verification", "Sneaker & ticketing", "Market research", "Web scraping", "Ad tech"],
+    included: ["Catalog plan comparisons", "Naira pricing", "Simulated preview"],
+    goodFor: ["Research", "Plan comparison", "Preview"],
     faqs: [
-      {
-        q: "Do proxy credits expire?",
-        a: "Bandwidth stays in your account for 30 days from purchase. Buy the smallest pack first if you are testing a new workflow, then scale up.",
-      },
-      {
-        q: "Can I use one endpoint for automation?",
-        a: "Yes. Every pack gives you a single authentication pair that works with HTTP/SOCKS5, sticky session headers and rotating mode, so it drops straight into your scraping or antidetect stack.",
-      },
+      { q: "Can I use a live proxy?", a: "No. Live proxy fulfillment is currently paused." },
+      { q: "Does a proxy guarantee anonymity?", a: "No. A proxy does not by itself guarantee anonymity or access to a particular site." },
     ],
   },
   {
-    slug: "email-otp",
-    name: "Email OTP",
-    shortName: "Email OTP",
-    href: "/email-otp",
-    eyebrow: "Temporary inboxes",
-    tagline: "A clean inbox for every signup.",
-    description:
-      "Disposable email addresses that receive verification mail in real time. Protect your primary inbox from noise and spam.",
-    intro:
-      "Spin up a temporary address, paste it into any signup form, and watch verification mail arrive in your Pryva dashboard. No forwarding, no app, no inbox clutter. Choose a 24-hour inbox for a quick trial or keep a dedicated address for 30 days.",
-    fromPrice: 790,
-    unit: "per inbox",
-    icon: "mail",
+    slug: "email-otp", name: "Email OTP", shortName: "Email OTP", href: "/email-otp",
+    eyebrow: "Temporary inbox plans", tagline: "Explore temporary inbox plans.",
+    description: "Browse email verification plans. Live fulfillment is paused and preview inboxes are simulated.",
+    intro: "Compare temporary inbox plans. Live email fulfillment is paused; preview inboxes cannot receive real messages.",
+    fromPrice: 790, unit: "per inbox", icon: "mail",
     highlights: [
-      {
-        title: "Live message view",
-        body: "Verification emails and codes appear in your dashboard as soon as they land.",
-      },
-      {
-        title: "No forwarding risk",
-        body: "Addresses are isolated to your account, never shared with other customers.",
-      },
-      {
-        title: "Works with any platform",
-        body: "Use it for trials, newsletters, testing and staging environments.",
-      },
+      { title: "Compare durations", body: "Review the durations listed in the catalog." },
+      { title: "Check platform rules", body: "Some services do not accept temporary email addresses." },
+      { title: "Preview only", body: "A preview inbox is simulated and does not receive real email." },
     ],
-    included: [
-      "Instant inbox creation with any label",
-      "Live OTP and full email preview",
-      "24-hour or 30-day retention",
-      "Unlimited signups on most bundles",
-    ],
-    goodFor: ["Free trials", "Testing", "Newsletters", "Marketplace signups", "QA teams"],
+    included: ["Catalog plan comparisons", "Naira pricing", "Simulated preview"],
+    goodFor: ["Testing plans", "Privacy guides", "Preview"],
     faqs: [
-      {
-        q: "Can I receive email after the inbox expires?",
-        a: "No. Once the retention window ends, the address stops accepting mail. Choose the 30-day plan if you need long-term signup verification.",
-      },
-      {
-        q: "Is this a catch-all domain?",
-        a: "Each inbox gets a unique Pryva address on a dedicated domain. You can create multiple inboxes and label them per project.",
-      },
+      { q: "Can a preview inbox receive real email?", a: "No. Preview inboxes are simulated and live email fulfillment is paused." },
+      { q: "Will every platform accept a temporary email?", a: "No. Check the platform's terms and restrictions." },
     ],
   },
   {
-    slug: "accounts",
-    name: "Digital Accounts",
-    shortName: "Accounts",
-    href: "/accounts",
-    eyebrow: "Marketplace",
-    tagline: "Verified accounts, ready in seconds.",
-    description:
-      "Facebook, Instagram, Gmail, TikTok, gaming and streaming accounts — live stock, Naira pricing and instant credential delivery from your wallet.",
-    intro:
-      "The fastest way to get a working account. Browse live stock by category, buy with your Pryva wallet and receive the credentials immediately. If a seller can't deliver, the amount returns to your wallet automatically.",
-    fromPrice: 800,
-    unit: "per account",
-    icon: "accounts",
+    slug: "accounts", name: "Digital Accounts", shortName: "Accounts", href: "/accounts",
+    eyebrow: "Marketplace", tagline: "Explore account listings.",
+    description: "Browse supplier account listings when available. Checkout is disabled by default and uncertain orders require review.",
+    intro: "Account marketplace checkout is disabled by default. Supplier availability and credentials are not guaranteed; uncertain purchases require review.",
+    fromPrice: 800, unit: "per account", icon: "accounts",
     highlights: [
-      {
-        title: "Every category",
-        body: "Facebook, Instagram, Gmail, Outlook, TikTok, gaming and streaming — one catalogue.",
-      },
-      {
-        title: "Live stock counts",
-        body: "See exactly how many are available before you buy. Bundles up to 50 with volume discounts.",
-      },
-      {
-        title: "Refund if it fails",
-        body: "Credentials not delivered? The full amount goes back to your wallet automatically.",
-      },
+      { title: "Listings", body: "Listings and stock depend on the supplier's current response." },
+      { title: "Checkout controls", body: "Live checkout is disabled by default and cannot use preview balances." },
+      { title: "Order review", body: "Contact support if delivery cannot be confirmed; do not repeat an uncertain purchase." },
     ],
-    included: [
-      "Live stock and instant delivery",
-      "Naira pricing from your wallet",
-      "Volume discounts on 5, 10 and 25+ accounts",
-      "Automatic refund if delivery fails",
-    ],
-    goodFor: ["Marketing teams", "Social managers", "Testing", "Resellers"],
+    included: ["Supplier listings when configured", "Naira pricing", "Support review for uncertain orders"],
+    goodFor: ["Listing comparison", "Catalog browsing", "Order support"],
     faqs: [
-      {
-        q: "How are the credentials delivered?",
-        a: "Straight to the screen and your order history the moment the payment clears. Copy them with one tap.",
-      },
-      {
-        q: "What if an account doesn't work?",
-        a: "If the seller fails to deliver, your wallet is refunded automatically — you don't need to ask.",
-      },
+      { q: "Can I purchase accounts now?", a: "Checkout is disabled by default. Check the marketplace for current availability." },
+      { q: "What if delivery is uncertain?", a: "Keep the reference and contact support before ordering again." },
     ],
   },
   {
-    slug: "data",
-    name: "Data Plans",
-    shortName: "Data",
-    href: "/dashboard/data",
-    eyebrow: "Airtime & data",
-    tagline: "Buy data for any Nigerian network.",
-    description:
-      "Purchase MTN, Airtel, Glo and 9mobile data plans instantly. Pay with your wallet, get data delivered to any Nigerian number in seconds.",
-    intro:
-      "Skip the bank app and buy data directly from your Pryva wallet. Choose from 500MB to 10GB bundles across all major Nigerian networks, delivered instantly to any phone number.",
-    fromPrice: 500,
-    unit: "per plan",
-    icon: "phone",
+    slug: "data", name: "Data Plans", shortName: "Data", href: "/dashboard/data",
+    eyebrow: "Data plans", tagline: "Explore data plans.",
+    description: "Browse mobile data plans. Live fulfillment is paused and preview purchases are simulated.",
+    intro: "The data catalog is available to explore, but live fulfillment is paused and preview orders do not deliver mobile data.",
+    fromPrice: 500, unit: "per plan", icon: "phone",
     highlights: [
-      {
-        title: "All networks",
-        body: "MTN, Airtel, Glo and 9mobile data plans available.",
-      },
-      {
-        title: "Instant delivery",
-        body: "Data arrives on the target number within seconds of purchase.",
-      },
-      {
-        title: "Pay with wallet",
-        body: "Use your existing Pryva wallet balance, no card needed.",
-      },
+      { title: "Plan comparison", body: "Review network, allowance and duration before ordering." },
+      { title: "Preview only", body: "Preview purchases are simulated and do not deliver mobile data." },
+      { title: "Support", body: "Contact support about an existing order with its reference." },
     ],
-    included: [
-      "Data delivered to any Nigerian number",
-      "All major networks supported",
-      "Instant delivery after payment",
-      "Purchase history in your dashboard",
-    ],
-    goodFor: ["Personal use", "Family", "Team members", "Quick top-ups"],
+    included: ["Catalog plan comparisons", "Naira pricing", "Simulated preview"], goodFor: ["Plan comparison", "Preview", "Order history"],
     faqs: [
-      {
-        q: "How long does delivery take?",
-        a: "Data is delivered instantly after payment. The recipient will receive a confirmation SMS from their network.",
-      },
-      {
-        q: "Can I buy data for someone else?",
-        a: "Yes. Enter any Nigerian phone number during checkout and the data will be delivered to that number.",
-      },
+      { q: "Can I buy live mobile data?", a: "No. Live data fulfillment is currently paused." },
+      { q: "Does the preview send data?", a: "No. Preview orders are simulated." },
     ],
   },
   {
-    slug: "gift-cards",
-    name: "Gift Cards",
-    shortName: "Gift Cards",
-    href: "/dashboard/gift-cards",
-    eyebrow: "Send value",
-    tagline: "Send Pryva credit to anyone.",
-    description:
-      "Create gift cards from ₦1,000 to ₦500,000. Share the code with friends, family or team members. They redeem it into their Pryva wallet instantly.",
-    intro:
-      "Send Pryva wallet credit to anyone with a simple code. Purchase a gift card, share the code via email or message, and the recipient redeems it into their wallet with one click. Perfect for birthdays, rewards or team allowances.",
-    fromPrice: 1000,
-    unit: "per card",
-    icon: "gift",
+    slug: "gift-cards", name: "Gift Cards", shortName: "Gift Cards", href: "/dashboard/gift-cards",
+    eyebrow: "Send value", tagline: "Share wallet credit with a code.",
+    description: "Create a gift card and share its code with a recipient. Preview gift cards represent simulated credit.",
+    intro: "Create a gift card using your wallet and share its code through a trusted channel. Gift cards are non-refundable; preview credit is simulated.",
+    fromPrice: 1000, unit: "per card", icon: "gift",
     highlights: [
-      {
-        title: "Any amount",
-        body: "Create gift cards from ₦1,000 to ₦500,000.",
-      },
-      {
-        title: "Instant redemption",
-        body: "Recipients enter the code and the credit appears in their wallet immediately.",
-      },
-      {
-        title: "Valid for 1 year",
-        body: "Gift cards stay active for 12 months from purchase.",
-      },
+      { title: "Choose an amount", body: "Gift card values range from ₦1,000 to ₦500,000." },
+      { title: "Protect the code", body: "Treat the redemption code like cash and share it only with the intended recipient." },
+      { title: "Validity", body: "Cards expire one year after purchase and are non-refundable." },
     ],
-    included: [
-      "Unique gift card code",
-      "Optional recipient email and message",
-      "1 year validity",
-      "Purchase history in your dashboard",
-    ],
-    goodFor: ["Birthdays", "Team rewards", "Allowances", "Thank you gifts"],
+    included: ["Unique gift card code", "Optional recipient details", "One-year validity"],
+    goodFor: ["Gifts", "Team rewards", "Wallet credit"],
     faqs: [
-      {
-        q: "Can I cancel or refund a gift card?",
-        a: "No. Gift cards are non-refundable once purchased. Make sure the amount and recipient details are correct before confirming.",
-      },
-      {
-        q: "Can I redeem my own gift card?",
-        a: "No. You can only redeem gift cards purchased by other users. This prevents circular transactions.",
-      },
+      { q: "Can I cancel or refund a gift card?", a: "Gift cards are non-refundable once purchased." },
+      { q: "Can I redeem my own card?", a: "No. A purchaser cannot redeem their own gift card." },
     ],
   },
   {
-    slug: "bulk",
-    name: "Bulk Orders",
-    shortName: "Bulk",
-    href: "/dashboard/bulk-orders",
-    eyebrow: "Buy in bulk",
-    tagline: "Discounted multi-buy orders.",
-    description:
-      "Order 10+ items and save 5%, or 20+ items and save 10%. Perfect for teams, resellers and agencies running multiple accounts.",
-    intro:
-      "Need multiple virtual numbers, eSIMs or proxy packs? Buy them all at once and unlock automatic discounts. 10+ items gets you 5% off, 20+ items gets you 10% off. All items delivered instantly to your dashboard.",
-    fromPrice: 12000,
-    unit: "per order",
-    icon: "package",
+    slug: "bulk", name: "Bulk Orders", shortName: "Bulk", href: "/dashboard/bulk-orders",
+    eyebrow: "Bulk baskets", tagline: "Explore multi-item baskets.",
+    description: "Compare a basket of catalog items. Live bulk fulfillment is paused; preview orders are simulated.",
+    intro: "Build a basket and review the total and any discount displayed. Live bulk fulfillment is paused; preview orders do not provide real products.",
+    fromPrice: 12000, unit: "per order", icon: "package",
     highlights: [
-      {
-        title: "Automatic discounts",
-        body: "5% off for 10+ items, 10% off for 20+ items.",
-      },
-      {
-        title: "Mix and match",
-        body: "Combine any services: numbers, eSIMs, proxies, email OTP.",
-      },
-      {
-        title: "Instant delivery",
-        body: "All items appear in your dashboard immediately after purchase.",
-      },
+      { title: "Basket pricing", body: "Review each item, its quantity and the final total." },
+      { title: "Discounts", body: "The applied discount depends on the products in the basket." },
+      { title: "Preview only", body: "Live bulk fulfillment is paused and preview orders are simulated." },
     ],
-    included: [
-      "Automatic quantity discounts",
-      "Mix any services in one order",
-      "All items delivered instantly",
-      "Unified order history",
-    ],
-    goodFor: ["Teams", "Resellers", "Agencies", "QA departments"],
+    included: ["Basket summary", "Calculated discounts", "Simulated preview"], goodFor: ["Basket comparison", "Preview", "Order history"],
     faqs: [
-      {
-        q: "How do discounts work?",
-        a: "Add 10 or more items to your cart and 5% is automatically deducted. Add 20 or more items and the discount increases to 10%.",
-      },
-      {
-        q: "Can I mix different services?",
-        a: "Yes. You can combine virtual numbers, eSIMs, proxies and email OTP in a single bulk order.",
-      },
+      { q: "How do discounts work?", a: "The applicable discount depends on basket quantity and product pricing. Review the final total before submitting." },
+      { q: "Can I buy live products in bulk?", a: "No. Live bulk fulfillment is currently paused." },
     ],
   },
   {
-    slug: "scheduled",
-    name: "Scheduled Purchases",
-    shortName: "Scheduled",
-    href: "/dashboard/scheduled",
-    eyebrow: "Auto-recurring",
-    tagline: "Set it and forget it.",
-    description:
-      "Schedule automatic purchases of any service on a daily, weekly, biweekly or monthly basis. Pause or cancel anytime.",
-    intro:
-      "Need a fresh virtual number every week? A monthly eSIM top-up? Schedule any Pryva service to purchase automatically on your preferred frequency. The cost is deducted from your wallet each time. Pause, resume or cancel whenever you need.",
-    fromPrice: 1200,
-    unit: "per schedule",
-    icon: "calendar",
+    slug: "scheduled", name: "Scheduled Purchases", shortName: "Scheduled", href: "/dashboard/scheduled",
+    eyebrow: "Scheduled orders", tagline: "Explore scheduled orders.",
+    description: "Try scheduled-order settings in preview. Live scheduled fulfillment is paused.",
+    intro: "Scheduled purchases are a preview-only feature. Live scheduling and fulfillment are currently disabled.",
+    fromPrice: 1200, unit: "per schedule", icon: "calendar",
     highlights: [
-      {
-        title: "Flexible frequency",
-        body: "Daily, weekly, biweekly or monthly schedules.",
-      },
-      {
-        title: "Full control",
-        body: "Pause, resume or cancel any scheduled order at any time.",
-      },
-      {
-        title: "Wallet deduction",
-        body: "Cost is automatically deducted from your wallet on each run.",
-      },
+      { title: "Frequency", body: "Preview schedule settings include daily, weekly, biweekly and monthly options." },
+      { title: "Control", body: "Review, pause or cancel preview schedules from the dashboard." },
+      { title: "Live fulfillment paused", body: "Preview schedules do not deliver real products." },
     ],
-    included: [
-      "Automatic recurring purchases",
-      "Pause/resume/cancel anytime",
-      "Email notifications before each run",
-      "Full purchase history",
-    ],
-    goodFor: ["Regular verifications", "Monthly travel", "Ongoing research", "Team accounts"],
+    included: ["Preview schedule settings", "Pause and cancel controls", "Simulated orders"],
+    goodFor: ["Scheduling preview", "Testing", "Order history"],
     faqs: [
-      {
-        q: "What happens if my wallet is empty?",
-        a: "The scheduled purchase will be skipped if your wallet balance is insufficient. You'll receive a notification to top up.",
-      },
-      {
-        q: "Can I change the frequency?",
-        a: "Yes. Cancel the existing schedule and create a new one with your preferred frequency.",
-      },
+      { q: "Can I schedule live purchases?", a: "No. Live scheduled purchases and fulfillment are currently disabled." },
+      { q: "Are preview schedules persistent?", a: "Preview data is held in memory and may be lost when the server restarts." },
     ],
   },
 ];
@@ -492,67 +226,67 @@ const planDefinitions: PlanDefinition[] = [
     slug: "vn-ng", service: "numbers", name: "Nigeria", planLabel: "Nigeria number",
     region: "Nigeria", flag: "🇳🇬", duration: "Single verification · 20 min window",
     popular: true, badge: "Most popular", highlight: "Best for WhatsApp, Telegram & local apps",
-    features: ["Real non-VoIP line", "Instant delivery", "Auto-refund if no code"],provider: {app: "whatsapp", country: "us"}
+    features: ["Real non-VoIP line", "Instant delivery", "Support review for delivery issues"]
   },
   {
     slug: "vn-us", service: "numbers", name: "United States", planLabel: "US number",
     region: "United States", flag: "🇺🇸", duration: "Single verification · 20 min window",
-    features: ["Non-VoIP carrier line", "Instant delivery", "Auto-refund if no code"],provider: {app: "whatsapp", country: "us"}
+    features: ["Non-VoIP carrier line", "Instant delivery", "Support review for delivery issues"]
   },
   {
     slug: "vn-uk", service: "numbers", name: "United Kingdom", planLabel: "UK number",
     region: "United Kingdom", flag: "🇬🇧", duration: "Single verification · 20 min window",
-    features: ["Non-VoIP carrier line", "Instant delivery", "Auto-refund if no code"],provider: {app: "whatsapp", country: "uk"}
+    features: ["Non-VoIP carrier line", "Instant delivery", "Support review for delivery issues"]
   },
   {
     slug: "vn-ca", service: "numbers", name: "Canada", planLabel: "Canada number",
     region: "Canada", flag: "🇨🇦", duration: "Single verification · 20 min window",
-    features: ["Non-VoIP carrier line", "Instant delivery", "Auto-refund if no code"],provider: {app: "whatsapp", country: "ca"}
+    features: ["Non-VoIP carrier line", "Instant delivery", "Support review for delivery issues"]
   },
   {
     slug: "vn-de", service: "numbers", name: "Germany", planLabel: "Germany number",
     region: "Germany", flag: "🇩🇪", duration: "Single verification · 20 min window",
-    features: ["Non-VoIP carrier line", "Instant delivery", "Auto-refund if no code"],provider: {app: "google", country: "uk"}
+    features: ["Non-VoIP carrier line", "Instant delivery", "Support review for delivery issues"]
   },
   {
     slug: "vn-gh", service: "numbers", name: "Ghana", planLabel: "Ghana number",
     region: "Ghana", flag: "🇬🇭", duration: "Single verification · 20 min window",
-    features: ["Non-VoIP carrier line", "Instant delivery", "Auto-refund if no code"],provider: {app: "telegram", country: "us"}
+    features: ["Non-VoIP carrier line", "Instant delivery", "Support review for delivery issues"]
   },
   {
     slug: "vn-otp-5", service: "numbers", name: "Verification pack", planLabel: "5 verifications",
     region: "Any 5 countries", flag: "🎟️", duration: "5 codes · valid 7 days",
     compareAt: 7000, badge: "Save 20%", highlight: "Buy a bundle of codes for launch week",
-    features: ["5 verification windows", "Mix any country", "7 days to use them"],provider: {app: "whatsapp", country: "us"}
+    features: ["5 verification windows", "Mix any country", "7 days to use them"]
   },
   // Virtual numbers — rentals
   {
     slug: "rent-ng-7", service: "numbers", name: "Nigeria rental", planLabel: "NG · 7 days",
     region: "Nigeria", flag: "🇳🇬", duration: "Rent for 7 days", badge: "Rent",
     highlight: "Keep the line for a full week",
-    features: ["Reusable for many codes", "Incoming SMS all week", "Renew any time"],provider: {country: "us", months: 1}
+    features: ["Reusable for many codes", "Incoming SMS all week", "Renew any time"]
   },
   {
     slug: "rent-ng-30", service: "numbers", name: "Nigeria rental", planLabel: "NG · 30 days",
     region: "Nigeria", flag: "🇳🇬", duration: "Rent for 30 days", popular: true,
     badge: "Best value", highlight: "Monthly identity for business accounts",
-    features: ["Reusable for many codes", "Incoming SMS all month", "Priority replacement"],provider: {country: "us", months: 1}
+    features: ["Reusable for many codes", "Incoming SMS all month", "Priority replacement"]
   },
   {
     slug: "rent-us-30", service: "numbers", name: "US rental", planLabel: "US · 30 days",
     region: "United States", flag: "🇺🇸", duration: "Rent for 30 days",
-    features: ["Reusable for many codes", "Incoming SMS all month", "Priority replacement"],provider: {country: "us", months: 1}
+    features: ["Reusable for many codes", "Incoming SMS all month", "Priority replacement"]
   },
   {
     slug: "rent-uk-30", service: "numbers", name: "UK rental", planLabel: "UK · 30 days",
     region: "United Kingdom", flag: "🇬🇧", duration: "Rent for 30 days",
-    features: ["Reusable for many codes", "Incoming SMS all month", "Priority replacement"],provider: {country: "uk", months: 1}
+    features: ["Reusable for many codes", "Incoming SMS all month", "Priority replacement"]
   },
   {
     slug: "rent-ng-90", service: "numbers", name: "Nigeria rental", planLabel: "NG · 90 days",
     region: "Nigeria", flag: "🇳🇬", duration: "Rent for 90 days",
     compareAt: 22500, badge: "Save 13%",
-    features: ["Reusable for many codes", "Quarterly business line", "Priority replacement"],provider: {country: "us", months: 3}
+    features: ["Reusable for many codes", "Quarterly business line", "Priority replacement"]
   },
   // eSIM
   {
@@ -620,23 +354,23 @@ const planDefinitions: PlanDefinition[] = [
     slug: "email-24", service: "email-otp", name: "Quick inbox", planLabel: "1 inbox · 24 hours",
     region: "Any domain", flag: "✉️", duration: "Expires after 24 hours",
     popular: true, highlight: "Ideal for a single signup or trial",
-    features: ["Unique address instantly", "Live OTP view", "No forwarding"],provider: {emailProduct: "auto"}
+    features: ["Unique address instantly", "Live OTP view", "No forwarding"]
   },
   {
     slug: "email-30", service: "email-otp", name: "Long inbox", planLabel: "1 inbox · 30 days",
     region: "Any domain", flag: "✉️", duration: "Active for 30 days",
-    features: ["Keep the same address", "Unlimited signups", "Live OTP view"],provider: {emailProduct: "auto"}
+    features: ["Keep the same address", "Unlimited signups", "Live OTP view"]
   },
   {
     slug: "email-bundle", service: "email-otp", name: "Inbox bundle", planLabel: "5 inboxes · 7 days",
     region: "Any domain", flag: "📬", duration: "Active for 7 days",
     compareAt: 3500, badge: "Save 48%",
-    features: ["5 isolated inboxes", "Label by project", "Live OTP view"],provider: {emailProduct: "auto"}
+    features: ["5 isolated inboxes", "Label by project", "Live OTP view"]
   },
   {
     slug: "email-team", service: "email-otp", name: "Team bundle", planLabel: "20 inboxes · 30 days",
     region: "Any domain", flag: "📬", duration: "Active for 30 days",
-    badge: "For QA teams", features: ["20 isolated inboxes", "Shared team access", "Live OTP view"],provider: {emailProduct: "auto"}
+    badge: "For QA teams", features: ["20 isolated inboxes", "Shared team access", "Live OTP view"]
   },
 ];
 
@@ -649,9 +383,8 @@ const planDefinitions: PlanDefinition[] = [
  * themselves stay out of this module on purpose: it is imported by client
  * components, and buying prices must not ship to the browser.
  *
- * `compareAt` is kept only when it is genuinely above the price we charge (a
- * strike-through below the price is a lie, and one a regulator would enjoy
- * reading).
+ * Historical strike-through prices and popularity badges are not shown until
+ * they can be supported by verified pricing and usage data.
  */
 export const plans: Plan[] = planDefinitions.map((definition) => {
   const generated = CATALOG_PRICES[definition.slug];
@@ -664,8 +397,13 @@ export const plans: Plan[] = planDefinitions.map((definition) => {
   return {
     ...definition,
     price: generated.price,
-    compareAt:
-      definition.compareAt && definition.compareAt > generated.price ? definition.compareAt : undefined,
+    // Supplier mappings and historical/popularity claims are not verified.
+    // The catalog is illustrative while live fulfillment is paused.
+    compareAt: undefined,
+    popular: undefined,
+    badge: undefined,
+    highlight: undefined,
+    features: ["Catalog plan details shown above", "Live fulfillment paused", "Preview orders are simulated"],
   };
 });
 

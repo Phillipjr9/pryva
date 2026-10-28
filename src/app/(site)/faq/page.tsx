@@ -13,15 +13,15 @@ const faqCategories = [
     questions: [
       {
         q: "What is Pryva?",
-        a: "Pryva is a digital services platform that provides virtual phone numbers, eSIM data plans, residential proxies, email OTP services, and more. We make it easy for Nigerians to access global digital services with Naira payments.",
+        a: "Pryva is a wallet and digital-services application. Live fulfillment for numbers, eSIMs, proxies, email, data, bulk and scheduled orders is currently paused. Preview balances and orders are simulated.",
       },
       {
         q: "How do I create an account?",
-        a: "Simply click the 'Get Started' button, enter your name and email, create a password, and verify your email. You can then top up your wallet and start using our services immediately.",
+        a: "Choose Get Started and enter your name, email and password. Password signup does not currently verify email ownership. Use a unique password; available payment and purchase features depend on the environment.",
       },
       {
         q: "Is Pryva safe to use?",
-        a: "Yes! We use industry-standard encryption, secure payment processing, and never store sensitive payment information. Your privacy and security are our top priorities.",
+        a: "Use a unique password and keep your verification codes and gift-card codes private. Passwords are stored as hashes. Contact support if you notice activity you do not recognize.",
       },
     ],
   },
@@ -30,19 +30,19 @@ const faqCategories = [
     questions: [
       {
         q: "How quickly will I receive my virtual number?",
-        a: "Virtual numbers are delivered instantly after payment. You'll see the number in your dashboard immediately and can start receiving SMS codes right away.",
+        a: "Live virtual-number fulfillment is currently paused. Preview orders are simulated and do not receive real SMS messages.",
       },
       {
         q: "Which platforms do your virtual numbers work with?",
-        a: "Our non-VoIP numbers work with WhatsApp, Telegram, Google, Binance, PayPal, and 500+ other platforms. Check the specific platform's requirements if you're unsure.",
+        a: "Compatibility is not guaranteed. Check the destination platform's rules and restrictions before relying on a virtual number; live fulfillment is currently paused.",
       },
       {
         q: "What's the difference between buying and renting a number?",
-        a: "Buying gives you a number for a single verification (20-minute window), while renting keeps the number active for 7, 30, or 90 days for multiple verifications.",
+        a: "The catalog distinguishes single-verification and rental plans, but live fulfillment for both is paused. Preview orders do not issue working numbers.",
       },
       {
         q: "What if my virtual number doesn't receive the code?",
-        a: "If you don't receive the expected SMS code within the service window, you'll receive an automatic refund to your wallet. No questions asked.",
+        a: "Contact support with your order reference. Live order refunds require a review of delivery and provider status.",
       },
     ],
   },
@@ -51,15 +51,15 @@ const faqCategories = [
     questions: [
       {
         q: "How do I activate my eSIM?",
-        a: "After purchasing an eSIM, you'll receive a QR code and activation instructions in your dashboard. Simply scan the QR code with your compatible device's camera.",
+        a: "Live eSIM fulfillment is currently paused. Preview activation details are simulated and will not activate a real plan.",
       },
       {
         q: "Which phones support eSIM?",
-        a: "Most phones released from 2020 onward support eSIM, including iPhone XS and newer, Samsung Galaxy S20 and newer, Google Pixel 3 and newer, and many others.",
+        a: "Compatibility varies by model, region and carrier. Check your device and carrier documentation for eSIM support and unlock requirements.",
       },
       {
         q: "Can I keep my WhatsApp number when using an eSIM?",
-        a: "Yes! Pryva eSIMs are data-only, so they run alongside your existing SIM. You can keep your WhatsApp and other apps on your primary line while using the eSIM for data.",
+        a: "Your existing account can generally remain associated with its original number, but check your device, carrier and app settings. Live eSIM fulfillment is paused.",
       },
     ],
   },
@@ -68,19 +68,19 @@ const faqCategories = [
     questions: [
       {
         q: "How do I top up my wallet?",
-        a: "Go to your dashboard, click on 'Wallet', and choose your preferred payment method. We accept bank transfers, card payments, and other popular Nigerian payment methods.",
+        a: "In a configured live environment, open Wallet and follow the Paystack checkout instructions. Available payment methods depend on the provider. Top-ups are disabled in preview mode.",
       },
       {
         q: "Are there any fees for wallet top-up?",
-        a: "We don't charge any fees for wallet top-ups. You pay exactly the amount you want to add to your wallet.",
+        a: "Review the amount and any fees shown by the payment provider before confirming.",
       },
       {
         q: "Can I withdraw money from my wallet?",
-        a: "Currently, wallet balances can only be used for purchasing Pryva services. We're working on withdrawal functionality for the future.",
+        a: "Withdrawal requests require a configured live payment provider and administrator review. A request or transfer initiation is not proof of settlement. Bank transfers are disabled in preview.",
       },
       {
         q: "Do wallet balances expire?",
-        a: "No, your wallet balance never expires. You can use it whenever you need to purchase services.",
+        a: "Your current balance and transaction history are shown in Wallet. Preview balances are simulated and are lost when the preview is reset.",
       },
     ],
   },
@@ -106,26 +106,6 @@ const faqCategories = [
 export default function FAQPage() {
   return (
     <div className="min-h-screen bg-cream">
-      {/* Header */}
-      <header className="border-b border-line bg-white">
-        <div className="shell flex h-16 items-center justify-between">
-          <div className="ml-auto flex items-center gap-3">
-            <Link
-              href="/login"
-              className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/signup"
-              className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700"
-            >
-              Get Started
-            </Link>
-          </div>
-        </div>
-      </header>
-
       {/* Hero */}
       <section className="py-16">
         <div className="shell text-center">

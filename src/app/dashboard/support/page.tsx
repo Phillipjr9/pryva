@@ -4,6 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { contactMessages } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import { isPreviewDatabase } from "@/lib/demo-policy";
 import { ContactForm } from "@/components/site/ContactForm";
 import { ArrowRight, Chat, Clock, Mail, MessageCircle } from "@/components/icons";
 
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SupportPage() {
   const user = await requireUser("/dashboard/support");
+  const preview = isPreviewDatabase();
 
   const messages = await db
     .select()
@@ -25,16 +27,15 @@ export default async function SupportPage() {
       <div>
         <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Support</h1>
         <p className="mt-1 text-[0.86rem] text-ink-2">
-          A real person from the Lagos team replies to these messages, usually within two working
-          hours.
+          {preview ? "Try the support form with a fictional message. Demo messages are shared and no real request is sent." : "Send a message about your account or an existing order. Response times may vary."}
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
         {[
-          { icon: MessageCircle, label: "WhatsApp", value: "Mon–Sat · 9am–8pm WAT" },
-          { icon: Mail, label: "Email", value: "support@pryva.ng" },
-          { icon: Clock, label: "Typical reply", value: "Under 2 working hours" },
+          { icon: MessageCircle, label: preview ? "Demo form" : "Message form", value: preview ? "Save a fictional message below" : "Send a support request below" },
+          { icon: Mail, label: preview ? "Delivery" : "Email", value: preview ? "No real request is sent" : "support@pryva.ng" },
+          { icon: Clock, label: preview ? "Demo history" : "Response time", value: preview ? "Visible in this preview" : "May vary" },
         ].map((item) => {
           const Icon = item.icon;
           return (
@@ -55,7 +56,7 @@ export default async function SupportPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
-        <ContactForm defaultName={user.name} defaultEmail={user.email} signedIn />
+        <ContactForm defaultName={preview ? "Demo Visitor" : user.name} defaultEmail={preview ? "demo@example.test" : user.email} signedIn preview={preview} />
 
         <div className="grid gap-4">
           <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
@@ -65,7 +66,7 @@ export default async function SupportPage() {
             </div>
             {messages.length === 0 ? (
               <p className="mt-3 rounded-xl border border-dashed border-line bg-cream/50 px-4 py-6 text-center text-[0.8rem] text-ink-3">
-                You haven&apos;t messaged us yet. Anything unclear? Ask away.
+                {preview ? "No demo messages yet. Try saving a fictional example." : "You haven't messaged us yet. Anything unclear? Ask away."}
               </p>
             ) : (
               <div className="mt-3 grid gap-2.5">
@@ -110,7 +111,7 @@ export default async function SupportPage() {
                 Find an order code <ArrowRight className="h-3.5 w-3.5" />
               </Link>
               <Link
-                href="/contact#refunds"
+                href="/refund-policy"
                 className="flex items-center justify-between rounded-lg bg-white/80 px-3 py-2 text-ink-2 hover:text-lav-700"
               >
                 Refund policy <ArrowRight className="h-3.5 w-3.5" />

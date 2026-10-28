@@ -161,10 +161,15 @@ function matchesConditionInContext(
   if (cleaned.length > 0) clauses.push(cleaned);
 
   return clauses.every((clause) => {
-    if (clause.length < 3) return true;
     const [leftTok, opTok, rightTok] = clause;
-    if (!leftTok || !opTok || !rightTok || opTok.kind !== "op") return true;
+    if (!leftTok || !opTok || opTok.kind !== "op") return true;
     const leftVal = resolveValue(leftTok, ctx, defaultTable);
+    const operator = opTok.text.trim().toLowerCase();
+    // Drizzle emits IS NULL without a right-hand value. Treating a two-token
+    // clause as automatically true silently ignored refund safety conditions.
+    if (operator === "is null") return leftVal == null;
+    if (operator === "is not null") return leftVal != null;
+    if (!rightTok) return true;
     const rightVal = resolveValue(rightTok, ctx, defaultTable);
     return compareValues(leftVal, opTok.text, rightVal);
   });
@@ -285,7 +290,7 @@ function sortDescendingByCreatedAt<T extends Record<string, unknown>>(items: T[]
   });
 }
 
-type MockState = Record<
+export type PreviewState = Record<
   | "users" | "sessions" | "orders" | "walletTransactions" | "paymentTopups"
   | "contactMessages" | "giftCards" | "scheduledOrders" | "notifications"
   | "securityViolations" | "withdrawals" | "bankAccounts",
@@ -294,10 +299,10 @@ type MockState = Record<
 
 const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;
-  __arenaPryvaMockState?: MockState;
+  __arenaPryvaMockState?: PreviewState;
 };
 
-const mockState: MockState =
+const mockState: PreviewState =
   globalForDb.__arenaPryvaMockState ?? {
     users: [],
     sessions: [],
@@ -342,7 +347,7 @@ function ensureDemoUser() {
 
   // Seed per row, not "if the user exists, stop": a preview process that signed
   // in before the orders were added must still pick them up on the next render.
-  const seedOnce = (key: keyof MockState, row: Record<string, unknown>) => {
+  const seedOnce = (key: keyof PreviewState, row: Record<string, unknown>) => {
     if (!mockState[key].some((existing) => existing.id === row.id)) {
       mockState[key].push(row);
     }
@@ -373,7 +378,7 @@ function ensureDemoUser() {
       status: "active",
       provider: "simulated",
       providerRequestId: null,
-      referenceCode: "+234 812 445 9081",
+      referenceCode: "+000 555 4820",
       otpCode: "482069",
       accounts: null,
       expiresAt: minutesFromNow(18),
@@ -394,7 +399,7 @@ function ensureDemoUser() {
       status: "active",
       provider: "simulated",
       providerRequestId: null,
-      referenceCode: "+234 812 445 9081",
+      referenceCode: "+000 555 4820",
       otpCode: null,
       accounts: null,
       expiresAt: new Date(now + 4 * 24 * 60 * 60 * 1000),
@@ -415,7 +420,7 @@ function ensureDemoUser() {
       status: "active",
       provider: "simulated",
       providerRequestId: null,
-      referenceCode: "LPA:1$rsp.truphone.com$PRYVA-DEMO-1GB-NG",
+      referenceCode: "LPA:1$demo.invalid$PRYVA-DEMO-1GB-NG",
       otpCode: null,
       accounts: null,
       expiresAt: new Date(now + 24 * 24 * 60 * 60 * 1000),
@@ -466,6 +471,13 @@ function ensureDemoUser() {
     },
   ];
   for (const order of demoOrders) seedOnce("orders", order);
+  // Safely update older seeded examples in a running preview without resetting
+  // the shared wallet or touching real/user-created orders.
+  for (const row of mockState.orders) {
+    if (row.userId !== demoUserId || row.provider !== "simulated") continue;
+    if ((row.id === "demo-order-live" || row.id === "demo-order-rental") && row.referenceCode === "+234 812 445 9081") row.referenceCode = "+000 555 4820";
+    if (row.id === "demo-order-esim" && row.referenceCode === "LPA:1$rsp.truphone.com$PRYVA-DEMO-1GB-NG") row.referenceCode = "LPA:1$demo.invalid$PRYVA-DEMO-1GB-NG";
+  }
 
   const ledger: Array<[string, string, number, number, string, string, Date]> = [
     // id, description, amount (+/-), balanceAfter, reference, type, createdAt
@@ -498,7 +510,7 @@ function ensureDemoUser() {
       id: "demo-notification-1",
       userId: demoUserId,
       title: "Your Nigeria number is live",
-      message: "Code 482069 arrived on +234 812 445 9081. It expires in 20 minutes.",
+      message: "Demo code 482069 arrived on +000 555 4820. It is fictional.",
       type: "order",
       read: 0,
       createdAt: new Date(now - 2 * 60 * 1000),
@@ -515,9 +527,32 @@ function ensureDemoUser() {
   ]) {
     seedOnce("notifications", notification);
   }
+  const seededNotice = mockState.notifications.find((row) => row.id === "demo-notification-1" && row.userId === demoUserId);
+  if (seededNotice?.message === "Code 482069 arrived on +234 812 445 9081. It expires in 20 minutes.") seededNotice.message = "Demo code 482069 arrived on +000 555 4820. It is fictional.";
 }
 
 if (!databaseUrl) ensureDemoUser();
+
+/** Read an isolated snapshot; never expose the mutable process-local state. */
+export function readPreviewDatabase<T>(reader: (snapshot: PreviewState) => T): T {
+  if (databaseUrl || process.env.DATABASE_URL?.trim()) throw new Error("Preview data unavailable with a persistent database");
+  return reader(structuredClone(mockState));
+}
+
+/**
+ * Commit a synchronous, preview-only mutation as one copy-on-write operation.
+ * This is not a PostgreSQL transaction and must never be used for live funds.
+ * No event-loop work can interleave while the callback runs; if it throws, the
+ * original preview state is untouched. Callbacks must not perform async work.
+ */
+export function mutatePreviewDatabase<T>(mutation: (draft: PreviewState) => T): T {
+  if (databaseUrl || process.env.DATABASE_URL?.trim()) throw new Error("Preview mutation unavailable with a persistent database");
+  const draft = structuredClone(mockState);
+  const result = mutation(draft);
+  if (result && typeof result === "object" && "then" in result) throw new Error("Preview mutation must be synchronous");
+  for (const key of Object.keys(mockState) as Array<keyof PreviewState>) mockState[key] = draft[key];
+  return result;
+}
 
 function buildQueryResult(
   contexts: TableRowContext[],
@@ -616,7 +651,7 @@ function projectQueryColumns(row: Record<string, unknown>, columns: unknown): Re
 }
 
 const mockQuery = Object.fromEntries(
-  (Object.keys(mockState) as Array<keyof MockState>).map((tableKey) => [
+  (Object.keys(mockState) as Array<keyof PreviewState>).map((tableKey) => [
     tableKey,
     {
       async findMany(options: Record<string, unknown> = {}) {
@@ -640,7 +675,7 @@ const mockDb: any = {
   select(selection?: Record<string, unknown>) {
     return {
       from(table: unknown) {
-        const baseKey = tableNameFor(table) as keyof MockState;
+        const baseKey = tableNameFor(table) as keyof PreviewState;
         const baseRows = mockState[baseKey] ?? [];
         const baseContexts: TableRowContext[] = baseRows.map((row) => ({ [baseKey]: row }));
 
@@ -652,7 +687,7 @@ const mockDb: any = {
             return buildQueryResult(filtered, selection, baseKey);
           },
           innerJoin(joinTable: unknown, onCondition?: unknown) {
-            const joinKey = tableNameFor(joinTable) as keyof MockState;
+            const joinKey = tableNameFor(joinTable) as keyof PreviewState;
             const joinRows = mockState[joinKey] ?? [];
             const joinedContexts: TableRowContext[] = baseContexts.flatMap((ctx) =>
               joinRows
@@ -674,7 +709,7 @@ const mockDb: any = {
     };
   },
   insert(table: unknown) {
-    const tableKey = tableNameFor(table) as keyof MockState;
+    const tableKey = tableNameFor(table) as keyof PreviewState;
     return {
       values(value: Record<string, unknown>) {
         const rows = mockState[tableKey] ?? [];
@@ -698,7 +733,7 @@ const mockDb: any = {
     };
   },
   update(table: unknown) {
-    const tableKey = tableNameFor(table) as keyof MockState;
+    const tableKey = tableNameFor(table) as keyof PreviewState;
     return {
       set(updates: Record<string, unknown>) {
         return {
@@ -727,7 +762,7 @@ const mockDb: any = {
     };
   },
   delete(table: unknown) {
-    const tableKey = tableNameFor(table) as keyof MockState;
+    const tableKey = tableNameFor(table) as keyof PreviewState;
     return {
       where(condition: unknown) {
         const rows = mockState[tableKey] ?? [];

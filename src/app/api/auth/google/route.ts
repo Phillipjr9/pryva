@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { googleAuthorizeUrl, googleConfigured, makeState } from "@/lib/google";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
 export const dynamic = "force-dynamic";
 
@@ -8,8 +9,7 @@ const NEXT_COOKIE = "pryva_google_next";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const nextRaw = url.searchParams.get("next") ?? "/dashboard";
-  const next = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/dashboard";
+  const next = safeRedirectPath(url.searchParams.get("next"));
 
   if (!googleConfigured()) {
     redirect("/login?error=google-not-configured");

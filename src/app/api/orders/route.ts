@@ -6,8 +6,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { findPlan } from "@/lib/catalog";
 import { FleexaError } from "@/lib/fleexa";
 import { cancelUpstream, fulfillPlan } from "@/lib/fulfillment";
-import { InsufficientFundsError, debitWallet } from "@/lib/wallet";
+import { InsufficientFundsError, debitWallet, makeReference } from "@/lib/wallet";
 import { isSameOriginMutation } from "@/lib/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { purchaseRateLimiter } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -35,9 +37,22 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "Cross-origin request denied." }, { status: 403 });
   }
 
+  if (!isJsonRequest(request)) return Response.json({ ok: false, error: "Expected JSON." }, { status: 415 });
+  const limit = await purchaseRateLimiter(`order-create:${user.id}`);
+  if (limit.unavailable) return Response.json({ ok: false, error: "Purchases are temporarily unavailable." }, { status: 503 });
+  if (!limit.allowed) return Response.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
+
+  let body: unknown;
   try {
-    const body = (await request.json()) as { planSlug?: string };
-    const plan = findPlan(body.planSlug ?? "");
+    body = await readJsonWithLimit(request, 2_048);
+  } catch (error) {
+    return Response.json({ ok: false, error: "Invalid request body." }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
+  }
+  const planSlug = body && typeof body === "object" && !Array.isArray(body) ? (body as { planSlug?: unknown }).planSlug : null;
+  if (typeof planSlug !== "string" || !planSlug || planSlug.length > 80) return Response.json({ ok: false, error: "Invalid plan." }, { status: 400 });
+
+  try {
+    const plan = findPlan(planSlug);
 
     if (!plan) {
       return Response.json({ ok: false, error: "That plan is no longer available." }, { status: 400 });
@@ -69,9 +84,7 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    const reference = `PRY-${Date.now().toString(36).toUpperCase().slice(-5)}${randomUUID()
-      .slice(0, 4)
-      .toUpperCase()}`;
+    const reference = makeReference("PRY");
     const orderId = randomUUID();
 
     await db.insert(orders).values({

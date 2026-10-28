@@ -1,11 +1,15 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { authorizeAdminApi } from "@/lib/admin-auth";
 import { db } from "@/db";
 import { withdrawals, users, walletTransactions } from "@/db/schema";
-import { initiateTransfer } from "@/lib/paystack";
+import { initiateTransfer, isPaystackConfigured } from "@/lib/paystack";
+import { paystackTransferReference } from "@/lib/paystack-transfer-reference";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
+import { isPreviewDatabase } from "@/lib/demo-policy";
 import { logger } from "@/lib/logger";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +31,7 @@ export async function GET(request: NextRequest) {
         recipientCode: withdrawals.recipientCode,
         status: withdrawals.status,
         reference: withdrawals.reference,
+        paystackReference: withdrawals.paystackReference,
         transferReference: withdrawals.transferReference,
         failureReason: withdrawals.failureReason,
         createdAt: withdrawals.createdAt,
@@ -38,7 +43,8 @@ export async function GET(request: NextRequest) {
       .from(withdrawals)
       .leftJoin(users, eq(withdrawals.userId, users.id))
       .where(status && status !== "all" ? eq(withdrawals.status, status) : undefined)
-      .orderBy(desc(withdrawals.createdAt));
+      .orderBy(desc(withdrawals.createdAt))
+      .limit(200);
 
     return NextResponse.json({ ok: true, withdrawals: allWithdrawals, count: allWithdrawals.length });
   } catch (error) {
@@ -52,8 +58,16 @@ export async function PUT(request: NextRequest) {
     const access = await authorizeAdminApi(request);
     if (access.response) return access.response;
     const admin = access.user;
-    const { id, action, reason } = await request.json() as { id?: unknown; action?: unknown; reason?: unknown };
-    if (typeof id !== "string" || !id || !["approve", "reject", "complete"].includes(String(action))) {
+    if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
+    let body: unknown;
+    try {
+      body = await readJsonWithLimit(request, 2_048);
+    } catch (error) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    const { id, action, reason, reconciliationConfirmed } = body as { id?: unknown; action?: unknown; reason?: unknown; reconciliationConfirmed?: unknown };
+    if (typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id) || !["approve", "reject", "complete"].includes(String(action))) {
       return NextResponse.json({ error: "A withdrawal ID and valid action are required" }, { status: 400 });
     }
     if (reason !== undefined && (typeof reason !== "string" || reason.length > 500)) {
@@ -61,39 +75,61 @@ export async function PUT(request: NextRequest) {
     }
 
     if (action === "approve") {
+      // Preview balances are simulated, even when a real Paystack key happens
+      // to be present. Never turn them into an actual bank transfer.
+      if (isPreviewDatabase() || !isPaystackConfigured()) {
+        return NextResponse.json({ error: "Bank transfers are unavailable in this environment" }, { status: 503 });
+      }
       const [existing] = await db.select().from(withdrawals).where(eq(withdrawals.id, id)).limit(1);
       if (!existing) return NextResponse.json({ error: "Withdrawal not found" }, { status: 404 });
       if (!existing.recipientCode) return NextResponse.json({ error: "Transfer recipient is missing" }, { status: 400 });
 
-      // Only one administrator can claim a pending request and initiate its transfer.
+      // Persist a unique, Paystack-compatible lowercase reference in the same
+      // claim as the status transition, before any external request. Legacy
+      // processing rows keep their original, possibly unknown reference.
+      const providerReference = paystackTransferReference(existing.id);
       const [claimed] = await db.update(withdrawals)
-        .set({ status: "processing", processedAt: new Date(), failureReason: null })
-        .where(and(eq(withdrawals.id, id), eq(withdrawals.status, "pending")))
+        .set({ status: "processing", paystackReference: providerReference, processedAt: new Date(), failureReason: null })
+        .where(and(eq(withdrawals.id, id), eq(withdrawals.status, "pending"), isNull(withdrawals.paystackReference)))
         .returning();
-      if (!claimed) return NextResponse.json({ error: "Withdrawal is no longer pending" }, { status: 409 });
+      if (!claimed) return NextResponse.json({ error: "Withdrawal is no longer pending or has an existing provider reference. Reconcile it before retrying." }, { status: 409 });
+      scheduleWalletEmails();
 
       try {
         const transfer = await initiateTransfer({
           source: "balance",
           amount: claimed.amount * 100,
+          currency: "NGN",
           recipient: existing.recipientCode,
           reason: `Withdrawal ${claimed.reference}`,
-          reference: claimed.reference,
+          reference: providerReference,
         });
-        if (!transfer.status || !transfer.data?.transfer_code) throw new Error("Transfer was not confirmed");
+        const transferCode = transfer.data?.transfer_code;
+        if (transfer.status !== true || typeof transferCode !== "string" || !transferCode.trim() || transferCode.length > 100 ||
+            transfer.data.reference !== providerReference || transfer.data.amount !== claimed.amount * 100 || transfer.data.currency !== "NGN") {
+          throw new Error("Transfer initiation details were not confirmed");
+        }
 
+        const providerStatus = typeof transfer.data.status === "string" && transfer.data.status.length <= 40 ? transfer.data.status : "unknown";
+        const note = providerStatus === "otp"
+          ? "Paystack requires merchant authorization. Follow its approval process and verify settlement."
+          : providerStatus === "failed" || providerStatus === "reversed"
+            ? "Paystack reports this transfer failed or reversed. Reconcile the final outcome before refunding."
+            : !["pending", "processing", "queued", "success"].includes(providerStatus)
+              ? "Paystack transfer status is unconfirmed. Reconcile it before retrying or refunding."
+              : null;
         await db.update(withdrawals)
-          .set({ transferReference: transfer.data.transfer_code })
+          .set({ transferReference: transferCode, failureReason: note })
           .where(eq(withdrawals.id, id));
-        logger.info("Withdrawal transfer initiated", { withdrawalId: id, adminId: admin.id });
-        return NextResponse.json({ ok: true, message: "Withdrawal approved and transfer initiated", transferCode: transfer.data.transfer_code });
-      } catch (error) {
+        logger.info("Withdrawal transfer initiated", { withdrawalId: id, adminId: admin.id, providerStatus });
+        return NextResponse.json({ ok: true, needsReview: Boolean(note), message: note ?? "Transfer initiated; settlement still requires verification.", transferCode, paystackReference: providerReference });
+      } catch {
         // A timeout can occur after Paystack accepted the transfer. Refunding
         // immediately could pay twice, so leave it for manual reconciliation.
         await db.update(withdrawals)
           .set({ failureReason: "Transfer outcome unconfirmed. Check Paystack before resolving." })
           .where(and(eq(withdrawals.id, id), eq(withdrawals.status, "processing")));
-        logger.error("Withdrawal transfer needs reconciliation", { withdrawalId: id, adminId: admin.id, error });
+        logger.error("Withdrawal transfer needs reconciliation", { withdrawalId: id, adminId: admin.id });
         return NextResponse.json({ error: "Transfer outcome unconfirmed. Check Paystack before resolving this request." }, { status: 502 });
       }
     }
@@ -102,7 +138,7 @@ export async function PUT(request: NextRequest) {
       const rejected = await db.transaction(async (tx) => {
         const [claimed] = await tx.update(withdrawals)
           .set({ status: "rejected", failureReason: typeof reason === "string" && reason.trim() ? reason.trim() : "Rejected by admin", processedAt: new Date() })
-          .where(and(eq(withdrawals.id, id), eq(withdrawals.status, "pending")))
+          .where(and(eq(withdrawals.id, id), eq(withdrawals.status, "pending"), isNull(withdrawals.paystackReference)))
           .returning();
         if (!claimed) return null;
 
@@ -123,17 +159,24 @@ export async function PUT(request: NextRequest) {
         });
         return claimed;
       });
-      if (!rejected) return NextResponse.json({ error: "Withdrawal is no longer pending" }, { status: 409 });
+      if (!rejected) return NextResponse.json({ error: "Withdrawal is no longer pending or has a provider reference. Reconcile it before refunding." }, { status: 409 });
       logger.info("Withdrawal rejected", { withdrawalId: id, adminId: admin.id });
+      scheduleWalletEmails();
       return NextResponse.json({ ok: true, message: "Withdrawal rejected and user refunded" });
     }
 
+    if (reconciliationConfirmed !== true || typeof reason !== "string" || !reason.trim()) {
+      return NextResponse.json({ error: "Confirm settlement with Paystack and provide a reconciliation note." }, { status: 400 });
+    }
+    // A processing request with no saved transfer code may still be in flight
+    // or have an ambiguous outcome. Do not mark it settled from this endpoint.
     const [completed] = await db.update(withdrawals)
       .set({ status: "completed", completedAt: new Date() })
-      .where(and(eq(withdrawals.id, id), eq(withdrawals.status, "processing")))
+      .where(and(eq(withdrawals.id, id), eq(withdrawals.status, "processing"), isNotNull(withdrawals.transferReference)))
       .returning({ id: withdrawals.id });
-    if (!completed) return NextResponse.json({ error: "Withdrawal is not processing" }, { status: 409 });
-    logger.info("Withdrawal completed", { withdrawalId: id, adminId: admin.id });
+    if (!completed) return NextResponse.json({ error: "Withdrawal has no confirmed initiation; reconcile it manually." }, { status: 409 });
+    logger.info("Withdrawal marked completed after manual reconciliation", { withdrawalId: id, adminId: admin.id, note: reason.trim() });
+    scheduleWalletEmails();
     return NextResponse.json({ ok: true, message: "Withdrawal marked as completed" });
   } catch (error) {
     logger.error("Failed to process withdrawal", { error });

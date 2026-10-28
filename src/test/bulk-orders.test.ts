@@ -33,6 +33,17 @@ describe("Bulk Orders", () => {
       expect(result.total).toBeLessThan(result.subtotal);
     });
 
+    it("rejects unknown products and non-positive or fractional quantities", () => {
+      for (const item of [
+        { productSlug: "vn-ng", quantity: -1 },
+        { productSlug: "vn-ng", quantity: 0 },
+        { productSlug: "vn-ng", quantity: 1.5 },
+        { productSlug: "not-a-plan", quantity: 10 },
+      ]) {
+        expect(() => calculateBulkOrder([item])).toThrow("Invalid bulk-order item");
+      }
+    });
+
     it("should handle multiple products", () => {
       const items = [
         { productSlug: "vn-ng", quantity: 5 },

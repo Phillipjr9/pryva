@@ -37,6 +37,13 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       category: "navigation",
     },
     {
+      id: "services",
+      label: "Explore Services",
+      icon: ShoppingCart,
+      action: () => router.push("/dashboard/services"),
+      category: "navigation",
+    },
+    {
       id: "orders",
       label: "View Orders",
       icon: ShoppingCart,

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Shield, Sparkle } from "@/components/icons";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
 type Mode = "login" | "signup";
 
@@ -12,6 +13,7 @@ const GOOGLE_ERRORS: Record<string, string> = {
   "google-canceled": "Google sign-in was cancelled before it finished.",
   "google-state": "That Google sign-in link expired. Please start again.",
   "google-exchange": "Google couldn’t complete the sign-in. Please try again.",
+  "google-account-exists": "An account already uses this email but is not linked to this Google identity. Sign in with your existing method or contact support for secure recovery.",
   "demo-failed": "The demo could not open right now. Please try again in a moment.",
 };
 
@@ -61,7 +63,7 @@ export function AuthForm({
         setPending(null);
         return;
       }
-      window.location.replace(next);
+      window.location.replace(safeRedirectPath(next));
       return;
     } catch {
       setError("Network hiccup. Please try again.");
@@ -86,10 +88,10 @@ export function AuthForm({
         </a>
 
         {/*
-          The demo is a *plain* form post on purpose. The server route answers
-          with a 303 straight into the dashboard, so the browser navigates even
-          if the client bundle is stale, a privacy extension blocks fetch, or a
-          request hangs. An earlier version intercepted this submit with
+          The demo is a *plain* form post on purpose. The server normally
+          answers with a 303 into the dashboard; the Arena preview may instead
+          open its temporary shared-demo bridge when the gateway drops cookies.
+          An earlier version intercepted this submit with
           onSubmit and a client-side request to the JSON demo endpoint; when that
           request completed but the follow-up navigation didn't, the visitor sat
           on "Opening the demo…" forever. Never intercept this submit, and never disable the button on
@@ -117,7 +119,7 @@ export function AuthForm({
           </button>
         </form>
         <p className="mt-2 text-center text-[0.72rem] text-ink-3">
-          Demo starts signed in with ₦25,000 wallet credit · No signup required
+          Shared public demo with simulated credit (preview mode only). Other visitors can see its activity; do not enter personal information, passwords or other secrets.
         </p>
         <p className="mt-1.5 text-center">
           <a
@@ -157,7 +159,7 @@ export function AuthForm({
         </h1>
         <p className="mt-3 text-[0.9rem] leading-relaxed text-ink-2">
           {mode === "signup"
-            ? "No documents, no waiting list. New preview accounts are credited with ₦5,000 to try a real purchase."
+            ? "New preview accounts receive ₦5,000 in simulated credit to explore the checkout experience."
             : "Your wallet, orders, codes and refunds are waiting exactly where you left them."}
         </p>
       </div>
@@ -260,7 +262,7 @@ export function AuthForm({
 
       {mode === "signup" && (
         <ul className="mt-4 grid gap-1.5">
-          {["Pay in Naira by transfer or card", "Instant delivery on every service", "Auto-refund if a code doesn't arrive"].map(
+          {["Pay in Naira by transfer or card", "Live fulfillment for several services is paused", "Support for delivery issues"].map(
             (item) => (
               <li key={item} className="flex items-center gap-2 text-[0.76rem] text-ink-2">
                 <Check className="h-3.5 w-3.5 text-lav-600" />

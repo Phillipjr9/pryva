@@ -6,6 +6,7 @@ import { formatNaira } from "@/lib/catalog";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { PlatformBadge, platformFor } from "@/components/PlatformBadge";
+import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
 
 type Category = { id: number; title: string; slug: string };
 type Subcategory = { id: number; title: string; slug: string };
@@ -13,7 +14,7 @@ type Listing = {
   id: number;
   slug: string;
   title: string;
-  stock: number;
+  stock: number | null;
   sold: number;
   category: string | null;
   subcategory: string | null;
@@ -27,7 +28,7 @@ const SORTS = [
   { value: "title", label: "A–Z" },
 ] as const;
 
-export function AccountsBrowser() {
+export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [configured, setConfigured] = useState(true);
@@ -42,13 +43,17 @@ export function AccountsBrowser() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastChecked, setLastChecked] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
 
   const [selected, setSelected] = useState<Listing | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [buying, setBuying] = useState(false);
   const [buyError, setBuyError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ accounts: string[]; reference: string; totalNgn: number } | null>(null);
+  const [result, setResult] = useState<{ accounts: string[]; reference: string; totalNgn: number; warning?: string } | null>(null);
+  const [pending, setPending] = useState<{ reference?: string; message: string } | null>(null);
+  const purchaseRequestId = useRef<string | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
   const [promoInput, setPromoInput] = useState("");
   const [promo, setPromo] = useState<{ code: string; totalNgn: number; savedNgn: number; message: string } | null>(null);
@@ -72,15 +77,19 @@ export function AccountsBrowser() {
     const url = activeCategory ? `/api/accounts/categories?categoryId=${activeCategory}` : "/api/accounts/categories";
 
     fetch(url, { cache: "no-store" })
-      .then((response) => response.json())
+      .then((response) => {
+        if (!response.ok) throw new Error("Categories unavailable");
+        return response.json();
+      })
       .then((data: { configured?: boolean; categories?: Category[]; subcategories?: Subcategory[] }) => {
         if (cancelled) return;
+        setCategoryError(null);
         setConfigured(data.configured !== false);
         if (data.categories) setCategories(data.categories);
         setSubcategories(data.subcategories ?? []);
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load categories.");
+        if (!cancelled) setCategoryError("Could not load all categories. Refresh the page to retry.");
       });
 
     return () => {
@@ -112,19 +121,32 @@ export function AccountsBrowser() {
       if (!response.ok) {
         setError(data.error ?? "Could not load accounts.");
         setListings([]);
+        setMeta(null);
+        setLastChecked(null);
         return;
       }
       setListings(data.listings ?? []);
       setMeta(data.meta ?? null);
+      setLastChecked(new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }));
     } catch {
-      if (current === requestId.current) setError("Could not load accounts. Check your connection.");
+      if (current === requestId.current) {
+        setError("Could not load accounts. Check your connection.");
+        setListings([]);
+        setMeta(null);
+        setLastChecked(null);
+      }
     } finally {
       if (current === requestId.current) setLoading(false);
     }
   }, [activeCategory, activeSubcategory, search, sort, page]);
 
   useEffect(() => {
-    void loadListings();
+    const version = requestId;
+    const timer = setTimeout(() => void loadListings(), 0);
+    return () => {
+      clearTimeout(timer);
+      version.current++;
+    };
   }, [loadListings]);
 
   function selectCategory(id: number | null) {
@@ -139,6 +161,9 @@ export function AccountsBrowser() {
   }
 
   function openBuy(listing: Listing) {
+    if (!purchaseEnabled || loading || listing.stock === null || listing.stock < 1) return;
+    purchaseRequestId.current = null;
+    setPending(null);
     setSelected(listing);
     setQuantity(1);
     setBuyError(null);
@@ -205,19 +230,30 @@ export function AccountsBrowser() {
     setBuyError(null);
 
     try {
+      purchaseRequestId.current ??= crypto.randomUUID();
       const response = await fetch("/api/accounts/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: selected.slug, quantity, promoCode: promo?.code }),
+        body: JSON.stringify({ slug: selected.slug, quantity, promoCode: promo?.code, requestId: purchaseRequestId.current }),
       });
       const data = (await response.json()) as {
         ok?: boolean;
         accounts?: string[];
         totalNgn?: number;
         error?: string;
+        pending?: boolean;
+        message?: string;
+        warning?: string;
         order?: { reference: string };
       };
 
+      if (data.pending || response.status >= 500) {
+        setPending({
+          reference: data.order?.reference,
+          message: data.message ?? "We could not confirm the purchase. Your wallet may have been charged. Check your orders or contact support before trying again.",
+        });
+        return;
+      }
       if (response.status === 401) {
         setNeedsSignIn(true);
         setBuyError("Please sign in to complete this purchase.");
@@ -232,10 +268,11 @@ export function AccountsBrowser() {
         accounts: data.accounts ?? [],
         reference: data.order?.reference ?? "—",
         totalNgn: data.totalNgn ?? estimatedTotal,
+        warning: data.warning,
       });
       void loadListings();
     } catch {
-      setBuyError("Something went wrong. Nothing was charged.");
+      setPending({ message: "We could not confirm the purchase. Your wallet may have been charged. Check your orders or contact support before trying again." });
     } finally {
       setBuying(false);
     }
@@ -256,8 +293,7 @@ export function AccountsBrowser() {
       <div className="rounded-2xl border border-line bg-white p-8 text-center">
         <h2 className="text-[1.05rem] font-semibold text-ink">Accounts are almost ready</h2>
         <p className="mx-auto mt-2 max-w-md text-[0.88rem] leading-relaxed text-ink-2">
-          Our account marketplace is being switched on. Everything else on Pryva — numbers, eSIM,
-          proxies, email and data — is available right now.
+          Our account marketplace is being prepared. You can explore the other services in the meantime.
         </p>
         <Link href="/virtual-numbers" className="btn btn-primary mt-5 inline-flex">
           Explore other services
@@ -268,8 +304,14 @@ export function AccountsBrowser() {
 
   return (
     <div>
+      {!purchaseEnabled && (
+        <div role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.85rem] text-amber-900">
+          Account purchases are temporarily paused. You can browse listings, but checkout is unavailable.
+        </div>
+      )}
       {/* Filters */}
       <div className="flex flex-col gap-4">
+        {categoryError && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8rem] text-amber-900">{categoryError}</p>}
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -368,6 +410,10 @@ export function AccountsBrowser() {
 
       {/* Results */}
       <div className="mt-6">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-[0.72rem] text-ink-3">
+          <span>{loading ? "Refreshing stock…" : lastChecked ? `Stock checked at ${lastChecked}; it may change.` : "Stock not checked yet."}</span>
+          <button type="button" disabled={loading} onClick={() => void loadListings()} className="font-semibold text-lav-700 hover:underline disabled:opacity-50">Refresh stock</button>
+        </div>
         {error && (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[0.85rem] text-red-800">
             {error}{" "}
@@ -406,15 +452,13 @@ export function AccountsBrowser() {
                     />
                     <h3 className="text-[0.9rem] font-semibold leading-snug text-ink">{listing.title}</h3>
                   </div>
-                  <span className="shrink-0 rounded-full bg-lav-50 px-2 py-0.5 text-[0.68rem] font-semibold text-lav-800">
-                    {listing.stock > 0 ? `${listing.stock} in stock` : "Out of stock"}
-                  </span>
                 </div>
 
                 <p className="mt-1.5 text-[0.74rem] text-ink-3">
                   {[listing.category, listing.subcategory].filter(Boolean).join(" · ") || "Digital account"}
                   {listing.sold > 0 ? ` · ${listing.sold.toLocaleString("en-NG")} sold` : ""}
                 </p>
+                <div className="mt-3"><UnitsStatus stock={listing.stock} /></div>
 
                 <div className="mt-4 flex items-end justify-between gap-3">
                   <div>
@@ -424,9 +468,9 @@ export function AccountsBrowser() {
                   <Button
                     size="sm"
                     onClick={() => openBuy(listing)}
-                    disabled={listing.stock < 1}
+                    disabled={!purchaseEnabled || loading || listing.stock === null || listing.stock < 1}
                   >
-                    Buy
+                    {purchaseEnabled ? "Buy" : "Paused"}
                   </Button>
                 </div>
               </article>
@@ -465,7 +509,7 @@ export function AccountsBrowser() {
           className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 backdrop-blur-sm sm:items-center"
           role="dialog"
           aria-modal="true"
-          aria-label={result ? "Purchase complete" : "Buy accounts"}
+          aria-label={result ? "Purchase complete" : pending ? "Purchase review" : "Buy accounts"}
           onClick={(event) => {
             if (event.target === event.currentTarget && !buying) {
               setSelected(null);
@@ -505,9 +549,13 @@ export function AccountsBrowser() {
                 </div>
 
                 <p className="mt-3 text-[0.74rem] text-ink-3">
-                  Save these now — they stay available in your order history, but treat them like
-                  passwords.
+                  Save these now and treat them like passwords.
                 </p>
+                {result.warning && (
+                  <p role="alert" className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[0.8rem] text-amber-900">
+                    {result.warning}
+                  </p>
+                )}
 
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Button
@@ -523,11 +571,22 @@ export function AccountsBrowser() {
                   </Link>
                 </div>
               </div>
+            ) : pending ? (
+              <div>
+                <h3 className="text-[1.02rem] font-semibold text-ink">Purchase needs review</h3>
+                <p role="status" className="mt-3 text-[0.85rem] text-ink-2">{pending.message}</p>
+                {pending.reference && <p className="mt-2 break-all text-[0.8rem] font-semibold text-ink">Reference: {pending.reference}</p>}
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <Link href="/dashboard/orders" className="btn btn-primary inline-flex items-center">View orders</Link>
+                  <Link href="/dashboard/support" className="btn btn-secondary inline-flex items-center">Contact support</Link>
+                  <Button variant="ghost" onClick={() => setSelected(null)}>Close</Button>
+                </div>
+              </div>
             ) : (
               <div>
                 <h3 className="text-[1.02rem] font-semibold text-ink">{selected.title}</h3>
                 <p className="mt-1 text-[0.8rem] text-ink-2">
-                  {formatNaira(selected.priceNgn)} per account · {selected.stock} in stock
+                  {formatNaira(selected.priceNgn)} per account · {selected.stock === null ? "Stock unknown" : `${selected.stock} in stock when last checked`}
                 </p>
 
                 <div className="mt-4 flex items-center justify-between gap-3">
@@ -552,7 +611,7 @@ export function AccountsBrowser() {
                       id="quantity"
                       type="number"
                       min={1}
-                      max={Math.min(50, selected.stock)}
+                      max={Math.min(50, selected.stock ?? 0)}
                       value={quantity}
                       onChange={(event) => {
                         const next = Number(event.target.value);
@@ -570,9 +629,9 @@ export function AccountsBrowser() {
                       onClick={() => {
                         setPromo(null);
                         setPromoMessage(null);
-                        setQuantity((q) => Math.min(50, selected.stock, q + 1));
+                        setQuantity((q) => Math.min(50, selected.stock ?? 0, q + 1));
                       }}
-                      disabled={quantity >= Math.min(50, selected.stock)}
+                      disabled={quantity >= Math.min(50, selected.stock ?? 0)}
                       aria-label="Increase quantity"
                     >
                       +
@@ -638,7 +697,7 @@ export function AccountsBrowser() {
                 )}
 
                 <div className="mt-5 flex flex-wrap gap-2">
-                  <Button onClick={() => void buy()} loading={buying} disabled={selected.stock < 1}>
+                  <Button onClick={() => void buy()} loading={buying} disabled={selected.stock === null || selected.stock < 1}>
                     {buying ? "Buying…" : `Pay ${formatNaira(estimatedTotal)}`}
                   </Button>
                   <Button variant="ghost" onClick={() => setSelected(null)} disabled={buying}>

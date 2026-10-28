@@ -5,6 +5,7 @@ import { users, orders, walletTransactions, withdrawals } from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { creditWallet, debitWallet, InsufficientFundsError } from "@/lib/wallet";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -121,8 +122,15 @@ export async function PUT(
     const admin = access.user;
 
     const { id: userId } = await params;
-    const body = await request.json();
-    const { action, amount, reason } = body;
+    if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
+    let body: unknown;
+    try {
+      body = await readJsonWithLimit(request, 2_048);
+    } catch (error) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    const { action, amount, reason } = body as { action?: unknown; amount?: unknown; reason?: unknown };
 
     if (!action) {
       return NextResponse.json(

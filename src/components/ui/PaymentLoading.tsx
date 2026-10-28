@@ -1,42 +1,30 @@
 "use client";
 
-import { Loader2 } from "@/components/icons";
+import { Card, Lock } from "@/components/icons";
 
 interface PaymentLoadingProps {
   show: boolean;
   message?: string;
 }
 
-export function PaymentLoading({
-  show,
-  message = "Processing your payment...",
-}: PaymentLoadingProps) {
+/** A calm, branded waiting state; it never claims success before the API does. */
+export function PaymentLoading({ show, message = "Processing your payment…" }: PaymentLoadingProps) {
   if (!show) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="mx-4 max-w-md rounded-2xl bg-white p-8 shadow-2xl animate-in fade-in zoom-in duration-300">
-        <div className="text-center">
-          {/* Animated Loader */}
-          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-lav-100 animate-pulse">
-            <Loader2 className="h-12 w-12 text-lav-600 animate-spin" />
-          </div>
-
-          {/* Loading Message */}
-          <h2 className="mb-2 text-2xl font-bold text-ink animate-in slide-in-from-bottom duration-500">
-            Processing Payment
-          </h2>
-          <p className="mb-4 text-ink-2 animate-in slide-in-from-bottom duration-500 delay-200">
-            {message}
-          </p>
-
-          {/* Animated Dots */}
-          <div className="flex justify-center gap-2 animate-in fade-in duration-500 delay-300">
-            <div className="h-2 w-2 rounded-full bg-lav-600 animate-bounce" style={{ animationDelay: "0ms" }} />
-            <div className="h-2 w-2 rounded-full bg-lav-600 animate-bounce" style={{ animationDelay: "150ms" }} />
-            <div className="h-2 w-2 rounded-full bg-lav-600 animate-bounce" style={{ animationDelay: "300ms" }} />
-          </div>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/55 p-4 backdrop-blur-sm" role="status" aria-live="polite" aria-busy="true">
+      <div className="demo-arrive w-full max-w-sm overflow-hidden rounded-[1.75rem] border border-white/80 bg-[#fffdfa] p-7 text-center shadow-float sm:p-9">
+        <div aria-hidden="true" className="relative mx-auto grid h-28 w-28 place-items-center">
+          <span className="demo-breathe absolute inset-2 rounded-full bg-lav-200" />
+          <span className="demo-orbit absolute inset-0 rounded-full border-2 border-lav-100 border-t-lav-600" />
+          <span className="relative grid h-16 w-16 place-items-center rounded-[1.3rem] bg-ink text-white shadow-lg"><Card className="h-7 w-7" /></span>
         </div>
+        <p className="mt-6 text-[0.63rem] font-bold uppercase tracking-[0.18em] text-lav-700">Just a moment</p>
+        <h2 className="mt-2 text-[1.45rem] font-semibold text-ink">Processing payment</h2>
+        <p className="mt-2 text-[0.84rem] leading-relaxed text-ink-2">{message}</p>
+        <div aria-hidden="true" className="mt-6 h-1.5 overflow-hidden rounded-full bg-lav-100">
+          <div className="demo-progress h-full w-1/3 rounded-full bg-lav-600" />
+        </div>
+        <p className="mt-4 inline-flex items-center gap-1.5 text-[0.68rem] text-ink-3"><Lock className="h-3 w-3" /> Please keep this page open</p>
       </div>
     </div>
   );

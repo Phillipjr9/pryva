@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AccountsBrowser } from "./AccountsBrowser";
+import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
 import { PlatformStrip } from "@/components/PlatformBadge";
 
 export const metadata: Metadata = {
-  title: "Verified Digital Accounts — Facebook, Instagram, Gmail & More | Pryva",
+  title: "Digital Account Listings — Facebook, Instagram, Gmail & More | Pryva",
   description:
-    "Buy verified digital accounts in Naira. Facebook, Instagram, Gmail, TikTok, gaming and streaming accounts delivered instantly from your Pryva wallet, with automatic refunds if delivery fails.",
+    "Browse digital account listings priced in Naira. Purchase availability and delivery depend on the seller.",
   alternates: { canonical: "/accounts" },
   openGraph: {
-    title: "Verified Digital Accounts | Pryva",
+    title: "Digital Account Listings | Pryva",
     description:
-      "Facebook, Instagram, Gmail, TikTok and more — instant delivery, Naira pricing, automatic refunds.",
+      "Browse Facebook, Instagram, Gmail, TikTok and more, with Naira pricing.",
     url: "/accounts",
     type: "website",
   },
@@ -27,12 +28,11 @@ export default function AccountsPage() {
               Digital accounts
             </span>
             <h1 className="mt-5 text-[2.1rem] font-semibold leading-[1.1] tracking-tight text-ink sm:text-[2.9rem]">
-              Every verified account you need, priced in Naira.
+              Browse digital account listings priced in Naira.
             </h1>
             <p className="mt-4 max-w-2xl text-[1rem] leading-relaxed text-ink-2">
-              Facebook, Instagram, Gmail, Outlook, TikTok, gaming and streaming accounts — browse live
-              stock, buy from your wallet, and receive the credentials instantly. If delivery fails, the
-              amount returns to your wallet automatically.
+              Facebook, Instagram, Gmail, Outlook, TikTok, gaming and streaming accounts — browse
+              listings priced in Naira. Uncertain purchases require review by support.
             </p>
             <PlatformStrip
               className="mt-6"
@@ -53,12 +53,12 @@ export default function AccountsPage() {
 
             <div className="mt-6 flex flex-wrap items-center gap-3 text-[0.82rem] text-ink-3">
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Instant delivery
+                <span className="h-1.5 w-1.5 rounded-full bg-lav-600" /> Digital listings
               </span>
               <span aria-hidden>·</span>
               <span>Live stock counts</span>
               <span aria-hidden>·</span>
-              <span>Automatic refund on failure</span>
+              <span>Support reviews uncertain orders</span>
               <span aria-hidden>·</span>
               <span>Wallet payment only</span>
             </div>
@@ -67,7 +67,7 @@ export default function AccountsPage() {
       </section>
 
       <section className="shell py-10 sm:py-12">
-        <AccountsBrowser />
+        <AccountsBrowser purchaseEnabled={isMarketplaceCheckoutConfigured()} />
       </section>
 
       <section className="border-t border-line/70 bg-cream/60">
@@ -79,11 +79,11 @@ export default function AccountsPage() {
             },
             {
               title: "Credentials on the spot",
-              body: "Your accounts appear the moment payment clears — copy them straight into your workflow.",
+              body: "When delivery is confirmed, credentials are shown on your order.",
             },
             {
-              title: "Not delivered, not charged",
-              body: "If an order can't be fulfilled, the full amount is refunded to your wallet automatically.",
+              title: "Support for uncertain orders",
+              body: "If delivery cannot be confirmed, support will review the order before any refund.",
             },
           ].map((item) => (
             <div key={item.title} className="rounded-2xl border border-line bg-white p-5">
@@ -100,8 +100,8 @@ export default function AccountsPage() {
           <p className="mt-2 max-w-3xl text-[0.85rem] leading-relaxed text-amber-900/80">
             Accounts are delivered exactly as supplied and are not screened by Pryva beyond what the
             seller states. Use them in line with each platform&apos;s terms — some platforms restrict
-            account transfers, and you accept that risk when you buy. Credentials are shown once on
-            delivery and are also available in your order history. See our{" "}
+            account transfers, and you accept that risk when you buy. Save your credentials on delivery;
+            if we cannot save them to your order history, we will warn you. See our{" "}
             <Link href="/terms" className="font-semibold underline underline-offset-2">
               Terms
             </Link>{" "}

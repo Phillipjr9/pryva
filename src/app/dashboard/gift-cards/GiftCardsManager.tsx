@@ -1,20 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { formatNaira } from "@/lib/catalog";
 import { Gift, Copy, Check } from "@/components/icons";
-import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
+import { useRouter } from "next/navigation";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
+import { fireConfetti } from "@/components/ui/Confetti";
 import type { GiftCard } from "@/db/schema";
 import type { PublicUser } from "@/lib/auth";
 
 interface GiftCardsManagerProps {
   user: PublicUser;
+  preview?: boolean;
 }
 
 type Tab = "create" | "redeem" | "history";
 
-export function GiftCardsManager({ user }: GiftCardsManagerProps) {
+export function GiftCardsManager({ user, preview = false }: GiftCardsManagerProps) {
+  const router = useRouter();
+  const attempt = useRef<{ amount: number; requestId: string } | null>(null);
+  const creating = useRef(false);
+  const redeeming = useRef(false);
   const [activeTab, setActiveTab] = useState<Tab>("create");
   const [amount, setAmount] = useState<number>(5000);
   const [recipientEmail, setRecipientEmail] = useState("");
@@ -26,82 +32,111 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
   const [redeemLoading, setRedeemLoading] = useState(false);
   const [redeemSuccess, setRedeemSuccess] = useState<number | null>(null);
   const [cards, setCards] = useState<GiftCard[]>([]);
+  const [historyState, setHistoryState] = useState<"loading" | "ready" | "error">("loading");
+  const [historyReload, setHistoryReload] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeTab !== "history") return;
     const controller = new AbortController();
-    fetch("/api/gift-cards/history", { signal: controller.signal })
-      .then((response) => response.json())
-      .then((data) => {
-        if (data.ok && !controller.signal.aborted) setCards(data.cards);
+    fetch("/api/gift-cards/history", { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !data.ok || !Array.isArray(data.cards)) throw new Error("History unavailable");
+        if (!controller.signal.aborted) {
+          setCards(data.cards);
+          setHistoryState("ready");
+        }
       })
-      .catch((error) => {
-        if (!controller.signal.aborted) console.error("Failed to fetch history:", error);
+      .catch(() => {
+        if (!controller.signal.aborted) setHistoryState("error");
       });
     return () => controller.abort();
-  }, [activeTab]);
+  }, [activeTab, historyReload]);
 
   async function handleCreate() {
+    if (creating.current) return;
+    if (preview && attempt.current && attempt.current.amount !== amount) {
+      setError("Check your gift card history and retry the previous amount before starting another.");
+      return;
+    }
+    creating.current = true;
     setLoading(true);
     setError(null);
     setSuccess(null);
 
     try {
-      const response = await fetch("/api/gift-cards/purchase", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount, recipientEmail: recipientEmail || undefined, message: message || undefined }),
-      });
+      if (preview) attempt.current ??= { amount, requestId: crypto.randomUUID() };
+      const [response] = await Promise.all([
+        fetch(preview ? "/api/demo/gift-cards/create" : "/api/gift-cards/purchase", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(preview ? attempt.current : { amount, recipientEmail: recipientEmail || undefined, message: message || undefined }),
+        }),
+        new Promise((resolve) => setTimeout(resolve, 1600)),
+      ]);
 
       const data = await response.json();
 
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error || "Purchase failed");
+      if (!response.ok || !data.ok || (preview && !data.simulated)) {
+        if (preview && response.status >= 400 && response.status < 500 && response.status !== 409) attempt.current = null;
+        setError(response.status >= 500 ? "Could not confirm the purchase. Check gift card history and wallet activity before trying again." : data.error || "Purchase failed");
+        return;
       }
 
+      attempt.current = null;
+      fireConfetti();
       setSuccess({ code: data.code, amount: data.amount });
+      router.refresh();
       setAmount(5000);
       setRecipientEmail("");
       setMessage("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Purchase failed");
+    } catch {
+      setError("Could not confirm the purchase. Check gift card history and wallet activity before trying again.");
     } finally {
       setLoading(false);
+      creating.current = false;
     }
   }
 
   async function handleRedeem() {
+    if (redeeming.current) return;
+    redeeming.current = true;
     setRedeemLoading(true);
     setError(null);
     setRedeemSuccess(null);
 
     try {
-      const response = await fetch("/api/gift-cards/redeem", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: redeemCode }),
-      });
+      const [response] = await Promise.all([
+        fetch(preview ? "/api/demo/gift-cards/redeem" : "/api/gift-cards/redeem", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: redeemCode }),
+        }),
+        new Promise((resolve) => setTimeout(resolve, 1600)),
+      ]);
 
       const data = await response.json();
 
-      if (!response.ok || !data.ok) {
+      if (!response.ok || !data.ok || (preview && !data.simulated)) {
         throw new Error(data.error || "Redemption failed");
       }
 
+      fireConfetti();
       setRedeemSuccess(data.amount);
       setRedeemCode("");
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Redemption failed");
     } finally {
       setRedeemLoading(false);
+      redeeming.current = false;
     }
   }
 
   function copyCode(code: string) {
-    navigator.clipboard.writeText(code);
-    setCopied(code);
-    setTimeout(() => setCopied(null), 2000);
+    void navigator.clipboard.writeText(code).then(() => {
+      setCopied(code);
+      setTimeout(() => setCopied(null), 2000);
+    }).catch(() => undefined);
   }
 
   const presetAmounts = [2000, 5000, 10000, 25000, 50000];
@@ -109,20 +144,20 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
   return (
     <>
       <PaymentLoading show={loading || redeemLoading} message="Processing your gift card..." />
-      <PaymentSuccess
-        show={!!success || !!redeemSuccess}
-        title={success ? "Gift Card Created!" : "Gift Card Redeemed!"}
-        message={success ? `Code: ${success.code}` : `${formatNaira(redeemSuccess || 0)} added to your wallet`}
-        redirectUrl="/dashboard"
-        redirectDelay={2500}
-      />
       <div className="space-y-6">
         {/* Tabs */}
         <div className="flex gap-2 border-b border-line">
           {(["create", "redeem", "history"] as Tab[]).map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                setError(null);
+                if (tab === "history") {
+                  setHistoryState("loading");
+                  if (activeTab === "history") setHistoryReload((value) => value + 1);
+                }
+                setActiveTab(tab);
+              }}
               className={`px-4 py-2 text-[0.9rem] font-medium transition-colors ${
                 activeTab === tab
                   ? "border-b-2 border-lav-600 text-lav-600"
@@ -174,6 +209,11 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
             />
           </div>
 
+          <p className={`rounded-xl border p-3 text-sm ${preview ? "border-lav-200 bg-lav-50 text-lav-800" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+            {preview ? "Create and redeem a fictional gift card with demo funds. You can redeem it in this same demo account." : "Gift card codes are bearer secrets: anyone with the code can redeem it. Email and message are labels only; no email is sent and the recipient is not restricted. Share the code privately yourself."}
+          </p>
+
+          {!preview && <>
           {/* Recipient Email */}
           <div>
             <label className="block text-[0.86rem] font-medium text-ink mb-2">
@@ -202,6 +242,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
             />
           </div>
 
+          </>}
           {/* Wallet Balance */}
           <div className="rounded-xl border border-line bg-cream p-4">
             <p className="text-[0.86rem] text-ink-2">Wallet Balance</p>
@@ -218,19 +259,21 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
           )}
 
           {success && (
-            <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center">
+            <div className="demo-arrive rounded-xl border border-green-200 bg-green-50 p-6 text-center">
               <Gift className="mx-auto h-12 w-12 text-green-600 mb-3" />
               <p className="text-[1.1rem] font-semibold text-green-700 mb-2">
-                Gift Card Created!
+                {preview ? "Demo gift card created!" : "Gift Card Created!"}
               </p>
               <p className="text-[0.9rem] text-green-600 mb-4">
-                Share this code with the recipient:
+                {preview ? "Try this fictional code in the Redeem tab. No real money or email is sent." : "Copy and share this code privately. No email is sent automatically."}
               </p>
               <div className="flex items-center justify-center gap-2 rounded-xl bg-white p-4">
                 <code className="text-[1.2rem] font-bold text-ink">
                   {success.code}
                 </code>
                 <button
+                  type="button"
+                  aria-label="Copy gift card code"
                   onClick={() => copyCode(success.code)}
                   className="rounded-lg p-2 text-ink-2 hover:bg-cream"
                 >
@@ -244,6 +287,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
               <p className="mt-3 text-[0.82rem] text-green-600">
                 Amount: {formatNaira(success.amount)}
               </p>
+              <button type="button" onClick={() => setSuccess(null)} className="mt-3 text-sm font-semibold underline">Create another card</button>
             </div>
           )}
 
@@ -283,10 +327,10 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
           )}
 
           {redeemSuccess && (
-            <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center">
+            <div className="demo-arrive rounded-xl border border-green-200 bg-green-50 p-6 text-center">
               <Check className="mx-auto h-12 w-12 text-green-600 mb-3" />
               <p className="text-[1.1rem] font-semibold text-green-700 mb-2">
-                Gift Card Redeemed!
+                {preview ? "Demo gift card redeemed!" : "Gift Card Redeemed!"}
               </p>
               <p className="text-[1.5rem] font-bold text-green-600">
                 {formatNaira(redeemSuccess)}
@@ -294,6 +338,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
               <p className="mt-2 text-[0.86rem] text-green-600">
                 Added to your wallet balance
               </p>
+              <button type="button" onClick={() => setRedeemSuccess(null)} className="mt-3 text-sm font-semibold underline">Redeem another card</button>
             </div>
           )}
 
@@ -312,7 +357,14 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
       {/* History Tab */}
       {activeTab === "history" && (
         <div className="space-y-4">
-          {cards.length === 0 ? (
+          {historyState === "loading" ? (
+            <p className="text-sm text-ink-2">Loading gift card history…</p>
+          ) : historyState === "error" ? (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              History could not be loaded. Do not assume a purchase failed; check your wallet and try loading history again.
+              <button type="button" className="ml-2 font-semibold underline" onClick={() => { setHistoryState("loading"); setHistoryReload((value) => value + 1); }}>Retry</button>
+            </div>
+          ) : cards.length === 0 ? (
             <div className="rounded-xl border border-line bg-white p-8 text-center">
               <Gift className="mx-auto h-12 w-12 text-ink-3 mb-3" />
               <p className="text-[0.95rem] text-ink-2">
