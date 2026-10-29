@@ -1,15 +1,15 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { users, withdrawals, walletTransactions, bankAccounts } from "@/db/schema";
+import { users, withdrawals, walletTransactions, bankAccounts , paymentTopups } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { isSameOriginMutation } from "@/lib/net";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { logger } from "@/lib/logger";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
-import { MAX_WITHDRAWAL, MIN_WITHDRAWAL, withdrawalFee } from "@/lib/withdrawal";
+import { holdRemainingMs, MAX_WITHDRAWAL, MIN_WITHDRAWAL, withdrawalFee } from "@/lib/withdrawal";
 import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 
 export const dynamic = "force-dynamic";
@@ -67,6 +67,27 @@ export async function POST(request: NextRequest) {
     if (typeof amount !== "number" || !Number.isSafeInteger(amount) || amount < MIN_WITHDRAWAL || amount > MAX_WITHDRAWAL) {
       return NextResponse.json({ error: "Enter a whole-naira amount between ₦1,000 and ₦5,000,000" }, { status: 400 });
     }
+    // Card-funded money is held before it can leave. This runs before the bank
+    // account lookup and before any transaction, so a held balance cannot start
+    // a transfer that then has to be reversed.
+    const [recentTopUp] = await db
+      .select({ paidAt: paymentTopups.paidAt, createdAt: paymentTopups.createdAt })
+      .from(paymentTopups)
+      .where(and(eq(paymentTopups.userId, user.id), eq(paymentTopups.status, "completed")))
+      .orderBy(desc(paymentTopups.paidAt))
+      .limit(1);
+    const heldMs = holdRemainingMs(recentTopUp?.paidAt ?? recentTopUp?.createdAt ?? null);
+    if (heldMs > 0) {
+      const hours = Math.ceil(heldMs / 3_600_000);
+      return NextResponse.json(
+        {
+          error: `Card top-ups are held for security. You can withdraw in about ${hours} ${hours === 1 ? "hour" : "hours"}.`,
+          heldMs,
+        },
+        { status: 423 },
+      );
+    }
+
     if (typeof rawBankAccountId !== "string" || !UUID.test(rawBankAccountId) || typeof rawRequestId !== "string" || !UUID.test(rawRequestId)) {
       return NextResponse.json({ error: "A valid bank account and request ID are required" }, { status: 400 });
     }
