@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { isSameOriginMutation } from "@/lib/net";
+import { refundRateLimiter } from "@/lib/rate-limit";
 import { cancelUpstream } from "@/lib/fulfillment";
 import { flagReconciliation } from "@/lib/reconciliation";
 import { isUndeliveredSingleNumber, SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
@@ -28,6 +29,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const user = await getCurrentUser();
   if (!user) return Response.json({ ok: false, error: "Please sign in first." }, { status: 401 });
   if (!isSameOriginMutation(request)) return Response.json({ ok: false, error: "Cross-origin request denied." }, { status: 403 });
+
+  // Before any order lookup: a refund triggers a provider call and a wallet
+  // credit, so the throttle has to sit ahead of the work it protects.
+  const refundLimit = await refundRateLimiter(`refund:${user.id}`);
+  if (refundLimit.unavailable) {
+    return Response.json({ ok: false, error: "Refunds are temporarily unavailable. Try again shortly." }, { status: 503 });
+  }
+  if (!refundLimit.allowed) {
+    return Response.json({ ok: false, error: "Too many refund attempts. Try again later." }, { status: 429 });
+  }
 
   const { id } = await params;
   try {
