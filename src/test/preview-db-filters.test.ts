@@ -39,7 +39,7 @@ beforeAll(async () => {
     },
   ];
   for (const row of orderRows) {
-    await database.db.insert(schema.orders).values({ ...row, userId, provider: "simulated" });
+    await database.db.insert(schema.orders).values({ ...row, userId, provider: "preview" });
   }
 
   // The preview database also seeds its own demo orders; scope every assertion
