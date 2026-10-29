@@ -6,7 +6,9 @@ import {
   FleexaError,
   isFleexaConfigured,
   listFleexaRentAreas,
+  listFleexaSmsServices,
 } from "@/lib/fleexa";
+import { checkMargin, MARGIN_BLOCKED_MESSAGE } from "@/lib/margin-guard";
 import { SERVICE_TIMEOUTS } from "@/lib/service-timeouts";
 
 export type FulfilledOrder = {
@@ -94,6 +96,26 @@ function providerExpiry(value: string | null, fallbackMs: number): Date {
  * exact parameter contract has not yet been confirmed against the live API:
  * the failure mode is a declined order, not a lost payment.
  */
+/**
+ * Refuse a purchase whose cost is unknown or whose margin is below the floor.
+ *
+ * Fulfilment spends the owner's real provider balance, so this runs before any
+ * buy call. The figures are logged for the owner only -- cost is wholesale
+ * information and must never reach a customer-facing response.
+ */
+function guardMargin(plan: Plan, costNgn: number | null): void {
+  const verdict = checkMargin(plan.price, costNgn);
+  if (verdict.ok) return;
+  console.error("Refusing a purchase that does not clear the margin floor", {
+    slug: plan.slug,
+    code: verdict.code,
+    priceNgn: verdict.priceNgn,
+    costNgn: verdict.costNgn,
+    marginNgn: verdict.marginNgn,
+  });
+  throw new FleexaError(MARGIN_BLOCKED_MESSAGE, 503, verdict.code);
+}
+
 export async function fulfillPlan(plan: Plan): Promise<FulfilledOrder> {
   if (!isFleexaConfigured()) {
     throw new FleexaError("Live fulfilment is not configured", 503, "NO_API_KEY");
@@ -109,7 +131,36 @@ export async function fulfillPlan(plan: Plan): Promise<FulfilledOrder> {
   }
 
   if (intent.kind === "sms") {
+    // Resolve the destination before buying: the buy call spends real balance and
+    // only reports its price afterwards. Quoting from the catalog first means an
+    // unpriced or loss-making service is refused while nothing has been spent.
+    const services = await listFleexaSmsServices();
+    const service = services.find(
+      (entry) => entry.id && matchesCountry(entry.country, intent.country, plan.region),
+    );
+    if (!service?.id) {
+      throw new FleexaError(
+        "No number coverage is confirmed for that destination",
+        503,
+        "SERVICE_UNAVAILABLE",
+      );
+    }
+    if (typeof service.stock === "number" && service.stock <= 0) {
+      throw new FleexaError("That destination is out of stock", 503, "SERVICE_UNAVAILABLE");
+    }
+    guardMargin(plan, service.priceNgn);
+
     const order = await buyFleexaSmsNumber({ country: intent.country });
+    if (typeof order.priceNgn === "number" && order.priceNgn > (service.priceNgn ?? 0)) {
+      // The quote is the best pre-spend signal available. If the provider charged
+      // more, the sale may have landed below the floor; it cannot be undone, so
+      // it is logged loudly instead of being silently absorbed.
+      console.error("Provider charged more than the quoted cost", {
+        slug: plan.slug,
+        quotedNgn: service.priceNgn,
+        chargedNgn: order.priceNgn,
+      });
+    }
     return {
       provider: "fleexa",
       providerRequestId: order.requestId,
@@ -132,6 +183,7 @@ export async function fulfillPlan(plan: Plan): Promise<FulfilledOrder> {
   if (typeof area.stock === "number" && area.stock <= 0) {
     throw new FleexaError("That rental is out of stock", 503, "SERVICE_UNAVAILABLE");
   }
+  guardMargin(plan, area.pricePerMonthNgn != null ? area.pricePerMonthNgn * intent.months : null);
 
   const rental = await buyFleexaRental({ area: area.id, months: intent.months });
   return {
