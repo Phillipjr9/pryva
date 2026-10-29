@@ -42,6 +42,7 @@ const MIGRATIONS = [
   "0003_withdrawal_idempotency.sql", "0004_paystack_transfer_reference.sql",
   "0005_wallet_email_outbox.sql", "0006_order_idempotency.sql",
   "0007_order_reconciliation_note.sql",
+  "0008_order_provider_cost.sql",
 ];
 
 beforeAll(async () => {
@@ -88,13 +89,47 @@ beforeEach(async () => {
   mocks.rateLimit.mockResolvedValue({ allowed: true, unavailable: false });
   mocks.currentUser.mockResolvedValue({ id: USER, walletBalance: 500_000, email: "buyer@example.com" });
   mocks.fulfillPlan.mockResolvedValue({
-    provider: "fleexa", providerRequestId: "req-1", referenceCode: "+2348000000000",
+    provider: "fleexa", providerCostNgn: 900, providerRequestId: "req-1",
+    referenceCode: "+2348000000000",
     otpCode: null, expiresAt: new Date(Date.now() + 20 * 60_000),
   });
   mocks.cancelUpstream.mockResolvedValue(false);
   await database.delete(schema.walletTransactions);
   await database.delete(schema.orders);
   await database.update(schema.users).set({ walletBalance: 500_000 }).where(eq(schema.users.id, USER));
+});
+
+describe("recorded unit cost", () => {
+  it("persists what the unit actually cost so real margin is measurable", async () => {
+    const requestId = crypto.randomUUID();
+    const body = await (await POST(purchase({ planSlug: SLUG, requestId }))).json();
+    const [row] = await ordersFor(requestId);
+
+    // Wholesale cost is recorded for the owner and must never reach the buyer:
+    // the receipt is an explicit field allowlist, and this keeps it that way.
+    expect(JSON.stringify(body)).not.toContain("providerCostNgn");
+    expect(JSON.stringify(body)).not.toContain("900");
+
+    // The cost sheet holds planned prices; only this column holds what the
+    // supplier really charged, which is the only honest basis for margin.
+    expect(row.providerCostNgn).toBe(900);
+    expect(row.amount).toBe(findPlan(SLUG)!.price);
+  });
+
+  it("records an unknown cost as null rather than zero", async () => {
+    mocks.fulfillPlan.mockResolvedValue({
+      provider: "fleexa", providerCostNgn: null, providerRequestId: "req-2",
+      referenceCode: "+2348000000001", otpCode: null,
+      expiresAt: new Date(Date.now() + 20 * 60_000),
+    });
+    const requestId = crypto.randomUUID();
+    await POST(purchase({ planSlug: SLUG, requestId }));
+    const [row] = await ordersFor(requestId);
+
+    // Zero would read as "this unit was free" and report a 100% margin on a
+    // sale whose real cost was simply never observed. Null keeps the two apart.
+    expect(row.providerCostNgn).toBeNull();
+  });
 });
 
 describe("purchase idempotency", () => {
