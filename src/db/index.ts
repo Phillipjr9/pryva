@@ -574,7 +574,7 @@ function ensureDemoUser() {
   // Safely update older seeded examples in a running preview without resetting
   // the shared wallet or touching real/user-created orders.
   for (const row of mockState.orders) {
-    if (row.userId !== demoUserId || row.provider !== "simulated") continue;
+    if (row.userId !== demoUserId || row.provider !== "preview") continue;
     if ((row.id === "demo-order-live" || row.id === "demo-order-rental") && row.referenceCode === "+234 812 445 9081") row.referenceCode = "+000 555 4820";
     if (row.id === "demo-order-esim" && row.referenceCode === "LPA:1$rsp.truphone.com$PRYVA-DEMO-1GB-NG") row.referenceCode = "LPA:1$demo.invalid$PRYVA-DEMO-1GB-NG";
   }
@@ -829,7 +829,7 @@ const mockDb: any = {
         const rows = mockState[tableKey] ?? [];
         const row: Record<string, unknown> = {
           status: tableKey === "orders" ? "active" : tableKey === "contactMessages" ? "open" : undefined,
-          provider: tableKey === "orders" ? "simulated" : undefined,
+          provider: tableKey === "orders" ? "preview" : undefined,
           walletBalance: tableKey === "users" ? 0 : undefined,
           ...value,
           id: value.id ?? randomBytes(16).toString("hex"),
