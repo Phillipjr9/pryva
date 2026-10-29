@@ -44,6 +44,7 @@ const MIGRATIONS = [
   "0007_order_reconciliation_note.sql",
   "0008_order_provider_cost.sql",
   "0009_password_reset_tokens.sql",
+  "0010_order_provider_no_default.sql",
 ];
 
 beforeAll(async () => {
