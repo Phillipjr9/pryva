@@ -11,6 +11,15 @@
  * rental that under-delivers must be reconciled by a human who can weigh the
  * time already used against the price paid.
  */
+/**
+ * Written to orders.reconciliationNote when a refund committed but the number
+ * could not be cancelled. Deliberately free of supplier names and prices: it can
+ * be rendered in an admin view, and cost is wholesale information. "Upstream" is
+ * avoided too -- it reads as a disclosure of where stock comes from.
+ */
+export const RECONCILIATION_NOTE =
+  "Refunded, but the provider could not cancel this number. Cancel it manually or absorb the cost.";
+
 export const SINGLE_NUMBER_WINDOW = "Single verification · 20 min window";
 
 /** A single-verification number order that produced no code. */

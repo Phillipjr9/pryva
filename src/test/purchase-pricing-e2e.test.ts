@@ -145,7 +145,7 @@ beforeAll(async () => {
   pg = new PGlite();
   for (const file of [
     "0000_base_schema.sql", "0001_google_subject.sql", "0002_shared_rate_limits.sql",
-    "0003_withdrawal_idempotency.sql", "0004_paystack_transfer_reference.sql", "0005_wallet_email_outbox.sql", "0006_order_idempotency.sql",
+    "0003_withdrawal_idempotency.sql", "0004_paystack_transfer_reference.sql", "0005_wallet_email_outbox.sql", "0006_order_idempotency.sql", "0007_order_reconciliation_note.sql",
   ]) {
     await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   }

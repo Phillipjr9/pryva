@@ -5,6 +5,7 @@ import { orders, users, walletTransactions } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { isSameOriginMutation } from "@/lib/net";
 import { cancelUpstream } from "@/lib/fulfillment";
+import { flagReconciliation } from "@/lib/reconciliation";
 import { isUndeliveredSingleNumber, SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
 import { SERVICE_TIMEOUTS } from "@/lib/service-timeouts";
 
@@ -93,6 +94,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         providerRequestId: claimed.row.providerRequestId,
         error: cancelError instanceof Error ? cancelError.message : String(cancelError),
       });
+      await flagReconciliation(claimed.row.id);
     }
 
     return Response.json({ ok: true, balance: claimed.balance, providerCancelled });

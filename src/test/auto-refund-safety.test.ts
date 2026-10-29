@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
-import { SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
+import { RECONCILIATION_NOTE, SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
 
 const mocks = vi.hoisted(() => ({ cancelUpstream: vi.fn() }));
 vi.mock("@/lib/fulfillment", () => ({ cancelUpstream: mocks.cancelUpstream }));
@@ -54,6 +54,8 @@ describe("automatic refunds for undelivered number orders", () => {
 
     const all = await db.select().from(schema.orders).where(eq(schema.orders.userId, "demo-user"));
     expect(all.find((order) => order.id === "refund-eligible")?.status).toBe("refunded");
+    // Released cleanly, so there is nothing for a human to chase.
+    expect(all.find((order) => order.id === "refund-eligible")?.reconciliationNote).toBeFalsy();
     expect(all.find((order) => order.id === "demo-order-live")?.status).toBe("active");
     // A rental has no upstream cancel, so it must never be swept automatically.
     expect(all.find((order) => order.id === "demo-order-rental")?.status).toBe("active");
@@ -82,7 +84,17 @@ describe("automatic refunds for undelivered number orders", () => {
     const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, "cancel-fails"));
     expect(order.status).toBe("refunded");
     expect(error).toHaveBeenCalled();
+    // The exposure has to reach a human: the money is back with the customer and
+    // the number may still be working in their hands. A log line is not enough,
+    // because nothing reads it.
+    expect(order.reconciliationNote).toBe(RECONCILIATION_NOTE);
     error.mockRestore();
+  });
+
+  it("keeps supplier names and costs out of the note an admin reads", () => {
+    expect(RECONCILIATION_NOTE.toLowerCase())
+      .not.toMatch(/fleexa|bulkacc|accszone|freshbulkacc|reseller|wholesale|supplier|upstream/);
+    expect(RECONCILIATION_NOTE).not.toMatch(/[0-9₦$]/);
   });
 
   it("runs against a real database, not only the in-memory preview", async () => {

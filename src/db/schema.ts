@@ -64,6 +64,12 @@ export const orders = pgTable(
     accounts: text("accounts"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     refundedAt: timestamp("refunded_at", { withTimezone: true }),
+    /**
+     * Set when a refund committed but the provider unit could not be released:
+     * the money is back with the customer and the number may still be working,
+     * so an owner has to finish it by hand.
+     */
+    reconciliationNote: text("reconciliation_note"),
     // Optional for legacy rows; every new purchase supplies a per-user key that
     // makes a retried request replay the original order instead of buying a
     // second number and debiting twice.

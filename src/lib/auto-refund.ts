@@ -3,6 +3,7 @@ import { and, eq, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { cancelUpstream } from "@/lib/fulfillment";
+import { flagReconciliation } from "@/lib/reconciliation";
 import { SERVICE_TIMEOUTS } from "@/lib/service-timeouts";
 import { isUndeliveredSingleNumber, SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
 
@@ -79,6 +80,9 @@ export async function processAutoRefunds(): Promise<{ refunded: number; cancelle
           providerRequestId: claimed.providerRequestId,
           error: cancelError instanceof Error ? cancelError.message : String(cancelError),
         });
+        // Persisted, not just logged: the customer is made whole and the unit may
+        // still be live in their hands, so this has to reach a human.
+        await flagReconciliation(claimed.id);
       }
     } catch (error) {
       console.error(`Failed to process refund for order ${candidate.id}:`, error);
