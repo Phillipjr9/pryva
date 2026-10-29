@@ -15,8 +15,12 @@ import "server-only";
 export const ORDER_PROVIDERS = {
   /** Live verification delivered through the configured OTP adapter. */
   liveOtp: "fleexa",
-  /** Produced by the in-memory demo: nothing was purchased or delivered. */
-  simulated: "simulated",
+  /**
+   * Seeded by the in-memory preview store. Nothing was purchased or delivered and
+   * there is no provider to ask for a release, so a refund of one correctly fails
+   * to cancel upstream and flags reconciliation instead.
+   */
+  preview: "preview",
   /** Catalog account order placed through the routing layer. */
   accounts: "accounts",
   /** Hand-prepared item waiting on the admin fulfilment queue. */
@@ -26,6 +30,6 @@ export const ORDER_PROVIDERS = {
 export type OrderProvider = (typeof ORDER_PROVIDERS)[keyof typeof ORDER_PROVIDERS];
 
 export const LIVE_OTP_PROVIDER = ORDER_PROVIDERS.liveOtp;
-export const SIMULATED_PROVIDER = ORDER_PROVIDERS.simulated;
+export const PREVIEW_PROVIDER = ORDER_PROVIDERS.preview;
 export const ACCOUNTS_PROVIDER = ORDER_PROVIDERS.accounts;
 export const MANUAL_PROVIDER = ORDER_PROVIDERS.manual;

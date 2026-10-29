@@ -7,7 +7,7 @@ import { useState } from "react";
  * Each line gets its own copy button; nothing is fetched on the client, the
  * values are handed down from the server component.
  */
-export function CredentialList({ accounts, demo = false }: { accounts: string[]; demo?: boolean }) {
+export function CredentialList({ accounts }: { accounts: string[] }) {
   const [copied, setCopied] = useState<number | "all" | null>(null);
 
   async function copy(value: string, key: number | "all") {
@@ -55,7 +55,7 @@ export function CredentialList({ accounts, demo = false }: { accounts: string[];
       </button>
 
       <p className="pt-1 text-[0.72rem] text-ink-3">
-        {demo ? "These are fictional samples, not usable account credentials." : "Treat these like passwords. Each line is one account, exactly as issued by the seller."}
+        Treat these like passwords. Each line is one account, exactly as described.
       </p>
     </div>
   );

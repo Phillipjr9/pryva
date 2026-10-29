@@ -11,14 +11,12 @@ import type { PublicUser } from "@/lib/auth";
 
 interface GiftCardsManagerProps {
   user: PublicUser;
-  preview?: boolean;
 }
 
 type Tab = "create" | "redeem" | "history";
 
-export function GiftCardsManager({ user, preview = false }: GiftCardsManagerProps) {
+export function GiftCardsManager({ user }: GiftCardsManagerProps) {
   const router = useRouter();
-  const attempt = useRef<{ amount: number; requestId: string } | null>(null);
   const creating = useRef(false);
   const redeeming = useRef(false);
   const [activeTab, setActiveTab] = useState<Tab>("create");
@@ -56,35 +54,28 @@ export function GiftCardsManager({ user, preview = false }: GiftCardsManagerProp
 
   async function handleCreate() {
     if (creating.current) return;
-    if (preview && attempt.current && attempt.current.amount !== amount) {
-      setError("Check your gift card history and retry the previous amount before starting another.");
-      return;
-    }
     creating.current = true;
     setLoading(true);
     setError(null);
     setSuccess(null);
 
     try {
-      if (preview) attempt.current ??= { amount, requestId: crypto.randomUUID() };
       const [response] = await Promise.all([
-        fetch(preview ? "/api/demo/gift-cards/create" : "/api/gift-cards/purchase", {
+        fetch("/api/gift-cards/purchase", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(preview ? attempt.current : { amount, recipientEmail: recipientEmail || undefined, message: message || undefined }),
+          body: JSON.stringify({ amount, recipientEmail: recipientEmail || undefined, message: message || undefined }),
         }),
         new Promise((resolve) => setTimeout(resolve, 1600)),
       ]);
 
       const data = await response.json();
 
-      if (!response.ok || !data.ok || (preview && !data.simulated)) {
-        if (preview && response.status >= 400 && response.status < 500 && response.status !== 409) attempt.current = null;
+      if (!response.ok || !data.ok) {
         setError(response.status >= 500 ? "Could not confirm the purchase. Check gift card history and wallet activity before trying again." : data.error || "Purchase failed");
         return;
       }
 
-      attempt.current = null;
       fireConfetti();
       setSuccess({ code: data.code, amount: data.amount });
       router.refresh();
@@ -108,7 +99,7 @@ export function GiftCardsManager({ user, preview = false }: GiftCardsManagerProp
 
     try {
       const [response] = await Promise.all([
-        fetch(preview ? "/api/demo/gift-cards/redeem" : "/api/gift-cards/redeem", {
+        fetch("/api/gift-cards/redeem", {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: redeemCode }),
         }),
         new Promise((resolve) => setTimeout(resolve, 1600)),
@@ -116,7 +107,7 @@ export function GiftCardsManager({ user, preview = false }: GiftCardsManagerProp
 
       const data = await response.json();
 
-      if (!response.ok || !data.ok || (preview && !data.simulated)) {
+      if (!response.ok || !data.ok) {
         throw new Error(data.error || "Redemption failed");
       }
 
@@ -209,11 +200,12 @@ export function GiftCardsManager({ user, preview = false }: GiftCardsManagerProp
             />
           </div>
 
-          <p className={`rounded-xl border p-3 text-sm ${preview ? "border-lav-200 bg-lav-50 text-lav-800" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
-            {preview ? "Create and redeem a fictional gift card with demo funds. You can redeem it in this same demo account." : "Gift card codes are bearer secrets: anyone with the code can redeem it. Email and message are labels only; no email is sent and the recipient is not restricted. Share the code privately yourself."}
+          <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            Gift card codes are bearer secrets: anyone with the code can redeem it. Email and message
+            are labels only; no email is sent and the recipient is not restricted. Share the code
+            privately yourself.
           </p>
 
-          {!preview && <>
           {/* Recipient Email */}
           <div>
             <label className="block text-[0.86rem] font-medium text-ink mb-2">
@@ -242,7 +234,6 @@ export function GiftCardsManager({ user, preview = false }: GiftCardsManagerProp
             />
           </div>
 
-          </>}
           {/* Wallet Balance */}
           <div className="rounded-xl border border-line bg-cream p-4">
             <p className="text-[0.86rem] text-ink-2">Wallet Balance</p>
@@ -259,13 +250,13 @@ export function GiftCardsManager({ user, preview = false }: GiftCardsManagerProp
           )}
 
           {success && (
-            <div className="demo-arrive rounded-xl border border-green-200 bg-green-50 p-6 text-center">
+            <div className="flow-arrive rounded-xl border border-green-200 bg-green-50 p-6 text-center">
               <Gift className="mx-auto h-12 w-12 text-green-600 mb-3" />
               <p className="text-[1.1rem] font-semibold text-green-700 mb-2">
-                {preview ? "Demo gift card created!" : "Gift Card Created!"}
+                Gift Card Created!
               </p>
               <p className="text-[0.9rem] text-green-600 mb-4">
-                {preview ? "Try this fictional code in the Redeem tab. No real money or email is sent." : "Copy and share this code privately. No email is sent automatically."}
+                Copy and share this code privately. No email is sent automatically.
               </p>
               <div className="flex items-center justify-center gap-2 rounded-xl bg-white p-4">
                 <code className="text-[1.2rem] font-bold text-ink">
@@ -327,10 +318,10 @@ export function GiftCardsManager({ user, preview = false }: GiftCardsManagerProp
           )}
 
           {redeemSuccess && (
-            <div className="demo-arrive rounded-xl border border-green-200 bg-green-50 p-6 text-center">
+            <div className="flow-arrive rounded-xl border border-green-200 bg-green-50 p-6 text-center">
               <Check className="mx-auto h-12 w-12 text-green-600 mb-3" />
               <p className="text-[1.1rem] font-semibold text-green-700 mb-2">
-                {preview ? "Demo gift card redeemed!" : "Gift Card Redeemed!"}
+                Gift Card Redeemed!
               </p>
               <p className="text-[1.5rem] font-bold text-green-600">
                 {formatNaira(redeemSuccess)}

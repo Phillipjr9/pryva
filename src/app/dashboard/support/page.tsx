@@ -4,7 +4,6 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { contactMessages } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
-import { isPreviewDatabase } from "@/lib/demo-policy";
 import { ContactForm } from "@/components/site/ContactForm";
 import { ArrowRight, Chat, Clock, Mail, MessageCircle } from "@/components/icons";
 
@@ -13,7 +12,6 @@ export const dynamic = "force-dynamic";
 
 export default async function SupportPage() {
   const user = await requireUser("/dashboard/support");
-  const preview = isPreviewDatabase();
 
   const messages = await db
     .select()
@@ -27,15 +25,15 @@ export default async function SupportPage() {
       <div>
         <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Support</h1>
         <p className="mt-1 text-[0.86rem] text-ink-2">
-          {preview ? "Try the support form with a fictional message. Demo messages are shared and no real request is sent." : "Send a message about your account or an existing order. Response times may vary."}
+          Send a message about your account or an existing order. Response times may vary.
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
         {[
-          { icon: MessageCircle, label: preview ? "Demo form" : "Message form", value: preview ? "Save a fictional message below" : "Send a support request below" },
-          { icon: Mail, label: preview ? "Delivery" : "Email", value: preview ? "No real request is sent" : "support@pryva.ng" },
-          { icon: Clock, label: preview ? "Demo history" : "Response time", value: preview ? "Visible in this preview" : "May vary" },
+          { icon: MessageCircle, label: "Message form", value: "Send a support request below" },
+          { icon: Mail, label: "Email", value: "support@pryva.ng" },
+          { icon: Clock, label: "Response time", value: "May vary" },
         ].map((item) => {
           const Icon = item.icon;
           return (
@@ -56,7 +54,7 @@ export default async function SupportPage() {
       </div>
 
       <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start">
-        <ContactForm defaultName={preview ? "Demo Visitor" : user.name} defaultEmail={preview ? "demo@example.test" : user.email} signedIn preview={preview} />
+        <ContactForm defaultName={user.name} defaultEmail={user.email} signedIn />
 
         <div className="grid gap-4">
           <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
@@ -66,7 +64,7 @@ export default async function SupportPage() {
             </div>
             {messages.length === 0 ? (
               <p className="mt-3 rounded-xl border border-dashed border-line bg-cream/50 px-4 py-6 text-center text-[0.8rem] text-ink-3">
-                {preview ? "No demo messages yet. Try saving a fictional example." : "You haven't messaged us yet. Anything unclear? Ask away."}
+                You haven&apos;t messaged us yet. Anything unclear? Ask away.
               </p>
             ) : (
               <div className="mt-3 grid gap-2.5">

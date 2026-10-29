@@ -83,6 +83,7 @@ export default async function AdminOrdersPage({
       status: orders.status,
       createdAt: orders.createdAt,
       refundedAt: orders.refundedAt,
+      reconciliationNote: orders.reconciliationNote,
     })
     .from(orders)
     .where(where)
@@ -214,6 +215,11 @@ export default async function AdminOrdersPage({
                   </span>
                   {row.refundedAt && (
                     <p className="mt-1 text-[0.7rem] text-ink-3">refunded {formatDate(row.refundedAt)}</p>
+                  )}
+                  {row.reconciliationNote && (
+                    <p className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-[0.7rem] font-medium leading-snug text-amber-800">
+                      {row.reconciliationNote}
+                    </p>
                   )}
                 </td>
                 <td className="px-4 py-3 text-ink-2">{formatDate(row.createdAt)}</td>

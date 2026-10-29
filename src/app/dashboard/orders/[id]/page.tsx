@@ -11,10 +11,7 @@ import Link from "next/link";
 import { ArrowLeft } from "@/components/icons";
 import { CredentialList } from "./CredentialList";
 import { OrderActions } from "@/components/dashboard/OrderActions";
-import { isPreviewDatabase } from "@/lib/demo-policy";
-import { isPreviewSingleNumberWithoutCode } from "@/lib/refund-policy";
-import { isDemoNumberRental } from "@/lib/demo-service-catalog";
-import { LIVE_OTP_PROVIDER, SIMULATED_PROVIDER } from "@/lib/order-providers";
+import { LIVE_OTP_PROVIDER } from "@/lib/order-providers";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -50,8 +47,6 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
   }
 
   const credentials = parseAccounts(order.accounts);
-  const demoUnitsValue = (order as typeof order & { demoUnitsRemaining?: unknown }).demoUnitsRemaining;
-  const demoUnitsRemaining = isPreviewDatabase() && typeof demoUnitsValue === "number" && Number.isSafeInteger(demoUnitsValue) && demoUnitsValue >= 0 ? demoUnitsValue : null;
   // Share the request-time clock with the client for hydration-safe countdowns.
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
@@ -107,11 +102,10 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                     <p className="text-[0.95rem] font-medium text-ink">{order.planLabel}</p>
                   </div>
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 mb-1">{isPreviewDatabase() && order.provider === "simulated" && order.service === "digital" ? "Browsing country" : "Region"}</p>
+                    <p className="text-[0.82rem] text-ink-3 mb-1">Region</p>
                     <p className="text-[0.95rem] font-medium text-ink">
                       {order.region}
                     </p>
-                    {isPreviewDatabase() && order.provider === "simulated" && order.service === "digital" && order.region !== "Demo" && <p className="mt-1 text-[0.7rem] text-ink-3">Demo selection, not confirmed coverage.</p>}
                   </div>
                   <div>
                     <p className="text-[0.82rem] text-ink-3 mb-1">Duration</p>
@@ -138,10 +132,10 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
             {credentials.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>{isPreviewDatabase() && order.provider === "simulated" ? "Demo account samples" : "Account credentials"} ({credentials.length})</CardTitle>
+                  <CardTitle>Account credentials ({credentials.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <CredentialList accounts={credentials} demo={isPreviewDatabase() && order.provider === "simulated"} />
+                  <CredentialList accounts={credentials} />
                 </CardContent>
               </Card>
             )}
@@ -157,14 +151,14 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                   </p>
                   {credentials.length > 0 && (
                     <div className="mt-3">
-                      <CredentialList accounts={credentials} demo={isPreviewDatabase() && order.provider === "simulated"} />
+                      <CredentialList accounts={credentials} />
                     </div>
                   )}
                 </CardContent>
               </Card>
             )}
 
-            {(order.status === "processing" || order.status === "review") && !(isPreviewDatabase() && order.provider === "simulated" && order.service === "social") && (
+            {(order.status === "processing" || order.status === "review") && (
               <Card>
                 <CardHeader>
                   <CardTitle>{order.status === "review" ? "Order needs review" : "Delivery in progress"}</CardTitle>
@@ -191,11 +185,6 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
               otpCode={order.otpCode ?? null}
               service={order.service}
               refreshableCode={order.provider === LIVE_OTP_PROVIDER}
-              demoOrder={order.provider === SIMULATED_PROVIDER}
-              preview={isPreviewDatabase()}
-              demoUnitsRemaining={demoUnitsRemaining}
-              reusableDemoNumber={isPreviewDatabase() && isDemoNumberRental(order)}
-              canRequestPreviewRefund={isPreviewDatabase() && isPreviewSingleNumberWithoutCode(order)}
               initialNow={now}
             />
             <Card>

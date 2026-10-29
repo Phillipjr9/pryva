@@ -40,6 +40,32 @@ export const sessions = pgTable(
   (table) => [index("sessions_user_idx").on(table.userId)],
 );
 
+/**
+ * Single-use password reset tokens.
+ *
+ * Only a SHA-256 hash of the token is stored: anyone who reads this table must
+ * not be able to reset a password with what they find. A token is valid until it
+ * is used or expires, and requesting a new one supersedes any outstanding token
+ * for that account so only the most recent link works.
+ */
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("password_reset_tokens_hash_idx").on(table.tokenHash),
+    index("password_reset_tokens_user_idx").on(table.userId),
+  ],
+);
+
 export const orders = pgTable(
   "orders",
   {
@@ -56,7 +82,18 @@ export const orders = pgTable(
     duration: varchar("duration", { length: 80 }).notNull(),
     amount: integer("amount").notNull(),
     status: varchar("status", { length: 24 }).notNull().default("active"),
-    provider: varchar("provider", { length: 40 }).notNull().default("simulated"),
+    /**
+     * Which provider fulfilled this order, and therefore which one has to be
+     * asked to release the unit on a refund.
+     *
+     * No default, deliberately. A default of "simulated" -- demo language left
+     * over in a production column -- meant any insert path that forgot to name a
+     * provider silently recorded a supplier that does not exist, and
+     * cancelUpstream would then match nothing and quietly fail to release the
+     * unit. A missing provider is now a database error instead of a plausible
+     * looking wrong answer.
+     */
+    provider: varchar("provider", { length: 40 }).notNull(),
     providerRequestId: varchar("provider_request_id", { length: 160 }),
     referenceCode: text("reference_code"),
     otpCode: varchar("otp_code", { length: 12 }),
@@ -64,9 +101,32 @@ export const orders = pgTable(
     accounts: text("accounts"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     refundedAt: timestamp("refunded_at", { withTimezone: true }),
+    /**
+     * Set when a refund committed but the provider unit could not be released:
+     * the money is back with the customer and the number may still be working,
+     * so an owner has to finish it by hand.
+     */
+    reconciliationNote: text("reconciliation_note"),
+    /**
+     * What this unit actually cost us, in naira.
+     *
+     * The provider's charged amount where it reports one, otherwise the price it
+     * quoted before we bought. Persisted because the cost sheet is a planning
+     * document, not a source of truth: real margin per plan and per destination
+     * can only be measured from what suppliers actually charged. Never shown to
+     * customers -- it is wholesale cost.
+     */
+    providerCostNgn: integer("provider_cost_ngn"),
+    // Optional for legacy rows; every new purchase supplies a per-user key that
+    // makes a retried request replay the original order instead of buying a
+    // second number and debiting twice.
+    requestId: uuid("request_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("orders_user_idx").on(table.userId)],
+  (table) => [
+    index("orders_user_idx").on(table.userId),
+    uniqueIndex("orders_user_request_idx").on(table.userId, table.requestId),
+  ],
 );
 
 export const walletTransactions = pgTable(

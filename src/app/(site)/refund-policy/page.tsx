@@ -13,12 +13,12 @@ const rows = [
     product: "Virtual numbers & rental numbers",
     refund: "Review required",
     detail:
-      "Live orders require provider review. Some simulated single-number orders may be refunded after the window closes without a code.",
+      "Refunds are reviewed against the delivery outcome. If the window closed and no code arrived, contact support with your order reference.",
   },
   {
     product: "Email OTP inboxes",
     refund: "Review required",
-    detail: "Contact support to review delivery; live automatic refunds are disabled.",
+    detail: "Email OTP inboxes are not available for purchase yet, so no charge can be raised for one.",
   },
   {
     product: "eSIM data & residential proxies",

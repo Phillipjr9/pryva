@@ -7,6 +7,8 @@ import { BrandLockup } from "@/components/brand/BrandLockup";
 const LINKS = [
   { href: "/admin/dashboard", label: "Overview" },
   { href: "/admin/orders", label: "Orders" },
+  { href: "/admin/refunds", label: "Refunds" },
+  { href: "/admin/margin", label: "Margin" },
   { href: "/admin/fulfilment", label: "Fulfilment" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/messages", label: "Support" },

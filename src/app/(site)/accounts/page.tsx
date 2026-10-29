@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AccountsBrowser } from "./AccountsBrowser";
 import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
-import { isPreviewDatabase } from "@/lib/demo-policy";
 import { PlatformStrip } from "@/components/PlatformBadge";
 
 export const metadata: Metadata = {
@@ -68,7 +67,7 @@ export default function AccountsPage() {
       </section>
 
       <section className="shell py-10 sm:py-12">
-        <AccountsBrowser purchaseEnabled={isMarketplaceCheckoutConfigured()} preview={isPreviewDatabase()} />
+        <AccountsBrowser purchaseEnabled={isMarketplaceCheckoutConfigured()} />
       </section>
 
       <section className="border-t border-line/70 bg-cream/60">

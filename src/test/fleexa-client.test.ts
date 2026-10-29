@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const runtime = vi.hoisted(() => ({ preview: false, limit: vi.fn() }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => runtime.preview }));
+const runtime = vi.hoisted(() => ({ limit: vi.fn() }));
 vi.mock("@/lib/rate-limit", () => ({ createRateLimiter: () => runtime.limit }));
 
 import { buyFleexaEmail, buyFleexaRental, buyFleexaSmsNumber, listFleexaRentAreas, listFleexaSmsServices } from "@/lib/fleexa";
@@ -10,29 +9,42 @@ beforeEach(() => {
   vi.stubEnv("FLEEXA_API_KEY", "provider-secret");
   vi.stubEnv("FLEEXA_BASE_URL", "");
   vi.stubEnv("FLEEXA_API_URL", "");
-  runtime.preview = false;
   runtime.limit.mockResolvedValue({ allowed: true });
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
 describe("supplier client safety", () => {
-  it("never calls the supplier from the demo or when shared budgeting fails", async () => {
+  it("never calls the supplier when shared budgeting fails", async () => {
     const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
-    runtime.preview = true;
-    await expect(listFleexaSmsServices()).rejects.toMatchObject({ code: "PREVIEW_DISABLED" });
-    runtime.preview = false;
     runtime.limit.mockResolvedValueOnce({ allowed: false, unavailable: true }).mockResolvedValueOnce({ allowed: false });
     await expect(listFleexaSmsServices()).rejects.toMatchObject({ code: "RATE_LIMIT_UNAVAILABLE" });
     await expect(listFleexaSmsServices()).rejects.toMatchObject({ code: "RATE_LIMITED" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("keeps all historical paid actions disabled even when a key is configured", async () => {
-    const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
-    for (const operation of [() => buyFleexaSmsNumber({ country: "US", app: "test" }), () => buyFleexaEmail(), () => buyFleexaRental({ area: "US" })]) {
-      await expect(operation()).rejects.toMatchObject({ code: "ACTIONS_DISABLED" });
-    }
-    expect(fetchMock).not.toHaveBeenCalled();
+  it("sends paid actions as POST with the key in headers, never in the URL", async () => {
+    // One payload carrying every alias so each parser finds its own field.
+    const receipt = { data: { request_id: "req-1", phone_number: "+2348000000000", email_id: "mail-1", email: "inbox@example.test", rental_id: "rent-1" } };
+    // A Response body can only be read once, so build a fresh one per call.
+    const fetchMock = vi.fn().mockImplementation(() => new Response(JSON.stringify(receipt), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await buyFleexaSmsNumber({ country: "ng" })).toMatchObject({ requestId: "req-1", number: "+2348000000000" });
+    expect(await buyFleexaEmail()).toMatchObject({ emailId: "mail-1", address: "inbox@example.test" });
+    expect(await buyFleexaRental({ area: "ng", months: 1 })).toMatchObject({ rentalId: "rent-1" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const paths = ["/sms4/buy", "/email/buy", "/rent/sms4/buy"];
+    fetchMock.mock.calls.forEach((call, index) => {
+      const [url, init] = call as [string, RequestInit & { headers: Record<string, string> }];
+      expect(url.endsWith(paths[index]), url).toBe(true);
+      // The key must ride in headers: a key in a query string ends up in logs.
+      expect(url).not.toContain("provider-secret");
+      expect(init.method).toBe("POST");
+      expect(init.redirect).toBe("error");
+      expect(init.headers.Authorization).toBe("Bearer provider-secret");
+      expect(init.headers["X-API-Key"]).toBe("provider-secret");
+    });
   });
 
   it("rejects credential-exfiltrating base URLs and never follows redirects", async () => {

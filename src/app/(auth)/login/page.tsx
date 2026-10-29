@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -28,15 +29,20 @@ function BounceNotice({ arenaPreview }: { arenaPreview: boolean }) {
       <p className="font-semibold text-amber-900">Just signed in and landed back here?</p>
       <p className="mt-1 leading-relaxed text-ink-2">
         {arenaPreview
-          ? "The embedded preview could not keep the session. Refresh it inside Arena and try the shared demo again. Your browser must allow site storage for the preview."
+          ? "This preview is embedded, and your browser will not let an embedded page keep the sign-in cookie. Refreshing will not help — open the preview in its own tab and sign in there."
           : "The browser may be blocking the session cookie in this embedded page. Try opening the sign-in page in its own tab."}
       </p>
       <p className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
-        {!arenaPreview && (
-          <a href="/login" target="_blank" rel="noopener noreferrer" className="font-semibold text-lav-700 underline underline-offset-2">
-            Open sign-in in a new tab
-          </a>
-        )}
+        {/*
+          Offered in both cases, including the embedded preview. It used to be
+          hidden when the preview host was detected, which removed the one
+          workaround exactly where it is needed: a browser that refuses site
+          storage in an embedded page cannot be fixed by refreshing it, but the
+          SameSite=Lax session cookie works normally once the page is top-level.
+        */}
+        <a href="/login" target="_blank" rel="noopener noreferrer" className="font-semibold text-lav-700 underline underline-offset-2">
+          Open sign-in in a new tab
+        </a>
         <a href="/api/auth/whoami" className="font-semibold text-lav-700 underline underline-offset-2">
           Check what the server sees
         </a>
@@ -66,6 +72,11 @@ export default async function LoginPage({
     <div className="mx-auto w-full max-w-md rounded-[1.75rem] border border-line bg-[#fffdfa] p-6 shadow-[var(--shadow-card)] sm:p-8">
       {bounced === "1" ? <BounceNotice arenaPreview={isArenaPreviewHost(host)} /> : null}
       <AuthForm mode="login" next={safeNext} errorParam={error ?? null} />
+      <p className="mt-4 text-center text-sm text-ink-2">
+        <Link href="/forgot-password" className="font-semibold text-lav-700 underline underline-offset-2">
+          Forgot your password?
+        </Link>
+      </p>
     </div>
   );
 }

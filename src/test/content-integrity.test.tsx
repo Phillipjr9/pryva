@@ -28,11 +28,13 @@ describe("public content integrity", () => {
     expect(html).not.toContain('href="#"');
     expect(html).toContain("/blog/esim-travel-guide");
   });
-  it("does not invent uptime or incidents and identifies preview settings", () => {
-    vi.stubEnv("DATABASE_URL", "");
+  it("does not invent uptime or incidents and reports derived availability", () => {
     const html = renderToStaticMarkup(<StatusPage />);
     expect(html).toContain("Live monitoring is not connected");
-    expect(html).toContain("Preview only");
+    // Availability is computed from the fulfilment allowlist, so the page can
+    // only ever claim a category is orderable if checkout would actually run.
+    expect(html).toContain("Virtual numbers (SMS verification &amp; rentals)");
+    expect(html).toContain("can be ordered and delivered automatically");
     expect(html).not.toMatch(/99\.\d+%|all systems operational|resolved incident/i);
   });
   it("does not promise automatic refunds or unverified top-up credit", () => {

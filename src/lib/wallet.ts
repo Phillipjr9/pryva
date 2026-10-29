@@ -68,36 +68,48 @@ export async function creditWallet(input: WalletEntryInput): Promise<number> {
   return balance;
 }
 
-export async function debitWallet(input: WalletEntryInput): Promise<number> {
+/**
+ * Debit inside a caller-supplied transaction.
+ *
+ * Split out so a purchase can commit its order row and its wallet charge as one
+ * unit. An order row that exists without a matching debit is worse than no row
+ * at all: the automatic refund sweep credits `amount` back to the wallet without
+ * ever checking that a debit happened, so a half-written row would pay out real
+ * money for nothing.
+ */
+export async function debitWalletInTx(tx: any, input: WalletEntryInput): Promise<number> {
   validateWalletEntry(input, "debit");
-  const balance = await db.transaction(async (tx: any) => {
-    const [updated] = await tx
-      .update(users)
-      .set({ walletBalance: sql`${users.walletBalance} - ${input.amount}` })
-      .where(sql`${users.id} = ${input.userId} AND ${users.walletBalance} >= ${input.amount}`)
-      .returning({ balance: users.walletBalance });
 
-    if (!updated) {
-      const [current] = await tx
-        .select({ balance: users.walletBalance })
-        .from(users)
-        .where(eq(users.id, input.userId))
-        .limit(1);
-      throw new InsufficientFundsError(current?.balance ?? 0, input.amount);
-    }
+  const [updated] = await tx
+    .update(users)
+    .set({ walletBalance: sql`${users.walletBalance} - ${input.amount}` })
+    .where(sql`${users.id} = ${input.userId} AND ${users.walletBalance} >= ${input.amount}`)
+    .returning({ balance: users.walletBalance });
 
-    await tx.insert(walletTransactions).values({
-      userId: input.userId,
-      orderId: input.orderId ?? null,
-      type: input.type,
-      amount: input.amount,
-      balanceAfter: updated.balance,
-      description: input.description,
-      reference: input.reference ?? makeReference("PAY"),
-    });
+  if (!updated) {
+    const [current] = await tx
+      .select({ balance: users.walletBalance })
+      .from(users)
+      .where(eq(users.id, input.userId))
+      .limit(1);
+    throw new InsufficientFundsError(current?.balance ?? 0, input.amount);
+  }
 
-    return updated.balance;
+  await tx.insert(walletTransactions).values({
+    userId: input.userId,
+    orderId: input.orderId ?? null,
+    type: input.type,
+    amount: input.amount,
+    balanceAfter: updated.balance,
+    description: input.description,
+    reference: input.reference ?? makeReference("PAY"),
   });
+
+  return updated.balance;
+}
+
+export async function debitWallet(input: WalletEntryInput): Promise<number> {
+  const balance = await db.transaction(async (tx: any) => debitWalletInTx(tx, input));
   scheduleWalletEmails();
   return balance;
 }

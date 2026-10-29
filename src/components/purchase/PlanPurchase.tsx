@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Lock, Shield, Sparkle } from "@/components/icons";
@@ -18,11 +18,24 @@ type Props = {
   signedIn: boolean;
   walletBalance: number | null;
   nextPath: string;
-  /** Explicitly label preview checkout so it cannot be mistaken for live delivery. */
-  previewOnly?: boolean;
 };
 
-export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previewOnly = false }: Props) {
+/**
+ * An RFC-4122-shaped idempotency key. crypto.randomUUID is only available on a
+ * secure origin, and a fallback that returned a constant would be worse than no
+ * key at all -- every customer would share one and replay each other's orders.
+ */
+function newRequestId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  const hex = (digits: number) =>
+    Math.floor(Math.random() * 16 ** digits).toString(16).padStart(digits, "0");
+  const variant = "89ab"[Math.floor(Math.random() * 4)];
+  return `${hex(8)}-${hex(4)}-4${hex(3)}-${variant}${hex(3)}-${hex(12)}`;
+}
+
+export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState(0);
   const plans = useMemo(() => groups[tab]?.plans ?? [], [groups, tab]);
@@ -37,6 +50,22 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previe
   );
 
   const selected = plans.find((plan) => plan.slug === selectedSlug) ?? plans[0];
+
+  // One key per purchase attempt. It is reused across a retry of the same attempt
+  // so a browser retry, a second tab, or a resubmit after a timeout whose first
+  // attempt actually succeeded cannot buy a second real number -- and it is
+  // regenerated only once an attempt succeeds or another plan is chosen. Keeping
+  // it across a failure is deliberate: if the request did reach the server, the
+  // retry replays that order instead of creating a second one.
+  const attempt = useRef<{ slug: string; requestId: string } | null>(null);
+
+  function requestIdFor(slug: string): string {
+    const current = attempt.current;
+    if (current && current.slug === slug) return current.requestId;
+    const requestId = newRequestId();
+    attempt.current = { slug, requestId };
+    return requestId;
+  }
 
   function changeTab(index: number) {
     setTab(index);
@@ -56,7 +85,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previe
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planSlug: selected.slug }),
+        body: JSON.stringify({ planSlug: selected.slug, requestId: requestIdFor(selected.slug) }),
       });
       const data = (await response.json()) as {
         ok?: boolean;
@@ -78,6 +107,8 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previe
         reference: data.order.reference,
         name: data.order.productName,
       });
+      // The attempt is settled, so the next purchase is genuinely a new one.
+      attempt.current = null;
       router.refresh();
     } catch {
       setError("Network hiccup. Please try again.");
@@ -91,8 +122,8 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previe
       <PaymentLoading show={pending} message="Processing your order..." />
       <PaymentSuccess
         show={!!success}
-        title="Preview Order Complete"
-        message={`${success?.name} is simulated and is now in your dashboard.`}
+        title="Order Complete"
+        message={`${success?.name} is now in your dashboard.`}
         redirectUrl={`/dashboard/orders/${success?.id}`}
         redirectDelay={2500}
       />
@@ -103,9 +134,9 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previe
           <span className="grid h-12 w-12 place-items-center rounded-full bg-lav-100 text-lav-700">
             <Check className="h-6 w-6" />
           </span>
-          <h3 className="mt-5 text-2xl font-medium">Preview order complete.</h3>
+          <h3 className="mt-5 text-2xl font-medium">Order complete.</h3>
           <p className="mt-2 max-w-md text-[0.92rem] leading-relaxed text-ink-2">
-            <span className="font-semibold text-ink">{success.name}</span> is simulated; no live service was delivered. The preview order is now in your dashboard.
+            <span className="font-semibold text-ink">{success.name}</span> is now in your dashboard. Your verification code appears in the order details as soon as it arrives.
             Order reference{" "}
             <span className="rounded-md bg-lav-50 px-1.5 py-0.5 font-mono text-[0.8rem] text-lav-700">
               {success.reference}
@@ -131,13 +162,13 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previe
       {!success && (
         <div id="buy" className="scroll-mt-28">
           {groups.length > 1 && (
-            <div className="mb-6 inline-flex items-center gap-1 rounded-full border border-line bg-white/70 p-1">
+            <div className="mb-6 inline-flex max-w-full flex-wrap items-center gap-1 rounded-full border border-line bg-white/70 p-1">
               {groups.map((group, index) => (
                 <button
                   key={group.label}
                   type="button"
                   onClick={() => changeTab(index)}
-                  className={`rounded-full px-4 py-2 text-[0.82rem] font-semibold transition-all ${
+                  className={`rounded-full px-3 py-1.5 text-[0.78rem] font-semibold transition-all sm:px-4 sm:py-2 sm:text-[0.82rem] ${
                     tab === index
                       ? "bg-ink text-white shadow-sm"
                       : "text-ink-2 hover:bg-lav-50 hover:text-lav-700"
@@ -149,7 +180,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previe
             </div>
           )}
 
-          <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 xl:grid-cols-3">
             {plans.map((plan) => {
               const isSelected = plan.slug === selected?.slug;
               return (
@@ -162,7 +193,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previe
                     setNeedsFunds(false);
                   }}
                   aria-pressed={isSelected}
-                  className={`group relative flex flex-col rounded-3xl border p-5 text-left transition-all duration-300 ${
+                  className={`group relative flex flex-col rounded-2xl border p-3 text-left transition-all duration-300 sm:rounded-3xl sm:p-5 ${
                     isSelected
                       ? "border-lav-300 bg-white shadow-[var(--shadow-soft)] ring-1 ring-lav-300"
                       : "border-line bg-white/60 hover:-translate-y-0.5 hover:border-lav-200 hover:bg-white"
@@ -189,8 +220,8 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previe
                     </span>
                   </div>
 
-                  <div className="mt-4 flex items-end gap-2">
-                    <span className="text-[1.55rem] font-semibold leading-none tracking-tight">
+                  <div className="mt-2.5 flex items-end gap-2 sm:mt-4">
+                    <span className="text-[1.05rem] font-semibold leading-none tracking-tight sm:text-[1.55rem]">
                       {formatNaira(plan.price)}
                     </span>
                     {plan.compareAt && (
@@ -200,11 +231,16 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previe
                     )}
                   </div>
                   <span className="mt-1.5 text-[0.74rem] text-ink-3">{plan.duration}</span>
-                  <span className="mt-3 block w-full"><UnitsStatus /></span>
+                  <span className="mt-2 block w-full sm:mt-3"><UnitsStatus /></span>
 
-                  <ul className="mt-4 space-y-1.5">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-1.5 text-[0.78rem] text-ink-2">
+                  <ul className="mt-2.5 space-y-1 sm:mt-4 sm:space-y-1.5">
+                    {/* Past the first two, the list is a detail: on a phone it is
+                        what makes each card taller than the product deserves. */}
+                    {plan.features.map((feature, index) => (
+                      <li
+                        key={feature}
+                        className={`${index >= 2 ? "hidden sm:flex" : "flex"} items-start gap-1.5 text-[0.72rem] text-ink-2 sm:text-[0.78rem]`}
+                      >
                         <Check className="mt-0.5 h-3 w-3 shrink-0 text-lav-500" />
                         {feature}
                       </li>
@@ -259,7 +295,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previe
                   disabled={pending || !selected}
                   className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
-                  {pending ? "Processing…" : previewOnly ? "Create simulated order" : "Pay from wallet"}
+                  {pending ? "Processing…" : "Pay from wallet"}
                   {!pending && <ArrowRight className="h-4 w-4" />}
                 </button>
               ) : (

@@ -52,6 +52,8 @@ vi.mock("@/lib/rate-limit", () => ({
   giftCardIpRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   giftCardUserRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   contactRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
+  passwordChangeRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
+  notificationRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   createRateLimiter: () => async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   resetRateLimit: async () => {},
 }));
@@ -136,6 +138,11 @@ beforeAll(async () => {
   await pg.exec(await readFile("migrations/0003_withdrawal_idempotency.sql", "utf8"));
   await pg.exec(await readFile("migrations/0004_paystack_transfer_reference.sql", "utf8"));
   await pg.exec(await readFile("migrations/0005_wallet_email_outbox.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0006_order_idempotency.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0007_order_reconciliation_note.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0008_order_provider_cost.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0009_password_reset_tokens.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0010_order_provider_no_default.sql", "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
   [purchaseRoute, refundRoute, bankRoute, verifyBankRoute, googleRoute, contactRoute, deleteRoute, passwordRoute, sessionsRoute, autoRefund, giftPurchaseRoute, giftCheckRoute, giftRedeemRoute, topUpRoute, verifyTopUpRoute, webhookRoute, profileRoute, notificationsRoute, markReadRoute, logoutRoute, syncRoute, scheduledRoute, promoRoute, withdrawalRoute, adminWithdrawalRoute, integrity] = await Promise.all([
@@ -310,7 +317,7 @@ describe("ledger integrity", () => {
   });
 
   it("recognizes the actual refund ledger type when checking a refunded order", async () => {
-    const [order] = await database.insert(schema.orders).values({ reference: "integrity-order", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "Nigeria", duration: "Single", amount: 1000, provider: "simulated", status: "refunded" }).returning();
+    const [order] = await database.insert(schema.orders).values({ reference: "integrity-order", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "Nigeria", duration: "Single", amount: 1000, provider: "fleexa", status: "refunded" }).returning();
     await database.insert(schema.walletTransactions).values([
       { userId: USER, orderId: order.id, type: "debit", amount: 1000, balanceAfter: 9000, description: "Purchase", reference: "integrity-debit" },
       { userId: USER, orderId: order.id, type: "refund", amount: 1000, balanceAfter: 10000, description: "Refund", reference: "integrity-order-refund" },
@@ -428,18 +435,18 @@ describe("marketplace money safety", () => {
   });
 });
 
-describe("simulated refund SQL", () => {
+describe("undelivered number refund SQL", () => {
   it("only claims timed-out single numbers without a code and never double-credits", async () => {
     vi.stubEnv("DATABASE_URL", "");
-    const common = { userId: USER, productSlug: "test", productName: "Test", planLabel: "Test", region: "Nigeria", amount: 1000, status: "active", provider: "simulated", createdAt: new Date(Date.now() - 60 * 60_000) };
+    const common = { userId: USER, productSlug: "test", productName: "Test", planLabel: "Test", region: "Nigeria", amount: 1000, status: "active", provider: "fleexa", createdAt: new Date(Date.now() - 60 * 60_000) };
     await database.insert(schema.orders).values([
       { ...common, reference: "no-code", service: "numbers", duration: "Single verification · 20 min window" },
       { ...common, reference: "with-code", service: "numbers", duration: "Single verification · 20 min window", otpCode: "123456" },
       { ...common, reference: "rental", service: "numbers", duration: "7 days" },
       { ...common, reference: "esim", service: "esim", duration: "30 days" },
     ]);
-    expect(await autoRefund.processAutoRefunds()).toBe(1);
-    expect(await autoRefund.processAutoRefunds()).toBe(0);
+    expect(await autoRefund.processAutoRefunds()).toEqual({ refunded: 1, cancelled: 0 });
+    expect(await autoRefund.processAutoRefunds()).toEqual({ refunded: 0, cancelled: 0 });
     const rows = await database.select().from(schema.orders);
     expect(rows.find((order) => order.reference === "no-code")?.status).toBe("refunded");
     for (const reference of ["with-code", "rental", "esim"]) {
@@ -451,11 +458,11 @@ describe("simulated refund SQL", () => {
 
   it("rolls back the claim and balance when a refund ledger entry fails", async () => {
     vi.stubEnv("DATABASE_URL", "");
-    await database.insert(schema.orders).values({ reference: "refund-rollback", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "Nigeria", duration: "Single verification · 20 min window", amount: 1000, provider: "simulated", createdAt: new Date(Date.now() - 60 * 60_000) });
+    await database.insert(schema.orders).values({ reference: "refund-rollback", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "Nigeria", duration: "Single verification · 20 min window", amount: 1000, provider: "fleexa", createdAt: new Date(Date.now() - 60 * 60_000) });
     await pg.exec('ALTER TABLE "wallet_transactions" ADD CONSTRAINT "test_no_refund" CHECK ("type" <> \'refund\')');
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
-      expect(await autoRefund.processAutoRefunds()).toBe(0);
+      expect(await autoRefund.processAutoRefunds()).toEqual({ refunded: 0, cancelled: 0 });
       expect((await database.select().from(schema.orders))[0].status).toBe("active");
       expect((await database.select().from(schema.users))[0].walletBalance).toBe(10000);
       expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
@@ -581,7 +588,7 @@ describe("Google subject binding and account protection", () => {
   });
 
   it("refuses self-service deletion and preserves the user and financial records", async () => {
-    await database.insert(schema.orders).values({ reference: "ORDER-1", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "NG", duration: "20 min", amount: 1000 });
+    await database.insert(schema.orders).values({ reference: "ORDER-1", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "NG", duration: "20 min", amount: 1000, provider: "fleexa" });
     const request = new NextRequest("https://pryva.test/api/user/delete", { method: "DELETE", headers: { origin: "https://pryva.test" } });
     expect((await deleteRoute.DELETE(request)).status).toBe(503);
     expect(await database.select().from(schema.users)).toHaveLength(1);

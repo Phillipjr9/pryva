@@ -14,7 +14,7 @@ import { ArrowRight, Download, Loader2, Shield } from "@/components/icons";
  * settlement and record retention are designed, so this panel says that plainly
  * and points at support instead of offering a button that always fails.
  */
-export function AccountDataPanel({ sharedDemo }: { sharedDemo?: boolean }) {
+export function AccountDataPanel() {
   const [busy, setBusy] = useState(false);
 
   async function download() {
@@ -78,9 +78,8 @@ export function AccountDataPanel({ sharedDemo }: { sharedDemo?: boolean }) {
         <p className="flex items-start gap-2 rounded-xl bg-cream/70 px-3.5 py-2.5 text-[0.74rem] leading-relaxed text-ink-2">
           <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
           <span>
-            {sharedDemo
-              ? "This is the shared demo account, so the file describes demo activity only. Do not treat it as your personal data."
-              : "The file can contain redeemable gift-card codes — store it somewhere private. It covers selected activity, not a complete personal-data record."}
+            The file can contain redeemable gift-card codes — store it somewhere private. It covers
+            selected activity, not a complete personal-data record.
           </span>
         </p>
 
