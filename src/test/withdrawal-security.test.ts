@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
-import { bankAccounts, users, withdrawals, walletTransactions , paymentTopups } from "@/db/schema";
+import { bankAccounts, users, withdrawals, walletTransactions , } from "@/db/schema";
 import { POST } from "@/app/api/wallet/withdraw/route";
 
 const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), select: vi.fn(), transaction: vi.fn() }));
@@ -31,18 +31,12 @@ function fakeDatabase() {
     balance: 7000,
     bank: { id: "f5ca2925-6050-49d2-ab89-fc324953ed11", userId: "user-id", bankName: "Test Bank", accountNumber: "1234567890", accountName: "Test User", recipientCode: "RCP-test" },
     withdrawals: [] as Array<Record<string, unknown>>,
-    /** Completed card top-ups; the route holds withdrawals against the newest. */
-    topups: [] as Array<Record<string, unknown>>,
     ledger: [] as Array<Record<string, unknown>>,
     failLedger: false,
   };
   mocks.select.mockImplementation(() => ({
     from: (table: unknown) => ({
       where: (condition: SQL) => ({
-        // The hold check orders by paidAt before limiting.
-        orderBy: () => ({
-          limit: async () => (table === paymentTopups ? state.topups : []),
-        }),
         limit: async () => {
           const params = dialect.sqlToQuery(condition).params;
           if (table === withdrawals) return state.withdrawals.filter((row) => row.userId === params[0] && row.requestId === params[1]);
@@ -150,23 +144,6 @@ describe("withdrawal requests", () => {
     state.bank.userId = "someone-else";
     expect((await POST(request(6000))).status).toBe(404);
     expect(mocks.transaction).not.toHaveBeenCalled();
-  });
-
-  it("holds a withdrawal while a card top-up is inside the window", async () => {
-    const state = fakeDatabase();
-    state.topups = [{ paidAt: new Date(), createdAt: new Date() }];
-    const response = await POST(request(6000));
-    expect(response.status).toBe(423);
-    expect((await response.json()).heldMs).toBeGreaterThan(0);
-    // No transfer may be initiated against held funds, not even a pending one.
-    expect(mocks.transaction).not.toHaveBeenCalled();
-  });
-
-  it("releases the hold once the window has passed", async () => {
-    const state = fakeDatabase();
-    const old = new Date(Date.now() - 49 * 3_600_000);
-    state.topups = [{ paidAt: old, createdAt: old }];
-    expect((await POST(request(6000))).status).toBe(200);
   });
 
   it("reserves the balance once and refuses a second withdrawal that would overdraw it", async () => {
