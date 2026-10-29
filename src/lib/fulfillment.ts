@@ -13,6 +13,8 @@ import { SERVICE_TIMEOUTS } from "@/lib/service-timeouts";
 
 export type FulfilledOrder = {
   provider: "fleexa";
+  /** Charged cost where the provider reports one, else the pre-spend quote. */
+  providerCostNgn: number | null;
   providerRequestId: string | null;
   referenceCode: string | null;
   otpCode: string | null;
@@ -163,6 +165,10 @@ export async function fulfillPlan(plan: Plan): Promise<FulfilledOrder> {
     }
     return {
       provider: "fleexa",
+      // Prefer what was actually charged over the quote: the quote is an
+      // estimate, and the gap between the two is exactly what margin analysis
+      // needs to see.
+      providerCostNgn: typeof order.priceNgn === "number" ? order.priceNgn : (service.priceNgn ?? null),
       providerRequestId: order.requestId,
       referenceCode: order.number,
       // The code arrives later; the order page polls for it.
@@ -186,8 +192,10 @@ export async function fulfillPlan(plan: Plan): Promise<FulfilledOrder> {
   guardMargin(plan, area.pricePerMonthNgn != null ? area.pricePerMonthNgn * intent.months : null);
 
   const rental = await buyFleexaRental({ area: area.id, months: intent.months });
+  const quotedRentalCost = area.pricePerMonthNgn != null ? area.pricePerMonthNgn * intent.months : null;
   return {
     provider: "fleexa",
+    providerCostNgn: quotedRentalCost,
     providerRequestId: rental.rentalId,
     referenceCode: rental.number,
     otpCode: null,

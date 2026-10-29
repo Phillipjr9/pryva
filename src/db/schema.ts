@@ -70,6 +70,16 @@ export const orders = pgTable(
      * so an owner has to finish it by hand.
      */
     reconciliationNote: text("reconciliation_note"),
+    /**
+     * What this unit actually cost us, in naira.
+     *
+     * The provider's charged amount where it reports one, otherwise the price it
+     * quoted before we bought. Persisted because the cost sheet is a planning
+     * document, not a source of truth: real margin per plan and per destination
+     * can only be measured from what suppliers actually charged. Never shown to
+     * customers -- it is wholesale cost.
+     */
+    providerCostNgn: integer("provider_cost_ngn"),
     // Optional for legacy rows; every new purchase supplies a per-user key that
     // makes a retried request replay the original order instead of buying a
     // second number and debiting twice.

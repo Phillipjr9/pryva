@@ -210,6 +210,7 @@ export async function POST(request: Request) {
           amount: plan.price,
           status: "active",
           provider: fulfilled.provider,
+          providerCostNgn: fulfilled.providerCostNgn,
           providerRequestId: fulfilled.providerRequestId,
           referenceCode: fulfilled.referenceCode,
           otpCode: fulfilled.otpCode,
