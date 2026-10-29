@@ -252,7 +252,7 @@ export function ServiceExplorer({ initialCountry, initialCategory, rejectedCount
             )}
 
             {liveState?.country === country && (liveState.failed || liveState.partial) && <p role="status" className="mt-4 text-[0.72rem] text-amber-800">Some live listings couldn&apos;t be loaded. <button type="button" className="font-semibold underline" onClick={() => setLiveRevision((value) => value + 1)}>Retry</button></p>}
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-4 grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-3">
               {filtered.slice(0, visible).map((item) => <ServiceCard key={item.id} item={item} countryName={selectedCountry.name} />)}
             </div>
             {filtered.length === 0 && (

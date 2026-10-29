@@ -162,13 +162,13 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
       {!success && (
         <div id="buy" className="scroll-mt-28">
           {groups.length > 1 && (
-            <div className="mb-6 inline-flex items-center gap-1 rounded-full border border-line bg-white/70 p-1">
+            <div className="mb-6 inline-flex max-w-full flex-wrap items-center gap-1 rounded-full border border-line bg-white/70 p-1">
               {groups.map((group, index) => (
                 <button
                   key={group.label}
                   type="button"
                   onClick={() => changeTab(index)}
-                  className={`rounded-full px-4 py-2 text-[0.82rem] font-semibold transition-all ${
+                  className={`rounded-full px-3 py-1.5 text-[0.78rem] font-semibold transition-all sm:px-4 sm:py-2 sm:text-[0.82rem] ${
                     tab === index
                       ? "bg-ink text-white shadow-sm"
                       : "text-ink-2 hover:bg-lav-50 hover:text-lav-700"
@@ -180,7 +180,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
             </div>
           )}
 
-          <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 xl:grid-cols-3">
             {plans.map((plan) => {
               const isSelected = plan.slug === selected?.slug;
               return (
@@ -193,7 +193,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
                     setNeedsFunds(false);
                   }}
                   aria-pressed={isSelected}
-                  className={`group relative flex flex-col rounded-3xl border p-5 text-left transition-all duration-300 ${
+                  className={`group relative flex flex-col rounded-2xl border p-3 text-left transition-all duration-300 sm:rounded-3xl sm:p-5 ${
                     isSelected
                       ? "border-lav-300 bg-white shadow-[var(--shadow-soft)] ring-1 ring-lav-300"
                       : "border-line bg-white/60 hover:-translate-y-0.5 hover:border-lav-200 hover:bg-white"
@@ -220,8 +220,8 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
                     </span>
                   </div>
 
-                  <div className="mt-4 flex items-end gap-2">
-                    <span className="text-[1.55rem] font-semibold leading-none tracking-tight">
+                  <div className="mt-2.5 flex items-end gap-2 sm:mt-4">
+                    <span className="text-[1.05rem] font-semibold leading-none tracking-tight sm:text-[1.55rem]">
                       {formatNaira(plan.price)}
                     </span>
                     {plan.compareAt && (
@@ -231,11 +231,16 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
                     )}
                   </div>
                   <span className="mt-1.5 text-[0.74rem] text-ink-3">{plan.duration}</span>
-                  <span className="mt-3 block w-full"><UnitsStatus /></span>
+                  <span className="mt-2 block w-full sm:mt-3"><UnitsStatus /></span>
 
-                  <ul className="mt-4 space-y-1.5">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-1.5 text-[0.78rem] text-ink-2">
+                  <ul className="mt-2.5 space-y-1 sm:mt-4 sm:space-y-1.5">
+                    {/* Past the first two, the list is a detail: on a phone it is
+                        what makes each card taller than the product deserves. */}
+                    {plan.features.map((feature, index) => (
+                      <li
+                        key={feature}
+                        className={`${index >= 2 ? "hidden sm:flex" : "flex"} items-start gap-1.5 text-[0.72rem] text-ink-2 sm:text-[0.78rem]`}
+                      >
                         <Check className="mt-0.5 h-3 w-3 shrink-0 text-lav-500" />
                         {feature}
                       </li>
