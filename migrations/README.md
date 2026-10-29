@@ -2,16 +2,37 @@
 
 ## Fresh database
 
-Apply the baseline and all numbered top-level migrations, in order, with errors
-stopping the deployment:
+Run the migration runner. It applies every `*.sql` in this directory in filename
+order, records each one in a `schema_migrations` ledger so a re-run is a no-op,
+and stops at the first error:
 
 ```bash
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0000_base_schema.sql
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0001_google_subject.sql
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0002_shared_rate_limits.sql
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0003_withdrawal_idempotency.sql
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0004_paystack_transfer_reference.sql
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0005_wallet_email_outbox.sql
+DATABASE_URL=postgres://... npm run db:migrate
+```
+
+It connects with `DATABASE_URL` if set, otherwise with the standard libpq
+variables (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`,
+`PGSSLMODE`). IAM-authenticated RDS roles have no `PGPASSWORD` and are not
+supported -- the application's connection pool needs one too.
+
+The runner exists because this README previously listed six of eleven
+migrations. A database built by following that list was missing `0006` order
+idempotency, `0007` reconciliation notes, `0008` provider cost, `0009` password
+reset tokens and `0010` the required `orders.provider`. None of those fail at
+setup time: they fail later, at query time, in the request that needed them.
+
+To apply them by hand instead, run **all** of these in order with
+`ON_ERROR_STOP=1`:
+
+```bash
+for f in migrations/0000_base_schema.sql migrations/0001_google_subject.sql \
+         migrations/0002_shared_rate_limits.sql migrations/0003_withdrawal_idempotency.sql \
+         migrations/0004_paystack_transfer_reference.sql migrations/0005_wallet_email_outbox.sql \
+         migrations/0006_order_idempotency.sql migrations/0007_order_reconciliation_note.sql \
+         migrations/0008_order_provider_cost.sql migrations/0009_password_reset_tokens.sql \
+         migrations/0010_order_provider_no_default.sql; do
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f" || break
+done
 ```
 
 The baseline creates the 12 original application tables and their indexes/foreign keys.
