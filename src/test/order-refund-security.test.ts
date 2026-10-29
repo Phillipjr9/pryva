@@ -4,9 +4,12 @@ import type { SQL } from "drizzle-orm";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { POST } from "@/app/api/orders/[id]/refund/route";
 
-const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), select: vi.fn(), transaction: vi.fn() }));
+const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), select: vi.fn(), transaction: vi.fn(), cancelUpstream: vi.fn() }));
 vi.mock("@/db", () => ({ db: { select: mocks.select, transaction: mocks.transaction } }));
 vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.currentUser }));
+// Must be mocked: the route releases the number upstream after committing the
+// refund, and an unmocked call would reach the real provider.
+vi.mock("@/lib/fulfillment", () => ({ cancelUpstream: mocks.cancelUpstream }));
 const dialect = new PgDialect();
 const context = { params: Promise.resolve({ id: "order-id" }) };
 function request(origin = "https://pryva.test") {
@@ -16,9 +19,11 @@ function request(origin = "https://pryva.test") {
 }
 
 function fakeDatabase() {
+  mocks.cancelUpstream.mockReset();
+  mocks.cancelUpstream.mockResolvedValue(true);
   const state = {
     order: { id: "order-id", userId: "user-id", status: "active", refundedAt: null as Date | null, amount: 1200,
-      provider: "simulated", providerRequestId: null as string | null, service: "numbers", productName: "Test", reference: "ORDER-1",
+      provider: "fleexa", providerRequestId: null as string | null, service: "numbers", productName: "Test", reference: "ORDER-1",
       duration: "Single verification · 20 min window", otpCode: null as string | null, createdAt: new Date(Date.now() - 21 * 60_000) },
     balance: 500,
     ledger: [] as Array<Record<string, unknown>>,
@@ -115,21 +120,43 @@ describe("order refund safety", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
-  it("never automatically credits even simulated orders in a persistent database", async () => {
+  it("refunds an undelivered order against a persistent database, not only in preview", async () => {
     const state = fakeDatabase();
     vi.stubEnv("DATABASE_URL", "postgres://test/db");
-    expect((await POST(request(), context)).status).toBe(503);
-    expect(state.balance).toBe(500);
-    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect((await POST(request(), context)).status).toBe(200);
+    expect(state.balance).toBe(1700);
+    expect(state.order.status).toBe("refunded");
+    expect(mocks.transaction).toHaveBeenCalled();
   });
 
-  it("requires manual reconciliation for legacy live orders", async () => {
+  it("refunds a live provider order and releases the number upstream afterwards", async () => {
     const state = fakeDatabase();
-    state.order.provider = "fleexa";
     state.order.providerRequestId = "request-id";
-    expect((await POST(request(), context)).status).toBe(503);
-    expect(state.balance).toBe(500);
-    expect(mocks.transaction).not.toHaveBeenCalled();
+    const response = await POST(request(), context);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, providerCancelled: true });
+    expect(state.balance).toBe(1700);
+    // The release happens only after the credit commits: cancelling first could
+    // free a number that delivered its code a moment later.
+    expect(mocks.cancelUpstream).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: "fleexa", providerRequestId: "request-id" }),
+    );
+  });
+
+  it("still credits the customer when the upstream release fails", async () => {
+    const state = fakeDatabase();
+    state.order.providerRequestId = "request-id";
+    mocks.cancelUpstream.mockRejectedValue(new Error("provider 502"));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const response = await POST(request(), context);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ ok: true, providerCancelled: false });
+      expect(state.balance).toBe(1700);
+      expect(state.order.status).toBe("refunded");
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it("rolls back the order and wallet if the ledger write fails", async () => {

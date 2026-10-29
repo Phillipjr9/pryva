@@ -17,6 +17,16 @@ type Props = {
   initialNow: number;
 };
 
+/**
+ * A number order that never produced a code can be refunded by the customer once
+ * its delivery window has passed. The server owns that timing rule — this only
+ * decides whether to offer the button, then surfaces whatever the server says.
+ * Duplicating the window here would let the two disagree.
+ */
+function isSelfRefundCandidate(active: boolean, service: string, otpCode: string | null): boolean {
+  return active && service === "numbers" && !otpCode;
+}
+
 function timeLeft(target: string | null, now: number): string | null {
   if (!target) return null;
   const diff = new Date(target).getTime() - now;
@@ -38,6 +48,9 @@ export function OrderActions({
   initialNow,
 }: Props) {
   const [copied, setCopied] = useState<string | null>(null);
+  const [refunding, setRefunding] = useState(false);
+  const [refundError, setRefundError] = useState<string | null>(null);
+  const [refundedNow, setRefundedNow] = useState(false);
   // Use the server timestamp for the first render; switch to the browser clock
   // in the interval after hydration.
   const [remaining, setRemaining] = useState<string | null>(() => timeLeft(expiresAt, initialNow));
@@ -85,6 +98,29 @@ export function OrderActions({
       clearInterval(interval);
     };
   }, [orderId, isLiveProvider, settledStatus, liveWindowOpen]);
+
+  async function requestRefund() {
+    if (refunding) return;
+    setRefunding(true);
+    setRefundError(null);
+    try {
+      const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}/refund`, {
+        method: "POST",
+      });
+      const data = (await response.json()) as { ok?: boolean; error?: string };
+      if (response.ok && data.ok) {
+        setRefundedNow(true);
+        return;
+      }
+      // Not eligible yet (window still open) and not eligible at all (a rental)
+      // both arrive here; the server's wording is the honest answer either way.
+      setRefundError(data.error ?? "The refund didn't go through. Please contact support.");
+    } catch {
+      setRefundError("The refund didn't go through. Please contact support.");
+    } finally {
+      setRefunding(false);
+    }
+  }
 
   async function copy(value: string, label: string) {
     try {
@@ -201,11 +237,29 @@ export function OrderActions({
         <p className="flex items-center gap-2 text-[0.85rem] font-semibold text-ink">
           <Shield className="h-4 w-4 text-lav-700" /> Refund information
         </p>
-        {settledStatus === "refunded" ? (
+        {refundedNow || settledStatus === "refunded" ? (
           <p className="mt-2 flex items-center gap-2 text-[0.82rem] text-ink-2">
             <Check className="h-4 w-4 text-emerald-600" />
             {formatNaira(amount)} was returned to your wallet. It&apos;s already spendable.
           </p>
+        ) : isSelfRefundCandidate(active, service, otpCode) ? (
+          <div className="mt-2">
+            <p className="text-[0.82rem] leading-relaxed text-ink-2">
+              No code arrived for this number? Once its delivery window has passed you can refund it
+              yourself — {formatNaira(amount)} goes straight back to your wallet.
+            </p>
+            <button
+              type="button"
+              onClick={requestRefund}
+              disabled={refunding}
+              className="btn btn-ghost mt-3 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {refunding ? "Requesting refund…" : "Refund this order"}
+            </button>
+            {refundError && (
+              <p role="alert" className="mt-2 text-[0.78rem] font-medium text-rose-600">{refundError}</p>
+            )}
+          </div>
         ) : active || settledStatus === "review" || settledStatus === "processing" ? (
           <p className="mt-2 text-[0.82rem] text-ink-2">
             Refunds require review. <a href="/dashboard/support" className="font-semibold underline">Contact support</a> with your order reference.

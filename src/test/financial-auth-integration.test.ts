@@ -428,18 +428,18 @@ describe("marketplace money safety", () => {
   });
 });
 
-describe("simulated refund SQL", () => {
+describe("undelivered number refund SQL", () => {
   it("only claims timed-out single numbers without a code and never double-credits", async () => {
     vi.stubEnv("DATABASE_URL", "");
-    const common = { userId: USER, productSlug: "test", productName: "Test", planLabel: "Test", region: "Nigeria", amount: 1000, status: "active", provider: "simulated", createdAt: new Date(Date.now() - 60 * 60_000) };
+    const common = { userId: USER, productSlug: "test", productName: "Test", planLabel: "Test", region: "Nigeria", amount: 1000, status: "active", provider: "fleexa", createdAt: new Date(Date.now() - 60 * 60_000) };
     await database.insert(schema.orders).values([
       { ...common, reference: "no-code", service: "numbers", duration: "Single verification · 20 min window" },
       { ...common, reference: "with-code", service: "numbers", duration: "Single verification · 20 min window", otpCode: "123456" },
       { ...common, reference: "rental", service: "numbers", duration: "7 days" },
       { ...common, reference: "esim", service: "esim", duration: "30 days" },
     ]);
-    expect(await autoRefund.processAutoRefunds()).toBe(1);
-    expect(await autoRefund.processAutoRefunds()).toBe(0);
+    expect(await autoRefund.processAutoRefunds()).toEqual({ refunded: 1, cancelled: 0 });
+    expect(await autoRefund.processAutoRefunds()).toEqual({ refunded: 0, cancelled: 0 });
     const rows = await database.select().from(schema.orders);
     expect(rows.find((order) => order.reference === "no-code")?.status).toBe("refunded");
     for (const reference of ["with-code", "rental", "esim"]) {
@@ -451,11 +451,11 @@ describe("simulated refund SQL", () => {
 
   it("rolls back the claim and balance when a refund ledger entry fails", async () => {
     vi.stubEnv("DATABASE_URL", "");
-    await database.insert(schema.orders).values({ reference: "refund-rollback", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "Nigeria", duration: "Single verification · 20 min window", amount: 1000, provider: "simulated", createdAt: new Date(Date.now() - 60 * 60_000) });
+    await database.insert(schema.orders).values({ reference: "refund-rollback", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "Nigeria", duration: "Single verification · 20 min window", amount: 1000, provider: "fleexa", createdAt: new Date(Date.now() - 60 * 60_000) });
     await pg.exec('ALTER TABLE "wallet_transactions" ADD CONSTRAINT "test_no_refund" CHECK ("type" <> \'refund\')');
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
-      expect(await autoRefund.processAutoRefunds()).toBe(0);
+      expect(await autoRefund.processAutoRefunds()).toEqual({ refunded: 0, cancelled: 0 });
       expect((await database.select().from(schema.orders))[0].status).toBe("active");
       expect((await database.select().from(schema.users))[0].walletBalance).toBe(10000);
       expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
