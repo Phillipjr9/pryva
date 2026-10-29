@@ -13,7 +13,15 @@
 
 const DEFAULT_MIN_MARGIN_RATIO = 0.1;
 
-function configuredFloor(): number {
+/**
+ * The floor every sale must clear, as a ratio of the selling price.
+ *
+ * Exported so the admin margin view measures realised margin against the same
+ * number the purchase guard enforces. A second copy of this threshold would
+ * eventually disagree with the first, and a report that uses a different floor
+ * than the code is worse than no report.
+ */
+export function configuredFloor(): number {
   const raw = process.env.MIN_MARGIN_RATIO?.trim();
   if (!raw) return DEFAULT_MIN_MARGIN_RATIO;
   const parsed = Number(raw);
