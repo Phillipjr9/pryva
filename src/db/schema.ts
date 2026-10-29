@@ -64,9 +64,16 @@ export const orders = pgTable(
     accounts: text("accounts"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     refundedAt: timestamp("refunded_at", { withTimezone: true }),
+    // Optional for legacy rows; every new purchase supplies a per-user key that
+    // makes a retried request replay the original order instead of buying a
+    // second number and debiting twice.
+    requestId: uuid("request_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("orders_user_idx").on(table.userId)],
+  (table) => [
+    index("orders_user_idx").on(table.userId),
+    uniqueIndex("orders_user_request_idx").on(table.userId, table.requestId),
+  ],
 );
 
 export const walletTransactions = pgTable(
