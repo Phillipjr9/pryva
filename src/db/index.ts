@@ -637,7 +637,11 @@ function ensureDemoUser() {
   if (seededNotice?.message === "Code 482069 arrived on +234 812 445 9081. It expires in 20 minutes.") seededNotice.message = "Demo code 482069 arrived on +000 555 4820. It is fictional.";
 }
 
-if (!databaseUrl) ensureDemoUser();
+// Gates on the shared predicate, not on DATABASE_URL. Aurora provisioned through
+// the Vercel AWS integration has no DATABASE_URL, so testing that variable alone
+// seeded the shared demo account -- published credentials and a wallet balance --
+// into a process that was connected to a real production database.
+if (!persistentDatabaseConfigured()) ensureDemoUser();
 
 /** Read an isolated snapshot; never expose the mutable process-local state. */
 export function readPreviewDatabase<T>(reader: (snapshot: PreviewState) => T): T {
