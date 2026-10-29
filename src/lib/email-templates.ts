@@ -479,7 +479,7 @@ export function emailVerificationEmail(name: string, verifyLink: string): EmailT
           <tr>
             <td style="background-color:${config.cardBackground};border:1px solid ${config.cardBorder};border-radius:18px;overflow:hidden;">
               <div style="height:5px;line-height:5px;font-size:0;background-color:${config.primaryColor};background-image:${config.primaryGradient};"> </div>
-              <img src="${config.siteUrl}/images/email/hero-welcome.jpg" width="600" alt="Confirm your email" style="display:block;width:100%;max-width:600px;height:auto;border:0;outline:none;text-decoration:none;">
+              <img src="${config.siteUrl}/images/email/hero-verify.jpg" width="600" alt="Confirm your email" style="display:block;width:100%;max-width:600px;height:auto;border:0;outline:none;text-decoration:none;">
               <div style="padding:32px 36px 30px;" class="email-padding">
       <div style="margin:0 0 12px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${config.accentColor};">Confirm Your Email</div>
       <h1 style="margin:0 0 14px;font-family:'Manrope', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:27px;line-height:1.16;font-weight:600;letter-spacing:-.6px;color:${config.darkColor};">One last step</h1>
