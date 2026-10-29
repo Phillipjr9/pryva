@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Lock, Shield, Sparkle } from "@/components/icons";
@@ -20,6 +20,21 @@ type Props = {
   nextPath: string;
 };
 
+/**
+ * An RFC-4122-shaped idempotency key. crypto.randomUUID is only available on a
+ * secure origin, and a fallback that returned a constant would be worse than no
+ * key at all -- every customer would share one and replay each other's orders.
+ */
+function newRequestId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  const hex = (digits: number) =>
+    Math.floor(Math.random() * 16 ** digits).toString(16).padStart(digits, "0");
+  const variant = "89ab"[Math.floor(Math.random() * 4)];
+  return `${hex(8)}-${hex(4)}-4${hex(3)}-${variant}${hex(3)}-${hex(12)}`;
+}
+
 export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState(0);
@@ -35,6 +50,22 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
   );
 
   const selected = plans.find((plan) => plan.slug === selectedSlug) ?? plans[0];
+
+  // One key per purchase attempt. It is reused across a retry of the same attempt
+  // so a browser retry, a second tab, or a resubmit after a timeout whose first
+  // attempt actually succeeded cannot buy a second real number -- and it is
+  // regenerated only once an attempt succeeds or another plan is chosen. Keeping
+  // it across a failure is deliberate: if the request did reach the server, the
+  // retry replays that order instead of creating a second one.
+  const attempt = useRef<{ slug: string; requestId: string } | null>(null);
+
+  function requestIdFor(slug: string): string {
+    const current = attempt.current;
+    if (current && current.slug === slug) return current.requestId;
+    const requestId = newRequestId();
+    attempt.current = { slug, requestId };
+    return requestId;
+  }
 
   function changeTab(index: number) {
     setTab(index);
@@ -54,7 +85,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planSlug: selected.slug }),
+        body: JSON.stringify({ planSlug: selected.slug, requestId: requestIdFor(selected.slug) }),
       });
       const data = (await response.json()) as {
         ok?: boolean;
@@ -76,6 +107,8 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
         reference: data.order.reference,
         name: data.order.productName,
       });
+      // The attempt is settled, so the next purchase is genuinely a new one.
+      attempt.current = null;
       router.refresh();
     } catch {
       setError("Network hiccup. Please try again.");
