@@ -8,6 +8,7 @@ import { SiteFooter } from "@/components/site/SiteFooter";
 import { BrandLockup, BrandMark } from "@/components/brand/BrandLockup";
 import NotFound from "@/app/not-found";
 import {
+  emailVerificationEmail,
   giftCardEmail,
   orderConfirmationEmail,
   passwordResetEmail,
@@ -109,10 +110,32 @@ describe("brand presentation", () => {
       giftCardEmail({ code: "CODE", amount: 1000, senderName: "Ada" }),
       refundEmail({ reference: "R1", productName: "Number", amount: 1000, reason: "Cancelled" }),
       passwordResetEmail("Ada", "https://pryva.ng/reset"),
+      emailVerificationEmail("Ada", "https://pryva.ng/verify-email?token=t"),
     ];
     for (const template of templates) {
       expect(template.html).toContain("pryva-mark.png");
       expect(template.html).toContain("Pryva");
     }
+  });
+
+  it("gives the auth emails the branded card, hero image and gradient bar", () => {
+    // The visual identity of every other Pryva email: a 5px gradient header bar,
+    // a hero image from /images/email, the rounded card and a CTA button. These
+    // two routes were sending bare <p> tags while this template library sat
+    // unused, so the assertions are on the rendered output rather than on intent.
+    for (const template of [
+      emailVerificationEmail("Ada", "https://pryva.ng/verify-email?token=t"),
+      passwordResetEmail("Ada", "https://pryva.ng/reset"),
+    ]) {
+      expect(template.html).toContain("/images/email/hero-");
+      expect(template.html).toContain("linear-gradient");
+      expect(template.html).toContain("border-radius:18px");
+      expect(template.html).toContain("DM Sans");
+      expect(template.text.length).toBeGreaterThan(20);
+    }
+    // A host that is not attached to the deployment would 404 every image.
+    expect(emailVerificationEmail("Ada", "https://x.test/v").html).not.toContain(
+      'src="/images/email/',
+    );
   });
 });

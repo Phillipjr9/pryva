@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     // link can be re-requested from /verify-email. Signup must not fail because
     // Resend is down.
     // `created` returns only the id; `email` is the normalized address in scope.
-    await issueEmailVerification(created.id, email).catch((error) => {
+    await issueEmailVerification(created.id, email, name).catch((error) => {
       console.error("[auth] signup verification email failed", error);
     });
     return Response.json({ ok: true });

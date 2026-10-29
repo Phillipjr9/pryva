@@ -5,6 +5,7 @@ import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { passwordResetTokens, sessions, users } from "@/db/schema";
 import { hashPassword, isValidEmail, normalizeEmail } from "@/lib/auth";
+import { passwordResetEmail } from "@/lib/email-templates";
 import { authRateLimiter } from "@/lib/rate-limit";
 import { validatePassword } from "@/lib/validation";
 
@@ -44,7 +45,7 @@ export function generateResetToken(): string {
  * and therefore the retrying outbox -- a reset link can simply be requested
  * again, so it does not justify that machinery.
  */
-async function sendResetEmail(to: string, token: string): Promise<void> {
+async function sendResetEmail(to: string, name: string, token: string): Promise<void> {
   const key = process.env.RESEND_API_KEY?.trim();
   const from = process.env.RESEND_FROM_EMAIL?.trim();
   if (!key || !from) {
@@ -61,6 +62,8 @@ async function sendResetEmail(to: string, token: string): Promise<void> {
     "https://pryva.ng"
   ).replace(/\/$/, "");
   const link = `${base}/reset-password?token=${encodeURIComponent(token)}`;
+  // The shared branded template, which already existed and was never called.
+  const template = passwordResetEmail(name, link);
   try {
     await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -68,8 +71,9 @@ async function sendResetEmail(to: string, token: string): Promise<void> {
       body: JSON.stringify({
         from,
         to,
-        subject: "Reset your Pryva password",
-        html: `<p>We received a request to reset your Pryva password.</p><p><a href="${link}">Choose a new password</a></p><p>This link expires in 30 minutes and can only be used once. If you did not ask for it, you can ignore this email — your password stays as it is.</p>`,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
       }),
     });
   } catch (error) {
@@ -92,7 +96,7 @@ export async function requestPasswordReset(rawEmail: string): Promise<void> {
   if (!isValidEmail(email) || email.length > 200) return;
 
   const [user] = await db
-    .select({ id: users.id })
+    .select({ id: users.id, name: users.name })
     .from(users)
     .where(eq(users.email, email))
     .limit(1);
@@ -108,7 +112,7 @@ export async function requestPasswordReset(rawEmail: string): Promise<void> {
     tokenHash,
     expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
   });
-  await sendResetEmail(email, token);
+  await sendResetEmail(email, user.name, token);
 }
 
 export async function resetPassword(
