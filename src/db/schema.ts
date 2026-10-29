@@ -23,6 +23,10 @@ export const users = pgTable("users", {
   googleSubject: varchar("google_subject", { length: 255 }).unique(),
   passwordHash: text("password_hash").notNull(),
   walletBalance: integer("wallet_balance").notNull().default(0),
+  // NULL until the owner proves control of the address. Privilege that is granted
+  // by matching this row's email (ADMIN_EMAILS) must not treat an unverified
+  // address as the owner's: signup accepted any string.
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -63,6 +67,24 @@ export const passwordResetTokens = pgTable(
   (table) => [
     uniqueIndex("password_reset_tokens_hash_idx").on(table.tokenHash),
     index("password_reset_tokens_user_idx").on(table.userId),
+  ],
+);
+
+export const emailVerificationTokens = pgTable(
+  "email_verification_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("email_verification_tokens_hash_idx").on(table.tokenHash),
+    index("email_verification_tokens_user_idx").on(table.userId),
   ],
 );
 

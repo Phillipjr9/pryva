@@ -67,7 +67,10 @@ export function verifyPassword(password: string, stored: string): boolean {
   return timingSafeEqual(derived, expected);
 }
 
-export type PublicUser = Pick<User, "id" | "name" | "email" | "walletBalance" | "createdAt">;
+export type PublicUser = Pick<
+  User,
+  "id" | "name" | "email" | "walletBalance" | "emailVerifiedAt" | "createdAt"
+>;
 
 function toPublicUser(user: User): PublicUser {
   return {
@@ -75,6 +78,7 @@ function toPublicUser(user: User): PublicUser {
     name: user.name,
     email: user.email,
     walletBalance: user.walletBalance,
+    emailVerifiedAt: user.emailVerifiedAt,
     createdAt: user.createdAt,
   };
 }
@@ -187,8 +191,22 @@ export function isConfiguredAdminEmail(email: string): boolean {
     .includes(normalized);
 }
 
-export function isAdminUser(user: Pick<User, "email"> | PublicUser | null): boolean {
-  return Boolean(user && isConfiguredAdminEmail(user.email));
+/**
+ * Administrator access requires a verified address.
+ *
+ * ADMIN_EMAILS grants privilege by string match, and signup accepted any address
+ * with no proof of control -- so on a public site, matching on email alone let
+ * anyone register a configured administrator's address and inherit their access.
+ * Requiring proof of control is what makes the match mean something.
+ *
+ * The field has to travel on PublicUser for this to work: toPublicUser strips
+ * anything not in that Pick, so gating on a field the type did not carry would
+ * have denied every administrator permanently and silently.
+ */
+export function isAdminUser(
+  user: Pick<User, "email" | "emailVerifiedAt"> | PublicUser | null,
+): boolean {
+  return Boolean(user && user.emailVerifiedAt && isConfiguredAdminEmail(user.email));
 }
 
 export async function requireUser(nextPath = "/dashboard"): Promise<PublicUser> {
