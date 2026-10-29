@@ -70,15 +70,23 @@ export async function POST(request: Request) {
     } catch (error) {
       if (error instanceof FleexaError) {
         console.error("Fleexa fulfilment failed", error.code, error.message);
+        // Every one of these leaves nothing bought and nothing charged, so they
+        // read as "unavailable" rather than a provider failure. The margin codes
+        // in particular must not leak wholesale economics into the wording a
+        // customer sees -- the figures stay in the server log above.
+        const unavailable =
+          error.code === "NO_API_KEY" ||
+          error.code === "SERVICE_UNAVAILABLE" ||
+          error.code === "COST_UNKNOWN" ||
+          error.code === "UNPROFITABLE";
         return Response.json(
           {
             ok: false,
-            error:
-              error.code === "NO_API_KEY" || error.code === "SERVICE_UNAVAILABLE"
-                ? "Fulfilment is temporarily unavailable."
-                : "Our provider couldn't fulfil that right now — nothing was charged. Try again in a moment.",
+            error: unavailable
+              ? "Fulfilment is temporarily unavailable."
+              : "Our provider couldn't fulfil that right now — nothing was charged. Try again in a moment.",
           },
-          { status: error.code === "NO_API_KEY" || error.code === "SERVICE_UNAVAILABLE" ? 503 : 502 },
+          { status: unavailable ? 503 : 502 },
         );
       }
       throw error;

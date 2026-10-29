@@ -9,6 +9,7 @@ import { findPlan } from "@/lib/catalog";
 const provider = vi.hoisted(() => ({
   configured: true,
   buySms: vi.fn(),
+  listServices: vi.fn(),
   buyRental: vi.fn(),
   listAreas: vi.fn(),
   cancelSms: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock("@/lib/fleexa", async (importOriginal) => {
     ...actual,
     isFleexaConfigured: () => provider.configured,
     buyFleexaSmsNumber: provider.buySms,
+    listFleexaSmsServices: provider.listServices,
     buyFleexaRental: provider.buyRental,
     listFleexaRentAreas: provider.listAreas,
     cancelFleexaSms: provider.cancelSms,
@@ -33,6 +35,16 @@ beforeEach(() => {
   provider.configured = true;
 });
 afterEach(() => { vi.restoreAllMocks(); });
+
+/**
+ * A catalog quote for every deliverable destination, priced far below what the
+ * storefront charges so the margin guard passes. The guard reads the price from
+ * this listing before buying, because the buy call only reports its price after
+ * the owner's balance has already been spent.
+ */
+const SMS_SERVICES = ["ng", "us", "gb", "ca", "de", "gh"].map((country) => ({
+  id: `svc-${country}`, country, name: country.toUpperCase(), priceNgn: 100, stock: 10,
+}));
 
 /** Plans we can deliver, and the exact provider arguments each one implies. */
 const DELIVERABLE: Array<[slug: string, args: unknown]> = [
@@ -66,6 +78,7 @@ describe("fulfilment", () => {
   });
 
   it.each(DELIVERABLE)("buys a real number for %s and returns the provider receipt", async (slug, args) => {
+    provider.listServices.mockResolvedValue(SMS_SERVICES);
     provider.buySms.mockResolvedValue({
       requestId: "req-1", number: "+2348000000000", service: null,
       country: null, priceNgn: null, expiresAt: null, raw: {},
@@ -83,6 +96,57 @@ describe("fulfilment", () => {
     });
     // No provider expiry, so fall back to the plan's own delivery window.
     expect(result.expiresAt.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  describe("margin guard", () => {
+    const plan = findPlan("vn-ng")!;
+    const receipt = { requestId: "req-1", number: "+2348000000000", service: null,
+      country: null, priceNgn: null, expiresAt: null, raw: {} };
+    /** Quote a cost for the destination we are about to buy. */
+    function quote(priceNgn: number | null) {
+      provider.listServices.mockResolvedValue([{ id: "svc-ng", country: "ng", priceNgn, stock: 10 }]);
+    }
+
+    it("refuses to spend when the provider costs more than we charge", async () => {
+      quote(plan.price * 2);
+      const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "UNPROFITABLE", status: 503 });
+      expect(provider.buySms).not.toHaveBeenCalled();
+      // The owner must be able to see why; the customer never does.
+      expect(error).toHaveBeenCalled();
+      error.mockRestore();
+    });
+
+    it("refuses a margin below the floor but sells one that clears it", async () => {
+      quote(Math.ceil(plan.price * 0.95));
+      await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "UNPROFITABLE" });
+      expect(provider.buySms).not.toHaveBeenCalled();
+
+      quote(Math.floor(plan.price * 0.5));
+      provider.buySms.mockResolvedValue(receipt);
+      await expect(fulfillPlan(plan)).resolves.toMatchObject({ provider: "fleexa" });
+      expect(provider.buySms).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses to spend when the provider does not report a price at all", async () => {
+      quote(null);
+      const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "COST_UNKNOWN", status: 503 });
+      expect(provider.buySms).not.toHaveBeenCalled();
+      error.mockRestore();
+    });
+
+    it("refuses before any spend when no service matches the destination", async () => {
+      provider.listServices.mockResolvedValue([{ id: "svc-zz", country: "zz", priceNgn: 100, stock: 10 }]);
+      await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
+      expect(provider.buySms).not.toHaveBeenCalled();
+    });
+
+    it("refuses when the matching destination is out of stock, before spending", async () => {
+      provider.listServices.mockResolvedValue([{ id: "svc-ng", country: "ng", priceNgn: 100, stock: 0 }]);
+      await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
+      expect(provider.buySms).not.toHaveBeenCalled();
+    });
   });
 
   it.each(UNDELIVERABLE)("fails closed on %s without contacting the provider", async (slug) => {
