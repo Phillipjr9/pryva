@@ -6,6 +6,7 @@ import { eq, desc, sql } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { creditWallet, debitWallet, InsufficientFundsError } from "@/lib/wallet";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { isSameOriginMutation } from "@/lib/net";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +117,12 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // The most privileged mutations in the app move real money and edit accounts,
+  // and cookie-based sessions make them a CSRF target. The origin is checked
+  // before authorization so an unauthenticated cross-origin caller learns nothing.
+  if (!isSameOriginMutation(request)) {
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  }
   try {
     const access = await authorizeAdminApi(request);
     if (access.response) return access.response;

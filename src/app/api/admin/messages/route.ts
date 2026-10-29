@@ -6,6 +6,7 @@ import { eq, desc, sql } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { isMessageStatus } from "@/lib/support-messages";
+import { isSameOriginMutation } from "@/lib/net";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,13 @@ export async function GET(request: NextRequest) {
 
 // PATCH /api/admin/messages - Update message status
 export async function PATCH(request: NextRequest) {
+  // These are the most privileged mutations in the app: they move real money out
+  // and edit accounts. Cookie-based admin sessions make them a CSRF target, so
+  // the origin is checked before authorization -- failing fast also avoids
+  // telling an unauthenticated cross-origin caller anything about the account.
+  if (!isSameOriginMutation(request)) {
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  }
   try {
     const access = await authorizeAdminApi(request);
     if (access.response) return access.response;

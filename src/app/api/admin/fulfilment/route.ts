@@ -7,6 +7,7 @@ import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/li
 import { manualWarrantyDays } from "@/lib/manual-catalog";
 import { MANUAL_PROVIDER, MAX_QUEUE_ITEMS, QUEUE_STATUSES, quantityFromPlanLabel } from "@/lib/fulfilment-queue";
 import { logger } from "@/lib/logger";
+import { isSameOriginMutation } from "@/lib/net";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +85,13 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // These are the most privileged mutations in the app: they move real money out
+  // and edit accounts. Cookie-based admin sessions make them a CSRF target, so
+  // the origin is checked before authorization -- failing fast also avoids
+  // telling an unauthenticated cross-origin caller anything about the account.
+  if (!isSameOriginMutation(request)) {
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  }
   try {
     const access = await authorizeAdminApi(request);
     if (access.response) return access.response;
