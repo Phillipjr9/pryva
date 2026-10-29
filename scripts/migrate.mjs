@@ -29,7 +29,45 @@ import pg from "pg";
 const MIGRATIONS_DIR = path.join(process.cwd(), "migrations");
 const LEDGER_TABLE = "schema_migrations";
 
-function describeConnection() {
+async function iamPoolConfig() {
+  const [{ Signer }, { awsCredentialsProvider }] = await Promise.all([
+    import("@aws-sdk/rds-signer"),
+    import("@vercel/functions/oidc"),
+  ]);
+  const region = process.env.AWS_REGION.trim();
+  const hostname = process.env.PGHOST.trim();
+  const username = process.env.PGUSER.trim();
+  const port = Number(process.env.PGPORT?.trim() || 5432);
+  const signer = new Signer({
+    hostname,
+    port,
+    username,
+    region,
+    credentials: awsCredentialsProvider({
+      roleArn: process.env.AWS_ROLE_ARN.trim(),
+      clientConfig: { region },
+    }),
+  });
+  return {
+    host: hostname,
+    port,
+    user: username,
+    database: process.env.PGDATABASE?.trim() || "postgres",
+    ssl: { rejectUnauthorized: process.env.PGSSL_NO_VERIFY?.trim() !== "1" },
+    password: () => signer.getAuthToken(),
+  };
+}
+
+function iamConfigured() {
+  return Boolean(
+    process.env.PGHOST?.trim() &&
+      process.env.PGUSER?.trim() &&
+      process.env.AWS_REGION?.trim() &&
+      process.env.AWS_ROLE_ARN?.trim(),
+  );
+}
+
+async function describeConnection() {
   const url = process.env.DATABASE_URL?.trim();
   if (url) {
     // Never print credentials: report the host only, and say where it came from.
@@ -42,12 +80,23 @@ function describeConnection() {
     })();
     return { config: { connectionString: url }, label: `DATABASE_URL -> ${host}` };
   }
+  // Aurora from the Vercel AWS integration: IAM tokens stand in for a password.
+  // Locally this needs VERCEL_OIDC_TOKEN, which `vercel env pull` provides.
+  if (!process.env.PGPASSWORD?.trim() && iamConfigured()) {
+    return {
+      config: await iamPoolConfig(),
+      label: `RDS IAM -> ${process.env.PGHOST}`,
+    };
+  }
+
   if (!process.env.PGHOST?.trim()) {
     console.error(
       "No database configured.\n" +
+        "For Aurora from the Vercel AWS integration, run `vercel env pull` first: the IAM\n" +
+        "path needs VERCEL_OIDC_TOKEN alongside PGHOST/PGUSER/AWS_REGION/AWS_ROLE_ARN.\n" +
         "Set DATABASE_URL, or the libpq variables (PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE).\n" +
-        "The Vercel AWS integration sets the PG* variables but not PGPASSWORD; if your RDS role\n" +
-        "uses IAM authentication this script cannot connect, and neither can the application.",
+        "An IAM-authenticated role has no PGPASSWORD by design: the token is minted per\n" +
+        "connection from AWS_ROLE_ARN, which this script and src/db/aws-iam.ts both do.",
     );
     process.exit(2);
   }
@@ -55,7 +104,7 @@ function describeConnection() {
   return { config: {}, label: `PG* env -> ${process.env.PGHOST}` };
 }
 
-const { config, label } = describeConnection();
+const { config, label } = await describeConnection();
 const pool = new pg.Pool(config);
 
 const files = (await readdir(MIGRATIONS_DIR))
