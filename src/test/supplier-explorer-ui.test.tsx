@@ -28,13 +28,14 @@ describe("service explorer live listings", () => {
     expect(screen.getByText("2026-01-01 12:34:56 UTC")).toBeTruthy();
   });
 
-  it("never requests the live catalog in the public demo", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, simulated: true, country: "us", inventory: {} }) });
+  it("requests the live catalog and never a demo endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, country: "us", items: [] }) });
     vi.stubGlobal("fetch", fetchMock);
-    render(<ServiceExplorer initialCountry="us" initialCategory="verification" preview />);
+    render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
-    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/demo/services/inventory");
-    expect(fetchMock.mock.calls.every(([url]) => !String(url).startsWith("/api/services/catalog"))).toBe(true);
-    expect(screen.getByText(/Demo catalog/)).toBeTruthy();
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/services/catalog?country=us");
+    // The demo inventory endpoint was deleted with the demo subsystem.
+    expect(fetchMock.mock.calls.every(([url]) => !String(url).includes("/demo/"))).toBe(true);
+    expect(screen.queryByText(/Demo catalog/)).toBeNull();
   });
 });

@@ -38,7 +38,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             <div className="mt-7 grid gap-2.5">
               {[
                 { title: "Pay in Naira", body: "Bank transfer or local card, no dollar cards." },
-                { title: "Preview mode", body: "Preview balances and orders are simulated." },
+                { title: "Instant delivery", body: "Codes land in your dashboard as soon as they arrive." },
                 { title: "Order support", body: "Contact us when a delivery needs review." },
               ].map((item) => (
                 <div

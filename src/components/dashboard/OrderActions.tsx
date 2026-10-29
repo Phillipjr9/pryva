@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Clock, Copy, Refresh, Shield } from "@/components/icons";
+import { useEffect, useState } from "react";
+import { ArrowRight, Check, Clock, Copy, Shield } from "@/components/icons";
 import { formatNaira } from "@/lib/catalog";
-import { useDemoOtp, useDemoPromotion } from "@/components/dashboard/useDemoOtp";
 
 type Props = {
   orderId: string;
@@ -16,12 +14,6 @@ type Props = {
   service: string;
   /** Server-computed: this order's code can be re-read while the window is open. */
   refreshableCode?: boolean;
-  /** Server-computed: this order was produced by the demo, not a live delivery. */
-  demoOrder?: boolean;
-  preview?: boolean;
-  demoUnitsRemaining?: number | null;
-  reusableDemoNumber?: boolean;
-  canRequestPreviewRefund: boolean;
   initialNow: number;
 };
 
@@ -43,14 +35,8 @@ export function OrderActions({
   otpCode,
   service,
   refreshableCode = false,
-  demoOrder = false,
-  preview = false,
-  demoUnitsRemaining = null,
-  reusableDemoNumber = false,
-  canRequestPreviewRefund,
   initialNow,
 }: Props) {
-  const router = useRouter();
   const [copied, setCopied] = useState<string | null>(null);
   // Use the server timestamp for the first render; switch to the browser clock
   // in the interval after hydration.
@@ -58,39 +44,11 @@ export function OrderActions({
   const [settledStatus, setSettledStatus] = useState(status);
   const [liveOtp, setLiveOtp] = useState<string | null>(otpCode);
   const [synced, setSynced] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [refunded, setRefunded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(service === "numbers" || service === "email-otp");
-  const [nextPending, setNextPending] = useState(false);
-  const nextAttempt = useRef<string | null>(null);
-  const nextInFlight = useRef(false);
-  const refreshedDemoCode = useRef<string | null>(otpCode);
 
   const isLiveProvider = refreshableCode;
   const liveWindowOpen = !expiresAt || remaining !== null;
-  const isDemoOtp = preview && demoOrder && (service === "numbers" || service === "email-otp");
-  const { code: demoOtp, retrying: demoRetrying, resetCode } = useDemoOtp(
-    orderId,
-    isDemoOtp && settledStatus === "active" && (remaining !== null || expiresAt === null),
-    otpCode,
-  );
-  const displayOtp = isDemoOtp ? demoOtp : liveOtp;
-  const isDemoRental = isDemoOtp && service === "numbers" && reusableDemoNumber;
-  const remainingDemoUnits = typeof demoUnitsRemaining === "number" && Number.isSafeInteger(demoUnitsRemaining) && demoUnitsRemaining >= 0
-    ? Math.max(0, demoUnitsRemaining - (!isDemoRental && demoOtp && demoOtp !== otpCode ? 1 : 0)) : null;
-  const isDemoPromotion = preview && demoOrder && service === "social";
-  const { finished: demoPromotionFinished, retrying: promotionRetrying } = useDemoPromotion(orderId, isDemoPromotion && settledStatus === "processing");
-  const displayedStatus = demoPromotionFinished ? "delivered" : settledStatus;
-
-  useEffect(() => {
-    if (isDemoOtp && demoOtp && refreshedDemoCode.current !== demoOtp) {
-      refreshedDemoCode.current = demoOtp;
-      router.refresh();
-    }
-  }, [isDemoOtp, demoOtp, router]);
-  useEffect(() => { if (demoPromotionFinished) router.refresh(); }, [demoPromotionFinished, router]);
-
   useEffect(() => {
     if (!expiresAt) return;
     const interval = setInterval(() => setRemaining(timeLeft(expiresAt, Date.now())), 1000);
@@ -138,51 +96,7 @@ export function OrderActions({
     }
   }
 
-  async function requestNextDemoCode() {
-    if (nextInFlight.current) return;
-    nextInFlight.current = true;
-    setNextPending(true);
-    setError(null);
-    try {
-      nextAttempt.current ??= crypto.randomUUID();
-      const response = await fetch(`/api/demo/orders/${encodeURIComponent(orderId)}/next`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId: nextAttempt.current }),
-      });
-      const data = await response.json() as { ok?: boolean; simulated?: boolean; error?: string };
-      if (!response.ok || !data.ok || !data.simulated) { setError(data.error ?? "Could not start the next demo code."); return; }
-      nextAttempt.current = null;
-      refreshedDemoCode.current = null;
-      resetCode();
-      router.refresh();
-    } catch {
-      setError("Could not confirm the next demo code. Refresh this order before retrying.");
-    } finally {
-      setNextPending(false);
-      nextInFlight.current = false;
-    }
-  }
-
-  async function requestRefund() {
-    setPending(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/orders/${orderId}/refund`, { method: "POST" });
-      const data = (await response.json()) as { ok?: boolean; error?: string };
-      if (!response.ok || !data.ok) {
-        setError(data.error ?? "The refund didn't go through.");
-        return;
-      }
-      setSettledStatus("refunded");
-      setRefunded(true);
-      router.refresh();
-    } catch {
-      setError("Network hiccup. Please try again.");
-    } finally {
-      setPending(false);
-    }
-  }
-
-  const active = displayedStatus === "active";
+  const active = settledStatus === "active";
   const expired = active && expiresAt !== null && !remaining;
 
   return (
@@ -215,12 +129,12 @@ export function OrderActions({
                   ? expired
                     ? "bg-amber-50 text-amber-700"
                     : "bg-emerald-50 text-emerald-700"
-                  : displayedStatus === "refunded"
+                  : settledStatus === "refunded"
                     ? "bg-amber-50 text-amber-700"
                     : "bg-lav-50 text-lav-700"
               }`}
             >
-              {active ? (expired ? "Window closed" : preview && demoOrder ? "Demo active" : "Live") : displayedStatus === "refunded" ? "Refunded" : displayedStatus}
+              {active ? (expired ? "Window closed" : "Live") : settledStatus === "refunded" ? "Refunded" : settledStatus}
             </span>
           </span>
         </div>
@@ -233,7 +147,6 @@ export function OrderActions({
 
         {referenceCode ? (
           <div className="mt-3.5 rounded-2xl border border-line bg-cream/60 p-4">
-            {isDemoOtp && <p className="mb-2 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-lav-700">{service === "numbers" ? "Demo number" : "Demo inbox"}</p>}
             <div className="flex items-start justify-between gap-3">
               <pre className="whitespace-pre-wrap break-words font-sans text-[0.88rem] leading-relaxed text-ink">
                 {referenceCode}
@@ -254,47 +167,26 @@ export function OrderActions({
           </p>
         )}
 
-        {isDemoPromotion && (
-          <div role="status" aria-live="polite" className="mt-3 rounded-2xl border border-lav-200 bg-lav-50/70 p-4">
-            <p className="text-[0.78rem] font-semibold text-ink">{displayedStatus === "delivered" ? "Demo campaign complete" : promotionRetrying ? "Checking demo progress…" : "Demo campaign in progress"}</p>
-            <p className="mt-1 text-[0.7rem] text-ink-3">{displayedStatus === "delivered" ? "The fictional campaign is complete." : "Simulating activity for a fictional profile."}</p>
-            <div aria-hidden="true" className="mt-3 h-1.5 overflow-hidden rounded-full bg-lav-100"><div className={displayedStatus === "delivered" ? "h-full w-full rounded-full bg-emerald-500" : "demo-progress h-full w-1/3 rounded-full bg-lav-600"} /></div>
-          </div>
-        )}
-
-        {isDemoOtp && active && !expired && !displayOtp && (
-          <div role="status" aria-live="polite" className="mt-3 rounded-2xl border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-4">
-            <div className="flex items-center gap-3">
-              <span aria-hidden="true" className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lav-100 text-lav-700">
-                <span className="demo-breathe absolute inset-0 rounded-xl bg-lav-200" />
-                <span className="relative text-lg">✦</span>
-              </span>
-              <div><p className="text-[0.79rem] font-semibold text-ink">Waiting for your demo code</p><p className="mt-0.5 text-[0.7rem] text-ink-3">{demoRetrying ? "Checking again shortly…" : "Your simulated message will appear here automatically."}</p></div>
-            </div>
-            <div aria-hidden="true" className="mt-4 flex gap-1.5">{Array.from({ length: 6 }, (_, index) => <span key={index} className="h-11 flex-1 animate-pulse rounded-lg border border-lav-100 bg-white" style={{ animationDelay: `${index * 90}ms` }} />)}</div>
-          </div>
-        )}
-
-        {isLiveProvider && settledStatus === "active" && liveWindowOpen && !displayOtp && (
+        {isLiveProvider && settledStatus === "active" && liveWindowOpen && !liveOtp && (
           <p className="mt-3 flex items-center gap-2 rounded-xl bg-lav-50 px-3.5 py-3 text-[0.78rem] font-medium text-lav-800">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-lav-600" />
             Waiting for the code — this page checks roughly every 25 seconds.
           </p>
         )}
 
-        {displayOtp && (
+        {liveOtp && (
           <div role="status" aria-live="polite" className="mt-3 rounded-2xl border border-lav-100 bg-gradient-to-br from-lav-50 to-white p-4">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-lav-700">
-                {isDemoOtp ? "Demo code received" : "Verification code"}
+                Verification code
               </p>
-              <button type="button" onClick={() => copy(displayOtp, "otp")} className="inline-flex items-center gap-1 text-[0.68rem] font-semibold text-lav-700">
+              <button type="button" onClick={() => copy(liveOtp, "otp")} className="inline-flex items-center gap-1 text-[0.68rem] font-semibold text-lav-700">
                 {copied === "otp" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                 {copied === "otp" ? "Copied" : "Copy code"}
               </button>
             </div>
-            <button type="button" onClick={() => setRevealed(true)} aria-label={revealed ? `Verification code ${displayOtp}` : "Reveal verification code"} className="mt-3 flex w-full gap-1.5 text-left">
-              {(revealed ? displayOtp : "••••••").split("").map((digit, index) => (
+            <button type="button" onClick={() => setRevealed(true)} aria-label={revealed ? `Verification code ${liveOtp}` : "Reveal verification code"} className="mt-3 flex w-full gap-1.5 text-left">
+              {(revealed ? liveOtp : "••••••").split("").map((digit, index) => (
                 <span key={index} aria-hidden="true" className="otp-arrive grid h-11 min-w-0 flex-1 place-items-center rounded-lg border border-lav-200 bg-white font-mono text-[1.15rem] font-semibold text-lav-800" style={{ animationDelay: `${index * 70}ms` }}>{digit}</span>
               ))}
             </button>
@@ -302,12 +194,6 @@ export function OrderActions({
           </div>
         )}
 
-        {isDemoOtp && remainingDemoUnits !== null && (
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[0.72rem] text-ink-3">
-            <span>My demo units: <strong className="text-ink">{isDemoRental && (!active || expired) ? "0 left" : `${remainingDemoUnits} left`}</strong>{isDemoRental && active && !expired && " · active rental"}</span>
-            {displayOtp && active && !expired && remainingDemoUnits > 0 && <button type="button" disabled={nextPending} onClick={() => void requestNextDemoCode()} className="font-semibold text-lav-700 underline underline-offset-2 disabled:opacity-50">{nextPending ? "Preparing…" : isDemoRental ? "Simulate another code" : "Use another demo unit"}</button>}
-          </div>
-        )}
         {error && <p role="alert" className="mt-3 text-[0.78rem] font-medium text-rose-600">{error}</p>}
       </div>
 
@@ -315,35 +201,12 @@ export function OrderActions({
         <p className="flex items-center gap-2 text-[0.85rem] font-semibold text-ink">
           <Shield className="h-4 w-4 text-lav-700" /> Refund information
         </p>
-        {refunded || displayedStatus === "refunded" ? (
+        {settledStatus === "refunded" ? (
           <p className="mt-2 flex items-center gap-2 text-[0.82rem] text-ink-2">
             <Check className="h-4 w-4 text-emerald-600" />
             {formatNaira(amount)} was returned to your wallet. It&apos;s already spendable.
           </p>
-        ) : active && canRequestPreviewRefund ? (
-          <>
-            <p className="mt-2 text-[0.82rem] leading-relaxed text-ink-2">
-              {expired
-                ? "This simulated single-number order may be refunded if the window closed without a code."
-                : "For this simulated single-number order, a refund can be requested after the window closes without a code."}
-            </p>
-            {expired && (
-              <button
-                type="button"
-                onClick={requestRefund}
-                disabled={pending}
-                className="btn btn-dark mt-3.5 w-full !py-3 !text-[0.8rem] disabled:opacity-60"
-              >
-                {pending ? "Processing refund…" : `Request ${formatNaira(amount)} refund`}
-                {!pending && <Refresh className="h-3.5 w-3.5" />}
-              </button>
-            )}
-          </>
-        ) : preview && demoOrder ? (
-          <p className="mt-2 text-[0.82rem] text-ink-2">
-            {displayOtp ? "This demo code was delivered, so it is not eligible for a demo refund." : "This simulated order used demo funds. No real payment or refund is involved."}
-          </p>
-        ) : active || displayedStatus === "review" || displayedStatus === "processing" ? (
+        ) : active || settledStatus === "review" || settledStatus === "processing" ? (
           <p className="mt-2 text-[0.82rem] text-ink-2">
             Refunds require review. <a href="/dashboard/support" className="font-semibold underline">Contact support</a> with your order reference.
           </p>

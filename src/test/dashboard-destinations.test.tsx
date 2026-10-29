@@ -1,11 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-const flags = vi.hoisted(() => ({ preview: true }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => flags.preview }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
   usePathname: () => "/dashboard",
@@ -25,16 +23,6 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const read = (relative: string) => readFileSync(join(root, relative), "utf8");
 
 describe("plan links keep their destination", () => {
-  beforeEach(() => {
-    flags.preview = true;
-  });
-
-  it("sends a chosen catalog plan to that plan's demo page in preview", () => {
-    expect(planDestination("vn-ng")).toBe("/dashboard/services/demo/plan-vn-ng?country=ng");
-    expect(planDestination("esim-ng-1")).toBe("/dashboard/services/demo/plan-esim-ng-1?country=ng");
-    expect(planDestination("proxy-ng-1")).toBe("/dashboard/services/demo/plan-proxy-ng-1?country=ng");
-  });
-
   it("falls back to the hub category instead of inventing a destination", () => {
     // A bundle whose region is not a single country has no country to select.
     expect(planDestination("vn-otp-5")).toBe("/dashboard/services?category=numbers");
@@ -45,8 +33,7 @@ describe("plan links keep their destination", () => {
     expect(planDestination("../admin/dashboard")).toBeNull();
   });
 
-  it("points at the live plan page only when preview is off", () => {
-    flags.preview = false;
+  it("points at the live plan page", () => {
     expect(planDestination("vn-ng")).toBe("/dashboard/services/plan/vn-ng?country=ng");
     expect(planDestination("vn-otp-5")).toBe("/dashboard/services?category=numbers");
   });
@@ -72,7 +59,6 @@ describe("dashboard dead ends", () => {
       <ServiceExplorer
         initialCountry={null}
         initialCategory={null}
-        preview
         rejectedCountry="zz"
         rejectedCategory="bogus"
       />,
@@ -83,7 +69,7 @@ describe("dashboard dead ends", () => {
     expect(markup).toContain("the selection was reset");
 
     const clean = renderToStaticMarkup(
-      <ServiceExplorer initialCountry="ng" initialCategory="numbers" preview />,
+      <ServiceExplorer initialCountry="ng" initialCategory="numbers" />,
     );
     expect(clean).not.toContain("the selection was reset");
     expect(clean).toContain("Number plans");
@@ -94,7 +80,6 @@ describe("dashboard dead ends", () => {
       <ServiceExplorer
         initialCountry={null}
         initialCategory={null}
-        preview
         rejectedCountry={`"><script>alert(1)</script>${"x".repeat(40)}`}
       />,
     );
@@ -137,7 +122,7 @@ describe("features that had an endpoint but no screen", () => {
     const panel = renderToStaticMarkup(<AccountDataPanel />);
     expect(panel).toContain("Download my data");
     expect(read("app/dashboard/settings/AccountDataPanel.tsx")).toContain("/api/user/export");
-    expect(read("app/dashboard/settings/SettingsForm.tsx")).toContain("<AccountDataPanel sharedDemo={sharedDemo} />");
+    expect(read("app/dashboard/settings/SettingsForm.tsx")).toContain("<AccountDataPanel />");
     // Self-service deletion is deliberately unavailable; the panel must not
     // offer a control that always fails.
     expect(panel).toContain("not self-service yet");
@@ -181,7 +166,6 @@ describe("small-screen layout guards", () => {
     ["app/dashboard/loading.tsx", "grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]"],
     ["app/dashboard/wallet/page.tsx", "grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]"],
     ["app/dashboard/support/page.tsx", "grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]"],
-    ["app/dashboard/services/demo/[itemId]/page.tsx", "grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)]"],
   ];
 
   it.each(guarded)("keeps %s tracks shrinkable", (file, expected) => {
@@ -200,6 +184,5 @@ describe("small-screen layout guards", () => {
 
   it("lets full-width buttons wrap instead of forcing a minimum width", () => {
     expect(read("components/dashboard/TopUpForm.tsx")).toContain("!whitespace-normal");
-    expect(read("components/dashboard/DemoServiceCheckout.tsx")).toContain("!whitespace-normal");
   });
 });

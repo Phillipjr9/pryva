@@ -6,7 +6,7 @@ import { fireConfetti } from "@/components/ui/Confetti";
 import { MoneyFlowDialog, MoneyOrbit, MoneyProcessing, MoneyResultIcon, downloadTextReceipt, moneyDate } from "@/components/dashboard/MoneyFlowDialog";
 import { formatNaira } from "@/lib/catalog";
 import { forgetPaystackTopUp, notifyPaystackTopUpsChanged } from "@/lib/paystack-topup-intent";
-import styles from "@/components/dashboard/DemoMoneyMovement.module.css";
+import styles from "@/components/dashboard/MoneyFlow.module.css";
 
 type Receipt = { reference: string; amount: number; balanceAfter: number; creditedAt: string };
 type State = "verifying" | "credited" | "pending" | "failed";
@@ -104,7 +104,7 @@ export function TopUpReturn({ status, reference, userId, testMode = false }: { s
   const verifying = state === "verifying";
   const title = verifying ? "Confirming your payment" : state === "credited" ? (testMode ? "Test funds added to your wallet" : "Funds added to your wallet") : state === "failed" ? "Payment needs attention" : "Payment not confirmed yet";
   return <MoneyFlowDialog stage={state === "credited" ? "done" : "processing"} title={title} onClose={close} centered lead={verifying ? <MoneyOrbit /> : state === "credited" ? <MoneyResultIcon /> : undefined}>
-    {testMode && <p className={styles.demo}>PAYSTACK TEST MODE — no real payment is made.</p>}
+    {testMode && <p className={styles.notice}>PAYSTACK TEST MODE — no real payment is made.</p>}
     {verifying && <>
       <MoneyProcessing detail="The return from checkout is not confirmation of payment." from="Paystack" fromNote="Payment status" to="Your wallet" toNote="Credit after confirmation" steps={["Payment reference received", "Verifying payment and wallet credit", "Receipt after confirmation"]} />
       {reference && <p className={styles.small}>Reference: {reference}</p>}

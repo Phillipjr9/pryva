@@ -4,7 +4,6 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAuthApi } from "@/lib/auth";
 import { isSameOriginMutation } from "@/lib/net";
-import { isSharedPreviewUser } from "@/lib/demo-policy";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +47,6 @@ export async function PUT(request: NextRequest) {
     }
 
     if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
-    if (isSharedPreviewUser(user)) return NextResponse.json({ error: "The shared demo profile is view-only." }, { status: 403 });
     if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
     let body: unknown;
     try {

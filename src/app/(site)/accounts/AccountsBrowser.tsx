@@ -40,7 +40,7 @@ const SORTS = [
   { value: "title", label: "A–Z" },
 ] as const;
 
-export function AccountsBrowser({ purchaseEnabled, preview = false }: { purchaseEnabled: boolean; preview?: boolean }) {
+export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [configured, setConfigured] = useState(true);
@@ -325,24 +325,21 @@ export function AccountsBrowser({ purchaseEnabled, preview = false }: { purchase
   }
 
   if (!configured) {
-    // In the preview there *is* a working marketplace — a simulated one inside
-    // the dashboard. Sending visitors to an unrelated service page left them at
-    // a dead end with nothing to try.
+    // Checkout is not configured, so offer a way onward rather than a dead end.
     return (
       <div className="rounded-2xl border border-line bg-white p-8 text-center">
         <h2 className="text-[1.05rem] font-semibold text-ink">
-          {preview ? "Try the demo marketplace instead" : "Accounts are almost ready"}
+          Accounts are almost ready
         </h2>
         <p className="mx-auto mt-2 max-w-md text-[0.88rem] leading-relaxed text-ink-2">
-          {preview
-            ? "Live listings are not connected here, so this page has no listings to show. The dashboard keeps a fictional marketplace with demo stock, demo prices and simulated delivery."
-            : "Our account marketplace is being prepared. You can explore the other services in the meantime."}
+          Our account marketplace is being prepared. You can explore the other services in the
+          meantime.
         </p>
         <Link
-          href={preview ? "/login?next=%2Fdashboard%2Faccounts" : "/virtual-numbers"}
+          href="/virtual-numbers"
           className="btn btn-primary mt-5 inline-flex"
         >
-          {preview ? "Open the demo marketplace" : "Explore other services"}
+          Explore other services
         </Link>
       </div>
     );

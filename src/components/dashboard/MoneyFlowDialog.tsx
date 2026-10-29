@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, type CSSProperties, type ReactNode } from "react";
 import { Check, Wallet } from "@/components/icons";
-import styles from "./DemoMoneyMovement.module.css";
+import styles from "./MoneyFlow.module.css";
 
 export type MoneyFlowStage = "details" | "review" | "processing" | "done";
 
@@ -86,7 +86,7 @@ export function MoneyProcessing({ detail, from, fromNote, to, toNote, steps, cur
 }
 
 export function MoneyOrbit() {
-  return <div className={styles.orbit} style={{ "--demo-progress": "45%" } as CSSProperties} aria-hidden="true"><span className={styles.orbitMark}><Wallet /></span></div>;
+  return <div className={styles.orbit} style={{ "--orbit-progress": "45%" } as CSSProperties} aria-hidden="true"><span className={styles.orbitMark}><Wallet /></span></div>;
 }
 
 export function MoneyResultIcon() {

@@ -67,12 +67,13 @@ describe("public site destinations", () => {
     expect(source).toContain("export const metadata");
   });
 
-  it("offers the demo marketplace instead of a dead end when listings are unavailable", () => {
+  it("offers a way onward instead of a dead end when listings are unavailable", () => {
     const browser = read("app/(site)/accounts/AccountsBrowser.tsx");
-    expect(browser).toContain("preview = false");
-    expect(browser).toContain("Try the demo marketplace instead");
-    expect(browser).toContain("/login?next=%2Fdashboard%2Faccounts");
-    expect(read("app/(site)/accounts/page.tsx")).toContain("preview={isPreviewDatabase()}");
+    expect(browser).not.toContain("preview");
+    expect(browser).not.toContain("demo");
+    expect(browser).toContain("Accounts are almost ready");
+    expect(browser).toContain('href="/virtual-numbers"');
+    expect(read("app/(site)/accounts/page.tsx")).not.toContain("isPreviewDatabase");
   });
 
   it("routes the help centre's wallet link through sign-in for signed-out visitors", () => {

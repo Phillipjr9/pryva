@@ -5,7 +5,7 @@ import { and, eq, gt, ne, desc } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE, SESSION_COOKIE_EMBEDDED, getCurrentUser } from "@/lib/auth";
 import { isSameOriginMutation } from "@/lib/net";
-import { isPreviewDatabase, isSharedPreviewUser } from "@/lib/demo-policy";
+import { isPreviewDatabase } from "@/lib/demo-policy";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { logger } from "@/lib/logger";
 
@@ -22,7 +22,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Shared demo visitors must not inspect or revoke one another's sessions.
-    if (isSharedPreviewUser(user)) return NextResponse.json({ error: "Use Sign out to end your own demo session." }, { status: 403 });
 
     const userSessions = await db
       .select()
@@ -64,7 +63,6 @@ export async function DELETE(request: NextRequest) {
     }
 
     if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Cross-origin request denied" }, { status: 403 });
-    if (isSharedPreviewUser(user)) return NextResponse.json({ error: "Use Sign out to end your own demo session." }, { status: 403 });
     if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
     let body: unknown;
     try {

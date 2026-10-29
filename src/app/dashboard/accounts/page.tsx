@@ -4,9 +4,6 @@ import { requireUser } from "@/lib/auth";
 import { AccountsBrowser } from "@/app/(site)/accounts/AccountsBrowser";
 import { ArrowRight, Shield } from "@/components/icons";
 import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
-import { isPreviewDatabase } from "@/lib/demo-policy";
-import { demoMarketplaceInventory } from "@/lib/demo-marketplace";
-import { DemoAccountsBrowser } from "@/components/dashboard/DemoAccountsBrowser";
 
 export const metadata: Metadata = { title: "Accounts" };
 
@@ -20,7 +17,6 @@ export const metadata: Metadata = { title: "Accounts" };
  */
 export default async function DashboardAccountsPage() {
   const user = await requireUser("/dashboard/accounts");
-  const preview = isPreviewDatabase();
 
   return (
     <div className="grid gap-4">
@@ -30,24 +26,24 @@ export default async function DashboardAccountsPage() {
             Digital accounts
           </h1>
           <p className="mt-1 text-[0.86rem] text-ink-2">
-            {preview ? "Explore fictional account samples with demo prices and stock." : "Browse live listings priced in Naira. Country coverage is not provided or filtered here, and stock can change."}
+            Browse live listings priced in Naira. Country coverage is not provided or filtered here, and stock can change.
           </p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-[0.68rem] text-ink-3">
-          <Shield className="h-3 w-3 text-lav-600" /> {preview ? "Demo marketplace" : "Support reviews delivery issues"}
+          <Shield className="h-3 w-3 text-lav-600" /> Support reviews delivery issues
         </span>
       </div>
 
-      {!preview && <p className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5 text-[0.76rem] leading-relaxed text-amber-900">
+      <p className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5 text-[0.76rem] leading-relaxed text-amber-900">
         <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         Accounts are delivered exactly as described. Some platforms restrict account transfers — you
         accept that risk when you buy.
         <Link href="/terms" className="ml-1 shrink-0 font-semibold underline underline-offset-2">
           Terms
         </Link>
-      </p>}
+      </p>
 
-      {preview ? <DemoAccountsBrowser initialListings={demoMarketplaceInventory(user.id)} /> : <AccountsBrowser purchaseEnabled={isMarketplaceCheckoutConfigured()} />}
+      <AccountsBrowser purchaseEnabled={isMarketplaceCheckoutConfigured()} />
 
       <p className="text-[0.74rem] text-ink-3">
         Wallet balance: <strong className="text-ink">{user.walletBalance.toLocaleString("en-NG", { style: "currency", currency: "NGN", minimumFractionDigits: 0 })}</strong>{" "}

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { formatNaira } from "@/lib/catalog";
 import { maskAccountNumber, withdrawalStatusLabel, type WithdrawalReceipt, type WithdrawalSubmitResult } from "@/lib/withdrawal-receipt";
 import { MoneyFlowDialog, MoneyOrbit, MoneyProcessing, MoneyResultIcon, MoneyRoute, downloadTextReceipt, moneyDate } from "./MoneyFlowDialog";
-import styles from "./DemoMoneyMovement.module.css";
+import styles from "./MoneyFlow.module.css";
 
 export type WithdrawalReview = { amount: number; fee: number; bankAccountId: string; bankName: string; accountNumber: string; accountName: string };
 
@@ -57,7 +57,7 @@ export function WithdrawalReviewDialog({ review, onSubmit, onClose, testMode = f
 
   const title = stage === "review" ? "Review your withdrawal" : stage === "processing" ? "Submitting your request" : stage === "done" ? "Withdrawal request recorded" : "Request needs attention";
   return <MoneyFlowDialog stage={stage === "unconfirmed" ? "processing" : stage} title={title} onClose={onClose} canClose={stage !== "processing"} centered={stage !== "review"} lead={stage === "processing" ? <MoneyOrbit /> : stage === "done" ? <MoneyResultIcon /> : undefined}>
-    {testMode && <p className={styles.demo}>PAYSTACK TEST MODE — this is not a real bank payout.</p>}
+    {testMode && <p className={styles.notice}>PAYSTACK TEST MODE — this is not a real bank payout.</p>}
     {stage === "review" && <>
       <p className={styles.description}>Confirm the payout details. A request is reviewed before any transfer is initiated.</p>
       <div className={styles.amount}>{formatNaira(review.amount)}</div>

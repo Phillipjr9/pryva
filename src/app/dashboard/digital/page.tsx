@@ -7,9 +7,6 @@ import { formatNaira } from "@/lib/catalog";
 import { DigitalServicesForm } from "./DigitalServicesForm";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { ArrowRight, Shield } from "@/components/icons";
-import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
-import { isPreviewDatabase } from "@/lib/demo-policy";
-import { demoDigitalInventory } from "@/lib/demo-digital";
 import { explorerCountry } from "@/lib/service-explorer";
 
 export const metadata: Metadata = { title: "Subscriptions" };
@@ -30,8 +27,6 @@ export default async function DigitalServicesPage({
   // A bad deep link must not silently render or purchase a different service.
   if ((query.service !== undefined && !selectedService) || (query.country !== undefined && !country)) notFound();
   const allSubscriptions = country ? `/dashboard/digital?country=${country.code}` : "/dashboard/digital";
-  const preview = isPreviewDatabase();
-  const inventory = preview ? demoDigitalInventory(user.id) : {};
 
   return (
     <div className="grid gap-4">
@@ -42,11 +37,11 @@ export default async function DigitalServicesPage({
             {selectedService ? selectedService.name : "Premium subscriptions"}
           </h1>
           <p className="mt-1 max-w-xl text-[0.86rem] text-ink-2">
-            {preview ? "Explore fictional subscription plans and try a demo checkout." : selectedService
-              ? "Compare catalog plans. Live fulfillment is paused."
-              : "Explore subscription examples. Live fulfillment is paused."}
+            {selectedService
+              ? "Compare catalog plans. Digital subscriptions cannot be delivered yet."
+              : "Explore subscription examples. Digital subscriptions cannot be delivered yet."}
           </p>
-          {country && <p className="mt-1 text-[0.73rem] text-ink-3">Browsing for {country.name}. This selection does not confirm real coverage.{preview && " Demo subscription stock and owned units are shared across browsing countries."}</p>}
+          {country && <p className="mt-1 text-[0.73rem] text-ink-3">Browsing for {country.name}. This selection does not confirm real coverage.</p>}
         </div>
         {selectedService ? (
           <Link
@@ -63,7 +58,7 @@ export default async function DigitalServicesPage({
       </div>
 
       {selectedService ? (
-        <DigitalServicesForm key={`${selectedService.slug}:${country?.code ?? ""}`} user={user} service={selectedService} preview={preview} inventory={inventory} countryCode={country?.code} backHref={allSubscriptions} />
+        <DigitalServicesForm key={`${selectedService.slug}:${country?.code ?? ""}`} user={user} service={selectedService} countryCode={country?.code} backHref={allSubscriptions} />
       ) : (
         <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
           {digitalServices.map((service) => (
@@ -82,12 +77,11 @@ export default async function DigitalServicesPage({
                 </div>
               </div>
               <p className="mt-3 text-[0.8rem] leading-relaxed text-ink-2">
-                {preview ? "Fictional subscription demo; no account access." : "Country coverage unconfirmed."}
+                Not available for purchase yet.
               </p>
-              <div className="mt-3"><UnitsStatus demo={preview} stock={preview ? service.plans.reduce((sum, plan) => sum + (inventory[plan.id]?.stock ?? 0), 0) : null} owned={preview ? service.plans.reduce((sum, plan) => sum + (inventory[plan.id]?.owned ?? 0), 0) : null} /></div>
               <div className="mt-auto flex items-end justify-between gap-2 pt-3.5">
                 <div>
-                  <p className="text-[0.62rem] uppercase tracking-[0.12em] text-ink-3">{preview ? "Demo from" : "Preview from"}</p>
+                  <p className="text-[0.62rem] uppercase tracking-[0.12em] text-ink-3">From</p>
                   <p className="text-[0.95rem] font-semibold text-ink">
                     {formatNaira(Math.min(...service.plans.map((plan) => plan.price)))}
                   </p>

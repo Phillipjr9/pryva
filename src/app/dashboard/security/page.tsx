@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { isSharedPreviewUser } from "@/lib/demo-policy";
 import { SessionsCard } from "./SessionsCard";
 import { ArrowRight, Check, Clock, Lock, Shield, User } from "@/components/icons";
 
@@ -9,7 +8,6 @@ export const metadata = { title: "Security" };
 // Shell comes from the dashboard layout; this page supplies content only.
 export default async function SecurityPage() {
   const user = await requireUser("/dashboard/security");
-  const sharedDemo = isSharedPreviewUser(user);
 
   return (
     <div className="grid gap-4">
@@ -27,25 +25,19 @@ export default async function SecurityPage() {
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-lav-50 text-lav-700">
             <Lock className="h-4 w-4" />
           </span>
-          <h2 className="mt-3 text-[0.95rem] font-semibold">{sharedDemo ? "Shared demo access" : "Password"}</h2>
+          <h2 className="mt-3 text-[0.95rem] font-semibold">Password</h2>
           <p className="mt-1 text-[0.8rem] leading-relaxed text-ink-2">
-            {sharedDemo ? "The shared demo does not need a password. Never enter a real password or verification code here." : "Change your password from Settings. Use something long and unique to protect your account."}
+            Change your password from Settings. Use something long and unique to protect your account.
           </p>
           <Link
             href="/dashboard/settings"
             className="mt-3 inline-flex items-center gap-1 text-[0.76rem] font-semibold text-lav-700 hover:underline"
           >
-            {sharedDemo ? "View demo settings" : "Change password"} <ArrowRight className="h-3 w-3" />
+            Change password <ArrowRight className="h-3 w-3" />
           </Link>
         </section>
 
-        {sharedDemo ? (
-          <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-lav-50 text-lav-700"><Shield className="h-4 w-4" /></span>
-            <h2 className="mt-3 text-[0.95rem] font-semibold">Your demo session</h2>
-            <p className="mt-1 text-[0.8rem] leading-relaxed text-ink-2">This account is shared. Use Sign out when you&apos;re done; other visitors&apos; sessions stay separate.</p>
-          </section>
-        ) : <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
+        <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
           <div className="flex items-start justify-between gap-2">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-lav-50 text-lav-700">
               <Shield className="h-4 w-4" />
@@ -58,9 +50,9 @@ export default async function SecurityPage() {
           <p className="mt-1 text-[0.8rem] leading-relaxed text-ink-2">
             Two-factor sign-in is not available yet. Do not rely on it to protect this account.
           </p>
-        </section>}
+        </section>
 
-        {!sharedDemo && <SessionsCard />}
+        <SessionsCard />
       </div>
 
       <section className="rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
@@ -72,7 +64,7 @@ export default async function SecurityPage() {
             "Session cookies are http-only and expire after 30 days.",
             "Sign-in attempts are rate limited per IP.",
             "Every purchase and refund is written to your wallet ledger.",
-            "Demo sessions can never become an administrator account.",
+            "Administrator access is granted separately, never at sign-up.",
           ].map((tip) => (
             <li key={tip} className="flex items-start gap-2">
               <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />

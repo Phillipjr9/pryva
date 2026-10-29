@@ -1,12 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const runtime = vi.hoisted(() => ({
-  preview: false,
   limit: vi.fn(),
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => runtime.preview }));
 vi.mock("@/lib/rate-limit", () => ({ createRateLimiter: () => runtime.limit }));
 vi.mock("@/lib/logger", () => ({ logger: runtime.log }));
 
@@ -46,7 +44,6 @@ function jsonResponse(body: unknown, status = 200): Response {
 beforeEach(() => {
   vi.stubEnv("BULKACC_API_KEY", API_KEY);
   vi.stubEnv("BULKACC_API_URL", "");
-  runtime.preview = false;
   runtime.limit.mockResolvedValue({ allowed: true });
   clearBulkaccCache();
 });
@@ -63,10 +60,6 @@ describe("supplier client: money-spending safety", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
-    runtime.preview = true;
-    await expect(createOrder("300004", 1)).rejects.toMatchObject({ code: "preview_blocked" });
-
-    runtime.preview = false;
     vi.stubEnv("BULKACC_API_KEY", "");
     await expect(createOrder("300004", 1)).rejects.toMatchObject({ code: "not_configured" });
 

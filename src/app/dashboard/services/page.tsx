@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth";
 import { ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
-import { isPreviewDatabase } from "@/lib/demo-policy";
 import { explorerCategory, explorerCountry } from "@/lib/service-explorer";
 
 export const metadata: Metadata = { title: "Service hub" };
@@ -28,7 +27,6 @@ export default async function DashboardServicesPage({
       key={`${country ?? ""}:${category ?? ""}`}
       initialCountry={country}
       initialCategory={category}
-      preview={isPreviewDatabase()}
       rejectedCountry={rejectedCountry}
       rejectedCategory={rejectedCategory}
     />

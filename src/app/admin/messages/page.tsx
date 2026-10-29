@@ -5,7 +5,6 @@ import { contactMessages } from "@/db/schema";
 import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { MessageStatusControl } from "./MessageStatusControl";
 import { isMessageStatus, MESSAGE_STATUS_LABELS, MESSAGE_STATUSES } from "@/lib/support-messages";
-import { isPreviewDatabase } from "@/lib/demo-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -110,13 +109,6 @@ export default async function AdminMessagesPage({
           </p>
         </div>
       </div>
-
-      {isPreviewDatabase() && (
-        <p role="note" className="rounded-xl border border-lav-200 bg-lav-50 px-4 py-3 text-[0.8rem] leading-relaxed text-lav-800">
-          Preview mode: these messages were saved by visitors exploring the shared demo. They are
-          fictional, publicly visible in this sandbox, and no real support request was sent.
-        </p>
-      )}
 
       <div className="flex flex-wrap items-center gap-2">
         {STATUS_FILTERS.map((filter) => (

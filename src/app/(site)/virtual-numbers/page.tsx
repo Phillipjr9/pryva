@@ -1,6 +1,9 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { serviceMap, plansFor, formatNaira } from "@/lib/catalog";
+import { isPlanFulfillable } from "@/lib/fulfillment";
+import { getCurrentUser } from "@/lib/auth";
+import { PlanPurchase } from "@/components/purchase/PlanPurchase";
 import { Check, ArrowRight } from "@/components/icons";
 import { CountryFlag, CountryChips } from "@/components/CountryFlag";
 import { hasCountryFlag } from "@/lib/countries";
@@ -10,9 +13,15 @@ export const metadata: Metadata = {
   description: "Explore virtual-number plans for SMS verification, priced in Naira.",
 };
 
-export default function VirtualNumbersPage() {
+export const dynamic = "force-dynamic";
+
+export default async function VirtualNumbersPage() {
   const service = serviceMap.numbers;
-  const plans = plansFor("numbers");
+  // Only plans the fulfilment layer can actually deliver are shown or sold.
+  const deliverable = plansFor("numbers").filter((plan) => isPlanFulfillable(plan.slug));
+  const plans = deliverable.filter((plan) => !plan.slug.startsWith("rent-"));
+  const rentals = deliverable.filter((plan) => plan.slug.startsWith("rent-"));
+  const user = await getCurrentUser().catch(() => null);
 
   if (!service) {
     return <div>Service not found</div>;
@@ -110,7 +119,7 @@ export default function VirtualNumbersPage() {
             Pricing
           </h2>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {plans.slice(0, 6).map((plan) => (
+            {plans.map((plan) => (
               <div
                 key={plan.slug}
                 className={`rounded-2xl border p-6 ${
@@ -158,6 +167,21 @@ export default function VirtualNumbersPage() {
               View all pricing options →
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* Checkout */}
+      <section className="pb-16">
+        <div className="shell">
+          <PlanPurchase
+            groups={[
+              { label: "Single verification", plans },
+              ...(rentals.length > 0 ? [{ label: "Number rentals", plans: rentals }] : []),
+            ]}
+            signedIn={Boolean(user)}
+            walletBalance={user?.walletBalance ?? null}
+            nextPath="/virtual-numbers"
+          />
         </div>
       </section>
 

@@ -18,11 +18,9 @@ type Props = {
   signedIn: boolean;
   walletBalance: number | null;
   nextPath: string;
-  /** Explicitly label preview checkout so it cannot be mistaken for live delivery. */
-  previewOnly?: boolean;
 };
 
-export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previewOnly = false }: Props) {
+export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState(0);
   const plans = useMemo(() => groups[tab]?.plans ?? [], [groups, tab]);
@@ -91,8 +89,8 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previe
       <PaymentLoading show={pending} message="Processing your order..." />
       <PaymentSuccess
         show={!!success}
-        title="Preview Order Complete"
-        message={`${success?.name} is simulated and is now in your dashboard.`}
+        title="Order Complete"
+        message={`${success?.name} is now in your dashboard.`}
         redirectUrl={`/dashboard/orders/${success?.id}`}
         redirectDelay={2500}
       />
@@ -103,9 +101,9 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previe
           <span className="grid h-12 w-12 place-items-center rounded-full bg-lav-100 text-lav-700">
             <Check className="h-6 w-6" />
           </span>
-          <h3 className="mt-5 text-2xl font-medium">Preview order complete.</h3>
+          <h3 className="mt-5 text-2xl font-medium">Order complete.</h3>
           <p className="mt-2 max-w-md text-[0.92rem] leading-relaxed text-ink-2">
-            <span className="font-semibold text-ink">{success.name}</span> is simulated; no live service was delivered. The preview order is now in your dashboard.
+            <span className="font-semibold text-ink">{success.name}</span> is now in your dashboard. Your verification code appears in the order details as soon as it arrives.
             Order reference{" "}
             <span className="rounded-md bg-lav-50 px-1.5 py-0.5 font-mono text-[0.8rem] text-lav-700">
               {success.reference}
@@ -259,7 +257,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, previe
                   disabled={pending || !selected}
                   className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
-                  {pending ? "Processing…" : previewOnly ? "Create simulated order" : "Pay from wallet"}
+                  {pending ? "Processing…" : "Pay from wallet"}
                   {!pending && <ArrowRight className="h-4 w-4" />}
                 </button>
               ) : (

@@ -3,7 +3,6 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { createSession, hashPassword, isConfiguredAdminEmail, isValidEmail, normalizeEmail } from "@/lib/auth";
 import { creditWallet } from "@/lib/wallet";
-import { isDemoEmail, isPreviewDatabase, PREVIEW_WELCOME_CREDIT } from "@/lib/demo-policy";
 import { checkAuthRateLimit } from "@/lib/auth-rate-limit";
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
@@ -35,7 +34,7 @@ export async function POST(request: Request) {
     if (email.length > 200 || !isValidEmail(email)) {
       return Response.json({ ok: false, error: "That email doesn't look right." }, { status: 400 });
     }
-    if (isConfiguredAdminEmail(email) || isDemoEmail(email)) {
+    if (isConfiguredAdminEmail(email)) {
       return Response.json({ ok: false, error: "This account cannot be created through public signup." }, { status: 403 });
     }
     if (password.length < 8 || password.length > 128) {
@@ -52,12 +51,8 @@ export async function POST(request: Request) {
       .returning({ id: users.id });
     if (!created) return Response.json({ ok: false, error: "Could not create that account." }, { status: 500 });
 
-    const welcomeCredit = isPreviewDatabase() ? PREVIEW_WELCOME_CREDIT : 0;
-    if (welcomeCredit > 0) {
-      await creditWallet({ userId: created.id, amount: welcomeCredit, type: "credit", description: "Preview welcome credit" });
-    }
     await createSession(created.id, request);
-    return Response.json({ ok: true, welcomeCredit });
+    return Response.json({ ok: true });
   } catch {
     return Response.json({ ok: false, error: "Something went wrong. Please try again." }, { status: 500 });
   }

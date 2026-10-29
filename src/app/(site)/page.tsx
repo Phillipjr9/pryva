@@ -73,7 +73,7 @@ const shortcuts = shortcutSlugs.map((slug) => {
 const features = [
   {
     title: "Pay in Naira, properly",
-    body: "Configured live top-ups use Paystack. Preview balances are simulated and real top-ups are disabled.",
+    body: "Top up with Paystack by bank transfer or card, then spend from a balance you control.",
     icon: Card,
     span: "md:col-span-3",
     tone: "cream" as const,
@@ -86,8 +86,8 @@ const features = [
     tone: "lav" as const,
   },
   {
-    title: "Live fulfillment paused",
-    body: "Preview orders are simulated and do not deliver working numbers, inboxes or eSIMs.",
+    title: "Delivered automatically",
+    body: "A verification number is provisioned the moment you pay, and the code appears in your dashboard.",
     icon: Bolt,
     span: "md:col-span-2",
     tone: "white" as const,
@@ -101,7 +101,7 @@ const features = [
   },
   {
     title: "Review plan details",
-    body: "The catalog lists single-use and rental options, but live number fulfillment is paused.",
+    body: "The catalog lists single-use and rental options, with the delivery window shown before you pay.",
     icon: Clock,
     span: "md:col-span-2",
     tone: "white" as const,
@@ -117,7 +117,7 @@ const steps = [
   {
     n: "02",
     title: "Fund your wallet in Naira",
-    body: "Configured live top-ups use Paystack. Preview balances are simulated.",
+    body: "Top up with Paystack by bank transfer or card. Your wallet is credited once payment is confirmed.",
   },
   {
     n: "03",
@@ -141,7 +141,7 @@ const priceRows = [
 const faqs = [
   {
     q: "Do I need a dollar card to use Pryva?",
-    a: "Catalog prices are shown in Naira. Available payment methods depend on the configured provider; real top-ups are disabled in preview.",
+    a: "No. Prices are shown in Naira and you top up with Paystack by bank transfer or local card.",
   },
   {
     q: "What happens if a verification code never arrives?",
@@ -149,19 +149,19 @@ const faqs = [
   },
   {
     q: "Are the virtual numbers real or VoIP?",
-    a: "Live number fulfillment is paused. Preview numbers are simulated and compatibility with any platform is not guaranteed.",
+    a: "Numbers are intended for receiving SMS verification codes. Compatibility with any specific platform is not guaranteed, so check its rules before you rely on a number.",
   },
   {
     q: "Can I keep the same number for longer than one code?",
-    a: "The catalog lists rental plans, but live fulfillment is paused and preview numbers cannot receive real messages.",
+    a: "Yes. Rental plans keep the same number for 30 or 90 days, and you can re-read incoming codes while the rental is active.",
   },
   {
     q: "How quickly does delivery happen?",
-    a: "Live number, eSIM, proxy, email, data, bulk and scheduled fulfillment is paused. Preview orders are simulated.",
+    a: "A number is provisioned immediately after payment. The code itself arrives when the platform sends it, and your order page keeps checking for it.",
   },
   {
     q: "Which platforms work best with Pryva numbers?",
-    a: "Compatibility varies by platform and cannot be guaranteed. Live number fulfillment is currently paused.",
+    a: "Compatibility varies by platform and cannot be guaranteed. Numbers are intended for receiving SMS verification codes.",
   },
 ];
 
@@ -225,8 +225,8 @@ export default async function HomePage() {
 
               <Reveal delay={130}>
                 <p className="mx-auto mt-4 max-w-xl text-[0.95rem] leading-relaxed text-ink-2 sm:mt-6 sm:text-[1.05rem] lg:mx-0">
-                  Explore virtual numbers, eSIM data, residential proxies, temporary inboxes and
-                  digital accounts priced in Naira. Live fulfillment is currently paused.
+                  Virtual numbers for SMS verification, priced in Naira and provisioned the moment
+                  you pay. Every order lands in one calm dashboard.
                 </p>
               </Reveal>
 
@@ -388,7 +388,7 @@ export default async function HomePage() {
               </Reveal>
               <Reveal delay={120}>
                 <p className="mt-4 max-w-lg text-[0.95rem] leading-relaxed text-ink-2">
-                  Explore nine catalog categories in one dashboard. Several live fulfillment paths are paused; preview orders are simulated.
+                  Browse the catalog in one dashboard, with your balance, orders and delivered codes in the same place.
                 </p>
               </Reveal>
             </div>
@@ -522,8 +522,8 @@ export default async function HomePage() {
                     <br className="hidden sm:block" /> and TikTok accounts.
                   </h2>
                   <p className="mt-3 text-[0.92rem] leading-relaxed text-ink-2">
-                    Browse listings priced in Naira. Purchases may be paused, and uncertain
-                    delivery must be reviewed by support.
+                    Browse listings priced in Naira. Stock and price are shown up front, and
+                    delivery issues are reviewed by support.
                   </p>
                   <div className="mt-5 flex flex-wrap items-center gap-2">
                     {["facebook", "instagram", "tiktok", "x"].map((brand) => (
@@ -650,13 +650,13 @@ export default async function HomePage() {
                 </Reveal>
                 <Reveal delay={120}>
                   <p className="mt-4 max-w-xl text-[0.95rem] leading-relaxed text-ink-2">
-                    Your dashboard brings wallet transactions and order references together. Preview balances and orders are simulated.
+                    Your dashboard brings wallet transactions, order references and delivered codes together.
                   </p>
                 </Reveal>
                 <Reveal delay={180}>
                   <ul className="mt-6 grid gap-3 sm:grid-cols-2">
                     {[
-                      "Preview order details and expiry timers",
+                      "Live order details and expiry timers",
                       "Wallet top-ups and a full transaction ledger",
                       "Order references for support review",
                       "Order history you can copy from any device",
@@ -883,7 +883,7 @@ export default async function HomePage() {
                   </ul>
                   <p className="mt-4 flex items-start gap-2 rounded-xl border border-line/70 bg-white/70 px-3 py-2.5 text-[0.74rem] leading-relaxed text-ink-3">
                     <Receipt className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
-                    Catalog prices are shown for comparison. Live fulfillment is paused for these products.
+                    Prices are fixed in Naira and shown before you pay. Categories we cannot deliver reliably are marked unavailable rather than sold.
                   </p>
                 </div>
                 <Link href="/pricing" className="btn btn-primary mt-6 w-full">
@@ -952,8 +952,8 @@ export default async function HomePage() {
                     <span className="text-display italic text-lav-200">two minutes.</span>
                   </h2>
                   <p className="mt-4 max-w-md text-[0.92rem] leading-relaxed text-white/70">
-                    Create an account to explore the dashboard. Preview balances and orders are
-                    simulated; live service fulfillment is currently paused.
+                    Create an account to fund your wallet, order a number and keep every
+                    delivered code in one place.
                   </p>
                   <div className="mt-7 flex flex-col gap-2.5 sm:flex-row">
                     <Link

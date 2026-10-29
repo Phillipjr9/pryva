@@ -40,9 +40,9 @@ export function PaymentSuccess({
   if (!show) return null;
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/55 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="payment-success-title" aria-describedby="payment-success-message">
-      <div className="demo-arrive relative w-full max-w-sm overflow-hidden rounded-[1.75rem] border border-white/80 bg-[#fffdfa] p-7 text-center shadow-float sm:p-9">
+      <div className="flow-arrive relative w-full max-w-sm overflow-hidden rounded-[1.75rem] border border-white/80 bg-[#fffdfa] p-7 text-center shadow-float sm:p-9">
         <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-lav-200/60 blur-2xl" />
-        <div aria-hidden="true" className="demo-pop relative mx-auto grid h-20 w-20 place-items-center rounded-[1.6rem] bg-emerald-100 text-emerald-700">
+        <div aria-hidden="true" className="flow-pop relative mx-auto grid h-20 w-20 place-items-center rounded-[1.6rem] bg-emerald-100 text-emerald-700">
           <Check className="h-10 w-10" />
           <Sparkle className="absolute -right-2 -top-2 h-5 w-5 text-lav-600" />
         </div>
@@ -52,7 +52,7 @@ export function PaymentSuccess({
         {autoRedirect ? (
           <div className="mt-6">
             <p className="text-[0.7rem] text-ink-3">Opening your details…</p>
-            <div aria-hidden="true" className="mt-3 h-1.5 overflow-hidden rounded-full bg-lav-100"><div className="demo-progress h-full w-1/3 rounded-full bg-lav-600" /></div>
+            <div aria-hidden="true" className="mt-3 h-1.5 overflow-hidden rounded-full bg-lav-100"><div className="flow-progress h-full w-1/3 rounded-full bg-lav-600" /></div>
             <a href={redirectUrl} className="mt-4 inline-flex text-[0.75rem] font-semibold text-lav-700 underline underline-offset-2">Continue now</a>
           </div>
         ) : (

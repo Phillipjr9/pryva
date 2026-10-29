@@ -14,7 +14,7 @@
 .close { display: grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border: 1px solid #e7e2e9; border-radius: 12px; background: transparent; color: #696570; font-size: 22px; line-height: 1; cursor: pointer; }
 .close:hover:not(:disabled) { background: #f7f4f8; }
 .close:disabled { opacity: .4; cursor: not-allowed; }
-.demo { margin: 0 0 14px; padding: 9px 11px; border: 1px solid #eadcf8; border-radius: 12px; background: #faf5ff; color: #6943a4; font-size: 12px; font-weight: 650; line-height: 1.45; }
+.notice { margin: 0 0 14px; padding: 9px 11px; border: 1px solid #eadcf8; border-radius: 12px; background: #faf5ff; color: #6943a4; font-size: 12px; font-weight: 650; line-height: 1.45; }
 .title { margin: 0; color: #1d1a21; font-size: 25px; font-weight: 650; letter-spacing: -.045em; line-height: 1.15; outline: none; }
 .description { margin: 7px 0 0; color: #77727e; font-size: 13px; line-height: 1.5; }
 .amount { margin: 17px 0 20px; color: #17151b; font-size: 42px; font-weight: 590; letter-spacing: -.065em; line-height: 1.08; overflow-wrap: anywhere; }
@@ -52,7 +52,7 @@
 .primary:hover:not(:disabled) { background: #302b36; }
 .error { margin: 14px 0 0; padding: 10px 12px; border: 1px solid #f1c9ca; border-radius: 11px; background: #fff4f4; color: #a23338; font-size: 12px; line-height: 1.45; }
 .processingHead { display: grid; justify-items: center; text-align: center; padding: 2px 0 8px; }
-.orbit { position: relative; display: grid; width: 76px; height: 76px; margin: 0 auto 14px; place-items: center; border-radius: 50%; background: conic-gradient(#7856dc var(--demo-progress), #eee9f2 0); box-shadow: 0 8px 24px rgb(110 77 202 / 14%); }
+.orbit { position: relative; display: grid; width: 76px; height: 76px; margin: 0 auto 14px; place-items: center; border-radius: 50%; background: conic-gradient(#7856dc var(--orbit-progress), #eee9f2 0); box-shadow: 0 8px 24px rgb(110 77 202 / 14%); }
 .orbit::before { position: absolute; inset: 5px; border-radius: 50%; background: #f5efff; content: ""; }
 .orbitMark { position: relative; display: grid; width: 54px; height: 54px; place-items: center; border-radius: 50%; background: #fff; color: #7250d2; }
 .orbitMark svg { width: 23px; height: 23px; }

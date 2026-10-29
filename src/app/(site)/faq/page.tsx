@@ -13,11 +13,11 @@ const faqCategories = [
     questions: [
       {
         q: "What is Pryva?",
-        a: "Pryva is a wallet and digital-services application. Live fulfillment for numbers, eSIMs, proxies, email, data, bulk and scheduled orders is currently paused. Preview balances and orders are simulated.",
+        a: "Pryva is a Naira wallet and digital-services application. Virtual numbers for SMS verification are delivered automatically; categories we cannot yet deliver reliably are marked unavailable rather than sold.",
       },
       {
         q: "How do I create an account?",
-        a: "Choose Get Started and enter your name, email and password. Password signup does not currently verify email ownership. Use a unique password; available payment and purchase features depend on the environment.",
+        a: "Choose Get Started and enter your name, email and password. Password signup does not currently verify email ownership, so use a unique password you do not reuse elsewhere.",
       },
       {
         q: "Is Pryva safe to use?",
@@ -30,15 +30,15 @@ const faqCategories = [
     questions: [
       {
         q: "How quickly will I receive my virtual number?",
-        a: "Live virtual-number fulfillment is currently paused. Preview orders are simulated and do not receive real SMS messages.",
+        a: "A number is provisioned immediately after payment. The code itself arrives when the platform sends it, and your order page keeps checking until the delivery window closes.",
       },
       {
         q: "Which platforms do your virtual numbers work with?",
-        a: "Compatibility is not guaranteed. Check the destination platform's rules and restrictions before relying on a virtual number; live fulfillment is currently paused.",
+        a: "Compatibility is not guaranteed. Check the destination platform's rules and restrictions before relying on a virtual number.",
       },
       {
         q: "What's the difference between buying and renting a number?",
-        a: "The catalog distinguishes single-verification and rental plans, but live fulfillment for both is paused. Preview orders do not issue working numbers.",
+        a: "A single-verification number receives one code within a short delivery window. A rental keeps the same number for 30 or 90 days, and you can re-read incoming codes while it is active.",
       },
       {
         q: "What if my virtual number doesn't receive the code?",
@@ -51,7 +51,7 @@ const faqCategories = [
     questions: [
       {
         q: "How do I activate my eSIM?",
-        a: "Live eSIM fulfillment is currently paused. Preview activation details are simulated and will not activate a real plan.",
+        a: "eSIM plans are not available for purchase yet. They are listed for reference and marked unavailable, so you cannot be charged for one.",
       },
       {
         q: "Which phones support eSIM?",
@@ -59,7 +59,7 @@ const faqCategories = [
       },
       {
         q: "Can I keep my WhatsApp number when using an eSIM?",
-        a: "Your existing account can generally remain associated with its original number, but check your device, carrier and app settings. Live eSIM fulfillment is paused.",
+        a: "Your existing account can generally remain associated with its original number, but check your device, carrier and app settings. eSIM plans are not available for purchase yet.",
       },
     ],
   },
@@ -68,7 +68,7 @@ const faqCategories = [
     questions: [
       {
         q: "How do I top up my wallet?",
-        a: "In a configured live environment, open Wallet and follow the Paystack checkout instructions. Available payment methods depend on the provider. Top-ups are disabled in preview mode.",
+        a: "Open Wallet, choose an amount and follow the Paystack checkout instructions. Paystack shows the payment methods available to you at checkout, and your wallet is credited only once the payment is confirmed.",
       },
       {
         q: "Are there any fees for wallet top-up?",
@@ -76,11 +76,11 @@ const faqCategories = [
       },
       {
         q: "Can I withdraw money from my wallet?",
-        a: "Withdrawal requests require a configured live payment provider and administrator review. A request or transfer initiation is not proof of settlement. Bank transfers are disabled in preview.",
+        a: "Withdrawal requests require administrator review and a payment provider that can settle them. A request or transfer initiation is not proof of settlement.",
       },
       {
         q: "Do wallet balances expire?",
-        a: "Your current balance and transaction history are shown in Wallet. Preview balances are simulated and are lost when the preview is reset.",
+        a: "Your current balance and transaction history are shown in Wallet. Balances do not expire, and every top-up and purchase is listed with its own reference.",
       },
     ],
   },

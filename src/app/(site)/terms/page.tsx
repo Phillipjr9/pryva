@@ -69,7 +69,7 @@ export default function TermsPage() {
 
             <h2>7. Service Availability</h2>
             <p>
-              Service availability is not guaranteed. Live fulfillment for several products is currently paused. See the service status page for feature availability.
+              Service availability is not guaranteed. Products that cannot currently be delivered are marked unavailable and cannot be ordered or charged. See the service status page for current availability.
             </p>
 
             <h2>8. Limitation of Liability</h2>

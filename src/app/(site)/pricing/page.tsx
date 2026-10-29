@@ -28,7 +28,7 @@ export default function PricingPage() {
             Simple, transparent pricing
           </h1>
           <p className="mt-4 text-[1.1rem] text-ink-2 max-w-2xl mx-auto">
-            Compare catalog prices in Naira. Live number, eSIM, proxy and inbox fulfillment is paused; preview orders are simulated.
+            Compare catalog prices in Naira. Every price is fixed before checkout, and your wallet is only debited once delivery succeeds.
           </p>
         </div>
       </section>
@@ -130,7 +130,7 @@ export default function PricingPage() {
                 What payment methods do you accept?
               </h3>
               <p className="text-[0.9rem] text-ink-2">
-                In a configured live environment, top-ups use Paystack. Available payment methods depend on the provider; top-ups are disabled in preview.
+                Top-ups use Paystack. Paystack shows the payment methods available to you at checkout.
               </p>
             </div>
             <div className="rounded-2xl border border-line bg-white p-6">
