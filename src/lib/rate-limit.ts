@@ -101,6 +101,13 @@ export const apiRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests:
 export const demoRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 30 });
 export const authRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 5 });
 export const purchaseRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 10 });
+/**
+ * Refunds are the one customer action that both calls a provider and credits a
+ * wallet, so it is throttled per account rather than per minute: ten genuine
+ * refund requests in fifteen minutes is already unusual, and the eligibility
+ * window means a legitimate retry never needs more.
+ */
+export const refundRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 10 });
 export const securityReportRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 6 });
 export const userExportRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 2 });
 export const contactRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 5 });

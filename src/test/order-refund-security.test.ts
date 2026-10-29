@@ -4,13 +4,17 @@ import type { SQL } from "drizzle-orm";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { POST } from "@/app/api/orders/[id]/refund/route";
 
-const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), select: vi.fn(), transaction: vi.fn(), cancelUpstream: vi.fn(), flagReconciliation: vi.fn() }));
+const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), select: vi.fn(), transaction: vi.fn(), cancelUpstream: vi.fn(), flagReconciliation: vi.fn(), refundRateLimit: vi.fn() }));
 vi.mock("@/db", () => ({ db: { select: mocks.select, transaction: mocks.transaction } }));
 vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.currentUser }));
 // Must be mocked: the route releases the number upstream after committing the
 // refund, and an unmocked call would reach the real provider.
 vi.mock("@/lib/fulfillment", () => ({ cancelUpstream: mocks.cancelUpstream }));
 vi.mock("@/lib/reconciliation", () => ({ flagReconciliation: mocks.flagReconciliation }));
+// The throttle is DB-backed, and the fake database below exposes only select and
+// transaction -- without this the limiter correctly reports itself unavailable
+// and every refund fails closed at 503.
+vi.mock("@/lib/rate-limit", () => ({ refundRateLimiter: mocks.refundRateLimit }));
 const dialect = new PgDialect();
 const context = { params: Promise.resolve({ id: "order-id" }) };
 function request(origin = "https://pryva.test") {
@@ -20,6 +24,8 @@ function request(origin = "https://pryva.test") {
 }
 
 function fakeDatabase() {
+  mocks.refundRateLimit.mockReset();
+  mocks.refundRateLimit.mockResolvedValue({ allowed: true, unavailable: false });
   mocks.cancelUpstream.mockReset();
   mocks.cancelUpstream.mockResolvedValue(true);
   mocks.flagReconciliation.mockReset();
@@ -173,5 +179,30 @@ describe("order refund safety", () => {
     expect(state.order.status).toBe("active");
     expect(state.order.refundedAt).toBeNull();
     expect(state.balance).toBe(500);
+  });
+
+  it("throttles a refund before looking the order up", async () => {
+    fakeDatabase();
+    mocks.refundRateLimit.mockResolvedValue({ allowed: false, unavailable: false });
+
+    const response = await POST(request(), context);
+
+    expect(response.status).toBe(429);
+    // The throttle sits ahead of the work it protects, so neither the order
+    // lookup nor the wallet transaction may have run.
+    expect(mocks.select).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the throttle itself is unavailable", async () => {
+    fakeDatabase();
+    mocks.refundRateLimit.mockResolvedValue({ allowed: true, unavailable: true });
+
+    const response = await POST(request(), context);
+
+    // A refund credits a wallet, so an unreadable counter must refuse rather
+    // than wave the request through.
+    expect(response.status).toBe(503);
+    expect(mocks.transaction).not.toHaveBeenCalled();
   });
 });
