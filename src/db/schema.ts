@@ -82,7 +82,18 @@ export const orders = pgTable(
     duration: varchar("duration", { length: 80 }).notNull(),
     amount: integer("amount").notNull(),
     status: varchar("status", { length: 24 }).notNull().default("active"),
-    provider: varchar("provider", { length: 40 }).notNull().default("simulated"),
+    /**
+     * Which provider fulfilled this order, and therefore which one has to be
+     * asked to release the unit on a refund.
+     *
+     * No default, deliberately. A default of "simulated" -- demo language left
+     * over in a production column -- meant any insert path that forgot to name a
+     * provider silently recorded a supplier that does not exist, and
+     * cancelUpstream would then match nothing and quietly fail to release the
+     * unit. A missing provider is now a database error instead of a plausible
+     * looking wrong answer.
+     */
+    provider: varchar("provider", { length: 40 }).notNull(),
     providerRequestId: varchar("provider_request_id", { length: 160 }),
     referenceCode: text("reference_code"),
     otpCode: varchar("otp_code", { length: 12 }),

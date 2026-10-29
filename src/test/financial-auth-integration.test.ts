@@ -142,6 +142,7 @@ beforeAll(async () => {
   await pg.exec(await readFile("migrations/0007_order_reconciliation_note.sql", "utf8"));
   await pg.exec(await readFile("migrations/0008_order_provider_cost.sql", "utf8"));
   await pg.exec(await readFile("migrations/0009_password_reset_tokens.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0010_order_provider_no_default.sql", "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
   [purchaseRoute, refundRoute, bankRoute, verifyBankRoute, googleRoute, contactRoute, deleteRoute, passwordRoute, sessionsRoute, autoRefund, giftPurchaseRoute, giftCheckRoute, giftRedeemRoute, topUpRoute, verifyTopUpRoute, webhookRoute, profileRoute, notificationsRoute, markReadRoute, logoutRoute, syncRoute, scheduledRoute, promoRoute, withdrawalRoute, adminWithdrawalRoute, integrity] = await Promise.all([
@@ -316,7 +317,7 @@ describe("ledger integrity", () => {
   });
 
   it("recognizes the actual refund ledger type when checking a refunded order", async () => {
-    const [order] = await database.insert(schema.orders).values({ reference: "integrity-order", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "Nigeria", duration: "Single", amount: 1000, provider: "simulated", status: "refunded" }).returning();
+    const [order] = await database.insert(schema.orders).values({ reference: "integrity-order", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "Nigeria", duration: "Single", amount: 1000, provider: "fleexa", status: "refunded" }).returning();
     await database.insert(schema.walletTransactions).values([
       { userId: USER, orderId: order.id, type: "debit", amount: 1000, balanceAfter: 9000, description: "Purchase", reference: "integrity-debit" },
       { userId: USER, orderId: order.id, type: "refund", amount: 1000, balanceAfter: 10000, description: "Refund", reference: "integrity-order-refund" },
@@ -587,7 +588,7 @@ describe("Google subject binding and account protection", () => {
   });
 
   it("refuses self-service deletion and preserves the user and financial records", async () => {
-    await database.insert(schema.orders).values({ reference: "ORDER-1", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "NG", duration: "20 min", amount: 1000 });
+    await database.insert(schema.orders).values({ reference: "ORDER-1", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "NG", duration: "20 min", amount: 1000, provider: "fleexa" });
     const request = new NextRequest("https://pryva.test/api/user/delete", { method: "DELETE", headers: { origin: "https://pryva.test" } });
     expect((await deleteRoute.DELETE(request)).status).toBe(503);
     expect(await database.select().from(schema.users)).toHaveLength(1);
