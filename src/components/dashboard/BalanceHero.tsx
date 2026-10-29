@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Plus, Shield, Wallet } from "@/components/icons";
+import { ArrowRight, ArrowUpRight, Plus, Wallet } from "@/components/icons";
 import { formatNaira } from "@/lib/catalog";
 
 export type BalanceStat = {
@@ -20,12 +20,10 @@ export function BalanceHero({
   name,
   balance,
   stats,
-  preview,
 }: {
   name: string;
   balance: number;
   stats: BalanceStat[];
-  preview: boolean;
 }) {
   return (
     <section
@@ -88,16 +86,6 @@ export function BalanceHero({
             </div>
           ))}
         </dl>
-
-        {preview ? (
-          <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[0.66rem] text-white/65">
-            <Shield className="h-3 w-3" /> Preview mode — balances and orders here are simulated
-          </p>
-        ) : (
-          <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[0.66rem] text-white/65">
-            <Shield className="h-3 w-3" /> Live purchasing is paused while integrations are reviewed
-          </p>
-        )}
 
         <Link
           href="/dashboard/wallet"

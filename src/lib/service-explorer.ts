@@ -275,7 +275,7 @@ function additionalItems(country: ExplorerCountry): ExplorerItem[] {
     },
     {
       id: "scheduled-orders", category: "tools", name: "Scheduled orders",
-      description: "Manage recurring preview orders", tag: "Order tool", artwork: { kind: "service", name: "scheduled" },
+      description: "Manage recurring orders", tag: "Order tool", artwork: { kind: "service", name: "scheduled" },
       source: "tool", coverage: "not-country-specific", stock: null, myUnits: null, price: null,
       action: { label: "Open schedules", href: "/dashboard/scheduled" },
     },

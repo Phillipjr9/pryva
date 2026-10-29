@@ -7,7 +7,6 @@ import { createSession, hashPassword } from "@/lib/auth";
 import { exchangeGoogleCode, fetchGoogleUser, googleConfigured } from "@/lib/google";
 import { relativeRedirect } from "@/lib/net";
 import { creditWallet } from "@/lib/wallet";
-import { isDemoEmail, isPreviewDatabase, PREVIEW_WELCOME_CREDIT } from "@/lib/demo-policy";
 import { safeRedirectPath } from "@/lib/safe-redirect";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +50,7 @@ export async function GET(request: Request) {
   try {
     const accessToken = await exchangeGoogleCode(request, code);
     const profile = await fetchGoogleUser(accessToken);
-    if (!profile.emailVerified || isDemoEmail(profile.email) || !profile.sub || profile.sub.length > 255) {
+    if (!profile.emailVerified || !profile.sub || profile.sub.length > 255) {
       return clearCookies(goToLogin("google-exchange"));
     }
 
@@ -78,14 +77,6 @@ export async function GET(request: Request) {
         .returning();
       user = created;
 
-      if (user && isPreviewDatabase()) {
-        await creditWallet({
-          userId: user.id,
-          amount: PREVIEW_WELCOME_CREDIT,
-          type: "credit",
-          description: "Preview welcome credit — Google sign-up",
-        });
-      }
     }
 
     if (!user) return clearCookies(goToLogin("google-exchange"));

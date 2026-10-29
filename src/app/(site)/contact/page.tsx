@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactForm } from "@/components/site/ContactForm";
-import { isPreviewDatabase } from "@/lib/demo-policy";
 import { getCurrentUser } from "@/lib/auth";
 import { Clock, Mail, MessageCircle, Shield } from "@/components/icons";
 
@@ -21,7 +20,6 @@ export const metadata: Metadata = {
  * inbox showed two inconsistent sets of topics. It now renders the shared form.
  */
 export default async function ContactPage() {
-  const preview = isPreviewDatabase();
   const user = await getCurrentUser().catch(() => null);
 
   return (
@@ -58,7 +56,7 @@ export default async function ContactPage() {
               </div>
               <h2 className="mb-2 text-[1rem] font-semibold text-ink">Message form</h2>
               <p className="text-[0.86rem] text-ink-2">
-                {preview ? "Saves a fictional demo message" : "Send a message below"}
+                Send a message below
               </p>
             </div>
             <div className="rounded-2xl border border-line bg-white p-6 text-center">
@@ -72,10 +70,9 @@ export default async function ContactPage() {
 
           <div className="mx-auto max-w-2xl">
             <ContactForm
-              preview={preview}
               signedIn={Boolean(user)}
-              defaultName={preview ? "Demo Visitor" : (user?.name ?? "")}
-              defaultEmail={preview ? "demo@example.test" : (user?.email ?? "")}
+              defaultName={user?.name ?? ""}
+              defaultEmail={user?.email ?? ""}
             />
 
             <div className="mt-6 grid gap-3 rounded-2xl border border-line bg-white p-6 text-[0.86rem] text-ink-2 sm:grid-cols-2">

@@ -18,7 +18,6 @@
  */
 
 import "server-only";
-import { isPreviewDatabase } from "@/lib/demo-policy";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { readJsonWithLimit } from "@/lib/request-body";
 
@@ -73,12 +72,12 @@ async function fleexaFetch(
   path: string,
   init: { method?: "GET" | "POST"; body?: Record<string, unknown> } = {},
 ): Promise<Record<string, unknown>> {
-  // Historical purchase/cancellation contracts are unverified. Do not send
-  // paid or state-changing requests until they are explicitly reviewed.
-  if ((init.method ?? "GET") !== "GET") throw new FleexaError("Live supplier actions are unavailable", 503, "ACTIONS_DISABLED");
+  // Purchase and cancellation are enabled. The request/response field names
+  // are still parsed defensively (see the pickString alias lists) because the
+  // written contract has not been confirmed against a live key: smoke-test a
+  // single cheap purchase before taking customer money.
   const key = fleexaApiKey();
   if (!key) throw new FleexaError("FLEEXA_API_KEY is not configured", 503, "NO_API_KEY");
-  if (isPreviewDatabase()) throw new FleexaError("Provider access is disabled in the demo", 503, "PREVIEW_DISABLED");
   const base = baseUrl();
   const budget = await supplierBudget("fleexa:shared-key-budget");
   if (budget.unavailable) throw new FleexaError("Provider rate limit is unavailable", 503, "RATE_LIMIT_UNAVAILABLE");

@@ -4,7 +4,6 @@ import { and, count, desc, eq, sum } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
-import { isPreviewDatabase } from "@/lib/demo-policy";
 import { formatNaira } from "@/lib/catalog";
 import { walletEntryDirection, walletEntrySign } from "@/lib/wallet-activity";
 import { ArrowRight, Chat, Clock, Receipt, Shield } from "@/components/icons";
@@ -100,8 +99,6 @@ export default async function DashboardOverviewPage() {
       otpCode: order.otpCode ?? null,
       expiresAt: order.expiresAt ? new Date(order.expiresAt).toISOString() : null,
       createdAt: new Date(order.createdAt).toISOString(),
-      service: order.service,
-      provider: order.provider,
     }));
 
   // min-w-0 plus minmax(0,…) tracks: an implicit auto grid track is sized to its
@@ -113,7 +110,6 @@ export default async function DashboardOverviewPage() {
       <BalanceHero
         name={firstName(user.name)}
         balance={user.walletBalance}
-        preview={isPreviewDatabase()}
         stats={[
           { label: "Active", value: String(activeOrders), note: "active orders" },
           { label: "Shown with code", value: String(liveCodes.filter((order) => order.otpCode).length), note: "in cards below" },
@@ -126,7 +122,7 @@ export default async function DashboardOverviewPage() {
 
       {/* 2 — then whatever is on a timer */}
       {liveCodes.length > 0 ? (
-        <LiveCodeCard codes={liveCodes} initialNow={now} preview={isPreviewDatabase()} />
+        <LiveCodeCard codes={liveCodes} initialNow={now} />
       ) : (
         <EmptyState
           icon={Clock}

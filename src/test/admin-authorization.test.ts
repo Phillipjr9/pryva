@@ -57,7 +57,7 @@ function request(path: string, method: string, origin = "https://pryva.test") {
 const context = { params: Promise.resolve({ id: "test-id" }) };
 
 beforeEach(() => {
-  vi.stubEnv("ADMIN_EMAILS", "Admin@Pryva.test, demo@pryva.ng");
+  vi.stubEnv("ADMIN_EMAILS", "Admin@Pryva.test");
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -65,12 +65,13 @@ afterEach(() => {
 });
 
 describe("admin authorization", () => {
-  it("requires an explicit allowlist and never gives the demo account admin access", () => {
+  it("requires an explicit allowlist hit, and grants nobody when it is empty", () => {
+    // Matching is case-insensitive; anything not listed is rejected.
     expect(isAdminUser(account("ADMIN@pryva.test"))).toBe(true);
-    expect(isAdminUser(account("demo@pryva.ng"))).toBe(false);
+    expect(isAdminUser(account("customer@example.com"))).toBe(false);
     vi.stubEnv("ADMIN_EMAILS", "");
     expect(isAdminUser(account("admin@pryva.ng"))).toBe(false);
-    expect(isAdminUser(account("demo@pryva.ng"))).toBe(false);
+    expect(isAdminUser(account("ADMIN@pryva.test"))).toBe(false);
   });
 
   it.each(handlers)("$method /api/admin/$path rejects anonymous users before database access", async ({ path, method, handler }) => {
@@ -97,8 +98,8 @@ describe("admin authorization", () => {
     expect(transaction).not.toHaveBeenCalled();
   });
 
-  it("rejects the shared demo account even if it is allowlisted", async () => {
-    vi.mocked(getCurrentUser).mockResolvedValue(account("demo@pryva.ng"));
+  it("rejects a signed-in account that is not on the allowlist", async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(account("customer@example.com"));
     expect((await users.GET(request("users", "GET"))).status).toBe(403);
   });
 

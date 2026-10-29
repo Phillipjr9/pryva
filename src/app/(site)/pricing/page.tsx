@@ -28,7 +28,7 @@ export default function PricingPage() {
             Simple, transparent pricing
           </h1>
           <p className="mt-4 text-[1.1rem] text-ink-2 max-w-2xl mx-auto">
-            Compare catalog prices in Naira. Live number, eSIM, proxy and inbox fulfillment is paused; preview orders are simulated.
+            Compare catalog prices in Naira. Every price is fixed before checkout, and your wallet is only debited once delivery succeeds.
           </p>
         </div>
       </section>
@@ -47,11 +47,11 @@ export default function PricingPage() {
                   {group.name}
                 </h2>
               </div>
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
                 {servicePlans.map((plan) => (
                   <div
                     key={plan.slug}
-                    className={`rounded-2xl border p-6 ${
+                    className={`rounded-xl border p-3 sm:rounded-2xl sm:p-6 ${
                       plan.popular
                         ? "border-lav-600 bg-white shadow-[var(--shadow-card)]"
                         : "border-line bg-white"
@@ -64,37 +64,42 @@ export default function PricingPage() {
                         </span>
                       </div>
                     )}
-                    <h3 className="mb-2 flex items-center gap-2 text-[1.1rem] font-semibold text-ink">
+                    <h3 className="mb-1.5 flex items-center gap-1.5 text-[0.84rem] font-semibold text-ink sm:mb-2 sm:gap-2 sm:text-[1.1rem]">
                       {hasCountryFlag(plan.region) && <CountryFlag region={plan.region} size={20} decorative />}
                       {plan.name}
                     </h3>
-                    <p className="text-[0.86rem] text-ink-2 mb-4">
+                    <p className="text-[0.72rem] text-ink-2 mb-2 sm:text-[0.86rem] sm:mb-4">
                       {plan.planLabel}
                     </p>
                     <div className="mb-4">
-                      <span className="text-[2rem] font-bold text-ink">
+                      <span className="text-[1.1rem] font-bold text-ink sm:text-[2rem]">
                         {formatNaira(plan.price)}
                       </span>
                       {plan.compareAt && (
-                        <span className="ml-2 text-[1rem] text-ink-3 line-through">
+                        <span className="ml-1.5 text-[0.74rem] text-ink-3 line-through sm:ml-2 sm:text-[1rem]">
                           {formatNaira(plan.compareAt)}
                         </span>
                       )}
                     </div>
-                    <p className="text-[0.86rem] text-ink-2 mb-6">
+                    <p className="text-[0.72rem] text-ink-2 mb-3 sm:text-[0.86rem] sm:mb-6">
                       {plan.duration}
                     </p>
-                    <ul className="space-y-2 mb-6">
+                    <ul className="space-y-1 mb-3 sm:space-y-2 sm:mb-6">
+                      {/* Past two, the list is detail: on a phone it is most of
+                          what makes each card taller than the product deserves. */}
                       {plan.features.map((feature, index) => (
-                        <li key={index} className="flex items-start gap-2 text-[0.86rem] text-ink-2">
-                          <Check className="h-4 w-4 text-lav-600 shrink-0 mt-0.5" />
+                        <li
+                          key={index}
+                          className={`${index >= 2 ? "hidden sm:flex" : "flex"} items-start gap-1.5 text-[0.72rem] text-ink-2 sm:gap-2 sm:text-[0.86rem]`}
+                        >
+                          <Check className="h-3 w-3 text-lav-600 shrink-0 mt-0.5 sm:h-4 sm:w-4" />
                           {feature}
                         </li>
                       ))}
                     </ul>
                     <Link
                       href={`/signup?plan=${plan.slug}`}
-                      className={`block w-full rounded-xl px-4 py-3 text-center text-[0.9rem] font-semibold transition-colors ${
+                      className={`block w-full rounded-lg px-3 py-2 text-center text-[0.78rem] font-semibold transition-colors sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.9rem] ${
                         plan.popular
                           ? "bg-lav-600 text-white hover:bg-lav-700"
                           : "border border-line bg-white text-ink hover:bg-cream"
@@ -130,7 +135,7 @@ export default function PricingPage() {
                 What payment methods do you accept?
               </h3>
               <p className="text-[0.9rem] text-ink-2">
-                In a configured live environment, top-ups use Paystack. Available payment methods depend on the provider; top-ups are disabled in preview.
+                Top-ups use Paystack. Paystack shows the payment methods available to you at checkout.
               </p>
             </div>
             <div className="rounded-2xl border border-line bg-white p-6">

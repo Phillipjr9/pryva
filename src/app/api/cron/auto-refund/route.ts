@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processAutoRefunds } from "@/lib/auto-refund";
-import { isPreviewDatabase } from "@/lib/demo-policy";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -8,9 +7,10 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/cron/auto-refund
  *
- * Only simulated, code-less single-number orders can be swept. Live provider
- * orders must be reconciled manually until cancellation and delivery semantics
- * have been verified; no production refund sweep should be scheduled yet.
+ * Sweeps single-verification number orders that timed out with no code and
+ * credits the wallet, then releases the number upstream on a best-effort basis.
+ * Rentals are deliberately out of scope — no upstream cancel exists for them, so
+ * they stay with support for manual reconciliation.
  */
 export async function POST(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -19,14 +19,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!isPreviewDatabase()) {
-    return NextResponse.json({ error: "Live automatic refunds require provider reconciliation" }, { status: 503 });
-  }
-
   try {
-    const refunded = await processAutoRefunds();
-    logger.info("Auto-refund sweep completed", { refunded });
-    return NextResponse.json({ ok: true, refunded });
+    const { refunded, cancelled } = await processAutoRefunds();
+    logger.info("Auto-refund sweep completed", { refunded, cancelled });
+    return NextResponse.json({ ok: true, refunded, cancelled });
   } catch (error) {
     logger.error("Auto-refund sweep failed", {
       error: error instanceof Error ? error.message : String(error),

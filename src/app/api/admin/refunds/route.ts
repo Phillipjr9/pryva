@@ -5,8 +5,10 @@ import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { eq, and, isNull, ne, sql } from "drizzle-orm";
 import { logger } from "@/lib/logger";
+import { flagReconciliation } from "@/lib/reconciliation";
 import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { isSameOriginMutation } from "@/lib/net";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +58,13 @@ export async function GET(request: NextRequest) {
 
 // POST /api/admin/refunds - Process a refund manually
 export async function POST(request: NextRequest) {
+  // These are the most privileged mutations in the app: they move real money out
+  // and edit accounts. Cookie-based admin sessions make them a CSRF target, so
+  // the origin is checked before authorization -- failing fast also avoids
+  // telling an unauthenticated cross-origin caller anything about the account.
+  if (!isSameOriginMutation(request)) {
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  }
   try {
     const access = await authorizeAdminApi(request);
     if (access.response) return access.response;
@@ -114,6 +123,10 @@ export async function POST(request: NextRequest) {
     if (!result) {
       return NextResponse.json({ error: "Order not found, already refunded, still processing, or requires confirmed reconciliation" }, { status: 409 });
     }
+    // This path credits the customer without releasing the unit upstream, so the
+    // exposure has to be recorded the same way the customer-facing refund paths
+    // record it: money returned and a number that may still be working.
+    if (reconciliationConfirmed === true) await flagReconciliation(orderId);
     logger.info("Manual refund processed", { orderId, amount: result.amount, adminId: access.user.id });
     scheduleWalletEmails();
     return NextResponse.json({ ok: true, message: "Refund processed successfully", refundAmount: result.amount });

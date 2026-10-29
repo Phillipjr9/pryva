@@ -101,9 +101,28 @@ export const apiRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests:
 export const demoRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 30 });
 export const authRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 5 });
 export const purchaseRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 10 });
+/**
+ * Refunds are the one customer action that both calls a provider and credits a
+ * wallet, so it is throttled per account rather than per minute: ten genuine
+ * refund requests in fifteen minutes is already unusual, and the eligibility
+ * window means a legitimate retry never needs more.
+ */
+export const refundRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 10 });
 export const securityReportRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 6 });
 export const userExportRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 2 });
 export const contactRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 5 });
+/**
+ * Changing a password requires the current one, so every attempt runs a scrypt
+ * verification. That makes the endpoint an expensive oracle -- not for guessing
+ * the new password, but for grinding the old one -- and five attempts per fifteen
+ * minutes is far more than a human who mistypes needs.
+ */
+export const passwordChangeRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 5 });
+/**
+ * Notifications are polled rather than submitted, so this is sized to tolerate a
+ * client refreshing on an interval without ever throttling a real user.
+ */
+export const notificationRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 30 });
 export const giftCardUserRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 15 });
 export const giftCardIpRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 60 });
 

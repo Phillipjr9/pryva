@@ -19,10 +19,9 @@ type Props = {
   defaultName?: string;
   defaultEmail?: string;
   signedIn?: boolean;
-  preview?: boolean;
 };
 
-export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = false, preview = false }: Props) {
+export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = false }: Props) {
   const router = useRouter();
   const [form, setForm] = useState({
     name: defaultName,
@@ -67,7 +66,7 @@ export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = fa
         </span>
         <h3 className="mt-5 text-2xl font-medium">Message received.</h3>
         <p className="mt-2 max-w-md text-[0.92rem] leading-relaxed text-ink-2">
-          {preview ? "Your fictional message was saved in the shared preview. No support request was sent." : "Your message was saved for support review. Response times may vary."}
+          Your message was saved for support review. Response times may vary.
         </p>
         <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
           <button type="button" onClick={() => setSent(false)} className="btn btn-primary">
@@ -86,9 +85,7 @@ export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = fa
 
   return (
     <form onSubmit={submit} className="card p-6 sm:p-8">
-      {preview ? (
-        <p className="rounded-xl bg-lav-50 p-3 text-[0.8rem] text-lav-800">Try a fictional message only. It is visible to other demo visitors and does not reach support.</p>
-      ) : <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="name" className="field-label">
             Your name
@@ -117,7 +114,7 @@ export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = fa
             onChange={(event) => setForm({ ...form, email: event.target.value })}
           />
         </div>
-      </div>}
+      </div>
 
       <div className="mt-4">
         <label htmlFor="topic" className="field-label">
@@ -147,7 +144,7 @@ export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = fa
           minLength={10}
           rows={5}
           className="field resize-none"
-          placeholder={preview ? "Write a fictional example message." : "Tell us what happened, and include your order reference if you have one."}
+          placeholder="Tell us what happened, and include your order reference if you have one."
           value={form.message}
           onChange={(event) => setForm({ ...form, message: event.target.value })}
         />
@@ -161,7 +158,7 @@ export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = fa
           Please do not include passwords, payment-card details or verification codes.
         </p>
         <button type="submit" disabled={pending} className="btn btn-primary disabled:opacity-60">
-          {pending ? (preview ? "Saving…" : "Sending…") : preview ? "Save demo message" : "Send message"}
+          {pending ? "Sending…" : "Send message"}
           {!pending && <ArrowRight className="h-4 w-4" />}
         </button>
       </div>

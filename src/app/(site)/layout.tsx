@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
-import { isPreviewDatabase } from "@/lib/demo-policy";
 
 export default function SiteLayout({ children }: { children: ReactNode }) {
   return (
@@ -17,11 +16,6 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
         Skip to content
       </a>
       <SiteHeader />
-      <div role="status" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-[0.8rem] text-amber-900">
-        {isPreviewDatabase()
-          ? "Preview mode: balances and orders are simulated. Live purchases and bank transfers are unavailable."
-          : "Live number, eSIM, proxy, email, data, bulk and scheduled fulfillment is paused. Contact support about existing orders."}
-      </div>
       <main id="main" className="flex-1">
         {children}
       </main>

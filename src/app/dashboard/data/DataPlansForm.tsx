@@ -3,21 +3,15 @@
 import { useState } from "react";
 import { dataPlans, findDataPlan, type AirtimeProvider } from "@/lib/airtime";
 import { formatNaira } from "@/lib/catalog";
-import { useRouter } from "next/navigation";
-import type { DemoInventory } from "@/lib/demo-service-catalog";
 import type { PublicUser } from "@/lib/auth";
 import { NetworkBadge } from "@/components/NetworkBadge";
-import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
 
 interface DataPlansFormProps {
   user: PublicUser;
   initialPlanId?: string;
-  preview: boolean;
-  inventory?: DemoInventory;
 }
 
-export function DataPlansForm({ user, initialPlanId, preview, inventory = {} }: DataPlansFormProps) {
-  const router = useRouter();
+export function DataPlansForm({ user, initialPlanId }: DataPlansFormProps) {
   const initialPlan = initialPlanId ? findDataPlan(initialPlanId) : undefined;
   const [selectedProvider, setSelectedProvider] = useState<AirtimeProvider>(initialPlan?.provider ?? "mtn");
   const [selectedPlan, setSelectedPlan] = useState<string | null>(initialPlan?.id ?? null);
@@ -30,10 +24,6 @@ export function DataPlansForm({ user, initialPlanId, preview, inventory = {} }: 
   ];
 
   const filteredPlans = dataPlans.filter((plan) => plan.provider === selectedProvider);
-
-  function handlePurchase() {
-    if (preview && selectedPlan) router.push(`/dashboard/services/demo/data-${encodeURIComponent(selectedPlan)}?country=ng`);
-  }
 
   return (
     <div className="space-y-6">
@@ -92,13 +82,14 @@ export function DataPlansForm({ user, initialPlanId, preview, inventory = {} }: 
                   {formatNaira(plan.price)}
                 </p>
               </div>
-              <span className="mt-3 block"><UnitsStatus demo={preview} stock={inventory[`data-${plan.id}`]?.stock} owned={inventory[`data-${plan.id}`]?.owned} /></span>
             </button>
           ))}
         </div>
       </div>
 
-      {preview && <p className="rounded-xl bg-lav-50 p-3 text-[0.76rem] text-lav-800">The demo uses a fictional mobile destination. No phone number is needed and no data is sent.</p>}
+      <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[0.76rem] text-amber-900">
+        Data plans cannot be delivered yet, so nothing on this page can be ordered or charged.
+      </p>
 
       {/* Wallet Balance */}
       <div className="rounded-xl border border-line bg-cream p-4">
@@ -110,11 +101,11 @@ export function DataPlansForm({ user, initialPlanId, preview, inventory = {} }: 
 
       {/* Purchase Button */}
       <button
-        onClick={handlePurchase}
-        disabled={!preview || !selectedPlan}
-        className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        type="button"
+        disabled
+        className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {preview ? "Continue to demo checkout" : "Live data purchases paused"}
+        Data plans are not available yet
       </button>
     </div>
   );

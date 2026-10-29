@@ -2,72 +2,92 @@ import { randomBytes } from "node:crypto";
 import { and, eq, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { cancelUpstream } from "@/lib/fulfillment";
+import { flagReconciliation } from "@/lib/reconciliation";
 import { SERVICE_TIMEOUTS } from "@/lib/service-timeouts";
-import { PREVIEW_SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
+import { isUndeliveredSingleNumber, SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
 
 /**
- * Refund timed-out, code-less *simulated* single-number orders only.
+ * Refund single-number orders that timed out without ever producing a code.
  *
- * Live provider cancellation and delivery semantics are not verified. Never use
- * this sweep for a persistent database: those orders need manual reconciliation.
- * The order claim, balance increment and ledger entry are one transaction so a
- * concurrent sweep or manual refund cannot credit an order twice.
+ * The order claim, balance increment and ledger entry are one transaction, and
+ * every eligibility condition is repeated inside the UPDATE rather than trusted
+ * from the initial SELECT — a code arriving mid-sweep, or a concurrent manual
+ * refund, must not let an order be credited twice.
+ *
+ * Upstream cancellation happens *after* the claim commits, never before. The
+ * claim re-checks `otpCode IS NULL`, so cancelling first could release a number
+ * that had just delivered. A failed cancel is logged and does not block the
+ * refund: recovering our cost is our problem, the customer's money is theirs.
  */
-export async function processAutoRefunds(): Promise<number> {
-  if (!isPreviewDatabase()) {
-    throw new Error("Live automatic refunds require provider reconciliation");
-  }
-
+export async function processAutoRefunds(): Promise<{ refunded: number; cancelled: number }> {
   const cutoff = new Date(Date.now() - SERVICE_TIMEOUTS.numbers.delivery);
   const eligible = and(
     eq(orders.status, "active"),
-    eq(orders.provider, "simulated"),
     eq(orders.service, "numbers"),
-    eq(orders.duration, PREVIEW_SINGLE_NUMBER_WINDOW),
+    eq(orders.duration, SINGLE_NUMBER_WINDOW),
     isNull(orders.otpCode),
     isNull(orders.refundedAt),
     lte(orders.createdAt, cutoff),
   );
   const candidates = await db.select().from(orders).where(eligible).limit(100);
   let refunded = 0;
+  let cancelled = 0;
 
   for (const candidate of candidates) {
+    // Belt and braces: the SQL already encodes this, but a future edit to the
+    // query should not silently widen what gets an automatic refund.
+    if (!isUndeliveredSingleNumber(candidate)) continue;
+
     try {
-      const credited = await db.transaction(async (tx) => {
-        // Repeat every eligibility condition in the UPDATE, not just the
-        // initial SELECT: delivery or another refund may have won the race.
-        const [claimed] = await tx.update(orders)
+      const claimed = await db.transaction(async (tx) => {
+        const [row] = await tx.update(orders)
           .set({ status: "refunded", refundedAt: new Date() })
           .where(and(eq(orders.id, candidate.id), eligible))
           .returning();
-        if (!claimed) return false;
-        if (!Number.isSafeInteger(claimed.amount) || claimed.amount <= 0) {
+        if (!row) return null;
+        if (!Number.isSafeInteger(row.amount) || row.amount <= 0) {
           throw new Error("Invalid order amount");
         }
 
         const [user] = await tx.update(users)
-          .set({ walletBalance: sql`${users.walletBalance} + ${claimed.amount}` })
-          .where(eq(users.id, claimed.userId))
+          .set({ walletBalance: sql`${users.walletBalance} + ${row.amount}` })
+          .where(eq(users.id, row.userId))
           .returning({ balance: users.walletBalance });
         if (!user) throw new Error("Refund user not found");
 
         await tx.insert(walletTransactions).values({
-          userId: claimed.userId,
-          orderId: claimed.id,
+          userId: row.userId,
+          orderId: row.id,
           type: "refund",
-          amount: claimed.amount,
+          amount: row.amount,
           balanceAfter: user.balance,
-          description: `Auto-refund: ${claimed.productName} (no code)`.slice(0, 200),
+          description: `Auto-refund: ${row.productName} (no code)`.slice(0, 200),
           reference: `RFD-${randomBytes(12).toString("hex")}`,
         });
-        return true;
+        return row;
       });
-      if (credited) refunded++;
+
+      if (!claimed) continue;
+      refunded++;
+
+      try {
+        if (await cancelUpstream(claimed)) cancelled++;
+      } catch (cancelError) {
+        // The customer is already made whole. This is our cost to chase.
+        console.error("Auto-refund succeeded but upstream cancel failed", {
+          orderId: claimed.id,
+          providerRequestId: claimed.providerRequestId,
+          error: cancelError instanceof Error ? cancelError.message : String(cancelError),
+        });
+        // Persisted, not just logged: the customer is made whole and the unit may
+        // still be live in their hands, so this has to reach a human.
+        await flagReconciliation(claimed.id);
+      }
     } catch (error) {
       console.error(`Failed to process refund for order ${candidate.id}:`, error);
     }
   }
 
-  return refunded;
+  return { refunded, cancelled };
 }

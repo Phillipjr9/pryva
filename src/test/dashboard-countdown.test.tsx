@@ -28,7 +28,7 @@ describe("hydration-safe order countdowns", () => {
 
   it("renders order details using the server timestamp, not the hydration time", () => {
     vi.useFakeTimers();
-    const props = { orderId: "order-1", status: "active", expiresAt, amount: 500, referenceCode: "ref", otpCode: null, service: "numbers", canRequestPreviewRefund: true, initialNow };
+    const props = { orderId: "order-1", status: "active", expiresAt, amount: 500, referenceCode: "ref", otpCode: null, service: "numbers", initialNow };
     vi.setSystemTime(initialNow);
     const server = renderToStaticMarkup(<OrderActions {...props} />);
     vi.setSystemTime(initialNow + 45_000);
@@ -39,7 +39,7 @@ describe("hydration-safe order countdowns", () => {
   });
 
   it("does not call an order without an expiry window closed", () => {
-    const html = renderToStaticMarkup(<OrderActions orderId="order-2" status="active" expiresAt={null} amount={500} referenceCode="ref" otpCode={null} service="numbers" canRequestPreviewRefund={false} initialNow={initialNow} />);
+    const html = renderToStaticMarkup(<OrderActions orderId="order-2" status="active" expiresAt={null} amount={500} referenceCode="ref" otpCode={null} service="numbers" initialNow={initialNow} />);
     expect(html).not.toContain("Window closed");
     expect(html).toContain(">Live</span>");
   });

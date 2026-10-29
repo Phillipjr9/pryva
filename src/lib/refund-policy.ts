@@ -1,12 +1,36 @@
-// This describes one simulated catalog plan, not a live-provider guarantee.
-export const PREVIEW_SINGLE_NUMBER_WINDOW = "Single verification · 20 min window";
+/**
+ * Refund eligibility for number orders that never delivered a code.
+ *
+ * Deliberately provider-agnostic. What the customer is owed does not depend on
+ * who fulfilled the order, and gating this on `provider === "simulated"` is what
+ * previously left paid-but-undelivered live orders with no refund path at all —
+ * neither the automatic sweep nor self-service would touch them.
+ *
+ * Rentals are excluded by construction rather than by an explicit check: they
+ * carry a different `duration`, and no upstream cancel exists for them, so a
+ * rental that under-delivers must be reconciled by a human who can weigh the
+ * time already used against the price paid.
+ */
+/**
+ * Written to orders.reconciliationNote when a refund committed but the number
+ * could not be cancelled. Deliberately free of supplier names and prices: it can
+ * be rendered in an admin view, and cost is wholesale information. "Upstream" is
+ * avoided too -- it reads as a disclosure of where stock comes from.
+ */
+export const RECONCILIATION_NOTE =
+  "Refunded, but the provider could not cancel this number. Cancel it manually or absorb the cost.";
 
-export function isPreviewSingleNumberWithoutCode(order: {
-  provider: string;
+export const SINGLE_NUMBER_WINDOW = "Single verification · 20 min window";
+
+/** A single-verification number order that produced no code. */
+export function isUndeliveredSingleNumber(order: {
   service: string;
   duration: string;
   otpCode: string | null;
 }): boolean {
-  return order.provider === "simulated" && order.service === "numbers" &&
-    order.duration === PREVIEW_SINGLE_NUMBER_WINDOW && order.otpCode == null;
+  return (
+    order.service === "numbers" &&
+    order.duration === SINGLE_NUMBER_WINDOW &&
+    order.otpCode == null
+  );
 }

@@ -5,7 +5,7 @@ import { ServiceIcon, CategoryIcon } from "@/components/ServiceIcon";
 
 export const metadata = {
   title: "Digital Accounts — Netflix, Spotify, ChatGPT & More | Pryva",
-  description: "Explore the digital-services catalog. Live fulfillment is currently paused.",
+  description: "Explore the digital-services catalog. These products are not available for purchase yet.",
 };
 
 export default function DigitalServicesPage() {
@@ -28,7 +28,7 @@ export default function DigitalServicesPage() {
           Netflix, Spotify, ChatGPT & More
         </h1>
         <p className="text-lg text-ink-2 max-w-2xl mx-auto">
-          Explore the catalog in Naira. Live digital-service fulfillment is currently paused; preview orders are simulated.
+          Explore the catalog in Naira. Digital subscriptions are not available for purchase yet, so nothing on this page can be ordered or charged.
         </p>
       </div>
 

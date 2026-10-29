@@ -9,12 +9,11 @@ type Mode = "login" | "signup";
 
 const GOOGLE_ERRORS: Record<string, string> = {
   "google-not-configured":
-    "Google sign-in isn’t configured on this preview yet — the site owner needs to add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.",
+    "Google sign-in isn’t available yet. Please continue with your email and password.",
   "google-canceled": "Google sign-in was cancelled before it finished.",
   "google-state": "That Google sign-in link expired. Please start again.",
   "google-exchange": "Google couldn’t complete the sign-in. Please try again.",
   "google-account-exists": "An account already uses this email but is not linked to this Google identity. Sign in with your existing method or contact support for secure recovery.",
-  "demo-failed": "The demo could not open right now. Please try again in a moment.",
 };
 
 /**
@@ -38,7 +37,7 @@ export function AuthForm({
   errorParam?: string | null;
 }) {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
-  const [pending, setPending] = useState<"form" | "demo" | null>(null);
+  const [pending, setPending] = useState<"form" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -87,49 +86,6 @@ export function AuthForm({
           Continue with Google
         </a>
 
-        {/*
-          The demo is a *plain* form post on purpose. The server normally
-          answers with a 303 into the dashboard; the Arena preview may instead
-          open its temporary shared-demo bridge when the gateway drops cookies.
-          An earlier version intercepted this submit with
-          onSubmit and a client-side request to the JSON demo endpoint; when that
-          request completed but the follow-up navigation didn't, the visitor sat
-          on "Opening the demo…" forever. Never intercept this submit, and never disable the button on
-          click: a submit button that becomes `disabled` inside its own handler
-          is removed before the browser posts the form.
-        */}
-        <form
-          action="/api/auth/demo-web"
-          method="post"
-          className="mt-2.5"
-          onSubmit={() => setPending("demo")}
-        >
-          <input type="hidden" name="next" value={next} />
-          <button
-            type="submit"
-            onClick={() => setPending("demo")}
-            aria-busy={pending === "demo"}
-            aria-disabled={pending !== null}
-            className={`btn w-full border-2 border-lav-400 bg-gradient-to-r from-lav-100 to-lav-50 !py-4 !text-[0.9rem] font-semibold text-lav-800 hover:from-lav-200 hover:to-lav-100 shadow-sm transition-all ${
-              pending !== null ? "opacity-70" : ""
-            }`}
-          >
-            <Sparkle className="h-5 w-5" />
-            {pending === "demo" ? "Opening the demo…" : "⚡ One-Click Demo Login"}
-          </button>
-        </form>
-        <p className="mt-2 text-center text-[0.72rem] text-ink-3">
-          Shared public demo with simulated credit (preview mode only). Other visitors can see its activity; do not enter personal information, passwords or other secrets.
-        </p>
-        <p className="mt-1.5 text-center">
-          <a
-            href={`/api/auth/demo-web?next=${encodeURIComponent(next)}`}
-            className="text-[0.7rem] font-semibold text-lav-700 underline underline-offset-2"
-          >
-            Button not responding? Open the demo directly
-          </a>
-        </p>
-
         <div className="my-5 flex items-center gap-3">
           <span className="h-px flex-1 bg-line" />
           <span className="text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
@@ -159,7 +115,7 @@ export function AuthForm({
         </h1>
         <p className="mt-3 text-[0.9rem] leading-relaxed text-ink-2">
           {mode === "signup"
-            ? "New preview accounts receive ₦5,000 in simulated credit to explore the checkout experience."
+            ? "Create an account to buy number plans and track every order in one dashboard."
             : "Your wallet, orders, codes and refunds are waiting exactly where you left them."}
         </p>
       </div>

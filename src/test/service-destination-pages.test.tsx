@@ -6,9 +6,6 @@ import { buildServiceExplorer } from "@/lib/service-explorer";
 
 const user = { id: "preview-user", name: "Preview", email: "preview@example.test", walletBalance: 5000, createdAt: new Date(0) };
 vi.mock("@/lib/auth", () => ({ requireUser: async () => user }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => true }));
-vi.mock("@/lib/demo-digital", () => ({ demoDigitalInventory: () => ({}) }));
-vi.mock("@/lib/demo-services", () => ({ demoInventory: () => ({}) }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NOT_FOUND"); },
   useRouter: () => ({ push: vi.fn() }),

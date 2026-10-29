@@ -4,6 +4,7 @@ import { notifications } from "@/db/schema";
 import { and, eq, desc, count } from "drizzle-orm";
 import { requireAuthApi } from "@/lib/auth";
 import { isSameOriginMutation } from "@/lib/net";
+import { notificationRateLimiter } from "@/lib/rate-limit";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
@@ -60,6 +61,16 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+
+    // Throttled per account: an authenticated route has a better identity than an
+    // IP, and a shared NAT would let one user's traffic exhaust another's allowance.
+    const throttle = await notificationRateLimiter(`notifications:${user.id}`);
+    if (throttle.unavailable) {
+      return NextResponse.json({ error: "Temporarily unavailable. Try again shortly." }, { status: 503 });
+    }
+    if (!throttle.allowed) {
+      return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
+    }
     if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
     let body: unknown;
     try {

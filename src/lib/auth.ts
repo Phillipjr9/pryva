@@ -5,7 +5,6 @@ import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
 import { isArenaPreviewHost, isLocalHost, requestProto } from "@/lib/net";
-import { isDemoEmail, isPreviewDatabase } from "@/lib/demo-policy";
 
 export const SESSION_COOKIE = "pryva_session";
 /**
@@ -138,32 +137,14 @@ async function sessionUser(token: string): Promise<User | null> {
   return rows[0]?.user ?? null;
 }
 
-async function previewDemoBridgeToken(): Promise<string | null> {
-  try {
-    const headerList = await headers();
-    const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
-    const token = headerList.get("x-pryva-preview-session") ?? "";
-    return isArenaPreviewHost(host) && /^[0-9a-f]{64}$/.test(token) ? token : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function getCurrentUser(): Promise<PublicUser | null> {
   const jar = await cookies();
   const cookieTokens = new Set([jar.get(SESSION_COOKIE)?.value, jar.get(SESSION_COOKIE_EMBEDDED)?.value].filter((value): value is string => Boolean(value)));
   for (const token of cookieTokens) {
     const user = await sessionUser(token);
-    if (user && (!isDemoEmail(user.email) || isPreviewDatabase())) return toPublicUser(user);
+    if (user) return toPublicUser(user);
   }
 
-  // The preview proxy can discard Cookie headers. The bridge is a fallback for
-  // the shared public demo only; it can never authenticate a private account.
-  const bridgeToken = await previewDemoBridgeToken();
-  if (bridgeToken) {
-    const user = await sessionUser(bridgeToken);
-    if (user && isDemoEmail(user.email)) return toPublicUser(user);
-  }
   if (!cookieTokens.size && process.env.NODE_ENV !== "production") {
     console.info("[auth] no session cookie on this request");
   }
@@ -207,9 +188,7 @@ export function isConfiguredAdminEmail(email: string): boolean {
 }
 
 export function isAdminUser(user: Pick<User, "email"> | PublicUser | null): boolean {
-  // The one-click demo identity must never become an administrator, even if
-  // it is accidentally added to the allowlist.
-  return Boolean(user && !isDemoEmail(user.email) && isConfiguredAdminEmail(user.email));
+  return Boolean(user && isConfiguredAdminEmail(user.email));
 }
 
 export async function requireUser(nextPath = "/dashboard"): Promise<PublicUser> {
@@ -229,8 +208,6 @@ export async function requireAdmin(nextPath = "/admin/dashboard"): Promise<Publi
 export async function destroySession(): Promise<void> {
   const jar = await cookies();
   const tokens = new Set([jar.get(SESSION_COOKIE)?.value, jar.get(SESSION_COOKIE_EMBEDDED)?.value].filter((value): value is string => Boolean(value)));
-  const bridgeToken = await previewDemoBridgeToken();
-  if (bridgeToken && isDemoEmail((await sessionUser(bridgeToken))?.email ?? "")) tokens.add(bridgeToken);
   for (const token of tokens) {
     await db.delete(sessions).where(eq(sessions.token, token));
   }
