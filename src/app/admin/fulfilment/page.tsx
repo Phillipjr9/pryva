@@ -8,7 +8,6 @@ import { MANUAL_PROVIDER, QUEUE_STATUSES, quantityFromPlanLabel } from "@/lib/fu
 import { manualWarrantyDays, readManualCatalog } from "@/lib/manual-catalog";
 import { formatNaira } from "@/lib/catalog";
 import { warrantyLabel } from "@/lib/warranty";
-import { isPreviewDatabase } from "@/lib/demo-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -87,13 +86,6 @@ export default async function AdminFulfilmentPage() {
         <Link href="/admin/orders" className="font-medium text-lav-700 underline underline-offset-2">orders page</Link>{" "}
         with a reconciliation reason. Credentials are never written to logs.
       </p>
-
-      {isPreviewDatabase() && (
-        <p role="note" className="rounded-xl border border-lav-200 bg-lav-50 px-4 py-3 text-[0.8rem] leading-relaxed text-lav-800">
-          Preview mode: this queue only ever fills from the shared demo, and demo purchases are
-          simulated. Nothing here was bought from a real supplier and no real money moved.
-        </p>
-      )}
 
       <div className="grid gap-3">
         {rows.length === 0 && (

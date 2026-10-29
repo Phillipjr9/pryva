@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { createSession, isValidEmail, normalizeEmail, verifyPassword } from "@/lib/auth";
-import { isDemoEmail, isPreviewDatabase } from "@/lib/demo-policy";
 import { checkAuthRateLimit, clearAuthRateLimit } from "@/lib/auth-rate-limit";
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
@@ -27,7 +26,7 @@ export async function POST(request: Request) {
     const limited = await checkAuthRateLimit(request, "login", email.length <= 200 ? email : "");
     if (limited) return limited;
 
-    if (email.length > 200 || !isValidEmail(email) || password.length === 0 || (isDemoEmail(email) && !isPreviewDatabase())) {
+    if (email.length > 200 || !isValidEmail(email) || password.length === 0) {
       return Response.json(
         { ok: false, error: "Enter your email and password to continue." },
         { status: 400 },

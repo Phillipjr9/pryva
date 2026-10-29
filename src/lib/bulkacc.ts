@@ -38,7 +38,6 @@
 import "server-only";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
-import { isPreviewDatabase } from "@/lib/demo-policy";
 import { usdMicros, usdStringFromMicros, SupplierMoneyError } from "@/lib/supplier-money";
 
 const DEFAULT_BASE_URL = "https://bulkacc.com";
@@ -183,8 +182,6 @@ async function request(
 ): Promise<{ envelope: Envelope | null; text: string; httpStatus: number }> {
   const key = bulkaccApiKey();
   if (!key) throw new BulkaccError("Marketplace is not configured", "not_configured", 503);
-  // Demo funds must never touch a real supplier, even if a key is set by accident.
-  if (isPreviewDatabase()) throw new BulkaccError("Marketplace is unavailable here", "preview_blocked", 503);
 
   const budget = await supplierBudget("bulkacc:shared-key-budget");
   if (budget.unavailable) throw new BulkaccError("Supplier rate limit is unavailable", "rate_limit_unavailable", 503);

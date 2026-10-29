@@ -6,12 +6,9 @@ import { walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/catalog";
 import { walletEntryDirection, walletEntrySign } from "@/lib/wallet-activity";
-import { isPreviewDatabase } from "@/lib/demo-policy";
 import { TopUpForm } from "@/components/dashboard/TopUpForm";
 import { ExportTransactionsButton } from "@/components/dashboard/ExportTransactionsButton";
 import { WithdrawalDashboard } from "./WithdrawalDashboard";
-import { DemoWithdrawal } from "@/components/dashboard/DemoWithdrawal";
-import { demoWithdrawalHistory } from "@/lib/demo-withdrawal";
 import { TopUpReturn } from "./TopUpReturn";
 import { ArrowRight, Card, Check, Clock, Refresh, Shield, Wallet } from "@/components/icons";
 
@@ -25,8 +22,7 @@ export default async function WalletPage({
 }) {
   const user = await requireUser("/dashboard/wallet");
   const params = await searchParams;
-  const preview = isPreviewDatabase();
-  const paystackTestMode = !preview && (process.env.PAYSTACK_SECRET_KEY?.trim().startsWith("sk_test_") ?? false);
+  const paystackTestMode = process.env.PAYSTACK_SECRET_KEY?.trim().startsWith("sk_test_") ?? false;
 
   // Headline totals come from aggregates, not from the visible slice: the old
   // version summed the newest 40 rows and labelled them "in total".
@@ -71,7 +67,7 @@ export default async function WalletPage({
       </div>
 
       {paystackTestMode && <p role="note" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8rem] leading-relaxed text-amber-900"><strong>Paystack test mode.</strong> Checkout and transfers are simulated by Paystack; no real payment is made. Use test data and a separate staging database.</p>}
-      {!preview && <TopUpReturn key={`${params.topup ?? ""}:${params.reference ?? params.trxref ?? ""}`} status={params.topup} reference={params.reference ?? params.trxref} userId={user.id} testMode={paystackTestMode} />}
+      <TopUpReturn key={`${params.topup ?? ""}:${params.reference ?? params.trxref ?? ""}`} status={params.topup} reference={params.reference ?? params.trxref} userId={user.id} testMode={paystackTestMode} />
 
       <div className="grid gap-2.5 sm:grid-cols-3">
         <div className="rounded-2xl bg-ink p-5 text-white">
@@ -106,7 +102,7 @@ export default async function WalletPage({
           min-content, and a truncated transaction reference is wide enough to
           push the whole wallet past a 320px viewport. */}
       <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start">
-        <TopUpForm balance={user.walletBalance} preview={preview} userId={user.id} testMode={paystackTestMode} />
+        <TopUpForm balance={user.walletBalance} userId={user.id} testMode={paystackTestMode} />
 
         <div className="grid min-w-0 grid-cols-1 gap-4">
           <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
@@ -161,15 +157,15 @@ export default async function WalletPage({
             <ul className="mt-2.5 grid gap-2 text-[0.8rem] text-ink-2">
               <li className="flex items-start gap-2">
                 <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
-                {preview ? "Add demo funds using the simulated checkout." : "When configured, top-ups use Paystack checkout."}
+                Top-ups use Paystack checkout.
               </li>
               <li className="flex items-start gap-2">
                 <Refresh className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
-                {preview ? "Demo orders and refunds appear in your wallet history." : "Live order refunds require support review."}
+                Order refunds require support review.
               </li>
               <li className="flex items-start gap-2">
                 <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
-                {preview ? "All wallet activity uses simulated funds." : "Withdrawal requests reserve funds; rejected requests can be refunded."}
+                Withdrawal requests reserve funds; rejected requests can be refunded.
               </li>
             </ul>
             <Link
@@ -182,7 +178,7 @@ export default async function WalletPage({
           </div>
         </div>
       </div>
-      {preview ? <DemoWithdrawal balance={user.walletBalance} userId={user.id} initialHistory={demoWithdrawalHistory(user.id)} /> : <WithdrawalDashboard balance={user.walletBalance} userId={user.id} testMode={paystackTestMode} />}
+      <WithdrawalDashboard balance={user.walletBalance} userId={user.id} testMode={paystackTestMode} />
     </div>
   );
 }

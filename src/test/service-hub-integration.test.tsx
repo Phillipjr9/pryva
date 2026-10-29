@@ -23,21 +23,19 @@ beforeEach(() => {
 
 describe("service hub destination pages", () => {
   it("opens the selected data plan and network rather than silently defaulting to MTN", () => {
-    const html = renderToStaticMarkup(<DataPlansForm user={user} initialPlanId="airtel-1gb" preview />);
+    const html = renderToStaticMarkup(<DataPlansForm user={user} initialPlanId="airtel-1gb" />);
     expect(html).toContain("Airtel 1GB");
     expect(html).not.toContain("MTN 1GB");
     expect(html).toMatch(/aria-pressed="true"[^>]*>[\s\S]*?Airtel 1GB/);
-    expect(html).toContain("Demo stock");
-    expect(html).toContain("My demo units");
-    expect(html).toContain("No phone number is needed");
+    expect(html).toContain("Data plans cannot be delivered yet");
+    expect(html).not.toContain("Demo");
   });
 
-  it("keeps data and subscription purchases disabled outside preview", () => {
-    const data = renderToStaticMarkup(<DataPlansForm user={user} preview={false} />);
-    expect(data).toContain("Live data purchases paused");
-    const digital = renderToStaticMarkup(<DigitalServicesForm user={user} service={getDigitalService("netflix")!} preview={false} />);
-    expect(digital).toContain("Live purchases paused");
-    expect(digital).toContain("Not tracked");
+  it("keeps data and subscription purchases disabled because neither can be delivered", () => {
+    const data = renderToStaticMarkup(<DataPlansForm user={user} />);
+    expect(data).toContain("Data plans are not available yet");
+    const digital = renderToStaticMarkup(<DigitalServicesForm user={user} service={getDigitalService("netflix")!} />);
+    expect(digital).toContain("Digital subscriptions are not available yet");
     expect(digital).not.toContain("Save 51% vs monthly");
   });
 });

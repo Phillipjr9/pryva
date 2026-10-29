@@ -21,8 +21,9 @@ export default function AboutPage() {
           <h1 className="text-4xl font-medium tracking-tight text-ink sm:text-5xl">About <span className="text-lav-600">Pryva</span></h1>
           <p className="mt-6 text-lg leading-8 text-ink-2">
             Pryva brings a wallet, order history and a digital-services catalog together in one application.
-            Live number, eSIM, proxy, email, data, bulk and scheduled fulfillment is currently paused.
-            Preview balances and orders are simulated.
+            Virtual numbers for SMS verification are delivered automatically, and every order is paid for in
+            Naira from a balance you control. Categories we cannot yet deliver reliably are marked unavailable
+            rather than sold.
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-3">
             <Link href="/status" className="btn btn-primary">Check service status</Link>

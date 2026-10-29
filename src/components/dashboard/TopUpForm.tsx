@@ -2,33 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowRight, Card, Lock, Wallet } from "@/components/icons";
+import { ArrowRight, Lock } from "@/components/icons";
 import { formatNaira } from "@/lib/catalog";
 import { PAYSTACK_TOPUP_UPDATED, forgetPaystackTopUp, notifyPaystackTopUpsChanged, readPendingPaystackTopUps, type PendingPaystackTopUp } from "@/lib/paystack-topup-intent";
-import { DemoMoneyMovement } from "@/components/dashboard/DemoMoneyMovement";
 import { PaystackTopUpFlow } from "@/components/dashboard/PaystackTopUpFlow";
 
-export function TopUpForm({ balance, preview = false, userId, testMode = false }: { balance: number; preview?: boolean; userId: string; testMode?: boolean }) {
-  return preview ? <DemoTopUp balance={balance} userId={userId} /> : <LiveTopUp balance={balance} userId={userId} testMode={testMode} />;
-}
-
-function DemoTopUp({ balance, userId }: { balance: number; userId: string }) {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  return <>
-    <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 sm:p-6">
-      <div className="flex items-center justify-between gap-3"><h2 className="text-[1.05rem] font-semibold">Fund your wallet</h2><span className="rounded-full bg-cream px-2.5 py-1 text-[0.66rem] font-medium text-ink-2">Balance {formatNaira(balance)}</span></div>
-      <p className="mt-3 text-[0.82rem] leading-relaxed text-ink-2">Add demo funds, review the details and watch your simulated wallet update.</p>
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <div className="flex items-center gap-2 rounded-xl border border-line bg-white p-3"><Wallet className="h-4 w-4 text-lav-700" /><span className="text-[0.75rem] font-semibold text-ink">Demo transfer</span></div>
-        <div className="flex items-center gap-2 rounded-xl border border-line bg-white p-3"><Card className="h-4 w-4 text-lav-700" /><span className="text-[0.75rem] font-semibold text-ink">Demo card</span></div>
-      </div>
-      <button type="button" onClick={() => setOpen(true)} className="btn btn-primary mt-4 w-full !whitespace-normal !py-3.5 !leading-snug">Continue to demo payment <ArrowRight className="h-4 w-4" /></button>
-      <p className="mt-3 flex items-start gap-1.5 text-[0.7rem] leading-relaxed text-ink-3"><Lock className="mt-0.5 h-3 w-3 shrink-0 text-lav-500" /> No personal payment details or real money are used.</p>
-    </section>
-    {open && <DemoMoneyMovement kind="add" balance={balance} userId={userId} onClose={() => setOpen(false)} onCompleted={() => router.refresh()} />}
-  </>;
+export function TopUpForm({ balance, userId, testMode = false }: { balance: number; userId: string; testMode?: boolean }) {
+  return <LiveTopUp balance={balance} userId={userId} testMode={testMode} />;
 }
 
 function LiveTopUp({ balance, userId, testMode }: { balance: number; userId: string; testMode: boolean }) {
@@ -67,7 +47,7 @@ function LiveTopUp({ balance, userId, testMode }: { balance: number; userId: str
           <button type="button" className="ml-3 font-semibold underline" onClick={() => clearAfterReview(entry.reference)}>Clear after reconciliation</button>
         </li>)}</ul>
       </div>}
-      <button type="button" onClick={() => setOpen(true)} disabled={storageState !== "ready" || pending.length > 0} className="btn btn-primary mt-4 w-full !py-3.5 disabled:opacity-50">Review a top-up <ArrowRight className="h-4 w-4" /></button>
+      <button type="button" onClick={() => setOpen(true)} disabled={storageState !== "ready" || pending.length > 0} className="btn btn-primary mt-4 w-full !whitespace-normal !py-3.5 !leading-snug disabled:opacity-50">Review a top-up <ArrowRight className="h-4 w-4" /></button>
       <p className="mt-3 flex items-start gap-1.5 text-[0.7rem] leading-relaxed text-ink-3"><Lock className="mt-0.5 h-3 w-3 shrink-0 text-lav-500" /> Your wallet is credited only after payment is confirmed. Payment credentials stay in Paystack checkout.</p>
     </section>
     {open && <PaystackTopUpFlow balance={balance} userId={userId} testMode={testMode} onClose={() => setOpen(false)} />}
