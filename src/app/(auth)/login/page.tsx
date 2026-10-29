@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -71,6 +72,11 @@ export default async function LoginPage({
     <div className="mx-auto w-full max-w-md rounded-[1.75rem] border border-line bg-[#fffdfa] p-6 shadow-[var(--shadow-card)] sm:p-8">
       {bounced === "1" ? <BounceNotice arenaPreview={isArenaPreviewHost(host)} /> : null}
       <AuthForm mode="login" next={safeNext} errorParam={error ?? null} />
+      <p className="mt-4 text-center text-sm text-ink-2">
+        <Link href="/forgot-password" className="font-semibold text-lav-700 underline underline-offset-2">
+          Forgot your password?
+        </Link>
+      </p>
     </div>
   );
 }

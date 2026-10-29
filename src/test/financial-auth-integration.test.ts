@@ -139,6 +139,7 @@ beforeAll(async () => {
   await pg.exec(await readFile("migrations/0006_order_idempotency.sql", "utf8"));
   await pg.exec(await readFile("migrations/0007_order_reconciliation_note.sql", "utf8"));
   await pg.exec(await readFile("migrations/0008_order_provider_cost.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0009_password_reset_tokens.sql", "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
   [purchaseRoute, refundRoute, bankRoute, verifyBankRoute, googleRoute, contactRoute, deleteRoute, passwordRoute, sessionsRoute, autoRefund, giftPurchaseRoute, giftCheckRoute, giftRedeemRoute, topUpRoute, verifyTopUpRoute, webhookRoute, profileRoute, notificationsRoute, markReadRoute, logoutRoute, syncRoute, scheduledRoute, promoRoute, withdrawalRoute, adminWithdrawalRoute, integrity] = await Promise.all([
