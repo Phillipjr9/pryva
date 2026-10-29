@@ -43,6 +43,7 @@ const MIGRATIONS = [
   "0005_wallet_email_outbox.sql", "0006_order_idempotency.sql",
   "0007_order_reconciliation_note.sql",
   "0008_order_provider_cost.sql",
+  "0009_password_reset_tokens.sql",
 ];
 
 beforeAll(async () => {
