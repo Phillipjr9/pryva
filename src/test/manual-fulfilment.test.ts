@@ -45,7 +45,9 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  mocks.user.mockResolvedValue({ id: randomUUID(), name: "Owner", email: ADMIN_EMAIL });
+  // Verified: administrator access now requires proof of control of the address,
+    // because ADMIN_EMAILS matches on the email string alone.
+    mocks.user.mockResolvedValue({ id: randomUUID(), name: "Owner", email: ADMIN_EMAIL, emailVerifiedAt: new Date("2026-01-02T00:00:00Z") });
   mocks.info.mockReset(); mocks.warn.mockReset(); mocks.error.mockReset();
 });
 
@@ -229,7 +231,9 @@ describe("admin fulfilment queue", () => {
     expect((await route.POST(post({ orderId: id, action: "deliver", credentials: ["a|b"] }))).status).toBe(403);
 
     // A cross-origin mutation is refused even for the administrator.
-    mocks.user.mockResolvedValue({ id: randomUUID(), name: "Owner", email: ADMIN_EMAIL });
+    // Verified: administrator access now requires proof of control of the address,
+    // because ADMIN_EMAILS matches on the email string alone.
+    mocks.user.mockResolvedValue({ id: randomUUID(), name: "Owner", email: ADMIN_EMAIL, emailVerifiedAt: new Date("2026-01-02T00:00:00Z") });
     const crossOrigin = new NextRequest(`${ORIGIN}/api/admin/fulfilment`, {
       method: "POST",
       headers: { origin: "https://evil.example", host: "pryva.test", "x-forwarded-proto": "https", "content-type": "application/json" },
