@@ -4,12 +4,13 @@ import type { SQL } from "drizzle-orm";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { POST } from "@/app/api/orders/[id]/refund/route";
 
-const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), select: vi.fn(), transaction: vi.fn(), cancelUpstream: vi.fn() }));
+const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), select: vi.fn(), transaction: vi.fn(), cancelUpstream: vi.fn(), flagReconciliation: vi.fn() }));
 vi.mock("@/db", () => ({ db: { select: mocks.select, transaction: mocks.transaction } }));
 vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.currentUser }));
 // Must be mocked: the route releases the number upstream after committing the
 // refund, and an unmocked call would reach the real provider.
 vi.mock("@/lib/fulfillment", () => ({ cancelUpstream: mocks.cancelUpstream }));
+vi.mock("@/lib/reconciliation", () => ({ flagReconciliation: mocks.flagReconciliation }));
 const dialect = new PgDialect();
 const context = { params: Promise.resolve({ id: "order-id" }) };
 function request(origin = "https://pryva.test") {
@@ -21,6 +22,8 @@ function request(origin = "https://pryva.test") {
 function fakeDatabase() {
   mocks.cancelUpstream.mockReset();
   mocks.cancelUpstream.mockResolvedValue(true);
+  mocks.flagReconciliation.mockReset();
+  mocks.flagReconciliation.mockResolvedValue(undefined);
   const state = {
     order: { id: "order-id", userId: "user-id", status: "active", refundedAt: null as Date | null, amount: 1200,
       provider: "fleexa", providerRequestId: null as string | null, service: "numbers", productName: "Test", reference: "ORDER-1",
@@ -141,6 +144,7 @@ describe("order refund safety", () => {
     expect(mocks.cancelUpstream).toHaveBeenCalledWith(
       expect.objectContaining({ provider: "fleexa", providerRequestId: "request-id" }),
     );
+    expect(mocks.flagReconciliation).not.toHaveBeenCalled();
   });
 
   it("still credits the customer when the upstream release fails", async () => {
@@ -154,6 +158,9 @@ describe("order refund safety", () => {
       expect(await response.json()).toMatchObject({ ok: true, providerCancelled: false });
       expect(state.balance).toBe(1700);
       expect(state.order.status).toBe("refunded");
+      // Refunded with the number still live upstream: an owner must be able to
+      // find this order and finish it by hand.
+      expect(mocks.flagReconciliation).toHaveBeenCalledWith("order-id");
     } finally {
       consoleError.mockRestore();
     }
