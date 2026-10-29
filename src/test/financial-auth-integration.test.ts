@@ -52,6 +52,8 @@ vi.mock("@/lib/rate-limit", () => ({
   giftCardIpRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   giftCardUserRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   contactRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
+  passwordChangeRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
+  notificationRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   createRateLimiter: () => async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   resetRateLimit: async () => {},
 }));

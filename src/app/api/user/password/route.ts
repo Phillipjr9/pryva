@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { users, sessions } from "@/db/schema";
 import { requireAuthApi, hashPassword, verifyPassword, SESSION_COOKIE, SESSION_COOKIE_EMBEDDED } from "@/lib/auth";
 import { isSameOriginMutation } from "@/lib/net";
+import { passwordChangeRateLimiter } from "@/lib/rate-limit";
 import { validatePassword } from "@/lib/validation";
 import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
@@ -15,6 +16,16 @@ export async function POST(request: NextRequest) {
     const user = await requireAuthApi();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Cross-origin request denied" }, { status: 403 });
+
+    // Throttled per account: an authenticated route has a better identity than an
+    // IP, and a shared NAT would let one user's traffic exhaust another's allowance.
+    const throttle = await passwordChangeRateLimiter(`password:${user.id}`);
+    if (throttle.unavailable) {
+      return NextResponse.json({ error: "Temporarily unavailable. Try again shortly." }, { status: 503 });
+    }
+    if (!throttle.allowed) {
+      return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
+    }
     if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get("content-type") ?? "")) {
       return NextResponse.json({ error: "Content-Type must be application/json" }, { status: 415 });
     }
