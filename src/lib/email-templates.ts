@@ -18,7 +18,14 @@ const config = {
   infoBackground: "#f8f5ee",
   infoBorder: "#eae5da",
   accentColor: "#8266C9",
-  siteUrl: "https://pryva.ng",
+  // Was hardcoded to https://pryva.ng, a domain that is not attached to the
+  // deployment. Hero images and the brand mark are absolute URLs built from this,
+  // so every image in every email would have 404d on the live host.
+  siteUrl: (
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    "https://pryva.ng"
+  ).replace(/\/$/, ""),
 };
 
 function emailWrapper(content: string, preheader: string = ""): string {
@@ -419,7 +426,7 @@ export function refundEmail(order: { reference: string; productName: string; amo
 }
 
 export function passwordResetEmail(name: string, resetLink: string): EmailTemplate {
-  const preheader = "Reset your Pryva password. This link expires in 1 hour.";
+  const preheader = "Reset your Pryva password. This link expires in 30 minutes.";
 
   const content = `
     <tr>
@@ -443,7 +450,7 @@ export function passwordResetEmail(name: string, resetLink: string): EmailTempla
   </table>
       
       <p style="margin:18px 0 2px;padding:13px 16px;border-radius:11px;background:#fff3e0;border:1px solid #ffe0b2;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.6;color:#e65100;">
-        <strong>⚠️ Security Notice:</strong> This link expires in 1 hour. If you didn't request this, please ignore this email or contact support if you're concerned about your account security.
+        <strong>⚠️ Security Notice:</strong> This link expires in 30 minutes. If you didn't request this, please ignore this email or contact support if you're concerned about your account security.
       </p>
       
       <p style="margin:18px 0 2px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.6;color:${config.textSecondary};">If the button doesn't work, copy and paste this link:<br><a href="${resetLink}" style="color:${config.accentColor};word-break:break-all;">${resetLink}</a></p>
@@ -457,7 +464,51 @@ export function passwordResetEmail(name: string, resetLink: string): EmailTempla
   return {
     subject: `Reset your Pryva password`,
     html: emailWrapper(content, preheader),
-    text: `Reset your Pryva password\n\nClick this link to reset your password: ${resetLink}\n\nThis link expires in 1 hour.`,
+    text: `Reset your Pryva password\n\nClick this link to reset your password: ${resetLink}\n\nThis link expires in 30 minutes.`,
+    preheader,
+  };
+}
+
+export function emailVerificationEmail(name: string, verifyLink: string): EmailTemplate {
+  const preheader = "Confirm your email address to finish setting up Pryva.";
+
+  const content = `
+    <tr>
+      <td align="center" style="padding:0 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;" class="email-container">
+          <tr>
+            <td style="background-color:${config.cardBackground};border:1px solid ${config.cardBorder};border-radius:18px;overflow:hidden;">
+              <div style="height:5px;line-height:5px;font-size:0;background-color:${config.primaryColor};background-image:${config.primaryGradient};"> </div>
+              <img src="${config.siteUrl}/images/email/hero-welcome.jpg" width="600" alt="Confirm your email" style="display:block;width:100%;max-width:600px;height:auto;border:0;outline:none;text-decoration:none;">
+              <div style="padding:32px 36px 30px;" class="email-padding">
+      <div style="margin:0 0 12px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${config.accentColor};">Confirm Your Email</div>
+      <h1 style="margin:0 0 14px;font-family:'Manrope', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:27px;line-height:1.16;font-weight:600;letter-spacing:-.6px;color:${config.darkColor};">One last step</h1>
+      <p style="margin:0 0 14px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:15px;line-height:1.65;font-weight:400;color:${config.textColor};text-align:left;">Hi ${name}, confirm your email address to finish setting up your Pryva account. This also proves you control the address, which is what keeps your account recoverable.</p>
+
+  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0 4px;">
+    <tr>
+      <td align="center" bgcolor="${config.primaryColor}" style="border-radius:12px;">
+        <a href="${verifyLink}" style="display:inline-block;padding:14px 30px;border-radius:12px;background:${config.primaryGradient};font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:14px;font-weight:600;line-height:1;color:#ffffff;text-decoration:none;white-space:nowrap;">Confirm Email  &#8594;</a>
+      </td>
+    </tr>
+  </table>
+
+      <p style="margin:18px 0 2px;padding:13px 16px;border-radius:11px;background:${config.infoBackground};border:1px solid ${config.infoBorder};font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.6;color:${config.textSecondary};">
+        This link expires in 24 hours and can only be used once. If you did not create a Pryva account, you can ignore this email.
+      </p>
+
+      <p style="margin:18px 0 2px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.6;color:${config.textSecondary};">If the button doesn't work, copy and paste this link:<br><a href="${verifyLink}" style="color:${config.accentColor};word-break:break-all;">${verifyLink}</a></p>
+    </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>`;
+
+  return {
+    subject: "Confirm your Pryva email",
+    html: emailWrapper(content, preheader),
+    text: `Confirm your Pryva email\n\nClick this link to confirm your address: ${verifyLink}\n\nThis link expires in 24 hours and can only be used once.`,
     preheader,
   };
 }

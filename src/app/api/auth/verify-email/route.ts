@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, alreadyVerified: true });
     }
 
-    await issueEmailVerification(user.id, user.email);
+    await issueEmailVerification(user.id, user.email, user.name);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[auth] verification request failed", error);

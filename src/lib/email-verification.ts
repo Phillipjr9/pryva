@@ -4,6 +4,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { emailVerificationTokens, users } from "@/db/schema";
+import { emailVerificationEmail } from "@/lib/email-templates";
 import { authRateLimiter } from "@/lib/rate-limit";
 
 /**
@@ -41,7 +42,7 @@ export function rateLimitEmailVerification(key: string) {
  * A wallet receipt is different -- that is a financial record needing guaranteed
  * delivery, which is why it uses the retrying outbox instead.
  */
-async function sendVerificationEmail(to: string, token: string): Promise<void> {
+async function sendVerificationEmail(to: string, name: string, token: string): Promise<void> {
   const key = process.env.RESEND_API_KEY?.trim();
   const from = process.env.RESEND_FROM_EMAIL?.trim();
   if (!key || !from) {
@@ -54,6 +55,10 @@ async function sendVerificationEmail(to: string, token: string): Promise<void> {
     "https://pryva.ng"
   ).replace(/\/$/, "");
   const link = `${base}/verify-email?token=${encodeURIComponent(token)}`;
+  // The shared branded template: gradient header bar, hero image, brand mark,
+  // DM Sans/Manrope, a plain-text fallback. This route was sending three bare
+  // <p> tags while a 463-line template library sat unused in the repository.
+  const template = emailVerificationEmail(name, link);
   try {
     await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -61,8 +66,9 @@ async function sendVerificationEmail(to: string, token: string): Promise<void> {
       body: JSON.stringify({
         from,
         to,
-        subject: "Confirm your Pryva email",
-        html: `<p>Welcome to Pryva.</p><p><a href="${link}">Confirm your email address</a></p><p>This link expires in 24 hours and can only be used once. If you did not create an account, you can ignore this email.</p>`,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
       }),
     });
   } catch (error) {
@@ -76,7 +82,11 @@ async function sendVerificationEmail(to: string, token: string): Promise<void> {
  * no address to enumerate and no need for the generic-message dance the reset flow
  * requires.
  */
-export async function issueEmailVerification(userId: string, email: string): Promise<void> {
+export async function issueEmailVerification(
+  userId: string,
+  email: string,
+  name: string,
+): Promise<void> {
   const token = generateVerificationToken();
   // Supersede any outstanding token so only the newest link works.
   await db
@@ -88,7 +98,7 @@ export async function issueEmailVerification(userId: string, email: string): Pro
     tokenHash: hashToken(token),
     expiresAt: new Date(Date.now() + VERIFY_TOKEN_TTL_MS),
   });
-  await sendVerificationEmail(email, token);
+  await sendVerificationEmail(email, name, token);
 }
 
 export async function confirmEmailVerification(
