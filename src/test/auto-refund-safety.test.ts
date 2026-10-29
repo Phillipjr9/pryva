@@ -1,10 +1,13 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
-import { PREVIEW_SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
+import { SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
 
-// Exercise the actual in-memory preview adapter as well as the refund policy:
-// its SQL-condition emulation must not ignore IS NULL checks.
+const mocks = vi.hoisted(() => ({ cancelUpstream: vi.fn() }));
+vi.mock("@/lib/fulfillment", () => ({ cancelUpstream: mocks.cancelUpstream }));
+
+// Exercise the real in-memory adapter as well as the refund policy: its
+// SQL-condition emulation must not ignore IS NULL checks.
 let db: typeof import("@/db").db;
 let schema: typeof import("@/db/schema");
 let processAutoRefunds: typeof import("@/lib/auto-refund").processAutoRefunds;
@@ -18,41 +21,84 @@ beforeAll(async () => {
   ({ processAutoRefunds } = await import("@/lib/auto-refund"));
   ({ POST: cronPost } = await import("@/app/api/cron/auto-refund/route"));
 });
+beforeEach(() => {
+  mocks.cancelUpstream.mockReset();
+  // cancelUpstream reports whether a real upstream release happened.
+  mocks.cancelUpstream.mockResolvedValue(true);
+});
 afterAll(() => vi.unstubAllEnvs());
 
-describe("preview automatic refund policy", () => {
-  it("refunds only an expired simulated single number without a code, once", async () => {
-    const old = new Date(Date.now() - 60 * 60_000);
-    // The seeded number already has a code; make it old enough to expose any
-    // bug which ignores the code, while rentals and eSIMs are already old.
-    await db.update(schema.orders).set({ createdAt: old }).where(eq(schema.orders.id, "demo-order-live"));
-    await db.insert(schema.orders).values({
-      id: "refund-eligible", reference: "REFUND-TEST", userId: "demo-user", service: "numbers",
-      productSlug: "vn-ng", productName: "Test number", planLabel: "Single", region: "Nigeria",
-      duration: PREVIEW_SINGLE_NUMBER_WINDOW, amount: 1000, status: "active", provider: "simulated",
-      createdAt: old, refundedAt: null, otpCode: null,
-    });
+const old = () => new Date(Date.now() - 60 * 60_000);
+
+async function insertUndelivered(overrides: Record<string, unknown> = {}) {
+  await db.insert(schema.orders).values({
+    id: "refund-eligible", reference: "REFUND-TEST", userId: "demo-user", service: "numbers",
+    productSlug: "vn-ng", productName: "Test number", planLabel: "Single", region: "Nigeria",
+    duration: SINGLE_NUMBER_WINDOW, amount: 1000, status: "active", provider: "fleexa",
+    providerRequestId: "req-123", createdAt: old(), refundedAt: null, otpCode: null,
+    ...overrides,
+  } as never);
+}
+
+describe("automatic refunds for undelivered number orders", () => {
+  it("refunds an expired live single number with no code, once, and releases it upstream", async () => {
+    // The seeded number already has a code; age it to expose any bug that
+    // ignores the code. Rentals and eSIMs in the seed are already old.
+    await db.update(schema.orders).set({ createdAt: old() }).where(eq(schema.orders.id, "demo-order-live"));
+    await insertUndelivered();
+
     const [before] = await db.select().from(schema.users).where(eq(schema.users.id, "demo-user"));
-    expect(await processAutoRefunds()).toBe(1);
-    expect(await processAutoRefunds()).toBe(0);
+    expect(await processAutoRefunds()).toEqual({ refunded: 1, cancelled: 1 });
+    // Idempotent: a second sweep must not credit the same order again.
+    expect(await processAutoRefunds()).toEqual({ refunded: 0, cancelled: 0 });
+
     const all = await db.select().from(schema.orders).where(eq(schema.orders.userId, "demo-user"));
     expect(all.find((order) => order.id === "refund-eligible")?.status).toBe("refunded");
     expect(all.find((order) => order.id === "demo-order-live")?.status).toBe("active");
+    // A rental has no upstream cancel, so it must never be swept automatically.
     expect(all.find((order) => order.id === "demo-order-rental")?.status).toBe("active");
     expect(all.find((order) => order.id === "demo-order-esim")?.status).toBe("active");
+
     const [after] = await db.select().from(schema.users).where(eq(schema.users.id, "demo-user"));
     expect(after.walletBalance).toBe(before.walletBalance + 1000);
+
     const ledger = await db.select().from(schema.walletTransactions).where(eq(schema.walletTransactions.orderId, "refund-eligible"));
     expect(ledger).toHaveLength(1);
     expect(ledger[0]).toMatchObject({ type: "refund", amount: 1000, balanceAfter: after.walletBalance });
+
+    expect(mocks.cancelUpstream).toHaveBeenCalledTimes(1);
+    expect(mocks.cancelUpstream.mock.calls[0][0]).toMatchObject({
+      provider: "fleexa", providerRequestId: "req-123",
+    });
   });
 
-  it("refuses the live cron and library sweep even with a valid cron secret", async () => {
+  it("still refunds when the upstream cancel fails — our cost recovery never withholds the customer's money", async () => {
+    mocks.cancelUpstream.mockRejectedValue(new Error("provider 502"));
+    await insertUndelivered({ id: "cancel-fails", reference: "REFUND-CANCEL-FAILS" });
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await processAutoRefunds()).toEqual({ refunded: 1, cancelled: 0 });
+
+    const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, "cancel-fails"));
+    expect(order.status).toBe("refunded");
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it("runs against a real database, not only the in-memory preview", async () => {
     vi.stubEnv("DATABASE_URL", "postgres://configured");
-    await expect(processAutoRefunds()).rejects.toThrow("provider reconciliation");
     const response = await cronPost(new NextRequest("https://pryva.test/api/cron/auto-refund", {
       method: "POST", headers: { authorization: "Bearer test-cron-secret" },
     }));
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true });
+    vi.stubEnv("DATABASE_URL", "");
+  });
+
+  it("still rejects a cron call without the shared secret", async () => {
+    const response = await cronPost(new NextRequest("https://pryva.test/api/cron/auto-refund", {
+      method: "POST", headers: { authorization: "Bearer wrong" },
+    }));
+    expect(response.status).toBe(401);
   });
 });

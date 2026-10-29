@@ -151,22 +151,27 @@ export async function fulfillPlan(plan: Plan): Promise<FulfilledOrder> {
  * an unrelated endpoint with a rental id, this logs the identifier so the
  * charge can be reconciled by hand. The balance is checked before fulfilment,
  * which makes this path rare, but it must never fail silently.
+ *
+ * Returns whether an upstream release actually happened. "Nothing to cancel" and
+ * "cancelled successfully" must stay distinguishable, otherwise a sweep that
+ * counted no-ops would report released inventory it never touched.
  */
 export async function cancelUpstream(order: {
   provider: string;
   providerRequestId: string | null;
   service: string;
   duration?: string;
-}): Promise<void> {
-  if (order.provider !== "fleexa" || !order.providerRequestId) return;
+}): Promise<boolean> {
+  if (order.provider !== "fleexa" || !order.providerRequestId) return false;
 
   if (order.duration?.startsWith("Rent")) {
     console.error(
       "Rental purchase needs manual reconciliation: no upstream cancel exists",
       { providerRequestId: order.providerRequestId },
     );
-    return;
+    return false;
   }
 
   await cancelFleexaSms(order.providerRequestId);
+  return true;
 }
