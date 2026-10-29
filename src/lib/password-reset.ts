@@ -51,7 +51,15 @@ async function sendResetEmail(to: string, token: string): Promise<void> {
     console.error("[auth] reset email not sent: Resend is not configured");
     return;
   }
-  const base = (process.env.SITE_URL?.trim() || "https://pryva.ng").replace(/\/$/, "");
+  // The variables the rest of the app already uses for absolute URLs. SITE_URL was
+  // invented in this file and appears nowhere else, so nobody could have known to
+  // set it from .env.example -- and an unset base would silently send every reset
+  // link to a domain that may not be the one serving the site.
+  const base = (
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    "https://pryva.ng"
+  ).replace(/\/$/, "");
   const link = `${base}/reset-password?token=${encodeURIComponent(token)}`;
   try {
     await fetch("https://api.resend.com/emails", {
