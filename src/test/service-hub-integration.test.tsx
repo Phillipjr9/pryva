@@ -14,7 +14,7 @@ vi.mock("@/lib/accszone", () => ({
 }));
 vi.mock("@/lib/marketplace-pricing", () => ({ priceMarketplaceListing: mocks.price }));
 
-const user = { id: "preview-user", name: "Preview", email: "preview@example.test", walletBalance: 5000, createdAt: new Date(0) };
+const user = { id: "preview-user", name: "Preview", email: "preview@example.test", walletBalance: 5000, emailVerifiedAt: null, createdAt: new Date(0) };
 
 beforeEach(() => {
   mocks.listListings.mockReset();

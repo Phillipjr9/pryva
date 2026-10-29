@@ -7,7 +7,7 @@ import { getDigitalService } from "@/lib/digital-services";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 
-const user = { id: "buyer", name: "Ada", email: "ada@example.test", walletBalance: 50000, createdAt: new Date(0) };
+const user = { id: "buyer", name: "Ada", email: "ada@example.test", walletBalance: 50000, emailVerifiedAt: null, createdAt: new Date(0) };
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 

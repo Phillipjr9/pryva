@@ -85,13 +85,22 @@ export function createRateLimiter(config: RateLimitConfig) {
       if (randomInt(1000) === 0) {
         try {
           await db.execute(sql`DELETE FROM rate_limit_buckets WHERE reset_at < now() - interval '1 day'`);
-        } catch {
-          console.error("Rate-limit cleanup failed");
+        } catch (error) {
+          console.error(
+            "Rate-limit cleanup failed:",
+            error instanceof Error ? error.message : error,
+          );
         }
       }
       return { allowed: count <= config.maxRequests, remaining: Math.max(0, config.maxRequests - count), resetTime };
-    } catch {
-      console.error("Shared rate-limit store unavailable");
+    } catch (error) {
+      // The cause used to be discarded here, so the log held a single line and a
+      // missing table was indistinguishable from a dead connection or a refused
+      // IAM token. Failing closed is the right decision; the silence was not.
+      console.error(
+        "Shared rate-limit store unavailable:",
+        error instanceof Error ? error.message : error,
+      );
       return { allowed: false, remaining: 0, resetTime: now + config.windowMs, unavailable: true };
     }
   };

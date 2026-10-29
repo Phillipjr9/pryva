@@ -19,11 +19,12 @@ vi.mock("@/lib/auth", async (importOriginal) => {
   return { ...actual, getCurrentUser: vi.fn() };
 });
 
-const account = (email: string): PublicUser => ({
+const account = (email: string, verified = true): PublicUser => ({
   id: "e6601368-4eef-45e7-a562-f8621c4239f2",
   email,
   name: "Test User",
   walletBalance: 1000,
+  emailVerifiedAt: verified ? new Date("2026-01-02T00:00:00Z") : null,
   createdAt: new Date("2026-01-01T00:00:00Z"),
 });
 
@@ -72,6 +73,15 @@ describe("admin authorization", () => {
     vi.stubEnv("ADMIN_EMAILS", "");
     expect(isAdminUser(account("admin@pryva.ng"))).toBe(false);
     expect(isAdminUser(account("ADMIN@pryva.test"))).toBe(false);
+  });
+
+  it("denies a configured administrator who has not proven control of the address", () => {
+    // ADMIN_EMAILS grants privilege by string match, and signup accepted any
+    // address with no proof of control. Matching on email alone therefore let a
+    // stranger register an administrator's address and inherit that access --
+    // refunds, withdrawals, the user list. Verification is what closes it.
+    expect(isAdminUser(account("ADMIN@pryva.test", true))).toBe(true);
+    expect(isAdminUser(account("ADMIN@pryva.test", false))).toBe(false);
   });
 
   it.each(handlers)("$method /api/admin/$path rejects anonymous users before database access", async ({ path, method, handler }) => {

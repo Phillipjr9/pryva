@@ -4,6 +4,7 @@ import { users } from "@/db/schema";
 import { createSession, hashPassword, isConfiguredAdminEmail, isValidEmail, normalizeEmail } from "@/lib/auth";
 import { creditWallet } from "@/lib/wallet";
 import { checkAuthRateLimit } from "@/lib/auth-rate-limit";
+import { issueEmailVerification } from "@/lib/email-verification";
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
@@ -52,6 +53,13 @@ export async function POST(request: Request) {
     if (!created) return Response.json({ ok: false, error: "Could not create that account." }, { status: 500 });
 
     await createSession(created.id, request);
+    // Best effort: the account exists whether or not mail is configured, and the
+    // link can be re-requested from /verify-email. Signup must not fail because
+    // Resend is down.
+    // `created` returns only the id; `email` is the normalized address in scope.
+    await issueEmailVerification(created.id, email, name).catch((error) => {
+      console.error("[auth] signup verification email failed", error);
+    });
     return Response.json({ ok: true });
   } catch {
     return Response.json({ ok: false, error: "Something went wrong. Please try again." }, { status: 500 });
