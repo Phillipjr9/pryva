@@ -10,8 +10,17 @@
  *
  * This one is different: it is a real environment check with 40+ callers, and it
  * stays until the in-memory shim in `src/db/index.ts` is retired in favour of a
- * mandatory `DATABASE_URL`.
+ * mandatory database connection.
+ *
+ * It asks `persistentDatabaseConfigured()` rather than testing DATABASE_URL
+ * directly, because Aurora provisioned through the Vercel AWS integration has no
+ * DATABASE_URL at all -- it authenticates with IAM tokens. Testing only for
+ * DATABASE_URL classified a correctly wired production database as preview,
+ * which meant the in-memory shim answered queries and the demo account was
+ * treated as the live data model.
  */
+
+import { persistentDatabaseConfigured } from "@/lib/database-config";
 export function isPreviewDatabase(): boolean {
-  return !process.env.DATABASE_URL?.trim();
+  return !persistentDatabaseConfigured();
 }

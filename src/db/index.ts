@@ -1,6 +1,12 @@
 import { randomBytes, scryptSync } from "node:crypto";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+
+import { createAwsIamPool } from "@/db/aws-iam";
+import {
+  awsIamConfigured,
+  persistentDatabaseConfigured,
+} from "@/lib/database-config";
 import { getOperators, getOrderByOperators } from "drizzle-orm";
 import * as schema from "./schema";
 
@@ -635,7 +641,7 @@ if (!databaseUrl) ensureDemoUser();
 
 /** Read an isolated snapshot; never expose the mutable process-local state. */
 export function readPreviewDatabase<T>(reader: (snapshot: PreviewState) => T): T {
-  if (databaseUrl || process.env.DATABASE_URL?.trim()) throw new Error("Preview data unavailable with a persistent database");
+  if (persistentDatabaseConfigured()) throw new Error("Preview data unavailable with a persistent database");
   return reader(structuredClone(mockState));
 }
 
@@ -646,7 +652,7 @@ export function readPreviewDatabase<T>(reader: (snapshot: PreviewState) => T): T
  * original preview state is untouched. Callbacks must not perform async work.
  */
 export function mutatePreviewDatabase<T>(mutation: (draft: PreviewState) => T): T {
-  if (databaseUrl || process.env.DATABASE_URL?.trim()) throw new Error("Preview mutation unavailable with a persistent database");
+  if (persistentDatabaseConfigured()) throw new Error("Preview mutation unavailable with a persistent database");
   const draft = structuredClone(mockState);
   const result = mutation(draft);
   if (result && typeof result === "object" && "then" in result) throw new Error("Preview mutation must be synchronous");
@@ -893,24 +899,30 @@ const mockDb: any = {
   },
 };
 
-export const pool = databaseUrl
-  ? (() => {
-      const runtimePool =
-        globalForDb.__arenaNextJsPostgresqlPool ??
-        new Pool({
-          connectionString: databaseUrl,
-        });
+// Aurora provisioned through the Vercel AWS integration has no DATABASE_URL: it
+// authenticates with RDS IAM tokens minted per connection. Treat it as a real
+// database, not as "no database configured".
+const useAwsIam = !databaseUrl && awsIamConfigured();
 
-      if (process.env.NODE_ENV !== "production") {
-        globalForDb.__arenaNextJsPostgresqlPool = runtimePool;
-      }
+export const pool: Pool | null =
+  databaseUrl || useAwsIam
+    ? (() => {
+        const runtimePool =
+          globalForDb.__arenaNextJsPostgresqlPool ??
+          (databaseUrl
+            ? new Pool({ connectionString: databaseUrl })
+            : createAwsIamPool());
 
-      return runtimePool;
-    })()
-  : null;
+        if (process.env.NODE_ENV !== "production") {
+          globalForDb.__arenaNextJsPostgresqlPool = runtimePool;
+        }
+
+        return runtimePool;
+      })()
+    : null;
 
 // The relational query API needs the schema at runtime. The preview adapter
 // implements the subset of this interface used without a database.
-export const db: NodePgDatabase<typeof schema> = databaseUrl
-  ? drizzle(pool as Pool, { schema })
+export const db: NodePgDatabase<typeof schema> = pool
+  ? drizzle(pool, { schema })
   : (mockDb as NodePgDatabase<typeof schema>);
