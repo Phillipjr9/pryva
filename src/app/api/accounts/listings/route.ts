@@ -6,6 +6,8 @@ import {
   type ListingQuery,
 } from "@/lib/marketplace-suppliers";
 import { isMarketplaceCatalogAvailable } from "@/lib/marketplace-suppliers";
+import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
+import { isManualFulfilmentReachable } from "@/lib/manual-fulfilment";
 import { priceMarketplaceListing } from "@/lib/marketplace-pricing";
 import { logger } from "@/lib/logger";
 import { safeUnitCount } from "@/lib/service-units";
@@ -48,6 +50,13 @@ export async function GET(request: NextRequest) {
   try {
     const { listings, meta } = await listMarketplaceListings(query);
 
+    const checkoutEnabled = isMarketplaceCheckoutConfigured();
+    // Asked only when it can change an answer: with checkout off, or with no
+    // hand-sourced listing on this page of results, the query would be wasted.
+    const manualReady = checkoutEnabled && listings.some((listing) => listing.fulfilment === "manual")
+      ? await isManualFulfilmentReachable()
+      : false;
+
     const priced = await Promise.all(
       listings.map(async (listing) => {
         const breakdown = await priceMarketplaceListing({
@@ -74,6 +83,17 @@ export async function GET(request: NextRequest) {
           maxQuantity: listing.maxQuantity,
           available: listing.available,
           fulfilment: listing.fulfilment,
+          /**
+           * Whether checkout is permitted for THIS listing, decided server-side.
+           *
+           * Distinct from `available`, which is the source's own declaration of
+           * stock, and from the page-wide pause: a hand-sourced item additionally
+           * needs someone who can reach the queue that prepares it. Computing it
+           * here rather than in the browser keeps one source of truth, and means
+           * the purchase route and the storefront cannot disagree about what is
+           * buyable.
+           */
+          purchasable: checkoutEnabled && (listing.fulfilment !== "manual" || manualReady),
         };
       }),
     );

@@ -5,10 +5,22 @@
 > Copy it freely. Nothing here is dropped — if something is impossible or not mine to decide, it stays on the
 > list with a note.
 >
-> **Last updated:** 2026-10-27 (main merged; money paths unified; marketplace shipped)
-> **Branch:** `arena/045f0b51-pryva` (merged up to `main` @ `5153fd4`)
+> **Last updated:** 2026-10-30 (PRs #18–#24 merged; PR #25 open)
+> **Branch:** `arena/083126a7-pryva` (`main` @ `0496001`, PR #24 merged)
 > **Repo audit method:** every status below was verified by reading files in the checkout — not from memory,
 > not from the earlier chat log.
+>
+> ⚠ **This file is the durable memory. Anything outside the repository does not survive** — switching
+> branch resets the sandbox and wipes untracked files at `/home/user`. A separate expansion plan kept
+> there was lost that way on 2026-10-30. Record decisions here, in the commit, or in the PR body.
+>
+> ⚠ **SEQUENCING — read before setting any supplier key.** `isMarketplacePurchaseEnabled()` returns
+> true the instant `BULKACC_API_KEY` exists, and the purchase route checks that gate *before* it
+> branches on hand-sourced items. So that one key also opens checkout for the six streaming products
+> in `data/manual-catalog.json`, whose only fulfilment path is `/admin/fulfilment` → `requireAdmin` →
+> `isAdminUser`, which needs a **verified** address. With no mail provider nobody can be verified, so
+> those orders would sit in `processing` forever. **Unblock admin first** (PR #25 makes the sale refuse
+> instead, but the fix is to make the queue reachable). Same root cause as withdrawals never completing.
 
 ---
 
@@ -260,6 +272,15 @@ Verified facts:
 | 2026-10-27 | **Auth throttling + admin console.** Per-IP/per-account login limits, per-IP signup limit (verified live: 6th bad attempt → 429), `/admin/users`, `/admin/orders`, shared admin nav. 23 files / 165 tests green, `next build` clean. | #5, #42, #45 |
 | 2026-10-27 | **Profit band + nav cleanup.** Every price is now derived from a supplier cost sheet (`data/cost-sheet.json` → `npm run pricing:build` → `prices.generated.ts`) at 30–50% markup on cost; volume discounts, promos and bulk tiers are all clamped to a 30% floor; ₦500 minimum order closes the Paystack-fee leak; `PRICING.md` documents the rule, the audit command and the three face-value exceptions (airtime, data, gift cards). Homepage nav lost the Services dropdown (Home, Pricing, Accounts, How it works, FAQ, Contact). 204 tests green. | #13, #24, #26 |
 | 2026-10-27 | **Homepage rebuilt around the phone.** Hero reordered (copy+CTA → photo → proof), services heading corrected from "Four" to nine with dashboard-only cards routed through sign-in, 3-up desktop grid, subscriptions strip for the orphaned `/digital-services`, new accounts marketplace band (FB/IG/TikTok), full-width bento, dashboard section given a real visual, pricing teaser replaced with live pay-as-you-go prices (fake Plus/Business tiers gone), invented ratings/counts removed, marquee seam fixed, section ids, FAQ JSON-LD, real `og.png`, skip link, sticky CTA that hides behind the closing CTA. 219 tests green (14 homepage). | #16, #20, #26 |
+| 2026-10-28 | **PR #16 — Stop telling customers the stock is supplied** (`4751ecd`). | #16 |
+| 2026-10-29 | **PR #18 — Make fulfilment real, and close the money-safety and account-recovery gaps** (`2d6bdaf`). | — |
+| 2026-10-29 | **PR #19 — Connect the deployed app to Aurora (RDS IAM), add a migration runner** (`5a82fc0`). Build command became `npm run db:migrate && npm run build`. **No `DATABASE_URL` is set anywhere:** the function assumes `AWS_ROLE_ARN` and mints a short-lived token via `@aws-sdk/rds-signer` (`useAwsIam = !databaseUrl && awsIamConfigured()`). A preview deployment created the schema — 11 of 11 migrations. | — |
+| 2026-10-29 | **PR #20 — Verify email ownership, and require it for administrator access** (`3519601`). `isAdminUser` = verified address **AND** allowlisted address. ⚠ Consequence still live: with no mail provider `emailVerifiedAt` is never set, so `/admin` is unreachable — which blocks withdrawal approval and hand-prepared fulfilment. Escape hatch (not taken): a one-off migration marking the owner's account verified. Note `signup/route.ts:38` returns 403 for any `ADMIN_EMAILS` member, so `admin@pryva.com` cannot even register. | — |
+| 2026-10-30 | **PR #21 — Stop claiming an email was sent when no mail provider is configured** (`9bbe88e`). | — |
+| 2026-10-30 | **PR #22 — Fix fee-bearing Paystack top-ups; schedule crons, make verification reachable, document IAM vars** (`2ffb9da`). A ₦50,000 top-up was refused because both money-in paths compared Paystack's gross `amount` (5,086,295 kobo) instead of `requested_amount` (5,000,000) when "Pass fees to customers" is on. Their formula was reproduced exactly: `ceil((net_kobo + 10000) / 0.985)`. **The checks were not loosened** — `gross < requested` is explicitly rejected, and both branches now log expected *and* received. Crons live: `wallet-emails 10 3 * * *`, `auto-refund 40 3 * * *`. | #1–#3 |
+| 2026-10-30 | **PR #23 — Panel-agnostic SMM boosting client; stop selling undeliverable plans on `/pricing`** (`c6c2e7b`). `smm-panel.ts` + `smm-catalog.ts`: listings only, `price` and `action` null so cards read "Ordering paused". `/pricing` CTA now gated on `isPlanFulfillable` — **10 plans orderable, 17 honestly refused** (verified live on production). Catalog route attempts each supplier independently and degrades rather than failing. | — |
+| 2026-10-30 | **PR #24 — Bitcall gateway client and read-only eSIM catalog** (`0496001`). `bitcall.ts`: base URL pinned to `api.bitcall.io` (`BITCALL_API_URL` may redeploy but not re-host, because the secret rides as a header), `redirect:"error"`, nothing logs headers. eSIM catalog/orders/profiles, `getBitcallBalance()` on `GET /v1/balance`, and the full OTP client (services/countries/pools, buy/get/list activations, cancel/resend/reactivate). Added `isAmbiguousBitcallOutcome()`, which separates *"may I retry"* from *"did it possibly already happen"* — `SERVICE_UNAVAILABLE` is both retryable and ambiguous, `PRODUCT_UNAVAILABLE` is retryable and **not**; without that split a timeout followed by an automatic retry rents two numbers. Local rate budget moved to its own `LOCAL_RATE_BUDGET` code so "did my request leave this process" is answerable. **Inert at merge** (`BITCALL_KEY_ID` unset); the owner has since set it in Vercel. 760 tests. | — |
+| 2026-10-30 | **PR #25 (open) — Do not sell a hand-prepared item nobody can prepare** (`cbb8215`). Purchasability is now per listing and decided server-side: `isManualFulfilmentReachable()` (fails closed), a `purchasable` field on `/api/accounts/listings`, a 503 **before** the wallet debit in the purchase route, and a banner explaining why *Prepared for you* items are paused. Found while adding a Google Voice account to the manual lane — see the sequencing warning at the top of this file. 766 tests; sabotage-proven three ways, including that removing only the server-side check while keeping the hidden button fails 2 tests. | — |
 
 
 ---
