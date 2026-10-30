@@ -254,6 +254,10 @@ preview apply a migration to production by removing the `VERCEL_ENV` gate.
 - Do not "fix" a two-factor lockout by unsetting `TWO_FACTOR_KEY` or deleting rows
   in bulk. The first is a fail-closed outage, the second silently removes a
   security control from every account it touches.
+- Do not let the service worker cache HTML, `/api` responses or anything carrying
+  account data. It is shared by every profile on the device. Static, content-hashed
+  assets and the offline page are the whole approved list; bump `VERSION` in
+  `public/sw.js` when changing the rules, or old caches survive the deploy.
 - Do not add a third-party script, font, style or image host, or an iframe, without
   extending the policy in `src/lib/security-headers.ts`. The browser will block it
   and the page will look broken in a way the server logs never show. Never put a
