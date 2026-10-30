@@ -1,6 +1,8 @@
 # Pryva
 
-Next.js application for a wallet and digital services. The repository currently supports an **in-memory preview**, not a verified production deployment. Live service purchasing is deliberately disabled until the provider integration, catalog mappings and payment/reconciliation workflows have been verified.
+Next.js application for a wallet and digital services. The repository supports an **in-memory preview** and a persistent deployment, but most live service purchasing is deliberately disabled until the provider integration, catalog mappings and payment/reconciliation workflows have been verified. What is live is deliberately narrow: Paystack wallet top-ups, manually settled withdrawals, virtual numbers and rentals for the ten plans in the fulfilment allowlist, account-marketplace checkout where its key is configured, gift cards, and the free disposable inbox. Everything else returns an actionable `503` rather than pretending.
+
+Operating the deployment — secrets and rotation, migrations, scheduled jobs, money operations and incident playbooks — is documented in [`RUNBOOK.md`](RUNBOOK.md).
 
 ## Local development
 

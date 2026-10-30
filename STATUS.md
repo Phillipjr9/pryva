@@ -58,7 +58,7 @@ eSIM, proxies, digital subscriptions, airtime/data, bulk orders, scheduled order
 | 11 | **Admin payment-audit view** | no dedicated reconciliation screen. "Failed orders" is already `/admin/orders?status=review`; the audit log now covers who acted, not what still needs reconciling |
 | 12 | **Paid inbox tier** | schema supports `tier='paid'`, the code only issues `free`; price needs the supplier's real `priceNgn` |
 | 13 | **CSP** | no `Content-Security-Policy` header anywhere (`src/proxy.ts` ships the other headers) |
-| 14 | **Dockerfile, RUNBOOK** | CI was added in this pass (`.github/workflows/ci.yml`); no Dockerfile and no runbook yet |
+| 14 | **Dockerfile** | CI (`.github/workflows/ci.yml`) and an operations runbook (`RUNBOOK.md`) were added in these passes; no Dockerfile — deployment is Vercel-only |
 | 15 | **Gift-card explainer page** | no `/gift-cards` marketing page; one blog post (`gift-cards-for-teams`) is all there is |
 | 16 | **Self-service account deletion** | deliberately returns 503; panel points at support |
 
@@ -181,6 +181,8 @@ The first pass found that privileged actions left a line in the application log 
 | Secrecy | The delivery summary records the **item count**, never the credentials — pinned by a test that fails if `credentials` is interpolated. Support message bodies are never copied |
 
 **Verified:** 855 tests / 95 files · typecheck · lint · build. Sabotage-proven three ways: rethrowing from `recordAdminAction` fails two tests, interpolating credentials into the summary fails the secrecy guard, and removing an audit call is caught by the static route scan.
+
+**Also in this pass:** `RUNBOOK.md` — the operations document that did not exist. It covers the deploy/migration gate, secret rotation, what each cron does (and why one is deliberately unscheduled), withdrawal and refund reconciliation, incident playbooks and the guards that must not be deleted.
 
 **Fixture lesson:** adding a migration makes four PGlite fixtures fail on purpose — `withdrawal-name-check.test.ts` asserts every fixture replays every migration. They now include `0014`, and the manual migration list in `migrations/README.md` was replaced with a glob so it cannot fall behind the directory again.
 
