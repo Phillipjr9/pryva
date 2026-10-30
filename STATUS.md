@@ -12,7 +12,7 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **1,059 tests / 115 files, all passing** (no `.skip`, no `.only`) |
+| `npm test` | **1,067 tests / 117 files, all passing** (no `.skip`, no `.only`) |
 | `npm run build` | **passes**; 75 API route handlers, 23 public pages, 17 dashboard pages, 12 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
@@ -700,12 +700,19 @@ settled total is an operator step, and both the admin page and the runbook say s
 rather than implying a check that never ran. Same for SPF/DKIM/DMARC, PITR and the
 WAF: they are DNS records, provider settings and money, not code.
 
-### 23.8 Still open: the social accounts
+### 23.8 Social platforms, shown without pretending
 
-Asked to "add our platforms" — TikTok and X are not live yet. A footer icon that
-links to a profile that does not exist is worse than no icon, so this needs the
-owner's handles (or an explicit "show them as coming soon"). Not guessed.
+TikTok and X are in the footer now, with real brand marks from `BRAND_MARKS`
+(the extractor's marks, never drawn by hand). The profiles do not exist yet, so
+each link goes to the platform's own home page and its label — the tooltip and
+what a screen reader hears — says "Pryva on X — profile coming soon". That is the
+compromise the owner chose over an icon that points nowhere or a link to a 404.
 
-**Verified:** 1,059 tests / 115 files · typecheck · lint · build · `npm audit`
+`src/lib/social.ts` holds the whole decision: `profileUrl` is the real account and
+is `null` today; `socialHref` and `socialIsPlaceholder` read it; the footer renders
+through them. Setting one field switches a placeholder to a real link with no
+other edit, and the module's comment says so.
+
+**Verified:** 1,067 tests / 117 files · typecheck · lint · build · `npm audit`
 clean for production dependencies.
 

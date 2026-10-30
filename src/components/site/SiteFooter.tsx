@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ArrowRight, Card, Shield, Check } from "@/components/icons";
 import { services } from "@/lib/catalog";
 import { BrandLockup } from "@/components/brand/BrandLockup";
+import { BrandIcon } from "@/components/BrandIcon";
+import { SOCIAL_LINKS, socialHref, socialIsPlaceholder, socialLabel } from "@/lib/social";
 
 const columns = [
   {
@@ -106,6 +108,29 @@ export function SiteFooter() {
                 <Shield className="h-3.5 w-3.5 text-lav-600" />
                 Live fulfillment paused
               </span>
+            </div>
+
+            {/* Our accounts are still being set up: until a `profileUrl` exists in
+                src/lib/social.ts these go to the platform and say "coming soon".
+                The label is not decoration — it is the difference between a
+                placeholder and a dead link. */}
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <span className="text-meta font-semibold uppercase tracking-[0.18em] text-ink-3">
+                Follow
+              </span>
+              {SOCIAL_LINKS.map((link) => (
+                <a
+                  key={link.id}
+                  href={socialHref(link)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={socialLabel(link)}
+                  title={socialLabel(link)}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white/80 transition-colors hover:border-lav-300"
+                >
+                  <BrandIcon brand={link.mark} size={18} variant="bare" decorative />
+                </a>
+              ))}
             </div>
           </div>
 
