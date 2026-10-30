@@ -284,6 +284,19 @@ export async function listProducts(pageIndex = 1, pageSize = CATALOG_PAGE_SIZE):
   const { envelope } = await request("/api/products/list", { pageIndex, pageSize });
   const data = readData(envelope, "/api/products/list") as Record<string, unknown> | null;
   const rawItems = Array.isArray(data?.items) ? data.items : [];
+  if (!rawItems.length) {
+    // An empty page is not a neutral outcome. This supplier reports a logical
+    // failure as HTTP 200 with `statusCode: 200` and `data: null`, so nothing
+    // throws and the `message` explaining it is the only evidence that anything
+    // went wrong. Dropping it left a storefront with no stock indistinguishable
+    // from one whose key had been rejected.
+    logger.warn("Supplier catalog returned no products", {
+      path: safePath("/api/products/list"),
+      detail: typeof envelope?.message === "string" && envelope.message.trim()
+        ? envelope.message.trim()
+        : "no message",
+    });
+  }
   const items: BulkaccProduct[] = [];
   for (const raw of rawItems) {
     // One malformed row must not take down the whole catalog.
@@ -332,6 +345,57 @@ export async function listAllProducts(): Promise<BulkaccProduct[]> {
 
   catalogCache = { value: products, expiresAt: Date.now() + CATALOG_TTL_MS };
   return products;
+}
+
+export type CatalogProbe =
+  | { state: "not_configured" }
+  | { state: "serving"; totalCount: number | null }
+  | { state: "no_products"; detail: string }
+  | { state: "failed"; code: string; detail: string };
+
+/**
+ * Why the account catalog is, or is not, serving products.
+ *
+ * `listAllProducts()` cannot answer this. An empty catalog and a refused one
+ * both surface as `[]`, because a logical failure arrives as HTTP 200 with
+ * `statusCode: 200` and `data: null` — the documented insufficient-balance
+ * shape. `primaryListings()` then returns null on `!products.length` without
+ * logging, so the two cases were indistinguishable from the outside and the
+ * reason was unrecoverable.
+ *
+ * Server-only. `detail` is the supplier's own wording and must never reach a
+ * customer; it belongs behind the diagnostics secret, not on a public page.
+ */
+export async function probeCatalog(): Promise<CatalogProbe> {
+  if (!isBulkaccConfigured()) return { state: "not_configured" };
+
+  try {
+    // pageSize 1: this asks "is there a catalog at all", not for the catalog.
+    const { envelope } = await request("/api/products/list", { pageIndex: 1, pageSize: 1 });
+    if (!envelope) return { state: "failed", code: "bad_response", detail: "Malformed response" };
+
+    const message = typeof envelope.message === "string" ? envelope.message.trim() : "";
+    const status = Number.isSafeInteger(envelope.statusCode) ? (envelope.statusCode as number) : null;
+    if (status !== null && status >= 400) {
+      return { state: "failed", code: "logical_error", detail: message || `statusCode ${status}` };
+    }
+
+    const data = envelope.data as Record<string, unknown> | null;
+    const items = Array.isArray(data?.items) ? (data?.items as unknown[]) : [];
+    if (!items.length) return { state: "no_products", detail: message || "No products and no explanation" };
+
+    const rawTotal = data?.totalCount;
+    const totalCount = typeof rawTotal === "number" && Number.isFinite(rawTotal) && rawTotal >= 0
+      ? Math.floor(rawTotal)
+      : null;
+    return { state: "serving", totalCount };
+  } catch (error) {
+    return {
+      state: "failed",
+      code: error instanceof BulkaccError ? error.code : "unknown_error",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 /** Authoritative price, stock and minimum for one product. Used at checkout. */
