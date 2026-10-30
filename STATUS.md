@@ -1,6 +1,6 @@
 # Pryva — verified status review
 
-**Date:** 30 October 2026 (updated) · **Commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva`
+**Date:** 30 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** `c0abe31` plus the two-factor batch
 **Method:** every claim below was read out of the code or produced by running the project. Nothing is taken from `PLAN.md` without checking it first — and several `PLAN.md` entries turned out to be stale (section 4).
 
 ---
@@ -12,11 +12,11 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **861 tests / 97 files, all passing** (no `.skip`, no `.only`) |
-| `npm run build` | **passes**; 70 API route handlers, 21 public pages, 17 dashboard pages, 10 admin pages |
+| `npm test` | **886 tests / 100 files, all passing** (no `.skip`, no `.only`) |
+| `npm run build` | **passes**; 75 API route handlers, 21 public pages, 17 dashboard pages, 12 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
-Codebase size: ~51,800 lines under `src/`, 95 modules in `src/lib/`, 18 database tables, 15 migrations (`0000`–`0014`).
+Codebase size: ~52,600 lines under `src/`, 98 modules in `src/lib/`, 22 database tables, 16 migrations (`0000`–`0015`).
 Migration coverage is complete — every table in `src/db/schema.ts` is created by a migration.
 
 **Summary in one line:** the engineering is in better shape than the planning docs suggest; the real gaps are (a) product surface that was never built, (b) operations/deployment wiring, and (c) documentation that no longer matches the code.
@@ -50,7 +50,7 @@ eSIM, proxies, digital subscriptions, airtime/data, bulk orders, scheduled order
 | 3 | **Reviews & ratings** | nothing (`/testimonials` is curated copy, not user reviews) |
 | 4 | **Coupons / discount codes** | only supplier promo codes on the marketplace; no Pryva coupon system |
 | 5 | **Support tickets** | `/dashboard/support` + `/admin/messages` handle flat `contact_messages`; no threads, priorities or SLA |
-| 6 | **Two-factor authentication** | `src/app/dashboard/security/page.tsx:51` literally says "not available yet"; no TOTP library |
+| 6 | ~~**Two-factor authentication**~~ | **Built in the fourth pass** — TOTP enrolment, recovery codes and a two-step sign-in; migration `0015` |
 | 7 | **SMS / WhatsApp notifications** | nothing (no Termii/Twilio/WhatsApp client) |
 | 8 | **PWA** | no manifest, no service worker, no offline page (the preview cookie bridge is not a PWA) |
 | 9 | **Product analytics / Web Vitals** | nothing — no GA4, no `@vercel/analytics`, no `web-vitals` |
@@ -62,7 +62,7 @@ eSIM, proxies, digital subscriptions, airtime/data, bulk orders, scheduled order
 | 15 | **Gift-card explainer page** | no `/gift-cards` marketing page; one blog post (`gift-cards-for-teams`) is all there is |
 | 16 | **Self-service account deletion** | deliberately returns 503; panel points at support |
 
-Rough sizing: 1–4 and 15 are S–M; 5, 10, 11, 13 are M; 6, 7, 8 are M; 9 is S.
+Rough sizing: 1–4 and 15 are S–M; 5, 10, 11, 13 are M; 7 and 8 are M; 9 is S.
 
 ---
 
@@ -142,7 +142,7 @@ These are healthy upgrades to schedule, not emergencies. Pin them behind the CI 
 2. ~~Make the truth surfaces agree.~~ **Done for README and `/status`**; the `PLAN.md` tables still need a proper rewrite, and the "are numbers live?" question is now answered by the documentation rather than left ambiguous.
 3. 🟡 **Fix operations** — the scheduled-orders mystery is resolved (it cannot be scheduled as written); still open: the email worker's cadence, and whether transfer webhooks will ever settle withdrawals or operators always will.
 4. 🟡 **Finish the money loop** — the admin audit log and the reconciliation view are done; still open: reconcile the supplier balance and enforce email verification on signup.
-5. **Then growth features** — referrals, coupons, reviews, wishlist, 2FA, PWA, analytics. These are additive; none of them unblocks revenue the way 1–4 do.
+5. 🟢 **Then growth features** — referrals, coupons, reviews, wishlist, PWA, analytics. 2FA moved out of this list: it is built (section 12). These are additive; none of them unblocks revenue the way 1–4 do.
 
 ---
 
@@ -221,3 +221,33 @@ find src/app/api/admin -name route.ts; cat vercel.json; cat next.config.ts
 ```
 
 Feature claims marked "absent" mean zero matching code in `src/`; "built" means the file was read, not that a live third-party call was made. No live supplier, Paystack or Resend credentials are present in this environment, so nothing here proves a third-party integration works — only that the code path exists.
+
+---
+
+## 12. Fourth pass — two-factor authentication (30 Oct 2026)
+
+**What was wrong.** `/dashboard/security` told customers 2FA was "not available yet" and not to rely on it, and sign-in issued a session on the password alone. On an app that holds customer wallets, that was the last self-service security gap. It is now closed.
+
+| Piece | File | Behaviour |
+|---|---|---|
+| TOTP | `src/lib/totp.ts` | dependency-free RFC 6238: base32, six-digit codes, ±1 step window, constant-time compare |
+| Enrolment, recovery, challenges | `src/lib/two-factor.ts` | AES-256-GCM secret, ten single-use recovery codes, hashed challenge tokens |
+| Enrol / confirm / disable | `src/app/api/security/2fa/{start,confirm,disable}/route.ts` | session-authenticated; disable needs the password **and** a code |
+| Sign-in second step | `src/app/api/auth/2fa/route.ts` | spends the challenge; shares the login rate-limit bucket |
+| UI | `src/app/dashboard/security/TwoFactorCard.tsx`, `src/components/auth/AuthForm.tsx` | one-time secret + `otpauth` link, recovery list, and the code step at sign-in |
+| Migration | `migrations/0015_two_factor.sql` | `user_two_factor`, `two_factor_recovery_codes`, `two_factor_challenges` |
+
+**The decisions that matter**
+
+- **Fail closed.** `TWO_FACTOR_KEY` (at least 16 characters) encrypts every secret. Without it an account that has 2FA enabled gets a **503 at sign-in and no session** — never a silent downgrade to password-only. Starting enrolment is refused too.
+- **Replay is rejected, not merely windowed.** The accepted time-step is stored (`last_used_step`) and advanced with a conditional update, so the same six digits cannot be used twice inside their 30-second window — including the code used to confirm enrolment.
+- **Challenges are single-use and cheap to revoke.** 32 random bytes go to the browser; only their SHA-256 is stored. Five-minute TTL, five wrong codes kill the challenge, a successful use consumes it with a conditional update.
+- **Recovery is real.** Ten `abcde-fghij` codes, hashed, each spendable exactly once, shown once at confirmation and never again.
+- **A stolen session cannot remove the factor.** Disable requires the password plus a current TOTP code or a recovery code.
+- **No enumeration.** Unknown, expired, consumed and wrong all return one indistinguishable message; an outage returns 503 without spending one of the five attempts.
+
+**The operational consequence:** rotating `TWO_FACTOR_KEY` makes every existing enrolment unreadable. Those accounts are locked out of the second step rather than let in without one — which is the intended failure, and why the runbook has a recovery procedure.
+
+**Verified:** 886 tests / 100 files · typecheck · lint · build. New tests: `src/test/totp.test.ts` (8 — the RFC 6238 published vectors), `src/test/two-factor.test.ts` (14 — fail-closed, replay, single-use recovery, challenge hashing) and `src/test/auth-two-factor-login.test.ts` (3 — a correct password yields a challenge, not a session, and 503 when the server cannot check). Sabotage-proven twice: dropping `rejectUpToStep` and the conditional step advance fails two tests, and disabling the login branch issues a session it should not; both restored, all pass.
+
+**Deliberately not done:** SMS or email one-time codes (an attacker with the password usually has the mailbox too), and an admin "reset 2FA" button. A reset is an audited operator action that needs an owner decision; the runbook describes how to handle a lockout manually in the meantime.

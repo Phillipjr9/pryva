@@ -40,6 +40,12 @@ export function AuthForm({
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [pending, setPending] = useState<"form" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Set only when the password was accepted and a second factor is required.
+  // Kept in client state on purpose: the challenge token is single-use, short
+  // lived and bound to this sign-in attempt, so it must not go in a URL or a
+  // cookie the browser might replay later.
+  const [challenge, setChallenge] = useState<string | null>(null);
+  const [code, setCode] = useState("");
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -57,9 +63,19 @@ export function AuthForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = (await response.json()) as { ok?: boolean; error?: string };
+      const data = (await response.json()) as {
+        ok?: boolean;
+        error?: string;
+        twoFactorRequired?: boolean;
+        challengeToken?: string;
+      };
       if (!response.ok || !data.ok) {
         setError(data.error ?? "That didn't work. Please try again.");
+        setPending(null);
+        return;
+      }
+      if (data.twoFactorRequired && data.challengeToken) {
+        setChallenge(data.challengeToken);
         setPending(null);
         return;
       }
@@ -69,6 +85,93 @@ export function AuthForm({
       setError("Network hiccup. Please try again.");
       setPending(null);
     }
+  }
+
+  async function verifySecondFactor(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!challenge) return;
+    setPending("form");
+    setError(null);
+    try {
+      const response = await fetch("/api/auth/2fa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeToken: challenge, code }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!response.ok || !data.ok) {
+        setError(data.error ?? "That code did not work.");
+        setPending(null);
+        return;
+      }
+      window.location.replace(safeRedirectPath(next));
+      return;
+    } catch {
+      setError("Network hiccup. Please try again.");
+      setPending(null);
+    }
+  }
+
+  if (challenge) {
+    return (
+      <div>
+        <span className="eyebrow">
+          <Shield className="h-3 w-3" />
+          Two-step verification
+        </span>
+        <h1 className="mt-3 text-[2rem] font-medium leading-[1.1] tracking-[-0.03em] sm:text-[2.3rem]">
+          Enter the code from
+          <br />
+          <span className="text-display italic text-lav-700">your authenticator.</span>
+        </h1>
+        <p className="mt-3 text-[0.9rem] leading-relaxed text-ink-2">
+          Your password was accepted. This sign-in needs the six-digit code, or one of your saved
+          recovery codes.
+        </p>
+
+        <form onSubmit={verifySecondFactor} className="mt-5 grid gap-3.5">
+          <div>
+            <label htmlFor="two-factor-code" className="field-label">
+              Code or recovery code
+            </label>
+            <input
+              id="two-factor-code"
+              autoFocus
+              required
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              className="field"
+              placeholder="123456 or abcde-fghij"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+            />
+          </div>
+
+          {error && (
+            <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-[0.78rem] font-medium text-red-700">
+              {error}
+            </p>
+          )}
+
+          <button type="submit" disabled={pending !== null || code.length < 6} className="btn btn-primary w-full !py-3.5">
+            {pending ? "Checking…" : "Continue"}
+            {!pending && <ArrowRight className="h-4 w-4" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setChallenge(null);
+              setCode("");
+              setError(null);
+            }}
+            className="text-[0.78rem] font-semibold text-ink-2 underline underline-offset-2"
+          >
+            Start over
+          </button>
+        </form>
+      </div>
+    );
   }
 
   return (

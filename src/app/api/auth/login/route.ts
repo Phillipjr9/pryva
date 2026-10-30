@@ -5,6 +5,12 @@ import { createSession, isValidEmail, normalizeEmail, verifyPassword } from "@/l
 import { checkAuthRateLimit, clearAuthRateLimit } from "@/lib/auth-rate-limit";
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import {
+  CHALLENGE_TTL_MS,
+  createChallenge,
+  getEnrolment,
+  twoFactorAvailable,
+} from "@/lib/two-factor";
 
 export async function POST(request: Request) {
   if (!isSameOriginMutation(request)) return Response.json({ ok: false, error: "Invalid origin." }, { status: 403 });
@@ -36,6 +42,27 @@ export async function POST(request: Request) {
     const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
     if (!user || !verifyPassword(password, user.passwordHash)) {
       return Response.json({ ok: false, error: "Those details don't match an account." }, { status: 401 });
+    }
+
+    // A correct password is only the first factor for an account that enabled a
+    // second one. No session is issued here: the caller receives a short-lived
+    // single-use challenge, and `/api/auth/2fa` spends it. Failing to issue that
+    // challenge (no key configured) must not fall back to a session.
+    const enrolment = await getEnrolment(user.id);
+    if (enrolment?.enabledAt) {
+      if (!twoFactorAvailable()) {
+        return Response.json(
+          { ok: false, error: "Sign-in is temporarily unavailable. Please try again later." },
+          { status: 503 },
+        );
+      }
+      const challenge = await createChallenge(user.id);
+      return Response.json({
+        ok: true,
+        twoFactorRequired: true,
+        challengeToken: challenge.token,
+        expiresInSeconds: Math.floor(CHALLENGE_TTL_MS / 1000),
+      });
     }
 
     await clearAuthRateLimit(request, email);
