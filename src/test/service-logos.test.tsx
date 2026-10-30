@@ -1,6 +1,6 @@
 import React from "react";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ServiceIcon, type ServiceType } from "@/components/ServiceIcon";
@@ -10,6 +10,7 @@ import { BrandIcon, WORDMARK_BRANDS } from "@/components/BrandIcon";
 import { PlatformBadge, platformName, type PlatformSlug } from "@/components/PlatformBadge";
 import { PROMOTION_EXAMPLES, VERIFICATION_EXAMPLES } from "@/lib/service-explorer";
 import { digitalServices } from "@/lib/digital-services";
+import { ARTWORK_WIDTHS } from "@/lib/service-artwork";
 
 /**
  * Every service shows its own icon.
@@ -233,5 +234,70 @@ describe("service logos", () => {
         /import \{(?: ServiceIcon| ServiceTitle) \} from "@\/components\/(?:ServiceIcon|ServiceTitle)"/,
       );
     }
+  });
+});
+
+/**
+ * The bytes behind the icons.
+ *
+ * `next.config.ts` turns off Next's image optimiser, so every `<Image>` used to
+ * hand the browser the 512×512 master: 220–270 KB per icon for a 20–64 px slot,
+ * 2,197 KB of PNG to paint nine thumbnails on the homepage. `ServiceIcon` now
+ * renders a plain `<img>` with a `srcSet` of generated WebP derivatives.
+ *
+ * These assertions are on sizes, not on intent, because the regression is
+ * invisible: the page looks identical at 3,000 KB and at 6 KB, and only a byte
+ * count notices.
+ */
+describe("artwork weight", () => {
+  const SERVICES = [
+    "virtual-numbers", "esim", "proxies", "email-otp", "digital-accounts",
+    "data", "gift-cards", "bulk", "scheduled",
+  ];
+  const CATEGORIES = ["streaming", "music", "gaming", "productivity"];
+
+  it("ships a WebP derivative at every width the UI can ask for", () => {
+    for (const folder of ["services", "categories"] as const) {
+      const bases = folder === "services" ? SERVICES : CATEGORIES;
+      for (const base of bases) {
+        for (const width of ARTWORK_WIDTHS) {
+          const path = `public/images/${folder}/${base}-${width}.webp`;
+          expect(existsSync(path), `${path} is missing — run npm run artwork:build`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("keeps every derivative small enough to be worth having", () => {
+    for (const folder of ["services", "categories"] as const) {
+      const bases = folder === "services" ? SERVICES : CATEGORIES;
+      for (const base of bases) {
+        const width64 = statSync(`public/images/${folder}/${base}-64.webp`).size;
+        // The masters are ~250 KB; a 64 px tile that needs a chunk of that is a
+        // derivative that has quietly stopped being one.
+        expect(width64, `${base}-64.webp is ${width64} bytes`).toBeLessThan(20_000);
+      }
+    }
+  });
+
+  it("serves one size per slot instead of the master", () => {
+    const html = renderToStaticMarkup(<ServiceIcon service="email-otp" size="md" />);
+
+    expect(html).toContain("srcSet=");
+    expect(html).toContain("/images/services/email-otp-64.webp 64w");
+    expect(html).toContain("/images/services/email-otp-192.webp 192w");
+    // `sizes` is what makes the browser pick 64 for a 48 px slot.
+    expect(html).toContain('sizes="48px"');
+    // The master stays as the fallback src, so a browser without WebP still works.
+    expect(html).toContain('src="/images/services/email-otp.png"');
+  });
+
+  it("keeps the nine homepage icons under 20 KB in total at 64 px", () => {
+    const total = SERVICES.reduce(
+      (sum, base) => sum + statSync(`public/images/services/${base}-64.webp`).size,
+      0,
+    );
+    // 2,197 KB of masters before this pass.
+    expect(total, `${total} bytes for nine icons`).toBeLessThan(20_000);
   });
 });

@@ -12,7 +12,7 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **955 tests / 107 files, all passing** (no `.skip`, no `.only`) |
+| `npm test` | **959 tests / 107 files, all passing** (no `.skip`, no `.only`) |
 | `npm run build` | **passes**; 75 API route handlers, 23 public pages, 17 dashboard pages, 12 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
@@ -441,3 +441,54 @@ the page (sabotage-proven — adding a second `ServiceIcon` fails it with "appea
 the section eyebrow numbers run 01–07 with no gap. The existing eighteen homepage assertions —
 nine services present, no dashboard link for a signed-out visitor, `₦1,340` from the catalogue,
 no price on a free inbox, the fulfilment-allowlist agreement — all still hold.
+
+---
+
+## 19. Eleventh pass — the artwork stops shipping at full size (30 Oct 2026)
+
+Continuing the homepage assessment from §18, item 1: the icons were the heaviest thing on the
+busiest page.
+
+**Why it was happening.** `next.config.ts` sets `images.unoptimized: true`, so `next/image` hands
+the browser the file it is given. Every service icon is a 512×512 PNG master of 220–270 KB, drawn
+into slots of 20, 32, 48 and 64 px. The nine icons on the homepage came to **2,197 KB** of PNG to
+paint nine thumbnails, and the four category images added another 1.1 MB.
+
+**What changed.** `scripts/build-service-artwork.mjs` (`npm run artwork:build`) writes 64, 128 and
+192 px WebP derivatives next to each master, and `src/lib/service-artwork.ts` builds the `srcSet`.
+`ServiceIcon` and `CategoryIcon` render a plain `<img>` — not `next/image`, which cannot offer a
+`srcSet` when the optimiser is off — with `sizes` set to the slot width, so a 48 px slot on a 2×
+screen takes the 128 px file and nothing larger. The master PNG stays as the `src`, so a browser
+that will not take a WebP still works, and the masters remain the source of truth.
+
+| | Before | After |
+|---|---|---|
+| Nine homepage icons | 2,197 KB (PNG masters) | **6 KB** at 64 px, ~12 KB at 128 px |
+| Every derivative, both folders (39 files) | 3,325 KB of masters | **71 KB** of WebP |
+| Largest single icon request | 270 KB | 3.3 KB |
+
+The derivatives are committed, so a deploy never depends on the script having run. They are
+generated output: regenerate after changing a master, never edit one by hand.
+
+**Verified:** 959 tests / 107 files · typecheck · lint · build. Four new assertions in
+`src/test/service-logos.test.tsx` are on bytes rather than intent, because this regression is
+invisible — the page looks identical at 3,000 KB and at 6 KB: a derivative exists at every width,
+none is over 20 KB, the rendered `<img>` carries `srcSet` + `sizes="48px"` + the PNG fallback, and
+the nine 64 px icons total under 20 KB (sabotage-proven: dropping the `srcSet` fails with
+"expected … to contain 'srcSet='").
+
+### Not done: the hero photo (assessment item 2)
+
+The hero is still `https://images.pexels.com/...`, and it could not be brought in-house from here:
+this sandbox has no outbound access to `images.pexels.com` (`curl` fails at TLS with
+`SSL_ERROR_SYSCALL`), so the file cannot be copied into `public/`. Until it is local, the remote
+host has to stay in both `next.config.ts` (`images.remotePatterns`) and the CSP
+(`img-src https://images.pexels.com`). Two ways to finish it:
+
+1. **Owner drops the original file in** `public/images/hero/` (it is 1080×1260 today) — then I
+   generate 640/1080 WebP copies, point `PHOTOS.hero` at them, and delete both the remote pattern
+   and the CSP allowance. That is the strictly better outcome: no third-party host on the LCP
+   element.
+2. **Authorise a replacement** and I generate one locally — but that replaces a real photograph of
+   a person with a synthetic one, which is a branding decision, not a technical one.
+

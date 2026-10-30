@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { BrandIcon, type BrandIconProps } from "@/components/BrandIcon";
+import { artworkMaster, artworkSrcSet } from "@/lib/service-artwork";
 
 type DigitalServiceType = "netflix" | "spotify" | "youtube" | "disney" | "chatgpt" | "canva";
 type CoreServiceType = "numbers" | "esim" | "proxies" | "email-otp";
@@ -35,24 +35,25 @@ const digitalServiceBrands: Record<DigitalServiceType, BrandIconProps["brand"]> 
   canva: "canva",
 };
 
-const coreServiceImages: Record<CoreServiceType, string> = {
-  numbers: "/images/services/virtual-numbers.png",
-  esim: "/images/services/esim.png",
-  proxies: "/images/services/proxies.png",
-  "email-otp": "/images/services/email-otp.png",
+/** Artwork file stems, without size or extension — see `@/lib/service-artwork`. */
+const coreServiceArtwork: Record<CoreServiceType, string> = {
+  numbers: "virtual-numbers",
+  esim: "esim",
+  proxies: "proxies",
+  "email-otp": "email-otp",
 };
 
-const additionalServiceImages: Record<AdditionalServiceType, string> = {
-  accounts: "/images/services/digital-accounts.png",
-  data: "/images/services/data.png",
-  "gift-cards": "/images/services/gift-cards.png",
-  bulk: "/images/services/bulk.png",
-  scheduled: "/images/services/scheduled.png",
+const additionalServiceArtwork: Record<AdditionalServiceType, string> = {
+  accounts: "digital-accounts",
+  data: "data",
+  "gift-cards": "gift-cards",
+  bulk: "bulk",
+  scheduled: "scheduled",
 };
 
-const serviceImages: Record<Exclude<ServiceType, DigitalServiceType>, string> = {
-  ...coreServiceImages,
-  ...additionalServiceImages,
+const serviceArtwork: Record<Exclude<ServiceType, DigitalServiceType>, string> = {
+  ...coreServiceArtwork,
+  ...additionalServiceArtwork,
 };
 
 const serviceNames: Record<ServiceType, string> = {
@@ -95,7 +96,7 @@ export function ServiceIcon({ service, size = "md", className = "", decorative =
     );
   }
 
-  const imageSrc = (serviceImages as Record<string, string | undefined>)[service];
+  const art = (serviceArtwork as Record<string, string | undefined>)[service];
   const altText = decorative ? "" : serviceNames[service] || service;
 
   /*
@@ -107,7 +108,7 @@ export function ServiceIcon({ service, size = "md", className = "", decorative =
    * a call site casts past the type — and if it does, the honest answer is a
    * neutral tile that claims nothing rather than a wrong brand.
    */
-  if (!imageSrc) {
+  if (!art) {
     if (process.env.NODE_ENV !== "production") {
       console.error(`ServiceIcon: no artwork mapped for "${service}"`);
     }
@@ -129,11 +130,23 @@ export function ServiceIcon({ service, size = "md", className = "", decorative =
 
   return (
     <div className={`relative ${className}`} style={{ width: pixelSize, height: pixelSize }}>
-      <Image
-        src={imageSrc}
-        alt={altText}
+      {/*
+        A plain <img> rather than next/image: with the optimiser turned off,
+        next/image cannot offer a srcSet, and this is the whole point — a 64 px
+        slot should download the 64 px file (836 bytes) instead of the 270 KB
+        master. `sizes` is the slot width in CSS pixels, so a 2× screen picks
+        128 px and a 3× screen 192 px. The master stays as `src`.
+      */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={artworkMaster("services", art)}
+        srcSet={artworkSrcSet("services", art)}
+        sizes={`${pixelSize}px`}
         width={pixelSize}
         height={pixelSize}
+        alt={altText}
+        loading="lazy"
+        decoding="async"
         className="rounded-lg object-cover"
       />
     </div>
@@ -146,11 +159,11 @@ interface CategoryIconProps {
   className?: string;
 }
 
-const categoryImages: Record<CategoryType, string> = {
-  streaming: "/images/categories/streaming.png",
-  music: "/images/categories/music.png",
-  gaming: "/images/categories/gaming.png",
-  productivity: "/images/categories/productivity.png",
+const categoryArtwork: Record<CategoryType, string> = {
+  streaming: "streaming",
+  music: "music",
+  gaming: "gaming",
+  productivity: "productivity",
 };
 
 const categoryNames: Record<CategoryType, string> = {
@@ -165,11 +178,16 @@ export function CategoryIcon({ category, size = "md", className = "" }: Category
 
   return (
     <div className={`relative ${className}`} style={{ width: pixelSize, height: pixelSize }}>
-      <Image
-        src={categoryImages[category]}
-        alt={categoryNames[category]}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={artworkMaster("categories", categoryArtwork[category])}
+        srcSet={artworkSrcSet("categories", categoryArtwork[category])}
+        sizes={`${pixelSize}px`}
         width={pixelSize}
         height={pixelSize}
+        alt={categoryNames[category]}
+        loading="lazy"
+        decoding="async"
         className="rounded-lg object-cover"
       />
     </div>
