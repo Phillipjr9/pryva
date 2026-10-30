@@ -7,6 +7,7 @@ import { isPreviewDatabase } from "@/lib/demo-policy";
 import { logger } from "@/lib/logger";
 import { readJsonWithLimit } from "@/lib/request-body";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { resendConfigured } from "@/lib/resend-config";
 import { makeWalletEmail, type ResendPayload, type WalletEmailEvent } from "@/lib/wallet-email-template";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
@@ -19,10 +20,13 @@ type Claimed = { id: string; lock_token: string };
 type DispatchResult = "sent" | "retry" | "review" | "empty" | "throttled";
 class InvalidNotificationData extends Error {}
 
+/**
+ * Kept under its historical name because three call sites and the cron route
+ * already use it. The check itself now lives in `@/lib/resend-config` so the
+ * auth routes can share it without importing the wallet outbox.
+ */
 export function walletEmailConfigured(): boolean {
-  const key = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.RESEND_FROM_EMAIL?.trim();
-  return Boolean(key && from && from.length <= 255 && !/[\r\n]/.test(from));
+  return resendConfigured();
 }
 
 function validPayload(value: unknown): value is ResendPayload {
