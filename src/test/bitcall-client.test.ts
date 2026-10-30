@@ -15,6 +15,7 @@ import {
   listBitcallEsimCountries,
   listBitcallEsimOrders,
   listBitcallEsimPlans,
+  listBitcallEsimProfiles,
 } from "@/lib/bitcall";
 
 const KEY_ID = "ak_test_1a2b3c";
@@ -312,5 +313,43 @@ describe("eSIM ordering", () => {
 
     await expect(getBitcallEsimProfile("")).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
     await expect(getBitcallEsimProfile("x".repeat(41))).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("lists every profile held, so a lost activation code is recoverable without re-buying", async () => {
+    // Their docs: "A client that lost one can read it again from the profile."
+    // Without this the only route back is via the order that produced it, and
+    // re-buying would charge again for something already owned.
+    const fetchMock = vi.fn().mockImplementation(() => json({
+      data: [
+        { iccid: "8901000000000000001", status: "installed", activationCode: "LPA:1$a$ONE" },
+        { iccid: "8901000000000000002", status: "available", activationCode: "LPA:1$b$TWO" },
+      ],
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const profiles = await listBitcallEsimProfiles();
+    expect(profiles).toHaveLength(2);
+    expect(profiles[0]).toMatchObject({ iccid: "8901000000000000001", status: "installed" });
+    expect(profiles[1].activationCode).toBe("LPA:1$b$TWO");
+    expect(lastCall(fetchMock).url.pathname).toBe("/v1/esim/profiles");
+  });
+
+  it("drops rows with no ICCID and de-duplicates, because such a row cannot be re-read", async () => {
+    // A profile is addressed by its ICCID. A row without one cannot be matched to
+    // an order or fetched again, so surfacing it would offer a dead end.
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
+      data: [
+        { iccid: "8901000000000000001", activationCode: "LPA:1$a$ONE" },
+        { iccid: "8901000000000000001", activationCode: "LPA:1$a$ONE" },
+        { status: "installed", activationCode: "LPA:1$c$ORPHAN" },
+      ],
+    })));
+    const profiles = await listBitcallEsimProfiles();
+    expect(profiles).toHaveLength(1);
+    expect(profiles[0].iccid).toBe("8901000000000000001");
+  });
+
+  it("accepts a bare array as well as the documented envelope", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json([{ iccid: "8901000000000000009" }])));
+    expect(await listBitcallEsimProfiles()).toHaveLength(1);
   });
 });

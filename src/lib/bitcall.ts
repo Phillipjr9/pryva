@@ -490,16 +490,53 @@ export type BitcallEsimProfile = {
   appleInstallUrl: string | null;
 };
 
+/**
+ * One profile, parsed from a gateway row. Shared by the single-profile read and
+ * the collection so the two cannot drift apart on field spelling.
+ */
+function parseEsimProfile(row: unknown, fallbackIccid: string | null): BitcallEsimProfile {
+  const profile = asRecord(row);
+  return {
+    iccid: pickString(profile, ["iccid", "ICCID", "iccId"]) ?? fallbackIccid ?? "",
+    status: pickString(profile, ["status", "state"]),
+    activationCode: pickString(profile, ["activationCode", "activation_code", "lpa"]),
+    appleInstallUrl: pickString(profile, ["appleInstallUrl", "apple_install_url"]),
+  };
+}
+
 export async function getBitcallEsimProfile(iccid: string): Promise<BitcallEsimProfile> {
   const id = iccid.trim();
   if (!id || id.length > 40) throw new BitcallError("Invalid ICCID", 400, "VALIDATION_ERROR", null, ["iccid"]);
   const payload = await gatewayFetch("GET", `/v1/esim/profiles/${encodeURIComponent(id)}`);
   const envelope = asRecord(payload);
-  const profile = asRecord(envelope.data ?? envelope);
-  return {
-    iccid: id,
-    status: pickString(profile, ["status", "state"]),
-    activationCode: pickString(profile, ["activationCode", "activation_code", "lpa"]),
-    appleInstallUrl: pickString(profile, ["appleInstallUrl", "apple_install_url"]),
-  };
+  return parseEsimProfile(envelope.data ?? envelope, id);
+}
+
+/**
+ * Every eSIM profile the account holds, across all orders.
+ *
+ * This exists because their docs are explicit that a lost activation credential
+ * is recoverable: "A client that lost one can read it again from the profile."
+ * Without this call the only route back to a credential is through the order
+ * that produced it, which means a customer who lost a code after the order
+ * scrolled out of view has no way to recover it — and re-buying would charge
+ * again for something they already own.
+ *
+ * Rows carry the same bearer credential as the single-profile read, so the same
+ * handling applies: never logged, never in an error message, only ever returned
+ * to the authenticated owner.
+ */
+export async function listBitcallEsimProfiles(): Promise<BitcallEsimProfile[]> {
+  const payload = await gatewayFetch("GET", "/v1/esim/profiles");
+  const profiles: BitcallEsimProfile[] = [];
+  const seen = new Set<string>();
+  for (const row of rowsFrom(payload).slice(0, 2000)) {
+    const profile = parseEsimProfile(row, null);
+    // A profile is addressed by its ICCID. Without one it cannot be re-read or
+    // matched to an order, so it is not a usable row.
+    if (!profile.iccid || seen.has(profile.iccid)) continue;
+    seen.add(profile.iccid);
+    profiles.push(profile);
+  }
+  return profiles;
 }
