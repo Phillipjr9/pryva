@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { isPreviewDatabase } from "@/lib/demo-policy";
-import { formatNaira, serviceMap } from "@/lib/catalog";
+import { formatNaira } from "@/lib/catalog";
 import { ArrowRight, ArrowUpRight, Clock, Receipt, Search, Sparkle } from "@/components/icons";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 
@@ -147,7 +147,7 @@ export default async function OrdersPage({
         <EmptyState
           icon={Receipt}
           title="No orders yet"
-          body={isPreviewDatabase() ? "Your simulated orders and demo codes will appear here." : `Orders and their references appear here. Live number and inbox fulfillment is paused; catalog prices start at ${formatNaira(serviceMap.numbers.fromPrice)} and ${formatNaira(serviceMap["email-otp"].fromPrice)} respectively.`}
+          body={isPreviewDatabase() ? "Your simulated orders and demo codes will appear here." : "Orders and their references appear here. Temporary inboxes are free and never create an order, so they do not appear in this list."}
           action={isPreviewDatabase() ? { label: "Explore demo services", href: "/dashboard/services" } : { label: "Browse pricing", href: "/pricing" }}
         />
       ) : matches.length === 0 ? (

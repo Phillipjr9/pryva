@@ -54,7 +54,7 @@ function matchesCountry(providerCountry: string | null, selectedCode: string): b
   return (country.code === "gb" && value === "uk") || (country.code === "us" && (value === "usa" || value === "united states of america"));
 }
 
-function retail(cost: number | null, service: "numbers" | "email-otp"): number | null {
+function retail(cost: number | null, service: "numbers"): number | null {
   if (typeof cost !== "number" || !Number.isFinite(cost) || cost < 1 || cost > 50_000_000) return null;
   const price = priceFromCost(Math.ceil(cost), { service }).priceNgn;
   return Number.isSafeInteger(price) && price > 0 && isPriceInBand(price, cost) ? price : null;
@@ -91,9 +91,13 @@ export function supplierItemsForCountry(snapshot: SupplierSnapshot, countryCode:
     const id = readable(entry.id, 120), name = readable(entry.name, 80) ?? readable(entry.domain, 80);
     if (!id || !name) continue;
     add({
-      id: itemId("email", id, "global"), category: "email", name, description: "Temporary email listing", tag: "Email OTP",
+      id: itemId("email", id, "global"), category: "email", name, description: "Free temporary inbox", tag: "Free",
       artwork: { kind: "service", name: "email-otp" }, source: "live", coverage: "not-country-specific",
-      stock: safeUnitCount(entry.stock), myUnits: null, price: retail(entry.priceNgn, "email-otp"), action: null,
+      // No price, and deliberately so. What the feed charges us per inbox is our
+      // cost of running a free tool, not a price a customer sees. Marking it up
+      // here would put a number on something we have decided to give away, and
+      // `retail()` would happily compute one -- so it is not called at all.
+      stock: safeUnitCount(entry.stock), myUnits: null, price: null, action: null,
     });
   }
   for (const entry of snapshot.rentals) {

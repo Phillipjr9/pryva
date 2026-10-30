@@ -59,7 +59,7 @@ const shortcuts = shortcutSlugs.map((slug) => {
     numbers: "Buy or rent",
     esim: "Plan catalog",
     proxies: "Plan catalog",
-    "email-otp": "Temporary inboxes",
+    "email-otp": "Free temporary inbox",
   };
   return {
     label: service.name,
@@ -135,7 +135,7 @@ const priceRows = [
   { slug: "numbers", note: "One-time, or rent for 7–90 days" },
   { slug: "esim", note: "Catalog data plans" },
   { slug: "proxies", note: "Catalog proxy plans" },
-  { slug: "email-otp", note: "From 24 hours to 30 days" },
+  { slug: "email-otp", note: "Free, one inbox at a time" },
 ] as const;
 
 const faqs = [
@@ -361,8 +361,14 @@ export default async function HomePage() {
                     <p className="text-[0.88rem] font-semibold text-ink">{item.label}</p>
                     <p className="text-[0.7rem] text-ink-3">{item.note}</p>
                     <p className="mt-2 text-[0.76rem] text-ink-2">
-                      From{" "}
-                      <span className="font-semibold text-lav-700">{formatNaira(item.price)}</span>
+                      {item.price === undefined ? (
+                        <span className="font-semibold text-lav-700">Free</span>
+                      ) : (
+                        <>
+                          From{" "}
+                          <span className="font-semibold text-lav-700">{formatNaira(item.price)}</span>
+                        </>
+                      )}
                     </p>
                   </div>
                 </Link>
@@ -445,7 +451,10 @@ export default async function HomePage() {
                     <div className="relative mt-5 flex items-end justify-between gap-3 border-t border-line/80 pt-4">
                       <div className="min-w-0">
                         <p className="text-[0.78rem] text-ink-3">
-                          {service.slug === "accounts" ? "See live listings" : <>
+                          {service.slug === "accounts" ? "See live listings"
+                            : service.fromPrice === undefined ? <>
+                            Free
+                          </> : <>
                             Catalog from{" "}
                             <span className="text-[1rem] font-semibold text-ink">{formatNaira(service.fromPrice)}</span>{" "}
                             <span className="text-[0.72rem]">{service.unit}</span>
@@ -846,10 +855,16 @@ export default async function HomePage() {
                         <p className="truncate text-[0.74rem] text-ink-3">{row.note}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[0.66rem] uppercase tracking-[0.1em] text-ink-3">from</p>
-                        <p className="text-[0.95rem] font-semibold text-ink">
-                          {formatNaira(service.fromPrice)}
-                        </p>
+                        {service.fromPrice === undefined ? (
+                          <p className="text-[0.95rem] font-semibold text-lav-700">Free</p>
+                        ) : (
+                          <>
+                            <p className="text-[0.66rem] uppercase tracking-[0.1em] text-ink-3">from</p>
+                            <p className="text-[0.95rem] font-semibold text-ink">
+                              {formatNaira(service.fromPrice)}
+                            </p>
+                          </>
+                        )}
                       </div>
                       <ArrowUpRight className="h-4 w-4 shrink-0 text-ink-3 transition-colors group-hover:text-lav-600" />
                     </Link>

@@ -40,7 +40,19 @@ export type Service = {
   tagline: string;
   description: string;
   intro: string;
-  fromPrice: number;
+  /**
+   * The cheapest way to buy into this service — or absent, when the service is
+   * not something a customer buys at all.
+   *
+   * This is optional on purpose. `services` below derives it from real plan
+   * prices, but falls back to whatever the definition hand-set when a service
+   * has no plans. That fallback is how a price survives the deletion of the
+   * thing it priced: removing every plan from a paid service would leave its
+   * hand-set `fromPrice` rendering on the homepage as though nothing changed.
+   * A free service therefore has no value here, and every consumer must decide
+   * what to render instead of being handed a number it can display blindly.
+   */
+  fromPrice?: number;
   unit: string;
   icon: "phone" | "sim" | "globe" | "mail" | "accounts" | "gift" | "package" | "calendar";
   highlights: { title: string; body: string }[];
@@ -112,20 +124,21 @@ const serviceDefinitions: Service[] = [
   },
   {
     slug: "email-otp", name: "Email OTP", shortName: "Email OTP", href: "/email-otp",
-    eyebrow: "Temporary inbox plans", tagline: "Explore temporary inbox plans.",
-    description: "Browse temporary inbox plans by duration. Email OTP plans are not available for purchase yet.",
-    intro: "Compare temporary inbox plans. Email OTP cannot be delivered yet, so it cannot be ordered or charged.",
-    fromPrice: 790, unit: "per inbox", icon: "mail",
+    eyebrow: "Free temporary inbox", tagline: "A free temporary inbox, one at a time.",
+    description: "Create a temporary inbox, read what arrives in it, and discard it when you are done. It is free — there is nothing here to buy.",
+    intro: "Temporary inboxes are free and are not a paid plan. Nothing in this category is ordered or charged.",
+    unit: "free", icon: "mail",
     highlights: [
-      { title: "Compare durations", body: "Review the durations listed in the catalog." },
-      { title: "Check platform rules", body: "Some services do not accept temporary email addresses." },
-      { title: "Not available yet", body: "Temporary inboxes cannot be delivered yet, so nothing here can be ordered or charged." },
+      { title: "Free, not a plan", body: "A temporary inbox costs nothing. It is not bought, ordered or charged, so it never appears in pricing." },
+      { title: "One at a time", body: "Each account keeps one active inbox. Discard it to create the next one." },
+      { title: "Check platform rules", body: "Some services do not accept temporary email addresses. Never use one for an account you need to recover later." },
     ],
-    included: ["Catalog plan comparisons", "Naira pricing", "Duration comparison"],
-    goodFor: ["Testing plans", "Privacy guides", "Duration comparison"],
+    included: ["A temporary address", "A live view of what it receives", "One-tap discard"],
+    goodFor: ["A one-off signup", "Keeping your real address private", "Reading a single verification code"],
     faqs: [
-      { q: "Can I buy a temporary inbox now?", a: "No. Email OTP plans are not available for purchase yet." },
-      { q: "Will every platform accept a temporary email?", a: "No. Check the platform's terms and restrictions." },
+      { q: "Does a temporary inbox cost anything?", a: "No. It is free, and nothing here is ordered or charged." },
+      { q: "How many inboxes can I have?", a: "One active inbox at a time. Discard it to create another." },
+      { q: "Will every platform accept a temporary email?", a: "No. Check the platform's terms and restrictions first, and never use a temporary address for anything you will need to recover later." },
     ],
   },
   {
@@ -350,29 +363,19 @@ const planDefinitions: PlanDefinition[] = [
     region: "Nigeria", flag: "🇳🇬", duration: "30 days to use",
     badge: "Scale", features: ["25GB residential traffic", "Priority pool", "HTTP/SOCKS5"],
   },
-  // Email OTP
-  {
-    slug: "email-24", service: "email-otp", name: "Quick inbox", planLabel: "1 inbox · 24 hours",
-    region: "Any domain", flag: "✉️", duration: "Expires after 24 hours",
-    popular: true, highlight: "Ideal for a single signup or trial",
-    features: ["Unique address instantly", "Live OTP view", "No forwarding"]
-  },
-  {
-    slug: "email-30", service: "email-otp", name: "Long inbox", planLabel: "1 inbox · 30 days",
-    region: "Any domain", flag: "✉️", duration: "Active for 30 days",
-    features: ["Keep the same address", "Unlimited signups", "Live OTP view"]
-  },
-  {
-    slug: "email-bundle", service: "email-otp", name: "Inbox bundle", planLabel: "5 inboxes · 7 days",
-    region: "Any domain", flag: "📬", duration: "Active for 7 days",
-    compareAt: 3500, badge: "Save 48%",
-    features: ["5 isolated inboxes", "Label by project", "Live OTP view"]
-  },
-  {
-    slug: "email-team", service: "email-otp", name: "Team bundle", planLabel: "20 inboxes · 30 days",
-    region: "Any domain", flag: "📬", duration: "Active for 30 days",
-    badge: "For QA teams", features: ["20 isolated inboxes", "Shared team access", "Live OTP view"]
-  },
+  // Email OTP has no plans, deliberately.
+  //
+  // It used to carry four duration tiers (email-24, email-30, email-bundle,
+  // email-team). They could never be delivered: the provider's email products
+  // expose no duration, so a 24-hour inbox and a 30-day inbox are the same
+  // purchase upstream and each tier promised something we could not honour.
+  //
+  // They are not replaced by another paid tier either. A disposable inbox is a
+  // commodity whose effective market price is zero -- free services hand one out
+  // in a click -- so charging for one was never going to sell. The inbox is now
+  // a free tool attached to an account rather than a product, which is why it
+  // has no plan here, no cost-sheet entry, and no price anywhere in the
+  // catalogue. See src/lib/disposable-email.ts.
 ];
 
 /**
