@@ -104,6 +104,7 @@ describe("what the storefront actually receives", () => {
     const allowed = [
       "id", "slug", "title", "stock", "sold", "category", "subcategory",
       "priceNgn", "warrantyDays", "minQuantity", "maxQuantity", "available", "fulfilment",
+      "purchasable",
     ];
     for (const listing of body.listings) {
       expect(Object.keys(listing).sort()).toEqual([...allowed].sort());
