@@ -131,7 +131,7 @@ export default async function AdminMarginPage() {
               },
             ].map((tile) => (
               <div key={tile.label} className="rounded-xl border border-line bg-white/70 p-4">
-                <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-ink-3">
+                <p className="text-meta font-semibold uppercase tracking-[0.14em] text-ink-3">
                   {tile.label}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-ink">{tile.value}</p>
@@ -142,7 +142,7 @@ export default async function AdminMarginPage() {
           <div className="overflow-x-auto rounded-xl border border-line bg-white/70">
             <table className="w-full min-w-[44rem] text-sm">
               <thead>
-                <tr className="border-b border-line text-left text-[0.7rem] uppercase tracking-[0.12em] text-ink-3">
+                <tr className="border-b border-line text-left text-meta uppercase tracking-[0.12em] text-ink-3">
                   <th className="px-3 py-2.5 font-semibold">Product</th>
                   <th className="px-3 py-2.5 text-right font-semibold">Units</th>
                   <th className="px-3 py-2.5 text-right font-semibold">Revenue</th>
@@ -158,7 +158,7 @@ export default async function AdminMarginPage() {
                     <tr key={row.slug} className="border-b border-line/60 last:border-0">
                       <td className="px-3 py-2.5">
                         <span className="font-medium text-ink">{row.name}</span>
-                        <span className="ml-2 text-[0.72rem] text-ink-3">{row.slug}</span>
+                        <span className="ml-2 text-meta text-ink-3">{row.slug}</span>
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-ink-2">{row.units}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-ink-2">
@@ -169,13 +169,13 @@ export default async function AdminMarginPage() {
                       </td>
                       <td className="px-3 py-2.5 text-right">
                         <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-[0.72rem] font-semibold tabular-nums ${
+                          className={`inline-flex rounded-full px-2 py-0.5 text-meta font-semibold tabular-nums ${
                             below ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"
                           }`}
                         >
                           {row.ratio === null ? "—" : `${(row.ratio * 100).toFixed(1)}%`}
                         </span>
-                        {below && <span className="ml-1.5 text-[0.7rem] text-red-600">below floor</span>}
+                        {below && <span className="ml-1.5 text-meta text-red-600">below floor</span>}
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-ink-2">{row.refunds}</td>
                     </tr>
@@ -186,12 +186,12 @@ export default async function AdminMarginPage() {
           </div>
 
           {unmeasurable.length > 0 && (
-            <p className="text-[0.78rem] text-ink-3">
+            <p className="text-meta text-ink-3">
               {unmeasurable.length} product(s) have orders but no recorded cost yet:{" "}
               {unmeasurable.map((row) => row.slug).join(", ")}.
             </p>
           )}
-          <p className="text-[0.78rem] text-ink-3">
+          <p className="text-meta text-ink-3">
             Aggregated from the {recent.length} most recent orders. Refunds count their cost but not
             their revenue.
           </p>

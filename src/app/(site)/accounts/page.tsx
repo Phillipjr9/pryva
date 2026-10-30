@@ -37,7 +37,7 @@ export default function AccountsPage() {
         <div className="shell py-14 sm:py-20">
           <div className="max-w-3xl">
             <ServiceIcon service="accounts" size="lg" className="mb-5" />
-            <span className="inline-flex items-center gap-2 rounded-full border border-lav-200 bg-white px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-lav-800">
+            <span className="inline-flex items-center gap-2 rounded-full border border-lav-200 bg-white px-3 py-1 text-meta font-semibold uppercase tracking-[0.16em] text-lav-800">
               Digital accounts
             </span>
             <h1 className="mt-5 text-[2.1rem] font-semibold leading-[1.1] tracking-tight text-ink sm:text-[2.9rem]">

@@ -101,7 +101,7 @@ export function FulfilmentControl({ orderId, reference, quantity, status }: Prop
 
       {mode === "deliver" && (
         <div className="min-w-0 space-y-2">
-          <label className="block text-[0.78rem] font-medium text-ink-2" htmlFor={`creds-${orderId}`}>
+          <label className="block text-meta font-medium text-ink-2" htmlFor={`creds-${orderId}`}>
             One credential per line — exactly {quantity} needed ({lines.length} entered)
           </label>
           <textarea
@@ -111,7 +111,7 @@ export function FulfilmentControl({ orderId, reference, quantity, status }: Prop
             rows={Math.min(8, Math.max(3, quantity + 1))}
             spellCheck={false}
             autoComplete="off"
-            className="w-full min-w-0 rounded-xl border border-line bg-white px-3 py-2 font-mono text-[0.78rem] text-ink"
+            className="w-full min-w-0 rounded-xl border border-line bg-white px-3 py-2 font-mono text-meta text-ink"
             placeholder="login|password|recovery"
           />
           <div className="flex flex-wrap gap-2">
@@ -137,7 +137,7 @@ export function FulfilmentControl({ orderId, reference, quantity, status }: Prop
 
       {mode === "unavailable" && (
         <div className="min-w-0 space-y-2">
-          <label className="block text-[0.78rem] font-medium text-ink-2" htmlFor={`reason-${orderId}`}>
+          <label className="block text-meta font-medium text-ink-2" htmlFor={`reason-${orderId}`}>
             Why it could not be sourced (shown on the refund record)
           </label>
           <input

@@ -46,7 +46,7 @@ export default async function SecurityPage() {
           </p>
           <Link
             href="/dashboard/settings"
-            className="mt-3 inline-flex items-center gap-1 text-[0.76rem] font-semibold text-lav-700 hover:underline"
+            className="mt-3 inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline"
           >
             Change password <ArrowRight className="h-3 w-3" />
           </Link>

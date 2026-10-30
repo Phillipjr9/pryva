@@ -59,7 +59,7 @@ export default async function DashboardReviewsPage() {
                       {review.productName}
                       <span className="ml-2 font-normal text-ink-3">{review.rating} / 5</span>
                     </span>
-                    <span className={`rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${status.className}`}>
+                    <span className={`rounded-full border px-2.5 py-1 text-micro font-semibold ${status.className}`}>
                       {status.label}
                     </span>
                   </div>
@@ -70,14 +70,14 @@ export default async function DashboardReviewsPage() {
                     {review.body}
                   </p>
                   {review.status === "rejected" && review.moderatorNote && (
-                    <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[0.78rem] text-red-700">
+                    <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-meta text-red-700">
                       Why it was not published: {review.moderatorNote}
                     </p>
                   )}
                   {review.status === "published" && (
                     <Link
                       href="/reviews"
-                      className="mt-3 inline-block text-[0.78rem] font-semibold text-lav-700 hover:underline"
+                      className="mt-3 inline-block text-meta font-semibold text-lav-700 hover:underline"
                     >
                       See it on the public page
                     </Link>

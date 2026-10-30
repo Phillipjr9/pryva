@@ -92,7 +92,7 @@ export function SiteFooter() {
               Pryva is a Nigerian digital services platform for virtual numbers, eSIM data,
               residential proxies and email OTP. Built for people who value calm, reliable access.
             </p>
-            <div className="mt-5 flex flex-wrap items-center gap-2 text-[0.7rem] font-semibold text-ink-2">
+            <div className="mt-5 flex flex-wrap items-center gap-2 text-meta font-semibold text-ink-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/80 px-2.5 py-1.5">
                 <Card className="h-3.5 w-3.5 text-lav-600" />
                 Bank transfer
@@ -115,7 +115,7 @@ export function SiteFooter() {
                 Nigerian digital services — numbers, data, proxies and accounts, priced in Naira.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5 text-[0.76rem] text-ink-3">
+            <div className="flex flex-wrap items-center gap-1.5 text-meta text-ink-3">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/80 px-2.5 py-1.5">
                 <Shield className="h-3.5 w-3.5 text-lav-600" />
                 Paystack when configured
@@ -130,7 +130,7 @@ export function SiteFooter() {
           <div className="mt-8 grid grid-cols-2 gap-8 sm:grid-cols-3">
             {columns.map((column) => (
               <div key={column.title}>
-                <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-ink-3">
+                <p className="text-meta font-semibold uppercase tracking-[0.18em] text-ink-3">
                   {column.title}
                 </p>
                 <ul className="mt-4 space-y-2.5">
@@ -150,7 +150,7 @@ export function SiteFooter() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-line py-6 text-[0.76rem] text-ink-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-t border-line py-6 text-meta text-ink-3 sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} Pryva Technologies. Made in Lagos, for Nigeria.</p>
           <div className="flex flex-wrap items-center gap-4">
             <span className="inline-flex items-center gap-1.5">

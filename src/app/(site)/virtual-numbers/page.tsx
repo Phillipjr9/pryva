@@ -35,7 +35,7 @@ export default async function VirtualNumbersPage() {
         <div className="shell">
           <div className="max-w-3xl">
             <ServiceIcon service="numbers" size="lg" className="mb-5" />
-            <span className="inline-block rounded-full bg-lav-100 px-4 py-1.5 text-[0.78rem] font-semibold text-lav-700 mb-4">
+            <span className="inline-block rounded-full bg-lav-100 px-4 py-1.5 text-meta font-semibold text-lav-700 mb-4">
               {service.eyebrow}
             </span>
             <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3.5rem]">
@@ -44,7 +44,7 @@ export default async function VirtualNumbersPage() {
             <p className="mt-6 text-[1.1rem] text-ink-2 leading-relaxed">
               {service.description}
             </p>
-            <div className="mt-8 flex gap-4">
+            <div className="mt-8 flex flex-wrap gap-3 sm:gap-4">
               <Link
                 href="/signup"
                 className="inline-flex items-center gap-2 rounded-xl bg-lav-600 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-700"
@@ -132,7 +132,7 @@ export default async function VirtualNumbersPage() {
               >
                 {plan.popular && (
                   <div className="mb-4">
-                    <span className="inline-block rounded-full bg-lav-100 px-3 py-1 text-[0.72rem] font-semibold text-lav-700">
+                    <span className="inline-block rounded-full bg-lav-100 px-3 py-1 text-meta font-semibold text-lav-700">
                       Most Popular
                     </span>
                   </div>

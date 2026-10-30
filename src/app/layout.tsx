@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-page-custom-font -- fonts are loaded once in the shared App Router root layout. */
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -49,6 +49,26 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Declared explicitly rather than relying on Next's default.
+ *
+ * `width=device-width, initial-scale=1` is what makes a phone lay the page out
+ * at its own width instead of a 980px desktop viewport. `viewport-fit=cover`
+ * lets the dashboard's bottom tab bar sit against the home indicator, and
+ * `colorScheme: "light"` stops iOS drawing dark form controls on a light page.
+ *
+ * `maximumScale` and `userScalable: false` are deliberately absent: pinch-zoom
+ * has to keep working, and turning it off is the usual way a "fix" for small
+ * text makes the page unusable for anyone who needs it.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#faf7f1",
+  colorScheme: "light",
+};
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
@@ -59,7 +79,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap"
         />
-        <meta name="theme-color" content="#faf7f1" />
         <noscript>
           <style>{`.reveal{opacity:1 !important;transform:none !important}`}</style>
         </noscript>

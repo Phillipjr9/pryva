@@ -12,7 +12,7 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **959 tests / 107 files, all passing** (no `.skip`, no `.only`) |
+| `npm test` | **968 tests / 108 files, all passing** (no `.skip`, no `.only`) |
 | `npm run build` | **passes**; 75 API route handlers, 23 public pages, 17 dashboard pages, 12 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
@@ -491,4 +491,40 @@ host has to stay in both `next.config.ts` (`images.remotePatterns`) and the CSP
    element.
 2. **Authorise a replacement** and I generate one locally — but that replaces a real photograph of
    a person with a synthetic one, which is a branding decision, not a technical one.
+
+---
+
+## 20. Twelfth pass — the site on a phone (30 Oct 2026)
+
+**The report:** on a phone, the visitor had to adjust the zoom to use the site. That is three
+separate faults, and only the third one is a layout bug.
+
+| Cause | Measured | Fixed by |
+|---|---|---|
+| The small print was genuinely tiny | **369** separate `text-[0.5…0.79rem]` declarations across 72 files, the smallest **9.3 px** — a badge, a table header, a price note | two named steps, `text-micro` and `text-meta`, with a **13 px floor below `sm`**. Desktop keeps the sizes the design was drawn at; a phone never goes below 13 px |
+| iOS zoomed the page itself | `.field` is `0.92rem` = **14.7 px**. Safari zooms the whole page in when a focused control is under 16 px, and does not zoom back out | form controls set to **16 px below `sm`** — the threshold, not a preference |
+| Tables were clipped, not scrollable | six tables in `overflow-hidden` wrappers (admin orders, users, audit, reconciliation; cookie and refund policy), two with `whitespace-nowrap` cells | `overflow-x-auto` plus a `min-w` on each, so the columns scroll instead of disappearing |
+
+**Also corrected while in there:** an explicit `viewport` export (`width=device-width`,
+`initial-scale=1`, `viewport-fit=cover` for the dashboard's bottom tab bar, `colorScheme: "light"`
+so iOS does not draw dark controls on a cream page) — and deliberately **no** `maximum-scale` or
+`user-scalable: no`, because disabling pinch-zoom is how a fix like this usually makes a page
+unusable for the people who need it; `-webkit-text-size-adjust: 100%` so rotating the device does
+not re-inflate the type; `overflow-x: clip` on `html` as a guard against a stray decorative blur
+(`clip`, not `hidden`, so the sticky header and fixed tab bar keep working); the hero call-to-action
+rows wrap instead of overflowing at 320 px; and the wallet's three money columns stack to one on a
+phone, where three columns of truncated currency hid the balance.
+
+**Verified:** 968 tests / 108 files · typecheck · lint · build. New file
+`src/test/mobile-layout.test.tsx` (9 tests): no unprefixed text under 0.8 rem anywhere (only
+`sm:`-prefixed desktop overrides may be small), both steps defined with the 639 px floor, controls
+at 16 px, `overflow-x: clip` and not `hidden`, no `maximumScale`/`userScalable`, no table wrapped in
+`overflow-hidden`, and every table in a scroll container. Sabotage-proven three ways: dropping the
+16 px rule, re-clipping the orders table (fails both table tests), and re-adding one `text-[0.7rem]`
+all fail.
+
+**What this pass could not do:** there is no browser in this environment, so this is verified at the
+source, CSS and served-HTML level — not by looking at a 360 px render. The counts above are real;
+the pixel result is not something I can claim to have seen. A pass on an actual handset is still
+worth doing before calling mobile done.
 

@@ -128,7 +128,7 @@ export function RefundsConsole() {
               setFilter(option.value);
               setLoading(true);
             }}
-            className={`rounded-full px-3 py-1.5 text-[0.78rem] font-semibold transition-colors sm:px-4 sm:py-2 ${
+            className={`rounded-full px-3 py-1.5 text-meta font-semibold transition-colors sm:px-4 sm:py-2 ${
               filter === option.value ? "bg-ink text-white" : "text-ink-2 hover:bg-lav-50"
             }`}
           >
@@ -164,7 +164,7 @@ export function RefundsConsole() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="font-medium text-ink">{order.productName}</p>
-                    <p className="mt-0.5 text-[0.78rem] text-ink-3">
+                    <p className="mt-0.5 text-meta text-ink-3">
                       {order.reference} · <span className="uppercase">{order.status}</span> ·{" "}
                       {when(order.createdAt)}
                     </p>
@@ -173,13 +173,13 @@ export function RefundsConsole() {
                 </div>
 
                 {refunded ? (
-                  <p className="mt-3 text-[0.78rem] text-emerald-700">
+                  <p className="mt-3 text-meta text-emerald-700">
                     Refunded {when(order.refundedAt)}
                   </p>
                 ) : (
                   <div className="mt-3 space-y-2.5">
                     {needsConfirmation && (
-                      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[0.78rem] text-amber-900">
+                      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-meta text-amber-900">
                         This order is under review, so its provider outcome was never verified. The
                         unit may still be live. Confirm you have reconciled it and say why.
                       </p>
@@ -195,7 +195,7 @@ export function RefundsConsole() {
                       className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-lav-400"
                     />
                     {needsConfirmation && (
-                      <label className="flex items-start gap-2 text-[0.78rem] text-ink-2">
+                      <label className="flex items-start gap-2 text-meta text-ink-2">
                         <input
                           type="checkbox"
                           checked={confirmed[order.id] ?? false}

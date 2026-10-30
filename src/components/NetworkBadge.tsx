@@ -56,7 +56,7 @@ export function NetworkBadge({
         role="img"
         aria-label={networkName(provider)}
         title={networkName(provider)}
-        className={`inline-flex items-center justify-center rounded-lg bg-lav-100 text-[0.7rem] font-semibold text-lav-700 ${className}`}
+        className={`inline-flex items-center justify-center rounded-lg bg-lav-100 text-meta font-semibold text-lav-700 ${className}`}
         style={{ width: size, height: size, flex: "0 0 auto" }}
       >
         {networkName(provider).slice(0, 3)}

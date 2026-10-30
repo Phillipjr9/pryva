@@ -123,7 +123,7 @@ export default async function AdminAuditPage({
           </p>
         </div>
         <div className="rounded-xl border border-line bg-white px-4 py-2 text-right">
-          <p className="text-[0.7rem] uppercase tracking-wide text-ink-3">Entries</p>
+          <p className="text-meta uppercase tracking-wide text-ink-3">Entries</p>
           <p className="text-[1rem] font-semibold text-ink">{Number(total).toLocaleString("en-NG")}</p>
         </div>
       </div>
@@ -159,9 +159,9 @@ export default async function AdminAuditPage({
         </form>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-line bg-white">
-        <table className="w-full text-left text-[0.84rem]">
-          <thead className="bg-cream/70 text-[0.72rem] uppercase tracking-wide text-ink-3">
+      <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+        <table className="w-full min-w-[36rem] text-left text-[0.84rem]">
+          <thead className="bg-cream/70 text-meta uppercase tracking-wide text-ink-3">
             <tr>
               <th className="px-4 py-3 font-semibold">When</th>
               <th className="px-4 py-3 font-semibold">Administrator</th>
@@ -179,11 +179,11 @@ export default async function AdminAuditPage({
             )}
             {rows.map((row) => (
               <tr key={row.id} className="border-t border-line/70 align-top">
-                <td className="whitespace-nowrap px-4 py-3 text-[0.78rem] text-ink-3">{formatDate(row.createdAt)}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-meta text-ink-3">{formatDate(row.createdAt)}</td>
                 <td className="px-4 py-3 text-[0.8rem] text-ink-2">{row.actorEmail}</td>
                 <td className="px-4 py-3">
                   <p className="font-medium text-ink">{ACTION_LABELS[row.action] ?? row.action}</p>
-                  <p className="font-mono text-[0.7rem] text-ink-3">
+                  <p className="font-mono text-meta text-ink-3">
                     {row.targetType}:{row.targetId}
                   </p>
                 </td>

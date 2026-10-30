@@ -87,7 +87,7 @@ export function DataPlansForm({ user, initialPlanId }: DataPlansFormProps) {
         </div>
       </div>
 
-      <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[0.76rem] text-amber-900">
+      <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-meta text-amber-900">
         Data plans cannot be delivered yet, so nothing on this page can be ordered or charged.
       </p>
 

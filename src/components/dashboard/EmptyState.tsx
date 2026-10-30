@@ -36,7 +36,7 @@ export function EmptyState({
           {action && (
             <Link
               href={action.href}
-              className="btn btn-primary !px-4 !py-2.5 !text-[0.78rem]"
+              className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.78rem]"
             >
               {action.label}
               <ArrowRight className="h-3.5 w-3.5" />
@@ -45,7 +45,7 @@ export function EmptyState({
           {secondary && (
             <Link
               href={secondary.href}
-              className="text-[0.78rem] font-semibold text-lav-700 hover:underline"
+              className="text-meta font-semibold text-lav-700 hover:underline"
             >
               {secondary.label}
             </Link>

@@ -102,7 +102,7 @@ export default async function OrdersPage({
             Every number, eSIM, proxy pack and inbox you&apos;ve bought — with codes kept safe.
           </p>
         </div>
-        <Link href={isPreviewDatabase() ? "/dashboard/services" : "/pricing"} className="btn btn-primary !px-4 !py-2.5 !text-[0.78rem]">
+        <Link href={isPreviewDatabase() ? "/dashboard/services" : "/pricing"} className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.78rem]">
           <Sparkle className="h-3.5 w-3.5" /> New order
         </Link>
       </div>
@@ -117,7 +117,7 @@ export default async function OrdersPage({
                   key={filter.key}
                   href={hrefFor(filter.key)}
                   aria-current={active ? "page" : undefined}
-                  className={`rounded-full border px-3 py-1.5 text-[0.74rem] font-semibold transition-colors ${
+                  className={`rounded-full border px-3 py-1.5 text-meta font-semibold transition-colors ${
                     active
                       ? "border-ink bg-ink text-white"
                       : "border-line bg-white/70 text-ink-2 hover:border-lav-200"
@@ -137,7 +137,7 @@ export default async function OrdersPage({
               defaultValue={q}
               placeholder="Search reference or product"
               aria-label="Search orders"
-              className="w-full rounded-full border border-line bg-white py-2 pl-9 pr-3 text-[0.78rem] text-ink outline-none placeholder:text-ink-3 focus:border-lav-300"
+              className="w-full rounded-full border border-line bg-white py-2 pl-9 pr-3 text-meta text-ink outline-none placeholder:text-ink-3 focus:border-lav-300"
             />
           </form>
         </div>
@@ -161,11 +161,11 @@ export default async function OrdersPage({
         <div className="grid gap-5">
           {grouped.map((group) => (
             <section key={group.label} className="grid gap-2">
-              <h2 className="px-1 text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
+              <h2 className="px-1 text-micro font-semibold uppercase tracking-[0.16em] text-ink-3">
                 {group.label}
               </h2>
               <div className="overflow-hidden rounded-[1.5rem] border border-line bg-[#fffdfa]">
-                <div className="hidden grid-cols-[1.6fr_0.9fr_0.7fr_0.6fr_0.3fr] gap-3 border-b border-line px-5 py-3 text-[0.64rem] font-semibold uppercase tracking-[0.14em] text-ink-3 md:grid">
+                <div className="hidden grid-cols-[1.6fr_0.9fr_0.7fr_0.6fr_0.3fr] gap-3 border-b border-line px-5 py-3 text-micro font-semibold uppercase tracking-[0.14em] text-ink-3 md:grid">
                   <span>Order</span>
                   <span>Placed</span>
                   <span>Amount</span>
@@ -186,12 +186,12 @@ export default async function OrdersPage({
                           <p className="truncate text-[0.87rem] font-semibold text-ink">
                             {order.productName}
                           </p>
-                          <p className="truncate text-[0.7rem] text-ink-3">
+                          <p className="truncate text-meta text-ink-3">
                             {order.planLabel} · {order.reference}
                           </p>
                         </div>
                         <div className="flex items-center justify-between gap-2 md:block">
-                          <p className="text-[0.76rem] text-ink-2">{dayLabel(new Date(order.createdAt))}</p>
+                          <p className="text-meta text-ink-2">{dayLabel(new Date(order.createdAt))}</p>
                           <p className="text-[0.82rem] font-semibold text-ink md:hidden">
                             {formatNaira(order.amount)}
                           </p>
@@ -201,12 +201,12 @@ export default async function OrdersPage({
                         </p>
                         <div className="flex items-center gap-2">
                           <span
-                            className={`inline-flex w-fit items-center rounded-full px-2.5 py-1 text-[0.64rem] font-semibold capitalize ${statusStyle(order.status)}`}
+                            className={`inline-flex w-fit items-center rounded-full px-2.5 py-1 text-micro font-semibold capitalize ${statusStyle(order.status)}`}
                           >
                             {order.status}
                           </span>
                           {live && order.otpCode && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-lav-50 px-2 py-1 text-[0.62rem] font-semibold text-lav-700">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-lav-50 px-2 py-1 text-micro font-semibold text-lav-700">
                               <Clock className="h-2.5 w-2.5" /> Code live
                             </span>
                           )}
@@ -214,7 +214,7 @@ export default async function OrdersPage({
                         <span className="hidden justify-self-end text-ink-3 md:block">
                           <ArrowUpRight className="h-4 w-4" />
                         </span>
-                        <span className="inline-flex items-center gap-1 text-[0.72rem] font-semibold text-lav-700 md:hidden">
+                        <span className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 md:hidden">
                           Open order <ArrowRight className="h-3 w-3" />
                         </span>
                       </Link>
