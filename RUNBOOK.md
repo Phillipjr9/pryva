@@ -262,6 +262,46 @@ until an operator publishes them**. `STATUS.md` §16 has the full rule set.
 - The customer's email is visible in `/admin/reviews` and nowhere public. Keep it
   that way: the public page selects no identity fields at all.
 
+## 7b. The support queue and the assistant
+
+Every customer ticket is answered by the support assistant first, in the same
+request, after it has read that account. `/admin/support` is what is left; it
+sorts by **least confident first**, because those are the ones worth opening.
+
+**What the assistant is allowed to do on the customer's behalf** (and nothing
+else — `src/test/support-surfaces.test.tsx` fails if this list grows silently):
+
+| Remedy | What it does | What it cannot do |
+|---|---|---|
+| `recheck_topup` | asks Paystack about one unsettled deposit and credits the wallet **only** if the provider confirms it, through the same idempotent path as the webhook | credit an unconfirmed charge, retry a failed payment, or touch another account's reference |
+| `resend_verification` | issues one fresh email-verification link, rate-limited per account | send it anywhere but the account's own address, or claim success when mail is unconfigured |
+| `cancel_schedule` | stops one of the customer's own scheduled orders | touch anyone else's schedule |
+
+**What it escalates, always:** refunds, withdrawal approval, payout problems,
+account locks, switching off two-factor, anything it cannot see, and anything a
+customer explicitly asks a person about. An escalated ticket carries its whole
+trail — the options it scored, the evidence, what it ran, what the verification
+said — so you are reading a diagnosis, not a complaint.
+
+**Working the queue:**
+1. Open the oldest `escalated` ticket first. Read the trace block under the
+   assistant's reply: it names the playbook, the confidence and the exact facts it
+   used. **If a fact there is wrong, the bug is upstream** (a missing ledger row, a
+   stuck order), not in the assistant — fix the fact.
+2. Reply and set the state. A reply defaults to **Resolved**; choose `escalated`
+   to keep it in the queue, or `waiting_on_customer` if you have asked something.
+3. Every reply is written to the thread and the audit log (`support.reply`).
+
+**Two things not to do.**
+- Do not let the assistant's wording stand in for an investigation. It reports
+  what the database says; if the database is wrong, saying it again does not fix
+  it.
+- Do not switch on the prose model to make answers sound friendlier while a
+  `SECURITY.md` gap is open. It is off by default for a reason and it never
+  changes a decision, only the wording.
+
+---
+
 ## 8. Incident playbooks
 
 **Suspected double credit.** Compare `wallet_transactions` references for the

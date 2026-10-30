@@ -1,6 +1,6 @@
 # Pryva — verified status review
 
-**Date:** 30 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** the sixteenth pass, §24
+**Date:** 30 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** the seventeenth pass, §25
 **Method:** every claim below was read out of the code or produced by running the project. Nothing is taken from `PLAN.md` without checking it first — and several `PLAN.md` entries turned out to be stale (section 4).
 
 ---
@@ -12,7 +12,7 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **1,078 tests / 119 files, all passing** (no `.skip`, no `.only`) |
+| `npm test` | **1,118 tests / 122 files, all passing** (no `.skip`, no `.only`) |
 | `npm run build` | **passes**; 75 API route handlers, 23 public pages, 17 dashboard pages, 12 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
@@ -133,6 +133,11 @@ These are healthy upgrades to schedule, not emergencies. Pin them behind the CI 
 4. **Email domain / Resend sender**, then decide whether signup must verify ownership before spending.
 5. **Make the repository private**, or move the cost sheets out of it, before launch.
 6. **Preview database isolation** — whether PR previews may keep touching production data.
+7. **Switch the support assistant's prose model on?** It is off and the assistant
+   works without it. Turning it on (`AI_SUPPORT_MODEL_ENABLED=true` + a key) sends
+   the drafted reply — the customer's own words and their amounts, never the
+   account — to the provider you name. Your call on the privacy and the cost, not
+   an engineering one.
 
 ---
 
@@ -767,3 +772,120 @@ before the page runs, so an unauthenticated `curl /dashboard/security` gets
 `307 → /login?next=%2Fdashboard` for every dashboard route alike. That is stated
 rather than papered over; the signed-in path is the unit-tested helper plus a
 two-line page.
+
+---
+
+## 25. Seventeenth pass — support that answers, and an assistant with hands (30 Oct 2026)
+
+**The request.** "Fix the support system, and I want AI support that will have engine
+and brain to think just like the way you think — every solution shouldn't come from
+admin only; the AI can also be able to fix whatever problem the user is facing."
+
+**What was there.** A contact form, a list of what you had already sent, and the
+words "response times may vary" where an answer belongs. Messages were stored in
+`contact_messages` and read back on one admin screen with a status dropdown. It was
+one-way, it had no thread, and nothing in it could do anything about a problem.
+
+### 25.1 A real ticket system
+
+Two tables (`migrations/0019`): `support_tickets` (subject, category, status,
+priority, who finished it, the assistant's last confidence) and `support_messages`
+(the thread, and the assistant's reasoning beside its own replies). Status says
+where the ball is — `open`, `waiting_on_customer`, `escalated`, `resolved`,
+`closed` — and a customer writing back reopens the thread instead of starting a
+second one, clearing `resolvedAt` and `handledBy` with it, because a ticket marked
+"resolved by the assistant" with an unanswered complaint on top is worse than no
+status at all.
+
+`contact_messages` is untouched and still serves the public form, which is
+anonymous and one-way by nature. The admin nav now separates them: **Support**
+(the queue) and **Contact form** (the inbox).
+
+### 25.2 The engine — how it thinks
+
+`src/lib/ai-support/engine.ts` is a deterministic loop, and being deterministic is
+the point: the same ticket gets the same answer twice, every step can be shown to
+an operator, and nothing it says can be invented.
+
+1. **read** — which explanation does the wording fit? each pattern scores.
+2. **gather** — what does this account actually look like now?
+3. **think** — score every explanation the brain knows: wording weight × account
+   evidence weight, with the notes kept.
+4. **decide** — act (≥72%), ask one question (40–72%), or hand to a person (<40%).
+   Two explanations within 6 points are not guessed between; it asks.
+5. **act** — run the remedy, if the explanation has one.
+6. **verify** — re-read the account and confirm the fix landed. If it did not, the
+   ticket escalates rather than claiming success.
+7. **conclude** — the reply, and where the ticket now sits.
+
+The evidence rule matters: the **strongest** fact decides and further facts add a
+little. Averaging them meant one decisive fact (an unsettled deposit) was diluted
+by a weak one (an empty wallet) — the assistant would ask a question it could
+already answer.
+
+### 25.3 The brain — what it knows
+
+`src/lib/ai-support/knowledge.ts` holds thirteen playbooks: deposit not credited,
+order not delivered or not working, refund missing, balance looks wrong,
+verification link, sign-in/lockout/two-factor, account-access concern (urgent),
+scheduled-order stop, gift-card redemption, withdrawal not paid, human requested,
+pricing question, acknowledgement — plus an explicit "I don't recognise this".
+
+Each one carries how it sounds, what in the account corroborates it, what the reply
+is, what it can do, when a person must take over, and — where several things on the
+account could be the subject — the one question that settles which.
+
+Two rules are enforced by tests across every reply: **no invented numbers** (a
+pricing question is answered by pointing at the live price, never by quoting one)
+and **no supplier language** (supplier/reseller/vendor/wholesale/upstream/our cost
+never appear on a customer ticket).
+
+### 25.4 The hands — three things it can actually do
+
+* **`recheck_topup`** — the flagship. A customer says "I paid and my wallet is
+  empty"; the engine finds the unsettled deposit, asks Paystack what happened and,
+  only if the provider confirms it, credits the wallet. This moved the checks out
+  of the browser-return route into `src/lib/topup-reconciliation.ts` so there is
+  **one** opinion about what counts as a confirmed payment — the route and the
+  assistant now share it, which is why that route's 52 existing tests still pass
+  unchanged.
+* **`resend_verification`** — one fresh link, rate-limited, only to the account's
+  own address, and refused outright when mail is not configured instead of telling
+  someone to check an inbox nothing was sent to.
+* **`cancel_schedule`** — stops one of the customer's own schedules; the ownership
+  check is in the query.
+
+Deliberately absent, and asserted absent: crediting a wallet by hand, refunds,
+withdrawals, payouts, unlocks, switching off two-factor. Those move money or move
+privilege and stay with a person. `src/test/support-surfaces.test.tsx` fails if the
+actions module ever imports a wallet, refund or payout function.
+
+### 25.5 The optional model
+
+`src/lib/ai-support/model.ts` can rewrite a decided reply for tone. It is **off**
+unless `AI_SUPPORT_MODEL_ENABLED=true` and a key exists; it never decides anything;
+it never sees the account (only the drafted reply); any error, timeout or odd length
+returns `null` and the engine's own wording ships. Escalation replies are never
+re-worded, so the hand-over sentence is exactly the one the engine wrote. Turning it
+on is owner decision 7 in §7 — it sends customer text to a third party, which is a
+judgement call, not an engineering one.
+
+### 25.6 What a person still gets
+
+Escalated tickets arrive with the whole trail: every option considered with its
+percentage and the reasons, what was run, what the verification said. `/admin/support`
+sorts by **least confident first** by default with a toggle, because the doubtful
+tickets are the ones worth opening. `/admin/support/[id]` shows the trace under each
+assistant reply. The customer's own thread shows the replies and never the trace:
+"confidence 91%" is not information a customer can use.
+
+**Verified:** 1,118 tests / 122 files · typecheck · lint · build (new routes:
+`/dashboard/support/[id]`, `/admin/support`, `/admin/support/[id]`,
+`/api/support/tickets[/[id]]`, `/api/admin/support/[id]`). New suites:
+`support-assistant-engine.test.ts` (18 — pure decisions: it fixes what it can,
+refuses to credit an unconfirmed charge, escalates when its own fix does not
+verify, asks instead of picking between two schedules, quotes no price, and never
+says "supplier"), `support-tickets.test.ts` (12 — threads, ownership, reopening,
+and a real end-to-end credit through PGlite that is not repeated on the second
+run), `support-surfaces.test.tsx` (10 — the capability list, the scoping, the admin
+gate and the audit entry).

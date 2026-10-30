@@ -662,3 +662,80 @@ export const twoFactorChallenges = pgTable(
     index("two_factor_challenges_expires_idx").on(table.expiresAt),
   ],
 );
+
+/**
+ * A support conversation, not a support form submission.
+ *
+ * `contact_messages` is the public form: anonymous, one-way, no thread. A
+ * customer with a problem needs the other shape — a thread they can add to, that
+ * can be answered by the assistant or by a person, and whose state is visible to
+ * both sides. That is this table.
+ *
+ * `status` drives who the ball is with:
+ *   open               the customer wrote, nobody has answered yet
+ *   waiting_on_customer the assistant asked a question and needs an answer
+ *   escalated          a person has to look; the assistant says why in the thread
+ *   resolved           answered or fixed; the customer can still reply
+ *   closed             read-only
+ *
+ * `handled_by` records who finished it (assistant | admin), because "the AI
+ * resolved 40% of tickets" should be a measured claim, not a hope.
+ */
+export const supportTickets = pgTable(
+  "support_tickets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    subject: varchar("subject", { length: 160 }).notNull(),
+    category: varchar("category", { length: 40 }).notNull().default("other"),
+    status: varchar("status", { length: 24 }).notNull().default("open"),
+    priority: varchar("priority", { length: 16 }).notNull().default("normal"),
+    channel: varchar("channel", { length: 16 }).notNull().default("dashboard"),
+    handledBy: varchar("handled_by", { length: 16 }),
+    assignedAdminId: uuid("assigned_admin_id").references(() => users.id, { onDelete: "set null" }),
+    /**
+     * The assistant's own confidence in its last decision, 0-100.
+     *
+     * Stored so an operator can sort by "least sure first" instead of reading
+     * every thread, and so the claim "it escalated rather than guessed" can be
+     * checked after the fact.
+     */
+    assistantConfidence: integer("assistant_confidence"),
+    escalatedAt: timestamp("escalated_at", { withTimezone: true }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("support_tickets_user_idx").on(table.userId),
+    index("support_tickets_status_idx").on(table.status),
+    index("support_tickets_activity_idx").on(table.lastActivityAt),
+  ],
+);
+
+/**
+ * One message in a ticket thread.
+ *
+ * `trace` holds the assistant's reasoning for its own messages: the evidence it
+ * read, the options it scored, what it ran and whether the fix verified. It is
+ * deliberately *not* shown to the customer (the reply is), and it is the reason
+ * an escalated ticket does not start the operator from zero.
+ */
+export const supportMessages = pgTable(
+  "support_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ticketId: uuid("ticket_id")
+      .notNull()
+      .references(() => supportTickets.id, { onDelete: "cascade" }),
+    authorRole: varchar("author_role", { length: 16 }).notNull(),
+    authorUserId: uuid("author_user_id").references(() => users.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    trace: text("trace"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("support_messages_ticket_idx").on(table.ticketId, table.createdAt)],
+);
