@@ -189,3 +189,140 @@ describe("storefront reflects configuration at request time", () => {
     expect(page.dynamic).toBe("force-dynamic");
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* Feed probes                                                         */
+/* ------------------------------------------------------------------ */
+
+const FLEEXA_KEY = "fleexa-key-ABCD1234";
+const BITCALL_ID = "ak_test_WXYZ5678";
+// The client refuses a secret that is not 128 hex characters before it spends a
+// request, so the fixture has to satisfy that or the probe never reaches fetch.
+const BITCALL_SECRET = "0123456789abcdef".repeat(8);
+
+/** Route by host and path, so one stub can stand in for every feed at once. */
+function stubFeeds(routes: {
+  emailProducts?: unknown;
+  emailStatus?: number;
+  sms?: unknown;
+  rent?: unknown;
+  fleexaBalance?: unknown;
+  bitcall?: unknown;
+} = {}) {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = new URL(typeof input === "string" ? input : input.toString());
+    const path = url.pathname;
+
+    if (url.hostname === "api.bitcall.io") {
+      return jsonResponse(routes.bitcall ?? { data: { balance: 12.5, currency: "EUR" } });
+    }
+    if (url.hostname === "fleexa.com.ng") {
+      if (path.endsWith("/email/products")) {
+        return jsonResponse(
+          routes.emailProducts ?? {
+            data: [{ id: "inbox-24", name: "24 hour inbox", domain: "inbox.test", price_ngn: 250, stock: 40 }],
+          },
+          routes.emailStatus ?? 200,
+        );
+      }
+      if (path.endsWith("/sms4/apps")) {
+        return jsonResponse(routes.sms ?? {
+          data: [{ id: "google", name: "Google", country: "NG", price_ngn: 350, stock: 12 }],
+        });
+      }
+      if (path.endsWith("/rent/sms4/areas")) {
+        return jsonResponse(routes.rent ?? { areas: [{ id: "ng", country: "NG", price_ngn: 9000, stock: 5 }] });
+      }
+      if (path.endsWith("/balance")) {
+        return jsonResponse(routes.fleexaBalance ?? { data: { balance: 1500, currency: "NGN" } });
+      }
+    }
+    // Anything else is the accounts feed.
+    if (path.includes("products")) return jsonResponse(NO_BALANCE);
+    return jsonResponse({ data: "0.00", statusCode: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function authed() {
+  return request("https://pryva.test/x", `Bearer ${CRON_SECRET}`);
+}
+
+describe("feed probes: configured is not the same as working", () => {
+  beforeEach(() => {
+    vi.stubEnv("FLEEXA_API_KEY", FLEEXA_KEY);
+    vi.stubEnv("BITCALL_KEY_ID", BITCALL_ID);
+    vi.stubEnv("BITCALL_API_SECRET", BITCALL_SECRET);
+  });
+
+  it("reports what each feed actually offers, and only the tail of each key", async () => {
+    stubFeeds();
+
+    const response = await GET(authed());
+    expect(response.status).toBe(200);
+    const body = await response.json();
+
+    expect(body.numbers.configured).toBe(true);
+    expect(body.numbers.emailProducts).toEqual({
+      ok: true,
+      value: {
+        count: 1,
+        sample: [{ id: "inbox-24", name: "24 hour inbox", domain: "inbox.test", priceNgn: 250, stock: 40 }],
+      },
+    });
+    expect(body.numbers.smsServices.value.count).toBe(1);
+    expect(body.numbers.rentAreas.value.count).toBe(1);
+    expect(body.numbers.balance).toEqual({ ok: true, value: { balance: 1500, currency: "NGN" } });
+
+    // A key that merely exists says nothing; a balance read proves it authenticates.
+    expect(body.gateway.configured).toBe(true);
+    expect(body.gateway.balance).toEqual({ ok: true, value: { balance: 12.5, currency: "EUR" } });
+
+    const text = JSON.stringify(body);
+    expect(text).not.toContain(FLEEXA_KEY);
+    expect(text).not.toContain(BITCALL_ID);
+    expect(text).not.toContain(BITCALL_SECRET);
+    expect(body.numbers.keyTail).toBe("…1234");
+    expect(body.gateway.keyTail).toBe("…5678");
+  });
+
+  it("keeps the other feeds visible when one of them fails", async () => {
+    stubFeeds({ emailStatus: 500 });
+
+    const response = await GET(authed());
+    // A single unreachable catalog is a finding, not a reason to fail the report.
+    expect(response.status).toBe(200);
+    const body = await response.json();
+
+    expect(body.numbers.emailProducts.ok).toBe(false);
+    expect(body.numbers.smsServices.ok).toBe(true);
+    expect(body.numbers.rentAreas.ok).toBe(true);
+    expect(body.gateway.balance.ok).toBe(true);
+    expect(body.accounts.catalog).toEqual({ state: "no_products", detail: "insufficient account balance!" });
+  });
+
+  it("caps the sample rather than echoing an entire catalog", async () => {
+    const many = Array.from({ length: 40 }, (_, i) => ({ id: `inbox-${i}`, name: `Inbox ${i}`, domain: "inbox.test", price_ngn: 100 + i, stock: i }));
+    stubFeeds({ emailProducts: { data: many } });
+
+    const body = await (await GET(authed())).json();
+    expect(body.numbers.emailProducts.value.count).toBe(40);
+    expect(body.numbers.emailProducts.value.sample).toHaveLength(5);
+  });
+
+  it("says not configured rather than probing when a key is absent", async () => {
+    const fetchMock = stubFeeds();
+    vi.stubEnv("FLEEXA_API_KEY", "");
+    vi.stubEnv("BITCALL_API_SECRET", "");
+
+    const body = await (await GET(authed())).json();
+    expect(body.numbers).toEqual({ configured: false });
+    expect(body.gateway).toEqual({ configured: false });
+
+    // Half a credential cannot authenticate, so it must not be reported as ready.
+    const hosts = fetchMock.mock.calls.map(([input]) => new URL(String(input)).hostname);
+    expect(hosts).not.toContain("fleexa.com.ng");
+    expect(hosts).not.toContain("api.bitcall.io");
+  });
+});
