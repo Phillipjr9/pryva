@@ -303,6 +303,31 @@ async function gatewayFetch(
 }
 
 /* ------------------------------------------------------------------ */
+/* Balance                                                              */
+/* ------------------------------------------------------------------ */
+
+export type BitcallBalance = { balance: number | null; currency: string | null };
+
+/**
+ * Reads the account balance every Bitcall product is charged against.
+ *
+ * Worth reading before a purchase rather than after. `INSUFFICIENT_BALANCE` is a
+ * 409 that spends nothing, so an unfunded account is safe — but it is also the
+ * failure that is easiest to prevent, and this is the only read-only way to
+ * check. The response shape is parsed defensively: the endpoint is documented
+ * but its fields were not published where they could be read.
+ */
+export async function getBitcallBalance(): Promise<BitcallBalance> {
+  const payload = await gatewayFetch("GET", "/v1/balance");
+  const envelope = asRecord(payload);
+  const body = asRecord(envelope.data ?? envelope);
+  return {
+    balance: nonNegative(pickNumber(body, ["balance", "amount", "available", "availableBalance"])),
+    currency: currencyCode(pickString(body, ["currency"])),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* eSIM — catalog                                                       */
 /* ------------------------------------------------------------------ */
 

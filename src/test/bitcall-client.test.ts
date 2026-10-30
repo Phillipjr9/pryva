@@ -8,6 +8,7 @@ import {
   bitcallKeyEnvironment,
   buyBitcallEsimPlan,
   classifyRetry,
+  getBitcallBalance,
   getBitcallEsimOrder,
   getBitcallEsimProfile,
   isBitcallConfigured,
@@ -165,6 +166,37 @@ describe("gateway transport", () => {
     // An unrecognized code is unknown, never silently treated as safe to retry.
     expect(classifyRetry("SOMETHING_NEW")).toBe("unknown");
     expect(classifyRetry(null)).toBe("unknown");
+  });
+});
+
+describe("account balance", () => {
+  it("reads the balance every product is charged against, from the envelope or bare", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => json({ data: { balance: "177.69", currency: "eur" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await getBitcallBalance()).toEqual({ balance: 177.69, currency: "EUR" });
+    expect(lastCall(fetchMock).url.pathname).toBe("/v1/balance");
+
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({ balance: 12.5, currency: "USD" })));
+    expect(await getBitcallBalance()).toEqual({ balance: 12.5, currency: "USD" });
+  });
+
+  it("reports an unusable currency as unknown rather than assuming one", async () => {
+    // Which currency the gateway bills in decides whether a returned price needs
+    // conversion, so a value that is not an ISO code must not be guessed at.
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({ data: { balance: 10, currency: "EURO" } })));
+    expect(await getBitcallBalance()).toEqual({ balance: 10, currency: null });
+
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({ data: {} })));
+    expect(await getBitcallBalance()).toEqual({ balance: null, currency: null });
+  });
+
+  it("surfaces an insufficient balance as the gateway's own code", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() =>
+      json({ error: { code: "INSUFFICIENT_BALANCE", message: "Your account balance is too low.", requestId: "r2" } }, 409)));
+    const error = await getBitcallBalance().catch((caught: unknown) => caught) as BitcallError;
+    expect(error).toMatchObject({ code: "INSUFFICIENT_BALANCE", status: 409 });
+    // Retryable only after acting: topping up. Never blind.
+    expect(classifyRetry(error.code)).toBe("retry_after_acting");
   });
 });
 
