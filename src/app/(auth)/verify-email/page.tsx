@@ -109,6 +109,35 @@ function VerifyEmail() {
               Check your inbox. The link expires in 24 hours and works once.
             </p>
           </>
+        ) : outcome?.status === "sendFailed" ? (
+          /*
+            Its own branch rather than sharing the one below. A send failure is
+            the server saying it could not deliver -- including the honest 503 it
+            now returns when no mail provider is configured -- so appending "It
+            may have expired or already been used" would contradict the very
+            message the endpoint was changed to tell the truth about. There was
+            often no link involved at all: the "Email me a link" button lands
+            here too.
+          */
+          <>
+            <h1 className="text-xl font-semibold text-slate-900">We could not send that email</h1>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">{outcome.message}</p>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Nothing is wrong with your account, and no link was used up. Try again shortly, or
+              contact support if it keeps happening.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button className={button} onClick={resend} disabled={sending} type="button">
+                {sending ? "Sending…" : "Try again"}
+              </button>
+              <Link
+                className="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                href="/dashboard"
+              >
+                Back to dashboard
+              </Link>
+            </div>
+          </>
         ) : (
           <>
             <h1 className="text-xl font-semibold text-slate-900">That link did not work</h1>
