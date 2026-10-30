@@ -189,6 +189,12 @@ Admin surfaces that answer "what happened": `/admin/orders?status=review`,
 `/admin/refunds`, `/admin/withdrawals`, `/admin/fulfilment`, `/admin/messages`,
 `/admin/margin`, `/admin/security`, and `/admin/audit`.
 
+The surface that answers **"what is still unresolved"** is `/admin/reconciliation`:
+withdrawals in flight, orders with an unknown supplier outcome, refunded orders
+whose unit may still be live, and deposits pending for over an hour, oldest
+first. It is read-only and does not show account numbers; act on the page that
+owns the action so every change lands in the audit log.
+
 **The audit log is best-effort.** Entries are written after the action commits; a
 failed insert is logged loudly and is not retried. The wallet ledger is the
 authoritative financial record — use the audit log to find *who* acted, the ledger

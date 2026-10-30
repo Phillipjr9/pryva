@@ -12,7 +12,7 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **855 tests / 95 files, all passing** (no `.skip`, no `.only`) |
+| `npm test` | **861 tests / 97 files, all passing** (no `.skip`, no `.only`) |
 | `npm run build` | **passes**; 70 API route handlers, 21 public pages, 17 dashboard pages, 10 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
@@ -55,7 +55,7 @@ eSIM, proxies, digital subscriptions, airtime/data, bulk orders, scheduled order
 | 8 | **PWA** | no manifest, no service worker, no offline page (the preview cookie bridge is not a PWA) |
 | 9 | **Product analytics / Web Vitals** | nothing — no GA4, no `@vercel/analytics`, no `web-vitals` |
 | 10 | ~~**Admin audit log**~~ | **Built in the second pass** — `admin_audit_log` (migration `0014`), `/admin/audit`, `GET /api/admin/audit` |
-| 11 | **Admin payment-audit view** | no dedicated reconciliation screen. "Failed orders" is already `/admin/orders?status=review`; the audit log now covers who acted, not what still needs reconciling |
+| 11 | ~~**Admin reconciliation view**~~ | **Built in the third pass** — `/admin/reconciliation` lists in-flight withdrawals, orders with an unknown supplier outcome, refunded-but-not-released orders and stale pending deposits, oldest first |
 | 12 | **Paid inbox tier** | schema supports `tier='paid'`, the code only issues `free`; price needs the supplier's real `priceNgn` |
 | 13 | **CSP** | no `Content-Security-Policy` header anywhere (`src/proxy.ts` ships the other headers) |
 | 14 | **Dockerfile** | CI (`.github/workflows/ci.yml`) and an operations runbook (`RUNBOOK.md`) were added in these passes; no Dockerfile — deployment is Vercel-only |
@@ -141,7 +141,7 @@ These are healthy upgrades to schedule, not emergencies. Pin them behind the CI 
 1. ~~Merge PR #17 / add CI.~~ **Done in this pass** — the workflow is in the branch and the price gate now fails correctly.
 2. ~~Make the truth surfaces agree.~~ **Done for README and `/status`**; the `PLAN.md` tables still need a proper rewrite, and the "are numbers live?" question is now answered by the documentation rather than left ambiguous.
 3. 🟡 **Fix operations** — the scheduled-orders mystery is resolved (it cannot be scheduled as written); still open: the email worker's cadence, and whether transfer webhooks will ever settle withdrawals or operators always will.
-4. 🟡 **Finish the money loop** — the admin audit log is done; still open: reconcile the supplier balance, a dedicated reconciliation view, and enforcing email verification on signup.
+4. 🟡 **Finish the money loop** — the admin audit log and the reconciliation view are done; still open: reconcile the supplier balance and enforce email verification on signup.
 5. **Then growth features** — referrals, coupons, reviews, wishlist, 2FA, PWA, analytics. These are additive; none of them unblocks revenue the way 1–4 do.
 
 ---
@@ -185,6 +185,29 @@ The first pass found that privileged actions left a line in the application log 
 **Also in this pass:** `RUNBOOK.md` — the operations document that did not exist. It covers the deploy/migration gate, secret rotation, what each cron does (and why one is deliberately unscheduled), withdrawal and refund reconciliation, incident playbooks and the guards that must not be deleted.
 
 **Fixture lesson:** adding a migration makes four PGlite fixtures fail on purpose — `withdrawal-name-check.test.ts` asserts every fixture replays every migration. They now include `0014`, and the manual migration list in `migrations/README.md` was replaced with a glob so it cannot fall behind the directory again.
+
+---
+
+---
+
+## 11. Third pass — the reconciliation queue
+
+The money loop had one gap left that a coder could close: nothing showed an operator **what was still unresolved**, only what had already happened.
+
+`/admin/reconciliation` (nav: Reconciliation) is read-only and separates four classes, because the action differs:
+
+| Class | Why it is here |
+|---|---|
+| Withdrawals in `processing` | the transfer may already have left; rejecting would refund a payout that could still arrive |
+| Orders in `processing` / `review` | supplier outcome unknown, or unsourceable and awaiting a refund decision |
+| Refunded orders carrying a reconciliation note | customer credited but the upstream unit may still be live — exposure, not a task to close |
+| Deposits `pending` for over an hour | an abandoned checkout and an unconfirmed payment look identical; only Paystack distinguishes them |
+
+Ages are bucketed (`fresh` under an hour, `watch` under a day, `urgent` beyond) with the count older than a day in the header. Bank **account numbers are never selected**, and no supplier is named — the operator gets the reference to reconcile with, which is what the job needs.
+
+`src/lib/reconciliation-queue.ts` holds the age arithmetic: a future timestamp clamps to zero instead of sorting above older items, and an unparseable date counts as new instead of becoming `NaN`, which would compare false against every threshold and hide the row.
+
+**Verified:** 861 tests / 97 files · typecheck · lint · build. The page test seeds one row of each class and asserts they render, that the age appears, that `0123456789` does **not**, and that the page says nothing resolves itself — sabotage-proven by rendering the account number, which fails the test.
 
 ---
 
