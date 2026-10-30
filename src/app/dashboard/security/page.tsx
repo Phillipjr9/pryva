@@ -11,8 +11,17 @@ import { ArrowRight, Check, Clock, Lock, Shield, User } from "@/components/icons
 export const metadata = { title: "Security" };
 
 // Shell comes from the dashboard layout; this page supplies content only.
-export default async function SecurityPage() {
+export default async function SecurityPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ require?: string; next?: string }>;
+}) {
   const user = await requireUser("/dashboard/security");
+  const params = await searchParams;
+  // Set by `requireAdmin` when an administrator has no second factor yet: the
+  // admin tools are closed until this page is finished, and saying so here is
+  // more useful than a 403 on a page they cannot open.
+  const needsSecondFactor = params.require === "2fa";
 
   // The card is a client component because enrolment is interactive, but whether
   // 2FA is on and whether the deployment can run it are server facts.
@@ -34,6 +43,21 @@ export default async function SecurityPage() {
           How this account is protected, and how to keep it that way.
         </p>
       </div>
+
+      {needsSecondFactor && (
+        <div
+          role="status"
+          className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.86rem] text-amber-900"
+        >
+          <p className="font-semibold">Administrator tools are locked until two-factor is on.</p>
+          <p className="mt-1">
+            Your account can approve withdrawals and issue refunds, so it needs a second factor
+            before it can do either. Turn it on below
+            {params.next ? ` and you will be returned to ${params.next}` : ""} — if this deployment
+            has no two-factor key configured, tell the operator instead of trying again.
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">

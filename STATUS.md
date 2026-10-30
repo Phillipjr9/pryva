@@ -12,7 +12,7 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **976 tests / 109 files, all passing** (no `.skip`, no `.only`) |
+| `npm test` | **1,059 tests / 115 files, all passing** (no `.skip`, no `.only`) |
 | `npm run build` | **passes**; 75 API route handlers, 23 public pages, 17 dashboard pages, 12 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
@@ -606,4 +606,106 @@ no third-party host in `<head>`, two JSON-LD blocks (`Organization` + `WebSite`,
 homepage's `FAQPage`), 8 self-hosted `@font-face` families in the emitted CSS, no
 `fonts.googleapis`/`fonts.gstatic` anywhere in it, and the CSP header narrowed as above.
 HTML weight unchanged at 55 KB gzipped.
+
+---
+
+## 23. Fifteenth pass — the security and money-operations request (30 Oct 2026)
+
+Seven things were asked for. Six are done and one needs an answer from the owner
+(§23.8). Every claim below is enforced by code or a test, not by intent.
+
+### 23.1 Temporary inboxes cannot create an account
+
+`src/lib/disposable-domains.ts` refuses ~150 providers at signup, matched on the
+domain and any subdomain of it, before the row is created — so the answer never
+reveals whether an address has been tried before. The refusal explains itself:
+a deleted inbox takes the verification link, receipts and every password reset
+with it. Deliberately conservative — gmail, outlook, yahoo, icloud, proton, zoho,
+gmx, yandex, aol and ordinary company domains are untouched, and a test pins that
+list. It is a speed bump, and the module says so.
+
+### 23.2 Accounts lock after repeated wrong passwords
+
+8 consecutive failures lock the account for 30 minutes (`migrations/0017`,
+`src/lib/account-lockout.ts`). The counter lives on the account row, so it
+survives a deploy and a second instance — the rate limiter's fixed windows never
+could. The increment and the lock are one atomic `UPDATE`; a locked account is
+refused before the password is compared; the reply is the same `429` +
+`Retry-After` the limiter already uses, so the status cannot be used to learn
+which emails have accounts. A successful sign-in clears the run; a completed
+password reset clears the lock, because proving the mailbox beats a forgotten
+password. The admin user list shows the state, read-only.
+
+### 23.3 Terms rewritten to match the product
+
+Fifteen dated, anchored clauses replacing eleven generic paragraphs that predated
+gift cards, 2FA, lockout, verified reviews, withdrawals and the switched-off
+products. It rendered in `prose` classes from a typography plugin this build does
+not load, so it was unstyled body text — that is gone too. It claims no
+registration number, no address and no delivery guarantee, and a test keeps the
+limitations stated.
+
+### 23.4 Backups, and a drill that has to be run
+
+Two copies, because they fail differently: the provider's PITR covers every
+write; `npm run db:backup` writes a verified logical snapshot (manifest + one line
+per table, SHA-256 per table) that survives the provider. The archive is data
+only — the schema is replayed from `migrations/`. `npm run db:restore` orders
+tables parents-first from the foreign keys recorded in the manifest, runs in one
+transaction, verifies every checksum before writing a row, and refuses three
+ways: no `--confirm-restore`, a non-empty target, or the live database. The
+backup verifies the file before pruning anything older. RUNBOOK §8a has the
+drill, and its log starts empty **because it has not been run yet**.
+
+### 23.5 A security pass that found three real things
+
+`SECURITY.md` is the audit: threat model, controls by file, known gaps, and the
+operator checklist for the things code cannot do. It opens with "no system is
+unhackable" because that is true.
+
+Found and fixed:
+* **administrators were not required to have 2FA** while being able to approve
+  withdrawals and issue refunds — now enforced on admin pages *and* admin APIs,
+  with `ADMIN_2FA_REQUIRED=false` as the documented recovery hatch;
+* **`zod < 4.6.6`** reachable through `@vercel/functions → @vercel/oidc →
+  @vercel/cli-config` (GHSA-mrhx-c7xc-m3w5) — pinned by an `overrides` entry;
+  `npm audit --omit=dev` now reports **0 vulnerabilities**, and CI fails on a high
+  advisory;
+* **no CI gate on advisories at all** — added to `ci.yml` with `--audit-level=high`
+  on production dependencies only.
+
+`public/.well-known/security.txt` publishes the contact, with an expiry a test
+keeps in the future.
+
+### 23.6 Each transaction tracked, and a daily close
+
+`/admin/transactions` lists every wallet movement with its account, running
+balance and reference — read-only, because a ledger you can edit is not a ledger.
+The nightly job (`/api/cron/nightly`, 02:20 Lagos) writes a `reconciliation_runs`
+row per day with the day's deposits, spend, refunds, gift cards and withdrawals,
+and checks the ledger invariant for **every** account: each `balance_after` must
+follow from the previous one (debits down, credits and refunds up), and the last
+must equal `users.wallet_balance`. A break marks the day `attention` and lists the
+accounts with the difference. The row is written as `running` before the work, so
+a crash leaves evidence rather than nothing, and a re-run corrects the same day.
+
+Vercel's Hobby plan allows two cron entries and this app needs three tasks, so
+they are one job with a defined order: close the books, drain the email outbox,
+then sweep refunds. Each step is isolated.
+
+### 23.7 What was deliberately not automated
+
+The **external** side of reconciliation. Comparing our deposits with Paystack's
+settled total is an operator step, and both the admin page and the runbook say so
+rather than implying a check that never ran. Same for SPF/DKIM/DMARC, PITR and the
+WAF: they are DNS records, provider settings and money, not code.
+
+### 23.8 Still open: the social accounts
+
+Asked to "add our platforms" — TikTok and X are not live yet. A footer icon that
+links to a profile that does not exist is worse than no icon, so this needs the
+owner's handles (or an explicit "show them as coming soon"). Not guessed.
+
+**Verified:** 1,059 tests / 115 files · typecheck · lint · build · `npm audit`
+clean for production dependencies.
 

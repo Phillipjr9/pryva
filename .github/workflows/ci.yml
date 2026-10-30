@@ -44,6 +44,11 @@ jobs:
       - name: Generated prices are inside the profit band
         run: npm run pricing:audit -- --check
 
+      # Production dependencies only: a dev-only advisory (a lint plugin's parser,
+      # say) must not block a release, and an advisory that ships must.
+      - name: No known advisories in production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Tests
         run: npm test
 

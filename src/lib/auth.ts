@@ -5,6 +5,7 @@ import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
 import { isArenaPreviewHost, isLocalHost, requestProto } from "@/lib/net";
+import { adminBlockedForMissingSecondFactor } from "@/lib/admin-two-factor";
 
 export const SESSION_COOKIE = "pryva_session";
 /**
@@ -218,6 +219,14 @@ export async function requireAdmin(nextPath = "/admin/dashboard"): Promise<Publi
 
   if (!isAdminUser(user)) {
     redirect(`/dashboard?error=admin-required`);
+  }
+
+  // An administrator can approve withdrawals and issue refunds, so the account
+  // that does it carries a second factor. Instead of an error, the redirect sends
+  // them to the page that fixes it — with where they were going, so the return
+  // trip is one click.
+  if (await adminBlockedForMissingSecondFactor(user.id)) {
+    redirect(`/dashboard/security?require=2fa&next=${encodeURIComponent(nextPath)}`);
   }
 
   return user;
