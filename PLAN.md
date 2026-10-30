@@ -87,6 +87,25 @@
 | R44 | **"I want all the marketplace and services to be fetched with API connectivity"** — if a feed does not return it, it is not inventory | **#26** |
 | R45 | **"I don't agree to the deletion, I want all the service"** — rejected removing streaming/proxies/airtime/boosting; every category stays and gets a feed instead | open |
 | R46 | Gift cards: no API exists, "but you can recommend" | answered in chat |
+| R47 | "Can you reverse engineer and work with fakemailo.com — I think it has some things I will need" | **answered: no, and it is not needed** |
+| R48 | (implied by R47) Make the temporary-inbox category deliverable | **#28** |
+
+**R47 verdict, with the reason, so it is not re-litigated in a later session.** fakemailo.com is a free
+ad-supported temp-mail site with no published API, no pricing and no developer terms. Its own Terms of
+Use say: *"Any emails received to the temporary addresses created on our platform are **publicly
+accessible** for the duration of their lifetime. **Do not use our service for receiving sensitive or
+personal data**"*, that it is offered *"as-is, with no guarantee of availability, security, or email
+delivery"*, and that they *"may modify, suspend, or terminate the service at any time without notice."*
+So it cannot be inventory for a paid inbox: the thing sold would be an inbox anyone can read, on a
+service that can disappear mid-order after money is taken. Scraping undocumented internal endpoints
+would also be untestable from this sandbox, whose egress allows only github.com, npm and pypi.
+
+**It is also unnecessary.** `src/lib/fleexa.ts` already implements Email OTP end to end —
+`/email/products`, `/email/buy`, `/email/check/:id`, `/email/cancel` — and `FLEEXA_API_KEY` went live
+on Production 2026-10-30 14:31. The four `email-*` plans are undeliverable only because they are
+absent from `FULFILMENT_MAP` (10 slugs, all `vn-*`/`rent-*`). The work is wiring, not scraping.
+Its own header comment is the standing caveat: the contract *"has not been confirmed against a live
+key: smoke-test a single cheap purchase before taking customer money."*
 
 ---
 
