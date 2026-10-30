@@ -81,7 +81,8 @@ export const VERIFICATION_EXAMPLES: Array<{ name: string; brand: BrandSlug; tag:
   { name: "Apple", brand: "apple", tag: "Work & other" },
 ];
 
-const PROMOTION_EXAMPLES: Array<{ name: string; brand: BrandSlug; types: string[] }> = [
+/** Exported so live supplier listings reuse the same platform/brand vocabulary. */
+export const PROMOTION_EXAMPLES: Array<{ name: string; brand: BrandSlug; types: string[] }> = [
   { name: "Instagram", brand: "instagram", types: ["Followers", "Likes", "Views"] },
   { name: "TikTok", brand: "tiktok", types: ["Followers", "Likes", "Views"] },
   { name: "YouTube", brand: "youtube", types: ["Subscribers", "Likes", "Views"] },
