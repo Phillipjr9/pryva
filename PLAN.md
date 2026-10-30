@@ -24,6 +24,16 @@
 
 ---
 
+> ⚠ **The §2 backlog is stale as of 2026-10-30.** Several items it marks ⬜/🟡 have since shipped and
+> were verified in the checkout: the README, `/refund-policy` and `/cookie-policy`, the settings data
+> export, admin users/orders/refunds/messages/margin pages, admin authorisation, and the disposable
+> inbox (migration `0013`, `/dashboard/inbox`, `/api/inbox/*`). Item #15 also claims `transfer.success`/
+> `transfer.failed` webhooks settle withdrawals; no such handler exists — settlement is manual, which is
+> what the README says. **`STATUS.md` is the verified snapshot taken at `19113f0`**; read it before
+> picking work, and correct the tables below as items close rather than adding a second backlog.
+
+---
+
 ## 0. HOW WE WORK (rules I follow)
 
 1. You send requirements (any length, typos fine). I **do not start coding**.

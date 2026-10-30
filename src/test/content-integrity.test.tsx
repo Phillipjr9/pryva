@@ -37,6 +37,14 @@ describe("public content integrity", () => {
     expect(html).toContain("can be ordered and delivered automatically");
     expect(html).not.toMatch(/99\.\d+%|all systems operational|resolved incident/i);
   });
+  it("reports gift cards as available, because Pryva issues them rather than a supplier", () => {
+    const html = renderToStaticMarkup(<StatusPage />);
+    // The row used to bundle gift cards with categories that have no live
+    // fulfilment, so the page said "Not available" while the dashboard sold them.
+    expect(html).toContain("Gift cards");
+    expect(html).toContain("issued by Pryva from your wallet balance");
+    expect(html).not.toContain("Digital subscriptions, gift cards");
+  });
   it("does not promise automatic refunds or unverified top-up credit", () => {
     const dashboard = readFileSync(fileURLToPath(new URL("../app/dashboard/page.tsx", import.meta.url)), "utf8");
     const topUp = readFileSync(fileURLToPath(new URL("../app/dashboard/wallet/TopUpReturn.tsx", import.meta.url)), "utf8");
