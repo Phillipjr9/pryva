@@ -56,6 +56,33 @@ users need a secure, operator-assisted recovery process. Verify identity out of
 band, examine and reset any untrusted password, and revoke existing sessions
 before creating a verified provider binding. Do not bulk-link subjects by email.
 
+## When migrations run
+
+`npm run db:migrate` is part of the Vercel build command, so a deployment applies
+migrations **before** the app is built. The command gates it on the environment:
+
+    if [ "$VERCEL_ENV" = "production" ]; then npm run db:migrate; fi && npm run build
+
+That gate is load-bearing. The `PG*` and `AWS_*` variables target development,
+preview *and* production — the Vercel RDS integration sets all three by default —
+so without it **every PR preview build applied its own migrations to the
+production database**, before anyone reviewed or merged the branch carrying them.
+An additive, idempotent migration survives that by luck; a `DROP COLUMN` would
+not have.
+
+Two consequences when adding a migration here:
+
+- Write it **idempotent and additive** (`ADD COLUMN IF NOT EXISTS`, `CREATE TABLE
+  IF NOT EXISTS`). Production may already have applied it through an earlier
+  build, and the `schema_migrations` ledger is what decides.
+- Previews do **not** migrate, so a preview of a branch that needs a new column
+  fails until the branch is merged. That is the intended trade-off: a visible
+  preview failure beats an invisible production change.
+
+Previews still read and write production data at runtime. Isolating them means
+removing `preview` from the `PG*` targets, which is an operator decision, not a
+code change.
+
 ## `legacy/`
 
 These older incremental migrations assume tables that nothing in the original
