@@ -4,6 +4,7 @@ import { serviceMap, plansFor, formatNaira } from "@/lib/catalog";
 import { Check, ArrowRight } from "@/components/icons";
 import { CountryFlag, CountryChips } from "@/components/CountryFlag";
 import { hasCountryFlag } from "@/lib/countries";
+import { ServiceIcon } from "@/components/ServiceIcon";
 
 export const metadata: Metadata = {
   title: "eSIM",
@@ -21,6 +22,7 @@ export default function ESIMPage() {
       <section className="py-16 sm:py-20">
         <div className="shell">
           <div className="max-w-3xl">
+            <ServiceIcon service="esim" size="lg" className="mb-5" />
             <span className="inline-block rounded-full bg-lav-100 px-4 py-1.5 text-[0.78rem] font-semibold text-lav-700 mb-4">{service.eyebrow}</span>
             <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3.5rem]">{service.tagline}</h1>
             <p className="mt-6 text-[1.1rem] text-ink-2 leading-relaxed">{service.description}</p>

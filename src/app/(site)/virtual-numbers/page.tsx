@@ -7,6 +7,7 @@ import { PlanPurchase } from "@/components/purchase/PlanPurchase";
 import { Check, ArrowRight } from "@/components/icons";
 import { CountryFlag, CountryChips } from "@/components/CountryFlag";
 import { hasCountryFlag } from "@/lib/countries";
+import { ServiceIcon } from "@/components/ServiceIcon";
 
 export const metadata: Metadata = {
   title: "Virtual Numbers",
@@ -33,6 +34,7 @@ export default async function VirtualNumbersPage() {
       <section className="py-16 sm:py-20">
         <div className="shell">
           <div className="max-w-3xl">
+            <ServiceIcon service="numbers" size="lg" className="mb-5" />
             <span className="inline-block rounded-full bg-lav-100 px-4 py-1.5 text-[0.78rem] font-semibold text-lav-700 mb-4">
               {service.eyebrow}
             </span>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check, Card, Shield } from "@/components/icons";
 import { formatNaira } from "@/lib/catalog";
+import { ServiceIcon } from "@/components/ServiceIcon";
 import {
   GIFT_CARD_MAX_AMOUNT,
   GIFT_CARD_MIN_AMOUNT,
@@ -112,6 +113,7 @@ export default function GiftCardsPage() {
       <section className="border-b border-line/70 bg-gradient-to-b from-cream to-white">
         <div className="shell py-14 sm:py-20">
           <div className="max-w-3xl">
+            <ServiceIcon service="gift-cards" size="lg" className="mb-5" />
             <span className="inline-flex items-center gap-2 rounded-full border border-lav-200 bg-white px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-lav-800">
               <Card className="h-3.5 w-3.5" />
               Gift cards

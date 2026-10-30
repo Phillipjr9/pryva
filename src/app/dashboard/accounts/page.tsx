@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { AccountsBrowser } from "@/app/(site)/accounts/AccountsBrowser";
 import { ArrowRight, Shield } from "@/components/icons";
 import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
+import { ServiceTitle } from "@/components/ServiceTitle";
 
 export const metadata: Metadata = { title: "Accounts" };
 
@@ -22,9 +23,9 @@ export default async function DashboardAccountsPage() {
     <div className="grid gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">
+          <ServiceTitle service="accounts">
             Digital accounts
-          </h1>
+          </ServiceTitle>
           <p className="mt-1 text-[0.86rem] text-ink-2">
             Browse live listings priced in Naira. Country coverage is not provided or filtered here, and stock can change.
           </p>

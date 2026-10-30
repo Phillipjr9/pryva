@@ -279,6 +279,13 @@ preview apply a migration to production by removing the `VERCEL_ENV` gate.
   account data. It is shared by every profile on the device. Static, content-hashed
   assets and the offline page are the whole approved list; bump `VERSION` in
   `public/sw.js` when changing the rules, or old caches survive the deploy.
+- Do not draw a brand mark by eye, generate one with an image model, or "borrow" a
+  nearby logo as a fallback. Real marks come from `scripts/extract-brand-marks.mjs`
+  (CC0/MIT sources) and are never hand-edited; a brand with no redistributable mark
+  gets a wordmark tile from `WORDMARK_BRANDS`, and that list is pinned by a test to
+  the five brands that genuinely have none. A cross-service fallback is how a page
+  ends up showing another product's logo for months — `ServiceIcon` and
+  `NetworkBadge` now render a neutral named tile instead.
 - Do not add a third-party script, font, style or image host, or an iframe, without
   extending the policy in `src/lib/security-headers.ts`. The browser will block it
   and the page will look broken in a way the server logs never show. Never put a

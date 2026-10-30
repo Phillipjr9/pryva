@@ -1,5 +1,5 @@
 import type { AirtimeProvider } from "@/lib/airtime";
-import { BrandIcon, type WordmarkSlug } from "@/components/BrandIcon";
+import { BrandIcon, type BrandIconProps } from "@/components/BrandIcon";
 
 /**
  * Network marks for the airtime / data pickers.
@@ -11,8 +11,21 @@ import { BrandIcon, type WordmarkSlug } from "@/components/BrandIcon";
  * yellow oval that looked broken. A correct wordmark always reads as the network.
  */
 
-const WORDMARK_NETWORKS: Record<string, WordmarkSlug> = {
+/**
+ * One entry per provider, exhaustive by type.
+ *
+ * This used to be a `Record<string, WordmarkSlug>` plus a final
+ * `return <BrandIcon brand="airtel" …>`, so ANY provider without a wordmark
+ * entry rendered Airtel's logo. There are exactly four providers today, which
+ * hid the bug; the moment a fifth appeared the picker would have shown a rival
+ * network's mark for it. The map below cannot miss a provider — adding one to
+ * `AirtimeProvider` fails typecheck until it is given its own mark here.
+ */
+const NETWORK_BRANDS: Record<AirtimeProvider, BrandIconProps["brand"]> = {
+  // MTN, Glo and 9mobile publish no redistributable mark, so they get the
+  // wordmark tile in their own colours (see WORDMARK_BRANDS in BrandIcon).
   mtn: "mtn",
+  airtel: "airtel",
   glo: "glo",
   "9mobile": "9mobile",
 };
@@ -33,13 +46,25 @@ export function NetworkBadge({
   size?: number;
   className?: string;
 }) {
-  const wordmark = WORDMARK_NETWORKS[provider];
+  const brand = (NETWORK_BRANDS as Record<string, BrandIconProps["brand"] | undefined>)[provider];
 
-  if (wordmark) {
-    return <BrandIcon brand={wordmark} size={size} variant="tile" className={className} />;
+  if (!brand) {
+    // Never substitute another network's mark. A neutral tile that names the
+    // provider is honest; a rival's logo is a lie with a trademark on it.
+    return (
+      <span
+        role="img"
+        aria-label={networkName(provider)}
+        title={networkName(provider)}
+        className={`inline-flex items-center justify-center rounded-lg bg-lav-100 text-[0.7rem] font-semibold text-lav-700 ${className}`}
+        style={{ width: size, height: size, flex: "0 0 auto" }}
+      >
+        {networkName(provider).slice(0, 3)}
+      </span>
+    );
   }
 
-  return <BrandIcon brand="airtel" size={size} variant="tile" className={className} />;
+  return <BrandIcon brand={brand} size={size} variant="tile" className={className} />;
 }
 
 export function networkName(provider: AirtimeProvider): string {
