@@ -14,6 +14,7 @@ const LINKS = [
   { href: "/admin/messages", label: "Support" },
   { href: "/admin/withdrawals", label: "Withdrawals" },
   { href: "/admin/reconciliation", label: "Reconciliation" },
+  { href: "/admin/reviews", label: "Reviews" },
   { href: "/admin/audit", label: "Audit" },
   { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/security", label: "Security" },

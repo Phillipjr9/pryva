@@ -34,6 +34,7 @@ const columns = [
       // existed but nothing on the site linked to them — they were reachable
       // only by typing the URL.
       { href: "/blog", label: "Guides & blog" },
+      { href: "/reviews", label: "Customer reviews" },
       { href: "/testimonials", label: "Customer feedback" },
     ],
   },

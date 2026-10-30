@@ -12,11 +12,11 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **913 tests / 103 files, all passing** (no `.skip`, no `.only`) |
+| `npm test` | **942 tests / 106 files, all passing** (no `.skip`, no `.only`) |
 | `npm run build` | **passes**; 75 API route handlers, 23 public pages, 17 dashboard pages, 12 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
-Codebase size: ~52,600 lines under `src/`, 100 modules in `src/lib/`, 22 database tables, 16 migrations (`0000`–`0015`).
+Codebase size: ~52,600 lines under `src/`, 101 modules in `src/lib/`, 23 database tables, 17 migrations (`0000`–`0016`).
 Migration coverage is complete — every table in `src/db/schema.ts` is created by a migration.
 
 **Summary in one line:** the engineering is in better shape than the planning docs suggest; the real gaps are (a) product surface that was never built, (b) operations/deployment wiring, and (c) documentation that no longer matches the code.
@@ -47,7 +47,7 @@ eSIM, proxies, digital subscriptions, airtime/data, bulk orders, scheduled order
 |---|---|---|
 | 1 | **Referral program** | no codes, tables, routes or pages |
 | 2 | **Wishlist / saved listings** | nothing |
-| 3 | **Reviews & ratings** | nothing (`/testimonials` is curated copy, not user reviews) |
+| 3 | ~~**Reviews & ratings**~~ | **Built in the eighth pass** — verified-purchase reviews, published only after moderation; `/testimonials` remains curated copy and says so |
 | 4 | **Coupons / discount codes** | only supplier promo codes on the marketplace; no Pryva coupon system |
 | 5 | **Support tickets** | `/dashboard/support` + `/admin/messages` handle flat `contact_messages`; no threads, priorities or SLA |
 | 6 | ~~**Two-factor authentication**~~ | **Built in the fourth pass** — TOTP enrolment, recovery codes and a two-step sign-in; migration `0015` |
@@ -62,7 +62,7 @@ eSIM, proxies, digital subscriptions, airtime/data, bulk orders, scheduled order
 | 15 | ~~**Gift-card explainer page**~~ | **Built in the seventh pass** — `/gift-cards`, generated from the same rule constants the checkout enforces |
 | 16 | **Self-service account deletion** | deliberately returns 503; panel points at support |
 
-Rough sizing: 1–4 are S–M; 5, 10, 11, 13 are M; 7 is M; 9 is S.
+Rough sizing: 1, 2 and 4 are S–M; 5, 10, 11, 13 are M; 7 is M; 9 is S.
 
 ---
 
@@ -315,3 +315,25 @@ Gift cards were live and sold from the dashboard with no page explaining them, s
 **Also wired:** the page is in the sitemap and linked from the footer's Services column, so it is reachable without typing the URL — the same defect the footer comment already records for the help centre and testimonials.
 
 **Verified:** 913 tests / 103 files · typecheck · lint · build. `next start` checked `/gift-cards` = 200 with the canonical tag, the footer link on `/`, and the sitemap entry. The supplier-secrecy scan covers the new page; an early draft said "no supplier is involved" and was rewritten, because that scan is right that even naming the category tells a customer something.
+
+---
+
+## 16. Eighth pass — verified-purchase reviews (30 Oct 2026)
+
+Customers had no way to record what happened after an order, and the site's only "feedback" was curated marketing copy. Reviews now exist, with three constraints that are structural rather than editorial:
+
+| Rule | Where it lives |
+|---|---|
+| Only the account that bought the order can review it | the order lookup includes `userId`, so someone else's order is indistinguishable from a missing one |
+| Only a `delivered` or `completed` order can be reviewed | `REVIEWABLE_STATUSES`; refunded, cancelled, processing and failed orders are refused |
+| One review per order, enforced by a unique index | `product_reviews_order_id_key`, plus a check before the insert |
+| Nothing is public until an operator publishes it | every review starts `pending`; the public list selects `status = 'published'` only |
+| Every decision is audited | `moderateReview` writes `review.publish` / `review.reject` with the note |
+
+**What is deliberately absent.** No seed data, no imported reviews, no "example" quotes and nothing generated — when there are none, `/reviews` says so in as many words. The public list carries **no customer identity at all**: not a name, not an initial, not a masked email. A wallet is a financial account; a review is not a reason to publish who holds one. Operators see the account in `/admin/reviews`, because judging a review means knowing whose order it came from.
+
+**Where it surfaces.** `/reviews` (public, published only), `/dashboard/reviews` (write one, and see your own status with the reason if it was not published), `/admin/reviews` (queue with waiting / published / not-published / all tabs), plus a footer link and a sitemap entry.
+
+**Moderation policy, documented rather than implied:** publish when the review is about a real experience and contains no contact details, credentials, other people's data or abuse; reject with a note the customer can read. Editing a review's words is not offered, and should not be done in SQL either — the audit trail says what was decided, not what was rewritten.
+
+**Verified:** 942 tests / 106 files · typecheck · lint · build. New tests: the eligibility matrix (another account's order, five non-delivered statuses, duplicate attempt), input bounds, publish/reject with audit, a second decision refused, and two page renders proving the public page shows published reviews only and no identity while the queue shows the account. Sabotage-proven twice: making the public list read pending reviews fails three tests, and dropping the delivery check fails the eligibility test. Migration `0016` applied in all four PGlite fixtures.

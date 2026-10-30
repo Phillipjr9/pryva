@@ -37,9 +37,17 @@ export type AdminAuditAction =
   | "withdrawal.complete"
   | "user.credit"
   | "user.debit"
-  | "message.status";
+  | "message.status"
+  | "review.publish"
+  | "review.reject";
 
-export type AdminAuditTargetType = "order" | "withdrawal" | "user" | "message" | "gift_card";
+export type AdminAuditTargetType =
+  | "order"
+  | "withdrawal"
+  | "user"
+  | "message"
+  | "gift_card"
+  | "review";
 
 type AuditActor = Pick<PublicUser, "id" | "email">;
 

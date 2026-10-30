@@ -203,6 +203,24 @@ to prove *what* moved.
 
 ---
 
+## 7a. Review moderation
+
+Reviews are written by customers whose order was delivered, and are **pending
+until an operator publishes them**. `STATUS.md` §16 has the full rule set.
+
+- **Publish** when the review describes a real experience and contains no phone
+  numbers, emails, credentials, other people's data, supplier names or abuse.
+  Strip those by rejecting with a note, not by editing the text.
+- **Reject** with a note the customer will read ("contains a phone number").
+  They see the note on `/dashboard/reviews`; write it for them, not for yourself.
+- **Do not** seed reviews, import them from another site, or copy a testimonial
+  into the table to make the page look populated. An empty `/reviews` page says
+  it is empty, and that is the honest state.
+- **Do not** publish a review on an order that was refunded after delivery
+  without mentioning it. The review stays tied to the order; check it first.
+- The customer's email is visible in `/admin/reviews` and nowhere public. Keep it
+  that way: the public page selects no identity fields at all.
+
 ## 8. Incident playbooks
 
 **Suspected double credit.** Compare `wallet_transactions` references for the
@@ -251,6 +269,9 @@ preview apply a migration to production by removing the `VERCEL_ENV` gate.
   (It already is public — see `STATUS.md` — so treat wholesale costs as disclosed.)
 - Do not apply a migration by hand from a list in a document. Use the runner and
   the glob in `migrations/README.md`.
+- Do not edit a review's text in SQL, publish it without checking the order, or
+  seed the table with borrowed testimonials. A review is a customer's statement;
+  the only two decisions are publish and reject, and both are audited.
 - Do not "fix" a two-factor lockout by unsetting `TWO_FACTOR_KEY` or deleting rows
   in bulk. The first is a fail-closed outage, the second silently removes a
   security control from every account it touches.

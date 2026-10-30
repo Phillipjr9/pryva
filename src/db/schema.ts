@@ -486,6 +486,43 @@ export type User = typeof users.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type WalletTransaction = typeof walletTransactions.$inferSelect;
 export type ContactMessage = typeof contactMessages.$inferSelect;
+/**
+ * A review of an order that was actually delivered.
+ *
+ * `orderId` is unique in the migration, so one purchase yields at most one
+ * review. `service` and `productName` are copied from the order rather than
+ * joined, so delisting a product cannot silently detach or rewrite a published
+ * review. Nothing is public until `status` becomes 'published'.
+ */
+export const productReviews = pgTable(
+  "product_reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    service: varchar("service", { length: 40 }).notNull(),
+    productName: varchar("product_name", { length: 160 }).notNull(),
+    rating: integer("rating").notNull(),
+    headline: varchar("headline", { length: 80 }),
+    body: text("body").notNull(),
+    status: varchar("status", { length: 16 }).notNull().default("pending"),
+    moderatorNote: text("moderator_note"),
+    moderatedBy: uuid("moderated_by").references(() => users.id, { onDelete: "set null" }),
+    moderatedAt: timestamp("moderated_at", { withTimezone: true }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("product_reviews_order_id_key").on(table.orderId),
+    index("product_reviews_status_created_idx").on(table.status, table.createdAt),
+    index("product_reviews_user_idx").on(table.userId),
+  ],
+);
+
 export type GiftCard = typeof giftCards.$inferSelect;
 export type ScheduledOrder = typeof scheduledOrders.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
@@ -494,6 +531,7 @@ export type Withdrawal = typeof withdrawals.$inferSelect;
 export type BankAccount = typeof bankAccounts.$inferSelect;
 export type DisposableInbox = typeof disposableInboxes.$inferSelect;
 export type InboxMessage = typeof inboxMessages.$inferSelect;
+export type ProductReview = typeof productReviews.$inferSelect;
 
 /**
  * Who did what in the admin console, and to whom.

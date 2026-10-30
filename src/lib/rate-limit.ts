@@ -133,6 +133,9 @@ export const passwordChangeRateLimiter = createRateLimiter({ windowMs: 15 * 60_0
  */
 export const notificationRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 30 });
 export const giftCardUserRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 15 });
+// Reviews are written once per order, so a handful per hour is generous; the cap
+// exists to stop an automated account filling the moderation queue.
+export const reviewRateLimiter = createRateLimiter({ windowMs: 60 * 60_000, maxRequests: 6 });
 export const giftCardIpRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 60 });
 
 /**
