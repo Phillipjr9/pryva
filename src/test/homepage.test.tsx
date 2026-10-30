@@ -128,3 +128,32 @@ describe("homepage SEO and navigation", () => {
     expect(html).toContain("Get started");
   });
 });
+
+/**
+ * Its own describe block, and deliberately at the end of the file: an open PR
+ * adds a test to "homepage SEO and navigation" above, and two branches inserting
+ * at the same anchor conflict for no reason. Placement here keeps both mergeable
+ * in either order.
+ */
+describe("homepage hero", () => {
+  /**
+   * The hero photo used to carry a fake verification card layered over it --
+   * "Example verification / Sample only", a masked +234 number, six digits and
+   * an "Expires in 00:19" countdown. It was decoration pretending to be a
+   * product screenshot, sitting on the one image a visitor sees first. Removed
+   * at the owner's request.
+   *
+   * Scoped to the hero card's own strings on purpose. The dashboard section
+   * further down still shows an illustrative order ("Example Order PV-2291"),
+   * because there it is doing real work -- showing what the dashboard looks like
+   * -- and it shares wording such as "Nigeria · sample number" with the card
+   * that is gone, so a broader assertion would fail for the wrong reason.
+   */
+  it("keeps the hero photo clean of the fake verification card", () => {
+    expect(html).not.toContain("Example verification");
+    expect(html).not.toContain("Sample only");
+    expect(html).not.toContain("482069");
+    // The photo and its call to action stay; only the overlay went.
+    expect(html).toContain("Create your account");
+  });
+});
