@@ -1,6 +1,6 @@
 # Pryva — verified status review
 
-**Date:** 30 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** `c0abe31` plus the two-factor batch
+**Date:** 30 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** the sixteenth pass, §24
 **Method:** every claim below was read out of the code or produced by running the project. Nothing is taken from `PLAN.md` without checking it first — and several `PLAN.md` entries turned out to be stale (section 4).
 
 ---
@@ -12,7 +12,7 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **1,067 tests / 117 files, all passing** (no `.skip`, no `.only`) |
+| `npm test` | **1,074 tests / 118 files, all passing** (no `.skip`, no `.only`) |
 | `npm run build` | **passes**; 75 API route handlers, 23 public pages, 17 dashboard pages, 12 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
@@ -716,3 +716,48 @@ other edit, and the module's comment says so.
 **Verified:** 1,067 tests / 117 files · typecheck · lint · build · `npm audit`
 clean for production dependencies.
 
+---
+
+## 24. Sixteenth pass — security is part of settings (30 Oct 2026)
+
+**The correction.** "Security should be under settings on user profile, they can't be
+separate." It was right, and not only cosmetically: password, two-factor and
+sessions are three properties of one account, and the app had them on two sibling
+pages that both sounded correct. A customer who wanted to turn on two-factor went
+to Settings — the page that already held the password field — and found no mention
+of it. The separate page also made the two halves disagree about what "Settings"
+meant.
+
+**What is there now.** `/dashboard/settings` is the whole account page, in one
+scroll: the `?require=2fa` explanation (when the administrator area has just
+refused someone), the profile and password form, then `#security` — the two-factor
+card, the active-sessions card, what we do on our side and the habits section that
+used to be the separate page's only other content. `src/app/dashboard/settings/
+SecuritySection.tsx` reads the 2FA state itself and is a server component, so the
+client cards kept their boundaries; `TwoFactorCard` and `SessionsCard` moved with
+`git mv`, not copied, so there is one implementation of each.
+
+**What did not change.** Every link that already pointed at the old address still
+arrives: `src/app/dashboard/security/page.tsx` is now a redirect to
+`/dashboard/settings` **carrying the query string and the `#security` anchor**
+forward. That matters for the case that is easy to miss — an administrator
+without 2FA is bounced out of `/admin/*` to `?require=2fa&next=…`, so a plain
+redirect would drop the explanation and land them on a page that looks unrelated
+to what just happened. Command palette entry renamed to "Security settings" and
+pointed at the section; the sidebar has **Settings** and no Security row; the
+terms page links to the anchor; `src/lib/auth.ts` bounces to the section directly.
+
+**Tests.** `src/test/settings-security.test.tsx` (new, 7) pins the shape: the
+section renders on the settings page with `id="security"`, both cards and the
+guidance came across, the sidebar has no security destination, the old route is a
+redirect that keeps the query and the anchor and no longer renders a heading, the
+moved files exist only in their new directory, the admin bounce carries the
+anchor, and the palette points at the section. Three older tests asserted the
+two-page layout and were rewritten rather than deleted: the sidebar list, the
+terms href, and the admin-2FA banner — that banner's text is now read out of the
+settings page.
+
+**Verified:** 1,074 tests / 118 files · typecheck · lint · build. Live check with
+`next start`: `/dashboard/security` answers **307** with
+`location: /dashboard/settings…#security` (query preserved), and
+`/dashboard/settings` still redirects to sign-in when signed out, as before.

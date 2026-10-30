@@ -48,7 +48,7 @@ const COMMANDS: Command[] = [
   { id: "bulk", label: "Bulk orders", icon: ShoppingCart, group: "Navigate", href: "/dashboard/bulk-orders" },
   { id: "scheduled", label: "Scheduled orders", icon: Calendar, group: "Navigate", href: "/dashboard/scheduled" },
   { id: "notifications", label: "Notifications", icon: Bell, group: "Manage", href: "/dashboard/notifications" },
-  { id: "security", label: "Security", icon: Shield, group: "Manage", href: "/dashboard/security" },
+  { id: "security", label: "Security settings", icon: Shield, group: "Manage", href: "/dashboard/settings#security" },
   { id: "settings", label: "Settings", icon: Settings, group: "Manage", href: "/dashboard/settings" },
   { id: "support", label: "Support", icon: Chat, group: "Manage", href: "/dashboard/support" },
   { id: "home", label: "Marketing site", icon: Home, group: "Manage", href: "/" },

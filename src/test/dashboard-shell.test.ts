@@ -41,7 +41,6 @@ describe("dashboard navigation", () => {
       "/dashboard/bulk-orders",
       "/dashboard/scheduled",
       "/dashboard/notifications",
-      "/dashboard/security",
       "/dashboard/settings",
       "/dashboard/support",
     ]) {
