@@ -18,6 +18,17 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Rendered per request, not at build time.
+ *
+ * `purchaseEnabled` is decided by environment variables that can change after a
+ * deployment exists. Prerendered, the value is frozen at whatever was configured
+ * during the build — which is how the storefront kept announcing that checkout
+ * was paused for twenty minutes after the account feed was connected, while the
+ * listings API on the same page reported the opposite.
+ */
+export const dynamic = "force-dynamic";
+
 export default function AccountsPage() {
   return (
     <main>
