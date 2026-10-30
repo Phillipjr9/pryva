@@ -734,6 +734,52 @@ describe("Paystack top-up safety", () => {
     expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
   });
 
+  it("names the mismatching field in the log so a stranded deposit is diagnosable", async () => {
+    mocks.initializePayment.mockImplementationOnce(async ({ reference }: { reference: string }) => ({
+      status: true, data: { authorization_url: "https://checkout.paystack.com/session", reference },
+    }));
+    const initialized = await topUpRoute.POST(request("", { amount: 2500 }));
+    expect(initialized.status).toBe(200);
+    const { reference } = await initialized.json();
+    const payment = { status: "success", reference, amount: 250000, currency: "NGN", customer: { email: "buyer@example.com" } };
+
+    // A stringified amount is what parsePaystackResponse's unchecked `as T` cast
+    // lets through, and under `!==` it is indistinguishable from a missing one.
+    mocks.verifyPayment.mockResolvedValueOnce({ status: true, data: { ...payment, amount: "250000" } });
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference }))).status).toBe(409);
+    expect(mocks.log.warn).toHaveBeenCalledWith(
+      "Top-up verification returned mismatched payment details",
+      expect.objectContaining({
+        reference,
+        mismatch: expect.stringContaining('amount: not a safe integer, provider sent "250000" (typeof string)'),
+      }),
+    );
+
+    mocks.log.warn.mockClear();
+    mocks.verifyPayment.mockResolvedValueOnce({ status: true, data: { ...payment, amount: 250001 } });
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference }))).status).toBe(409);
+    expect(mocks.log.warn).toHaveBeenCalledWith(
+      "Top-up verification returned mismatched payment details",
+      expect.objectContaining({
+        mismatch: expect.stringContaining("amount: provider sent 250001 kobo, expected 250000 kobo from the stored 2500 naira"),
+      }),
+    );
+
+    mocks.log.warn.mockClear();
+    mocks.verifyPayment.mockResolvedValueOnce({ status: true, data: { ...payment, currency: "USD" } });
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference }))).status).toBe(409);
+    expect(mocks.log.warn).toHaveBeenCalledWith(
+      "Top-up verification returned mismatched payment details",
+      expect.objectContaining({
+        mismatch: expect.stringContaining('currency: provider sent "USD", expected "NGN"'),
+      }),
+    );
+
+    // Every rejected attempt left the wallet untouched.
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(10000);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
+  });
+
   it("verifies reference, currency and exact naira amount and deduplicates the signed webhook", async () => {
     mocks.initializePayment.mockImplementationOnce(async ({ reference }: { reference: string }) => ({
       status: true, data: { authorization_url: "https://checkout.paystack.com/session", reference },
