@@ -177,24 +177,6 @@ const serviceDefinitions: Service[] = [
     ],
   },
   {
-    slug: "gift-cards", name: "Gift Cards", shortName: "Gift Cards", href: "/dashboard/gift-cards",
-    eyebrow: "Send value", tagline: "Share wallet credit with a code.",
-    description: "Create a gift card from your wallet and share its code with a recipient.",
-    intro: "Create a gift card using your wallet and share its code through a trusted channel. Gift cards are non-refundable.",
-    fromPrice: 1000, unit: "per card", icon: "gift",
-    highlights: [
-      { title: "Choose an amount", body: "Gift card values range from ₦1,000 to ₦500,000." },
-      { title: "Protect the code", body: "Treat the redemption code like cash and share it only with the intended recipient." },
-      { title: "Validity", body: "Cards expire one year after purchase and are non-refundable." },
-    ],
-    included: ["Unique gift card code", "Optional recipient details", "One-year validity"],
-    goodFor: ["Gifts", "Team rewards", "Wallet credit"],
-    faqs: [
-      { q: "Can I cancel or refund a gift card?", a: "Gift cards are non-refundable once purchased." },
-      { q: "Can I redeem my own card?", a: "No. A purchaser cannot redeem their own gift card." },
-    ],
-  },
-  {
     slug: "bulk", name: "Bulk Orders", shortName: "Bulk", href: "/dashboard/bulk-orders",
     eyebrow: "Bulk baskets", tagline: "Explore multi-item baskets.",
     description: "Compare a basket of catalog items and review volume discounts. Bulk purchasing is not available yet.",
