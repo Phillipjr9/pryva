@@ -23,7 +23,7 @@ vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => false }));
  *    Internal code identifiers and comments are excluded on purpose — `provider
  *    === "fleexa"` is a routing key, not a sentence anybody reads.
  */
-const VENDORS = ["fleexa", "accszone", "bulkacc", "freshbulkacc", "resellacc", "accsbulk"];
+const VENDORS = ["fleexa", "accszone", "bulkacc", "freshbulkacc", "resellacc", "accsbulk", "bitcall"];
 const DISCLOSURE = [
   "reseller", "resell", "wholesale", "upstream", "vendor", "dropship", "drop-ship",
   // Every inflection, not just the noun: "supplier" alone let "delivered exactly
