@@ -5,6 +5,8 @@ import { isFleexaConfigured } from "@/lib/fleexa";
 import { readSupplierSnapshot, supplierItemsForCountry } from "@/lib/fleexa-catalog";
 import { isSmmPanelConfigured } from "@/lib/smm-panel";
 import { boostItems, readBoostSnapshot } from "@/lib/smm-catalog";
+import { isBitcallConfigured } from "@/lib/bitcall";
+import { esimItemsForCountry, readEsimSnapshot } from "@/lib/bitcall-esim-catalog";
 import { explorerCountry } from "@/lib/service-explorer";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
 
@@ -43,24 +45,27 @@ export async function GET(request: NextRequest) {
   if (!limit.allowed) return NextResponse.json({ error: "Please try again shortly" }, { status: 429 });
 
   const refresh = request.nextUrl.searchParams.get("refresh") === "1";
-  const [supplier, boost] = await Promise.all([
+  const [supplier, boost, esim] = await Promise.all([
     attempt(isFleexaConfigured(), () => readSupplierSnapshot(refresh)),
     attempt(isSmmPanelConfigured(), () => readBoostSnapshot(refresh)),
+    attempt(isBitcallConfigured(), () => readEsimSnapshot(refresh)),
   ]);
-  if (!supplier.snapshot && !boost.snapshot) {
+  const sources = [supplier, boost, esim];
+  if (sources.every((source) => !source.snapshot)) {
     return NextResponse.json({ error: "The live catalog is temporarily unavailable" }, { status: 503 });
   }
 
   const items = [
     ...(supplier.snapshot ? supplierItemsForCountry(supplier.snapshot, country.code) : []),
+    ...(esim.snapshot ? esimItemsForCountry(esim.snapshot, country.code) : []),
     ...(boost.snapshot ? boostItems(boost.snapshot) : []),
   ];
-  // Partial means "this may be incomplete": a configured supplier that failed,
-  // or one that reported its own degraded read. A supplier that is simply not
+  // Partial means "this may be incomplete": a configured source that failed, or
+  // one that reported its own degraded read. A source that is simply not
   // configured is the steady state, not a warning.
-  const partial = supplier.snapshot?.partial === true || boost.snapshot?.partial === true ||
-    (supplier.configured && !supplier.snapshot) || (boost.configured && !boost.snapshot);
-  const fetchedAt = [supplier.snapshot?.fetchedAt, boost.snapshot?.fetchedAt]
+  const partial = sources.some((source) => source.snapshot?.partial === true || (source.configured && !source.snapshot));
+  const fetchedAt = sources
+    .map((source) => source.snapshot?.fetchedAt)
     .filter((value): value is string => typeof value === "string" && Number.isFinite(Date.parse(value)))
     .sort()
     .pop() ?? null;
