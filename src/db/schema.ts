@@ -181,6 +181,17 @@ export const paymentTopups = pgTable(
     amount: integer("amount").notNull(),
     status: varchar("status", { length: 24 }).notNull().default("pending"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
+    /**
+     * The account holder's name at the moment this deposit settled, frozen
+     * thereafter. Withdrawals may only be paid to a bank account whose resolved
+     * name matches it — see src/lib/withdrawal-name-check.ts.
+     *
+     * Deliberately not `users.name`, which the profile endpoint edits at any
+     * time: a reference that can be changed after the money arrives cannot prove
+     * who sent it. NULL for deposits that settled before migration 0012, and a
+     * NULL fails the payout check closed rather than being treated as a match.
+     */
+    payerName: varchar("payer_name", { length: 120 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("payment_topups_user_idx").on(table.userId)],

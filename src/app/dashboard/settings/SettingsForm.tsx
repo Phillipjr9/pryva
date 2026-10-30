@@ -1,12 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Loader2, Lock, Shield, User } from "@/components/icons";
+import Link from "next/link";
+import { Check, Loader2, Lock, Mail, Shield, User } from "@/components/icons";
 import type { PublicUser } from "@/lib/auth";
 import { AccountDataPanel } from "./AccountDataPanel";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 interface SettingsFormProps {
   user: PublicUser;
+  /**
+   * Whether this server can actually send the verification email. Decided
+   * server-side rather than by letting the button fail, because a control that
+   * is known to be dead should not be rendered as though it works.
+   */
+  canSendVerification: boolean;
 }
 
 function Notice({ kind, children }: { kind: "error" | "success"; children: string }) {
@@ -58,7 +66,7 @@ function Section({
  * styles instead of the older generic Card/Input set, which made this page look
  * like a different product.
  */
-export function SettingsForm({ user }: SettingsFormProps) {
+export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
   const [name, setName] = useState(user.name);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -182,14 +190,12 @@ export function SettingsForm({ user }: SettingsFormProps) {
           <label htmlFor="current-password" className="field-label">
             Current password
           </label>
-          <input
+          <PasswordInput
             id="current-password"
-            type="password"
             autoComplete="current-password"
             value={currentPassword}
             onChange={(event) => setCurrentPassword(event.target.value)}
             placeholder="Current password"
-            className="field"
           />
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -197,28 +203,24 @@ export function SettingsForm({ user }: SettingsFormProps) {
             <label htmlFor="new-password" className="field-label">
               New password
             </label>
-            <input
+            <PasswordInput
               id="new-password"
-              type="password"
               autoComplete="new-password"
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
               placeholder="At least 8 characters"
-              className="field"
             />
           </div>
           <div>
             <label htmlFor="confirm-password" className="field-label">
               Confirm new password
             </label>
-            <input
+            <PasswordInput
               id="confirm-password"
-              type="password"
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
               placeholder="Repeat it"
-              className="field"
             />
           </div>
         </div>
@@ -236,6 +238,47 @@ export function SettingsForm({ user }: SettingsFormProps) {
             "Change password"
           )}
         </button>
+      </Section>
+
+      <Section
+        icon={Mail}
+        title="Email verification"
+        note="Proof that you control this address, and where a password reset would be sent."
+      >
+        {user.emailVerifiedAt ? (
+          <p className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-[0.8rem] font-medium text-emerald-800">
+            <Check className="h-3.5 w-3.5 shrink-0" />
+            {user.email} was verified on{" "}
+            {new Date(user.emailVerifiedAt).toLocaleDateString("en-NG", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })}
+          </p>
+        ) : (
+          <>
+            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[0.78rem] leading-relaxed text-amber-900">
+              <span className="font-semibold">{user.email}</span> is not verified yet.
+            </p>
+            {canSendVerification ? (
+              <Link
+                href="/verify-email"
+                className="btn w-fit border border-lav-300 bg-lav-50 !px-4 !py-2.5 !text-[0.8rem] font-semibold text-lav-700 hover:bg-lav-100"
+              >
+                Send the confirmation link
+              </Link>
+            ) : (
+              <p className="text-[0.75rem] leading-relaxed text-ink-3">
+                This server cannot send that email yet, so there is no button here that would only
+                fail. {" "}
+                <Link href="/contact" className="font-semibold text-lav-700 underline underline-offset-2">
+                  Contact support
+                </Link>{" "}
+                and they will verify the address for you.
+              </p>
+            )}
+          </>
+        )}
       </Section>
 
       <Section icon={Shield} title="Account" note="Read-only details. Your data can be downloaded below.">

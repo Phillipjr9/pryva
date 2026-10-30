@@ -11,7 +11,7 @@ import {
 import { isBitcallConfigured, getBitcallBalance } from "@/lib/bitcall";
 import { isSmmPanelConfigured } from "@/lib/smm-panel";
 import { resendConfigured } from "@/lib/resend-config";
-import { isPaystackConfigured } from "@/lib/paystack";
+import { isPaystackConfigured, paystackKeyMode, getBanks } from "@/lib/paystack";
 import { persistentDatabaseConfigured } from "@/lib/database-config";
 import {
   isMarketplaceCheckoutConfigured,
@@ -135,7 +135,18 @@ export async function GET(request: NextRequest) {
       numbers,
       gateway,
       boosting: { configured: isSmmPanelConfigured() },
-      payments: { configured: isPaystackConfigured() },
+      payments: isPaystackConfigured()
+        ? {
+            configured: true as const,
+            keyTail: keyTail("PAYSTACK_SECRET_KEY"),
+            // A test key cannot resolve real bank accounts, so "add a bank
+            // account" fails at the resolve step. Reporting the mode says whether
+            // that is an environment fact or a code bug, and the banks probe says
+            // whether the credential is accepted at all.
+            mode: paystackKeyMode(),
+            banks: await probe("paystack-banks", async () => summarize(await getBanks())),
+          }
+        : { configured: false as const },
       email: { configured: resendConfigured() },
       manualFulfilmentReachable,
     },

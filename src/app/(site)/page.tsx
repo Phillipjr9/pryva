@@ -286,59 +286,6 @@ export default async function HomePage() {
                     className="aspect-[4/4.3] w-full object-cover sm:aspect-[4/4.25] lg:aspect-[4/4.6]"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-ink/35 via-transparent to-transparent" />
-
-                  {/* one card on phones keeps the story without the clutter */}
-                  <div className="absolute inset-x-2.5 bottom-2.5 rounded-[1.25rem] border border-white/90 bg-white/95 p-3 shadow-[var(--shadow-soft)] backdrop-blur-xl sm:inset-x-3 sm:bottom-3 sm:p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1.5 text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-ink-3">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                        Example verification
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[0.58rem] font-semibold text-emerald-700">
-                        <Bolt className="h-2.5 w-2.5" /> Sample only
-                      </span>
-                    </div>
-
-                    <div className="mt-2.5 flex items-center justify-between rounded-xl border border-line bg-cream/70 px-2.5 py-2">
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        <CountryFlag code="ng" size={24} decorative />
-                        <div className="min-w-0">
-                          <p className="truncate text-[0.82rem] font-semibold tracking-tight">
-                            +234 ••• ••• ••••
-                          </p>
-                          <p className="truncate text-[0.62rem] text-ink-3">
-                            Nigeria · sample number
-                          </p>
-                        </div>
-                      </div>
-                      <Copy className="h-3.5 w-3.5 shrink-0 text-ink-3" />
-                    </div>
-
-                    <div className="mt-2.5 flex gap-1">
-                      {["4", "8", "2", "0", "6", "9"].map((digit, index) => (
-                        <span
-                          key={index}
-                          className={`grid h-8 flex-1 place-items-center rounded-md border text-[0.85rem] font-semibold sm:h-9 sm:text-[0.95rem] ${
-                            index === 5
-                              ? "border-lav-400 bg-white text-lav-700 shadow-sm"
-                              : "border-line bg-white/80 text-ink"
-                          }`}
-                        >
-                          {digit}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="mt-2 flex items-center justify-between text-[0.58rem] font-medium text-ink-3">
-                      <span className="inline-flex items-center gap-1">
-                        <Clock className="h-2.5 w-2.5" /> Expires in 00:19
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <BrandIcon brand="whatsapp" size={12} variant="bare" decorative />
-                        Example only
-                      </span>
-                    </div>
-                  </div>
                 </div>
               </div>
             </Reveal>
