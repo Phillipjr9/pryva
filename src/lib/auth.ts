@@ -226,7 +226,7 @@ export async function requireAdmin(nextPath = "/admin/dashboard"): Promise<Publi
   // them to the page that fixes it — with where they were going, so the return
   // trip is one click.
   if (await adminBlockedForMissingSecondFactor(user.id)) {
-    redirect(`/dashboard/security?require=2fa&next=${encodeURIComponent(nextPath)}`);
+    redirect(`/dashboard/settings?require=2fa&next=${encodeURIComponent(nextPath)}#security`);
   }
 
   return user;

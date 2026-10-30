@@ -67,11 +67,15 @@ describe("administrator second factor", () => {
 describe("the rule is wired into both doors", () => {
   const auth = readFileSync("src/lib/auth.ts", "utf8");
   const adminApi = readFileSync("src/lib/admin-auth.ts", "utf8");
-  const securityPage = readFileSync("src/app/dashboard/security/page.tsx", "utf8");
+  const settingsPage = readFileSync("src/app/dashboard/settings/page.tsx", "utf8");
+  const securitySection = readFileSync("src/app/dashboard/settings/SecuritySection.tsx", "utf8");
 
   it("guards the admin pages, and sends the operator to the page that fixes it", () => {
     expect(auth).toContain("adminBlockedForMissingSecondFactor(user.id)");
-    expect(auth).toContain("/dashboard/security?require=2fa");
+    // Security is a section of Settings, so the bounce carries the anchor as
+    // well as the explanation.
+    expect(auth).toContain("/dashboard/settings?require=2fa");
+    expect(auth).toContain("#security");
   });
 
   it("guards the admin API too, so the page rule is not theatre", () => {
@@ -80,7 +84,10 @@ describe("the rule is wired into both doors", () => {
   });
 
   it("says why the tools are closed instead of failing silently", () => {
-    expect(securityPage).toContain('params.require === "2fa"');
-    expect(securityPage).toContain("locked until two-factor is on");
+    expect(settingsPage).toContain('params.require === "2fa"');
+    expect(settingsPage).toContain("locked until two-factor is on");
+    // And the section the bounce points at renders the thing that fixes it.
+    expect(securitySection).toContain('id="security"');
+    expect(securitySection).toContain("TwoFactorCard");
   });
 });

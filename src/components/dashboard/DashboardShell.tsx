@@ -16,7 +16,6 @@ import {
   Plus,
   Receipt,
   Settings,
-  Shield,
   Sparkle,
   Phone,
   Users,
@@ -79,7 +78,8 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
     label: "You",
     items: [
       { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
-      { href: "/dashboard/security", label: "Security", icon: Shield },
+      // Security is a section of Settings, not a destination of its own: one
+      // account, one page that changes it. The old route redirects here.
       { href: "/dashboard/settings", label: "Settings", icon: Settings },
       { href: "/dashboard/support", label: "Support", icon: Chat },
     ],

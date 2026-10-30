@@ -82,7 +82,7 @@ const clauses: Clause[] = [
         <p>
           You are responsible for everything done with your account. Keep your password private,
           and turn on two-factor authentication in{" "}
-          <Link href="/dashboard/security">security settings</Link> if your account handles money —
+          <Link href="/dashboard/settings#security">security settings</Link> if your account handles money —
           it is checked after the password and before any session is created.
         </p>
         <p>

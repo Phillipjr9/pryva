@@ -40,7 +40,7 @@ describe("terms of service", () => {
       "/cookie-policy",
       "/contact",
       "/status",
-      "/dashboard/security",
+      "/dashboard/settings#security",
       "/dashboard/settings",
     ]) {
       expect(text, href).toContain(`href="${href}"`);
