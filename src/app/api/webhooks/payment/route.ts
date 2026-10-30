@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
       status?: unknown;
       reference?: unknown;
       amount?: unknown;
+      requested_amount?: unknown;
       currency?: unknown;
       metadata?: unknown;
     };
@@ -56,7 +57,15 @@ export async function POST(request: NextRequest) {
   const details = metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata as { userId?: unknown; type?: unknown } : null;
   const userId = details?.userId;
   const reference = data?.reference;
-  const kobo = data?.amount;
+  const chargedKobo = data?.amount;
+  // `amount` is the gross the customer paid. With "Pass fees to customers" on in
+  // the Paystack dashboard that exceeds the net we requested and can be a
+  // fractional naira figure, which both mismatches the stored top-up and fails
+  // the whole-naira check below -- so a fee-bearing charge.success could never
+  // credit a wallet through this route. Match the net we asked for instead, and
+  // fall back to the gross when Paystack does not report one, which is the
+  // correct figure when fees are not being passed on.
+  const kobo = Number.isSafeInteger(data?.requested_amount) ? data?.requested_amount : chargedKobo;
   if (
     data?.status !== "success" ||
     data.currency !== "NGN" ||
@@ -79,6 +88,10 @@ export async function POST(request: NextRequest) {
       metadataUserId: typeof userId === "string" ? userId : null,
       amountType: typeof kobo,
       amount: typeof kobo === "number" || typeof kobo === "string" ? kobo : null,
+      chargedAmount: typeof chargedKobo === "number" || typeof chargedKobo === "string" ? chargedKobo : null,
+      requestedAmount: typeof data?.requested_amount === "number" || typeof data?.requested_amount === "string"
+        ? data.requested_amount
+        : null,
     });
     return NextResponse.json({ error: "Invalid payment details" }, { status: 400 });
   }

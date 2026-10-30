@@ -193,6 +193,28 @@ describe("Paystack webhook", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
+  it("credits a fee-bearing charge by matching the net Paystack was asked for", async () => {
+    const state = fakeDatabase();
+    // The stored top-up is N2,500. With "Pass fees to customers" on, the charge
+    // is grossed up to 263960 kobo -- fractional naira, so the whole-naira check
+    // and the amount match both rejected it before requested_amount was read.
+    const body = JSON.stringify(payload({ amount: 263960, requested_amount: 250000, fees: 13959 }));
+    const response = await POST(request(body));
+    expect(response.status).toBe(200);
+    expect(state.topup.status).toBe("completed");
+    expect(state.balance).toBe(3000);
+    expect(state.ledger).toHaveLength(1);
+    // Credited at the net, never the gross the customer was charged.
+    expect(state.ledger[0]).toMatchObject({ userId, reference, amount: 2500, balanceAfter: 3000 });
+  });
+
+  it("still refuses a fractional-naira gross when Paystack reports no requested amount", async () => {
+    // Failing closed is deliberate: without the net there is no figure to match
+    // against, and the verify route can still credit this reference.
+    expect((await POST(request(JSON.stringify(payload({ amount: 263960 }))))).status).toBe(400);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
   it("ignores signed non-payment events", async () => {
     expect((await POST(request(JSON.stringify({ event: "transfer.success" })))).status).toBe(200);
     expect(mocks.transaction).not.toHaveBeenCalled();
