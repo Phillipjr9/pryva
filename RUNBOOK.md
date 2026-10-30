@@ -102,12 +102,30 @@ Removing it from the environment does not invalidate the leaked value.
 
 ## 5. Scheduled jobs
 
-`vercel.json` schedules two daily jobs (the Hobby plan's limit):
+`vercel.json` schedules **one** job (the Hobby plan allows two, and the three
+tasks want a defined order rather than three clocks) at 01:20 UTC — 02:20 in
+Lagos, after the business day has closed:
 
 | Path | Schedule | What it does |
 |---|---|---|
-| `/api/cron/wallet-emails` | 03:10 | drains the wallet email outbox, max four jobs per invocation |
-| `/api/cron/auto-refund` | 03:40 | **refuses persistent databases**; preview-only sweep |
+| `/api/cron/nightly` | 01:20 | 1. closes yesterday's books (`reconciliation_runs`), 2. drains the wallet email outbox, 3. runs the auto-refund sweep |
+
+The order is a dependency, not a preference: the close reads the ledger, so it
+goes before anything else writes to it. Each step is isolated — an email outage
+never stops a refund sweep.
+
+The per-task endpoints still exist and are no longer scheduled; use them for a
+manual run:
+
+| Path | What it does |
+|---|---|
+| `/api/cron/wallet-emails` | drains the wallet email outbox, max four jobs per invocation |
+| `/api/cron/auto-refund` | **refuses persistent databases**; preview-only sweep |
+| `/api/cron/daily-reconciliation` | one day's close; `?day=YYYY-MM-DD` backfills |
+
+Check the close actually ran: `/admin/reconciliation` lists the last fourteen
+days, and a missing row for yesterday is the signal that the cron is not firing.
+A day marked **attention** means the wallet ledger did not add up — see §6a.
 
 `/api/cron/scheduled-orders` is **not scheduled on purpose**. It exports only
 `POST`, while Vercel Cron sends `GET`, so scheduling it would register a job that
@@ -128,6 +146,29 @@ code bug.
 ---
 
 ## 6. Money operations
+
+### The daily close, and what to do when it says "attention"
+
+Every morning, look at `/admin/reconciliation` → **Daily close**:
+
+1. **A missing row for yesterday** means the cron did not run. Check the job in
+   the Vercel dashboard and the deploy's `CRON_SECRET`; then backfill it:
+   `curl -H "Authorization: Bearer $CRON_SECRET" "https://<domain>/api/cron/daily-reconciliation?day=YYYY-MM-DD"`.
+2. **A row marked `clean`** means the day's totals were recorded and every
+   account's ledger added up. Compare the **deposits** figure with the settled
+   total in the Paystack dashboard for the same Lagos day. A difference is a real
+   finding: a payment we never credited, a duplicate credit, or a chargeback.
+3. **A row marked `attention`** means the wallet ledger does not add up. The page
+   lists the accounts and the difference. Do **not** edit a balance to make it
+   match — that hides the cause and destroys the evidence. Instead open
+   `/admin/transactions` filtered to that account and find the transaction whose
+   running balance does not follow. The usual causes are a hand-written `UPDATE`,
+   a credit committed without its ledger row, or a debit applied twice.
+4. Record what you found in the run's `notes` (or in the incident log) even when
+   the answer is "provider-side, expected".
+
+The close never writes to a money table. Only the person at the keyboard does, and
+only through the pages that audit it.
 
 ### Top-ups
 A credit requires a matching pending `payment_topups` row, the right currency and
@@ -394,6 +435,18 @@ fails, the backup is not real until it passes.
   extending the policy in `src/lib/security-headers.ts`. The browser will block it
   and the page will look broken in a way the server logs never show. Never put a
   bare `*` in `script-src`, `style-src` or `connect-src` to "make it work".
+- Do not leave `ADMIN_2FA_REQUIRED=false` set. It exists to get one administrator
+  back in after a lost phone and lost recovery codes; leaving it off removes the
+  second factor from every account that can approve a withdrawal or issue a
+  refund. Turn it off, fix the enrolment, turn it back on, and say so in the
+  incident log.
+- Do not "fix" a wallet balance by editing `users.wallet_balance`. The nightly
+  close compares that column with the account's ledger, and a hand edit is exactly
+  what it is built to catch. Correct the transaction that is wrong, or reverse it
+  with a new ledger entry.
+- Do not run `npm run db:restore` against a database the app is serving. It
+  refuses by default and with `--allow-overwrite` it will happily write rows into a
+  live database, which is a data-loss event with a confirmation flag.
 - Do not link `fonts.googleapis.com` (or any font CDN) again. The webfonts are
   self-hosted from `@fontsource` packages imported in `src/app/layout.tsx`, which
   is why `style-src` and `font-src` are plain `'self'`. A `<link>` to Google would
