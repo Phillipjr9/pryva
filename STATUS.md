@@ -12,7 +12,7 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **969 tests / 108 files, all passing** (no `.skip`, no `.only`) |
+| `npm test` | **976 tests / 109 files, all passing** (no `.skip`, no `.only`) |
 | `npm run build` | **passes**; 75 API route handlers, 23 public pages, 17 dashboard pages, 12 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
@@ -267,13 +267,18 @@ img-src 'self' data: blob: https://images.pexels.com; connect-src 'self';
 media-src 'self'; worker-src 'self' blob:; manifest-src 'self'; frame-src 'none'
 ```
 
+> **Superseded in §22:** the two Google Fonts hosts are gone. The webfonts are self-hosted
+> from `@fontsource` packages, so `style-src` and `font-src` are plain `'self'` now. The rest
+> of the policy below is unchanged.
+
 **What it actually stops.** A third-party origin cannot supply a script, style, font or image unless it is on that list; the page cannot be framed by anyone but itself; forms cannot post off-site; plugins/objects cannot load at all. That closes the "inject a tag from a supplier's error page" class and makes a new external dependency a visible, reviewable change rather than a silent one.
 
 **What it does not stop, stated plainly.** `script-src` still includes `'unsafe-inline'`, so HTML injection that gets past React's escaping would still execute. Next.js emits its own inline bootstrap, the home page emits JSON-LD, and `BuildGuard` installs a stale-bundle check before hydration; a nonce-based policy would force every page to render dynamically and would still need those scripts rewritten to carry the nonce. That is a real follow-up, not a one-line change, and it is recorded here rather than pretended away.
 
 **Environment differences are deliberate and tested.** Development adds `'unsafe-eval'` and `ws:`/`wss:` for hot reload; production has neither. The embedded preview keeps `frame-ancestors *` (and continues to omit `X-Frame-Options`) so the Arena viewer can frame the demo; a real deployment keeps `'self'`. `isEmbeddedPreviewHost` is anchored so `e2b.app.evil.com` does not match.
 
-**Drift is the failure mode, so the tests read the sources.** `src/test/content-security-policy.test.ts` parses the policy and compares it with `layout.tsx` (the two Google Fonts hosts) and `next.config.ts` (`images.remotePatterns`), so adding an image host in one place and forgetting the other fails locally instead of silently blocking the image in production. It also fails if a form posts off-origin, if a wildcard appears in a script/style/image/font/connect source, or if a directive is emitted empty.
+**Drift is the failure mode, so the tests read the sources.** `src/test/content-security-policy.test.ts` parses the policy and compares it with `layout.tsx` (since §22: that no Google Fonts host is
+linked) and `next.config.ts` (`images.remotePatterns`), so adding an image host in one place and forgetting the other fails locally instead of silently blocking the image in production. It also fails if a form posts off-origin, if a wildcard appears in a script/style/image/font/connect source, or if a directive is emitted empty.
 
 **Verified:** 896 tests / 101 files · typecheck · lint · build. Booted `next start` and checked the real headers on `/`, `/login`, `/pricing` and `/api/health`, and with `Host: 3000-abc.e2b.app` to confirm the preview branch (`frame-ancestors *`, no `X-Frame-Options`). Sabotage-proven: removing the Pexels host and hard-coding `frame-ancestors *` fails three tests; restored, all pass.
 
@@ -558,4 +563,47 @@ deleted: the homepage test now requires eight service names and asserts gift car
 the grid, the explorer test asserts there is no `gift-cards` category and no item, and the
 dashboard-shell test asserts the sidebar has no `category: "gift-cards"` while `/dashboard/gift-cards`
 is still reachable. `/gift-cards` remains in the footer (moved column) and in the sitemap.
+
+---
+
+## 22. Fourteenth pass — fonts on our own origin, and structured data (30 Oct 2026)
+
+Two upgrades, both invisible in a screenshot and measurable in the source of the page.
+
+**1. The webfonts are self-hosted.** `<head>` used to carry two `preconnect` hints and a
+`<link rel="stylesheet" href="https://fonts.googleapis.com/css2?...">` for Plus Jakarta Sans
+and Instrument Serif. That is a third-party request **on the critical path**: the browser
+cannot finish painting until Google answers, and the only reason the Content-Security-Policy
+named `style-src https://fonts.googleapis.com` and `font-src https://fonts.gstatic.com` was
+that stylesheet. Both families ship as npm packages, so `src/app/layout.tsx` now imports the
+eight cuts the design actually uses (`@fontsource/plus-jakarta-sans` 300–800, and
+`@fontsource/instrument-serif` 400 + italic) and the `<link>` tags are gone.
+
+- Files are emitted into `/_next/static/media` with the same hashed, `immutable` caching as
+  every other asset — verified: `Cache-Control: public, max-age=31536000, immutable`,
+  `content-type: font/woff2`.
+- Each `@fontsource` file declares a `unicode-range`, so a browser downloads latin, and
+  latin-ext only when a glyph outside it appears. The naira sign (`U+20A6`) lives in
+  latin-ext (`U+20A0-20AB`), so prices keep the right face instead of falling back.
+- `font-display: swap` is preserved from the packages, so text paints immediately.
+- **The policy narrowed rather than widened:** `style-src 'self' 'unsafe-inline'` and
+  `font-src 'self' data:`. Two hosts left the CSP, and a test now fails if a `<link>` to
+  either host comes back.
+
+**2. Structured data for the publisher, not just the page.** The homepage emitted `FAQPage`
+and nothing else, so a crawler learned the questions but not who was answering them. The root
+layout now emits `Organization` (name, url, logo, description, `areaServed` Nigeria) and
+`WebSite` (`inLanguage: en-NG`, `publisher` by `@id` reference) from `src/lib/structured-data.ts`.
+
+It deliberately claims **nothing Pryva cannot show**: no `aggregateRating`, no `review`, no
+`foundingDate`, no `address`, no `telephone`, no `sameAs`. A rich result won for an invented
+rating is the same lie as a seeded testimonial, in a format crawlers believe — a test pins
+each of those keys as absent. The serializer escapes `<`/`>` so a string can never close its
+own `<script>` block.
+
+**Verified:** 976 tests / 109 files · typecheck · lint · build. Served HTML checked directly:
+no third-party host in `<head>`, two JSON-LD blocks (`Organization` + `WebSite`, plus the
+homepage's `FAQPage`), 8 self-hosted `@font-face` families in the emitted CSS, no
+`fonts.googleapis`/`fonts.gstatic` anywhere in it, and the CSP header narrowed as above.
+HTML weight unchanged at 55 KB gzipped.
 

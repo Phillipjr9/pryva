@@ -1,11 +1,26 @@
-/* eslint-disable @next/next/no-page-custom-font -- fonts are loaded once in the shared App Router root layout. */
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+// Self-hosted webfonts, imported per weight so the build ships only the cuts
+// the design actually uses. These replace the two <link> tags to
+// fonts.googleapis.com that used to sit in <head>: that stylesheet was a
+// third-party request on the critical path, and it was the only reason the
+// Content-Security-Policy had to allow Google's style and font hosts.
+// Each @fontsource file declares its own `unicode-range`, so a browser fetches
+// latin, plus latin-ext only when a glyph like the naira sign (U+20A6) appears.
+import "@fontsource/plus-jakarta-sans/300.css";
+import "@fontsource/plus-jakarta-sans/400.css";
+import "@fontsource/plus-jakarta-sans/500.css";
+import "@fontsource/plus-jakarta-sans/600.css";
+import "@fontsource/plus-jakarta-sans/700.css";
+import "@fontsource/plus-jakarta-sans/800.css";
+import "@fontsource/instrument-serif/400.css";
+import "@fontsource/instrument-serif/400-italic.css";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
 import { BUILD_ID } from "@/lib/build-id";
 import { BuildGuard } from "@/components/system/BuildGuard";
 import { ServiceWorkerRegistration } from "@/components/system/ServiceWorkerRegistration";
+import { serializeStructuredData, siteStructuredData } from "@/lib/structured-data";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://pryva.ng"),
@@ -73,11 +88,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap"
+        <script
+          type="application/ld+json"
+          // Static, authored in @/lib/structured-data — not user input.
+          dangerouslySetInnerHTML={{ __html: serializeStructuredData(siteStructuredData) }}
         />
         <noscript>
           <style>{`.reveal{opacity:1 !important;transform:none !important}`}</style>

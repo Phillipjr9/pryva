@@ -304,6 +304,13 @@ preview apply a migration to production by removing the `VERCEL_ENV` gate.
   extending the policy in `src/lib/security-headers.ts`. The browser will block it
   and the page will look broken in a way the server logs never show. Never put a
   bare `*` in `script-src`, `style-src` or `connect-src` to "make it work".
+- Do not link `fonts.googleapis.com` (or any font CDN) again. The webfonts are
+  self-hosted from `@fontsource` packages imported in `src/app/layout.tsx`, which
+  is why `style-src` and `font-src` are plain `'self'`. A `<link>` to Google would
+  be blocked by the policy, and re-adding the hosts to make it work puts a
+  render-blocking third-party request back on the critical path. To add a weight,
+  import that weight's CSS file; to add a family, install the `@fontsource`
+  package and add the family to the `--font-*` variables in `globals.css`.
 
 ---
 

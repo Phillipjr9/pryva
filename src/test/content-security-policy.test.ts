@@ -61,16 +61,23 @@ describe("content security policy", () => {
     expect(production.get("frame-ancestors")).toBe("'self'");
   });
 
-  it("allows the fonts the layout actually links", () => {
+  it("no longer allows Google's font hosts, because the fonts are self-hosted", () => {
     const layout = readFileSync("src/app/layout.tsx", "utf8");
     const style = production.get("style-src") ?? "";
     const font = production.get("font-src") ?? "";
 
+    // The webfonts come from @fontsource packages bundled into /_next/static.
+    // If a <link> to fonts.googleapis.com ever comes back, it will be blocked
+    // by this policy rather than quietly re-widening it.
+    // The prose above may still name the hosts; what must not come back is a
+    // tag that actually fetches from them.
+    expect(layout).not.toMatch(/<(?:link|style)[^>]*fonts\.g/i);
     for (const host of ["fonts.googleapis.com", "fonts.gstatic.com"]) {
-      expect(layout, `layout.tsx no longer links ${host}`).toContain(host);
+      expect(style).not.toContain(host);
+      expect(font).not.toContain(host);
     }
-    expect(style).toContain("https://fonts.googleapis.com");
-    expect(font).toContain("https://fonts.gstatic.com");
+    expect(style).toMatch(/^'self' 'unsafe-inline'$/);
+    expect(font).toMatch(/^'self' data:$/);
   });
 
   it("allows every image host configured for next/image", () => {
