@@ -141,7 +141,15 @@ describe("stale-build guard behaviour", () => {
     expect(layout).toContain("BuildGuard");
     expect(layout).not.toContain("next/script");
     const code = layout.replace(/\/\*[\s\S]*?\*\//g, "");
-    expect(code).not.toMatch(/<script[\s>]/);
+    // The one script element the layout may render is the JSON-LD block, which
+    // is data for crawlers rather than executable code. Everything else — the
+    // stale-build guard included — has to arrive through useServerInsertedHTML,
+    // because React refuses to run a script element it renders itself.
+    const jsonLd = code.match(/<script\s+type="application\/ld\+json"[\s\S]*?\/>/g) ?? [];
+    expect(jsonLd).toHaveLength(1);
+    expect(code.replace(/<script\s+type="application\/ld\+json"[\s\S]*?\/>/g, "")).not.toMatch(
+      /<script[\s>]/,
+    );
   });
 
   it("targets the running build", () => {

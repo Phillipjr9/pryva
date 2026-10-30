@@ -20,8 +20,9 @@
  *
  * - `style-src 'unsafe-inline'` — Tailwind and React both emit inline styles.
  * - `img-src https://images.pexels.com` — the marketing photographs.
- * - `font-src https://fonts.gstatic.com` + `style-src https://fonts.googleapis.com`
- *   — the two Google Fonts files `layout.tsx` links.
+ * - nothing for fonts: they are self-hosted from `@fontsource` packages and
+ *   served from `/_next/static`, so `font-src 'self'` is enough. Google's
+ *   style and font hosts were removed with the `<link>` tags that needed them.
  * - `frame-ancestors *` (preview only) — the isolated in-memory demo must stay
  *   embeddable in the Arena viewer, which is also why `X-Frame-Options` is
  *   omitted there. A real deployment keeps `'self'`.
@@ -48,8 +49,8 @@ export function contentSecurityPolicy(options: ContentSecurityPolicyOptions = {}
     ["frame-ancestors", [embeddedPreview ? "*" : "'self'"]],
     ["form-action", ["'self'"]],
     ["script-src", ["'self'", "'unsafe-inline'", ...(development ? ["'unsafe-eval'"] : [])]],
-    ["style-src", ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"]],
-    ["font-src", ["'self'", "data:", "https://fonts.gstatic.com"]],
+    ["style-src", ["'self'", "'unsafe-inline'"]],
+    ["font-src", ["'self'", "data:"]],
     ["img-src", ["'self'", "data:", "blob:", "https://images.pexels.com"]],
     ["connect-src", ["'self'", ...(development ? ["ws:", "wss:"] : [])]],
     ["media-src", ["'self'"]],
