@@ -233,10 +233,88 @@ name failed the bypass proof first. Two of those failures were caused by the **t
 the logger mock omitted `warn`, so a refusal surfaced as a 500 — which is the same partial-`vi.mock` trap as
 before, now commented in the fixture.
 
-**Still owed by the owner:** "merge" for PRs #30 and #31, the diagnostics `curl` output (which now also answers
-whether Paystack is test or live, i.e. item 4), and the disposable-inbox cost decision (A absorb ≈₦540/inbox,
-B own a domain + inbound email for under ₦2/inbox — B is the better business case and it is also what would
-make `emailVerifiedAt` real). The free inbox itself is still **not built**.
+**Still owed by the owner at the time of writing:** "merge" for PRs #30 and #31, the diagnostics `curl` output
+(which now also answers whether Paystack is test or live, i.e. item 4), and the disposable-inbox cost decision
+(A absorb ≈₦540/inbox, B own a domain + inbound email for under ₦2/inbox — B is the better business case and it
+is also what would make `emailVerifiedAt` real). The free inbox itself is still **not built**.
+
+*(Both PRs were merged and promoted to production immediately afterwards — see the change log — and R52 below
+supersedes the two open items that concerned the inbox and the probe.)*
+
+**R52 — the free inbox is built, and email becomes freemium rather than free.**
+
+The owner reversed part of R49 with a sharper model: *"the only free service should be the temp email, the other
+email verification otp should cost money… users that cant afford to use the paid service can use temporary mail
+with limited time."* That is a better shape than the one it replaces, because it gives the free tier a job —
+being outgrown — instead of competing with the paid catalogue.
+
+**The old four tiers still cannot simply come back.** They were removed for two reasons and only one of them was
+the pricing argument. The other was technical and is unchanged: the supplier sells *an inbox* and no duration.
+`FleexaEmailProduct` is `{id, name, domain, priceNgn, stock}`, so a "24-hour" and a "30-day" inbox are the same
+purchase on their side. Selling four durations would have delivered one thing four times.
+
+So the free/paid difference is **volume and history, not time** — we control both, the supplier controls neither.
+The owner chose: **one free inbox per account per day**, **alive until discarded**, and a paid tier as **both a
+single inbox and a bundle**. The consequence was stated plainly rather than left implicit: because a free inbox
+lives until discarded, there is no time pressure to upgrade, so conversion rests entirely on wanting several
+inboxes at once or wanting messages kept. That is a legitimate choice, but it is a different lever from the one
+"limited time" implies, and the supplier's own `expiresAt` remains the real ceiling on both tiers.
+
+**What was built.** Migration `0013_disposable_inboxes.sql` adds `disposable_inboxes` and `inbox_messages`; the
+Drizzle schema, `src/lib/disposable-inbox.ts`, three routes (`POST /api/inbox`, `POST /api/inbox/poll`,
+`POST /api/inbox/discard` plus `GET /api/inbox`), `/dashboard/inbox`, a nav entry under Manage, and the
+explorer's `temporary-inbox` item now opens the real page instead of the marketing page.
+
+**Two limits live in the database, not in application code**, because both are decided by two requests arriving
+at once and creating an inbox spends real money the moment the supplier accepts it: a partial unique index gives
+**one active free inbox per account**, scoped to `tier = 'free'` on purpose so a paid bundle of concurrent
+inboxes stays possible without another migration; and a unique index on `daily_key` (`<userId>:<UTC date>`, NULL
+for paid) makes **one free inbox per day** survive a race. The key is UTC so two instances cannot disagree about
+which day it is and let one customer take two.
+
+**Money safety, both directions.** The supplier is called *before* the row is written, because the address only
+exists once it has accepted the purchase — so when our own index then refuses the row, we are holding an inbox we
+paid for and cannot record, and it is cancelled rather than stranded. Discarding runs the other way round: the
+supplier is cancelled *before* the row is marked discarded, because the opposite order lets a failed cancellation
+leave a customer looking at a closed inbox that is still receiving mail somewhere they can no longer read. For a
+verification code that is worse than an error. Both orderings are pinned by tests that record the call sequence.
+
+**Cost and abuse controls.** A per-IP daily ceiling of three sits under the per-account cap, because the account
+half of the defence is currently hollow: transactional email is not configured, so signup never verifies an
+address and "signed-in users only" bounds nothing — anyone can register a hundred accounts. When the IP cannot be
+determined the limiter degrades to keying by account rather than letting every unidentifiable caller share one
+`unknown` bucket, which would lock the feature out for all of them. Polling is capped per account at twelve a
+minute and the UI checks every fifteen seconds only while the tab is visible, because the supplier's request
+budget is shared across every customer at once: one browser tab refreshing briskly could otherwise turn other
+customers' purchases into 429s.
+
+**Honesty in the copy.** `/email-otp` carried an amber "The inbox tool is not switched on yet" notice, which was
+the right thing to render while nothing existed and would understate a shipped feature now, so it became a link to
+the real page. The test that pinned that notice was replaced rather than deleted: it now asserts the page links to
+`/dashboard/inbox`, does **not** say "not switched on yet", and does not promise retained history on the free
+tier — giving that away would hand over the paid tier's only differentiator and then fail to deliver it. The
+dashboard reports unavailability dynamically when the source is not configured, which is where that truth can
+actually be told.
+
+**Not built: the paid tier.** Its price has to be derived from the real per-inbox `priceNgn` through the existing
+30–50% band, and the standing money rule is not to guess pricing. The probe is the thing that returns that
+number, which is why R52's other half is the credential split in the commit before this one: diagnostics now
+accepts its own `DIAGNOSTICS_SECRET` (set in Vercel as *sensitive*, so it is write-only and unreadable by
+anyone) instead of borrowing `CRON_SECRET`, which also opens the auto-refund, scheduled-orders and wallet-email
+crons. A read-only endpoint should not share a credential with jobs that move money, and rotating one should not
+silently change the other.
+
+**Verification.** `tsc`, `eslint` and `next build` all clean; **843 tests across 94 files**. Sabotage-proven three
+ways, each confirmed applied by grep before the result was trusted: removing the compensation cancel failed 2
+tests, moving the discard's cancel after the write failed the ordering test, and making the free tier retain
+messages failed 1. Two of my own artefacts were caught by the gates rather than by me — an `EmptyState` action
+that takes an `href`, not an `onClick`, and two synchronous `setState` calls in effect bodies that eslint's
+`react-hooks/set-state-in-effect` rejected; the effects now subscribe to timers and bump a reload key instead,
+which is the pattern `GiftCardsManager` already used.
+
+**Still owed by the owner:** merge PRs #32 (docs) and #33 (this work), then the probe can be run without any
+secret of theirs entering chat. After that the paid tier is a pricing exercise rather than a build: two plans,
+their costs from `priceNgn`, and a `tier` the schema already carries.
 ---
 
 ## 2. THE PLAN / BACKLOG

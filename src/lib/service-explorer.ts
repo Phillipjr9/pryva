@@ -266,7 +266,7 @@ function additionalItems(country: ExplorerCountry): ExplorerItem[] {
       description: "Free disposable address, one at a time", tag: "Free",
       artwork: { kind: "service", name: "email-otp" },
       source: "tool", coverage: "not-country-specific", stock: null, myUnits: null, price: null,
-      action: { label: "Open temporary email", href: "/email-otp" },
+      action: { label: "Open temporary inbox", href: "/dashboard/inbox" },
     },
     {
       id: "account-marketplace", category: "accounts", name: "Account marketplace",
