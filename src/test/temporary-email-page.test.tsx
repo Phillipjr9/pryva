@@ -39,12 +39,21 @@ describe("the free temporary inbox page", () => {
     expect(html).toContain("One active inbox at a time");
   });
 
-  it("does not pretend to hand out an inbox before the tool is switched on", () => {
-    // Honesty in both directions: no price, and no promise. A visitor should be
-    // able to tell that creating an inbox is not possible yet, which is the same
-    // standard the eSIM and proxy pages are held to.
-    expect(html).toContain("not switched on yet");
-    expect(html).toContain("there is no button here to make one");
+  it("links to the inbox rather than describing a tool that does not exist", () => {
+    // This page used to carry an amber notice saying the inbox was not switched
+    // on, because there was nothing to switch on. The tool is built now, so the
+    // notice would understate what is on offer — and the dashboard page reports
+    // unavailability dynamically if the source is ever not configured, which is
+    // where that truth can actually be told.
+    expect(html).toContain("/dashboard/inbox");
+    expect(html).not.toContain("not switched on yet");
+  });
+
+  it("does not promise retained history on the free tier", () => {
+    // A free inbox keeps nothing once it ends. Claiming otherwise would give away
+    // the paid tier's whole differentiator and then fail to deliver it, which is
+    // the same defect this page originally had in reverse.
+    expect(html).toContain("Nothing is kept");
   });
 
   it("warns about the mistake that actually costs someone an account", () => {

@@ -51,6 +51,7 @@ beforeEach(() => {
   vi.stubEnv("BULKACC_API_KEY", API_KEY);
   vi.stubEnv("BULKACC_API_URL", "");
   vi.stubEnv("CRON_SECRET", CRON_SECRET);
+  vi.stubEnv("DIAGNOSTICS_SECRET", "");
   // Aurora over RDS IAM sets no DATABASE_URL; these four are what the predicate
   // actually asks for. Without them the app classifies itself as preview and
   // refuses marketplace purchasing outright, which would make every assertion
@@ -128,11 +129,46 @@ describe("diagnostics endpoint: gated, and never echoes a credential", () => {
   it("refuses everything when no secret is configured, so the route cannot be opened by accident", async () => {
     stubFetch({});
     vi.stubEnv("CRON_SECRET", "");
+    vi.stubEnv("DIAGNOSTICS_SECRET", "");
 
     // With no secret there is no value that could match, so even an empty
     // bearer must not get through.
     const response = await GET(request("https://pryva.test/x", "Bearer "));
     expect(response.status).toBe(401);
+  });
+
+  /**
+   * Diagnostics has its own credential because CRON_SECRET also opens the
+   * auto-refund, scheduled-orders and wallet-email crons. Handing out the right
+   * to read a status report must not hand out the right to fire a refund run, so
+   * these pin the separation in both directions.
+   */
+  it("accepts a diagnostics-only secret with no cron secret configured at all", async () => {
+    stubFetch({});
+    vi.stubEnv("DIAGNOSTICS_SECRET", "diag-only-secret");
+    vi.stubEnv("CRON_SECRET", "");
+
+    const response = await GET(request("https://pryva.test/x", "Bearer diag-only-secret"));
+
+    expect(response.status).toBe(200);
+  });
+
+  it("still accepts the cron secret, so an existing deployment is not locked out", async () => {
+    stubFetch({});
+
+    expect((await GET(request("https://pryva.test/x", `Bearer ${CRON_SECRET}`))).status).toBe(200);
+  });
+
+  it("refuses a near miss against either credential", async () => {
+    stubFetch({});
+    vi.stubEnv("DIAGNOSTICS_SECRET", "diag-only-secret");
+
+    // A trailing space is not in this list on purpose: the Headers API strips
+    // trailing whitespace, so that value cannot be constructed and asserting on
+    // it would test the platform's normalisation rather than this route.
+    for (const bearer of ["diag-only-secretx", `${CRON_SECRET}x`, "diag only secret", "Bearer diag-only-secret", ""]) {
+      expect((await GET(request("https://pryva.test/x", `Bearer ${bearer}`))).status, bearer).toBe(401);
+    }
   });
 
   it("reports the connected-but-empty feed, and only the tail of the key", async () => {

@@ -135,6 +135,29 @@ export const notificationRateLimiter = createRateLimiter({ windowMs: 60_000, max
 export const giftCardUserRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 15 });
 export const giftCardIpRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 60 });
 
+/**
+ * Creating a free inbox spends real money with the supplier the moment it is
+ * bought, so this is a cost control and not merely an abuse control.
+ *
+ * It is keyed by IP rather than by account because the account half of the
+ * defence is currently hollow: transactional email is not configured, so signup
+ * never verifies an address and "signed-in users only" bounds nothing. Anyone can
+ * register a hundred accounts. The per-user daily cap lives in the database (a
+ * partial unique index on `disposable_inboxes.daily_key`); this is the per-IP
+ * ceiling underneath it, sized to tolerate a household or a shared carrier NAT
+ * while making bulk account farming unprofitable.
+ */
+export const inboxCreateIpRateLimiter = createRateLimiter({ windowMs: 24 * 60 * 60_000, maxRequests: 3 });
+/**
+ * Polling an inbox re-reads the whole mailbox from the supplier, whose request
+ * budget is shared across every customer at once. Without a per-user ceiling one
+ * browser tab refreshing on an interval could consume the whole budget and turn
+ * everybody else's purchases into 429s -- a denial of service that costs the
+ * attacker nothing. Twelve a minute is far more than a human needs while waiting
+ * for a verification code.
+ */
+export const inboxPollRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 12 });
+
 /** Drop one key's counter after successful authentication. */
 export async function resetRateLimit(key: string): Promise<void> {
   const hashedKey = digest(key);

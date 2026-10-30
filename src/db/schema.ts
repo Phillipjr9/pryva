@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   index,
   integer,
@@ -381,6 +382,105 @@ export const bankAccounts = pgTable(
   ],
 );
 
+/**
+ * A disposable inbox.
+ *
+ * The free tier is the one thing Pryva gives away, and it is built to be
+ * outgrown: one inbox a day, read while it is alive, nothing retained. The paid
+ * tier sells volume and history rather than time, because the supplier sets an
+ * inbox's own lifetime and sells no duration -- which is what made four
+ * duration-based tiers undeliverable when they were tried.
+ *
+ * Two limits are partial unique indexes rather than application checks, because
+ * both are decided by two requests arriving at once and buying an inbox spends
+ * real money the moment it is created. See migration 0013.
+ */
+export const disposableInboxes = pgTable(
+  "disposable_inboxes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Which source supplied it, so a stranded inbox can still be cancelled. */
+    provider: varchar("provider", { length: 32 }).notNull(),
+    /** The provider's own handle; polling and cancelling both need it. */
+    providerInboxId: varchar("provider_inbox_id", { length: 191 }).notNull(),
+    address: varchar("address", { length: 320 }).notNull(),
+    domain: varchar("domain", { length: 255 }),
+    /** `free` | `paid`. Decides which limits apply and whether messages are kept. */
+    tier: varchar("tier", { length: 16 }).notNull().default("free"),
+    /**
+     * The order that paid for a paid inbox. Free inboxes move no money and leave
+     * this NULL: recording them as orders would put zero-revenue rows into margin
+     * analytics and would need an order status that means "nothing was sold".
+     */
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    /** `active` | `discarded` | `expired` | `failed` */
+    status: varchar("status", { length: 24 }).notNull().default("active"),
+    /**
+     * `<userId>:<yyyy-mm-dd>` for free inboxes, NULL for paid ones. The unique
+     * index on it is what makes "one free inbox per day" survive two concurrent
+     * requests, and scoping it by NULL keeps it from colliding across tiers.
+     */
+    dailyKey: varchar("daily_key", { length: 80 }),
+    /**
+     * The provider's own expiry, when it reports one. We may end an inbox sooner;
+     * nothing can make one live longer than the supplier allows.
+     */
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    discardedAt: timestamp("discarded_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Scoped to the free tier on purpose: a paid bundle is several concurrent
+    // inboxes, so a blanket one-active-inbox index would make it unsellable.
+    uniqueIndex("disposable_inboxes_one_active_free_per_user")
+      .on(table.userId)
+      .where(sql`${table.status} = 'active' AND ${table.tier} = 'free'`),
+    uniqueIndex("disposable_inboxes_free_daily_key")
+      .on(table.dailyKey)
+      .where(sql`${table.dailyKey} IS NOT NULL`),
+    index("disposable_inboxes_user_idx").on(table.userId),
+  ],
+);
+
+/**
+ * A message that arrived in an inbox.
+ *
+ * Retained for paid inboxes -- that retention is the product. Polling re-reads
+ * the whole mailbox and the provider gives its messages no identity, so
+ * `fingerprint` hashes the parts that do distinguish one from another and the
+ * unique index makes a repeated poll insert nothing. Without it every refresh
+ * would duplicate the mailbox.
+ */
+export const inboxMessages = pgTable(
+  "inbox_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    inboxId: uuid("inbox_id")
+      .notNull()
+      .references(() => disposableInboxes.id, { onDelete: "cascade" }),
+    /** Denormalised so a customer's messages can be listed and deleted with them. */
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+    subject: text("subject"),
+    fromAddress: text("from_address"),
+    body: text("body"),
+    /** The parsed verification code, when the provider recognised one. */
+    code: varchar("code", { length: 64 }),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("inbox_messages_once_per_inbox").on(table.inboxId, table.fingerprint),
+    index("inbox_messages_inbox_idx").on(table.inboxId),
+    index("inbox_messages_user_idx").on(table.userId),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type WalletTransaction = typeof walletTransactions.$inferSelect;
@@ -391,3 +491,5 @@ export type Notification = typeof notifications.$inferSelect;
 export type SecurityViolation = typeof securityViolations.$inferSelect;
 export type Withdrawal = typeof withdrawals.$inferSelect;
 export type BankAccount = typeof bankAccounts.$inferSelect;
+export type DisposableInbox = typeof disposableInboxes.$inferSelect;
+export type InboxMessage = typeof inboxMessages.$inferSelect;
