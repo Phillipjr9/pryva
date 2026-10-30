@@ -6,6 +6,7 @@ import {
   rateLimitEmailVerification,
 } from "@/lib/email-verification";
 import { isSameOriginMutation } from "@/lib/net";
+import { resendConfigured } from "@/lib/resend-config";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,18 @@ export async function POST(request: NextRequest) {
 
     if (user.emailVerifiedAt) {
       return NextResponse.json({ ok: true, alreadyVerified: true });
+    }
+
+    // This route is authenticated, so unlike the password-reset endpoint it can
+    // say plainly what is wrong instead of answering identically for everyone --
+    // there is no address to enumerate here. Answering ok would leave a signed-in
+    // user waiting on a link that was never queued, and this is the only in-app
+    // path that re-requests one.
+    if (!resendConfigured()) {
+      return NextResponse.json(
+        { error: "Email delivery is not configured on this server, so the link cannot be sent." },
+        { status: 503 },
+      );
     }
 
     await issueEmailVerification(user.id, user.email, user.name);
