@@ -53,7 +53,7 @@ function keyTail(name: string): string | null {
 
 /**
  * GET /api/diagnostics/integrations
- * Authorization: Bearer <CRON_SECRET>
+ * Authorization: Bearer <DIAGNOSTICS_SECRET>  (CRON_SECRET also accepted)
  *
  * Answers "which feeds are actually connected, and what does each one really
  * offer?" — neither question is answerable from the storefront, because a feed
@@ -68,9 +68,37 @@ function keyTail(name: string): string | null {
  * sourcing ever reaches a customer. And each call spends a rate-limited request,
  * so an open endpoint would be a way to exhaust the budget.
  */
+/**
+ * Which credentials may read this report.
+ *
+ * `DIAGNOSTICS_SECRET` is preferred and `CRON_SECRET` is still accepted, so a
+ * deployment that has not been given the new variable keeps working.
+ *
+ * The split exists because the two credentials authorise very different things.
+ * `CRON_SECRET` also opens `/api/cron/auto-refund`, `/api/cron/scheduled-orders`
+ * and `/api/cron/wallet-emails` — jobs that credit wallets and send mail. This
+ * endpoint is read-only. Sharing one secret between them means that anyone who
+ * needs to read a status report also holds the ability to fire a refund run, and
+ * that rotating the secret for one reason silently changes the other. A
+ * read-only surface gets a read-only credential, which can be handed out and
+ * rotated without ever touching the crons.
+ */
+function diagnosticsAuthorized(request: NextRequest): boolean {
+  const header = request.headers.get("authorization");
+  if (!header) return false;
+  // Compared as a whole header, exactly as this route always did: the configured
+  // secret is trimmed but the presented one is not, so a bearer with stray
+  // whitespace is refused rather than quietly accepted. An empty or unset secret
+  // can never match, which is what keeps the endpoint shut when neither variable
+  // is configured.
+  return [process.env.DIAGNOSTICS_SECRET, process.env.CRON_SECRET].some((value) => {
+    const secret = value?.trim();
+    return Boolean(secret) && header === `Bearer ${secret}`;
+  });
+}
+
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!diagnosticsAuthorized(request)) {
     logger.warn("Unauthorized integrations diagnostics attempt");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
