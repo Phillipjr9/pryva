@@ -29,6 +29,10 @@ export const users = pgTable("users", {
   // by matching this row's email (ADMIN_EMAILS) must not treat an unverified
   // address as the owner's: signup accepted any string.
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+  // Consecutive wrong passwords. Reset on success, on lock, and on reset.
+  // The lock is an instant rather than a flag so it expires without a job.
+  failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
