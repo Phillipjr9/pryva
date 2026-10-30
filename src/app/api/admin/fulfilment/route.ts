@@ -8,6 +8,7 @@ import { manualWarrantyDays } from "@/lib/manual-catalog";
 import { MANUAL_PROVIDER, MAX_QUEUE_ITEMS, QUEUE_STATUSES, quantityFromPlanLabel } from "@/lib/fulfilment-queue";
 import { logger } from "@/lib/logger";
 import { isSameOriginMutation } from "@/lib/net";
+import { recordAdminAction } from "@/lib/admin-audit";
 
 export const dynamic = "force-dynamic";
 
@@ -148,6 +149,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "That order has already been fulfilled or changed" }, { status: 409 });
       }
       logger.info("Hand-sourced order marked unavailable", { reference: order.reference });
+      await recordAdminAction({
+        actor: access.user,
+        action: "order.unavailable",
+        targetType: "order",
+        targetId: order.id,
+        summary: `Could not source ${order.reference}; moved to review for refund — ${reason.trim()}`,
+      });
       return NextResponse.json({
         ok: true,
         status: "review",
@@ -190,6 +198,14 @@ export async function POST(request: NextRequest) {
 
     // The count is logged; the credentials never are.
     logger.info("Hand-sourced order delivered", { reference: order.reference, items: credentials.length });
+    await recordAdminAction({
+      actor: access.user,
+      action: "order.deliver",
+      targetType: "order",
+      targetId: order.id,
+      // The count and the warranty window only. Never the credentials themselves.
+      summary: `Delivered ${credentials.length} item(s) for ${order.reference}` + (warrantyDays ? `; replacement window ${warrantyDays} days` : ""),
+    });
     return NextResponse.json({ ok: true, status: "delivered", items: credentials.length, warrantyDays });
   } catch (error) {
     logger.error("Failed to fulfil a hand-sourced order", { error });

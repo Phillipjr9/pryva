@@ -493,3 +493,45 @@ export type Withdrawal = typeof withdrawals.$inferSelect;
 export type BankAccount = typeof bankAccounts.$inferSelect;
 export type DisposableInbox = typeof disposableInboxes.$inferSelect;
 export type InboxMessage = typeof inboxMessages.$inferSelect;
+
+/**
+ * Who did what in the admin console, and to whom.
+ *
+ * Every privileged mutation that moves money or changes an account writes one
+ * row here. It is deliberately append-only: nothing in the app updates or
+ * deletes an entry, and there is no route that exposes one to a customer.
+ *
+ * `actor_email` is snapshotted rather than joined. An email is the identity a
+ * human recognises in a dispute, and the account it came from may be renamed or
+ * removed later; the ledger has to keep saying what was true when the action ran.
+ *
+ * The entry is a *record*, not the source of truth: the wallet ledger remains
+ * authoritative for money. A failed insert is logged loudly and does not roll
+ * back an action that already moved funds -- see `src/lib/admin-audit.ts` for why
+ * that trade was chosen and what it costs.
+ */
+export const adminAuditLog = pgTable(
+  "admin_audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** NULL only if the acting account is later deleted (deletion is not offered yet). */
+    actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+    actorEmail: varchar("actor_email", { length: 200 }).notNull(),
+    /** Dotted verbs such as `withdrawal.approve`, so filters stay stable. */
+    action: varchar("action", { length: 64 }).notNull(),
+    /** `order` | `withdrawal` | `user` | `message` | `gift_card`. */
+    targetType: varchar("target_type", { length: 32 }).notNull(),
+    /** An id or reference. Not a foreign key: targets live in several tables. */
+    targetId: varchar("target_id", { length: 191 }).notNull(),
+    /** Human-readable, already redacted. Never credentials, codes or full account numbers. */
+    summary: text("summary").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("admin_audit_log_created_idx").on(table.createdAt),
+    index("admin_audit_log_actor_idx").on(table.actorId),
+    index("admin_audit_log_target_idx").on(table.targetType, table.targetId),
+  ],
+);
+
+export type AdminAuditEntry = typeof adminAuditLog.$inferSelect;

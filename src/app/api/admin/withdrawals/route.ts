@@ -11,6 +11,7 @@ import { isPreviewDatabase } from "@/lib/demo-policy";
 import { logger } from "@/lib/logger";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { isSameOriginMutation } from "@/lib/net";
+import { recordAdminAction } from "@/lib/admin-audit";
 
 export const dynamic = "force-dynamic";
 
@@ -130,6 +131,16 @@ export async function PUT(request: NextRequest) {
           .set({ transferReference: transferCode, failureReason: note })
           .where(eq(withdrawals.id, id));
         logger.info("Withdrawal transfer initiated", { withdrawalId: id, adminId: admin.id, providerStatus });
+        await recordAdminAction({
+          actor: admin,
+          action: "withdrawal.approve",
+          targetType: "withdrawal",
+          targetId: claimed.id,
+          summary:
+            `Initiated a ₦${claimed.amount.toLocaleString("en-NG")} transfer for ${claimed.reference} to ${claimed.bankName}` +
+            ` (provider status ${providerStatus})` +
+            (note ? " — left for reconciliation" : ""),
+        });
         return NextResponse.json({ ok: true, needsReview: Boolean(note), message: note ?? "Transfer initiated; settlement still requires verification.", transferCode, paystackReference: providerReference });
       } catch {
         // A timeout can occur after Paystack accepted the transfer. Refunding
@@ -138,6 +149,13 @@ export async function PUT(request: NextRequest) {
           .set({ failureReason: "Transfer outcome unconfirmed. Check Paystack before resolving." })
           .where(and(eq(withdrawals.id, id), eq(withdrawals.status, "processing")));
         logger.error("Withdrawal transfer needs reconciliation", { withdrawalId: id, adminId: admin.id });
+        await recordAdminAction({
+          actor: admin,
+          action: "withdrawal.approve",
+          targetType: "withdrawal",
+          targetId: claimed.id,
+          summary: `Transfer initiation for ${claimed.reference} (₦${claimed.amount.toLocaleString("en-NG")}) has an unconfirmed outcome; left for reconciliation, not refunded`,
+        });
         return NextResponse.json({ error: "Transfer outcome unconfirmed. Check Paystack before resolving this request." }, { status: 502 });
       }
     }
@@ -169,6 +187,16 @@ export async function PUT(request: NextRequest) {
       });
       if (!rejected) return NextResponse.json({ error: "Withdrawal is no longer pending or has a provider reference. Reconcile it before refunding." }, { status: 409 });
       logger.info("Withdrawal rejected", { withdrawalId: id, adminId: admin.id });
+      await recordAdminAction({
+        actor: admin,
+        action: "withdrawal.reject",
+        targetType: "withdrawal",
+        targetId: rejected.id,
+        summary:
+          `Rejected ${rejected.reference} (₦${rejected.amount.toLocaleString("en-NG")}) and refunded ` +
+          `₦${(rejected.amount + rejected.fee).toLocaleString("en-NG")} to the wallet` +
+          (typeof reason === "string" && reason.trim() ? ` — ${reason.trim()}` : ""),
+      });
       scheduleWalletEmails();
       return NextResponse.json({ ok: true, message: "Withdrawal rejected and user refunded" });
     }
@@ -184,6 +212,13 @@ export async function PUT(request: NextRequest) {
       .returning({ id: withdrawals.id });
     if (!completed) return NextResponse.json({ error: "Withdrawal has no confirmed initiation; reconcile it manually." }, { status: 409 });
     logger.info("Withdrawal marked completed after manual reconciliation", { withdrawalId: id, adminId: admin.id, note: reason.trim() });
+    await recordAdminAction({
+      actor: admin,
+      action: "withdrawal.complete",
+      targetType: "withdrawal",
+      targetId: completed.id,
+      summary: `Marked withdrawal settled after reconciliation — ${reason.trim()}`,
+    });
     scheduleWalletEmails();
     return NextResponse.json({ ok: true, message: "Withdrawal marked as completed" });
   } catch (error) {

@@ -399,7 +399,7 @@ function sortDescendingByCreatedAt<T extends Record<string, unknown>>(items: T[]
 export type PreviewState = Record<
   | "users" | "sessions" | "orders" | "walletTransactions" | "paymentTopups"
   | "contactMessages" | "giftCards" | "scheduledOrders" | "notifications"
-  | "securityViolations" | "withdrawals" | "bankAccounts",
+  | "securityViolations" | "withdrawals" | "bankAccounts" | "adminAuditLog",
   Array<Record<string, unknown>>
 >;
 
@@ -422,12 +422,13 @@ const mockState: PreviewState =
     securityViolations: [],
     withdrawals: [],
     bankAccounts: [],
+    adminAuditLog: [],
   };
 
 // Next can load route handlers and server components in separate bundles.
 // Share the in-memory preview state across those bundles in this process.
 if (!databaseUrl) {
-  for (const key of ["users", "sessions", "orders", "walletTransactions", "paymentTopups", "contactMessages", "giftCards", "scheduledOrders", "notifications", "securityViolations", "withdrawals", "bankAccounts"] as const) {
+  for (const key of ["users", "sessions", "orders", "walletTransactions", "paymentTopups", "contactMessages", "giftCards", "scheduledOrders", "notifications", "securityViolations", "withdrawals", "bankAccounts", "adminAuditLog"] as const) {
     mockState[key] ??= [];
   }
   globalForDb.__arenaPryvaMockState = mockState;

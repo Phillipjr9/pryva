@@ -13,6 +13,7 @@ const LINKS = [
   { href: "/admin/users", label: "Users" },
   { href: "/admin/messages", label: "Support" },
   { href: "/admin/withdrawals", label: "Withdrawals" },
+  { href: "/admin/audit", label: "Audit" },
   { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/security", label: "Security" },
 ];
