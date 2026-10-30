@@ -10,6 +10,11 @@ import { isSameOriginMutation } from "@/lib/net";
 import { logger } from "@/lib/logger";
 import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
+import {
+  comparePayoutNames,
+  depositorNameFor,
+  PAYOUT_NAME_MESSAGES,
+} from "@/lib/withdrawal-name-check";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +95,36 @@ export async function POST(request: NextRequest) {
     if (typeof expectedAccountName === "string" && accountName !== expectedAccountName.trim()) {
       return NextResponse.json({ error: "The resolved account name changed. Verify it again before saving." }, { status: 409 });
     }
+    // Refuse to save an account that could never be paid out to, so the customer
+    // learns that here rather than after filling in a withdrawal. This is early
+    // feedback and not the authoritative control: the withdrawal route re-checks
+    // against the name frozen on the first settled deposit, because a profile
+    // name can be edited after this row is saved. Where a deposit has already
+    // settled its frozen name is the reference here too, so the two agree.
+    //
+    // It also runs *before* createTransferRecipient, which registers a payee with
+    // the payment provider -- a side effect that should not happen for an account
+    // we are going to refuse.
+    // Only the frozen deposit name is used here, never `users.name`. The profile
+    // field is self-typed and editable, so refusing on it would lock out genuine
+    // customers whose bank record spells, orders or abbreviates their name
+    // differently -- and would give a false sense of enforcement, since it proves
+    // nothing about who sent the money. With no recorded deposit yet there is
+    // nothing authoritative to compare against, so saving is allowed and the
+    // withdrawal route makes the decision that actually moves money.
+    const depositorName = await depositorNameFor(user.id);
+    if (depositorName) {
+      const nameCheck = comparePayoutNames(depositorName, accountName);
+      if (!nameCheck.ok) {
+        // Reason and identifiers only: bank account names are not logged.
+        logger.warn("Bank account refused: resolved name does not match the depositor", {
+          userId: user.id,
+          reason: nameCheck.reason,
+        });
+        return NextResponse.json({ error: PAYOUT_NAME_MESSAGES[nameCheck.reason] }, { status: 403 });
+      }
+    }
+
     const recipient = await createTransferRecipient({ name: accountName, accountNumber, bankCode });
     const recipientCode = recipient.data?.recipient_code;
     if (recipient.status !== true || typeof recipientCode !== "string" || !recipientCode || recipientCode.length > 100) {

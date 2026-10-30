@@ -60,6 +60,7 @@ export function WithdrawalReviewDialog({ review, onSubmit, onClose, testMode = f
     {testMode && <p className={styles.notice}>PAYSTACK TEST MODE — this is not a real bank payout.</p>}
     {stage === "review" && <>
       <p className={styles.description}>Confirm the payout details. A request is reviewed before any transfer is initiated.</p>
+      <p className={styles.small}>The account name above is the name the withdrawal is paid into. It must be the name that funded this wallet — a payout to a third-party account is refused.</p>
       <div className={styles.amount}>{formatNaira(review.amount)}</div>
       <MoneyRoute from="Your wallet" fromNote="Funds reserved" to={review.bankName} toNote={maskAccountNumber(review.accountNumber)} />
       <div className={styles.summary}>

@@ -202,3 +202,24 @@ export function verifyWebhookSignature(payload: string, signature: string | null
 export function isPaystackConfigured(): boolean {
   return Boolean(PAYSTACK_SECRET_KEY);
 }
+
+/**
+ * Which Paystack environment the configured key belongs to, read from its prefix.
+ *
+ * The prefix is a mode indicator rather than a secret: Paystack keys are
+ * `sk_test_…` or `sk_live_…`, and this returns neither the key nor any part of it
+ * beyond the mode.
+ *
+ * It matters because bank-account resolution and transfers only work against real
+ * banks in live mode. A correctly configured *test* key therefore makes "add a
+ * bank account" fail at the resolve step with "unable to verify", which reads
+ * exactly like a bug in the app when it is a fact about the environment. Being
+ * able to say which one it is, is the difference between debugging code and
+ * swapping a key.
+ */
+export function paystackKeyMode(): "test" | "live" | "unrecognised" | null {
+  if (!PAYSTACK_SECRET_KEY) return null;
+  if (PAYSTACK_SECRET_KEY.startsWith("sk_test_")) return "test";
+  if (PAYSTACK_SECRET_KEY.startsWith("sk_live_")) return "live";
+  return "unrecognised";
+}

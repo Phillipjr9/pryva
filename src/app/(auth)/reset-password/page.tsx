@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 const field =
   "w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink outline-none transition-colors focus:border-lav-400";
@@ -58,9 +59,8 @@ function ResetForm() {
           <label htmlFor="password" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-ink-3">
             New password
           </label>
-          <input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="new-password"
             required
             minLength={8}
@@ -74,9 +74,8 @@ function ResetForm() {
           <label htmlFor="confirm" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-ink-3">
             Confirm password
           </label>
-          <input
+          <PasswordInput
             id="confirm"
-            type="password"
             autoComplete="new-password"
             required
             minLength={8}

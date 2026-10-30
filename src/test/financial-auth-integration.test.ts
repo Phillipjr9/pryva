@@ -144,6 +144,7 @@ beforeAll(async () => {
   await pg.exec(await readFile("migrations/0009_password_reset_tokens.sql", "utf8"));
   await pg.exec(await readFile("migrations/0010_order_provider_no_default.sql", "utf8"));
   await pg.exec(await readFile("migrations/0011_email_verification.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0012_topup_payer_name.sql", "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
   [purchaseRoute, refundRoute, bankRoute, verifyBankRoute, googleRoute, contactRoute, deleteRoute, passwordRoute, sessionsRoute, autoRefund, giftPurchaseRoute, giftCheckRoute, giftRedeemRoute, topUpRoute, verifyTopUpRoute, webhookRoute, profileRoute, notificationsRoute, markReadRoute, logoutRoute, syncRoute, scheduledRoute, promoRoute, withdrawalRoute, adminWithdrawalRoute, integrity] = await Promise.all([
@@ -200,7 +201,41 @@ describe("withdrawal request idempotency on embedded PostgreSQL", () => {
   }
   async function addBank(id = BANK_ID, userId = USER) {
     await database.insert(schema.bankAccounts).values({ id, userId, bankName: "Test Bank", bankCode: "044", accountNumber: "1234567890", accountName: "Test Customer", recipientCode: "RCP-test" });
+    // A balance that can be withdrawn always arrived through a completed deposit,
+    // and the deposit is what records the name a payout has to match -- so these
+    // fixtures model one rather than a wallet that cannot exist in production.
+    // The payer name is deliberately not the profile name ("Buyer"): the reference
+    // is the name frozen at settlement, precisely because the profile field is
+    // editable afterwards.
+    await database.insert(schema.paymentTopups).values({
+      reference: `TOP-fund-${id.slice(0, 8)}`, // "reference" is varchar(40)
+      userId,
+      amount: 10_000,
+      status: "completed",
+      paidAt: new Date(),
+      payerName: "Test Customer",
+    });
   }
+
+  it("does not let a profile rename redirect money to a third party", async () => {
+    await addBank();
+
+    // This is why the reference is a column on the deposit and not `users.name`.
+    // The customer renames their profile to match a bank account that is not
+    // theirs, and the profile endpoint happily allows it -- the frozen deposit
+    // name does not move with it, so the payout is still refused.
+    await database.update(schema.users).set({ name: "Mule Account" }).where(eq(schema.users.id, USER));
+    await database.update(schema.bankAccounts).set({ accountName: "Mule Account" }).where(eq(schema.bankAccounts.id, BANK_ID));
+    mocks.user.mockResolvedValue({ id: USER, email: "buyer@example.com", name: "Mule Account", walletBalance: 10000 });
+
+    const response = await withdrawalRoute.POST(withdrawalRequest());
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toContain("same name");
+    const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+    expect(user.walletBalance).toBe(10000);
+    expect(await database.select().from(schema.withdrawals)).toHaveLength(0);
+  });
 
   it("persists a Paystack-compliant transfer reference before contacting the provider", async () => {
     await addBank();
@@ -688,6 +723,28 @@ describe("Paystack top-up safety", () => {
     expect(init.currency).toBe("NGN");
     expect(init.callback_url).toBe("https://pryva.test/dashboard/wallet?topup=return");
     expect(JSON.parse(init.metadata)).toMatchObject({ userId: USER, type: "wallet_topup", cancel_action: `${init.callback_url}&reference=${init.reference}` });
+  });
+
+  it("freezes the depositor's name when a payment settles, and never rewrites it", async () => {
+    const reference = "TOP-payer-name";
+    await database.insert(schema.paymentTopups).values({ reference, userId: USER, amount: 2500 });
+    const settled = { reference, amount: 250000, currency: "NGN", status: "success" };
+    mocks.verifyPayment.mockResolvedValueOnce({ status: true, data: settled });
+
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference }))).status).toBe(200);
+
+    const [topup] = await database.select().from(schema.paymentTopups).where(eq(schema.paymentTopups.reference, reference));
+    expect(topup.payerName).toBe("Buyer");
+
+    // A retried delivery arrives after the profile has been edited. The name is
+    // written only on the pending -> completed transition, so the retry cannot
+    // overwrite the frozen one with a name nobody was paid under.
+    await database.update(schema.users).set({ name: "Renamed Later" }).where(eq(schema.users.id, USER));
+    mocks.verifyPayment.mockResolvedValueOnce({ status: true, data: settled });
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference }))).status).toBe(200);
+
+    const [after] = await database.select().from(schema.paymentTopups).where(eq(schema.paymentTopups.reference, reference));
+    expect(after.payerName).toBe("Buyer");
   });
 
   it("treats in-flight and unknown provider statuses as unconfirmed, not failed or credited", async () => {

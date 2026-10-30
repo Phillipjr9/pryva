@@ -140,8 +140,10 @@ charging for them. An inbox that target sites reject, or that anyone can read, i
 user enforced by a **partial unique index** rather than an application check — two concurrent requests would
 race past a check and buy two inboxes, spending twice), a per-IP daily cap, create/poll/discard routes, and
 the viewer UI (`checkFleexaEmail()` already returns subject, from, body and a parsed `code`). All five PGlite
-test files hardcode a `MIGRATIONS` filename array, so all five need `0012` added or they silently run a stale
-schema. **Not authorised yet:** the one paid smoke test that would confirm the feed's contract, which its own
+test files hardcode a migration filename list, so every one of them needs a new file added or they silently run
+a stale schema. **(Updated by R51: `0012` is now the withdrawal payer-name migration, so the inbox becomes
+`0013`; and the list is four fixtures, not five — `shared-rate-limit.test.ts` replays `0002` alone on purpose.
+`withdrawal-name-check.test.ts` now fails if any fixture forgets a migration file.) **Not authorised yet:** the one paid smoke test that would confirm the feed's contract, which its own
 header comment says *"has not been confirmed against a live key."*
 
 **R50, done.** The hero photo carried a decorative card dressed as a product screenshot — "Example
@@ -159,6 +161,82 @@ separate decision.
 three files, so this change's test went into a new `describe("homepage hero")` at the *end* of
 `homepage.test.tsx` (old lines 128+ versus PR #30's insertion at 120–125) and this record went into §1
 rather than §8, where PR #30 appends. Both PRs stay mergeable in either order.
+
+**R51, done — five requests, all five shipped.**
+
+**(1) Password eye toggle.** New `src/components/ui/PasswordInput.tsx` (`"use client"`, typed as
+`Omit<InputHTMLAttributes, "type">` so no caller can pin the mode back to hidden), with `aria-pressed`,
+`aria-controls` and a `useId` fallback, and an inset transparent button so it sits correctly in both field
+styles. `EyeOff` added to `icons.tsx`. All **six** `type="password"` inputs converted: `AuthForm` (1),
+`reset-password` (2), settings (3).
+
+**(2) "The user settings looks empty."** The page had two sections; it now has five (Profile, Password, **Email
+verification**, Account, Your data). The new section surfaces `user.emailVerifiedAt`, which was already in
+`PublicUser` and never displayed anywhere. Auditing it found **three features that were built but unreachable**:
+`POST /api/auth/verify-email` — its own comment calls it *"the only in-app path that re-requests one"* — had no
+link to it; the dashboard's unverified-email banner is gated on `resendConfigured()`, so with Resend unset an
+unverified user saw nothing at all; and `/api/user/delete` returns 503 **by design** (it would cascade into
+wallets, orders, payment records and issued gift cards before any retention design exists). The first is now
+linked from settings, the second is why the section states the truth instead of offering a resend button that
+would fail, and the third was **left alone deliberately** — no button was wired to a dead endpoint.
+
+**(3) Nav promo card removed.** The "New order / Choose a country and explore numbers, social services and
+more / Browse services" card is gone from `DashboardShell.tsx`. `Sparkle` and `ArrowRight` are still used
+elsewhere in that file, so no import was orphaned; the separate "New order" button on the orders page is not
+the nav bar and was left in place.
+
+**(4) "User can't add bank account for withdrawal."** The whole flow **exists and is correct**: the dashboard
+verifies via `/api/wallet/verify-account`, then saves via `/api/wallet/bank-accounts`, which re-resolves the
+name with Paystack, 409s if it changed since review, creates the transfer recipient and inserts
+transactionally. The name is never client-supplied. The likely cause is environmental, not a bug: **the
+Paystack key is still `sk_test_`, and test mode cannot resolve real Nigerian bank accounts**, so verification
+400s, `accountName` stays empty and "Save bank account" stays permanently disabled — which reads as a broken
+button. Added `paystackKeyMode()` to `paystack.ts`, which returns `test`/`live` from the key's **prefix only**
+(a mode indicator, never the key), and extended diagnostics to `payments.{configured, keyTail, mode, banks}` so
+the owner's `curl` now settles the question. Also added persistent inline verify errors — the failure used to
+show only as a toast that vanished under a greyed-out button.
+
+**(5) ★ The money rule: a payout may only go to the name that funded the wallet.** *"dont ever send money to
+third party account."* Ownership was already enforced (a withdrawal can only name an account belonging to the
+signed-in user), but that ties the account to a **session**, not to the person who sent the money — it left the
+mule payout wide open: add a bank account in somebody else's name, withdraw to it, and the platform is the
+route between two identities. Closed:
+- **Migration `0012_topup_payer_name.sql`** adds `payment_topups.payer_name`. It is written by `completeTopUp`,
+  the single place money enters a wallet, **only on the `pending → completed` transition**, so a duplicate
+  Paystack delivery cannot overwrite it with a name edited in between.
+- The reference is that frozen column and **never `users.name`**, which `/api/user/profile` edits at any time.
+  A reference that can be changed after the money arrives cannot prove who sent it — and a test now renames the
+  profile and re-points the bank account to prove the payout is still refused.
+- **Existing rows are left NULL on purpose.** Backfilling from the current profile name would launder exactly
+  the rename this exists to stop. A NULL **fails closed** rather than being treated as a match.
+- `comparePayoutNames` accepts the same name in any order, ignoring accents and titles, allowing **at most one**
+  extra token for the middle name a bank record carries, and requiring **two** overlapping tokens so a shared
+  surname alone can never pass: "Ada Obi" matches `ADA OBI`, `OBI ADA`, `ADA OBI CHUKWUEMEKA`; it refuses
+  `BOLA ADEYEMI`, `CHINEDU OBI`, `ADA OBINNA`, `Ada`, and `ADA OBI CHUKWU OBIORA`.
+- Enforced in the withdrawal route **before any write** — no row, no debit, no ledger entry — and again when
+  saving a bank account, but there **only when a deposit name exists**. Refusing on the profile name would lock
+  out genuine customers whose bank record spells their name differently, for no security gain.
+- The rule is stated in the UI up front (bank-account form and the final review dialog) rather than discovered
+  as an error.
+
+**Two consequences the owner should know about, both deliberate.** A wallet funded only by a **gift card** has
+no bank deposit and therefore no recorded depositor name, so it **cannot be withdrawn** until one deposit
+settles — support can settle it by hand. And any deposit that settled **before migration 0012** is in the same
+position. Neither strands anybody today, because the Paystack key is still in test mode and no real money has
+ever entered a wallet. Refusing costs a support conversation; paying the wrong person cannot be undone.
+
+**Verification.** `tsc` and `eslint` clean; **819 tests across 93 files** pass (was 785/92); `next build`
+succeeds. The new control was **sabotage-proven four ways**, each confirmed applied by grep before the result
+was trusted: disabling the route's refusal branch failed 4 tests; bypassing the comparison failed 12; dropping
+`0012` from one fixture failed the new migration guard; and making the reference follow the editable profile
+name failed the bypass proof first. Two of those failures were caused by the **test doubles**, not the code —
+the logger mock omitted `warn`, so a refusal surfaced as a 500 — which is the same partial-`vi.mock` trap as
+before, now commented in the fixture.
+
+**Still owed by the owner:** "merge" for PRs #30 and #31, the diagnostics `curl` output (which now also answers
+whether Paystack is test or live, i.e. item 4), and the disposable-inbox cost decision (A absorb ≈₦540/inbox,
+B own a domain + inbound email for under ₦2/inbox — B is the better business case and it is also what would
+make `emailVerifiedAt` real). The free inbox itself is still **not built**.
 ---
 
 ## 2. THE PLAN / BACKLOG

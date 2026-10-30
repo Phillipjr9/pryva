@@ -1,0 +1,20 @@
+-- Freeze the name of whoever deposited the money.
+--
+-- A withdrawal could already only be sent to a bank account belonging to the
+-- signed-in user, which stops a stranger's account being attached to somebody
+-- else's session. It does not stop a mule payout: the account holder adds a bank
+-- account that is in a *different person's* name, and withdraws to it. Nothing
+-- compared the payout name against the name the money arrived under.
+--
+-- `users.name` cannot be that reference, because /api/user/profile edits it at
+-- any time. A name captured when a deposit settles is the only record of who
+-- actually funded the wallet, and it never changes afterwards -- which is what
+-- makes "pay out only in the depositor's name" enforceable rather than advisory.
+--
+-- Existing rows are left NULL on purpose. Backfilling them from the current
+-- `users.name` would assert a fact nobody established at the time, and would
+-- launder a rename performed *after* the deposit -- the exact bypass this column
+-- exists to close. A withdrawal with no recorded depositor name fails closed
+-- instead, and support can settle it by hand. (Nothing is stranded today: the
+-- Paystack key is still in test mode, so no live money has entered a wallet.)
+ALTER TABLE "payment_topups" ADD COLUMN IF NOT EXISTS "payer_name" varchar(120);
