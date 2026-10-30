@@ -312,9 +312,42 @@ that takes an `href`, not an `onClick`, and two synchronous `setState` calls in 
 `react-hooks/set-state-in-effect` rejected; the effects now subscribe to timers and bump a reload key instead,
 which is the pattern `GiftCardsManager` already used.
 
-**Still owed by the owner:** merge PRs #32 (docs) and #33 (this work), then the probe can be run without any
-secret of theirs entering chat. After that the paid tier is a pricing exercise rather than a build: two plans,
-their costs from `priceNgn`, and a `tier` the schema already carries.
+**Correction — the probe is still not runnable by me, and the credential was never the blocker.** I said that
+once #33 deployed I could run the integrations probe myself. That was wrong. `DIAGNOSTICS_SECRET` is set and the
+route accepts it, but **this sandbox has no network route to the production domain at all**: `curl` to
+`pryva-two.vercel.app` fails with `SSL_ERROR_SYSCALL` before any HTTP status, because outbound access is
+restricted to a short allowlist of build hosts. `fetch_page` reaches production but cannot set an
+`Authorization` header, so it cannot authenticate to a secret-gated endpoint. **The obstacle is egress, not
+secrecy** — and I diagnosed it as secrecy, then built a fix for the wrong problem. The credential split is still
+worth keeping (a read-only endpoint should not share a credential with jobs that credit wallets and send mail,
+and the owner can now hand out or rotate diagnostic access without touching the crons), but it does not let me
+run the probe and no future change to that variable will.
+
+**A workaround was considered and rejected on purpose.** `gh` *is* reachable, so a GitHub Actions workflow could
+`curl` the endpoint and I could read its log. The repository is **public**, which makes Actions logs publicly
+readable, and the probe's output is exactly what must not be public: credential tails, supplier balances and
+sampled catalogue rows. That would trade one blocked diagnostic for a permanent public disclosure, and would
+break the sourcing-secrecy rule the codebase is tested against. **Do not do this.** The probe is run by the owner,
+from their own machine, and pasted back.
+
+**Merged and live.** PRs #32 (`be87299`) and #33 (`19113f0`); production `dpl_DNfk3o8TGRscnypE2zWn2tBZh1vT`
+READY/PROMOTED. Its build log reads **`RDS IAM -> …: applying 1 of 14 migration(s).` / `applied
+0013_disposable_inboxes.sql` / `Done. 14 migration(s) recorded.`** — *applying*, not *up to date*, which is the
+end-to-end proof that previews no longer migrate production: under the old command this build would have reported
+"up to date (14)" because PR #33's own preview had already applied it, exactly the misleading line that exposed
+the hazard for `0012`. `/email-otp` verified live: the amber "not switched on yet" notice is gone and the page
+links to `/dashboard/inbox`.
+
+**Residual risk now that the free inbox is live.** Creating one makes a real purchase against the supplier
+balance on first use, and that supplier's email contract still carries its own warning that it *has not been
+confirmed against a live key*. One edge case is not covered by the compensation logic: if the provider charges
+but returns a receipt missing `email_id` or `address`, `buyFleexaEmail` throws `INCOMPLETE_RECEIPT` and there is
+then no handle to cancel with, so that spend is unrecoverable. It needs the probe's `numbers.emailProducts`
+output — or one real inbox — to know whether it can happen.
+
+**Still owed by the owner:** the probe output, run locally with the `DIAGNOSTICS_SECRET` set in this session.
+After that the paid tier is a pricing exercise rather than a build: two plans, their costs from `priceNgn`, and a
+`tier` the schema already carries.
 ---
 
 ## 2. THE PLAN / BACKLOG
