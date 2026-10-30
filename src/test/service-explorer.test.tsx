@@ -74,8 +74,16 @@ describe("country-first service explorer", () => {
     expect(us.some((item) => item.id === "plan-vn-ng")).toBe(false);
     const regional = us.find((item) => item.id === "plan-esim-europe");
     expect(regional).toMatchObject({ coverage: "unconfirmed", action: null });
-    expect(nigeria.find((item) => item.id === "plan-email-24")?.coverage).toBe("not-country-specific");
-    expect(us.find((item) => item.id === "plan-email-24")?.coverage).toBe("not-country-specific");
+    // Email is no longer a set of catalogue plans, so nothing here matches a
+    // country -- and nothing needs to. The free inbox is a tool item that shows
+    // up in every country with the same shape.
+    for (const list of [nigeria, us]) {
+      expect(list.some((item) => item.id.startsWith("plan-email-"))).toBe(false);
+      expect(list.find((item) => item.id === "temporary-inbox")).toMatchObject({
+        category: "email", source: "tool", coverage: "not-country-specific",
+        stock: null, price: null,
+      });
+    }
   });
 
   it("does not allow mismatched or multi-unit bundles into the single-unit preview checkout", () => {
@@ -83,8 +91,11 @@ describe("country-first service explorer", () => {
     expect(canPreviewPlan(ng, "ng")).toBe(true);
     expect(canPreviewPlan(ng, "us")).toBe(false);
     expect(canPreviewPlan(findPlan("vn-otp-5")!, "ng")).toBe(false);
-    expect(canPreviewPlan(findPlan("email-bundle")!, "ng")).toBe(false);
-    expect(canPreviewPlan(findPlan("email-team")!, "ng")).toBe(false);
+    // The email bundles are gone from the catalogue, so they cannot be previewed
+    // or bought at all -- a stronger guarantee than being excluded here.
+    for (const slug of ["email-bundle", "email-team", "email-24", "email-30"]) {
+      expect(findPlan(slug), `${slug} should no longer exist`).toBeUndefined();
+    }
     expect(planMatchesCountry(findPlan("esim-europe")!, "de")).toBe(false);
     for (const item of buildServiceExplorer("ng")) {
       if (!item.id.startsWith("plan-") || !item.action) continue;

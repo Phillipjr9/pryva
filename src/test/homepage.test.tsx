@@ -62,8 +62,24 @@ describe("homepage structure", () => {
 describe("homepage promises", () => {
   it("prices the page from the live catalogue, not from typed-in numbers", () => {
     expect(html).toContain("₦1,340"); // Nigeria number
-    expect(html).toContain("₦790"); // cheapest inbox
     expect(html).toContain("Wallet top-ups from ₦1,000");
+  });
+
+  /**
+   * The homepage used to advertise ₦790 for a temporary inbox in four separate
+   * places: the quick service picker, the service card, the price list, and the
+   * sticky phone bar. Email is free now, so a price on it is not merely stale --
+   * it asks money for something we have decided to give away.
+   *
+   * This pins the absence rather than a replacement number, because the failure
+   * that matters is a price quietly reappearing: `services` in catalog.ts falls
+   * back to a hand-set `fromPrice` whenever a service has no plans, so deleting
+   * the email plans alone would have left ₦790 rendering exactly as before.
+   */
+  it("never puts a price on a temporary inbox", () => {
+    expect(html).not.toContain("₦790");
+    expect(html).not.toContain("per inbox");
+    expect(html).toContain("Free");
   });
 
   it("no longer sells subscription tiers that do not exist", () => {
@@ -105,7 +121,10 @@ describe("homepage SEO and navigation", () => {
   });
 
   it("keeps the sticky phone CTA, which knows when to hide", () => {
-    expect(html).toContain("Start with");
+    // The cheapest way onto the site is a free tool now, so the permanent phone
+    // bar invites the visitor to start free instead of naming a paid floor.
+    expect(html).toContain("Start free");
+    expect(html).not.toContain("Start with");
     expect(html).toContain("Get started");
   });
 });

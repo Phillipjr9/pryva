@@ -5,8 +5,8 @@
 > Copy it freely. Nothing here is dropped — if something is impossible or not mine to decide, it stays on the
 > list with a note.
 >
-> **Last updated:** 2026-10-30 (PRs #18–#26 merged)
-> **Branch:** `arena/33b91259-pryva` (`main` @ `fac64ad`, PR #26 merged). **Merging a PR does not close its branch** — this one still takes commits and now carries PR #27 (this docs update), so work can continue here rather than needing a fresh branch.
+> **Last updated:** 2026-10-30 (PRs #18–#28 merged; temporary email made free on this branch)
+> **Branch:** `arena/608d860b-pryva` (`main` @ `e9fa62a`, PRs #27 and #28 merged). **Merging a PR does not close its branch**, and each Arena session gets a fresh one — this branch carries the free-email change described in R49.
 > **Repo audit method:** every status below was verified by reading files in the checkout — not from memory,
 > not from the earlier chat log.
 >
@@ -89,6 +89,7 @@
 | R46 | Gift cards: no API exists, "but you can recommend" | answered in chat |
 | R47 | "Can you reverse engineer and work with fakemailo.com — I think it has some things I will need" | **answered: no, and it is not needed** |
 | R48 | (implied by R47) Make the temporary-inbox category deliverable | **#28** |
+| R49 | **"can the email be temporary email and free?"** then, as a business argument: *"there's thousands of temporary email providers that doesn't require fees… do you think user will leave free service and paid for mine? so we need to think as a business owner, generating free email doesnt mean other service is free too"* — email is free to the customer permanently; **every other service keeps its price** | **this branch** |
 
 **R47 verdict, with the reason, so it is not re-litigated in a later session.** fakemailo.com is a free
 ad-supported temp-mail site with no published API, no pricing and no developer terms. Its own Terms of
@@ -107,6 +108,40 @@ absent from `FULFILMENT_MAP` (10 slugs, all `vn-*`/`rent-*`). The work is wiring
 Its own header comment is the standing caveat: the contract *"has not been confirmed against a live
 key: smoke-test a single cheap purchase before taking customer money."*
 
+
+**R49, and why it is settled rather than open.** A disposable inbox is a commodity whose effective market
+price is zero — free services hand one out in a click — so charging ₦790–₦13,950 for one was never going to
+sell. It also could never have been *delivered*: the supplier's email products expose no duration, so a
+24-hour and a 30-day inbox are the same purchase upstream (`src/lib/fulfillment.ts`). Both halves point the
+same way, so the four tiers are gone rather than gated, and the inbox becomes a free tool attached to an
+account — no plan, no cost-sheet entry, no price, no order row. This is the one authorised exception to R45
+("I want all the service"): the *category* stays, its paid tiers do not.
+
+**What is still open, and it is about cost, not price.** Free to the customer does not mean free to run.
+Two ways to source an inbox: **(A)** the existing supplier feed, where each inbox costs us roughly ₦540 by
+the old cost sheet — an estimate dated 2026-10-27 that PR #28's probe now returns properly as the feed's own
+`priceNgn`; or **(B)** our own domain with inbound email (SES inbound parse, Cloudflare Email Routing,
+Mailgun routes), where receiving costs on the order of $0.10 per 1,000 messages — under ₦2 an inbox — and
+the same domain would unlock password resets and email verification. **(B) is the better business case once
+it exists, because a free inbox is an acquisition channel and its cost per signup is the whole point**, and
+because verified email is what would make "signed-in users only" a real cost control instead of a formality
+(transactional email is parked, so today anyone can mint unlimited accounts). It needs a domain, which only
+the owner can buy.
+
+**Rejected, with reasons, so this is not re-litigated:** free public temp-mail APIs. Mail.tm is genuinely
+free with no key and no paid tier, but its terms **require attribution and prohibit reselling or mirroring the
+API under your own domain**, and its disposable domains are blocklisted within days (`uberip.com` was flagged
+the day it launched). fakemailo's terms make every inbox **publicly readable** and reserve the right to
+terminate without notice — wrapping that would expose our users' OTP codes to strangers, which is worse than
+charging for them. An inbox that target sites reject, or that anyone can read, is not a feature. See R47.
+
+**Still to build:** the inbox itself (`disposable_inboxes` table via migration `0012`, one active inbox per
+user enforced by a **partial unique index** rather than an application check — two concurrent requests would
+race past a check and buy two inboxes, spending twice), a per-IP daily cap, create/poll/discard routes, and
+the viewer UI (`checkFleexaEmail()` already returns subject, from, body and a parsed `code`). All five PGlite
+test files hardcode a `MIGRATIONS` filename array, so all five need `0012` added or they silently run a stale
+schema. **Not authorised yet:** the one paid smoke test that would confirm the feed's contract, which its own
+header comment says *"has not been confirmed against a live key."*
 ---
 
 ## 2. THE PLAN / BACKLOG
@@ -305,6 +340,8 @@ Verified facts:
 | 2026-10-30 | **PR #24 — Bitcall gateway client and read-only eSIM catalog** (`0496001`). `bitcall.ts`: base URL pinned to `api.bitcall.io` (`BITCALL_API_URL` may redeploy but not re-host, because the secret rides as a header), `redirect:"error"`, nothing logs headers. eSIM catalog/orders/profiles, `getBitcallBalance()` on `GET /v1/balance`, and the full OTP client (services/countries/pools, buy/get/list activations, cancel/resend/reactivate). Added `isAmbiguousBitcallOutcome()`, which separates *"may I retry"* from *"did it possibly already happen"* — `SERVICE_UNAVAILABLE` is both retryable and ambiguous, `PRODUCT_UNAVAILABLE` is retryable and **not**; without that split a timeout followed by an automatic retry rents two numbers. Local rate budget moved to its own `LOCAL_RATE_BUDGET` code so "did my request leave this process" is answerable. **Inert at merge** (`BITCALL_KEY_ID` unset); the owner has since set it in Vercel. 760 tests. | — |
 | 2026-10-30 | **PR #25 — Do not sell a hand-prepared item nobody can prepare** (merged `bd645fa`, head `cbb8215`). Purchasability is now per listing and decided server-side: `isManualFulfilmentReachable()` (fails closed), a `purchasable` field on `/api/accounts/listings`, a 503 **before** the wallet debit in the purchase route, and a banner explaining why *Prepared for you* items are paused. Found while adding a Google Voice account to the manual lane — see the sequencing warning at the top of this file. 766 tests; sabotage-proven three ways, including that removing only the server-side check while keeping the hidden button fails 2 tests. | — |
 | 2026-10-30 | **PR #26 — Make an empty account feed explain itself** (merged `fac64ad`, heads `5581662` + `8ff5ca5`). Owner set `BULKACC_API_KEY` 14:28:40 and `FLEEXA_API_KEY` 14:31:00, both **after** the 14:10:09 production build — Vercel snapshots env at build time, so the running deployment's own `env` manifest contained neither. Rebuilt production (`dpl_BFn9uxSQQNihqPZNBamqtGQndn6Z`, PROMOTED, carries both). **⚠ `/status` then served stale HTML: plain `/status` still said "Not available" while `/status?cb=<random>` said "Available"** — always cache-bust when reading production, or you will diagnose a cache. So the account feed is confirmed live, yet `/api/accounts/categories` still returns only `Streaming`: connected, zero products. The reason was unrecoverable because this supplier reports a logical failure as HTTP 200 + `statusCode:200` + `data:null` (its documented insufficient-balance shape), so `readData()` did not throw, `items` became `[]`, and `primaryListings()` returned null on `!products.length` **logging nothing** — unfunded, rejected-key and empty-catalog were identical and silent. Added `probeCatalog()` (`not_configured`/`serving`/`no_products`/`failed`, keeps the message), a warn log on an empty page, and `GET /api/diagnostics/integrations` gated on the `CRON_SECRET` bearer (gated because it returns a feed's own wording and spends a rate-limited request; echoes only a key's last 4). Also `/accounts` had no `dynamic` export unlike 15 other pages, so its pause banner was frozen at build time and contradicted the listings API from the same deployment — now `ƒ`. 775 tests / 91 files, sabotage-proven three ways. **Most likely cause of zero products: the account has no balance.** Gift cards checked and need no feed: `createGiftCard()` debits the customer's own wallet and mints a `PRYVA-` code, so the earlier suspicion of hand-entered codes was wrong. **Verified live after merge** (production `dpl_8pc2DhSt7eFfNA2GJrAPkMXoXLyN`, PROMOTED): the global "purchases are temporarily paused" banner is gone from `/accounts`, so the page now reads configuration at request time; `/api/diagnostics/integrations` returns `{"error":"Unauthorized"}` without the secret; and — the first time this has been exercisable in production, because checkout was globally off until today and short-circuited before the per-listing logic — all six hand-prepared listings still report `purchasable:false` **with checkout enabled**, so PR #25's gate genuinely holds rather than merely passing tests. `/api/accounts/categories` still returns only `Streaming`: **the feed remains connected and empty**, which is now diagnosable rather than silent. | R43–R45 |
+| 2026-10-30 | **PRs #27 + #28 merged** (`33506a1`, `e9fa62a`; production `dpl_3aFEr9M5JwbrF9TRyDv48LDp6Lj1`, PROMOTED). #27 recorded #26 here. #28 added per-feed probes to `/api/diagnostics/integrations` — `numbers.{balance,emailProducts,smsServices,rentAreas}` and `gateway.balance`, each an independent `probe()` so one unreachable catalogue cannot hide the others, samples capped at 5 rows, credentials echoed as their last four characters only. It exists because *configured* was being read as *working*: `isBitcallConfigured()` says nothing about whether a secret is 128-hex-shaped, which `bitcall.ts` rejects with `MALFORMED_SECRET` **before** any request is made. 779 tests, four sabotage-proofs (a fixture secret that was not 128 hex made two of them fail for the wrong reason — **read a client's own validation before stubbing a credential**). Verified live: the endpoint returns `{"error":"Unauthorized"}` without the secret. **Still needs the owner to run the `curl` with their own `CRON_SECRET`** — I will not read that value into chat, because the same secret authorises the refund and wallet-email crons. | R48 |
+| 2026-10-30 | **Temporary email becomes free and stops being a product** (this branch, R49). Owner's business argument: a disposable inbox has thousands of free competitors, so nobody will pay for ours — and making email free must not make anything else free. Correct on both counts. The four paid tiers (`email-24/30/bundle/team`, ₦790–₦13,950) could never have sold *and* could never have been delivered, so they are removed from `catalog.ts`, `cost-sheet.json`, `prices.generated.ts` (41 → 37 plans, thinnest margin now ₦420 on `vn-ng`) and `SERVICE_TARGET_MARKUP` — not gated, gone. **⚠ The trap worth remembering:** `services` derives `fromPrice` from a service's plans but **falls back to the hand-set value when it has none**, so deleting the plans alone left ₦790 rendering in four places on the homepage, including the permanent phone sticky bar reading "Start with ₦790". `fromPrice` is now optional so TypeScript forces each consumer to choose what to render, and the bar says "Start free" — which is both true and a better opening than the cheapest paid plan. `/email-otp` rewritten: it had told visitors "nothing here can be ordered or charged" while rendering four priced cards with working `/signup?plan=email-*` buttons, and **no test covered that page's content at all**. Live feed inboxes in `fleexa-catalog.ts` now carry `price: null` — the supplier's per-inbox cost is an operating cost of a free feature and belongs in diagnostics, not a margin table — and the explorer keeps the `email` category populated with a `source:"tool"` item, the same shape bulk and scheduled orders use for things that are not priced. 784 tests / 92 files, sabotage-proven three ways: resurrecting ₦790 fails 3, dropping the tool item fails 2, re-adding a priced CTA fails 1. **The inbox itself is not built yet** — cost source and the paid smoke test are still the owner's calls; see R49. | R45, R49 |
 
 
 ---

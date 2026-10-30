@@ -50,10 +50,14 @@ export const PROFIT_BAND = {
  * Paystack charge, a refund risk and support, so 45% is not greed, it is what
  * keeps the order worth taking. High-ticket items (gift cards, big eSIM packs)
  * sit at the bottom because customers can price-check them instantly.
+ *
+ * `email-otp` is absent on purpose: a temporary inbox is free, so there is no
+ * cost to mark up. Its absence is not an oversight to be filled in — if this map
+ * ever gains an `email-otp` entry, something has started charging for a free
+ * tool. See the note on the email plans in src/lib/catalog.ts.
  */
 export const SERVICE_TARGET_MARKUP: Record<string, number> = {
   numbers: 45,
-  "email-otp": 45,
   esim: 35,
   proxies: 35,
   accounts: 45,

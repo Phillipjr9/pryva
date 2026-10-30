@@ -1,27 +1,7 @@
 {
   "_readme": "Cost sheet. `cost` is the fixed amount we pay per unit, in naira. Edit a cost here, run `npm run pricing:build`, and every price follows (30-50% markup, see src/lib/pricing.ts). `label` is for humans only.",
-  "_updated": "2026-10-27",
+  "_updated": "2026-10-30",
   "catalog": {
-    "email-24": {
-      "service": "email-otp",
-      "label": "1 inbox · 24 hours",
-      "cost": 540
-    },
-    "email-30": {
-      "service": "email-otp",
-      "label": "1 inbox · 30 days",
-      "cost": 4230
-    },
-    "email-bundle": {
-      "service": "email-otp",
-      "label": "5 inboxes · 7 days",
-      "cost": 1380
-    },
-    "email-team": {
-      "service": "email-otp",
-      "label": "20 inboxes · 30 days",
-      "cost": 9620
-    },
     "esim-africa": {
       "service": "esim",
       "label": "3GB · 15 days",

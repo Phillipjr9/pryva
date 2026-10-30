@@ -71,10 +71,20 @@ a ₦800 virtual number has to absorb a payment fee, a refund risk and support, 
 45% is not greed — it is what makes the order worth taking. High-ticket items sit
 nearer the floor because customers price-check them instantly.
 
+**Temporary email inboxes are not in this table, and must not be added.** A
+disposable inbox is free: it is a tool attached to an account, not a product, so
+it has no cost-sheet entry, no target markup and no selling price. The category
+used to carry four paid duration tiers (`email-24`, `email-30`, `email-bundle`,
+`email-team`) which could never be delivered — the supplier's email products
+expose no duration, so a 24-hour and a 30-day inbox are the same purchase
+upstream — and could never have sold, because a disposable inbox is a commodity
+with an effective market price of zero. We still pay a cost per inbox to run the
+free tool; that is an operating cost of a free feature, not a price, and it
+belongs in the diagnostics output rather than in a margin table.
+
 | service | target | why |
 |---|---|---|
 | Virtual numbers | 45% | smallest tickets, highest failure/refund rate |
-| Email / OTP inboxes | 45% | same, short-lived products |
 | Digital accounts (marketplace) | 40% + premium | 45–48% on Facebook/Instagram, 43–45% on X/TikTok |
 | Subscriptions (Netflix, Spotify…) | 40% | price-checked against the platforms' own naira rates |
 | eSIM | 35% | high ticket, compared with Airalo/Holat at checkout |
@@ -127,8 +137,8 @@ or lose the customer instantly:
 - **Gift cards** — sold at face value by definition. The margin is the discount
   we buy them at (and they are strictly non-refundable — see `/refund-policy`).
 
-Everything else — numbers, eSIM, proxies, email/OTP, digital accounts,
-subscriptions, bulk, scheduled — is priced by the band. If a supplier ever quotes
+Everything else — numbers, eSIM, proxies, digital accounts, subscriptions,
+bulk, scheduled — is priced by the band. If a supplier ever quotes
 us above the market rate for airtime/data/gift cards, the correct response is to
 stop selling that SKU, not to break the band.
 
@@ -136,19 +146,18 @@ stop selling that SKU, not to break the band.
 
 ## 5. What the numbers look like today
 
-From `npm run pricing:audit` (2026-10-27, placeholder costs pending the owner's
+From `npm run pricing:audit` (2026-10-30, placeholder costs pending the owner's
 real supplier invoices — see §6):
 
 | plan | cost | price | profit | markup |
 |---|---|---|---|---|
 | vn-ng (Nigeria number) | ₦920 | ₦1,340 | ₦420 | 45.7% |
-| email-24 (1 inbox · 24h) | ₦540 | ₦790 | ₦250 | 46.3% |
 | esim-ng-1 | ₦3,460 | ₦4,700 | ₦1,240 | 35.8% |
 | proxy-ng-25 | ₦50,000 | ₦67,500 | ₦17,500 | 35.0% |
 | netflix-1month | ₦2,690 | ₦3,800 | ₦1,110 | 41.3% |
 | spotify-1month | ₦1,540 | ₦2,160 | ₦620 | 40.3% |
 
-41 plans · thinnest margin ₦250 · every price inside the band.
+37 plans · thinnest margin ₦420 · every price inside the band.
 
 ---
 
@@ -165,5 +174,4 @@ charges per unit, then run `npm run pricing:build`. Two sources:
 - **Marketplace listings** (accounts, and anything else from the supplier API):
   no manual work — the live `price` from the listing × the live FX rate feeds
   `marketplace-pricing.ts`, which applies the same band at request time.
-- **Own catalogue** (numbers, eSIM, proxies, email/OTP, subscriptions): the cost
-  sheet. Ask the supplier for their per-unit price list, paste it in, rebuild.
+- **Own catalogue** (numbers, eSIM, proxies, subscriptions): the cost sheet. Ask the supplier for their per-unit price list, paste it in, rebuild.

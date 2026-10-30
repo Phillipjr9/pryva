@@ -16,22 +16,6 @@ export type GeneratedPrice = {
 };
 
 export const CATALOG_PRICES: Record<string, GeneratedPrice> = {
-  "email-24": {
-    "price": 790,
-    "maxDiscountPercent": 6
-  },
-  "email-30": {
-    "price": 6150,
-    "maxDiscountPercent": 10
-  },
-  "email-bundle": {
-    "price": 2010,
-    "maxDiscountPercent": 10
-  },
-  "email-team": {
-    "price": 13950,
-    "maxDiscountPercent": 10
-  },
   "esim-africa": {
     "price": 12500,
     "maxDiscountPercent": 4

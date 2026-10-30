@@ -18,7 +18,13 @@ export function StickyMobileCta({
   targetId,
 }: {
   label: string;
-  price: number;
+  /**
+   * Omit for a service that costs nothing. The bar then invites the visitor to
+   * start free instead of naming a price — which is both true and a better
+   * opening than the cheapest paid plan, since a free tool is the lowest
+   * commitment on the site.
+   */
+  price?: number;
   targetId: string;
 }) {
   const [hidden, setHidden] = useState(false);
@@ -48,7 +54,7 @@ export function StickyMobileCta({
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
             <p className="truncate text-[0.78rem] font-semibold text-ink">
-              Start with {formatNaira(price)}
+              {price === undefined ? "Start free" : <>Start with {formatNaira(price)}</>}
             </p>
             <p className="truncate text-[0.66rem] text-ink-3">{label}</p>
           </div>
