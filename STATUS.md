@@ -12,11 +12,11 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **886 tests / 100 files, all passing** (no `.skip`, no `.only`) |
+| `npm test` | **896 tests / 101 files, all passing** (no `.skip`, no `.only`) |
 | `npm run build` | **passes**; 75 API route handlers, 21 public pages, 17 dashboard pages, 12 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
-Codebase size: ~52,600 lines under `src/`, 98 modules in `src/lib/`, 22 database tables, 16 migrations (`0000`–`0015`).
+Codebase size: ~52,600 lines under `src/`, 99 modules in `src/lib/`, 22 database tables, 16 migrations (`0000`–`0015`).
 Migration coverage is complete — every table in `src/db/schema.ts` is created by a migration.
 
 **Summary in one line:** the engineering is in better shape than the planning docs suggest; the real gaps are (a) product surface that was never built, (b) operations/deployment wiring, and (c) documentation that no longer matches the code.
@@ -57,7 +57,7 @@ eSIM, proxies, digital subscriptions, airtime/data, bulk orders, scheduled order
 | 10 | ~~**Admin audit log**~~ | **Built in the second pass** — `admin_audit_log` (migration `0014`), `/admin/audit`, `GET /api/admin/audit` |
 | 11 | ~~**Admin reconciliation view**~~ | **Built in the third pass** — `/admin/reconciliation` lists in-flight withdrawals, orders with an unknown supplier outcome, refunded-but-not-released orders and stale pending deposits, oldest first |
 | 12 | **Paid inbox tier** | schema supports `tier='paid'`, the code only issues `free`; price needs the supplier's real `priceNgn` |
-| 13 | **CSP** | no `Content-Security-Policy` header anywhere (`src/proxy.ts` ships the other headers) |
+| 13 | ~~**CSP**~~ | **Added in the fifth pass** — `src/lib/security-headers.ts`, served by the proxy, with the asset hosts pinned by a test |
 | 14 | **Dockerfile** | CI (`.github/workflows/ci.yml`) and an operations runbook (`RUNBOOK.md`) were added in these passes; no Dockerfile — deployment is Vercel-only |
 | 15 | **Gift-card explainer page** | no `/gift-cards` marketing page; one blog post (`gift-cards-for-teams`) is all there is |
 | 16 | **Self-service account deletion** | deliberately returns 503; panel points at support |
@@ -251,3 +251,28 @@ Feature claims marked "absent" mean zero matching code in `src/`; "built" means 
 **Verified:** 886 tests / 100 files · typecheck · lint · build. New tests: `src/test/totp.test.ts` (8 — the RFC 6238 published vectors), `src/test/two-factor.test.ts` (14 — fail-closed, replay, single-use recovery, challenge hashing) and `src/test/auth-two-factor-login.test.ts` (3 — a correct password yields a challenge, not a session, and 503 when the server cannot check). Sabotage-proven twice: dropping `rejectUpToStep` and the conditional step advance fails two tests, and disabling the login branch issues a session it should not; both restored, all pass.
 
 **Deliberately not done:** SMS or email one-time codes (an attacker with the password usually has the mailbox too), and an admin "reset 2FA" button. A reset is an audited operator action that needs an owner decision; the runbook describes how to handle a lockout manually in the meantime.
+
+---
+
+## 13. Fifth pass — a content security policy (30 Oct 2026)
+
+The only security header missing from `src/proxy.ts` was the one that constrains where the browser may load anything from. It is now sent on every response:
+
+```
+default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self';
+form-action 'self'; script-src 'self' 'unsafe-inline';
+style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+font-src 'self' data: https://fonts.gstatic.com;
+img-src 'self' data: blob: https://images.pexels.com; connect-src 'self';
+media-src 'self'; worker-src 'self' blob:; manifest-src 'self'; frame-src 'none'
+```
+
+**What it actually stops.** A third-party origin cannot supply a script, style, font or image unless it is on that list; the page cannot be framed by anyone but itself; forms cannot post off-site; plugins/objects cannot load at all. That closes the "inject a tag from a supplier's error page" class and makes a new external dependency a visible, reviewable change rather than a silent one.
+
+**What it does not stop, stated plainly.** `script-src` still includes `'unsafe-inline'`, so HTML injection that gets past React's escaping would still execute. Next.js emits its own inline bootstrap, the home page emits JSON-LD, and `BuildGuard` installs a stale-bundle check before hydration; a nonce-based policy would force every page to render dynamically and would still need those scripts rewritten to carry the nonce. That is a real follow-up, not a one-line change, and it is recorded here rather than pretended away.
+
+**Environment differences are deliberate and tested.** Development adds `'unsafe-eval'` and `ws:`/`wss:` for hot reload; production has neither. The embedded preview keeps `frame-ancestors *` (and continues to omit `X-Frame-Options`) so the Arena viewer can frame the demo; a real deployment keeps `'self'`. `isEmbeddedPreviewHost` is anchored so `e2b.app.evil.com` does not match.
+
+**Drift is the failure mode, so the tests read the sources.** `src/test/content-security-policy.test.ts` parses the policy and compares it with `layout.tsx` (the two Google Fonts hosts) and `next.config.ts` (`images.remotePatterns`), so adding an image host in one place and forgetting the other fails locally instead of silently blocking the image in production. It also fails if a form posts off-origin, if a wildcard appears in a script/style/image/font/connect source, or if a directive is emitted empty.
+
+**Verified:** 896 tests / 101 files · typecheck · lint · build. Booted `next start` and checked the real headers on `/`, `/login`, `/pricing` and `/api/health`, and with `Host: 3000-abc.e2b.app` to confirm the preview branch (`frame-ancestors *`, no `X-Frame-Options`). Sabotage-proven: removing the Pexels host and hard-coding `frame-ancestors *` fails three tests; restored, all pass.
