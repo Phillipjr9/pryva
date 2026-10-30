@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { plansFor } from "@/lib/catalog";
+import { isPlanFulfillable } from "@/lib/fulfillment";
 
 vi.mock("@/lib/auth", () => ({
   getCurrentUser: async () => null,
@@ -118,6 +120,25 @@ describe("homepage SEO and navigation", () => {
   it("sets an Open Graph image so shared links are not bare", () => {
     const og = metadata.openGraph as { images?: { url: string; width: number; height: number }[] };
     expect(og.images?.[0]).toMatchObject({ url: "/og.png", width: 1200, height: 630 });
+  });
+
+  /**
+   * The footer hardcoded `Number fulfillment: Paused` long after numbers became
+   * deliverable, so the busiest page on the site said the core product was
+   * switched off while /pricing sold ten number plans with working "Get Started"
+   * links. The row now derives from the same allowlist /status uses.
+   *
+   * The expectation is computed here from that allowlist rather than written as a
+   * literal, so the test keeps holding when the numbers change -- and so the two
+   * cannot drift apart the way a typed-in "Paused" did.
+   */
+  it("agrees with the fulfilment allowlist about whether numbers are deliverable", () => {
+    const numbers = plansFor("numbers");
+    const deliverable = numbers.filter((plan) => isPlanFulfillable(plan.slug)).length;
+    expect(deliverable, "numbers are deliverable, so this branch is the live one").toBeGreaterThan(0);
+
+    expect(html).toContain(`Automatic · ${deliverable} of ${numbers.length} plans`);
+    expect(html).not.toContain("Paused");
   });
 
   it("keeps the sticky phone CTA, which knows when to hide", () => {
