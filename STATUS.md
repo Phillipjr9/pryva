@@ -12,7 +12,7 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **968 tests / 108 files, all passing** (no `.skip`, no `.only`) |
+| `npm test` | **969 tests / 108 files, all passing** (no `.skip`, no `.only`) |
 | `npm run build` | **passes**; 75 API route handlers, 23 public pages, 17 dashboard pages, 12 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
@@ -527,4 +527,35 @@ all fail.
 source, CSS and served-HTML level — not by looking at a 360 px render. The counts above are real;
 the pixel result is not something I can claim to have seen. A pass on an actual handset is still
 worth doing before calling mobile done.
+
+---
+
+## 21. Thirteenth pass — gift cards are not a service (30 Oct 2026)
+
+**The report:** gift cards should not be part of the categories, because they are not services.
+Correct — nothing is fulfilled and nothing is supplied: a gift card is wallet credit Pryva issues
+itself, the moment it is paid for.
+
+| Where gift cards were a "service" | Now |
+|---|---|
+| `serviceDefinitions` in `catalog.ts` — one of the nine service cards, with `fromPrice`, `unit`, highlights and FAQs | removed from the catalogue; the homepage grid shows **eight** services |
+| `EXPLORER_CATEGORIES` — a "Gift cards · Pryva wallet credit" chip, plus a card in that category | chip and card removed; the dashboard hub no longer offers a gift-cards category |
+| Dashboard sidebar, under **Buy**, pointing at the services hub with `category: "gift-cards"` | links straight to `/dashboard/gift-cards`, still in the sidebar and the command palette |
+| Footer, under **Services** | moved to the product links, beside Pricing |
+| Terms: "…data plans, gift cards, bulk ordering…" | the sentence now lists the services, then says Pryva also issues gift cards that carry wallet credit |
+
+`/gift-cards`, `/dashboard/gift-cards`, the purchase and redeem routes, the email template and the
+sitemap entry are untouched — the product exists and works; only its classification changed. The
+`gift-cards` string stays in `ServiceSlug`, `service-timeouts` and the pricing markup table as an
+internal identifier, which is why old orders and the gift-card rules still typecheck.
+
+**One deliberate exception:** `/status` still lists "Gift cards — Available". That page reports
+*which products can be ordered and delivered* (its own words), not which services exist, and a
+visitor looking for whether gift cards work should not have to guess. Say the word and the row goes.
+
+**Verified:** 969 tests / 108 files · typecheck · lint · build. Assertions moved rather than
+deleted: the homepage test now requires eight service names and asserts gift cards is absent from
+the grid, the explorer test asserts there is no `gift-cards` category and no item, and the
+dashboard-shell test asserts the sidebar has no `category: "gift-cards"` while `/dashboard/gift-cards`
+is still reachable. `/gift-cards` remains in the footer (moved column) and in the sitemap.
 

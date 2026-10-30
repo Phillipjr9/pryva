@@ -68,7 +68,9 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
       { href: "/dashboard/services", label: "Accounts", art: "accounts", category: "accounts" },
       { href: "/dashboard/services", label: "Subscriptions", art: "accounts", category: "subscriptions" },
       { href: "/dashboard/services", label: "Data Plans", art: "data", category: "data" },
-      { href: "/dashboard/services", label: "Gift Cards", art: "gift-cards", category: "gift-cards" },
+      // Gift cards are wallet credit Pryva issues itself, not a service in the
+      // catalogue, so this links straight at the page instead of the hub.
+      { href: "/dashboard/gift-cards", label: "Gift cards", art: "gift-cards" },
       { href: "/dashboard/bulk-orders", label: "Bulk Orders", art: "bulk" },
       { href: "/dashboard/scheduled", label: "Scheduled", art: "scheduled" },
     ],

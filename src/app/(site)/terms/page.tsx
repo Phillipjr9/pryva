@@ -44,7 +44,7 @@ export default function TermsPage() {
 
             <h2>2. Description of Services</h2>
             <p>
-              Pryva provides digital services including but not limited to virtual phone numbers, eSIM data plans, residential proxies, email OTP services, data plans, gift cards, bulk ordering, and scheduled purchases.
+              Pryva provides digital services including but not limited to virtual phone numbers, eSIM data plans, residential proxies, email OTP services, data plans, bulk ordering, and scheduled purchases. Pryva also issues gift cards, which carry wallet credit rather than being a separate service.
             </p>
 
             <h2>3. User Accounts</h2>

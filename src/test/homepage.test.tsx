@@ -19,7 +19,7 @@ describe("homepage structure", () => {
     expect(html).toContain("without the friction");
   });
 
-  it("renders all nine services, not the old four", () => {
+  it("renders all eight services, not the old four", () => {
     for (const name of [
       "Virtual Numbers",
       "eSIM",
@@ -27,13 +27,26 @@ describe("homepage structure", () => {
       "Email OTP",
       "Digital Accounts",
       "Data Plans",
-      "Gift Cards",
       "Bulk Orders",
       "Scheduled Purchases",
     ]) {
       expect(html).toContain(name);
     }
     expect(html).not.toContain("Four services");
+  });
+
+  /**
+   * Gift cards are not a service.
+   *
+   * They were one of the nine cards here, one chip in the dashboard's service
+   * categories, and one row in the sidebar's "Buy" list. They are wallet credit
+   * that Pryva issues itself — nothing is fulfilled, nothing is supplied — so
+   * they belong with the wallet, reachable from the footer and `/dashboard`,
+   * not in a catalogue next to virtual numbers.
+   */
+  it("does not list gift cards among the services", () => {
+    expect(html).not.toContain("Gift Cards");
+    expect(html).not.toContain("/dashboard/gift-cards");
   });
 
   it("never sends a signed-out visitor straight at a dashboard route", () => {
@@ -195,6 +208,8 @@ describe("homepage hero", () => {
  */
 describe("homepage service list", () => {
   it("draws each service's artwork exactly once", () => {
+    // Gift cards are deliberately not here: they left the catalogue, so their
+    // artwork belongs on /gift-cards and in the dashboard, not on this page.
     const artwork = [
       "virtual-numbers",
       "esim",
@@ -202,7 +217,6 @@ describe("homepage service list", () => {
       "email-otp",
       "digital-accounts",
       "data",
-      "gift-cards",
       "bulk",
       "scheduled",
     ];
