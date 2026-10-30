@@ -90,6 +90,7 @@
 | R47 | "Can you reverse engineer and work with fakemailo.com — I think it has some things I will need" | **answered: no, and it is not needed** |
 | R48 | (implied by R47) Make the temporary-inbox category deliverable | **#28** |
 | R49 | **"can the email be temporary email and free?"** then, as a business argument: *"there's thousands of temporary email providers that doesn't require fees… do you think user will leave free service and paid for mine? so we need to think as a business owner, generating free email doesnt mean other service is free too"* — email is free to the customer permanently; **every other service keeps its price** | **this branch** |
+| R50 | **"remove the EXAMPLE VERIFICATION Sample only / +234 ••• ••• •••• / Nigeria · sample number / 482069 at the top of the image on homepage"** — the fake verification card layered over the hero photo | **this branch** |
 
 **R47 verdict, with the reason, so it is not re-litigated in a later session.** fakemailo.com is a free
 ad-supported temp-mail site with no published API, no pricing and no developer terms. Its own Terms of
@@ -142,6 +143,22 @@ the viewer UI (`checkFleexaEmail()` already returns subject, from, body and a pa
 test files hardcode a `MIGRATIONS` filename array, so all five need `0012` added or they silently run a stale
 schema. **Not authorised yet:** the one paid smoke test that would confirm the feed's contract, which its own
 header comment says *"has not been confirmed against a live key."*
+
+**R50, done.** The hero photo carried a decorative card dressed as a product screenshot — "Example
+verification / Sample only", a masked `+234 ••• ••• ••••`, "Nigeria · sample number", six digits and an
+"Expires in 00:19" countdown. Removed outright (53 lines) at the owner's request; the photo and its gradient
+overlay stay. Nothing tested that card, so it is now pinned by a test that fails if it comes back.
+
+**What was deliberately left alone:** the "04 / Your dashboard" section still shows an illustrative order
+("Example Order PV-2291", code 814027, its own "Expires in 00:19"). That one is doing real work — it shows
+what the dashboard looks like — and it shares wording with the card that went, so a broad assertion like
+`not.toContain("Expires in")` would fail for the wrong reason. If the owner wants that removed too, it is a
+separate decision.
+
+**Two open-PR collisions avoided while doing this** (the same technique as R47/R48): PR #30 edits the same
+three files, so this change's test went into a new `describe("homepage hero")` at the *end* of
+`homepage.test.tsx` (old lines 128+ versus PR #30's insertion at 120–125) and this record went into §1
+rather than §8, where PR #30 appends. Both PRs stay mergeable in either order.
 ---
 
 ## 2. THE PLAN / BACKLOG
