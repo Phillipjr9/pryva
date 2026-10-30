@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "artwork:build": "node scripts/build-service-artwork.mjs",
     "pricing:build": "node --experimental-strip-types scripts/build-prices.mjs",
     "pricing:audit": "node --experimental-strip-types scripts/build-prices.mjs --audit"
   },
