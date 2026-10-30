@@ -5,6 +5,7 @@ import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
 import { BUILD_ID } from "@/lib/build-id";
 import { BuildGuard } from "@/components/system/BuildGuard";
+import { ServiceWorkerRegistration } from "@/components/system/ServiceWorkerRegistration";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://pryva.ng"),
@@ -65,6 +66,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="min-h-screen bg-cream text-ink antialiased">
         <BuildGuard buildId={BUILD_ID} />
+        <ServiceWorkerRegistration />
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

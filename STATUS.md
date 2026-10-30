@@ -12,8 +12,8 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **896 tests / 101 files, all passing** (no `.skip`, no `.only`) |
-| `npm run build` | **passes**; 75 API route handlers, 21 public pages, 17 dashboard pages, 12 admin pages |
+| `npm test` | **907 tests / 102 files, all passing** (no `.skip`, no `.only`) |
+| `npm run build` | **passes**; 75 API route handlers, 22 public pages, 17 dashboard pages, 12 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
 Codebase size: ~52,600 lines under `src/`, 99 modules in `src/lib/`, 22 database tables, 16 migrations (`0000`–`0015`).
@@ -52,7 +52,7 @@ eSIM, proxies, digital subscriptions, airtime/data, bulk orders, scheduled order
 | 5 | **Support tickets** | `/dashboard/support` + `/admin/messages` handle flat `contact_messages`; no threads, priorities or SLA |
 | 6 | ~~**Two-factor authentication**~~ | **Built in the fourth pass** — TOTP enrolment, recovery codes and a two-step sign-in; migration `0015` |
 | 7 | **SMS / WhatsApp notifications** | nothing (no Termii/Twilio/WhatsApp client) |
-| 8 | **PWA** | no manifest, no service worker, no offline page (the preview cookie bridge is not a PWA) |
+| 8 | ~~**PWA**~~ | **Built in the sixth pass** — web manifest, installable icons, offline page and a deliberately narrow service worker |
 | 9 | **Product analytics / Web Vitals** | nothing — no GA4, no `@vercel/analytics`, no `web-vitals` |
 | 10 | ~~**Admin audit log**~~ | **Built in the second pass** — `admin_audit_log` (migration `0014`), `/admin/audit`, `GET /api/admin/audit` |
 | 11 | ~~**Admin reconciliation view**~~ | **Built in the third pass** — `/admin/reconciliation` lists in-flight withdrawals, orders with an unknown supplier outcome, refunded-but-not-released orders and stale pending deposits, oldest first |
@@ -62,7 +62,7 @@ eSIM, proxies, digital subscriptions, airtime/data, bulk orders, scheduled order
 | 15 | **Gift-card explainer page** | no `/gift-cards` marketing page; one blog post (`gift-cards-for-teams`) is all there is |
 | 16 | **Self-service account deletion** | deliberately returns 503; panel points at support |
 
-Rough sizing: 1–4 and 15 are S–M; 5, 10, 11, 13 are M; 7 and 8 are M; 9 is S.
+Rough sizing: 1–4 and 15 are S–M; 5, 10, 11, 13 are M; 7 is M; 9 is S.
 
 ---
 
@@ -276,3 +276,28 @@ media-src 'self'; worker-src 'self' blob:; manifest-src 'self'; frame-src 'none'
 **Drift is the failure mode, so the tests read the sources.** `src/test/content-security-policy.test.ts` parses the policy and compares it with `layout.tsx` (the two Google Fonts hosts) and `next.config.ts` (`images.remotePatterns`), so adding an image host in one place and forgetting the other fails locally instead of silently blocking the image in production. It also fails if a form posts off-origin, if a wildcard appears in a script/style/image/font/connect source, or if a directive is emitted empty.
 
 **Verified:** 896 tests / 101 files · typecheck · lint · build. Booted `next start` and checked the real headers on `/`, `/login`, `/pricing` and `/api/health`, and with `Host: 3000-abc.e2b.app` to confirm the preview branch (`frame-ancestors *`, no `X-Frame-Options`). Sabotage-proven: removing the Pexels host and hard-coding `frame-ancestors *` fails three tests; restored, all pass.
+
+---
+
+## 14. Sixth pass — installable app and a careful service worker (30 Oct 2026)
+
+The app can now be installed, and survives a dead connection without pretending to work offline.
+
+| Piece | File | Notes |
+|---|---|---|
+| Manifest | `src/app/manifest.ts` | generated route, so the name and description cannot drift from the metadata; `display: standalone`, cream theme |
+| Icons | `public/icons/*` | 192 and 512 from the existing brand shield, plus a padded 512 `maskable` |
+| Offline page | `src/app/offline/page.tsx` | static, no account data, `noindex` |
+| Service worker | `public/sw.js` | versioned cache; see the rules below |
+| Registration | `src/components/system/ServiceWorkerRegistration.tsx` | production only, two seconds after paint, failure is silent |
+
+**The cache rules are the design.** A service worker outlives the tab and is shared by every profile on the device, so a careless cache is a data leak rather than a performance tweak. It caches exactly two things:
+
+1. the offline fallback page, which contains no account data;
+2. content-hashed `/_next/static/` assets and the app icons.
+
+Navigations are network-first and **never** written to the cache. `/api` is skipped on every method. A failed navigation falls back to `/offline`; a failed asset is returned as-is and not cached, because an error page stored under an asset URL would break the app until the next version bump. The cache is capped at 80 entries and wiped on `VERSION` change.
+
+**No offline money.** There is no background sync, no queued purchase, no push. A wallet that replays a payment after reconnecting is a double-spend risk, so the app simply requires the network to move money — the offline page says so.
+
+**Verified:** 907 tests / 102 files · typecheck · lint · build. New tests execute `public/sw.js` in a Worker sandbox with a fake Cache API rather than grepping it: install precaches only the three files, API/POST/cross-origin requests are not intercepted, a navigation response is never stored, a repeated hashed asset is served without a second fetch, a 500 is not cached, and an older cache version is deleted on activate. The manifest test reads the PNG headers and fails if a declared size no longer matches the file. Sabotage-proven: dropping the method guard and caching navigations each fail a test. Also checked live with `next start`: `/manifest.webmanifest`, `/offline`, `/sw.js` and all three icons return 200 with the manifest linked in the HTML.
