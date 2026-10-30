@@ -64,9 +64,31 @@ export async function POST(request: NextRequest) {
     }
     // Check the provider's details for every status, not just success. A
     // mismatched or incomplete response is unconfirmed, not a failed charge.
-    if (payment.reference !== reference || payment.currency !== "NGN" ||
-        !Number.isSafeInteger(payment.amount) || payment.amount !== topup.amount * 100) {
-      logger.warn("Top-up verification returned mismatched payment details", { reference, userId: user.id });
+    //
+    // Each comparison reports itself separately. This used to be one compound
+    // condition behind one warning that said payment details had mismatched
+    // without saying which, so a deposit confirmed by Paystack but stranded as
+    // pending could not be diagnosed from the log at all. parsePaystackResponse
+    // casts the JSON without validating it, so the recorded types matter: a
+    // stringified amount and a missing one look identical under `!==`.
+    const mismatches: string[] = [];
+    if (payment.reference !== reference) {
+      mismatches.push(`reference: provider sent ${JSON.stringify(payment.reference)}, expected ${JSON.stringify(reference)}`);
+    }
+    if (payment.currency !== "NGN") {
+      mismatches.push(`currency: provider sent ${JSON.stringify(payment.currency)}, expected "NGN"`);
+    }
+    if (!Number.isSafeInteger(payment.amount)) {
+      mismatches.push(`amount: not a safe integer, provider sent ${JSON.stringify(payment.amount)} (typeof ${typeof payment.amount})`);
+    } else if (payment.amount !== topup.amount * 100) {
+      mismatches.push(`amount: provider sent ${payment.amount} kobo, expected ${topup.amount * 100} kobo from the stored ${topup.amount} naira`);
+    }
+    if (mismatches.length > 0) {
+      logger.warn("Top-up verification returned mismatched payment details", {
+        reference,
+        userId: user.id,
+        mismatch: mismatches.join(" | "),
+      });
       return NextResponse.json({ error: "Payment details could not be verified. Contact support with your reference before paying again." }, { status: 409 });
     }
 
