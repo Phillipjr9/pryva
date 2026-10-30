@@ -56,6 +56,23 @@ describe("password reset endpoints", () => {
     expect(response.status).toBe(400);
   });
 
+  it("reports 503 instead of a false promise when mail is not configured", async () => {
+    // This file sets no RESEND_API_KEY / RESEND_FROM_EMAIL, so the gate must fire
+    // before the rate limiter is touched and before any reset token is written.
+    const response = await forgot(build("/api/auth/forgot", {
+      body: { email: "customer@pryva.ng" },
+      origin: "https://pryva.test",
+      site: "same-origin",
+    }));
+    expect(response.status).toBe(503);
+    const body = (await response.json()) as { ok: boolean; error?: string; message?: string };
+    expect(body.ok).toBe(false);
+    // Identical wording to a rate-limit-store outage: the response must not let a
+    // caller distinguish operator-side failures, or tell which addresses exist.
+    expect(body.error).toBe("Password resets are temporarily unavailable.");
+    expect(body.message).toBeUndefined();
+  });
+
   it("requires both a token and a password to reset", async () => {
     const response = await reset(build("/api/auth/reset", { body: { password: "only-a-password" } }));
     expect(response.status).toBe(400);
