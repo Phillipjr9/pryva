@@ -83,6 +83,53 @@ export function classifyRetry(code: string | null | undefined): BitcallRetryClas
   return "unknown";
 }
 
+/**
+ * Codes that mean the request was refused *before* it could execute, so no money
+ * moved. Their gateway check order is: headers → key → IP → secret → account
+ * standing → product enabled → rate limit → schema. Everything in this set is
+ * rejected at or before that pipeline, and their docs state the charge did not
+ * happen for the ones that spend (`INSUFFICIENT_BALANCE`: "Nothing was charged,
+ * so no number was rented").
+ */
+const DEFINITIVELY_NOT_EXECUTED: ReadonlySet<string> = new Set([
+  // Gateway refusals.
+  "VALIDATION_ERROR", "NOT_FOUND", "CONFLICT",
+  "AUTHENTICATION_REQUIRED", "INVALID_API_KEY",
+  "INSUFFICIENT_BALANCE", "PRODUCT_UNAVAILABLE",
+  "CANCELLATION_NOT_AVAILABLE_YET", "REACTIVATION_UNAVAILABLE",
+  "RATE_LIMITED",
+  // Local refusals: the request never left this process.
+  "NO_KEY_ID", "NO_API_SECRET", "MALFORMED_SECRET", "INVALID_BASE_URL", "LOCAL_RATE_BUDGET",
+]);
+
+/**
+ * Whether a failure leaves the outcome of a **money-spending** call unknown.
+ *
+ * `classifyRetry` answers "may I try again". This answers a different and more
+ * dangerous question: "did the thing I asked for possibly already happen". The
+ * two do not agree, and treating them as the same is how a purchase happens
+ * twice — their docs are blunt about it: *"Retrying an operation that spends
+ * money can spend it twice… no key or header makes a retry safe"*, and for OTP
+ * specifically *"Each call to this endpoint rents a number and charges for it.
+ * If it times out or fails without a clear answer, do not resend it — read your
+ * orders back to see whether one was created."*
+ *
+ * So `SERVICE_UNAVAILABLE` is classified `retry_with_backoff` — correct for a
+ * read — yet is ambiguous here, because a 503 can arrive after the operation
+ * began. Conversely `PRODUCT_UNAVAILABLE` is also `retry_with_backoff` but is
+ * *not* ambiguous: nothing was rented.
+ *
+ * When this returns true the only safe next step is reconciliation — read the
+ * activations or orders collection back and check whether one was created —
+ * never a resend, and never an automatic failover to another supplier. Anything
+ * that is not a `BitcallError` is treated as ambiguous, because an unexpected
+ * throw is precisely the case where what happened is unknown.
+ */
+export function isAmbiguousBitcallOutcome(error: unknown): boolean {
+  if (!(error instanceof BitcallError)) return true;
+  return !DEFINITIVELY_NOT_EXECUTED.has(error.code);
+}
+
 export class BitcallError extends Error {
   constructor(
     message: string,
@@ -230,7 +277,11 @@ async function gatewayFetch(
 
   const budget = await gatewayBudget("bitcall:shared-key-budget");
   if (budget.unavailable) throw new BitcallError("Gateway rate limit is unavailable", 503, "RATE_LIMIT_UNAVAILABLE");
-  if (!budget.allowed) throw new BitcallError("Gateway rate limit reached", 429, "RATE_LIMITED");
+  // Distinct from the gateway's own `RATE_LIMITED`: this refusal happens here,
+  // so the request never left the process and nothing upstream can have executed.
+  // Collapsing the two would make "did my purchase go out?" unanswerable, which
+  // is exactly what isAmbiguousBitcallOutcome has to decide.
+  if (!budget.allowed) throw new BitcallError("Gateway rate limit reached", 429, "LOCAL_RATE_BUDGET");
 
   const url = new URL(base + path);
   for (const [name, value] of Object.entries(options.query ?? {})) {
@@ -539,4 +590,321 @@ export async function listBitcallEsimProfiles(): Promise<BitcallEsimProfile[]> {
     profiles.push(profile);
   }
   return profiles;
+}
+
+/* ------------------------------------------------------------------ */
+/* OTP — catalog                                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * One offer: a single service in a single country, from a single pool.
+ *
+ * The same service and country appear once per pool that sells it, each at its
+ * own price, stock and measured success rate. Those two extra fields are why
+ * this catalog is worth routing on rather than just listing: for a verification
+ * product the success rate *is* the product, and a number that never receives
+ * the code is a refund plus a support ticket.
+ */
+export type BitcallOtpOffer = {
+  /**
+   * Opaque. "Do not assemble one yourself — the segments are spelled the way the
+   * selling side spells them, and a value you build will not resolve." It happens
+   * to read as pool-country-service; that shape is a coincidence of their naming
+   * and must never be parsed, generated or validated against.
+   */
+  serviceId: string | null;
+  /** The price this offer charges. Units and cost-vs-retail are not assumed here. */
+  price: number | null;
+  currency: string | null;
+  /** Numbers in stock. Offers with none are omitted by the gateway entirely. */
+  availableCount: number | null;
+  /**
+   * Measured success rate, surfaced exactly as reported. Their example shows `87`
+   * alongside a price of `0.42`, which reads as a percentage, but the scale is not
+   * documented — so it is not normalised. Guessing 0–1 versus 0–100 would silently
+   * invert any routing decision built on it.
+   */
+  successRate: number | null;
+};
+
+export type BitcallOtpService = {
+  name: string | null;
+  slug: string | null;
+  countryCode: string | null;
+  offers: BitcallOtpOffer[];
+};
+
+function parseOtpOffer(row: unknown): BitcallOtpOffer | null {
+  const offer = asRecord(row);
+  // Without a serviceId the offer cannot be bought, so it cannot be offered.
+  const serviceId = pickString(offer, ["serviceId", "service_id", "id"]);
+  if (!serviceId) return null;
+  return {
+    serviceId,
+    price: nonNegative(pickNumber(offer, ["price", "amount", "cost"])),
+    currency: currencyCode(pickString(offer, ["currency"])),
+    availableCount: nonNegative(pickNumber(offer, ["availableCount", "available_count", "available", "stock", "count"])),
+    successRate: nonNegative(pickNumber(offer, ["successRate", "success_rate", "success"])),
+  };
+}
+
+function parseOtpService(row: unknown): BitcallOtpService {
+  const service = asRecord(row);
+  const pools = Array.isArray(service.pools) ? service.pools : [];
+  const offers: BitcallOtpOffer[] = [];
+  const seen = new Set<string>();
+  for (const entry of pools.slice(0, 200)) {
+    const offer = parseOtpOffer(entry);
+    if (!offer?.serviceId || seen.has(offer.serviceId)) continue;
+    seen.add(offer.serviceId);
+    offers.push(offer);
+  }
+  return {
+    name: pickString(service, ["name", "title", "serviceName"]),
+    slug: pickString(service, ["slug", "serviceSlug"]),
+    countryCode: pickString(service, ["country_code", "countryCode", "country"]),
+    offers,
+  };
+}
+
+/**
+ * The whole OTP catalog, filtered. One collection — there is no per-country
+ * sub-resource, so country is a query parameter rather than a path.
+ */
+export async function listBitcallOtpServices(
+  filter: { q?: string; countryCode?: string; pool?: string } = {},
+): Promise<BitcallOtpService[]> {
+  const payload = await gatewayFetch("GET", "/v1/otp/services", {
+    query: { q: filter.q, country_code: filter.countryCode, pool: filter.pool },
+  });
+  return rowsFrom(payload).slice(0, 2000).map(parseOtpService).filter((service) => service.offers.length > 0);
+}
+
+/**
+ * Offers for one service, addressed either by a `serviceId` the catalog published
+ * (matched exactly; `404` when no such offer is sellable) or by free-text name
+ * (matched case-insensitively against a name or slug).
+ *
+ * The two cases behave differently on a miss, and the difference is load-bearing:
+ * **a name that matches nothing returns an empty `data` array with `meta.total` 0,
+ * not a `404`** — "no result is a result". A sold-out offer is omitted from the
+ * catalog, so a `serviceId` that was sellable yesterday can `404` today without
+ * anything being wrong.
+ */
+export async function findBitcallOtpService(reference: string): Promise<BitcallOtpService[]> {
+  const ref = reference.trim();
+  if (!ref || ref.length > 200) {
+    throw new BitcallError("Invalid service reference", 400, "VALIDATION_ERROR", null, ["reference"]);
+  }
+  const payload = await gatewayFetch("GET", `/v1/otp/services/${encodeURIComponent(ref)}`);
+  return rowsFrom(payload).slice(0, 2000).map(parseOtpService).filter((service) => service.offers.length > 0);
+}
+
+export async function listBitcallOtpCountries(): Promise<string[]> {
+  const payload = await gatewayFetch("GET", "/v1/otp/countries");
+  const codes = new Set<string>();
+  for (const row of rowsFrom(payload, ["data", "countries", "items"]).slice(0, 1000)) {
+    const code = pickString(row, ["country_code", "countryCode", "code", "country"]);
+    if (code) codes.add(code.trim().toUpperCase());
+    else {
+      // A bare array of strings is the other plausible shape.
+      const raw = Object.values(row).find((value): value is string => typeof value === "string");
+      if (raw?.trim()) codes.add(raw.trim().toUpperCase());
+    }
+  }
+  return [...codes];
+}
+
+/**
+ * Pools — a grouping of numbers, **not something you rent directly**. Offers are
+ * what you rent; this exists to supply the `pool` filter on the catalog.
+ */
+export async function listBitcallOtpPools(): Promise<string[]> {
+  const payload = await gatewayFetch("GET", "/v1/otp/pools");
+  const pools = new Set<string>();
+  for (const row of rowsFrom(payload, ["data", "pools", "items"]).slice(0, 1000)) {
+    const pool = pickString(row, ["pool", "name", "id", "code"]);
+    if (pool?.trim()) pools.add(pool.trim());
+  }
+  return [...pools];
+}
+
+/* ------------------------------------------------------------------ */
+/* OTP — activations                                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The whole status vocabulary. Anything unmappable is reported as `unknown`
+ * rather than passed through, matching their own behaviour and keeping an
+ * internal provider name from reaching a customer.
+ */
+export const OTP_ACTIVATION_STATUSES = [
+  "waiting", "activating", "received", "completed", "expired", "cancelled", "refunded", "unknown",
+] as const;
+
+export type OtpActivationStatus = (typeof OTP_ACTIVATION_STATUSES)[number];
+
+export type BitcallOtpActivation = {
+  activationId: string | null;
+  /** The rented number. Only ever returned to the authenticated owner. */
+  phoneNumber: string | null;
+  /** The code, once status is `received`. Null before that. */
+  code: string | null;
+  price: number | null;
+  currency: string | null;
+  status: OtpActivationStatus;
+  /** Echoed back so a later order shows which offer it was placed against. */
+  serviceId: string | null;
+  /**
+   * Use these rather than inferring from status — but they are **not equally
+   * strong**. `canResend` tracks a local, time-based cooldown and is reliable.
+   * `canReactivate` reflects the provider's ~10 minute window as it stood when
+   * the flag was computed, and that window can close before you act, so a
+   * reactivation can still be refused with `409 REACTIVATION_UNAVAILABLE`.
+   * Treat it as "worth trying", never as "will succeed".
+   */
+  actions: { canResend: boolean; canReactivate: boolean };
+};
+
+function normalizeOtpStatus(value: string | null): OtpActivationStatus {
+  if (!value) return "unknown";
+  const lowered = value.trim().toLowerCase();
+  return (OTP_ACTIVATION_STATUSES as readonly string[]).includes(lowered)
+    ? (lowered as OtpActivationStatus)
+    : "unknown";
+}
+
+function parseOtpActivation(row: unknown, fallbackId: string | null): BitcallOtpActivation {
+  const activation = asRecord(row);
+  const actions = asRecord(activation.actions);
+  return {
+    activationId: pickString(activation, ["activationId", "activation_id", "id"]) ?? fallbackId,
+    phoneNumber: pickString(activation, ["phoneNumber", "phone_number", "number", "msisdn"]),
+    code: pickString(activation, ["code", "smsCode", "sms_code", "otp"]),
+    price: nonNegative(pickNumber(activation, ["price", "amount", "cost"])),
+    currency: currencyCode(pickString(activation, ["currency"])),
+    status: normalizeOtpStatus(pickString(activation, ["status", "state"])),
+    serviceId: pickString(activation, ["serviceId", "service_id"]),
+    actions: {
+      canResend: actions.canResend === true || actions.can_resend === true,
+      canReactivate: actions.canReactivate === true || actions.can_reactivate === true,
+    },
+  };
+}
+
+/**
+ * Rents a number and **charges for it**.
+ *
+ * Nothing here retries, and nothing may. Their instruction is explicit: *"Each
+ * call to this endpoint rents a number and charges for it. If it times out or
+ * fails without a clear answer, do not resend it — read your orders back to see
+ * whether one was created, and only then decide whether to try again."*
+ *
+ * On rejection, call `isAmbiguousBitcallOutcome(error)`. If it is true the only
+ * safe next step is `listBitcallOtpActivations()` to check whether one was
+ * created — not a resend, and not a failover to another supplier, which would
+ * risk renting twice and delivering two numbers for one customer order.
+ */
+export async function buyBitcallOtpActivation(serviceId: string): Promise<BitcallOtpActivation> {
+  const id = serviceId.trim();
+  // The shape is deliberately *not* validated beyond presence: their docs warn
+  // that a serviceId you construct will not resolve, and a format check would
+  // only make an invented id look sanctioned. It must come from the catalog.
+  if (!id || id.length > 200) {
+    throw new BitcallError("Invalid service id", 400, "VALIDATION_ERROR", null, ["serviceId"]);
+  }
+  const payload = await gatewayFetch("POST", "/v1/otp/activations", { body: { serviceId: id } });
+  const envelope = asRecord(payload);
+  return parseOtpActivation(envelope.data ?? envelope, null);
+}
+
+/**
+ * Polls one activation. An id that is unknown — **or that is not yours** — answers
+ * `404`, never an empty result; the two cases are indistinguishable by design.
+ */
+export async function getBitcallOtpActivation(activationId: string): Promise<BitcallOtpActivation> {
+  const id = activationId.trim();
+  if (!id || id.length > 200) {
+    throw new BitcallError("Invalid activation id", 400, "VALIDATION_ERROR", null, ["activationId"]);
+  }
+  const payload = await gatewayFetch("GET", `/v1/otp/activations/${encodeURIComponent(id)}`);
+  const envelope = asRecord(payload);
+  return parseOtpActivation(envelope.data ?? envelope, id);
+}
+
+/**
+ * Several activations, newest first, for a dashboard.
+ *
+ * This collection carries **no `activationId` filter** — a single rental is always
+ * polled by path via `getBitcallOtpActivation`. It is also the reconciliation read
+ * after an ambiguous purchase: the only way to learn whether a timed-out create
+ * actually rented a number.
+ *
+ * Accepted `status` values are not published for this endpoint, so the filter is
+ * passed through rather than checked locally. A wrong value answers
+ * `400 VALIDATION_ERROR` naming `query.status`, which is a clearer failure than a
+ * local guess would be — and unlike the eSIM order list, an empty result here does
+ * not masquerade as "you have none".
+ */
+export async function listBitcallOtpActivations(
+  filter: { status?: string; page?: number; pageSize?: number } = {},
+): Promise<BitcallOtpActivation[]> {
+  const payload = await gatewayFetch("GET", "/v1/otp/activations", {
+    query: { status: filter.status, page: filter.page, pageSize: filter.pageSize },
+  });
+  const activations: BitcallOtpActivation[] = [];
+  const seen = new Set<string>();
+  for (const row of rowsFrom(payload).slice(0, 2000)) {
+    const activation = parseOtpActivation(row, null);
+    if (!activation.activationId || seen.has(activation.activationId)) continue;
+    seen.add(activation.activationId);
+    activations.push(activation);
+  }
+  return activations;
+}
+
+/**
+ * Cancels an unused rental. **The refund is not a separate step:** an order reaches
+ * `refunded` on its own, because cancelling before the code arrives returns the
+ * rental. There is no refund endpoint to call.
+ *
+ * Can be refused with `409 CANCELLATION_NOT_AVAILABLE_YET` — a short provider
+ * cooldown before a fresh number may be cancelled. It lifts on its own and nothing
+ * was charged, so waiting and retrying is correct here in a way it is not for the
+ * purchase above.
+ */
+export async function cancelBitcallOtpActivation(activationId: string): Promise<BitcallOtpActivation> {
+  const id = activationId.trim();
+  if (!id || id.length > 200) {
+    throw new BitcallError("Invalid activation id", 400, "VALIDATION_ERROR", null, ["activationId"]);
+  }
+  const payload = await gatewayFetch("POST", `/v1/otp/activations/${encodeURIComponent(id)}/cancel`);
+  const envelope = asRecord(payload);
+  return parseOtpActivation(envelope.data ?? envelope, id);
+}
+
+/** Resends the code. Gated by a local, time-based cooldown reported as `canResend`. */
+export async function resendBitcallOtpActivation(activationId: string): Promise<BitcallOtpActivation> {
+  const id = activationId.trim();
+  if (!id || id.length > 200) {
+    throw new BitcallError("Invalid activation id", 400, "VALIDATION_ERROR", null, ["activationId"]);
+  }
+  const payload = await gatewayFetch("POST", `/v1/otp/activations/${encodeURIComponent(id)}/resend`);
+  const envelope = asRecord(payload);
+  return parseOtpActivation(envelope.data ?? envelope, id);
+}
+
+/**
+ * Reactivates an expired rental. **Not charged when refused** — `409
+ * REACTIVATION_UNAVAILABLE` means the window closed, whatever `canReactivate`
+ * said, and the correct response is a new number rather than another attempt.
+ */
+export async function reactivateBitcallOtpActivation(activationId: string): Promise<BitcallOtpActivation> {
+  const id = activationId.trim();
+  if (!id || id.length > 200) {
+    throw new BitcallError("Invalid activation id", 400, "VALIDATION_ERROR", null, ["activationId"]);
+  }
+  const payload = await gatewayFetch("POST", `/v1/otp/activations/${encodeURIComponent(id)}/reactivate`);
+  const envelope = asRecord(payload);
+  return parseOtpActivation(envelope.data ?? envelope, id);
 }
