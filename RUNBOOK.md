@@ -258,6 +258,96 @@ preview apply a migration to production by removing the `VERCEL_ENV` gate.
 
 ---
 
+## 8a. Backups and the restore drill
+
+Two copies, because they fail differently:
+
+| Copy | Taken by | Covers | Where the truth lives |
+|---|---|---|---|
+| Provider backups / PITR | the database provider | every write, to the minute | the provider's console — **turn it on and check the retention date** |
+| Logical snapshot | `npm run db:backup` | every table's rows at one instant | wherever you put the file (see below) |
+
+The second exists because the first is invisible from here: nothing in this
+repository can prove the provider's backups are on, or restore one.
+
+### Taking a snapshot
+
+```bash
+DATABASE_URL=postgres://... npm run db:backup -- --out ./backups --keep 14 --label nightly
+```
+
+It writes `backups/pryva-backup-YYYYMMDD-HHmmss.ndjson.gz` (UTC), verifies the
+file's checksums before it prunes anything older, and prints a summary. The
+archive holds **schema-independent data only**: a manifest (instant, migrations
+applied, per-table row count and SHA-256, foreign-key edges) followed by one line
+per table. The schema itself comes from `migrations/`, which is what
+`npm run db:migrate` replays — that is why the restore needs a migrated database
+rather than a schema dump.
+
+Verify a file at any time without restoring it:
+
+```bash
+npm run db:verify-backup -- backups/pryva-backup-20261030-031500.ndjson.gz
+```
+
+**Move the file off the machine.** A snapshot on the same disk as the app is not
+a backup. Put it in object storage with versioning and a lifecycle rule, in a
+different account from the database, and keep the credentials out of the app's
+environment. That transfer is deliberately not automated here: it needs a bucket
+and an access policy that belong to the owner, not to this repository.
+
+### The restore drill
+
+Do this **before** you need it, into a throwaway database, once a quarter. A
+backup nobody has restored is a file, not a backup.
+
+```bash
+# 1. a new, empty database
+createdb pryva_restore
+
+# 2. the schema, from the migrations the archive was taken against
+DATABASE_URL=postgres://.../pryva_restore npm run db:migrate
+
+# 3. the rows, parents first, in one transaction
+npm run db:restore -- \
+  --file backups/pryva-backup-20261030-031500.ndjson.gz \
+  --target postgres://.../pryva_restore \
+  --confirm-restore
+```
+
+The script refuses to run without `--confirm-restore`, refuses if the archive
+fails its checksums (before writing a single row), and refuses a target that
+already has rows unless you pass `--allow-overwrite`. It also refuses to restore
+into the database `DATABASE_URL` points at — restore into a new database, check
+it, then switch the application over.
+
+Then check the things that matter, in this order:
+
+1. **Wallet ledger.** Every `wallet_transactions` row's `balance_after` must line
+   up with the running sum for its user. A restore that loses a transaction is
+   worse than no restore, because it looks fine.
+2. **Orders against the payment provider.** Count and sum for a recent day on
+   both sides (`/admin/reconciliation` shows the operator's queue).
+3. **Sign-in.** A test account can authenticate, and a session cookie is issued.
+4. **Money that is mid-flight.** Any withdrawal or order in a pending state is
+   expected to stay pending; do not "fix" it by hand.
+
+Record the date of the last successful drill in the table below. If the drill
+fails, the backup is not real until it passes.
+
+| Drill date | Archive | Restored rows | Ledger checked | Notes |
+|---|---|---|---|---|
+| _not yet run_ | | | | |
+
+### What is not covered
+
+- **Writes after the snapshot.** Only PITR closes that gap.
+- **Very large tables.** `db:backup` reads one table into memory at a time; a
+  table bigger than the machine fails loudly rather than truncating. Past that
+  size, use `pg_dump -Fc` from a host that has it.
+- **Secrets and `.env`.** They are not in the database and not in this archive.
+  Back them up where your secret manager lives.
+
 ## 9. What not to do
 
 - Do not enable live purchases by deleting a `503`. Every guard corresponds to an
