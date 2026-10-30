@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const settings = readFileSync("src/app/dashboard/settings/page.tsx", "utf8");
 const section = readFileSync("src/app/dashboard/settings/SecuritySection.tsx", "utf8");
 const redirectPage = readFileSync("src/app/dashboard/security/page.tsx", "utf8");
+const targets = readFileSync("src/lib/legacy-redirects.ts", "utf8");
 const shell = readFileSync("src/components/dashboard/DashboardShell.tsx", "utf8");
 const palette = readFileSync("src/components/command/CommandPalette.tsx", "utf8");
 const auth = readFileSync("src/lib/auth.ts", "utf8");
@@ -40,13 +41,15 @@ describe("security lives inside settings", () => {
   });
 
   it("keeps the old route working as a redirect, query and all", () => {
-    expect(redirectPage).toContain("redirect(");
-    expect(redirectPage).toContain("/dashboard/settings");
-    expect(redirectPage).toContain("#security");
+    expect(redirectPage).toContain("redirect(securityRedirectTarget(");
     // Dropping `require=2fa` would land an administrator on a page with no
-    // explanation of why the admin area just refused them.
+    // explanation of why the admin area just refused them, so the query is
+    // forwarded — and the escaping/ordering of that is tested directly in
+    // src/test/legacy-redirects.test.ts.
     expect(redirectPage).toContain("searchParams");
     expect(redirectPage).not.toContain("<h1");
+    expect(targets).toContain("/dashboard/settings");
+    expect(targets).toContain("#security");
   });
 
   it("no longer has its own page directory with components in it", () => {
