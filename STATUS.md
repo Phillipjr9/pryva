@@ -12,7 +12,7 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **953 tests / 107 files, all passing** (no `.skip`, no `.only`) |
+| `npm test` | **955 tests / 107 files, all passing** (no `.skip`, no `.only`) |
 | `npm run build` | **passes**; 75 API route handlers, 23 public pages, 17 dashboard pages, 12 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
@@ -407,3 +407,37 @@ twelve service surfaces still contains its icon — the last one is a source-lev
 rendering those pages needs a database. `src/test/logo-removal.test.tsx` keeps its original
 assertions unchanged; Pryva's own catalogue still uses its 3D artwork, which remains the right
 answer now that the audit has established there is no official mark for those services.
+
+---
+
+## 18. Tenth pass — the homepage, deduplicated (30 Oct 2026)
+
+**The report:** services were appearing twice on the homepage. They were appearing up to three
+times, and one of the repeats had a stale price in it.
+
+| Repeat | What was on the page | Now |
+|---|---|---|
+| Quick service picker | numbers, eSIM, proxies and Email OTP as four cards, sitting **directly above** the nine-card grid that contains the same four | removed — the grid is the list |
+| Price list | the same four services again, with the same four `from` prices the cards above already show, and the same icons | removed; the panel keeps only what the cards do not say — which plans are priced inside the dashboard — plus the link to the full list and a new link to `/status` |
+| Accounts platform chips | Facebook, Instagram, TikTok, X as chips, while the platform marquee **40 px below** shows the same marks at the same size | chips removed; the marquee is the strip |
+| Section numbering | `06 / Pricing` was followed by `08 / Questions` — nothing on the page was 07 | `07 / Questions` |
+
+The homepage is now 918 lines (was 1005), 10 sections (was 11), and draws **nine service
+artworks instead of seventeen** — one `ServiceIcon` per catalogue service. The pages it links to
+are unchanged; `/pricing` still carries the full list, so nothing was lost but the repetition.
+
+**What the page still needs — measured, not guessed.** `next.config.ts` sets
+`images.unoptimized: true`, so every service icon is served as its full-size PNG: the nine
+files total **2,197 KB** to fill slots between 32 px and 64 px. The categories artwork adds
+1.2 MB and the flag set 2.3 MB (not used on the homepage). Switching those nine to generated
+64/128 px WebP derivatives would take the same page from ~2.2 MB of icon bytes to roughly 40 KB,
+and it is the largest improvement available on this page — larger than any further copy or
+layout change. It is not done here because it touches `ServiceIcon`, the artwork tests and a
+build step, and belongs in its own pass.
+
+**Verified:** 955 tests / 107 files · typecheck · lint · build. New assertions in
+`src/test/homepage.test.tsx`: each of the nine artwork files appears in exactly one `<img>` on
+the page (sabotage-proven — adding a second `ServiceIcon` fails it with "appears 2 time(s)"), and
+the section eyebrow numbers run 01–07 with no gap. The existing eighteen homepage assertions —
+nine services present, no dashboard link for a signed-out visitor, `₦1,340` from the catalogue,
+no price on a free inbox, the fulfilment-allowlist agreement — all still hold.
