@@ -1,6 +1,6 @@
 # Pryva — verified status review
 
-**Date:** 30 October 2026 · **Commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva`
+**Date:** 30 October 2026 (updated) · **Commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva`
 **Method:** every claim below was read out of the code or produced by running the project. Nothing is taken from `PLAN.md` without checking it first — and several `PLAN.md` entries turned out to be stale (section 4).
 
 ---
@@ -12,11 +12,11 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **844 tests / 94 files, all passing** (no `.skip`, no `.only`) |
+| `npm test` | **855 tests / 95 files, all passing** (no `.skip`, no `.only`) |
 | `npm run build` | **passes**; 70 API route handlers, 21 public pages, 17 dashboard pages, 10 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
-Codebase size: ~51,500 lines under `src/`, 94 modules in `src/lib/`, 17 database tables, 14 migrations (`0000`–`0013`).
+Codebase size: ~51,800 lines under `src/`, 95 modules in `src/lib/`, 18 database tables, 15 migrations (`0000`–`0014`).
 Migration coverage is complete — every table in `src/db/schema.ts` is created by a migration.
 
 **Summary in one line:** the engineering is in better shape than the planning docs suggest; the real gaps are (a) product surface that was never built, (b) operations/deployment wiring, and (c) documentation that no longer matches the code.
@@ -54,8 +54,8 @@ eSIM, proxies, digital subscriptions, airtime/data, bulk orders, scheduled order
 | 7 | **SMS / WhatsApp notifications** | nothing (no Termii/Twilio/WhatsApp client) |
 | 8 | **PWA** | no manifest, no service worker, no offline page (the preview cookie bridge is not a PWA) |
 | 9 | **Product analytics / Web Vitals** | nothing — no GA4, no `@vercel/analytics`, no `web-vitals` |
-| 10 | **Admin audit log** | no `audit_log`/`auditLog` anywhere; admin actions only hit the logger |
-| 11 | **Admin payment-audit & failed-orders views** | neither route nor page exists |
+| 10 | ~~**Admin audit log**~~ | **Built in the second pass** — `admin_audit_log` (migration `0014`), `/admin/audit`, `GET /api/admin/audit` |
+| 11 | **Admin payment-audit view** | no dedicated reconciliation screen. "Failed orders" is already `/admin/orders?status=review`; the audit log now covers who acted, not what still needs reconciling |
 | 12 | **Paid inbox tier** | schema supports `tier='paid'`, the code only issues `free`; price needs the supplier's real `priceNgn` |
 | 13 | **CSP** | no `Content-Security-Policy` header anywhere (`src/proxy.ts` ships the other headers) |
 | 14 | **Dockerfile, RUNBOOK** | CI was added in this pass (`.github/workflows/ci.yml`); no Dockerfile and no runbook yet |
@@ -89,10 +89,10 @@ These are wrong *today*, not feature requests.
 
 3. ✅ **`/status` rendered a hardcoded false row.** *(fixed — gift cards now have their own Available row, and the remaining categories say "preview only, no verified live fulfilment"; a test pins it)* `src/app/(site)/status/page.tsx:70` prints *"Digital subscriptions, gift cards, data, bulk and scheduled orders — Not available"*, but gift cards work and are sold. Same class of bug as the "Number fulfillment: Paused" literal that was already fixed once.
 
-4. ⬜ **Cron scheduling is incomplete and mismatched.** *(not touched — needs your call on plan/tier and whether these jobs should run live at all)* `vercel.json` lists only `wallet-emails` (daily 03:10) and `auto-refund` (daily 03:40):
-   - `scheduled-orders` exists and is never scheduled;
-   - the wallet-email outbox README requires a **per-minute** scheduler and a 23-hour cutoff — a daily run cannot meet it;
-   - both scheduled jobs are preview-only anyway, so in production they are no-ops that look like coverage.
+4. ⬜ **Cron scheduling is incomplete and mismatched.** *(not touched — needs your call on plan/tier and whether these jobs should run live at all)* `vercel.json` lists only `wallet-emails` (daily 03:10) and `auto-refund` (daily 03:40).
+   - **Correction to the first version of this report:** `scheduled-orders` is *deliberately* absent. It exports only `POST`, while Vercel Cron issues `GET`, so scheduling it would register a job that is answered `405` forever. `src/test/cron-schedule.test.ts` pins exactly that, plus the Hobby plan's two-job daily limit.
+   - The real gap is that live scheduled fulfilment and live automatic refunds are disabled anyway (both routes refuse a persistent database), so no schedule would help until that changes.
+   - The wallet-email outbox README requires a **per-minute** scheduler and a 23-hour cutoff; a daily run cannot meet it. Moving it needs Pro or an external scheduler — your call.
 
 5. ✅ **`DIAGNOSTICS_SECRET` was missing from `.env.example`** *(added, with a note on why it is separate from `CRON_SECRET`)* although `src` reads it and README documents it. A new deployment cannot discover the variable from the template.
 
@@ -140,8 +140,8 @@ These are healthy upgrades to schedule, not emergencies. Pin them behind the CI 
 
 1. ~~Merge PR #17 / add CI.~~ **Done in this pass** — the workflow is in the branch and the price gate now fails correctly.
 2. ~~Make the truth surfaces agree.~~ **Done for README and `/status`**; the `PLAN.md` tables still need a proper rewrite, and the "are numbers live?" question is now answered by the documentation rather than left ambiguous.
-3. **Fix operations** — schedule `scheduled-orders`, set the email worker to a per-minute cadence (or change the documented promise), and decide whether transfer webhooks will ever settle withdrawals or operators always will.
-4. **Finish the money loop** — reconcile the supplier balance, add the admin audit log and the payment-audit/failed-orders views, and enforce email verification on signup.
+3. 🟡 **Fix operations** — the scheduled-orders mystery is resolved (it cannot be scheduled as written); still open: the email worker's cadence, and whether transfer webhooks will ever settle withdrawals or operators always will.
+4. 🟡 **Finish the money loop** — the admin audit log is done; still open: reconcile the supplier balance, a dedicated reconciliation view, and enforcing email verification on signup.
 5. **Then growth features** — referrals, coupons, reviews, wishlist, 2FA, PWA, analytics. These are additive; none of them unblocks revenue the way 1–4 do.
 
 ---
@@ -163,6 +163,26 @@ These are healthy upgrades to schedule, not emergencies. Pin them behind the CI 
 **Verified after the changes:** `typecheck` 0 errors · `lint` clean · **844/844 tests** · `build` passes · `pricing:audit -- --check` exits 0 in band and 1 when sabotaged.
 
 **Still open from §4:** cron scheduling (#4), the public repo exposing cost sheets (#8), preview/production database sharing (#9), and deployment wiring living only in the Vercel dashboard (#10).
+
+---
+
+---
+
+## 10. Second pass — the admin audit trail (30 Oct 2026)
+
+The first pass found that privileged actions left a line in the application log and nothing durable in the database. That is now built.
+
+| Piece | Detail |
+|---|---|
+| Migration `0014_admin_audit_log.sql` | `admin_audit_log`: actor id **and** a snapshotted email, dotted action verb, target type/id, a redacted summary, timestamp. Append-only; indices on time, actor and target |
+| `src/lib/admin-audit.ts` | `recordAdminAction()`. Best-effort by design: it returns `false` and logs loudly when the insert fails rather than throwing, because it runs *after* money has already moved — a failed audit write must not make a committed refund look retryable. The wallet ledger remains the authoritative financial record; the file says so |
+| Wired into | refunds (`order.refund`), withdrawal approve/reject/complete, fulfilment deliver/unsourceable, admin wallet credit/debit, support message status |
+| Surfaces | `/admin/audit` page with action filters, search and pagination; `GET /api/admin/audit` (read-only, admin-gated); "Audit" in the admin nav |
+| Secrecy | The delivery summary records the **item count**, never the credentials — pinned by a test that fails if `credentials` is interpolated. Support message bodies are never copied |
+
+**Verified:** 855 tests / 95 files · typecheck · lint · build. Sabotage-proven three ways: rethrowing from `recordAdminAction` fails two tests, interpolating credentials into the summary fails the secrecy guard, and removing an audit call is caught by the static route scan.
+
+**Fixture lesson:** adding a migration makes four PGlite fixtures fail on purpose — `withdrawal-name-check.test.ts` asserts every fixture replays every migration. They now include `0014`, and the manual migration list in `migrations/README.md` was replaced with a glob so it cannot fall behind the directory again.
 
 ---
 
