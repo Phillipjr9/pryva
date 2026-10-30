@@ -16,6 +16,7 @@ const routes = [
   // nowhere at all.
   "/help",
   "/testimonials",
+  "/reviews",
   "/status",
   "/terms",
   "/privacy",
