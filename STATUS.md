@@ -12,7 +12,7 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **1,118 tests / 122 files, all passing** (no `.skip`, no `.only`) |
+| `npm test` | **1,120 tests / 123 files, all passing** (no `.skip`, no `.only`) |
 | `npm run build` | **passes**; 75 API route handlers, 23 public pages, 17 dashboard pages, 12 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
@@ -879,7 +879,7 @@ tickets are the ones worth opening. `/admin/support/[id]` shows the trace under 
 assistant reply. The customer's own thread shows the replies and never the trace:
 "confidence 91%" is not information a customer can use.
 
-**Verified:** 1,118 tests / 122 files · typecheck · lint · build (new routes:
+**Verified:** 1,120 tests / 123 files · typecheck · lint · build (new routes:
 `/dashboard/support/[id]`, `/admin/support`, `/admin/support/[id]`,
 `/api/support/tickets[/[id]]`, `/api/admin/support/[id]`). New suites:
 `support-assistant-engine.test.ts` (18 — pure decisions: it fixes what it can,
@@ -888,4 +888,6 @@ verify, asks instead of picking between two schedules, quotes no price, and neve
 says "supplier"), `support-tickets.test.ts` (12 — threads, ownership, reopening,
 and a real end-to-end credit through PGlite that is not repeated on the second
 run), `support-surfaces.test.tsx` (10 — the capability list, the scoping, the admin
-gate and the audit entry).
+gate and the audit entry) and `support-preview-shim.test.ts` (2 — the same flow
+against the in-memory preview adapter, including that it will not pretend it can
+reach Paystack from there).
