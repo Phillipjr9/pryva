@@ -113,6 +113,10 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
   const [accountNumber, setAccountNumber] = useState("");
   const [accountName, setAccountName] = useState("");
   const [verifyingAccount, setVerifyingAccount] = useState(false);
+  // A toast disappears in a few seconds; a disabled Save button does not. Without
+  // this the only trace of why verification failed was gone before the user
+  // looked back at the form, which reads as a broken button.
+  const [verifyError, setVerifyError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBankAccounts();
@@ -180,6 +184,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
 
     setVerifyingAccount(true);
     setAccountName("");
+    setVerifyError(null);
     const abort = new AbortController();
     const timeout = window.setTimeout(() => abort.abort(), 20_000);
 
@@ -196,10 +201,16 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
         setAccountName(data.accountName);
         addToast({ type: "success", message: "Account verified" });
       } else {
-        addToast({ type: "error", message: data.error || "Failed to verify account" });
+        const message = typeof data.error === "string" && data.error.trim()
+          ? data.error
+          : "Failed to verify account";
+        setVerifyError(message);
+        addToast({ type: "error", message });
       }
     } catch {
-      addToast({ type: "error", message: "Failed to verify account" });
+      const message = "Could not reach bank verification. Check the details and try again.";
+      setVerifyError(message);
+      addToast({ type: "error", message });
     } finally {
       window.clearTimeout(timeout);
       setVerifyingAccount(false);
@@ -619,6 +630,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                   onChange={(event) => {
                     setBankCode(event.target.value);
                     setAccountName("");
+                    setVerifyError(null);
                   }}
                   className="field"
                 >
@@ -646,6 +658,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                     onChange={(event) => {
                       setAccountNumber(event.target.value.replace(/\D/g, "").slice(0, 10));
                       setAccountName("");
+                      setVerifyError(null);
                     }}
                     maxLength={10}
                     className="field"
@@ -666,6 +679,33 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                   <Check className="h-3.5 w-3.5" /> {accountName}
                 </p>
               )}
+
+              {!accountName && verifyError && (
+                <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[0.78rem] leading-relaxed text-rose-700">
+                  {verifyError}
+                </p>
+              )}
+
+              {!accountName && !verifyError && (
+                <p className="text-[0.72rem] leading-relaxed text-ink-3">
+                  Saving unlocks once the account is verified. The name shown comes from the bank,
+                  not from anything you type, so a payout can only go to the account it was resolved
+                  against.
+                </p>
+              )}
+
+              {/* Stated up front rather than discovered as an error: this is the
+                  rule the withdrawal API enforces, and a customer adding somebody
+                  else's account should find out before they have filled in a
+                  withdrawal and been refused. */}
+              <p className="flex gap-2 rounded-xl border border-lav-200 bg-lav-50 px-3 py-2.5 text-[0.72rem] leading-relaxed text-ink-2">
+                <Shield className="mt-px h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Withdrawals are paid only to a bank account in the same name as the one that
+                  funded your wallet. Money is never sent to a third-party account, so an account
+                  in somebody else&apos;s name cannot be used.
+                </span>
+              </p>
 
               <button
                 type="button"
