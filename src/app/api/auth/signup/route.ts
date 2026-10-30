@@ -5,6 +5,7 @@ import { createSession, hashPassword, isConfiguredAdminEmail, isValidEmail, norm
 import { creditWallet } from "@/lib/wallet";
 import { checkAuthRateLimit } from "@/lib/auth-rate-limit";
 import { issueEmailVerification } from "@/lib/email-verification";
+import { DISPOSABLE_EMAIL_ERROR, isDisposableEmailAddress } from "@/lib/disposable-domains";
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
@@ -34,6 +35,13 @@ export async function POST(request: Request) {
     }
     if (email.length > 200 || !isValidEmail(email)) {
       return Response.json({ ok: false, error: "That email doesn't look right." }, { status: 400 });
+    }
+    // A throwaway inbox is the one address an account cannot depend on: it is
+    // deleted by design, taking the verification link, receipts and every
+    // password reset with it. Refused before the row is created, so the answer
+    // is the same whether or not the address has been tried before.
+    if (isDisposableEmailAddress(email)) {
+      return Response.json({ ok: false, error: DISPOSABLE_EMAIL_ERROR }, { status: 400 });
     }
     if (isConfiguredAdminEmail(email)) {
       return Response.json({ ok: false, error: "This account cannot be created through public signup." }, { status: 403 });
