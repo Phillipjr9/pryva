@@ -74,24 +74,35 @@ export default function EmailOTPPage() {
         </div>
       </section>
 
-      {/* Availability, stated honestly */}
+      {/* Where the tool actually is.
+          This used to be an amber notice saying the inbox was not switched on,
+          which was the honest thing to render while nothing existed to switch
+          on. It exists now, so the honest thing is a link to it — and the
+          dashboard page is where unavailability can be reported dynamically if
+          the source is ever not configured, rather than being baked into copy
+          that cannot notice. */}
       <section className="pb-12">
         <div className="shell">
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 sm:p-8">
-            <h2 className="text-[1.25rem] font-semibold text-amber-950">
-              The inbox tool is not switched on yet
+          <div className="rounded-2xl border border-lav-200 bg-lav-50 p-6 sm:p-8">
+            <h2 className="text-[1.25rem] font-semibold text-ink">
+              Create your inbox from the dashboard
             </h2>
-            <p className="mt-3 text-[0.95rem] leading-relaxed text-amber-900 max-w-2xl">
-              Creating an inbox is not available yet, so there is no button here to make one. We
-              would rather show you nothing to click than a button that cannot deliver — the same
-              rule that keeps undeliverable plans out of checkout everywhere else on the site.
+            <p className="mt-3 text-[0.95rem] leading-relaxed text-ink-2 max-w-2xl">
+              One free inbox per day for a signed-in account, alive until you discard it. Nothing is
+              kept afterwards, so read your code while the inbox is open — retaining messages is what
+              the paid inbox is for.
             </p>
-            <p className="mt-3 text-[0.95rem] leading-relaxed text-amber-900 max-w-2xl">
-              <Link href="/status" className="font-semibold text-amber-950 underline">
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link href="/dashboard/inbox" className="btn btn-primary !px-5 !py-2.5 !text-[0.85rem]">
+                Open your inbox
+              </Link>
+              <Link
+                href="/status"
+                className="btn border border-line bg-white !px-5 !py-2.5 !text-[0.85rem] text-ink"
+              >
                 Service status
-              </Link>{" "}
-              lists what can actually be ordered and delivered right now.
-            </p>
+              </Link>
+            </div>
           </div>
         </div>
       </section>

@@ -11,6 +11,7 @@ import {
   Close,
   Grid,
   Logout,
+  Mail,
   Menu,
   Plus,
   Receipt,
@@ -49,6 +50,9 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
       { href: "/dashboard", label: "Overview", icon: Grid },
       { href: "/dashboard/orders", label: "Orders", icon: Receipt },
       { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
+      // Free, and the only thing on this list that is: one inbox a day, nothing
+      // retained. It sits under Manage rather than Buy because no money moves.
+      { href: "/dashboard/inbox", label: "Temporary inbox", icon: Mail },
     ],
   },
   {
