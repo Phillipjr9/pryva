@@ -44,7 +44,7 @@ const MIGRATIONS = [
   "0007_order_reconciliation_note.sql",
   "0008_order_provider_cost.sql",
   "0009_password_reset_tokens.sql",
-  "0010_order_provider_no_default.sql", "0011_email_verification.sql", "0012_topup_payer_name.sql", "0013_disposable_inboxes.sql", "0014_admin_audit_log.sql", "0015_two_factor.sql", "0016_product_reviews.sql", "0017_login_lockout.sql", "0018_reconciliation_runs.sql",
+  "0010_order_provider_no_default.sql", "0011_email_verification.sql", "0012_topup_payer_name.sql", "0013_disposable_inboxes.sql", "0014_admin_audit_log.sql", "0015_two_factor.sql", "0016_product_reviews.sql", "0017_login_lockout.sql", "0018_reconciliation_runs.sql", "0019_support_tickets.sql",
 ];
 
 beforeAll(async () => {

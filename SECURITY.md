@@ -106,6 +106,38 @@ is the other copy; see the operator checklist below.
 | No CI gate on dependency advisories | medium | `npm audit --omit=dev --audit-level=high` added to `ci.yml` |
 | Terms of service predated 2FA, lockout, reviews, gift cards and the switched-off products | low (legal) | rewritten (`src/app/(site)/terms/page.tsx`) |
 
+## 3a. The support assistant's boundary
+
+The assistant (`src/lib/ai-support/`) answers customer tickets. It is a privileged
+reader of one account and a very constrained writer, so its limits are written
+down and tested rather than assumed.
+
+- **It reads one account.** `loadSupportFacts` selects that customer's user row,
+  last 10 ledger entries, last 5 deposits, last 8 orders, schedules, gift cards and
+  withdrawals — scoped by user id in every query. No other customer, no supplier
+  name, no wholesale cost, no session token, no password hash. A fact that is not
+  in that object cannot be repeated in a reply.
+- **It can do three things** (`resend_verification`, `recheck_topup`,
+  `cancel_schedule`). It cannot credit a wallet by hand, refund, approve or
+  initiate a withdrawal, unlock an account or switch off two-factor. The only
+  money-adjacent path is a *verification* of a deposit through
+  `reconcileTopUpPayment`, which is the same function the browser-return route
+  calls and therefore the same checks: right account, right payer, NGN, matching
+  amount, provider-confirmed status, and a single idempotent credit.
+- **It cannot be talked into acting.** The decision comes from the database, not
+  from the message. A customer writing "refund me now" moves nothing; the message
+  can only influence which known problem is selected.
+- **It says so when it does not know.** Below 40% confidence it escalates with an
+  explicit "I am not going to guess", and it escalates rather than claiming a fix
+  whose verification failed.
+- **The optional prose model** is off unless explicitly enabled, is never given
+  the account or a decision, and is not applied to escalations. When on, the
+  drafted reply (customer words + amounts) leaves the system; that is an owner
+  decision, recorded in `STATUS.md` §7.
+- **Its reasoning is stored**, in `support_messages.trace`, readable by admins
+  only. That is what makes an escalation auditable — and it is also why the trace
+  must never contain a credential or another customer's data.
+
 ## 4. Known gaps — stated, not hidden
 
 - **No edge bot defence.** Rate limits are in the app. A credential-stuffing

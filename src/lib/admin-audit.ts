@@ -39,7 +39,8 @@ export type AdminAuditAction =
   | "user.debit"
   | "message.status"
   | "review.publish"
-  | "review.reject";
+  | "review.reject"
+  | "support.reply";
 
 export type AdminAuditTargetType =
   | "order"
@@ -47,7 +48,8 @@ export type AdminAuditTargetType =
   | "user"
   | "message"
   | "gift_card"
-  | "review";
+  | "review"
+  | "support_ticket";
 
 type AuditActor = Pick<PublicUser, "id" | "email">;
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ArrowRight, Check, Clock, Copy, Shield } from "@/components/icons";
 import { formatNaira } from "@/lib/catalog";
 
@@ -262,7 +263,8 @@ export function OrderActions({
           </div>
         ) : active || settledStatus === "review" || settledStatus === "processing" ? (
           <p className="mt-2 text-[0.82rem] text-ink-2">
-            Refunds require review. <a href="/dashboard/support" className="font-semibold underline">Contact support</a> with your order reference.
+            Refunds require review. <Link href="/dashboard/support" className="font-semibold underline">Ask support</Link> with
+            your order reference — the assistant can check the order and tell you where it stands straight away.
           </p>
         ) : (
           <p className="mt-2 flex items-center gap-2 text-[0.82rem] text-ink-2">

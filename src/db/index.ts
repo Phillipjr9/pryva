@@ -401,7 +401,7 @@ export type PreviewState = Record<
   | "contactMessages" | "giftCards" | "scheduledOrders" | "notifications"
   | "securityViolations" | "withdrawals" | "bankAccounts" | "adminAuditLog"
   | "userTwoFactor" | "twoFactorRecoveryCodes" | "twoFactorChallenges"
-  | "productReviews",
+  | "productReviews" | "supportTickets" | "supportMessages",
   Array<Record<string, unknown>>
 >;
 
@@ -429,12 +429,14 @@ const mockState: PreviewState =
     twoFactorRecoveryCodes: [],
     twoFactorChallenges: [],
     productReviews: [],
+    supportTickets: [],
+    supportMessages: [],
   };
 
 // Next can load route handlers and server components in separate bundles.
 // Share the in-memory preview state across those bundles in this process.
 if (!databaseUrl) {
-  for (const key of ["users", "sessions", "orders", "walletTransactions", "paymentTopups", "contactMessages", "giftCards", "scheduledOrders", "notifications", "securityViolations", "withdrawals", "bankAccounts", "adminAuditLog", "userTwoFactor", "twoFactorRecoveryCodes", "twoFactorChallenges", "productReviews"] as const) {
+  for (const key of ["users", "sessions", "orders", "walletTransactions", "paymentTopups", "contactMessages", "giftCards", "scheduledOrders", "notifications", "securityViolations", "withdrawals", "bankAccounts", "adminAuditLog", "userTwoFactor", "twoFactorRecoveryCodes", "twoFactorChallenges", "productReviews", "supportTickets", "supportMessages"] as const) {
     mockState[key] ??= [];
   }
   globalForDb.__arenaPryvaMockState = mockState;

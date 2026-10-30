@@ -160,6 +160,13 @@ export const inboxCreateIpRateLimiter = createRateLimiter({ windowMs: 24 * 60 * 
  * for a verification code.
  */
 export const inboxPollRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 12 });
+/**
+ * Support messages run the assistant, which reads the account and may call the
+ * payment provider. Twenty in fifteen minutes is well past what a real
+ * conversation needs and low enough that a script cannot use the assistant as a
+ * free provider-probing service.
+ */
+export const supportMessageRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 20 });
 
 /** Drop one key's counter after successful authentication. */
 export async function resetRateLimit(key: string): Promise<void> {

@@ -137,7 +137,9 @@ describe("features that had an endpoint but no screen", () => {
   });
 
   it("gives support messages an admin inbox", () => {
-    expect(read("app/admin/AdminNav.tsx")).toContain('{ href: "/admin/messages", label: "Support" }');
+    const nav = read("app/admin/AdminNav.tsx");
+    expect(nav).toContain('{ href: "/admin/support", label: "Support" }');
+    expect(nav).toContain('{ href: "/admin/messages", label: "Contact form" }');
     const page = read("app/admin/messages/page.tsx");
     expect(page).toContain('await requireAdmin("/admin/messages")');
     expect(page).toContain("contactMessages");
@@ -148,12 +150,14 @@ describe("features that had an endpoint but no screen", () => {
     expect(renderToStaticMarkup(<MessageStatusControl id="abc" status="open" />)).toContain("In progress");
   });
 
-  it("replaces the invented growth metric with the real open-message count", () => {
+  it("replaces the invented growth metric with a count somebody has to act on", () => {
     const source = read("app/admin/dashboard/page.tsx");
     expect(source).not.toContain('value: "+12%"');
-    expect(source).toContain("Open support messages");
-    expect(source).toContain('href: "/admin/messages"');
-    expect(source).toContain('eq(contactMessages.status, "open")');
+    // Tickets the assistant could not settle, not form submissions nobody has
+    // touched: the number on the dashboard is the work, not the inbox depth.
+    expect(source).toContain("Tickets needing a person");
+    expect(source).toContain('href: "/admin/support?status=escalated"');
+    expect(source).toContain('eq(supportTickets.status, "escalated")');
   });
 });
 
