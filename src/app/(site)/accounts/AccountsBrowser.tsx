@@ -31,6 +31,15 @@ type Listing = {
   available: boolean;
   /** "instant" delivers on payment; "manual" is confirmed afterwards. */
   fulfilment: "instant" | "manual";
+  /**
+   * Whether checkout is permitted for this listing, decided server-side.
+   *
+   * A hand-prepared item can be listed, priced and honestly described and still
+   * not be buyable, because preparing it needs someone who can reach the
+   * fulfilment queue. Optional so an older response cannot break the type;
+   * absent reads as not buyable, which is the safe direction.
+   */
+  purchasable?: boolean;
 };
 type Meta = { current_page: number; last_page: number; per_page: number; total: number };
 
@@ -179,7 +188,10 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
    * count for it would tell the customer something nobody knows.
    */
   function canBuy(listing: Listing): boolean {
-    if (!purchaseEnabled || loading || !listing.available) return false;
+    // `purchasable` already folds in the page-wide checkout gate server-side,
+    // plus the extra condition a hand-prepared item needs. Reading the page flag
+    // here instead would let a manual listing be bought while nobody can prepare it.
+    if (!listing.purchasable || loading || !listing.available) return false;
     return listing.stock === null ? listing.fulfilment === "manual" : listing.stock >= listing.minQuantity;
   }
 
@@ -350,6 +362,15 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
       {!purchaseEnabled && (
         <div role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.85rem] text-amber-900">
           Account purchases are temporarily paused. You can browse listings, but checkout is unavailable.
+        </div>
+      )}
+      {/* Checkout is open, but not for hand-prepared items. Without this the
+          customer sees "Paused" on some cards and no reason anywhere. Wording
+          stays customer-facing: why they are paused is not their concern. */}
+      {purchaseEnabled && listings.some((listing) => listing.fulfilment === "manual" && !listing.purchasable) && (
+        <div role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.85rem] text-amber-900">
+          Items marked <strong>Prepared for you</strong> cannot be ordered right now. Every other listing is
+          available as normal.
         </div>
       )}
       {/* Filters */}
@@ -537,7 +558,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                     onClick={() => openBuy(listing)}
                     disabled={!canBuy(listing)}
                   >
-                    {purchaseEnabled ? "Buy" : "Paused"}
+                    {listing.purchasable ? "Buy" : "Paused"}
                   </Button>
                 </div>
               </article>
