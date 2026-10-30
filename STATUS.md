@@ -104,7 +104,7 @@ These are wrong *today*, not feature requests.
 
 9. **Preview deployments still read and write the production database.** `PGHOST`/`PGUSER`/… target `preview` and `production`; the migration *build step* is gated on `VERCEL_ENV`, but runtime data access is not. Recorded as the owner's call in `PLAN.md`.
 
-10. **Deployment wiring lives only in the Vercel dashboard.** Build command, migration gating, env scoping and the cron cadence are not in the repo, and there is no CI to catch a regression — see PR #17 below.
+10. 🟡 **Deployment wiring is half in the repo.** *(partly fixed — `.github/workflows/ci.yml` now exists and `RUNBOOK.md` documents the build command, migration gate and env scoping; the workflow has never run because GitHub Actions is blocked on this account's billing, so treat CI as unproven)* Env scoping and the cron cadence still live only in the Vercel dashboard, and a fresh clone cannot see which environment variables are scoped to which environment.
 
 ---
 
@@ -142,7 +142,7 @@ These are healthy upgrades to schedule, not emergencies. Pin them behind the CI 
 2. ~~Make the truth surfaces agree.~~ **Done for README and `/status`**; the `PLAN.md` tables still need a proper rewrite, and the "are numbers live?" question is now answered by the documentation rather than left ambiguous.
 3. 🟡 **Fix operations** — the scheduled-orders mystery is resolved (it cannot be scheduled as written); still open: the email worker's cadence, and whether transfer webhooks will ever settle withdrawals or operators always will.
 4. 🟡 **Finish the money loop** — the admin audit log and the reconciliation view are done; still open: reconcile the supplier balance and enforce email verification on signup.
-5. 🟢 **Then growth features** — referrals, coupons, reviews, wishlist, PWA, analytics. 2FA moved out of this list: it is built (section 12). These are additive; none of them unblocks revenue the way 1–4 do.
+5. 🟢 **Then growth features** — referrals, coupons, wishlist, analytics. 2FA, the PWA, the CSP and verified-purchase reviews are built (sections 12–16). What remains is additive; none of it unblocks revenue the way 1–4 do — and referrals and coupons need your reward figures before they can be written.
 
 ---
 
