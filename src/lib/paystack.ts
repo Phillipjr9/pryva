@@ -40,7 +40,18 @@ interface PaystackVerifyResponse {
     id: number;
     status: string;
     reference: string;
+    // What the customer actually paid. When "Pass fees to customers" is enabled
+    // in the Paystack dashboard (Settings -> Preferences -> Transaction fees),
+    // Paystack grosses this up above the amount we requested and keeps the
+    // difference; when it is disabled this equals requested_amount.
     amount: number;
+    // The net amount we asked Paystack to charge at initialize. This, not
+    // `amount`, is what a stored top-up can be compared against. Optional and
+    // nullable because older payloads omit it, and because parsePaystackResponse
+    // casts without validating, so neither field is guaranteed at runtime.
+    requested_amount?: number | null;
+    // Paystack's own fee in kobo, when it reports one.
+    fees?: number | null;
     currency: string;
     customer: {
       email: string;

@@ -734,6 +734,106 @@ describe("Paystack top-up safety", () => {
     expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
   });
 
+  it("names the mismatching field in the log so a stranded deposit is diagnosable", async () => {
+    mocks.initializePayment.mockImplementationOnce(async ({ reference }: { reference: string }) => ({
+      status: true, data: { authorization_url: "https://checkout.paystack.com/session", reference },
+    }));
+    const initialized = await topUpRoute.POST(request("", { amount: 2500 }));
+    expect(initialized.status).toBe(200);
+    const { reference } = await initialized.json();
+    const payment = { status: "success", reference, amount: 250000, currency: "NGN", customer: { email: "buyer@example.com" } };
+
+    // A stringified amount is what parsePaystackResponse's unchecked `as T` cast
+    // lets through, and under `!==` it is indistinguishable from a missing one.
+    mocks.verifyPayment.mockResolvedValueOnce({ status: true, data: { ...payment, amount: "250000" } });
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference }))).status).toBe(409);
+    expect(mocks.log.warn).toHaveBeenCalledWith(
+      "Top-up verification returned mismatched payment details",
+      expect.objectContaining({
+        reference,
+        mismatch: expect.stringMatching(/amount: no usable integer.*typeof string/),
+      }),
+    );
+
+    mocks.log.warn.mockClear();
+    mocks.verifyPayment.mockResolvedValueOnce({ status: true, data: { ...payment, amount: 250001 } });
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference }))).status).toBe(409);
+    expect(mocks.log.warn).toHaveBeenCalledWith(
+      "Top-up verification returned mismatched payment details",
+      expect.objectContaining({
+        mismatch: expect.stringContaining("amount: provider requested 250001 kobo, expected 250000 kobo from the stored 2500 naira"),
+      }),
+    );
+
+    mocks.log.warn.mockClear();
+    mocks.verifyPayment.mockResolvedValueOnce({ status: true, data: { ...payment, currency: "USD" } });
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference }))).status).toBe(409);
+    expect(mocks.log.warn).toHaveBeenCalledWith(
+      "Top-up verification returned mismatched payment details",
+      expect.objectContaining({
+        mismatch: expect.stringContaining('currency: provider sent "USD", expected "NGN"'),
+      }),
+    );
+
+    // Every rejected attempt left the wallet untouched.
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(10000);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
+  });
+
+  it("credits a top-up Paystack grossed up to pass its fee to the customer", async () => {
+    mocks.initializePayment.mockImplementationOnce(async ({ reference }: { reference: string }) => ({
+      status: true, data: { authorization_url: "https://checkout.paystack.com/session", reference },
+    }));
+    const initialized = await topUpRoute.POST(request("", { amount: 2500 }));
+    expect(initialized.status).toBe(200);
+    const { reference } = await initialized.json();
+
+    // With "Pass fees to customers" enabled in the Paystack dashboard, the
+    // customer is charged ceil((net + N100) / 0.985) and that gross is reported
+    // as `amount`, while `requested_amount` stays the net we asked for. For
+    // N2,500 the gross is 263960 kobo: a fractional naira figure that matches
+    // neither the stored amount nor a whole naira, so matching on `amount`
+    // rejected a payment the customer had genuinely made.
+    mocks.verifyPayment.mockResolvedValueOnce({
+      status: true,
+      data: {
+        status: "success", reference, currency: "NGN", customer: { email: "buyer@example.com" },
+        amount: 263960, requested_amount: 250000, fees: 13959,
+      },
+    });
+    const response = await verifyTopUpRoute.POST(request("/verify", { reference }));
+    expect(response.status).toBe(200);
+    // The wallet is credited the net that was recorded, never the gross charged.
+    expect(await response.json()).toMatchObject({
+      ok: true, status: "completed", credited: true,
+      receipt: { reference, amount: 2500, balanceAfter: 12500 },
+    });
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(12500);
+
+    // Matching the net must not have loosened the check: a charge that came in
+    // short of what we requested is still refused.
+    mocks.initializePayment.mockImplementationOnce(async ({ reference: ref }: { reference: string }) => ({
+      status: true, data: { authorization_url: "https://checkout.paystack.com/session", reference: ref },
+    }));
+    const shortReference = (await (await topUpRoute.POST(request("", { amount: 2500 }))).json()).reference;
+    mocks.log.warn.mockClear();
+    mocks.verifyPayment.mockResolvedValueOnce({
+      status: true,
+      data: {
+        status: "success", reference: shortReference, currency: "NGN", customer: { email: "buyer@example.com" },
+        amount: 240000, requested_amount: 250000, fees: 0,
+      },
+    });
+    expect((await verifyTopUpRoute.POST(request("/verify", { reference: shortReference }))).status).toBe(409);
+    expect(mocks.log.warn).toHaveBeenCalledWith(
+      "Top-up verification returned mismatched payment details",
+      expect.objectContaining({
+        mismatch: expect.stringMatching(/charged 240000 kobo is less than the 250000 kobo requested/),
+      }),
+    );
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(12500);
+  });
+
   it("verifies reference, currency and exact naira amount and deduplicates the signed webhook", async () => {
     mocks.initializePayment.mockImplementationOnce(async ({ reference }: { reference: string }) => ({
       status: true, data: { authorization_url: "https://checkout.paystack.com/session", reference },

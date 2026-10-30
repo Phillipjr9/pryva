@@ -64,9 +64,46 @@ export async function POST(request: NextRequest) {
     }
     // Check the provider's details for every status, not just success. A
     // mismatched or incomplete response is unconfirmed, not a failed charge.
-    if (payment.reference !== reference || payment.currency !== "NGN" ||
-        !Number.isSafeInteger(payment.amount) || payment.amount !== topup.amount * 100) {
-      logger.warn("Top-up verification returned mismatched payment details", { reference, userId: user.id });
+    //
+    // Each comparison reports itself separately. This used to be one compound
+    // condition behind one warning that said payment details had mismatched
+    // without saying which, so a deposit confirmed by Paystack but stranded as
+    // pending could not be diagnosed from the log at all. parsePaystackResponse
+    // casts the JSON without validating it, so the recorded types matter: a
+    // stringified amount and a missing one look identical under `!==`.
+    const mismatches: string[] = [];
+    if (payment.reference !== reference) {
+      mismatches.push(`reference: provider sent ${JSON.stringify(payment.reference)}, expected ${JSON.stringify(reference)}`);
+    }
+    if (payment.currency !== "NGN") {
+      mismatches.push(`currency: provider sent ${JSON.stringify(payment.currency)}, expected "NGN"`);
+    }
+    // `payment.amount` is the gross the customer actually paid. When "Pass fees
+    // to customers" is enabled in the Paystack dashboard, Paystack grosses it up
+    // and keeps the difference, so a N50,000 top-up is charged as N50,862.95 and
+    // comparing the gross against the stored net rejected every confirmed
+    // payment. `requested_amount` is the net we asked for at initialize, so that
+    // is what the stored top-up is compared against. A missing or null
+    // requested_amount falls back to the gross, which is both the pre-existing
+    // behaviour and the correct answer when fees are not passed on.
+    const grossKobo = typeof payment.amount === "number" && Number.isSafeInteger(payment.amount) ? payment.amount : null;
+    const requestedKobo = typeof payment.requested_amount === "number" && Number.isSafeInteger(payment.requested_amount)
+      ? payment.requested_amount
+      : grossKobo;
+    if (requestedKobo === null) {
+      mismatches.push(`amount: no usable integer, provider sent requested_amount ${JSON.stringify(payment.requested_amount)} and amount ${JSON.stringify(payment.amount)} (typeof ${typeof payment.amount})`);
+    } else if (requestedKobo !== topup.amount * 100) {
+      mismatches.push(`amount: provider requested ${requestedKobo} kobo, expected ${topup.amount * 100} kobo from the stored ${topup.amount} naira (charged ${JSON.stringify(payment.amount)} kobo, fees ${JSON.stringify(payment.fees)})`);
+    } else if (grossKobo !== null && grossKobo < requestedKobo) {
+      // A successful charge must not be short of what we asked for.
+      mismatches.push(`amount: charged ${grossKobo} kobo is less than the ${requestedKobo} kobo requested, so the payment was short`);
+    }
+    if (mismatches.length > 0) {
+      logger.warn("Top-up verification returned mismatched payment details", {
+        reference,
+        userId: user.id,
+        mismatch: mismatches.join(" | "),
+      });
       return NextResponse.json({ error: "Payment details could not be verified. Contact support with your reference before paying again." }, { status: 409 });
     }
 
