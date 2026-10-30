@@ -21,7 +21,7 @@ function Notice({ kind, children }: { kind: "error" | "success"; children: strin
   return (
     <p
       role="status"
-      className={`flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-[0.78rem] font-medium ${
+      className={`flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-meta font-medium ${
         kind === "error"
           ? "border-rose-200 bg-rose-50 text-rose-700"
           : "border-emerald-200 bg-emerald-50 text-emerald-800"
@@ -52,7 +52,7 @@ function Section({
         </span>
         <div>
           <h2 className="text-[0.95rem] font-semibold">{title}</h2>
-          <p className="mt-0.5 text-[0.78rem] text-ink-2">{note}</p>
+          <p className="mt-0.5 text-meta text-ink-2">{note}</p>
         </div>
       </div>
       <div className="mt-3.5 grid gap-3">{children}</div>
@@ -161,7 +161,7 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
             aria-describedby="profile-email-hint"
             className="field disabled:opacity-60"
           />
-          <p id="profile-email-hint" className="mt-1 text-[0.7rem] text-ink-3">
+          <p id="profile-email-hint" className="mt-1 text-meta text-ink-3">
             {"Email can't be changed here — message support if you need to move accounts."}
           </p>
         </div>
@@ -257,7 +257,7 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
           </p>
         ) : (
           <>
-            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[0.78rem] leading-relaxed text-amber-900">
+            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-meta leading-relaxed text-amber-900">
               <span className="font-semibold">{user.email}</span> is not verified yet.
             </p>
             {canSendVerification ? (
@@ -268,7 +268,7 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
                 Send the confirmation link
               </Link>
             ) : (
-              <p className="text-[0.75rem] leading-relaxed text-ink-3">
+              <p className="text-meta leading-relaxed text-ink-3">
                 This server cannot send that email yet, so there is no button here that would only
                 fail. {" "}
                 <Link href="/contact" className="font-semibold text-lav-700 underline underline-offset-2">

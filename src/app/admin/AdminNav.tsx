@@ -28,7 +28,7 @@ export function AdminNav() {
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
         <span className="flex items-center gap-2">
           <BrandLockup size="xs" />
-          <span className="rounded-full bg-lav-100 px-2 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-lav-800">
+          <span className="rounded-full bg-lav-100 px-2 py-0.5 text-micro font-semibold uppercase tracking-[0.12em] text-lav-800">
             Admin
           </span>
         </span>

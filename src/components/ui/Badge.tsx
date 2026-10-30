@@ -21,8 +21,8 @@ export function Badge({ children, variant = "default", size = "md", className }:
           "bg-blue-100 text-blue-700": variant === "info",
         },
         {
-          "px-2 py-0.5 text-[0.7rem]": size === "sm",
-          "px-3 py-1 text-[0.78rem]": size === "md",
+          "px-2 py-0.5 text-meta": size === "sm",
+          "px-3 py-1 text-meta": size === "md",
         },
         className
       )}

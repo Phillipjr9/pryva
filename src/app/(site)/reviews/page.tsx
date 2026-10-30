@@ -103,7 +103,7 @@ export default async function ReviewsPage() {
                 <li key={review.id} className="rounded-3xl border border-line bg-white p-6">
                   <div className="flex items-center justify-between gap-3">
                     <Stars rating={review.rating} />
-                    <span className="text-[0.74rem] text-ink-3">{formatDate(review.publishedAt)}</span>
+                    <span className="text-meta text-ink-3">{formatDate(review.publishedAt)}</span>
                   </div>
                   {review.headline && (
                     <h2 className="mt-3 text-[1.02rem] font-semibold text-ink">{review.headline}</h2>
@@ -111,7 +111,7 @@ export default async function ReviewsPage() {
                   <p className="mt-2 whitespace-pre-line text-[0.92rem] leading-relaxed text-ink-2">
                     {review.body}
                   </p>
-                  <p className="mt-4 flex items-center gap-1.5 text-[0.76rem] font-medium text-lav-700">
+                  <p className="mt-4 flex items-center gap-1.5 text-meta font-medium text-lav-700">
                     <Check className="h-3.5 w-3.5" />
                     Verified purchase · {review.productName}
                   </p>

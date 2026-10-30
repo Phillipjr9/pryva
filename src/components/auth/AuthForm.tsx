@@ -148,7 +148,7 @@ export function AuthForm({
           </div>
 
           {error && (
-            <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-[0.78rem] font-medium text-red-700">
+            <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-meta font-medium text-red-700">
               {error}
             </p>
           )}
@@ -165,7 +165,7 @@ export function AuthForm({
               setCode("");
               setError(null);
             }}
-            className="text-[0.78rem] font-semibold text-ink-2 underline underline-offset-2"
+            className="text-meta font-semibold text-ink-2 underline underline-offset-2"
           >
             Start over
           </button>
@@ -178,7 +178,7 @@ export function AuthForm({
     <div>
       <div className="mb-6">
         {errorParam && GOOGLE_ERRORS[errorParam] && (
-          <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[0.78rem] font-medium text-amber-800">
+          <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-meta font-medium text-amber-800">
             {GOOGLE_ERRORS[errorParam]}
           </p>
         )}
@@ -192,7 +192,7 @@ export function AuthForm({
 
         <div className="my-5 flex items-center gap-3">
           <span className="h-px flex-1 bg-line" />
-          <span className="text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
+          <span className="text-micro font-semibold uppercase tracking-[0.16em] text-ink-3">
             or with email
           </span>
           <span className="h-px flex-1 bg-line" />
@@ -312,7 +312,7 @@ export function AuthForm({
         )}
       </p>
 
-      <p className="mt-6 flex items-start gap-2 rounded-xl bg-lav-50/80 px-3.5 py-3 text-[0.74rem] leading-relaxed text-ink-2">
+      <p className="mt-6 flex items-start gap-2 rounded-xl bg-lav-50/80 px-3.5 py-3 text-meta leading-relaxed text-ink-2">
         <Shield className="mt-0.5 h-4 w-4 shrink-0 text-lav-600" />
         Passwords are stored salted and hashed. Pryva never asks for your BVN, bank login or OTP from
         other platforms.
@@ -322,7 +322,7 @@ export function AuthForm({
         <ul className="mt-4 grid gap-1.5">
           {["Pay in Naira by transfer or card", "Live fulfillment for several services is paused", "Support for delivery issues"].map(
             (item) => (
-              <li key={item} className="flex items-center gap-2 text-[0.76rem] text-ink-2">
+              <li key={item} className="flex items-center gap-2 text-meta text-ink-2">
                 <Check className="h-3.5 w-3.5 text-lav-600" />
                 {item}
               </li>

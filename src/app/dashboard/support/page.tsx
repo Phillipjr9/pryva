@@ -46,7 +46,7 @@ export default async function SupportPage() {
               </span>
               <div>
                 <p className="text-[0.8rem] font-semibold text-ink">{item.label}</p>
-                <p className="text-[0.72rem] text-ink-3">{item.value}</p>
+                <p className="text-meta text-ink-3">{item.value}</p>
               </div>
             </div>
           );
@@ -71,15 +71,15 @@ export default async function SupportPage() {
                 {messages.map((message: { id: string; topic: string; status: string; message: string; createdAt: Date | string }) => (
                   <div key={message.id} className="rounded-xl border border-line bg-white p-3.5">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-[0.78rem] font-semibold text-ink">{message.topic}</p>
-                      <span className="rounded-full bg-lav-50 px-2 py-0.5 text-[0.6rem] font-semibold capitalize text-lav-700">
+                      <p className="text-meta font-semibold text-ink">{message.topic}</p>
+                      <span className="rounded-full bg-lav-50 px-2 py-0.5 text-micro font-semibold capitalize text-lav-700">
                         {message.status}
                       </span>
                     </div>
-                    <p className="mt-1 line-clamp-3 text-[0.76rem] leading-relaxed text-ink-2">
+                    <p className="mt-1 line-clamp-3 text-meta leading-relaxed text-ink-2">
                       {message.message}
                     </p>
-                    <p className="mt-1.5 text-[0.64rem] text-ink-3">
+                    <p className="mt-1.5 text-micro text-ink-3">
                       {new Date(message.createdAt).toLocaleString("en-NG", {
                         day: "numeric",
                         month: "short",
@@ -95,7 +95,7 @@ export default async function SupportPage() {
 
           <div className="rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
             <p className="text-[0.85rem] font-semibold text-ink">Quick self-serve</p>
-            <div className="mt-2.5 grid gap-1.5 text-[0.78rem]">
+            <div className="mt-2.5 grid gap-1.5 text-meta">
               <Link
                 href="/faq"
                 className="flex items-center justify-between rounded-lg bg-white/80 px-3 py-2 text-ink-2 hover:text-lav-700"

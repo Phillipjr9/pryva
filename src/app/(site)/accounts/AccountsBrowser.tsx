@@ -412,7 +412,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
               type="button"
               onClick={() => selectSubcategory(null)}
               className={cn(
-                "rounded-full border px-3 py-1 text-[0.76rem]",
+                "rounded-full border px-3 py-1 text-meta",
                 activeSubcategory === null
                   ? "border-ink bg-ink text-white"
                   : "border-line bg-cream text-ink-2",
@@ -426,7 +426,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                 type="button"
                 onClick={() => selectSubcategory(subcategory.id)}
                 className={cn(
-                  "rounded-full border px-3 py-1 text-[0.76rem]",
+                  "rounded-full border px-3 py-1 text-meta",
                   activeSubcategory === subcategory.id
                     ? "border-ink bg-ink text-white"
                     : "border-line bg-cream text-ink-2",
@@ -450,7 +450,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
             />
           </div>
           <div className="flex items-center gap-2">
-            <label htmlFor="sort" className="text-[0.78rem] text-ink-3">
+            <label htmlFor="sort" className="text-meta text-ink-3">
               Sort
             </label>
             <select
@@ -474,7 +474,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
 
       {/* Results */}
       <div className="mt-6">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-[0.72rem] text-ink-3">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-meta text-ink-3">
           <span>{loading ? "Refreshing stock…" : lastChecked ? `Stock checked at ${lastChecked}; it may change.` : "Stock not checked yet."}</span>
           <button type="button" disabled={loading} onClick={() => void loadListings()} className="font-semibold text-lav-700 hover:underline disabled:opacity-50">Refresh stock</button>
         </div>
@@ -518,7 +518,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                   </div>
                 </div>
 
-                <p className="mt-1.5 text-[0.74rem] text-ink-3">
+                <p className="mt-1.5 text-meta text-ink-3">
                   {[listing.category, listing.subcategory].filter(Boolean).join(" · ") || "Digital account"}
                   {(listing.sold ?? 0) > 0 ? ` · ${(listing.sold as number).toLocaleString("en-NG")} sold` : ""}
                 </p>
@@ -527,7 +527,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                   {listing.stock === null && listing.fulfilment === "manual" ? (
                     // No published count exists for this item, so say how it is
                     // delivered instead of showing a number nobody has.
-                    <p className="inline-flex items-center rounded-lg bg-cream px-2 py-1 text-[0.72rem] font-medium text-ink-2">
+                    <p className="inline-flex items-center rounded-lg bg-cream px-2 py-1 text-meta font-medium text-ink-2">
                       Confirmed after payment
                     </p>
                   ) : (
@@ -537,12 +537,12 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
 
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   {listing.warrantyDays !== null && listing.warrantyDays > 0 && (
-                    <span className="rounded-full bg-lav-50 px-2 py-0.5 text-[0.68rem] font-semibold text-lav-800">
+                    <span className="rounded-full bg-lav-50 px-2 py-0.5 text-micro font-semibold text-lav-800">
                       {warrantyBadge(listing.warrantyDays)}
                     </span>
                   )}
                   {listing.fulfilment === "manual" && (
-                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[0.68rem] font-semibold text-amber-800">
+                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-micro font-semibold text-amber-800">
                       Prepared for you
                     </span>
                   )}
@@ -551,7 +551,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                 <div className="mt-4 flex items-end justify-between gap-3">
                   <div>
                     <p className="text-[1.05rem] font-semibold text-ink">{formatNaira(listing.priceNgn)}</p>
-                    <p className="text-[0.7rem] text-ink-3">per account</p>
+                    <p className="text-meta text-ink-3">per account</p>
                   </div>
                   <Button
                     size="sm"
@@ -576,7 +576,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
             >
               Previous
             </Button>
-            <p className="text-[0.78rem] text-ink-3">
+            <p className="text-meta text-ink-3">
               Page {meta.current_page} of {meta.last_page} · {meta.total.toLocaleString("en-NG")} listings
             </p>
             <Button
@@ -631,13 +631,13 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                 <div className="mt-4 max-h-64 space-y-2 overflow-y-auto rounded-xl border border-line bg-cream/60 p-3">
                   {result.accounts.map((account, index) => (
                     <div key={index} className="flex items-center gap-2">
-                      <code className="flex-1 break-all rounded-lg bg-white px-2.5 py-1.5 font-mono text-[0.76rem] text-ink">
+                      <code className="flex-1 break-all rounded-lg bg-white px-2.5 py-1.5 font-mono text-meta text-ink">
                         {account}
                       </code>
                       <button
                         type="button"
                         onClick={() => void copy(account, index)}
-                        className="shrink-0 rounded-lg border border-line bg-white px-2 py-1 text-[0.72rem] font-semibold text-ink-2 hover:border-lav-300"
+                        className="shrink-0 rounded-lg border border-line bg-white px-2 py-1 text-meta font-semibold text-ink-2 hover:border-lav-300"
                       >
                         {copied === index ? "Copied" : "Copy"}
                       </button>
@@ -645,7 +645,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                   ))}
                 </div>
 
-                <p className="mt-3 text-[0.74rem] text-ink-3">
+                <p className="mt-3 text-meta text-ink-3">
                   Save these now and treat them like passwords.
                 </p>
                 {result.warning && (
@@ -708,12 +708,12 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                     : `${selected.stock} in stock when last checked`}
                 </p>
                 {(selected.warrantyDays ?? 0) > 0 && (
-                  <p className="mt-1 text-[0.76rem] text-ink-3">
+                  <p className="mt-1 text-meta text-ink-3">
                     {warrantyLabel(selected.warrantyDays)} on this item.
                   </p>
                 )}
                 {selected.fulfilment === "manual" && (
-                  <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[0.78rem] leading-relaxed text-amber-900">
+                  <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-meta leading-relaxed text-amber-900">
                     This item is prepared for you after payment rather than delivered instantly. It
                     appears on your order page as soon as it is confirmed.
                   </p>
@@ -770,7 +770,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                 </div>
 
                 <div className="mt-4">
-                  <label htmlFor="promo" className="text-[0.78rem] font-medium text-ink-2">
+                  <label htmlFor="promo" className="text-meta font-medium text-ink-2">
                     Promo code
                   </label>
                   <div className="mt-1.5 flex gap-2">
@@ -792,8 +792,8 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                       Apply
                     </Button>
                   </div>
-                  {promo && <p className="mt-1.5 text-[0.75rem] font-medium text-emerald-700">{promo.message}</p>}
-                  {promoMessage && !promo && <p className="mt-1.5 text-[0.75rem] text-red-700">{promoMessage}</p>}
+                  {promo && <p className="mt-1.5 text-meta font-medium text-emerald-700">{promo.message}</p>}
+                  {promoMessage && !promo && <p className="mt-1.5 text-meta text-red-700">{promoMessage}</p>}
                 </div>
 
                 <div className="mt-4 rounded-xl border border-line bg-cream/70 p-3">
@@ -801,12 +801,12 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                     <span className="text-ink-2">Total</span>
                     <span className="font-semibold text-ink">{formatNaira(estimatedTotal)}</span>
                   </div>
-                  <p className="mt-1 text-[0.72rem] text-ink-3">
+                  <p className="mt-1 text-meta text-ink-3">
                     Paid from your Pryva wallet. Volume discounts apply automatically at 5, 10 and 25
                     accounts. Final total is confirmed by the server.
                   </p>
                   {promo && (
-                    <p className="mt-1 text-[0.72rem] font-medium text-emerald-700">
+                    <p className="mt-1 text-meta font-medium text-emerald-700">
                       {promo.code} applied — you save {formatNaira(promo.savedNgn)}.
                     </p>
                   )}

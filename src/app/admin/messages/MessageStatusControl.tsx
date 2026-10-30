@@ -52,7 +52,7 @@ export function MessageStatusControl({ id, status }: { id: string; status: strin
         value={next}
         onChange={(event) => setNext(event.target.value as MessageStatus)}
         disabled={saving}
-        className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-[0.78rem] text-ink outline-none focus:border-lav-400 disabled:opacity-60"
+        className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-meta text-ink outline-none focus:border-lav-400 disabled:opacity-60"
       >
         {MESSAGE_STATUSES.map((value) => (
           <option key={value} value={value}>
@@ -64,7 +64,7 @@ export function MessageStatusControl({ id, status }: { id: string; status: strin
         type="button"
         onClick={() => void save()}
         disabled={saving || unchanged}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-white px-2.5 py-1.5 text-[0.76rem] font-semibold text-ink transition-colors hover:border-lav-300 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-white px-2.5 py-1.5 text-meta font-semibold text-ink transition-colors hover:border-lav-300 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {saving && <Loader2 className="h-3 w-3 animate-spin" />}
         {saving ? "Saving…" : "Update"}

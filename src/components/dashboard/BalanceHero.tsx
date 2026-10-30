@@ -43,7 +43,7 @@ export function BalanceHero({
       <div className="relative">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-white/55">
+            <p className="flex items-center gap-1.5 text-micro font-semibold uppercase tracking-[0.16em] text-white/55">
               <Wallet className="h-3.5 w-3.5" /> Available to spend
             </p>
             <h1
@@ -52,12 +52,12 @@ export function BalanceHero({
             >
               {formatNaira(balance)}
             </h1>
-            <p className="mt-2 text-[0.76rem] text-white/55">
+            <p className="mt-2 text-meta text-white/55">
               Hello {name} · your wallet and transaction history
             </p>
           </div>
 
-          <div className="flex w-full gap-2 sm:w-auto">
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
             <Link
               href="/dashboard/wallet"
               className="btn flex-1 bg-white !px-4 !py-2.5 !text-[0.8rem] font-semibold text-ink shadow-sm hover:bg-white/90 sm:flex-none"
@@ -73,23 +73,25 @@ export function BalanceHero({
           </div>
         </div>
 
-        <dl className="mt-5 grid grid-cols-3 gap-2 border-t border-white/10 pt-4">
+        {/* One column on a phone: three columns of truncated money at 320 px
+            hide the balance, which is the number the page exists to show. */}
+        <dl className="mt-5 grid grid-cols-1 gap-3 border-t border-white/10 pt-4 sm:grid-cols-3 sm:gap-2">
           {stats.map((stat) => (
             <div key={stat.label}>
-              <dt className="text-[0.58rem] uppercase tracking-[0.12em] text-white/45">
+              <dt className="text-micro uppercase tracking-[0.12em] text-white/45">
                 {stat.label}
               </dt>
               <dd className="mt-1 truncate text-[0.95rem] font-semibold tabular-nums">
                 {stat.value}
               </dd>
-              {stat.note && <p className="mt-0.5 truncate text-[0.6rem] text-white/40">{stat.note}</p>}
+              {stat.note && <p className="mt-0.5 truncate text-micro text-white/40">{stat.note}</p>}
             </div>
           ))}
         </dl>
 
         <Link
           href="/dashboard/wallet"
-          className="mt-3 inline-flex items-center gap-1 text-[0.72rem] font-semibold text-white/70 hover:text-white"
+          className="mt-3 inline-flex items-center gap-1 text-meta font-semibold text-white/70 hover:text-white"
         >
           Full wallet and statement <ArrowRight className="h-3 w-3" />
         </Link>

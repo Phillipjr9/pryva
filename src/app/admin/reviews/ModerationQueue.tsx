@@ -84,11 +84,11 @@ export function ModerationQueue({ items }: { items: QueueItem[] }) {
                   {item.productName}
                   <span className="ml-2 font-normal text-ink-3">{item.rating} / 5</span>
                 </h2>
-                <p className="mt-0.5 text-[0.74rem] text-ink-3">
+                <p className="mt-0.5 text-meta text-ink-3">
                   {item.customerEmail} · {new Date(item.createdAt).toLocaleString("en-NG")} · {item.service}
                 </p>
               </div>
-              <span className="rounded-full border border-line px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-ink-2">
+              <span className="rounded-full border border-line px-2.5 py-1 text-micro font-semibold uppercase tracking-[0.1em] text-ink-2">
                 {item.status}
               </span>
             </div>
@@ -96,7 +96,7 @@ export function ModerationQueue({ items }: { items: QueueItem[] }) {
             {item.headline && <p className="mt-3 text-[0.9rem] font-medium">{item.headline}</p>}
             <p className="mt-1 whitespace-pre-line text-[0.88rem] leading-relaxed text-ink-2">{item.body}</p>
             {item.moderatorNote && (
-              <p className="mt-2 text-[0.78rem] text-ink-3">Note on record: {item.moderatorNote}</p>
+              <p className="mt-2 text-meta text-ink-3">Note on record: {item.moderatorNote}</p>
             )}
 
             {!decided && (

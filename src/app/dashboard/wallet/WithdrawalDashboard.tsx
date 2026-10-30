@@ -72,7 +72,7 @@ const statusLabels: Record<string, string> = {
 function StatusPill({ status, testMode }: { status: string; testMode: boolean }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[0.64rem] font-semibold ${
+      className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-micro font-semibold ${
         statusStyles[status] ?? "bg-lav-50 text-lav-700"
       }`}
     >
@@ -410,7 +410,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
             {testMode ? "Test requests are reviewed; Paystack test transfers do not make real payouts." : "Requests are reviewed, then paid out through Paystack Transfers."}
           </p>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-[0.68rem] text-ink-3">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-micro text-ink-3">
           <Wallet className="h-3 w-3 text-lav-600" /> {formatNaira(balance)} available
         </span>
       </div>
@@ -422,7 +422,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
             type="button"
             onClick={() => setActiveTab(tab.key)}
             aria-pressed={activeTab === tab.key}
-            className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[0.76rem] font-semibold transition-colors ${
+            className={`shrink-0 rounded-full border px-3.5 py-1.5 text-meta font-semibold transition-colors ${
               activeTab === tab.key
                 ? "border-ink bg-ink text-white"
                 : "border-line bg-white/70 text-ink-2 hover:border-lav-200"
@@ -473,7 +473,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                       type="button"
                       onClick={() => setAmount(String(preset))}
                       disabled={preset > maxPayout}
-                      className="rounded-full border border-line bg-white px-2.5 py-1 text-[0.68rem] font-semibold text-ink-2 hover:border-lav-200 disabled:opacity-40"
+                      className="rounded-full border border-line bg-white px-2.5 py-1 text-micro font-semibold text-ink-2 hover:border-lav-200 disabled:opacity-40"
                     >
                       {formatNaira(preset)}
                     </button>
@@ -482,16 +482,16 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                     type="button"
                     onClick={() => setAmount(String(maxPayout))}
                     disabled={maxPayout < MIN_WITHDRAWAL}
-                    className="rounded-full bg-lav-50 px-2.5 py-1 text-[0.68rem] font-semibold text-lav-800 disabled:opacity-40"
+                    className="rounded-full bg-lav-50 px-2.5 py-1 text-micro font-semibold text-lav-800 disabled:opacity-40"
                   >
                     Maximum payout {formatNaira(maxPayout)}
                   </button>
                 </div>
-                <p className="mt-1.5 text-[0.7rem] text-ink-3">
+                <p className="mt-1.5 text-meta text-ink-3">
                   Minimum ₦1,000 · a 1% fee applies above ₦5,000 and is deducted in addition to the payout.
                 </p>
                 {validEnteredAmount && (
-                  <p className="mt-1 text-[0.72rem] text-ink-2">
+                  <p className="mt-1 text-meta text-ink-2">
                     Bank payout {formatNaira(enteredAmount)} · Fee {formatNaira(fee)} · Wallet deduction {formatNaira(enteredAmount + fee)}
                   </p>
                 )}
@@ -535,7 +535,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                 )}
               </button>
 
-              <p className="flex items-start gap-2 rounded-xl bg-lav-50 px-3 py-2.5 text-[0.74rem] leading-relaxed text-lav-800">
+              <p className="flex items-start gap-2 rounded-xl bg-lav-50 px-3 py-2.5 text-meta leading-relaxed text-lav-800">
                 <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 Requests are reviewed. An initiated transfer is not confirmation of settlement; uncertain outcomes require manual reconciliation.
               </p>
@@ -580,13 +580,13 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                       <p className="text-[0.9rem] font-semibold text-ink">
                         {formatNaira(withdrawal.amount)}
                       </p>
-                      <p className="truncate text-[0.72rem] text-ink-2">
+                      <p className="truncate text-meta text-ink-2">
                         {withdrawal.bankName} · {withdrawal.accountNumber}
                       </p>
                     </div>
                     <StatusPill status={withdrawal.status} testMode={testMode} />
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.66rem] text-ink-3">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-micro text-ink-3">
                     <span>Ref {withdrawal.reference}</span>
                     {withdrawal.fee > 0 && <span>Fee {formatNaira(withdrawal.fee)}</span>}
                     <span>
@@ -598,7 +598,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                     </span>
                   </div>
                   {withdrawal.failureReason && (
-                    <p className="mt-1.5 flex items-start gap-1.5 text-[0.7rem] text-rose-600">
+                    <p className="mt-1.5 flex items-start gap-1.5 text-meta text-rose-600">
                       <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
                       {withdrawal.failureReason}
                     </p>
@@ -614,7 +614,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
         <div id="bank-accounts" className="grid gap-3 lg:grid-cols-2">
           <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
             <p className="text-[0.95rem] font-semibold">Add a bank account</p>
-            <p className="mt-0.5 text-[0.76rem] text-ink-2">
+            <p className="mt-0.5 text-meta text-ink-2">
               We verify the name on the account before saving it.
             </p>
 
@@ -667,7 +667,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                     type="button"
                     onClick={verifyAccount}
                     disabled={verifyingAccount || loading || !bankCode || accountNumber.length !== 10}
-                    className="btn shrink-0 border border-line bg-white !px-3.5 !py-2.5 !text-[0.78rem] text-ink hover:border-lav-200 disabled:opacity-50"
+                    className="btn shrink-0 border border-line bg-white !px-3.5 !py-2.5 !text-[0.8125rem] sm:!text-[0.78rem] text-ink hover:border-lav-200 disabled:opacity-50"
                   >
                     {verifyingAccount ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Verify"}
                   </button>
@@ -675,19 +675,19 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
               </div>
 
               {accountName && (
-                <p className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[0.78rem] font-medium text-emerald-800">
+                <p className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-meta font-medium text-emerald-800">
                   <Check className="h-3.5 w-3.5" /> {accountName}
                 </p>
               )}
 
               {!accountName && verifyError && (
-                <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[0.78rem] leading-relaxed text-rose-700">
+                <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-meta leading-relaxed text-rose-700">
                   {verifyError}
                 </p>
               )}
 
               {!accountName && !verifyError && (
-                <p className="text-[0.72rem] leading-relaxed text-ink-3">
+                <p className="text-meta leading-relaxed text-ink-3">
                   Saving unlocks once the account is verified. The name shown comes from the bank,
                   not from anything you type, so a payout can only go to the account it was resolved
                   against.
@@ -698,7 +698,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                   rule the withdrawal API enforces, and a customer adding somebody
                   else's account should find out before they have filled in a
                   withdrawal and been refused. */}
-              <p className="flex gap-2 rounded-xl border border-lav-200 bg-lav-50 px-3 py-2.5 text-[0.72rem] leading-relaxed text-ink-2">
+              <p className="flex gap-2 rounded-xl border border-lav-200 bg-lav-50 px-3 py-2.5 text-meta leading-relaxed text-ink-2">
                 <Shield className="mt-px h-3.5 w-3.5 shrink-0" />
                 <span>
                   Withdrawals are paid only to a bank account in the same name as the one that
@@ -745,13 +745,13 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                       <p className="flex items-center gap-1.5 text-[0.84rem] font-semibold text-ink">
                         {account.bankName}
                         {account.isDefault && (
-                          <span className="rounded-full bg-lav-50 px-2 py-0.5 text-[0.6rem] font-semibold text-lav-700">
+                          <span className="rounded-full bg-lav-50 px-2 py-0.5 text-micro font-semibold text-lav-700">
                             Default
                           </span>
                         )}
                       </p>
-                      <p className="truncate text-[0.72rem] text-ink-2">{account.accountNumber}</p>
-                      <p className="truncate text-[0.72rem] text-ink-3">{account.accountName}</p>
+                      <p className="truncate text-meta text-ink-2">{account.accountNumber}</p>
+                      <p className="truncate text-meta text-ink-3">{account.accountName}</p>
                     </div>
                     <button
                       type="button"

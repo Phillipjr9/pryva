@@ -36,9 +36,9 @@ export default async function DashboardPlanPage({
 
   return (
     <div className="grid gap-5">
-      <Link href={back} className="w-fit text-[0.78rem] font-semibold text-lav-700 hover:underline">← Back to services</Link>
+      <Link href={back} className="w-fit text-meta font-semibold text-lav-700 hover:underline">← Back to services</Link>
       <div>
-        <p className="flex items-center gap-2 text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-lav-700">
+        <p className="flex items-center gap-2 text-meta font-semibold uppercase tracking-[0.14em] text-lav-700">
           <CountryFlag code={country.code} size={20} decorative radius={10} /> {country.name} selected
         </p>
         <h1 className="mt-2 text-[1.6rem] font-semibold text-ink">{plan.name}</h1>
@@ -47,7 +47,7 @@ export default async function DashboardPlanPage({
 
       {fulfillable ? (
         <>
-          <div role="note" className="rounded-2xl border border-line bg-white p-4 text-[0.78rem] leading-relaxed text-ink-2">
+          <div role="note" className="rounded-2xl border border-line bg-white p-4 text-meta leading-relaxed text-ink-2">
             Delivered automatically once payment is taken from your wallet. Your verification code
             appears in the order details as soon as it arrives.
           </div>
@@ -60,7 +60,7 @@ export default async function DashboardPlanPage({
         </>
       ) : (
         <>
-          <div role="note" className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-[0.78rem] leading-relaxed text-amber-900">
+          <div role="note" className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-meta leading-relaxed text-amber-900">
             This plan cannot be delivered yet, so it cannot be ordered or charged.
           </div>
           <div className="rounded-2xl border border-line bg-white p-6 text-[0.84rem] text-ink-2">

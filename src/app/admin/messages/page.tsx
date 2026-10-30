@@ -102,7 +102,7 @@ export default async function AdminMessagesPage({
           </p>
         </div>
         <div className="rounded-xl border border-line bg-white px-4 py-2 text-right">
-          <p className="text-[0.7rem] uppercase tracking-wide text-ink-3">Waiting for a reply</p>
+          <p className="text-meta uppercase tracking-wide text-ink-3">Waiting for a reply</p>
           <p className="text-[1rem] font-semibold text-ink">
             {Number(openRow?.total ?? 0).toLocaleString("en-NG")} open
             {oldestOpen ? ` · oldest ${formatWhen(oldestOpen)}` : ""}
@@ -156,14 +156,14 @@ export default async function AdminMessagesPage({
                 <p className="flex flex-wrap items-center gap-2 text-[0.9rem] font-semibold text-ink">
                   {row.topic}
                   <span
-                    className={`rounded-full px-2 py-0.5 text-[0.68rem] font-semibold capitalize ${
+                    className={`rounded-full px-2 py-0.5 text-micro font-semibold capitalize ${
                       STATUS_STYLES[row.status] ?? "bg-slate-100 text-slate-600"
                     }`}
                   >
                     {row.status.replace("_", " ")}
                   </span>
                 </p>
-                <p className="mt-1 text-[0.78rem] text-ink-3">
+                <p className="mt-1 text-meta text-ink-3">
                   {row.name} · <a href={`mailto:${row.email}`} className="text-lav-700 underline underline-offset-2">{row.email}</a>
                   {" · "}
                   {formatWhen(row.createdAt)}

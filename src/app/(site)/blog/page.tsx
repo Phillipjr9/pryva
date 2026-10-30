@@ -26,7 +26,7 @@ export default function BlogPage() {
               href={`/blog/${post.slug}`}
               className="group rounded-2xl border border-line bg-white p-6 transition-shadow hover:shadow-[var(--shadow-card)]"
             >
-              <span className="inline-block rounded-full bg-lav-100 px-3 py-1 text-[0.72rem] font-semibold text-lav-700">
+              <span className="inline-block rounded-full bg-lav-100 px-3 py-1 text-meta font-semibold text-lav-700">
                 {post.category}
               </span>
               <h2 className="mb-3 mt-4 text-[1.1rem] font-semibold text-ink group-hover:text-lav-600">

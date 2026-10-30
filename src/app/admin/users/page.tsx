@@ -85,7 +85,7 @@ export default async function AdminUsersPage({
           </p>
         </div>
         <div className="rounded-xl border border-line bg-white px-4 py-2 text-right">
-          <p className="text-[0.7rem] uppercase tracking-wide text-ink-3">Wallet balance on this page</p>
+          <p className="text-meta uppercase tracking-wide text-ink-3">Wallet balance on this page</p>
           <p className="text-[1rem] font-semibold text-ink">{formatNaira(walletTotal)}</p>
         </div>
       </div>
@@ -109,9 +109,9 @@ export default async function AdminUsersPage({
         )}
       </form>
 
-      <div className="overflow-hidden rounded-2xl border border-line bg-white">
-        <table className="w-full text-left text-[0.84rem]">
-          <thead className="bg-cream/70 text-[0.72rem] uppercase tracking-wide text-ink-3">
+      <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+        <table className="w-full min-w-[36rem] text-left text-[0.84rem]">
+          <thead className="bg-cream/70 text-meta uppercase tracking-wide text-ink-3">
             <tr>
               <th className="px-4 py-3 font-semibold">User</th>
               <th className="px-4 py-3 font-semibold">Wallet</th>
@@ -134,7 +134,7 @@ export default async function AdminUsersPage({
                 <tr key={row.id} className="border-t border-line/70">
                   <td className="px-4 py-3">
                     <p className="font-medium text-ink">{row.name}</p>
-                    <p className="text-[0.76rem] text-ink-3">{row.email}</p>
+                    <p className="text-meta text-ink-3">{row.email}</p>
                   </td>
                   <td className="px-4 py-3 font-medium">{formatNaira(row.walletBalance)}</td>
                   <td className="px-4 py-3">{stats?.orders ?? 0}</td>

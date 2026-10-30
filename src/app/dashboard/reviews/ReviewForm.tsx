@@ -151,13 +151,13 @@ export function ReviewForm({ orders }: { orders: ReviewableOrder[] }) {
           maxLength={BODY_MAX}
           placeholder="What you bought, whether it worked, and what you would tell someone considering it."
         />
-        <p className="mt-1 text-[0.72rem] text-ink-3">
+        <p className="mt-1 text-meta text-ink-3">
           {body.trim().length}/{BODY_MAX} · at least {BODY_MIN} characters
         </p>
       </div>
 
       {error && (
-        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-[0.78rem] font-medium text-red-700">
+        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-meta font-medium text-red-700">
           {error}
         </p>
       )}
@@ -171,7 +171,7 @@ export function ReviewForm({ orders }: { orders: ReviewableOrder[] }) {
           {pending ? "Submitting…" : "Submit for review"}
           {!pending && <ArrowRight className="h-3.5 w-3.5" />}
         </button>
-        <span className="text-[0.74rem] text-ink-3">
+        <span className="text-meta text-ink-3">
           Published only after an operator checks it. Never edited by us.
         </span>
       </div>

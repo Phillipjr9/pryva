@@ -30,12 +30,12 @@ export default async function DashboardAccountsPage() {
             Browse live listings priced in Naira. Country coverage is not provided or filtered here, and stock can change.
           </p>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-[0.68rem] text-ink-3">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-micro text-ink-3">
           <Shield className="h-3 w-3 text-lav-600" /> Support reviews delivery issues
         </span>
       </div>
 
-      <p className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5 text-[0.76rem] leading-relaxed text-amber-900">
+      <p className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5 text-meta leading-relaxed text-amber-900">
         <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         Accounts are delivered exactly as described. Some platforms restrict account transfers — you
         accept that risk when you buy.
@@ -46,7 +46,7 @@ export default async function DashboardAccountsPage() {
 
       <AccountsBrowser purchaseEnabled={isMarketplaceCheckoutConfigured()} />
 
-      <p className="text-[0.74rem] text-ink-3">
+      <p className="text-meta text-ink-3">
         Wallet balance: <strong className="text-ink">{user.walletBalance.toLocaleString("en-NG", { style: "currency", currency: "NGN", minimumFractionDigits: 0 })}</strong>{" "}
         ·{" "}
         <Link href="/dashboard/wallet" className="inline-flex items-center gap-1 font-semibold text-lav-700 hover:underline">

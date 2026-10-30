@@ -73,7 +73,7 @@ export default async function AdminFulfilmentPage() {
           </p>
         </div>
         <div className="rounded-xl border border-line bg-white px-4 py-2 text-right">
-          <p className="text-[0.7rem] uppercase tracking-wide text-ink-3">Catalog items</p>
+          <p className="text-meta uppercase tracking-wide text-ink-3">Catalog items</p>
           <p className="text-[1rem] font-semibold text-ink">
             {catalog.filter((item) => item.available).length} live of {catalog.length}
           </p>
@@ -106,14 +106,14 @@ export default async function AdminFulfilmentPage() {
                     <span
                       className={
                         row.status === "processing"
-                          ? "rounded-full bg-amber-50 px-2 py-0.5 text-[0.68rem] font-semibold text-amber-800"
-                          : "rounded-full bg-rose-50 px-2 py-0.5 text-[0.68rem] font-semibold text-rose-700"
+                          ? "rounded-full bg-amber-50 px-2 py-0.5 text-micro font-semibold text-amber-800"
+                          : "rounded-full bg-rose-50 px-2 py-0.5 text-micro font-semibold text-rose-700"
                       }
                     >
                       {row.status === "processing" ? "Needs credentials" : "Could not source"}
                     </span>
                   </p>
-                  <dl className="mt-2 grid min-w-0 grid-cols-1 gap-x-6 gap-y-1 text-[0.78rem] text-ink-2 sm:grid-cols-2">
+                  <dl className="mt-2 grid min-w-0 grid-cols-1 gap-x-6 gap-y-1 text-meta text-ink-2 sm:grid-cols-2">
                     <div className="flex min-w-0 gap-1">
                       <dt className="shrink-0 text-ink-3">Order</dt>
                       <dd className="min-w-0 break-all font-mono">{row.reference}</dd>

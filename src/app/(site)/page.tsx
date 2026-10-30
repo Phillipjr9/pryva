@@ -203,7 +203,7 @@ export default async function HomePage() {
             {/* --- copy + action (first thing a phone shows) --- */}
             <div className="order-1 text-center lg:col-start-1 lg:row-start-1 lg:text-left">
               <Reveal>
-                <span className="inline-flex items-center gap-2 rounded-full border border-lav-200 bg-white/75 py-1 pl-1 pr-3 text-[0.64rem] font-semibold uppercase tracking-[0.12em] text-lav-700 backdrop-blur sm:text-[0.68rem]">
+                <span className="inline-flex items-center gap-2 rounded-full border border-lav-200 bg-white/75 py-1 pl-1 pr-3 text-micro font-semibold uppercase tracking-[0.12em] text-lav-700 backdrop-blur sm:text-[0.68rem]">
                   <BrandMark size="xs" />
                   Pryva · Nigerian digital services
                 </span>
@@ -267,7 +267,7 @@ export default async function HomePage() {
             {/* --- proof: under the photo on phones, under the copy on desktop --- */}
             <div className="order-3 lg:col-start-1 lg:row-start-2">
               <Reveal delay={220}>
-                <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[0.78rem] text-ink-2 sm:gap-x-5 sm:text-[0.8rem] lg:justify-start">
+                <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-meta text-ink-2 sm:gap-x-5 sm:text-[0.8rem] lg:justify-start">
                   {["Naira pricing", "Support for delivery issues", "Explore number plans"].map((item) => (
                     <li key={item} className="inline-flex items-center gap-1.5">
                       <Check className="h-3.5 w-3.5 shrink-0 text-lav-600" />
@@ -275,7 +275,7 @@ export default async function HomePage() {
                     </li>
                   ))}
                 </ul>
-                <p className="mt-3 text-center text-[0.76rem] text-ink-3 lg:text-left">
+                <p className="mt-3 text-center text-meta text-ink-3 lg:text-left">
                   Catalog prices in Naira · check service availability
                 </p>
               </Reveal>
@@ -331,7 +331,7 @@ export default async function HomePage() {
                   >
                     <div className="relative flex items-start justify-between gap-4">
                       <ServiceIcon service={service.slug} size="md" />
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/80 px-2.5 py-1 text-[0.66rem] font-medium text-ink-3">
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/80 px-2.5 py-1 text-micro font-medium text-ink-3">
                         <Sparkle className="h-2.5 w-2.5 text-lav-500" />
                         {service.eyebrow}
                       </span>
@@ -346,7 +346,7 @@ export default async function HomePage() {
                         {service.goodFor.slice(0, 3).map((tag) => (
                           <span
                             key={tag}
-                            className="inline-flex items-center gap-1.5 rounded-full bg-lav-50 px-2.5 py-1 text-[0.66rem] font-medium text-lav-700"
+                            className="inline-flex items-center gap-1.5 rounded-full bg-lav-50 px-2.5 py-1 text-micro font-medium text-lav-700"
                           >
                             {tag}
                           </span>
@@ -356,18 +356,18 @@ export default async function HomePage() {
 
                     <div className="relative mt-5 flex items-end justify-between gap-3 border-t border-line/80 pt-4">
                       <div className="min-w-0">
-                        <p className="text-[0.78rem] text-ink-3">
+                        <p className="text-meta text-ink-3">
                           {service.slug === "accounts" ? "See live listings"
                             : service.fromPrice === undefined ? <>
                             Free
                           </> : <>
                             Catalog from{" "}
                             <span className="text-[1rem] font-semibold text-ink">{formatNaira(service.fromPrice)}</span>{" "}
-                            <span className="text-[0.72rem]">{service.unit}</span>
+                            <span className="text-meta">{service.unit}</span>
                           </>}
                         </p>
                         {popular && !inDashboard && (
-                          <p className="mt-1 flex items-center gap-1.5 text-[0.7rem] text-ink-3">
+                          <p className="mt-1 flex items-center gap-1.5 text-meta text-ink-3">
                             {hasCountryFlag(popular.region) && (
                               <CountryFlag region={popular.region} size={14} decorative />
                             )}
@@ -375,7 +375,7 @@ export default async function HomePage() {
                           </p>
                         )}
                         {inDashboard && (
-                          <p className="mt-1 inline-flex items-center gap-1.5 text-[0.68rem] font-medium text-ink-3">
+                          <p className="mt-1 inline-flex items-center gap-1.5 text-micro font-medium text-ink-3">
                             <Lock className="h-3 w-3 text-lav-500" />
                             {user ? "Open in your dashboard" : "In your dashboard — sign in to buy"}
                           </p>
@@ -407,7 +407,7 @@ export default async function HomePage() {
                     />
                   ))}
                 </div>
-                <p className="text-[0.78rem] text-ink-3">
+                <p className="text-meta text-ink-3">
                   {subscriptionPlanCount} plans, priced in Naira
                 </p>
               </div>
@@ -443,13 +443,13 @@ export default async function HomePage() {
                 </div>
 
                 <div className="w-full max-w-sm rounded-2xl border border-line bg-white/85 p-5">
-                  <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-ink-3">
+                  <p className="text-micro font-semibold uppercase tracking-[0.14em] text-ink-3">
                     Account marketplace
                   </p>
                   <p className="mt-1 text-[2rem] font-medium tracking-tight">
                     Browse listings
                   </p>
-                  <p className="mt-1 text-[0.78rem] text-ink-3">
+                  <p className="mt-1 text-meta text-ink-3">
                     Final price depends on the platform, age and follower count — always shown before
                     you confirm.
                   </p>
@@ -476,7 +476,7 @@ export default async function HomePage() {
               {PLATFORM_SHOWCASE.map((platform) => (
                 <span
                   key={`${copy}-${platform.brand}`}
-                  className="inline-flex items-center gap-2 rounded-full border border-line bg-cream/80 py-1.5 pl-1.5 pr-3.5 text-[0.76rem] font-medium text-ink-2"
+                  className="inline-flex items-center gap-2 rounded-full border border-line bg-cream/80 py-1.5 pl-1.5 pr-3.5 text-meta font-medium text-ink-2"
                 >
                   <BrandIcon brand={platform.brand} size={20} variant="tile" decorative />
                   {platform.label}
@@ -584,10 +584,10 @@ export default async function HomePage() {
                 <div className="mx-auto w-full max-w-sm">
                   <div className="rounded-[1.5rem] border border-line bg-white p-4 shadow-[var(--shadow-card)]">
                     <div className="flex items-center justify-between">
-                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-3">
+                      <p className="text-micro font-semibold uppercase tracking-[0.12em] text-ink-3">
                         Example Order PV-2291
                       </p>
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[0.6rem] font-semibold text-emerald-700">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-micro font-semibold text-emerald-700">
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
                         Sample code
                       </span>
@@ -598,7 +598,7 @@ export default async function HomePage() {
                         <CountryFlag code="ng" size={22} decorative />
                         <div className="min-w-0">
                           <p className="truncate text-[0.82rem] font-semibold">+234 ••• ••• ••••</p>
-                          <p className="text-[0.64rem] text-ink-3">Nigeria · sample number</p>
+                          <p className="text-micro text-ink-3">Nigeria · sample number</p>
                         </div>
                       </div>
                       <Copy className="h-3.5 w-3.5 text-ink-3" />
@@ -619,7 +619,7 @@ export default async function HomePage() {
                       ))}
                     </div>
 
-                    <div className="mt-3 flex items-center justify-between text-[0.66rem] text-ink-3">
+                    <div className="mt-3 flex items-center justify-between text-micro text-ink-3">
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3" /> Expires in 00:19
                       </span>
@@ -632,8 +632,8 @@ export default async function HomePage() {
                       <Shield className="h-4 w-4" />
                     </span>
                     <div>
-                      <p className="text-[0.78rem] font-semibold">Order support</p>
-                      <p className="text-[0.7rem] leading-relaxed text-ink-3">
+                      <p className="text-meta font-semibold">Order support</p>
+                      <p className="text-meta leading-relaxed text-ink-3">
                         If delivery is uncertain, contact support with your order reference.
                       </p>
                     </div>
@@ -644,8 +644,8 @@ export default async function HomePage() {
                       <Wallet className="h-4 w-4" />
                     </span>
                     <div>
-                      <p className="text-[0.78rem] font-semibold">Wallet {formatNaira(12500)}</p>
-                      <p className="text-[0.7rem] leading-relaxed text-ink-3">
+                      <p className="text-meta font-semibold">Wallet {formatNaira(12500)}</p>
+                      <p className="text-meta leading-relaxed text-ink-3">
                         Every top-up, purchase and refund lands in one ledger.
                       </p>
                     </div>
@@ -753,7 +753,7 @@ export default async function HomePage() {
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-4 flex items-start gap-2 rounded-xl border border-line/70 bg-white/70 px-3 py-2.5 text-[0.74rem] leading-relaxed text-ink-3">
+                  <p className="mt-4 flex items-start gap-2 rounded-xl border border-line/70 bg-white/70 px-3 py-2.5 text-meta leading-relaxed text-ink-3">
                     <Receipt className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
                     Gift cards, data plans, bulk and scheduled purchases are priced inside your
                     dashboard, from the same wallet. Prices are fixed in Naira and shown before you
@@ -836,7 +836,7 @@ export default async function HomePage() {
 
               <div className="relative grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
                 <div>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 py-1 pl-1 pr-3 text-[0.64rem] font-semibold uppercase tracking-[0.14em] text-white/80">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 py-1 pl-1 pr-3 text-micro font-semibold uppercase tracking-[0.14em] text-white/80">
                     <BrandMark size="xs" />
                     Ready when you are
                   </span>
@@ -866,7 +866,7 @@ export default async function HomePage() {
                       <ArrowUpRight className="h-4 w-4" />
                     </Link>
                   </div>
-                  <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.72rem] text-white/55">
+                  <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-white/55">
                     <span className="inline-flex items-center gap-1.5">
                       <Shield className="h-3.5 w-3.5" /> Payments via Paystack
                     </span>
@@ -893,10 +893,10 @@ export default async function HomePage() {
                       key={item.label}
                       className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3"
                     >
-                      <span className="text-[0.68rem] uppercase tracking-[0.12em] text-white/50">
+                      <span className="text-micro uppercase tracking-[0.12em] text-white/50">
                         {item.label}
                       </span>
-                      <span className="text-right text-[0.78rem] font-medium text-white/90">
+                      <span className="text-right text-meta font-medium text-white/90">
                         {item.value}
                       </span>
                     </div>

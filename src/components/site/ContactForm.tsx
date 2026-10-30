@@ -153,7 +153,7 @@ export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = fa
       {error && <p className="mt-3 text-[0.8rem] font-medium text-rose-600">{error}</p>}
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="inline-flex items-center gap-1.5 text-[0.74rem] text-ink-3">
+        <p className="inline-flex items-center gap-1.5 text-meta text-ink-3">
           <Shield className="h-3.5 w-3.5 text-lav-600" />
           Please do not include passwords, payment-card details or verification codes.
         </p>

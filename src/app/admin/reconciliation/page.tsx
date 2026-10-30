@@ -53,7 +53,7 @@ function AgeBadge({ since }: { since: Date | string }) {
   const hours = ageHours(since);
   const severity = ageSeverity(hours);
   return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-[0.72rem] font-semibold ${SEVERITY_STYLES[severity]}`}>
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-meta font-semibold ${SEVERITY_STYLES[severity]}`}>
       {formatAge(hours)}
     </span>
   );
@@ -79,9 +79,9 @@ function Section({
         </span>
       </div>
       <p className="max-w-3xl text-[0.82rem] text-ink-2">{description}</p>
-      <div className="overflow-hidden rounded-2xl border border-line bg-white">
-        <table className="w-full text-left text-[0.84rem]">
-          <thead className="bg-cream/70 text-[0.72rem] uppercase tracking-wide text-ink-3">
+      <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+        <table className="w-full min-w-[36rem] text-left text-[0.84rem]">
+          <thead className="bg-cream/70 text-meta uppercase tracking-wide text-ink-3">
             <tr>
               <th className="px-4 py-3 font-semibold">Reference</th>
               <th className="px-4 py-3 font-semibold">Detail</th>
@@ -195,7 +195,7 @@ export default async function AdminReconciliationPage() {
           </p>
         </div>
         <div className={`rounded-xl border px-4 py-2 text-right ${urgent > 0 ? "border-red-200 bg-red-50" : "border-line bg-white"}`}>
-          <p className="text-[0.7rem] uppercase tracking-wide text-ink-3">Older than a day</p>
+          <p className="text-meta uppercase tracking-wide text-ink-3">Older than a day</p>
           <p className={`text-[1rem] font-semibold ${urgent > 0 ? "text-red-700" : "text-ink"}`}>{urgent}</p>
         </div>
       </div>
@@ -207,14 +207,14 @@ export default async function AdminReconciliationPage() {
       >
         {processingWithdrawals.map((row) => (
           <tr key={row.id} className="border-t border-line/70 align-top">
-            <td className="px-4 py-3 font-mono text-[0.76rem] text-ink-2">{row.reference}</td>
+            <td className="px-4 py-3 font-mono text-meta text-ink-2">{row.reference}</td>
             <td className="px-4 py-3">
               <p className="text-ink">{row.bankName}</p>
-              <p className="text-[0.75rem] text-ink-3">{row.failureReason ?? "No review note recorded"}</p>
+              <p className="text-meta text-ink-3">{row.failureReason ?? "No review note recorded"}</p>
             </td>
             <td className="px-4 py-3 whitespace-nowrap">{formatNaira(row.amount + row.fee)}</td>
             <td className="px-4 py-3"><AgeBadge since={row.createdAt} /></td>
-            <td className="px-4 py-3 whitespace-nowrap text-[0.78rem] text-ink-3">{formatDate(row.createdAt)}</td>
+            <td className="px-4 py-3 whitespace-nowrap text-meta text-ink-3">{formatDate(row.createdAt)}</td>
           </tr>
         ))}
       </Section>
@@ -231,17 +231,17 @@ export default async function AdminReconciliationPage() {
       >
         {unresolvedOrders.map((row) => (
           <tr key={row.id} className="border-t border-line/70 align-top">
-            <td className="px-4 py-3 font-mono text-[0.76rem] text-ink-2">{row.reference}</td>
+            <td className="px-4 py-3 font-mono text-meta text-ink-2">{row.reference}</td>
             <td className="px-4 py-3">
               <p className="text-ink">{row.productName}</p>
-              <p className="text-[0.75rem] text-ink-3">
+              <p className="text-meta text-ink-3">
                 {row.status === "review" ? "Unsourceable — refund decision pending" : "Outcome unknown — provider reference recorded"}
                 {row.providerRequestId ? ` · ${row.providerRequestId}` : ""}
               </p>
             </td>
             <td className="px-4 py-3 whitespace-nowrap">{formatNaira(row.amount)}</td>
             <td className="px-4 py-3"><AgeBadge since={row.createdAt} /></td>
-            <td className="px-4 py-3 whitespace-nowrap text-[0.78rem] text-ink-3">{formatDate(row.createdAt)}</td>
+            <td className="px-4 py-3 whitespace-nowrap text-meta text-ink-3">{formatDate(row.createdAt)}</td>
           </tr>
         ))}
       </Section>
@@ -253,14 +253,14 @@ export default async function AdminReconciliationPage() {
       >
         {flaggedOrders.map((row) => (
           <tr key={row.id} className="border-t border-line/70 align-top">
-            <td className="px-4 py-3 font-mono text-[0.76rem] text-ink-2">{row.reference}</td>
+            <td className="px-4 py-3 font-mono text-meta text-ink-2">{row.reference}</td>
             <td className="px-4 py-3">
               <p className="text-ink">{row.productName}</p>
-              <p className="text-[0.75rem] text-ink-3">{row.reconciliationNote}</p>
+              <p className="text-meta text-ink-3">{row.reconciliationNote}</p>
             </td>
             <td className="px-4 py-3 whitespace-nowrap">{formatNaira(row.amount)}</td>
             <td className="px-4 py-3"><AgeBadge since={row.createdAt} /></td>
-            <td className="px-4 py-3 whitespace-nowrap text-[0.78rem] text-ink-3">{formatDate(row.createdAt)}</td>
+            <td className="px-4 py-3 whitespace-nowrap text-meta text-ink-3">{formatDate(row.createdAt)}</td>
           </tr>
         ))}
       </Section>
@@ -272,13 +272,13 @@ export default async function AdminReconciliationPage() {
       >
         {staleTopups.map((row) => (
           <tr key={row.reference} className="border-t border-line/70 align-top">
-            <td className="px-4 py-3 font-mono text-[0.76rem] text-ink-2">{row.reference}</td>
+            <td className="px-4 py-3 font-mono text-meta text-ink-2">{row.reference}</td>
             <td className="px-4 py-3 text-[0.8rem] text-ink-3">
               Check this reference in the Paystack dashboard before doing anything
             </td>
             <td className="px-4 py-3 whitespace-nowrap">{formatNaira(row.amount)}</td>
             <td className="px-4 py-3"><AgeBadge since={row.createdAt} /></td>
-            <td className="px-4 py-3 whitespace-nowrap text-[0.78rem] text-ink-3">{formatDate(row.createdAt)}</td>
+            <td className="px-4 py-3 whitespace-nowrap text-meta text-ink-3">{formatDate(row.createdAt)}</td>
           </tr>
         ))}
       </Section>

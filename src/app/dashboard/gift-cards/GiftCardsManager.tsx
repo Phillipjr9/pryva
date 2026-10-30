@@ -395,7 +395,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
                     )}
                   </div>
                   <span
-                    className={`rounded-full px-3 py-1 text-[0.75rem] font-semibold ${
+                    className={`rounded-full px-3 py-1 text-meta font-semibold ${
                       card.status === "active"
                         ? "bg-emerald-50 text-emerald-700"
                         : card.status === "redeemed"

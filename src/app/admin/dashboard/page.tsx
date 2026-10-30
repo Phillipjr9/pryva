@@ -139,7 +139,7 @@ export default async function AdminDashboardPage() {
                     <p className="text-[0.9rem] font-semibold text-ink">
                       ₦{order.amount.toLocaleString()}
                     </p>
-                    <p className="text-[0.78rem] text-ink-2 capitalize">
+                    <p className="text-meta text-ink-2 capitalize">
                       {order.status}
                     </p>
                   </div>

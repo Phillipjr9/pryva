@@ -12,7 +12,7 @@ export default function DashboardLoading() {
       <div className="animate-pulse rounded-[1.75rem] border border-ink bg-ink p-5 sm:p-6">
         <SkeletonBlock className="h-3 w-32 rounded-full bg-white/15" />
         <SkeletonBlock className="mt-3 h-9 w-44 rounded-xl bg-white/20" />
-        <div className="mt-5 grid grid-cols-3 gap-2 border-t border-white/10 pt-4">
+        <div className="mt-5 grid grid-cols-1 gap-3 border-t border-white/10 pt-4 sm:grid-cols-3 sm:gap-2">
           {[0, 1, 2].map((index) => (
             <div key={index}>
               <SkeletonBlock className="h-2.5 w-14 rounded-full bg-white/15" />

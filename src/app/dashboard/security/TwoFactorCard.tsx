@@ -124,8 +124,8 @@ export function TwoFactorCard({
         <span
           className={
             enabled
-              ? "rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[0.64rem] font-semibold text-emerald-700"
-              : "rounded-full border border-line bg-white px-2.5 py-1 text-[0.64rem] font-semibold text-ink-3"
+              ? "rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-micro font-semibold text-emerald-700"
+              : "rounded-full border border-line bg-white px-2.5 py-1 text-micro font-semibold text-ink-3"
           }
         >
           {enabled ? "On" : available ? "Off" : "Not configured"}
@@ -135,7 +135,7 @@ export function TwoFactorCard({
       <h2 className="mt-3 text-[0.95rem] font-semibold">Two-factor authentication</h2>
 
       {notice && (
-        <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[0.76rem] text-emerald-800">
+        <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-meta text-emerald-800">
           {notice}
         </p>
       )}
@@ -148,7 +148,7 @@ export function TwoFactorCard({
       )}
 
       {available && phase === "idle" && error && (
-        <p role="alert" className="mt-2 text-[0.78rem] font-medium text-red-700">
+        <p role="alert" className="mt-2 text-meta font-medium text-red-700">
           {error}
         </p>
       )}
@@ -181,9 +181,9 @@ export function TwoFactorCard({
           <code className="block break-all rounded-lg border border-line bg-white px-3 py-2 font-mono text-[0.8rem] tracking-[0.12em]">
             {secret}
           </code>
-          <details className="text-[0.76rem] text-ink-2">
+          <details className="text-meta text-ink-2">
             <summary className="cursor-pointer font-semibold text-lav-700">Show setup link</summary>
-            <p className="mt-1 break-all font-mono text-[0.72rem]">{uri}</p>
+            <p className="mt-1 break-all font-mono text-meta">{uri}</p>
           </details>
           <div>
             <label htmlFor="totp-code" className="field-label">Six-digit code</label>
@@ -200,7 +200,7 @@ export function TwoFactorCard({
             />
           </div>
           {error && (
-            <p role="alert" className="text-[0.78rem] font-medium text-red-700">{error}</p>
+            <p role="alert" className="text-meta font-medium text-red-700">{error}</p>
           )}
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={confirm} disabled={pending || code.length < 6} className="btn btn-primary btn-sm">
@@ -213,7 +213,7 @@ export function TwoFactorCard({
 
       {phase === "recovery" && (
         <div className="mt-2 grid gap-3">
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[0.78rem] text-amber-900">
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-meta text-amber-900">
             Save these now. They are the only way back in if you lose your authenticator, and they
             will never be shown again.
           </p>
@@ -222,7 +222,7 @@ export function TwoFactorCard({
               <li key={value} className="rounded-lg border border-line bg-white px-2 py-1.5 text-center">{value}</li>
             ))}
           </ul>
-          <label className="flex items-start gap-2 text-[0.78rem] text-ink-2">
+          <label className="flex items-start gap-2 text-meta text-ink-2">
             <input type="checkbox" checked={saved} onChange={(event) => setSaved(event.target.checked)} className="mt-0.5" />
             I have saved these somewhere safe.
           </label>
@@ -259,7 +259,7 @@ export function TwoFactorCard({
             />
           </div>
           {error && (
-            <p role="alert" className="text-[0.78rem] font-medium text-red-700">{error}</p>
+            <p role="alert" className="text-meta font-medium text-red-700">{error}</p>
           )}
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={disable} disabled={pending || !password || !code} className="btn btn-primary btn-sm">

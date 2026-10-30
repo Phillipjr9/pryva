@@ -118,7 +118,7 @@ function LogoutButton({ compact = false }: { compact?: boolean }) {
         type="button"
         onClick={signOut}
         disabled={pending}
-        className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[0.78rem] font-medium text-ink-3 transition-colors hover:bg-white hover:text-ink disabled:opacity-60 ${
+        className={`flex items-center gap-2 rounded-xl px-3 py-2 text-meta font-medium text-ink-3 transition-colors hover:bg-white hover:text-ink disabled:opacity-60 ${
           compact ? "" : "w-full"
         }`}
       >
@@ -184,11 +184,11 @@ export function DashboardShell({
         onClick={() => setOpen(false)}
         className="mt-5 block rounded-2xl bg-gradient-to-br from-ink to-[#3b2f56] p-4 text-white"
       >
-        <p className="text-[0.58rem] uppercase tracking-[0.16em] text-white/55">Wallet balance</p>
+        <p className="text-micro uppercase tracking-[0.16em] text-white/55">Wallet balance</p>
         <p className="mt-1.5 text-[1.35rem] font-semibold leading-none">
           {formatNaira(user.walletBalance)}
         </p>
-        <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[0.62rem] font-semibold">
+        <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-micro font-semibold">
           <Plus className="h-2.5 w-2.5" /> Top up wallet
         </span>
       </Link>
@@ -196,7 +196,7 @@ export function DashboardShell({
       <nav aria-label="Dashboard navigation" className="mt-5 grid min-h-0 flex-1 content-start gap-4 overflow-y-auto">
         {navGroups.map((group) => (
           <div key={group.label} className="grid gap-0.5">
-            <p className="px-3 text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
+            <p className="px-3 text-micro font-semibold uppercase tracking-[0.16em] text-ink-3">
               {group.label}
             </p>
             {group.items.map((item) => {
@@ -227,7 +227,7 @@ export function DashboardShell({
                   )}
                   {item.label}
                   {badge ? (
-                    <span className="ml-auto rounded-full bg-lav-600 px-1.5 py-0.5 text-[0.6rem] font-bold text-white">
+                    <span className="ml-auto rounded-full bg-lav-600 px-1.5 py-0.5 text-micro font-bold text-white">
                       {badge}
                     </span>
                   ) : (
@@ -242,12 +242,12 @@ export function DashboardShell({
 
       <div className="mt-auto border-t border-line pt-4">
         <div className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-lav-200 to-lav-400 text-[0.66rem] font-bold text-lav-800">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-lav-200 to-lav-400 text-micro font-bold text-lav-800">
             {initials || "P"}
           </span>
           <div className="min-w-0">
             <p className="truncate text-[0.82rem] font-semibold text-ink">{user.name}</p>
-            <p className="truncate text-[0.68rem] text-ink-3">{user.email}</p>
+            <p className="truncate text-micro text-ink-3">{user.email}</p>
           </div>
         </div>
         <div className="mt-2.5">
@@ -283,7 +283,7 @@ export function DashboardShell({
                 <BrandLockup size="xs" />
               </span>
               <div className="hidden lg:block">
-                <p className="text-[0.68rem] uppercase tracking-[0.16em] text-ink-3">Dashboard</p>
+                <p className="text-micro uppercase tracking-[0.16em] text-ink-3">Dashboard</p>
                 <p className="text-[0.88rem] font-semibold leading-tight text-ink">
                   Hello, {user.name.split(" ")[0]}
                 </p>
@@ -296,7 +296,7 @@ export function DashboardShell({
               <Link
                 href="/dashboard/wallet"
                 aria-label={`Wallet balance ${formatNaira(user.walletBalance)} — open wallet`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-lav-200 bg-lav-50 px-2.5 py-1.5 text-[0.74rem] font-semibold text-lav-800 transition-colors hover:border-lav-300 hover:bg-lav-100 sm:px-3"
+                className="inline-flex items-center gap-1.5 rounded-full border border-lav-200 bg-lav-50 px-2.5 py-1.5 text-meta font-semibold text-lav-800 transition-colors hover:border-lav-300 hover:bg-lav-100 sm:px-3"
               >
                 <Wallet className="h-3.5 w-3.5 text-lav-600" />
                 {formatNaira(user.walletBalance)}
@@ -312,13 +312,13 @@ export function DashboardShell({
               >
                 <Bell className="h-4 w-4" />
                 {unreadNotifications > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-lav-600 px-1 text-[0.58rem] font-bold text-white">
+                  <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-lav-600 px-1 text-micro font-bold text-white">
                     {unreadNotifications}
                   </span>
                 )}
               </Link>
 
-              <Link href="/dashboard/services" className="btn btn-primary !px-3.5 !py-2 !text-[0.76rem] max-[374px]:!hidden">
+              <Link href="/dashboard/services" className="btn btn-primary !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.76rem] max-[374px]:!hidden">
                 Services
                 <ArrowRight className="h-3 w-3" />
               </Link>
@@ -331,7 +331,7 @@ export function DashboardShell({
             /* In development only. If a page looks unchanged after a deploy,
                this line is the fastest way to tell a stale tab from a real bug:
                compare it with /api/version. */
-            <p className="pb-6 text-center text-[0.62rem] text-ink-3/70">
+            <p className="pb-6 text-center text-micro text-ink-3/70">
               build <span data-testid="build-id">{buildId}</span>
             </p>
           )}
@@ -367,7 +367,7 @@ export function DashboardShell({
                 key={tab.href}
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-2 text-[0.6rem] font-semibold transition-colors ${
+                className={`flex flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-2 text-micro font-semibold transition-colors ${
                   active ? "text-lav-700" : "text-ink-3 hover:text-ink"
                 }`}
               >

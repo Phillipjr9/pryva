@@ -224,7 +224,7 @@ export function InboxManager() {
           <button
             type="button"
             onClick={reload}
-            className="btn border border-line bg-white !px-4 !py-2.5 !text-[0.78rem] text-ink hover:border-lav-200"
+            className="btn border border-line bg-white !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.78rem] text-ink hover:border-lav-200"
           >
             <Refresh className="h-3.5 w-3.5" /> Try again
           </button>
@@ -277,14 +277,14 @@ export function InboxManager() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-[0.72rem] uppercase tracking-wide text-ink-3">Your inbox</p>
+                <p className="text-meta uppercase tracking-wide text-ink-3">Your inbox</p>
                 <p className="mt-1 font-mono text-[0.95rem] text-ink sm:text-[1.05rem]">{active.address}</p>
               </div>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => void copyAddress(active.address)}
-                  className="btn border border-line bg-white !px-3.5 !py-2 !text-[0.78rem] text-ink hover:border-lav-200"
+                  className="btn border border-line bg-white !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.84rem] text-ink hover:border-lav-200"
                 >
                   {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                   {copied ? "Copied" : "Copy"}
@@ -293,7 +293,7 @@ export function InboxManager() {
                   type="button"
                   onClick={() => void checkForMail(active.id)}
                   disabled={checking}
-                  className="btn border border-line bg-white !px-3.5 !py-2 !text-[0.78rem] text-ink hover:border-lav-200 disabled:opacity-50"
+                  className="btn border border-line bg-white !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.78rem] text-ink hover:border-lav-200 disabled:opacity-50"
                 >
                   {checking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Refresh className="h-3.5 w-3.5" />}
                   Check for mail
@@ -301,7 +301,7 @@ export function InboxManager() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.72rem] text-ink-3">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-meta text-ink-3">
               <span className="flex items-center gap-1.5">
                 <Clock className="h-3.5 w-3.5" />
                 {lastChecked
@@ -313,7 +313,7 @@ export function InboxManager() {
 
             {code && (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                <p className="text-[0.72rem] uppercase tracking-wide text-emerald-700">Verification code</p>
+                <p className="text-meta uppercase tracking-wide text-emerald-700">Verification code</p>
                 <p className="mt-1 font-mono text-[1.5rem] font-semibold tracking-widest text-emerald-900">{code}</p>
               </div>
             )}
@@ -338,17 +338,17 @@ export function InboxManager() {
                           <span className="block truncate text-[0.84rem] font-medium text-ink">
                             {message.subject ?? "(no subject)"}
                           </span>
-                          <span className="mt-0.5 block truncate text-[0.74rem] text-ink-3">
+                          <span className="mt-0.5 block truncate text-meta text-ink-3">
                             {message.from ?? "unknown sender"}
                             {message.code ? ` · code ${message.code}` : ""}
                           </span>
                         </span>
-                        <span className="shrink-0 text-[0.7rem] text-ink-3">
+                        <span className="shrink-0 text-meta text-ink-3">
                           {message.receivedAt ? new Date(message.receivedAt).toLocaleTimeString() : ""}
                         </span>
                       </button>
                       {isOpen && message.body && (
-                        <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words px-4 pb-4 text-[0.78rem] leading-relaxed text-ink-2">
+                        <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words px-4 pb-4 text-meta leading-relaxed text-ink-2">
                           {message.body}
                         </pre>
                       )}
@@ -363,12 +363,12 @@ export function InboxManager() {
                 type="button"
                 onClick={() => void handleDiscard()}
                 disabled={discarding}
-                className="btn border border-rose-200 bg-white !px-3.5 !py-2 !text-[0.78rem] text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                className="btn border border-rose-200 bg-white !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.78rem] text-rose-700 hover:bg-rose-50 disabled:opacity-50"
               >
                 {discarding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                 Discard inbox
               </button>
-              <p className="mt-2 text-[0.72rem] leading-relaxed text-ink-3">
+              <p className="mt-2 text-meta leading-relaxed text-ink-3">
                 Discarding ends this inbox immediately and anything still in it is lost. It does not
                 give you another free one today.
               </p>
@@ -397,13 +397,13 @@ export function InboxManager() {
               .map((inbox) => (
                 <li key={inbox.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
                   <span className="font-mono text-[0.8rem] text-ink-2">{inbox.address}</span>
-                  <span className="text-[0.72rem] text-ink-3">
+                  <span className="text-meta text-ink-3">
                     {inbox.status} · {new Date(inbox.createdAt).toLocaleDateString()}
                   </span>
                 </li>
               ))}
           </ul>
-          <p className="mt-3 text-[0.72rem] leading-relaxed text-ink-3">
+          <p className="mt-3 text-meta leading-relaxed text-ink-3">
             A free inbox keeps nothing once it ends, so these addresses are a record that you used
             one — not a place to read old mail.
           </p>
