@@ -12,6 +12,7 @@ import {
   supportsPromoCodes,
 } from "@/lib/marketplace-suppliers";
 import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
+import { isManualFulfilmentReachable } from "@/lib/manual-fulfilment";
 import { isManualSlug } from "@/lib/manual-catalog";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
 import { validatePromo } from "@/lib/accszone";
@@ -139,6 +140,19 @@ export async function POST(request: NextRequest) {
   const reference = `MKT-${clientReference.replace(/-/g, "").slice(0, 28)}`;
   // Hand-sourced items are recorded and queued; no supplier call is made.
   const isManual = isManualSlug(slug);
+
+  // A hand-sourced item is prepared through /admin/fulfilment, which needs an
+  // administrator with a verified address. Refuse here, before the wallet is
+  // touched: the debit happens in a transaction further down, and taking money
+  // for an item nobody can prepare is not made right by refunding it — the
+  // customer still did not get what they bought. The storefront already hides
+  // the button, but a hidden button is not a control.
+  if (isManual && !(await isManualFulfilmentReachable())) {
+    return NextResponse.json(
+      { error: "This item cannot be prepared right now. No payment was taken." },
+      { status: 503 },
+    );
+  }
 
   // A repeat of the same request must not call the supplier a second time, even
   // when the listing or provider is no longer available.

@@ -148,7 +148,7 @@ describe("listings route pricing, end to end", () => {
     for (const listing of body.listings) {
       expect(Object.keys(listing).sort()).toEqual([
         "available", "category", "fulfilment", "id", "maxQuantity", "minQuantity",
-        "priceNgn", "slug", "sold", "stock", "subcategory", "title", "warrantyDays",
+        "priceNgn", "purchasable", "slug", "sold", "stock", "subcategory", "title", "warrantyDays",
       ]);
     }
   });

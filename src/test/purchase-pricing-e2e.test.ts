@@ -39,7 +39,14 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/auth", () => ({ requireAuthApi: mocks.user, getCurrentUser: mocks.user }));
+// Spread the real module: a partial factory silently removes every other export,
+// and `isConfiguredAdminEmail` is now reached through @/lib/manual-fulfilment when
+// a hand-prepared item is bought. Missing, it throws and the gate fails closed —
+// safe in production, but it would make these tests prove nothing.
+vi.mock("@/lib/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/auth")>();
+  return { ...actual, requireAuthApi: mocks.user, getCurrentUser: mocks.user };
+});
 vi.mock("@/lib/logger", () => ({ logger: mocks.log }));
 vi.mock("@/lib/rate-limit", () => ({
   purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }),
@@ -160,9 +167,25 @@ beforeAll(async () => {
 
 afterAll(async () => { await pg?.close(); });
 
+/** Allowlisted owner address. Privilege needs this AND a verified address. */
+const ADMIN_EMAIL = "owner@pryva.test";
+
+/**
+ * Seeds the precondition for selling a hand-prepared item: an administrator who
+ * can actually reach `/admin/fulfilment`. Without one, the queue that prepares
+ * those orders is unreachable and the purchase route refuses the sale.
+ */
+async function seedReachableAdmin() {
+  await database.insert(schema.users).values({
+    id: randomUUID(), name: "Owner", email: ADMIN_EMAIL, passwordHash: "hash",
+    walletBalance: 0, emailVerifiedAt: new Date("2026-01-02T00:00:00Z"),
+  });
+}
+
 beforeEach(async () => {
   vi.clearAllMocks();
   vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db");
+  vi.stubEnv("ADMIN_EMAILS", ADMIN_EMAIL);
   await pg.exec('TRUNCATE TABLE "users" CASCADE');
   await database.insert(schema.users).values({
     id: USER, name: "Buyer", email: "buyer@example.com", passwordHash: "hash", walletBalance: START_BALANCE,
@@ -313,6 +336,8 @@ describe("checkout with real pricing", () => {
   });
 
   it("charges a real six-decimal price for a hand-prepared item without calling any source", async () => {
+    // Sellable only because someone can prepare it: see the refusal test below.
+    await seedReachableAdmin();
     mocks.listing = listing({
       slug: "p3:netflix-standard", sourceId: "netflix-standard", title: "Netflix Standard (1080p)",
       priceUsd: "2.500000", stock: null, sold: null, warrantyDays: 120, fulfilment: "manual",
@@ -332,6 +357,42 @@ describe("checkout with real pricing", () => {
     expect(await balance()).toBe(START_BALANCE - body.totalNgn);
     // No source exists for this item, so none may be contacted.
     expect(mocks.purchaseCalls).toBe(0);
+  });
+
+  it("refuses a hand-prepared item when nobody can reach the fulfilment queue", async () => {
+    // The state this deployment is actually in while transactional email is
+    // unconfigured: ADMIN_EMAILS is set, but no user has a verified address, so
+    // `isAdminUser` is false for everyone and /admin/fulfilment is unreachable.
+    // The listing is still honest and correctly priced — it simply must not be
+    // sold, because the order would sit in `processing` with no way to prepare it.
+    mocks.listing = listing({
+      slug: "p3:netflix-standard", sourceId: "netflix-standard", title: "Netflix Standard (1080p)",
+      priceUsd: "2.500000", stock: null, sold: null, warrantyDays: 120, fulfilment: "manual",
+    });
+
+    const response = await purchaseRoute.POST(purchaseRequest({ slug: "p3:netflix-standard", quantity: 2 }));
+    expect(response.status).toBe(503);
+    // Refused before the wallet was touched: no order, no debit, no source call.
+    expect(await orderRows()).toHaveLength(0);
+    expect(await balance()).toBe(START_BALANCE);
+    expect(mocks.purchaseCalls).toBe(0);
+  });
+
+  it("does not let an allowlisted but unverified address open the manual lane", async () => {
+    // ADMIN_EMAILS grants by string match alone, so verification is the only
+    // proof of control. An unverified allowlisted user must not make hand-prepared
+    // items sellable — that is the whole reason isAdminUser requires both.
+    await database.insert(schema.users).values({
+      id: randomUUID(), name: "Owner", email: ADMIN_EMAIL, passwordHash: "hash", walletBalance: 0,
+    });
+    mocks.listing = listing({
+      slug: "p3:netflix-standard", sourceId: "netflix-standard", title: "Netflix Standard (1080p)",
+      priceUsd: "2.500000", stock: null, sold: null, warrantyDays: 120, fulfilment: "manual",
+    });
+
+    const response = await purchaseRoute.POST(purchaseRequest({ slug: "p3:netflix-standard", quantity: 2 }));
+    expect(response.status).toBe(503);
+    expect(await balance()).toBe(START_BALANCE);
   });
 
   it("holds a short receipt for review instead of calling the order delivered", async () => {
