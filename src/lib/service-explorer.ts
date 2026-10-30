@@ -124,12 +124,11 @@ const ambiguousPlanRegions = new Set([
  * Bundle checkout is modeled separately by the explicitly simulated demo hub;
  * neither path claims verified live supplier coverage.
  */
-const noPreviewCheckout = new Set(["vn-otp-5", "email-bundle", "email-team"]);
+const noPreviewCheckout = new Set(["vn-otp-5"]);
 
 export function planMatchesCountry(plan: Plan, countryCode: string): boolean {
   const country = explorerCountry(countryCode);
   if (!country) return false;
-  if (plan.service === "email-otp" && plan.region === "Any domain") return true;
   return planCountry(plan)?.code === country.code;
 }
 
@@ -142,7 +141,9 @@ const planCategories: Partial<Record<Plan["service"], ExplorerCategory>> = {
   numbers: "numbers",
   esim: "esim",
   proxies: "proxies",
-  "email-otp": "email",
+  // email-otp is absent: a free inbox is not a catalogue plan, so it has no plan
+  // rows to map. Live inbox availability reaches the explorer through
+  // supplierItemsForCountry instead, already categorised as "email".
 };
 
 function planItems(country: ExplorerCountry): ExplorerItem[] {
@@ -152,9 +153,7 @@ function planItems(country: ExplorerCountry): ExplorerItem[] {
     const matches = planMatchesCountry(plan, country.code);
     const ambiguous = ambiguousPlanRegions.has(plan.region);
     if (!matches && !ambiguous) return [];
-    const coverage = plan.service === "email-otp"
-      ? "not-country-specific"
-      : matches ? "catalog-country" : "unconfirmed";
+    const coverage = matches ? "catalog-country" : "unconfirmed";
     const categoryTag = plan.service === "numbers"
       ? plan.slug.startsWith("rent-") ? "Rental" : plan.slug === "vn-otp-5" ? "Bundle" : "Single use"
       : categoryById.get(category)?.label ?? "Plan";
@@ -256,6 +255,19 @@ function additionalItems(country: ExplorerCountry): ExplorerItem[] {
     : [];
 
   const other: ExplorerItem[] = [
+    {
+      // A free tool rather than a product, shaped like the order tools below for
+      // the same reason: no price because nothing is charged, no stock because
+      // we do not sell units, no country because an address is not regional.
+      // It also keeps the email category present in the explorer now that the
+      // four paid inbox tiers are gone -- a category with no item at all would
+      // be a silent hole where a service family used to be.
+      id: "temporary-inbox", category: "email", name: "Temporary inbox",
+      description: "Free disposable address, one at a time", tag: "Free",
+      artwork: { kind: "service", name: "email-otp" },
+      source: "tool", coverage: "not-country-specific", stock: null, myUnits: null, price: null,
+      action: { label: "Open temporary email", href: "/email-otp" },
+    },
     {
       id: "account-marketplace", category: "accounts", name: "Account marketplace",
       description: "Browse live listings", tag: "Digital accounts", artwork: { kind: "service", name: "accounts" },
