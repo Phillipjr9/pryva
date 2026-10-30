@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { findPlan } from "@/lib/catalog";
+import { findPlan, plansFor } from "@/lib/catalog";
 
 /**
  * Fulfilment is the point where a customer's wallet meets a real supplier, so
@@ -58,14 +58,16 @@ const DELIVERABLE: Array<[slug: string, args: unknown]> = [
 
 /**
  * Plans that are advertised but cannot be delivered: no eSIM or proxy endpoint
- * exists, provider email products carry no duration so a 24-hour and a 30-day
- * inbox are indistinguishable at purchase time, and the provider sells one unit
- * per call so bundles cannot be honoured. Each must fail closed.
+ * exists, and the provider sells one unit per call so bundles cannot be
+ * honoured. Each must fail closed.
+ *
+ * The four email tiers used to be listed here. They are no longer in the
+ * catalogue at all, which is a strictly stronger position than failing closed --
+ * see the dedicated test below.
  */
 const UNDELIVERABLE = [
   "esim-ng-1", "esim-ng-5", "esim-africa", "esim-europe", "esim-us", "esim-global",
   "proxy-ng-1", "proxy-ng-5", "proxy-us-5", "proxy-eu-10", "proxy-ng-25",
-  "email-24", "email-30", "email-bundle", "email-team",
   "vn-otp-5",
   "rent-ng-7",
 ];
@@ -155,6 +157,27 @@ describe("fulfilment", () => {
 
     await expect(fulfillPlan(plan!)).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
     expect(isPlanFulfillable(slug)).toBe(false);
+    expect(provider.buySms).not.toHaveBeenCalled();
+    expect(provider.buyRental).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Email is free, so it is not a plan and must never reach fulfilment at all.
+   * This is the replacement for the four "fails closed on email-*" cases that
+   * used to run here: failing closed still had to advertise a price and a plan
+   * the provider could not honour. Absence removes the whole class of mistake --
+   * there is no price to render, no tier to promise, and a legacy slug from an
+   * old link or a bookmarked checkout resolves to nothing rather than to a
+   * purchase.
+   */
+  it("has no email plans, and a legacy email slug still cannot be fulfilled", () => {
+    expect(plansFor("email-otp")).toEqual([]);
+
+    for (const slug of ["email-24", "email-30", "email-bundle", "email-team"]) {
+      expect(findPlan(slug), `${slug} should no longer exist in the catalog`).toBeUndefined();
+      expect(isPlanFulfillable(slug), `${slug} must never be fulfillable`).toBe(false);
+    }
+
     expect(provider.buySms).not.toHaveBeenCalled();
     expect(provider.buyRental).not.toHaveBeenCalled();
   });

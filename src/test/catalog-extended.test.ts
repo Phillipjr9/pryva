@@ -24,6 +24,20 @@ describe("Catalog Extended", () => {
       expect(services.length).toBeGreaterThanOrEqual(8);
     });
 
+    /**
+     * `services` in catalog.ts derives `fromPrice` from a service's plan prices
+     * but falls back to whatever the definition hand-set when there are no plans.
+     * So deleting the four paid inbox tiers was not, by itself, enough to stop
+     * the homepage advertising ₦790 for a temporary inbox -- the definition had
+     * to carry no number either. This pins both halves of that.
+     */
+    it("leaves the free temporary inbox with no plans and no floor price", () => {
+      const inbox = findService("email-otp");
+      expect(inbox, "the email category is kept, only its paid tiers are gone").toBeDefined();
+      expect(inbox!.fromPrice).toBeUndefined();
+      expect(plansFor("email-otp")).toEqual([]);
+    });
+
     it("should have all required fields for each service", () => {
       services.forEach((service) => {
         expect(service.slug).toBeDefined();
@@ -34,7 +48,9 @@ describe("Catalog Extended", () => {
         expect(service.tagline).toBeDefined();
         expect(service.description).toBeDefined();
         expect(service.intro).toBeDefined();
-        expect(service.fromPrice).toBeGreaterThan(0);
+        // Optional on purpose: a free service has no floor price, and every
+        // consumer has to decide what to render instead of being handed a number.
+        if (service.fromPrice !== undefined) expect(service.fromPrice).toBeGreaterThan(0);
         expect(service.unit).toBeDefined();
         expect(service.icon).toBeDefined();
         expect(service.highlights.length).toBeGreaterThan(0);

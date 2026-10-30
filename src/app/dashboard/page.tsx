@@ -20,7 +20,7 @@ const quickBuys = [
   { label: "Number plans", note: "Single-use & rentals", href: "/dashboard/services?category=numbers", service: "numbers" as const },
   { label: "eSIM data", note: "Travel data previews", href: "/dashboard/services?category=esim", service: "esim" as const },
   { label: "Residential proxy", note: "Browse catalog plans", href: "/dashboard/services?category=proxies", service: "proxies" as const },
-  { label: "Email OTP", note: "Explore inbox plans", href: "/dashboard/services?category=email", service: "email-otp" as const },
+  { label: "Email OTP", note: "Free temporary inbox", href: "/dashboard/services?category=email", service: "email-otp" as const },
 ];
 
 function statusStyle(status: string) {
