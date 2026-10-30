@@ -6,7 +6,7 @@
 > list with a note.
 >
 > **Last updated:** 2026-10-30 (PRs #18–#26 merged)
-> **Branch:** `arena/33b91259-pryva` — **MERGED**, closed to further commits (`main` @ `fac64ad`). New work needs a fresh branch.
+> **Branch:** `arena/33b91259-pryva` (`main` @ `fac64ad`, PR #26 merged). **Merging a PR does not close its branch** — this one still takes commits and now carries PR #27 (this docs update), so work can continue here rather than needing a fresh branch.
 > **Repo audit method:** every status below was verified by reading files in the checkout — not from memory,
 > not from the earlier chat log.
 >
