@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 
+import { securityRedirectTarget } from "@/lib/legacy-redirects";
+
 /**
  * Security moved inside Settings.
  *
@@ -20,14 +22,5 @@ export default async function SecurityRedirect({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const params = await searchParams;
-  const search = new URLSearchParams();
-
-  for (const [key, value] of Object.entries(params)) {
-    if (typeof value === "string") search.set(key, value);
-    else if (Array.isArray(value) && typeof value[0] === "string") search.set(key, value[0]);
-  }
-
-  const query = search.toString();
-  redirect(`/dashboard/settings${query ? `?${query}` : ""}#security`);
+  redirect(securityRedirectTarget(await searchParams));
 }

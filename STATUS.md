@@ -12,7 +12,7 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **1,074 tests / 118 files, all passing** (no `.skip`, no `.only`) |
+| `npm test` | **1,078 tests / 119 files, all passing** (no `.skip`, no `.only`) |
 | `npm run build` | **passes**; 75 API route handlers, 23 public pages, 17 dashboard pages, 12 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
@@ -747,7 +747,8 @@ to what just happened. Command palette entry renamed to "Security settings" and
 pointed at the section; the sidebar has **Settings** and no Security row; the
 terms page links to the anchor; `src/lib/auth.ts` bounces to the section directly.
 
-**Tests.** `src/test/settings-security.test.tsx` (new, 7) pins the shape: the
+**Tests.** `src/test/legacy-redirects.test.ts` (new, 4) covers the forwarding
+helper directly; `src/test/settings-security.test.tsx` (new, 7) pins the shape: the
 section renders on the settings page with `id="security"`, both cards and the
 guidance came across, the sidebar has no security destination, the old route is a
 redirect that keeps the query and the anchor and no longer renders a heading, the
@@ -757,7 +758,12 @@ two-page layout and were rewritten rather than deleted: the sidebar list, the
 terms href, and the admin-2FA banner — that banner's text is now read out of the
 settings page.
 
-**Verified:** 1,074 tests / 118 files · typecheck · lint · build. Live check with
-`next start`: `/dashboard/security` answers **307** with
-`location: /dashboard/settings…#security` (query preserved), and
-`/dashboard/settings` still redirects to sign-in when signed out, as before.
+**Verified:** 1,078 tests / 119 files · typecheck · lint · build. The
+query-forwarding — the part with any logic in it — moved to
+`securityRedirectTarget` in `src/lib/legacy-redirects.ts` and is tested directly
+(empty, the admin bounce, repeated keys, blank values, escaping), because the
+page cannot be exercised over HTTP here: middleware answers `/dashboard/*`
+before the page runs, so an unauthenticated `curl /dashboard/security` gets
+`307 → /login?next=%2Fdashboard` for every dashboard route alike. That is stated
+rather than papered over; the signed-in path is the unit-tested helper plus a
+two-line page.
