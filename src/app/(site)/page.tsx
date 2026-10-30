@@ -23,6 +23,7 @@ import {
   Wallet,
 } from "@/components/icons";
 import { formatNaira, plansFor, serviceMap, services } from "@/lib/catalog";
+import { isPlanFulfillable } from "@/lib/fulfillment";
 import { digitalServices } from "@/lib/digital-services";
 import { CountryFlag } from "@/components/CountryFlag";
 import { hasCountryFlag } from "@/lib/countries";
@@ -130,6 +131,25 @@ const steps = [
     body: "Contact support with the reference if an existing delivery needs review.",
   },
 ];
+
+/**
+ * Derived from the same fulfilment allowlist /status uses, never typed in.
+ *
+ * This row said "Paused" long after numbers became deliverable, so the footer of
+ * the busiest page on the site told visitors the core product was switched off
+ * while /pricing offered ten purchasable number plans with working "Get Started"
+ * links. A hardcoded availability claim goes stale in one direction only: it
+ * keeps saying "no" after the answer has become "yes", and it costs sales rather
+ * than causing a support complaint -- which is exactly why nobody reports it.
+ *
+ * Safe to compute at build time even though this page is prerendered:
+ * `isPlanFulfillable` reads a constant allowlist, with no env and no network.
+ */
+const numberPlans = plansFor("numbers");
+const deliverableNumbers = numberPlans.filter((plan) => isPlanFulfillable(plan.slug)).length;
+const numberFulfilment = deliverableNumbers > 0
+  ? `Automatic · ${deliverableNumbers} of ${numberPlans.length} plans`
+  : "Paused";
 
 const priceRows = [
   { slug: "numbers", note: "One-time, or rent for 7–90 days" },
@@ -1004,7 +1024,7 @@ export default async function HomePage() {
 
                 <div className="grid gap-2.5">
                   {[
-                    { label: "Number fulfillment", value: "Paused" },
+                    { label: "Number fulfillment", value: numberFulfilment },
                     { label: "Payments", value: "Bank transfer or card" },
                     { label: "Refunds", value: "Reviewed by support" },
                     { label: "Coverage", value: "Numbers, eSIM, proxies, accounts" },
