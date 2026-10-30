@@ -26,8 +26,14 @@ function formatDate(value: Date | string) {
  */
 function SignInState({ lockedUntil, attempts }: { lockedUntil: Date | string | null; attempts: number }) {
   const until = lockedUntil ? new Date(lockedUntil) : null;
-  if (until && until.getTime() > Date.now()) {
-    const minutes = Math.max(1, Math.ceil((until.getTime() - Date.now()) / 60_000));
+  // This is a server component rendered once per request, so "now" is the request
+  // time, not a value that has to be stable across re-renders. The purity rule
+  // exists for client components; suppressing it here keeps the label honest
+  // instead of turning it into a hydration-only value.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
+  if (until && until.getTime() > now) {
+    const minutes = Math.max(1, Math.ceil((until.getTime() - now) / 60_000));
     return (
       <span className="inline-flex rounded-full bg-red-50 px-2 py-0.5 text-meta font-semibold text-red-700">
         Locked · {minutes} min

@@ -236,7 +236,7 @@ const clauses: Clause[] = [
             other customers&rsquo; data, or interfering with the payment and delivery systems;
           </li>
           <li>
-            reselling, sub-licensing or white-labelling anything bought here without our written
+            selling on, sub-licensing or white-labelling anything bought here without our written
             permission.
           </li>
         </ul>
