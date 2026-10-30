@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Shield, Sparkle } from "@/components/icons";
 import { safeRedirectPath } from "@/lib/safe-redirect";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 type Mode = "login" | "signup";
 
@@ -157,13 +158,11 @@ export function AuthForm({
           <label htmlFor="password" className="field-label">
             Password
           </label>
-          <input
+          <PasswordInput
             id="password"
-            type="password"
             required
             minLength={mode === "signup" ? 8 : 1}
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            className="field"
             placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
             value={form.password}
             onChange={(event) => setForm({ ...form, password: event.target.value })}

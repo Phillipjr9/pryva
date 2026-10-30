@@ -2,13 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
-import { bankAccounts, users, withdrawals, walletTransactions , } from "@/db/schema";
+import { bankAccounts, paymentTopups, users, withdrawals, walletTransactions , } from "@/db/schema";
 import { POST } from "@/app/api/wallet/withdraw/route";
 
 const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), select: vi.fn(), transaction: vi.fn() }));
 vi.mock("@/db", () => ({ db: { select: mocks.select, transaction: mocks.transaction } }));
 vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.currentUser }));
-vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
+// Every level the real logger exposes. A partial mock turns a call to a missing
+// method into a TypeError that the route's catch reports as a 500, which reads as
+// "the route broke" when it was the test double that was incomplete.
+vi.mock("@/lib/logger", () => ({ logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/rate-limit", () => ({
   purchaseRateLimiter: async () => ({ allowed: true }),
   createRateLimiter: () => async () => ({ allowed: true }),
@@ -33,17 +36,26 @@ function fakeDatabase() {
     withdrawals: [] as Array<Record<string, unknown>>,
     ledger: [] as Array<Record<string, unknown>>,
     failLedger: false,
+    // The name frozen when this wallet was funded. Payouts are only allowed to a
+    // bank account whose resolved name matches it.
+    topups: [{ userId: "user-id", payerName: "Test User" }] as Array<{ userId: string; payerName: string | null }>,
   };
   mocks.select.mockImplementation(() => ({
     from: (table: unknown) => ({
-      where: (condition: SQL) => ({
-        limit: async () => {
+      where: (condition: SQL) => {
+        const limit = async () => {
           const params = dialect.sqlToQuery(condition).params;
           if (table === withdrawals) return state.withdrawals.filter((row) => row.userId === params[0] && row.requestId === params[1]);
           if (table === bankAccounts) return params[0] === state.bank.id && params[1] === state.bank.userId ? [{ ...state.bank }] : [];
+          // depositorNameFor() reads the frozen payer name, oldest deposit first.
+          if (table === paymentTopups) return state.topups
+            .filter((row) => row.userId === params[0] && row.payerName !== null)
+            .map((row) => ({ payerName: row.payerName }));
           return [];
-        },
-      }),
+        };
+        // The payout-name lookup orders by paid_at; the others do not.
+        return { limit, orderBy: () => ({ limit }) };
+      },
     }),
   }));
   const tx = {
@@ -175,5 +187,85 @@ describe("withdrawal requests", () => {
     expect(state.balance).toBe(7000);
     expect(state.withdrawals).toHaveLength(0);
     expect(state.ledger).toHaveLength(0);
+  });
+
+  /**
+   * Money leaves only in the name it arrived in.
+   *
+   * Ownership of the bank account was already enforced -- the 404 above proves a
+   * withdrawal cannot name somebody else's saved account. But that only ties the
+   * account to this *session*. The gap it left is a mule payout: the account
+   * holder saves a bank account in a different person's name, and withdraws to
+   * it. The reference is the name frozen on the first settled deposit, not
+   * `users.name`, which the profile endpoint can change afterwards.
+   */
+  it("refuses to pay a bank account in somebody else's name", async () => {
+    const state = fakeDatabase();
+    state.bank.accountName = "Bola Adeyemi";
+
+    const response = await POST(request(6000));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toContain("same name");
+    // Refused before any write: no row, no debit, no ledger entry.
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(state.balance).toBe(7000);
+    expect(state.withdrawals).toHaveLength(0);
+    expect(state.ledger).toHaveLength(0);
+  });
+
+  it("does not treat one shared surname as the same person", async () => {
+    const state = fakeDatabase();
+    state.topups = [{ userId: "user-id", payerName: "Ada Obi" }];
+    state.bank.accountName = "CHINEDU OBI";
+
+    expect((await POST(request(6000))).status).toBe(403);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(state.balance).toBe(7000);
+  });
+
+  it("refuses a near-miss spelling rather than guessing at it", async () => {
+    const state = fakeDatabase();
+    state.topups = [{ userId: "user-id", payerName: "Ada Obi" }];
+    state.bank.accountName = "ADA OBINNA";
+
+    expect((await POST(request(6000))).status).toBe(403);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("refuses when no settled deposit recorded a depositor name", async () => {
+    const state = fakeDatabase();
+    state.topups = [];
+
+    const response = await POST(request(6000));
+
+    // A wallet funded before migration 0012 has no recorded depositor, and an
+    // absent name is not a match -- it fails closed rather than paying out on the
+    // strength of a name nobody captured.
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toContain("no completed deposit");
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(state.balance).toBe(7000);
+  });
+
+  it("pays the depositor's own name however the bank formatted it", async () => {
+    const state = fakeDatabase();
+    state.topups = [{ userId: "user-id", payerName: "Ada Obi" }];
+    // Surname-first, capitalised, and carrying a middle name the customer never
+    // typed at signup -- the way Nigerian bank records usually arrive.
+    state.bank.accountName = "OBI ADA CHUKWUEMEKA";
+
+    expect((await POST(request(6000))).status).toBe(200);
+    expect(state.withdrawals).toHaveLength(1);
+    expect(state.balance).toBe(940);
+  });
+
+  it("ignores a title the bank added, because a title is not a name", async () => {
+    const state = fakeDatabase();
+    state.topups = [{ userId: "user-id", payerName: "Chief Ada Obi" }];
+    state.bank.accountName = "ADA OBI";
+
+    expect((await POST(request(6000))).status).toBe(200);
+    expect(state.withdrawals).toHaveLength(1);
   });
 });

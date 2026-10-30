@@ -428,6 +428,17 @@ export function Eye(props: IconProps) {
   );
 }
 
+export function EyeOff(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M10.6 5.2A9.9 9.9 0 0 1 12 5c6 0 9.5 7 9.5 7a15.6 15.6 0 0 1-2.4 3.3" />
+      <path d="M6.4 6.6A15.9 15.9 0 0 0 2.5 12S6 19 12 19a9.8 9.8 0 0 0 4.2-.9" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+      <path d="m3 3 18 18" />
+    </svg>
+  );
+}
+
 export function Code(props: IconProps) {
   return (
     <svg {...base(props)}>

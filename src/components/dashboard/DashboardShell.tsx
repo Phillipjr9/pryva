@@ -236,23 +236,6 @@ export function DashboardShell({
         ))}
       </nav>
 
-      <div className="mt-5 rounded-2xl border border-lav-200/70 bg-gradient-to-br from-lav-50 to-white p-4">
-        <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-lav-700">
-          <Sparkle className="h-3 w-3" /> New order
-        </span>
-        <p className="mt-2 text-[0.78rem] leading-relaxed text-ink-2">
-          Choose a country and explore numbers, social services and more.
-        </p>
-        <Link
-          href="/dashboard/services"
-          onClick={() => setOpen(false)}
-          className="mt-3 inline-flex items-center gap-1 text-[0.76rem] font-semibold text-lav-700 hover:underline"
-        >
-          Browse services
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
-      </div>
-
       <div className="mt-auto border-t border-line pt-4">
         <div className="flex items-center gap-2.5">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-lav-200 to-lav-400 text-[0.66rem] font-bold text-lav-800">

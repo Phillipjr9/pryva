@@ -24,9 +24,24 @@ export async function completeTopUp(input: {
   const { reference, userId, amount } = input;
 
   const outcome = await db.transaction(async (tx) => {
+    // Read the name inside the transaction, before the credit, so the value
+    // frozen onto the deposit is the one that held when the money arrived. It is
+    // the reference every later withdrawal is checked against, and it is written
+    // only on the pending -> completed transition, so a duplicate callback cannot
+    // overwrite it with a name edited in between.
+    const [accountHolder] = await tx
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
     const [topup] = await tx
       .update(paymentTopups)
-      .set({ status: "completed", paidAt: new Date() })
+      .set({
+        status: "completed",
+        paidAt: new Date(),
+        payerName: accountHolder?.name.trim() || null,
+      })
       .where(
         and(
           eq(paymentTopups.reference, reference),
