@@ -1,8 +1,10 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  date,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -553,6 +555,29 @@ export type ProductReview = typeof productReviews.$inferSelect;
  * back an action that already moved funds -- see `src/lib/admin-audit.ts` for why
  * that trade was chosen and what it costs.
  */
+/**
+ * One row per business day: the nightly close, and the evidence that it ran.
+ *
+ * `status` starts at 'running' and is updated when the sweep finishes, so a
+ * crashed run leaves a visible row instead of no trace. `totals` is a report
+ * (jsonb) — nothing joins to it; the money stays in the tables that constrain it.
+ */
+export const reconciliationRuns = pgTable(
+  "reconciliation_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    day: date("day").notNull().unique(),
+    status: varchar("status", { length: 16 }).notNull().default("running"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    accountsChecked: integer("accounts_checked").notNull().default(0),
+    discrepancies: integer("discrepancies").notNull().default(0),
+    totals: jsonb("totals"),
+    notes: text("notes"),
+  },
+  (table) => [index("reconciliation_runs_started_idx").on(table.startedAt)],
+);
+
 export const adminAuditLog = pgTable(
   "admin_audit_log",
   {

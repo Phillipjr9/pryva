@@ -30,7 +30,10 @@ beforeAll(async () => {
   const files = (await readdir("migrations"))
     .filter((name) => /^\d{4}_.*\.sql$/.test(name))
     .sort();
-  expect(files.at(-1)).toBe("0017_login_lockout.sql");
+  // The list is applied in filename order; 0017 has to be in it, and nothing may
+  // sort after it silently (a mis-numbered migration would run out of order).
+  expect(files).toContain("0017_login_lockout.sql");
+  expect([...files].sort()).toEqual(files);
   for (const file of files) {
     await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   }

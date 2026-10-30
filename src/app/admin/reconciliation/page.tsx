@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { orders, paymentTopups, withdrawals } from "@/db/schema";
 import { asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { ageHours, ageSeverity, formatAge, type AgeSeverity } from "@/lib/reconciliation-queue";
+import { ledgerBreaks, recentReconciliationRuns } from "@/lib/daily-reconciliation";
 
 export const dynamic = "force-dynamic";
 
@@ -109,7 +110,7 @@ function Section({
 export default async function AdminReconciliationPage() {
   await requireAdmin("/admin/reconciliation");
 
-  const [processingWithdrawals, pendingWithdrawals, unresolvedOrders, flaggedOrders, pendingTopups] =
+  const [processingWithdrawals, pendingWithdrawals, unresolvedOrders, flaggedOrders, pendingTopups, dailyRuns, breaks] =
     await Promise.all([
       db
         .select({
@@ -169,6 +170,8 @@ export default async function AdminReconciliationPage() {
         .where(eq(paymentTopups.status, "pending"))
         .orderBy(asc(paymentTopups.createdAt))
         .limit(LIST_LIMIT * 4),
+      recentReconciliationRuns(14),
+      ledgerBreaks(25),
     ]);
 
   // A deposit that has been pending for a few minutes is an ordinary checkout in
@@ -282,6 +285,124 @@ export default async function AdminReconciliationPage() {
           </tr>
         ))}
       </Section>
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-[1.05rem] font-medium tracking-tight">Daily close</h2>
+          <span className="text-[0.8rem] text-ink-3">last {dailyRuns.length} days</span>
+        </div>
+        <p className="max-w-3xl text-[0.82rem] text-ink-2">
+          The nightly job records each day&apos;s totals and checks every account&apos;s ledger for
+          continuity: each transaction&apos;s balance must follow from the one before it, and the last
+          one must equal the balance on the account. A day marked{" "}
+          <span className="font-semibold text-red-700">attention</span> means the wallet ledger did
+          not add up and needs a person.
+        </p>
+        <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+          <table className="w-full min-w-[44rem] text-left text-[0.84rem]">
+            <thead className="bg-cream/70 text-meta uppercase tracking-wide text-ink-3">
+              <tr>
+                <th className="px-4 py-3 font-semibold">Day</th>
+                <th className="px-4 py-3 font-semibold">Status</th>
+                <th className="px-4 py-3 font-semibold">Deposits</th>
+                <th className="px-4 py-3 font-semibold">Spend</th>
+                <th className="px-4 py-3 font-semibold">Refunds</th>
+                <th className="px-4 py-3 font-semibold">Withdrawals</th>
+                <th className="px-4 py-3 font-semibold">Accounts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dailyRuns.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-ink-2">
+                    No close has run yet. It runs nightly at 02:20 Lagos time; a day can be
+                    backfilled by calling the cron endpoint with <code>?day=YYYY-MM-DD</code>.
+                  </td>
+                </tr>
+              )}
+              {dailyRuns.map((run) => {
+                const totals = (run.totals ?? {}) as {
+                  topupsPaid?: { amount?: number };
+                  ordersPlaced?: { amount?: number };
+                  refunds?: { amount?: number };
+                  withdrawalsCompleted?: { amount?: number };
+                };
+                return (
+                  <tr key={run.id} className="border-t border-line/70">
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-meta text-ink-2">
+                      {String(run.day)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-meta font-semibold ${
+                          run.status === "clean"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : run.status === "running"
+                              ? "bg-slate-100 text-slate-600"
+                              : "bg-red-50 text-red-700"
+                        }`}
+                      >
+                        {run.status}
+                        {run.discrepancies > 0 ? ` · ${run.discrepancies}` : ""}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">{formatNaira(totals.topupsPaid?.amount ?? 0)}</td>
+                    <td className="whitespace-nowrap px-4 py-3">{formatNaira(totals.ordersPlaced?.amount ?? 0)}</td>
+                    <td className="whitespace-nowrap px-4 py-3">{formatNaira(totals.refunds?.amount ?? 0)}</td>
+                    <td className="whitespace-nowrap px-4 py-3">{formatNaira(totals.withdrawalsCompleted?.amount ?? 0)}</td>
+                    <td className="px-4 py-3 text-ink-2">{run.accountsChecked}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-[0.8rem] text-ink-3">
+          The external side is not automated: compare the deposits figure with the payment
+          provider&apos;s settled total for the same day. That comparison is the operator&apos;s step,
+          not the job&apos;s.
+        </p>
+      </section>
+
+      {breaks.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-[1.05rem] font-medium tracking-tight text-red-700">
+            Accounts whose ledger does not add up
+          </h2>
+          <p className="max-w-3xl text-[0.82rem] text-ink-2">
+            The balance on the account row and the balance the ledger ends at disagree. Do not
+            &ldquo;fix&rdquo; this by editing a balance: find the transaction that is wrong, and read{" "}
+            <Link href="/admin/transactions" className="font-semibold underline underline-offset-2">
+              the ledger
+            </Link>{" "}
+            for that account first.
+          </p>
+          <div className="overflow-x-auto rounded-2xl border border-red-200 bg-white">
+            <table className="w-full min-w-[36rem] text-left text-[0.84rem]">
+              <thead className="bg-red-50/60 text-meta uppercase tracking-wide text-red-700">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Account</th>
+                  <th className="px-4 py-3 font-semibold">Wallet balance</th>
+                  <th className="px-4 py-3 font-semibold">Ledger ends at</th>
+                  <th className="px-4 py-3 font-semibold">Difference</th>
+                </tr>
+              </thead>
+              <tbody>
+                {breaks.map((row) => (
+                  <tr key={row.user_id} className="border-t border-line/70">
+                    <td className="px-4 py-3">{row.email}</td>
+                    <td className="whitespace-nowrap px-4 py-3">{formatNaira(row.wallet_balance)}</td>
+                    <td className="whitespace-nowrap px-4 py-3">{formatNaira(row.ledger_balance)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-red-700">
+                      {formatNaira(row.wallet_balance - row.ledger_balance)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <p className="rounded-xl border border-line bg-cream/60 px-4 py-3 text-[0.8rem] text-ink-2">
         There is no automatic resolver for any row on this page. Paystack settles top-ups through
