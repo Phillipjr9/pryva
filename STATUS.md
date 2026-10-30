@@ -12,11 +12,11 @@
 | `npm ci` | clean install, 534 packages |
 | `npm run typecheck` | **0 errors** |
 | `npm run lint` | **0 warnings/errors** |
-| `npm test` | **907 tests / 102 files, all passing** (no `.skip`, no `.only`) |
-| `npm run build` | **passes**; 75 API route handlers, 22 public pages, 17 dashboard pages, 12 admin pages |
+| `npm test` | **913 tests / 103 files, all passing** (no `.skip`, no `.only`) |
+| `npm run build` | **passes**; 75 API route handlers, 23 public pages, 17 dashboard pages, 12 admin pages |
 | Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
 
-Codebase size: ~52,600 lines under `src/`, 99 modules in `src/lib/`, 22 database tables, 16 migrations (`0000`–`0015`).
+Codebase size: ~52,600 lines under `src/`, 100 modules in `src/lib/`, 22 database tables, 16 migrations (`0000`–`0015`).
 Migration coverage is complete — every table in `src/db/schema.ts` is created by a migration.
 
 **Summary in one line:** the engineering is in better shape than the planning docs suggest; the real gaps are (a) product surface that was never built, (b) operations/deployment wiring, and (c) documentation that no longer matches the code.
@@ -59,10 +59,10 @@ eSIM, proxies, digital subscriptions, airtime/data, bulk orders, scheduled order
 | 12 | **Paid inbox tier** | schema supports `tier='paid'`, the code only issues `free`; price needs the supplier's real `priceNgn` |
 | 13 | ~~**CSP**~~ | **Added in the fifth pass** — `src/lib/security-headers.ts`, served by the proxy, with the asset hosts pinned by a test |
 | 14 | **Dockerfile** | CI (`.github/workflows/ci.yml`) and an operations runbook (`RUNBOOK.md`) were added in these passes; no Dockerfile — deployment is Vercel-only |
-| 15 | **Gift-card explainer page** | no `/gift-cards` marketing page; one blog post (`gift-cards-for-teams`) is all there is |
+| 15 | ~~**Gift-card explainer page**~~ | **Built in the seventh pass** — `/gift-cards`, generated from the same rule constants the checkout enforces |
 | 16 | **Self-service account deletion** | deliberately returns 503; panel points at support |
 
-Rough sizing: 1–4 and 15 are S–M; 5, 10, 11, 13 are M; 7 is M; 9 is S.
+Rough sizing: 1–4 are S–M; 5, 10, 11, 13 are M; 7 is M; 9 is S.
 
 ---
 
@@ -301,3 +301,17 @@ Navigations are network-first and **never** written to the cache. `/api` is skip
 **No offline money.** There is no background sync, no queued purchase, no push. A wallet that replays a payment after reconnecting is a double-spend risk, so the app simply requires the network to move money — the offline page says so.
 
 **Verified:** 907 tests / 102 files · typecheck · lint · build. New tests execute `public/sw.js` in a Worker sandbox with a fake Cache API rather than grepping it: install precaches only the three files, API/POST/cross-origin requests are not intercepted, a navigation response is never stored, a repeated hashed asset is served without a second fetch, a 500 is not cached, and an older cache version is deleted on activate. The manifest test reads the PNG headers and fails if a declared size no longer matches the file. Sabotage-proven: dropping the method guard and caching navigations each fail a test. Also checked live with `next start`: `/manifest.webmanifest`, `/offline`, `/sw.js` and all three icons return 200 with the manifest linked in the HTML.
+
+---
+
+## 15. Seventh pass — the gift-card explainer page (30 Oct 2026)
+
+Gift cards were live and sold from the dashboard with no page explaining them, so the rules only surfaced at the moment of purchase. `/gift-cards` now exists: how it works in three steps, the six rules in full, what a gift card is *not*, and the questions people actually ask.
+
+**The copy is generated from the code that enforces it.** The amount range and twelve-month validity moved into `src/lib/gift-card-rules.ts`, which the checkout validates against and the page renders. The rules the page states come from `redeemGiftCard` and `refundGiftCard`: one redemption for the whole amount, validity one year, non-refundable, cannot redeem your own card, recipient needs an account, and the recipient email is a record rather than a delivery address — the buyer sends the code themselves.
+
+`src/test/gift-card-page.test.tsx` renders the page and fails if the range stops matching the constants, if the checkout starts hard-coding numbers instead of using them, if the copy stops saying "not refundable" or "one redemption", if it promises to email the code, or if the buy button bypasses `/login?next=…`. Sabotage-proven in both directions: hard-coding the range in `gift-cards.ts` and rewriting the copy to "refundable if unused" each fail a test.
+
+**Also wired:** the page is in the sitemap and linked from the footer's Services column, so it is reachable without typing the URL — the same defect the footer comment already records for the help centre and testimonials.
+
+**Verified:** 913 tests / 103 files · typecheck · lint · build. `next start` checked `/gift-cards` = 200 with the canonical tag, the footer link on `/`, and the sitemap entry. The supplier-secrecy scan covers the new page; an early draft said "no supplier is involved" and was rewritten, because that scan is right that even naming the category tells a customer something.

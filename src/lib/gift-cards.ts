@@ -3,6 +3,11 @@ import { giftCards, users, walletTransactions } from "@/db/schema";
 import { eq, and, gte, gt, ne, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
+import {
+  GIFT_CARD_MAX_AMOUNT,
+  GIFT_CARD_MIN_AMOUNT,
+  GIFT_CARD_VALIDITY_MONTHS,
+} from "@/lib/gift-card-rules";
 
 export function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -26,13 +31,19 @@ export async function createGiftCard(params: {
 }): Promise<{ code: string; amount: number; expiresAt: Date }> {
   const { userId, amount, recipientEmail, message } = params;
 
-  if (!Number.isSafeInteger(amount) || amount < 1000 || amount > 500000) {
-    throw new Error("Gift card amount must be a whole-naira value between ₦1,000 and ₦500,000");
+  if (
+    !Number.isSafeInteger(amount) ||
+    amount < GIFT_CARD_MIN_AMOUNT ||
+    amount > GIFT_CARD_MAX_AMOUNT
+  ) {
+    throw new Error(
+      `Gift card amount must be a whole-naira value between ₦${GIFT_CARD_MIN_AMOUNT.toLocaleString("en-NG")} and ₦${GIFT_CARD_MAX_AMOUNT.toLocaleString("en-NG")}`,
+    );
   }
 
   const code = generateCode();
   const expiresAt = new Date();
-  expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+  expiresAt.setMonth(expiresAt.getMonth() + GIFT_CARD_VALIDITY_MONTHS);
 
   await db.transaction(async (tx) => {
     const [user] = await tx.update(users)

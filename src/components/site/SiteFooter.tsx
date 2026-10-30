@@ -19,6 +19,7 @@ const columns = [
           : service.href,
         label: service.name,
       })),
+      { href: "/gift-cards", label: "Gift cards" },
       { href: "/digital-services", label: "Streaming & subscriptions" },
     ].filter((link, index, all) => all.findIndex((entry) => entry.href === link.href) === index),
   },
