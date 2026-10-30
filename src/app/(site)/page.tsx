@@ -52,25 +52,6 @@ export const metadata: Metadata = {
   },
 };
 
-const shortcutSlugs = ["numbers", "esim", "proxies", "email-otp"] as const;
-
-const shortcuts = shortcutSlugs.map((slug) => {
-  const service = serviceMap[slug];
-  const notes: Record<(typeof shortcutSlugs)[number], string> = {
-    numbers: "Buy or rent",
-    esim: "Plan catalog",
-    proxies: "Plan catalog",
-    "email-otp": "Free temporary inbox",
-  };
-  return {
-    label: service.name,
-    price: service.fromPrice,
-    note: notes[slug],
-    href: service.href,
-    service: slug,
-  };
-});
-
 const features = [
   {
     title: "Pay in Naira, properly",
@@ -150,13 +131,6 @@ const deliverableNumbers = numberPlans.filter((plan) => isPlanFulfillable(plan.s
 const numberFulfilment = deliverableNumbers > 0
   ? `Automatic · ${deliverableNumbers} of ${numberPlans.length} plans`
   : "Paused";
-
-const priceRows = [
-  { slug: "numbers", note: "One-time, or rent for 7–90 days" },
-  { slug: "esim", note: "Catalog data plans" },
-  { slug: "proxies", note: "Catalog proxy plans" },
-  { slug: "email-otp", note: "Free, one inbox at a time" },
-] as const;
 
 const faqs = [
   {
@@ -306,41 +280,6 @@ export default async function HomePage() {
                 </p>
               </Reveal>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ---------- QUICK SERVICE PICKER ---------- */}
-      <section className="relative pb-8">
-        <div className="shell">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {shortcuts.map((item, index) => (
-              <Reveal key={item.label} delay={index * 60}>
-                <Link
-                  href={item.href}
-                  className="group flex h-full flex-col justify-between rounded-2xl border border-line bg-white/70 p-4 backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-lav-200 hover:bg-white hover:shadow-[var(--shadow-soft)]"
-                >
-                  <div className="flex items-start justify-between">
-                    <ServiceIcon service={item.service} size="sm" />
-                    <ArrowUpRight className="h-4 w-4 text-ink-3 transition-colors group-hover:text-lav-600" />
-                  </div>
-                  <div className="mt-4">
-                    <p className="text-[0.88rem] font-semibold text-ink">{item.label}</p>
-                    <p className="text-[0.7rem] text-ink-3">{item.note}</p>
-                    <p className="mt-2 text-[0.76rem] text-ink-2">
-                      {item.price === undefined ? (
-                        <span className="font-semibold text-lav-700">Free</span>
-                      ) : (
-                        <>
-                          From{" "}
-                          <span className="font-semibold text-lav-700">{formatNaira(item.price)}</span>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                </Link>
-              </Reveal>
-            ))}
           </div>
         </div>
       </section>
@@ -501,17 +440,6 @@ export default async function HomePage() {
                     Browse listings priced in Naira. Stock and price are shown up front, and
                     delivery issues are reviewed by support.
                   </p>
-                  <div className="mt-5 flex flex-wrap items-center gap-2">
-                    {["facebook", "instagram", "tiktok", "x"].map((brand) => (
-                      <span
-                        key={brand}
-                        className="inline-flex items-center gap-2 rounded-full border border-line bg-white/80 py-1.5 pl-1.5 pr-3 text-[0.76rem] font-medium text-ink-2"
-                      >
-                        <BrandIcon brand={brand as "facebook"} size={20} variant="tile" decorative />
-                        {brand === "x" ? "X / Twitter" : brand[0].toUpperCase() + brand.slice(1)}
-                      </span>
-                    ))}
-                  </div>
                 </div>
 
                 <div className="w-full max-w-sm rounded-2xl border border-line bg-white/85 p-5">
@@ -805,45 +733,7 @@ export default async function HomePage() {
             </Reveal>
           </div>
 
-          <div className="mt-8 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-            <Reveal>
-              <div className="rounded-[1.75rem] border border-line bg-white/70 p-2">
-                {priceRows.map((row) => {
-                  const service = serviceMap[row.slug];
-                  return (
-                    <Link
-                      key={row.slug}
-                      href={service.href}
-                      className="group flex items-center gap-3 rounded-2xl px-3 py-3.5 transition-colors hover:bg-cream-2/70 sm:px-4"
-                    >
-                      <ServiceIcon service={row.slug} size="sm" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[0.9rem] font-semibold text-ink">{service.name}</p>
-                        <p className="truncate text-[0.74rem] text-ink-3">{row.note}</p>
-                      </div>
-                      <div className="text-right">
-                        {service.fromPrice === undefined ? (
-                          <p className="text-[0.95rem] font-semibold text-lav-700">Free</p>
-                        ) : (
-                          <>
-                            <p className="text-[0.66rem] uppercase tracking-[0.1em] text-ink-3">from</p>
-                            <p className="text-[0.95rem] font-semibold text-ink">
-                              {formatNaira(service.fromPrice)}
-                            </p>
-                          </>
-                        )}
-                      </div>
-                      <ArrowUpRight className="h-4 w-4 shrink-0 text-ink-3 transition-colors group-hover:text-lav-600" />
-                    </Link>
-                  );
-                })}
-                <p className="px-4 py-3 text-[0.74rem] text-ink-3">
-                  Gift cards, data plans, bulk and scheduled purchases are priced inside your
-                  dashboard, from the same wallet.
-                </p>
-              </div>
-            </Reveal>
-
+          <div className="mt-8 grid gap-4 lg:grid-cols-2">
             <Reveal delay={80}>
               <div className="flex h-full flex-col justify-between rounded-[1.75rem] border border-lav-300 bg-gradient-to-br from-lav-100 via-[#faf6ff] to-white p-6">
                 <div>
@@ -865,13 +755,36 @@ export default async function HomePage() {
                   </ul>
                   <p className="mt-4 flex items-start gap-2 rounded-xl border border-line/70 bg-white/70 px-3 py-2.5 text-[0.74rem] leading-relaxed text-ink-3">
                     <Receipt className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
-                    Prices are fixed in Naira and shown before you pay. Categories we cannot deliver reliably are marked unavailable rather than sold.
+                    Gift cards, data plans, bulk and scheduled purchases are priced inside your
+                    dashboard, from the same wallet. Prices are fixed in Naira and shown before you
+                    pay, and categories we cannot deliver reliably are marked unavailable rather than
+                    sold.
                   </p>
                 </div>
-                <Link href="/pricing" className="btn btn-primary mt-6 w-full">
-                  See the full price list
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
+              </div>
+            </Reveal>
+
+            <Reveal delay={120}>
+              <div className="flex h-full flex-col justify-between rounded-[1.75rem] border border-line bg-white/70 p-6">
+                <div>
+                  <h3 className="text-[1.15rem] font-semibold text-ink">The full price list</h3>
+                  <p className="mt-2 text-[0.88rem] leading-relaxed text-ink-2">
+                    Every plan in the catalog, in Naira, with whether it can be delivered today.
+                  </p>
+                  <p className="mt-2 text-[0.8rem] leading-relaxed text-ink-3">
+                    This page shows only what the catalog prices. Plans sold inside the dashboard
+                    are quoted there, before you confirm.
+                  </p>
+                </div>
+                <div className="mt-6 grid gap-2 sm:grid-cols-2">
+                  <Link href="/pricing" className="btn btn-primary w-full">
+                    See the full price list
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <Link href="/status" className="btn w-full border border-line bg-white text-ink">
+                    What works today
+                  </Link>
+                </div>
               </div>
             </Reveal>
           </div>
@@ -883,7 +796,7 @@ export default async function HomePage() {
         <div className="shell grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
           <div className="lg:sticky lg:top-28">
             <Reveal>
-              <span className="eyebrow">08 / Questions</span>
+              <span className="eyebrow">07 / Questions</span>
             </Reveal>
             <Reveal delay={60}>
               <h2 className="mt-4 text-[2rem] font-medium leading-[1.08] sm:text-[2.5rem]">
