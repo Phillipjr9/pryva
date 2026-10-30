@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { plans, services, formatNaira } from "@/lib/catalog";
+import { isPlanFulfillable } from "@/lib/fulfillment";
 import { Check } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { CountryFlag } from "@/components/CountryFlag";
@@ -48,7 +49,17 @@ export default function PricingPage() {
                 </h2>
               </div>
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
-                {servicePlans.map((plan) => (
+                {servicePlans.map((plan) => {
+                  // The fulfilment allowlist is the single source of truth for
+                  // what can be sold: the plan page offers no way to pay for a
+                  // plan outside it and /api/orders refuses it server-side. This
+                  // page advertised a signup funnel for those plans anyway, so a
+                  // visitor could be driven to create an account to buy something
+                  // that could never be delivered. Plans stay listed with their
+                  // price and details -- what is withdrawn is the promise to sell,
+                  // using the same wording the plan page already uses.
+                  const deliverable = isPlanFulfillable(plan.slug);
+                  return (
                   <div
                     key={plan.slug}
                     className={`rounded-xl border p-3 sm:rounded-2xl sm:p-6 ${
@@ -97,18 +108,25 @@ export default function PricingPage() {
                         </li>
                       ))}
                     </ul>
-                    <Link
-                      href={`/signup?plan=${plan.slug}`}
-                      className={`block w-full rounded-lg px-3 py-2 text-center text-[0.78rem] font-semibold transition-colors sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.9rem] ${
-                        plan.popular
-                          ? "bg-lav-600 text-white hover:bg-lav-700"
-                          : "border border-line bg-white text-ink hover:bg-cream"
-                      }`}
-                    >
-                      Get Started
-                    </Link>
+                    {deliverable ? (
+                      <Link
+                        href={`/signup?plan=${plan.slug}`}
+                        className={`block w-full rounded-lg px-3 py-2 text-center text-[0.78rem] font-semibold transition-colors sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.9rem] ${
+                          plan.popular
+                            ? "bg-lav-600 text-white hover:bg-lav-700"
+                            : "border border-line bg-white text-ink hover:bg-cream"
+                        }`}
+                      >
+                        Get Started
+                      </Link>
+                    ) : (
+                      <p className="block w-full rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-center text-[0.7rem] font-semibold leading-relaxed text-amber-900 sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.78rem]">
+                        This plan cannot be delivered yet, so it cannot be ordered or charged.
+                      </p>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </section>
