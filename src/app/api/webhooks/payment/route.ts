@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
       status?: unknown;
       reference?: unknown;
       amount?: unknown;
+      requested_amount?: unknown;
       currency?: unknown;
       metadata?: unknown;
     };
@@ -56,7 +57,15 @@ export async function POST(request: NextRequest) {
   const details = metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata as { userId?: unknown; type?: unknown } : null;
   const userId = details?.userId;
   const reference = data?.reference;
-  const kobo = data?.amount;
+  const chargedKobo = data?.amount;
+  // `amount` is the gross the customer paid. With "Pass fees to customers" on in
+  // the Paystack dashboard that exceeds the net we requested and can be a
+  // fractional naira figure, which both mismatches the stored top-up and fails
+  // the whole-naira check below -- so a fee-bearing charge.success could never
+  // credit a wallet through this route. Match the net we asked for instead, and
+  // fall back to the gross when Paystack does not report one, which is the
+  // correct figure when fees are not being passed on.
+  const kobo = Number.isSafeInteger(data?.requested_amount) ? data?.requested_amount : chargedKobo;
   if (
     data?.status !== "success" ||
     data.currency !== "NGN" ||
@@ -66,6 +75,24 @@ export async function POST(request: NextRequest) {
     typeof reference !== "string" || reference.length > 40 || reference.length === 0 ||
     typeof kobo !== "number" || !Number.isSafeInteger(kobo) || kobo < 10000 || kobo > 1000000000 || kobo % 100 !== 0
   ) {
+    // This rejection previously returned 400 with nothing logged, so a webhook
+    // that refused to credit a real payment left no evidence anywhere -- not in
+    // the response, which Paystack does not surface, and not in the log. Records
+    // what was received rather than what was expected, because the payload is
+    // untrusted and the interesting case is a field arriving in the wrong shape.
+    logger.warn("Paystack event rejected: invalid payment details", {
+      reference: typeof reference === "string" ? reference : null,
+      status: data?.status,
+      currency: data?.currency,
+      metadataType: details?.type,
+      metadataUserId: typeof userId === "string" ? userId : null,
+      amountType: typeof kobo,
+      amount: typeof kobo === "number" || typeof kobo === "string" ? kobo : null,
+      chargedAmount: typeof chargedKobo === "number" || typeof chargedKobo === "string" ? chargedKobo : null,
+      requestedAmount: typeof data?.requested_amount === "number" || typeof data?.requested_amount === "string"
+        ? data.requested_amount
+        : null,
+    });
     return NextResponse.json({ error: "Invalid payment details" }, { status: 400 });
   }
   const amount = kobo / 100;
