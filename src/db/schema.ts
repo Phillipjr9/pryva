@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   index,
   integer,
   pgTable,
@@ -535,3 +536,62 @@ export const adminAuditLog = pgTable(
 );
 
 export type AdminAuditEntry = typeof adminAuditLog.$inferSelect;
+
+/**
+ * A user's TOTP enrolment. `enabledAt` NULL means an enrolment was started and
+ * abandoned; sign-in only demands a code once it is set.
+ *
+ * The secret is encrypted here, never stored as issued: a database dump must not
+ * hand over the second factor. See `src/lib/two-factor.ts`.
+ */
+export const userTwoFactor = pgTable("user_two_factor", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  secretCiphertext: text("secret_ciphertext").notNull(),
+  enabledAt: timestamp("enabled_at", { withTimezone: true }),
+  /**
+   * The last TOTP time-step accepted, so a code cannot be replayed within its
+   * own validity window. BIGINT because a step is seconds since the epoch / 30.
+   */
+  lastUsedStep: bigint("last_used_step", { mode: "number" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** One-way hashes of the ten single-use recovery codes. Plaintext is shown once. */
+export const twoFactorRecoveryCodes = pgTable(
+  "two_factor_recovery_codes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    codeHash: varchar("code_hash", { length: 64 }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("two_factor_recovery_codes_hash_idx").on(table.userId, table.codeHash),
+    index("two_factor_recovery_codes_user_idx").on(table.userId),
+  ],
+);
+
+/** Short-lived sign-in challenge. Only the SHA-256 of the token is stored. */
+export const twoFactorChallenges = pgTable(
+  "two_factor_challenges",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+    attempts: integer("attempts").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("two_factor_challenges_user_idx").on(table.userId),
+    index("two_factor_challenges_expires_idx").on(table.expiresAt),
+  ],
+);

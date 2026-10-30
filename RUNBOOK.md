@@ -86,6 +86,7 @@ build. Never hand-edit `schema_migrations`.
 | `PAYSTACK_SECRET_KEY` | checkout init, verification, transfers, webhook HMAC | rotate in Paystack, then the host; webhook signatures fail closed without it |
 | `CRON_SECRET` | bearer for the cron routes | rotate in the host and in whatever calls the jobs |
 | `DIAGNOSTICS_SECRET` | bearer for the read-only integration probe | rotate independently; `CRON_SECRET` is still accepted as a fallback |
+| `TWO_FACTOR_KEY` | encrypts every stored TOTP secret (AES-256-GCM, scrypt-derived; at least 16 characters) | **rotating it locks out every account with 2FA enabled** — they still hold the factor, the server can no longer read it. Clear the affected enrolments deliberately, one at a time, after verifying identity (see the playbook) |
 | `ADMIN_EMAILS` | the only source of administrator identity | edit deliberately; a match still requires a **verified** email |
 | Supplier keys (`BULKACC_API_KEY`, `FLEEXA_API_KEY`, `ACCSZONE_API_KEY`, `BITCALL_*`) | catalog and fulfilment | rotate at the supplier, then the host |
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | wallet email outbox | rotate in Resend; the outbox retries, so a short outage is recoverable |
@@ -219,6 +220,21 @@ your own logs. Do not replay historical events; see the README's cutover warning
 secret before any request), then the balance, then the mapping. The probe tells you
 which of the three it is.
 
+**Customer locked out by two-factor.** In order:
+1. Ask for a recovery code — each is single-use, and there are ten unless some
+   have been spent.
+2. If the codes are gone, confirm identity out of band (a reply from the account's
+   verified email, plus something the account holder knows that a session thief
+   would not). Do not accept a support message alone: a stolen session can send one.
+3. Only then clear the enrolment for that user: `DELETE FROM user_two_factor`,
+   `two_factor_recovery_codes` and `two_factor_challenges` rows for that
+   `user_id` in one transaction, and record who authorised it and why in
+   `admin_audit_log`. The account returns to password-only until it enrols again.
+4. If every account is affected at once, suspect a **missing or rotated
+   `TWO_FACTOR_KEY`**, not the customers: restore the previous key value rather
+   than mass-clearing enrolments. Setting the variable to empty makes sign-in for
+   those accounts return 503 — by design; it does not disable their 2FA.
+
 **Bad deploy.** Restore the backup, redeploy the previous build, and do not let a
 preview apply a migration to production by removing the `VERCEL_ENV` gate.
 
@@ -235,6 +251,9 @@ preview apply a migration to production by removing the `VERCEL_ENV` gate.
   (It already is public — see `STATUS.md` — so treat wholesale costs as disclosed.)
 - Do not apply a migration by hand from a list in a document. Use the runner and
   the glob in `migrations/README.md`.
+- Do not "fix" a two-factor lockout by unsetting `TWO_FACTOR_KEY` or deleting rows
+  in bulk. The first is a fail-closed outage, the second silently removes a
+  security control from every account it touches.
 
 ---
 

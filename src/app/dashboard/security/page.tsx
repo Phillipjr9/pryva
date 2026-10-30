@@ -1,6 +1,11 @@
 import Link from "next/link";
+import { eq } from "drizzle-orm";
 import { requireUser } from "@/lib/auth";
+import { db } from "@/db";
+import { userTwoFactor } from "@/db/schema";
+import { remainingRecoveryCodes, twoFactorAvailable } from "@/lib/two-factor";
 import { SessionsCard } from "./SessionsCard";
+import { TwoFactorCard } from "./TwoFactorCard";
 import { ArrowRight, Check, Clock, Lock, Shield, User } from "@/components/icons";
 
 export const metadata = { title: "Security" };
@@ -8,6 +13,16 @@ export const metadata = { title: "Security" };
 // Shell comes from the dashboard layout; this page supplies content only.
 export default async function SecurityPage() {
   const user = await requireUser("/dashboard/security");
+
+  // The card is a client component because enrolment is interactive, but whether
+  // 2FA is on and whether the deployment can run it are server facts.
+  const [enrolment] = await db
+    .select({ enabledAt: userTwoFactor.enabledAt })
+    .from(userTwoFactor)
+    .where(eq(userTwoFactor.userId, user.id))
+    .limit(1);
+  const twoFactorEnabled = Boolean(enrolment?.enabledAt);
+  const recoveryCodesLeft = twoFactorEnabled ? await remainingRecoveryCodes(user.id) : 0;
 
   return (
     <div className="grid gap-4">
@@ -37,20 +52,11 @@ export default async function SecurityPage() {
           </Link>
         </section>
 
-        <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
-          <div className="flex items-start justify-between gap-2">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-lav-50 text-lav-700">
-              <Shield className="h-4 w-4" />
-            </span>
-            <span className="rounded-full border border-line bg-white px-2.5 py-1 text-[0.64rem] font-semibold text-ink-3">
-              Not yet available
-            </span>
-          </div>
-          <h2 className="mt-3 text-[0.95rem] font-semibold">Two-factor authentication</h2>
-          <p className="mt-1 text-[0.8rem] leading-relaxed text-ink-2">
-            Two-factor sign-in is not available yet. Do not rely on it to protect this account.
-          </p>
-        </section>
+        <TwoFactorCard
+          initialEnabled={twoFactorEnabled}
+          available={twoFactorAvailable()}
+          remainingCodes={recoveryCodesLeft}
+        />
 
         <SessionsCard />
       </div>
