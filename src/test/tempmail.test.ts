@@ -5,9 +5,9 @@ import {
   createTempMailInbox,
   extractVerificationCode,
   isTempMailConfigured,
-  TempMailError,
 } from "@/lib/tempmail";
 import {
+  activateInbox,
   createFreeInbox,
   discardInbox,
   getInboxProvider,
@@ -23,9 +23,11 @@ const dbState = vi.hoisted(() => ({
   calls: [] as string[],
   rows: [] as Record<string, unknown>[],
   updateResult: [] as Record<string, unknown>[],
+  insertedMessages: [] as Record<string, unknown>[],
 }));
 
-vi.mock("@/db", () => {
+vi.mock("@/db", async () => {
+  const schema = await import("@/db/schema");
   const thenable = (rows: () => Record<string, unknown>[]) => ({
     then: (resolve: (value: Record<string, unknown>[]) => unknown) => Promise.resolve(rows()).then(resolve),
     limit: async (n: number) => rows().slice(0, n),
@@ -33,7 +35,7 @@ vi.mock("@/db", () => {
   });
 
   const db = {
-    insert: () => ({
+    insert: (table: unknown) => ({
       values: (val: unknown) => ({
         returning: async () => {
           const row = {
@@ -42,14 +44,19 @@ vi.mock("@/db", () => {
             createdAt: new Date("2026-10-31T12:00:00Z"),
             discardedAt: null,
           };
-          dbState.rows = [row];
+          dbState.rows.push(row);
           return [row];
+        },
+        onConflictDoNothing: async () => {
+          const items = Array.isArray(val) ? val : [val];
+          dbState.insertedMessages.push(...items);
+          return [];
         },
       }),
     }),
     select: () => ({
-      from: () => ({
-        where: () => thenable(() => dbState.rows),
+      from: (table: unknown) => ({
+        where: () => thenable(() => (table === schema.inboxMessages ? dbState.insertedMessages : dbState.rows)),
       }),
     }),
     update: () => ({
@@ -92,8 +99,8 @@ describe("extractVerificationCode", () => {
 describe("createTempMailInbox", () => {
   it("generates a valid address on a public domain", async () => {
     const inbox = await createTempMailInbox();
-    expect(inbox.address).toMatch(/^[0-9a-f]{10}@(1secmail\.(com|net|org))$/);
-    expect(inbox.domain).toMatch(/^1secmail\.(com|net|org)$/);
+    expect(inbox.address).toContain("@");
+    expect(inbox.domain).toBeTruthy();
     expect(inbox.id).toContain(":");
   });
 
@@ -109,6 +116,7 @@ describe("checkTempMail and cancelTempMail", () => {
     dbState.calls = [];
     dbState.rows = [];
     dbState.updateResult = [];
+    dbState.insertedMessages = [];
   });
 
   afterEach(() => {
@@ -116,36 +124,76 @@ describe("checkTempMail and cancelTempMail", () => {
     vi.restoreAllMocks();
   });
 
-  it("polls and formats incoming messages with extracted codes", async () => {
-    const mockList = [{ id: 101, from: "auth@service.com", subject: "Verification Code", date: "2026-10-31 12:00:00" }];
-    const mockDetail = {
-      id: 101,
-      from: "auth@service.com",
-      subject: "Verification Code",
-      date: "2026-10-31 12:00:00",
-      body: "Your verification code is 591024",
-      textBody: "Your verification code is 591024",
-    };
-
+  it("polls and formats incoming Mail.tm messages with extracted codes", async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes("action=getMessages")) {
-        return Promise.resolve({ ok: true, json: async () => mockList });
+      if (url.includes("/token")) {
+        return Promise.resolve({ ok: true, json: async () => ({ token: "jwt-test-token" }) });
       }
-      if (url.includes("action=readMessage")) {
-        return Promise.resolve({ ok: true, json: async () => mockDetail });
+      if (url.includes("/messages") && !url.includes("/messages/")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            "hydra:member": [
+              { id: "msg-1", subject: "Your code is 591024", from: { address: "auth@service.com" }, createdAt: "2026-10-31" },
+            ],
+          }),
+        });
+      }
+      if (url.includes("/messages/msg-1")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            subject: "Your code is 591024",
+            from: { address: "auth@service.com" },
+            text: "Your verification code is 591024",
+            createdAt: "2026-10-31",
+          }),
+        });
       }
       return Promise.resolve({ ok: false, status: 404 });
     });
 
-    const result = await checkTempMail("testlogin:1secmail.com");
+    const result = await checkTempMail("mailtm:acc-123:mypassword", "test@domain.com");
     expect(result.messages).toHaveLength(1);
     expect(result.messages[0]).toMatchObject({
       from: "auth@service.com",
-      subject: "Verification Code",
+      subject: "Your code is 591024",
       body: "Your verification code is 591024",
       code: "591024",
     });
     expect(result.code).toBe("591024");
+  });
+
+  it("polls and formats incoming Guerrilla Mail messages", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("check_email")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            list: [
+              { mail_id: "gm-42", mail_from: "verify@app.test", mail_subject: "OTP: 884422", mail_date: "2026-10-31" },
+            ],
+          }),
+        });
+      }
+      if (url.includes("fetch_email")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            mail_subject: "OTP: 884422",
+            mail_from: "verify@app.test",
+            mail_body: "Use 884422 to confirm your account",
+            mail_date: "2026-10-31",
+          }),
+        });
+      }
+      return Promise.resolve({ ok: false });
+    });
+
+    const result = await checkTempMail("guerrilla:sid-token-xyz:test@sharklasers.com");
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.code).toBe("884422");
+    expect(result.code).toBe("884422");
   });
 
   it("handles empty inboxes gracefully", async () => {
@@ -165,6 +213,9 @@ describe("integration with disposable-inbox lifecycle", () => {
 
   beforeEach(() => {
     process.env.INBOX_PROVIDER = "tempmail";
+    dbState.rows = [];
+    dbState.updateResult = [];
+    dbState.insertedMessages = [];
   });
 
   afterEach(() => {
@@ -178,42 +229,44 @@ describe("integration with disposable-inbox lifecycle", () => {
 
   it("creates a free inbox via tempmail and saves to db", async () => {
     const created = await createFreeInbox("user-1");
-    expect(created.address).toContain("@1secmail.");
+    expect(created.address).toContain("@");
     expect(created.tier).toBe("free");
     expect(created.status).toBe("active");
   });
 
-  it("polls and returns live messages for tempmail inboxes", async () => {
-    dbState.rows = [
-      {
-        id: "inbox-temp-1",
-        userId: "user-1",
-        provider: "tempmail",
-        providerInboxId: "demologin:1secmail.com",
-        address: "demologin@1secmail.com",
-        tier: "free",
-        status: "active",
-        createdAt: new Date(),
-        discardedAt: null,
-      },
-    ];
+  it("polls and stores live messages in the database", async () => {
+    const activeRow = {
+      id: "inbox-temp-1",
+      userId: "user-1",
+      provider: "tempmail",
+      providerInboxId: "guerrilla:sid-token:test@sharklasers.com",
+      address: "test@sharklasers.com",
+      tier: "free",
+      status: "active",
+      createdAt: new Date(),
+      discardedAt: null,
+    };
+    dbState.rows = [activeRow];
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes("action=getMessages")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => [{ id: 42, from: "no-reply@app.test", subject: "Code: 998877", date: "2026-10-31" }],
-        });
-      }
-      if (url.includes("action=readMessage")) {
+      if (url.includes("check_email")) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
-            id: 42,
-            from: "no-reply@app.test",
-            subject: "Code: 998877",
-            body: "Your confirmation code is 998877",
-            textBody: "Your confirmation code is 998877",
+            list: [
+              { mail_id: "gm-99", mail_from: "verify@test.com", mail_subject: "Code: 112233", mail_date: "2026-10-31" },
+            ],
+          }),
+        });
+      }
+      if (url.includes("fetch_email")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            mail_subject: "Code: 112233",
+            mail_from: "verify@test.com",
+            mail_body: "Your confirmation code is 112233",
+            mail_date: "2026-10-31",
           }),
         });
       }
@@ -221,10 +274,31 @@ describe("integration with disposable-inbox lifecycle", () => {
     });
 
     const poll = await pollInbox("user-1", "inbox-temp-1");
-    expect(poll.code).toBe("998877");
+    expect(poll.code).toBe("112233");
     expect(poll.messages).toHaveLength(1);
-    expect(poll.messages[0]?.code).toBe("998877");
-    expect(poll.stored).toBe(false);
+    expect(poll.messages[0]?.code).toBe("112233");
+    // Messages for tempmail are saved in DB
+    expect(poll.stored).toBe(true);
+    expect(dbState.insertedMessages).toHaveLength(1);
+  });
+
+  it("switches and activates a saved inbox", async () => {
+    const savedRow = {
+      id: "inbox-temp-2",
+      userId: "user-1",
+      provider: "tempmail",
+      providerInboxId: "guerrilla:sid-token:test2@sharklasers.com",
+      address: "test2@sharklasers.com",
+      tier: "free",
+      status: "saved",
+      createdAt: new Date(),
+      discardedAt: null,
+    };
+    dbState.rows = [savedRow];
+    dbState.updateResult = [{ ...savedRow, status: "active" }];
+
+    const activated = await activateInbox("user-1", "inbox-temp-2");
+    expect(activated.status).toBe("active");
   });
 
   it("discards active tempmail inboxes", async () => {
@@ -232,8 +306,8 @@ describe("integration with disposable-inbox lifecycle", () => {
       id: "inbox-temp-1",
       userId: "user-1",
       provider: "tempmail",
-      providerInboxId: "demologin:1secmail.com",
-      address: "demologin@1secmail.com",
+      providerInboxId: "guerrilla:sid:demologin@sharklasers.com",
+      address: "demologin@sharklasers.com",
       tier: "free",
       status: "active",
       createdAt: new Date(),
