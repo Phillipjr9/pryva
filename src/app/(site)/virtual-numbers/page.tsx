@@ -92,7 +92,11 @@ export default async function VirtualNumbersPage() {
             These regions appear in the catalog. Live number fulfillment is paused and actual coverage requires provider verification.
           </p>
           <CountryChips
-            codes={["ng", "us", "gb", "ca", "de", "gh", "ke", "za", "in", "ae", "fr", "nl"]}
+            codes={[
+              "ng", "us", "gb", "ca", "de", "gh", "ke", "za",
+              "in", "ae", "fr", "nl", "br", "es", "it", "pl",
+              "id", "ph", "tr", "mx",
+            ]}
           />
         </div>
       </section>

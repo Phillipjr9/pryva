@@ -26,6 +26,17 @@ export type PlatformSlug =
   | "netflix"
   | "spotify"
   | "steam"
+  | "reddit"
+  | "snapchat"
+  | "linkedin"
+  | "pinterest"
+  | "apple"
+  | "chatgpt"
+  | "twitch"
+  | "canva"
+  | "threads"
+  | "kick"
+  | "soundcloud"
   | "generic";
 
 const LABELS: Record<PlatformSlug, string> = {
@@ -42,6 +53,17 @@ const LABELS: Record<PlatformSlug, string> = {
   netflix: "Netflix",
   spotify: "Spotify",
   steam: "Steam",
+  reddit: "Reddit",
+  snapchat: "Snapchat",
+  linkedin: "LinkedIn",
+  pinterest: "Pinterest",
+  apple: "Apple",
+  chatgpt: "ChatGPT",
+  twitch: "Twitch",
+  canva: "Canva",
+  threads: "Threads",
+  kick: "Kick",
+  soundcloud: "SoundCloud",
   generic: "Digital account",
 };
 
@@ -63,6 +85,17 @@ const MATCHERS: Array<[PlatformSlug, RegExp]> = [
   ["netflix", /\bnetflix\b/i],
   ["spotify", /\bspotify\b/i],
   ["steam", /\bsteam\b/i],
+  ["reddit", /\breddit\b/i],
+  ["snapchat", /\bsnapchat\b|\bsnap\b/i],
+  ["linkedin", /\blinkedin\b/i],
+  ["pinterest", /\bpinterest\b/i],
+  ["apple", /\bapple\b|\bicloud\b|\bapple id\b/i],
+  ["chatgpt", /\bchatgpt\b|\bopenai\b|\bgpt-?4\b/i],
+  ["twitch", /\btwitch\b/i],
+  ["canva", /\bcanva\b/i],
+  ["threads", /\bthreads\b/i],
+  ["kick", /\bkick\b/i],
+  ["soundcloud", /\bsoundcloud\b/i],
 ];
 
 export function platformFor(...text: Array<string | null | undefined>): PlatformSlug {

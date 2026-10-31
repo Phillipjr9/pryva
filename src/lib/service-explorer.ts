@@ -68,6 +68,13 @@ export const VERIFICATION_EXAMPLES: Array<{ name: string; brand: BrandSlug; tag:
   { name: "Reddit", brand: "reddit", tag: "Social" },
   { name: "Pinterest", brand: "pinterest", tag: "Social" },
   { name: "Twitch", brand: "twitch", tag: "Entertainment" },
+  { name: "LinkedIn", brand: "linkedin", tag: "Work & other" },
+  { name: "ChatGPT", brand: "chatgpt", tag: "Work & other" },
+  { name: "Threads", brand: "threads", tag: "Social" },
+  { name: "Kick", brand: "kick", tag: "Entertainment" },
+  { name: "SoundCloud", brand: "soundcloud", tag: "Entertainment" },
+  { name: "Canva", brand: "canva", tag: "Work & other" },
+  { name: "Crunchyroll", brand: "crunchyroll", tag: "Entertainment" },
   { name: "WeChat", brand: "wechat", tag: "Messaging" },
   { name: "Zoom", brand: "zoom", tag: "Work & other" },
   { name: "Airbnb", brand: "airbnb", tag: "Travel" },
@@ -82,13 +89,22 @@ export const VERIFICATION_EXAMPLES: Array<{ name: string; brand: BrandSlug; tag:
 
 /** Exported so live supplier listings reuse the same platform/brand vocabulary. */
 export const PROMOTION_EXAMPLES: Array<{ name: string; brand: BrandSlug; types: string[] }> = [
-  { name: "Instagram", brand: "instagram", types: ["Followers", "Likes", "Views"] },
-  { name: "TikTok", brand: "tiktok", types: ["Followers", "Likes", "Views"] },
-  { name: "YouTube", brand: "youtube", types: ["Subscribers", "Likes", "Views"] },
-  { name: "Facebook", brand: "facebook", types: ["Followers", "Likes", "Views"] },
-  { name: "X", brand: "x", types: ["Followers", "Likes", "Views"] },
-  { name: "Telegram", brand: "telegram", types: ["Subscribers", "Views"] },
+  { name: "Instagram", brand: "instagram", types: ["Followers", "Likes", "Views", "Comments", "Shares", "Saves"] },
+  { name: "TikTok", brand: "tiktok", types: ["Followers", "Likes", "Views", "Shares", "Comments", "Saves"] },
+  { name: "YouTube", brand: "youtube", types: ["Subscribers", "Likes", "Views", "Comments", "Watch time", "Shares"] },
+  { name: "Facebook", brand: "facebook", types: ["Followers", "Likes", "Views", "Shares", "Comments", "Reactions"] },
+  { name: "X", brand: "x", types: ["Followers", "Likes", "Views", "Shares", "Comments"] },
+  { name: "Telegram", brand: "telegram", types: ["Subscribers", "Members", "Views", "Reactions"] },
+  { name: "Spotify", brand: "spotify", types: ["Plays", "Followers", "Saves"] },
+  { name: "Discord", brand: "discord", types: ["Members"] },
+  { name: "LinkedIn", brand: "linkedin", types: ["Followers", "Likes", "Connections"] },
+  { name: "Snapchat", brand: "snapchat", types: ["Followers", "Views"] },
+  { name: "Reddit", brand: "reddit", types: ["Likes", "Members"] },
+  { name: "Pinterest", brand: "pinterest", types: ["Followers", "Saves"] },
   { name: "Twitch", brand: "twitch", types: ["Followers", "Views"] },
+  { name: "Threads", brand: "threads", types: ["Followers", "Likes", "Shares"] },
+  { name: "SoundCloud", brand: "soundcloud", types: ["Plays", "Followers", "Likes"] },
+  { name: "Kick", brand: "kick", types: ["Followers", "Views"] },
 ];
 
 const categoryById = new Map(EXPLORER_CATEGORIES.map((category) => [category.id, category]));
@@ -193,7 +209,7 @@ function exampleItems(): ExplorerItem[] {
   }));
   const social: ExplorerItem[] = PROMOTION_EXAMPLES.flatMap((platform) =>
     platform.types.map((type): ExplorerItem => ({
-      id: `social-${platform.brand}-${type.toLowerCase()}`,
+      id: `social-${platform.brand}-${type.toLowerCase().replace(/\s+/g, "-")}`,
       category: "social",
       name: `${platform.name} ${type.toLowerCase()}`,
       description: "Social promotion",

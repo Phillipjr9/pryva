@@ -126,8 +126,19 @@ export class MarketplaceError extends Error {
  */
 const GROUP_LABELS: Record<string, string> = {
   Spotify: "Streaming",
+  Netflix: "Streaming",
+  Disney: "Streaming",
+  Soundcloud: "Streaming",
+  SoundCloud: "Streaming",
   Google: "Email",
   "Other Emails": "Email",
+  Yahoo: "Email",
+  "Yahoo Mail": "Email",
+  Hotmail: "Email",
+  Outlook: "Email",
+  Microsoft: "Email",
+  "Mail.ru": "Email",
+  GMX: "Email",
   YouTube: "Video",
   Facebook: "Social",
   Instagram: "Social",
@@ -136,6 +147,9 @@ const GROUP_LABELS: Record<string, string> = {
   "TikTok Ads": "Social",
   Reddit: "Social",
   Discord: "Social",
+  Telegram: "Social",
+  WhatsApp: "Social",
+  Threads: "Social",
   Snapchat: "Social",
   Linkedin: "Social",
   Pinterest: "Social",
@@ -143,11 +157,17 @@ const GROUP_LABELS: Record<string, string> = {
   "ID APPLE": "Apple ID",
   Github: "Developer",
   AI: "AI tools",
+  OpenAI: "AI tools",
+  ChatGPT: "AI tools",
   Tripadvisor: "Reviews",
   Trustpilot: "Reviews",
   Medium: "Publishing",
+  Canva: "Publishing",
   "Web 2.0": "Web profiles",
   Game: "Gaming",
+  Steam: "Gaming",
+  Twitch: "Gaming",
+  Kick: "Gaming",
 };
 
 /**
@@ -167,7 +187,11 @@ export const GROUP_LABEL_VALUES: readonly string[] = Object.freeze(
 const STREAMING_KEYWORDS = [
   "netflix", "spotify", "disney", "hulu", "paramount", "prime video",
   "apple tv", "youtube premium", "iptv", "deezer", "tidal", "crunchyroll",
+  "soundcloud", "hbo", "peacock", "dazn",
 ];
+
+/** Title keywords that mean "AI tools" whatever group the source used. */
+const AI_KEYWORDS = ["chatgpt", "openai", "midjourney", "claude"];
 
 /**
  * Pryva-facing group for one supplier product.
@@ -182,7 +206,9 @@ export function groupLabelFor(product: { groupName?: string | null; name?: strin
   if (fromGroup === "Streaming") return "Streaming";
   const haystack = ` ${product.groupName ?? ""} ${product.name ?? ""} `.toLowerCase();
   if (STREAMING_KEYWORDS.some((needle) => haystack.includes(needle))) return "Streaming";
-  return fromGroup ?? "Other";
+  if (fromGroup) return fromGroup;
+  if (AI_KEYWORDS.some((needle) => haystack.includes(needle))) return "AI tools";
+  return "Other";
 }
 
 /**
