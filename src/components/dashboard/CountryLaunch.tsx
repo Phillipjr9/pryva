@@ -23,9 +23,10 @@ export function CountryLaunch() {
           </p>
         </div>
         <form action="/dashboard/services" method="get" className="rounded-2xl border border-white/80 bg-white/60 p-4 shadow-sm">
-          <CountrySelector id="dashboard-country" name="country" value={country} onChange={setCountry} />
-          <button type="submit" disabled={!country} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-3 text-[0.8rem] font-semibold text-white transition-colors hover:bg-lav-800 disabled:cursor-not-allowed disabled:opacity-45">
-            <Globe className="h-4 w-4" /> Explore services <ArrowRight className="h-4 w-4" />
+          <input type="hidden" name="country" value={country || "ng"} />
+          <CountrySelector id="dashboard-country" value={country} onChange={setCountry} />
+          <button type="submit" className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-3 text-[0.85rem] font-semibold text-white transition-colors hover:bg-lav-800">
+            <Globe className="h-4 w-4" /> {country ? "Explore services for selected country" : "Explore all services (Nigeria default)"} <ArrowRight className="h-4 w-4" />
           </button>
         </form>
       </div>
