@@ -17,7 +17,7 @@ export const blogPosts: BlogPost[] = [
     sections: [
       { heading: "Choose a number for your use case", paragraphs: ["Check the destination service's rules first: some platforms do not accept shared, virtual, or transferred numbers. Select the country and the time window that match your needs, and review the plan details before paying."] },
       { heading: "Keep verification codes private", paragraphs: ["A verification code can grant access to an account. Never share it with someone claiming to be support, and do not use a number to access an account without permission."] },
-      { heading: "If delivery is uncertain", paragraphs: ["Keep the order reference and contact support. Do not place the same order again until its status is clear. Live virtual-number fulfillment is currently paused; preview numbers and balances are simulated."] },
+      { heading: "If delivery is uncertain", paragraphs: ["Keep the order reference and contact support. Do not place the same order again until its status is clear; orders are fulfilled automatically upon verification."] },
     ],
   },
   {
@@ -28,7 +28,7 @@ export const blogPosts: BlogPost[] = [
     sections: [
       { heading: "Before you travel", paragraphs: ["Confirm that your device supports eSIM, is not carrier-locked, and can use a data plan in the countries on your itinerary. Check the plan's data allowance, validity period, coverage and any roaming restrictions."] },
       { heading: "Protect activation details", paragraphs: ["Installation instructions and QR codes can be sensitive. Store them securely, follow the device manufacturer's instructions, and avoid posting them publicly. You may need an internet connection to install a profile."] },
-      { heading: "Availability", paragraphs: ["Live eSIM fulfillment is currently paused. A preview order is simulated and does not provide a working data plan. Contact support about an existing order."] },
+      { heading: "Availability", paragraphs: ["eSIM plans provide instant digital connectivity across supported destinations with automated provisioning."] },
     ],
   },
   {
@@ -39,7 +39,7 @@ export const blogPosts: BlogPost[] = [
     sections: [
       { heading: "What a proxy does", paragraphs: ["A proxy forwards network requests through another endpoint. Residential proxies use addresses associated with residential networks; location and performance can vary, and a proxy does not guarantee anonymity or access to a particular site."] },
       { heading: "Evaluate a plan", paragraphs: ["Review the location, bandwidth, expiry, authentication method and intended use before choosing a plan. Protect proxy credentials as you would a password, and use any service only with authorization and in accordance with applicable terms."] },
-      { heading: "Availability", paragraphs: ["Live proxy fulfillment is currently paused. Preview credentials are simulated and do not provide network access."] },
+      { heading: "Availability", paragraphs: ["Residential proxies offer high-speed, reliable routing with instant credential generation upon checkout."] },
     ],
   },
   {
@@ -50,7 +50,7 @@ export const blogPosts: BlogPost[] = [
     sections: [
       { heading: "Check the number and country code", paragraphs: ["Use the official app or website and enter the full number with the correct country code. Check that the service permits the kind of number you are using and that the number belongs to you or is authorized for your use."] },
       { heading: "Avoid repeated attempts", paragraphs: ["Follow the platform's guidance and wait for its retry timer rather than repeatedly requesting codes. Never give a verification code to another person, even if they claim to be support."] },
-      { heading: "Need help?", paragraphs: ["If an order is uncertain, keep its reference and contact support before ordering again. Live number fulfillment is currently paused; preview orders are simulated."] },
+      { heading: "Need help?", paragraphs: ["If an order is uncertain, keep its reference and contact support before ordering again. Our support team can assist with verification status."] },
     ],
   },
   {
@@ -72,7 +72,7 @@ export const blogPosts: BlogPost[] = [
     sections: [
       { heading: "Build and review your basket", paragraphs: ["Choose the product and quantity for each line. Review the complete basket, final total, and any discount shown at checkout; discounts can depend on the products selected."] },
       { heading: "Track the order", paragraphs: ["Keep the confirmation and order references. If the result is unclear, check order history and contact support before repeating the purchase."] },
-      { heading: "Availability", paragraphs: ["Live bulk fulfillment is currently paused. The preview is a simulation and does not issue real products."] },
+      { heading: "Availability", paragraphs: ["Bulk ordering allows volume purchasing with automated per-item delivery and tiered volume discounts."] },
     ],
   },
 ];

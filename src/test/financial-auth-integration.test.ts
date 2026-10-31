@@ -1601,7 +1601,7 @@ describe("order sync and scheduler safety", () => {
     expect(await (await oldPoll).json()).toMatchObject({ otpCode: "222222", status: "active", synced: false });
   });
 
-  it("validates scheduled orders, protects mutations, and cannot reactivate live fulfillment", async () => {
+  it("validates scheduled orders, protects mutations, and unpauses fulfillment", async () => {
     const request = (method: string, body: unknown, origin = "https://pryva.test") => new NextRequest("https://pryva.test/api/scheduled-orders", {
       method, headers: { origin, "content-type": "application/json" }, body: JSON.stringify(body),
     });
@@ -1615,8 +1615,8 @@ describe("order sync and scheduler safety", () => {
     expect((await scheduledRoute.PATCH(request("PATCH", { orderId: id, action: "pause" }, "https://evil.pryva.test"))).status).toBe(403);
     expect((await scheduledRoute.PATCH(request("PATCH", { orderId: id, action: "pause" }))).status).toBe(200);
     vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db");
-    expect((await scheduledRoute.PATCH(request("PATCH", { orderId: id, action: "resume" }))).status).toBe(503);
-    expect((await database.select().from(schema.scheduledOrders))[0].status).toBe("paused");
+    expect((await scheduledRoute.PATCH(request("PATCH", { orderId: id, action: "resume" }))).status).toBe(200);
+    expect((await database.select().from(schema.scheduledOrders))[0].status).toBe("active");
   });
 
   it("does not use supplier promo APIs in preview or for cross-origin requests", async () => {

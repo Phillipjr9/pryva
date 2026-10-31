@@ -36,7 +36,7 @@ const rows = [
     product: "Airtime & data bundles",
     refund: "Failed delivery only",
     detail:
-      "Live purchases are paused. Any legacy transfer requires review before a refund.",
+      "Failed deliveries are refunded automatically to your wallet balance.",
   },
   {
     product: "Gift cards",
@@ -46,9 +46,9 @@ const rows = [
   },
   {
     product: "Bulk & scheduled orders",
-    refund: "Review required",
+    refund: "Failed units refunded",
     detail:
-      "Live fulfillment is paused. Contact support to reconcile any legacy order.",
+      "Failed or unfulfilled units are refunded to your wallet.",
   },
 ];
 
@@ -61,8 +61,8 @@ export default function RefundPolicyPage() {
             Refund Policy
           </h1>
           <p className="mt-3 max-w-2xl text-[0.98rem] leading-relaxed text-ink-2">
-            Live automatic refunds are paused until delivery and provider cancellation can be verified.
-            Contact support with your order reference for review.
+            Automatic refunds are processed for failed or cancelled deliveries.
+            Contact support with your order reference if you need assistance.
           </p>
         </div>
       </section>

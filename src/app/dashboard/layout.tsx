@@ -51,11 +51,11 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           </Link>
         </div>
       )}
-      <div role="status" className={`mb-5 rounded-xl border px-4 py-3 text-sm ${isPreviewDatabase() ? "border-lav-200 bg-lav-50 text-lav-800" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
-        {isPreviewDatabase()
-          ? "Demo mode · Payments, balances and services are simulated. This account is shared, so use fictional details only."
-          : "Live number, eSIM, proxy, email, data, bulk and scheduled fulfillment is paused. Contact support about existing orders."}
-      </div>
+      {isPreviewDatabase() && (
+        <div role="status" className="mb-5 rounded-xl border border-lav-200 bg-lav-50 px-4 py-3 text-sm text-lav-800">
+          Demo mode · Payments, balances and services are simulated. This account is shared, so use fictional details only.
+        </div>
+      )}
       {children}
     </DashboardShell>
   );
