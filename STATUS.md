@@ -1643,3 +1643,58 @@ pins the status it writes and the no-op case.
 first real proof remains one small boost order whose status is read back — the
 nightly sweep does not replace that, it only means the answer keeps arriving after
 the customer stops looking.
+
+## 39. Thirty-first pass — stock is a question, not an assumption (31 Oct 2026)
+
+The owner asked which services are not showing up or not working right now, and for
+stock to be readable through the API. Both questions had the same root: **the shop
+knew what it advertised and nothing about what the feeds hold.**
+
+- Numbers and rentals are sold from a fixed catalogue of ten plans with **no stock
+  read at all**. A plan could be advertised, and `503` at checkout, because the feed
+  had no number for that destination — and nothing anywhere said so in advance.
+- Boosting had a per-order minimum and maximum but no availability view, and the
+  integrations report answered `boosting: { configured: true }` — a key existing,
+  which is not the same statement.
+- The account marketplace had per-listing inventory, but only inside the storefront.
+- Two feeds are connected and sell nothing: eSIM (balance readable, catalogue
+  readable, no purchase route) and email inboxes (products listed, no plan mapped
+  because the feed exposes no duration). Neither looked any different from a
+  working integration.
+
+**`GET /api/diagnostics/stock`** and **`/admin/stock`** now answer it lane by lane,
+per sellable thing, from the live feed rather than from the catalogue:
+
+| State | Means |
+|---|---|
+| **In stock / low** | the feed reported units (below five is *low*) |
+| **Out of stock** | the feed counted zero, or below its own minimum |
+| **Not listed** | the feed has nothing for that destination — the checkout would refuse |
+| **Unknown** | the feed lists it but declined to count it. Not zero |
+| **No price** | the feed offers it but no honest retail price can be computed |
+| **Not sold** | the feed answers and nothing of ours is mapped to it |
+
+Two of those exist because of mistakes the page would otherwise make. `unknown` is
+not zero: the purchase path treats an unreported count as buyable, so calling it
+out of stock would hide a working lane. And `no price` is the case that looks like
+a healthy panel: a USD-billing feed with no conversion rate lists thousands of
+services and the shop refuses every one of them — before this, that was
+indistinguishable from a feed that is down.
+
+Every call behind the page is a catalog list or a balance read, so refreshing it
+cannot spend money. One feed being down reports its own error and the other lanes
+still answer — the report is most useful exactly when something is broken.
+
+**What is not working, stated plainly:** eSIM and email inboxes are connected and
+unsold by design; a second marketplace is connected but only read when the primary
+feed is absent, and is reported as such rather than counted as stock.
+
+**Verified:** 1,394 tests / 151 files · typecheck · lint · build.
+`stock-report.test.ts` (18) pins each state, including that a feed declining to
+count is not a zero and that an unpriced catalogue is not an empty one;
+`stock-live.test.ts` (8) pins the isolation between lanes; `stock-route.test.ts`
+(3) and `admin-stock-page.test.tsx` (5) cover the surfaces.
+
+**Not verified:** the numbers themselves. This environment cannot call any feed,
+so the first real answer is the deployed page — and the numbers it shows are the
+owner's to read, not mine to assume.
