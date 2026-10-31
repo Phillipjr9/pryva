@@ -48,6 +48,14 @@ describe("choosing services", () => {
     fireEvent.click(screen.getByRole("button", { name: "Rental" }));
     expect(screen.getAllByRole("heading", { name: "Nigeria rental" })).toHaveLength(3);
     expect(screen.queryByRole("heading", { name: "Nigeria" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Mobile data" }));
+    expect(screen.getByRole("heading", { level: 1, name: "Mobile data" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "MTN" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Airtel" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "MTN" }));
+    expect(screen.getByRole("heading", { name: "MTN 1GB" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Airtel 1GB" })).toBeNull();
   });
 
   it("never retains another subscription or country as the active plan", () => {
