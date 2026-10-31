@@ -1561,3 +1561,49 @@ and its verdict was obeyed rather than argued with.
 **Still true:** no boost has been purchased from this supplier. The owner's
 minimum-size order is what turns 20 listed services into a proven delivery path, and
 the order page is now the thing that will tell them whether it worked.
+
+## 37. Twenty-ninth pass — the shop can say what it actually delivers (31 Oct 2026)
+
+The owner asked for the thing no single file answered: *are all the suppliers
+working, and does every customer get their service entirely?* Every part of that was
+knowable and none of it was visible — whether a key exists is an env var, whether a
+gate is open is a function, whether an order was delivered is a row, and nobody had
+put the three in one place. A configured supplier that had never fulfilled anything
+looked exactly like one that was carrying the business.
+
+**`/admin/services`** answers it from evidence: one grouped read of the orders table
+(provider × status, with how many rows already carry a reference code and when the
+newest landed) turned into four lane verdicts:
+
+- **Delivering** — something reached a customer in the last 7 days.
+- **Untested** — configured, but nothing has ever been bought. A key is not proof.
+- **Needs attention** — orders exist and nothing reached a customer, or the last
+  delivery is older than the window, or work has been stuck past the lane's own
+  threshold (2 h for a number, 48 h for an account, a week for a boost).
+- **Not for sale** — the gates refuse money, which is the correct state, not a fault.
+
+Two details carry the honesty. An `active` order counts as delivery evidence **only
+when it carries a reference code**: a number in hand is something the customer can
+use, an accepted boost is not. And the page lists what the shop deliberately does not
+sell — eSIM, data plans, proxies, subscriptions, bulk, airtime — with the reason for
+each, so "I can't buy this" does not read as "this is broken".
+
+Gift cards are excluded on purpose. They are Pryva-issued wallet credit delivered by
+the purchase call itself; scoring them on order history would report "untested"
+forever, and a page that cries wolf is worse than no page.
+
+**What it does not claim.** It reads history, so a supplier that is down right now
+still reads *delivering* until a purchase fails. The page says so and points at the
+live probes that do exist: `/admin/boosting` for the boosting panel, and
+`/api/diagnostics/integrations` for balance and catalogue health on the rest.
+
+**Verified:** 1,349 tests / 145 files · typecheck · lint · build. New
+`service-coverage.test.ts` (12) pins the verdict rules — including that a lane
+switched off after trading reads *not for sale* rather than healthy, and that an
+`active` order without a code is not evidence — and `admin-services-page.test.tsx`
+(5) renders each state.
+
+**Still unverified by me:** no supplier call was made from this environment; the
+sandbox cannot reach any of them. Whether Fleexa, BulkAcc or the boosting panel
+answer today is a question only the deployed diagnostics and the first real orders
+can settle — and the page is now the place those answers accumulate.
