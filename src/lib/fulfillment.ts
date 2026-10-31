@@ -1,4 +1,4 @@
-import type { Plan } from "@/lib/catalog";
+import { plans, type Plan } from "@/lib/catalog";
 import {
   buyFleexaRental,
   buyFleexaSmsNumber,
@@ -38,10 +38,11 @@ export type FulfilledOrder = {
  *   vn-otp-5            a 5-code bundle; the provider sells one number per call
  *   rent-ng-7           7 days is not a whole number of provider rental months
  */
-type SmsIntent = { kind: "sms"; country: string };
-type RentalIntent = { kind: "rental"; country: string; months: number };
+export type SmsIntent = { kind: "sms"; country: string };
+export type RentalIntent = { kind: "rental"; country: string; months: number };
+export type PlanIntent = SmsIntent | RentalIntent;
 
-const FULFILMENT_MAP: Record<string, SmsIntent | RentalIntent> = {
+const FULFILMENT_MAP: Record<string, PlanIntent> = {
   "vn-ng": { kind: "sms", country: "ng" },
   "vn-us": { kind: "sms", country: "us" },
   "vn-uk": { kind: "sms", country: "gb" },
@@ -65,13 +66,31 @@ export function isPlanFulfillable(slug: unknown): boolean {
 }
 
 /**
+ * The provider intent behind a sellable plan, or null for anything the shop must
+ * not sell. Exported so stock reporting asks the same allowlist the checkout
+ * uses: a report built from a second copy of this map would sooner or later
+ * describe a plan that cannot be bought, or miss one that can.
+ */
+export function fulfilmentIntent(slug: string): PlanIntent | null {
+  return Object.hasOwn(FULFILMENT_MAP, slug) ? FULFILMENT_MAP[slug] : null;
+}
+
+/** Every category plan that is actually for sale, paired with what it buys. */
+export function fulfilablePlans(): Array<{ plan: Plan; intent: PlanIntent }> {
+  return plans.flatMap((plan) => {
+    const intent = fulfilmentIntent(plan.slug);
+    return intent ? [{ plan, intent }] : [];
+  });
+}
+
+/**
  * Country identifiers are the one part of this contract that could not be
  * confirmed against documentation, so they are matched tolerantly against
  * whatever the provider's own catalog returns. Matching the provider's value
  * to our ISO code (and to the plan's human region name) is deliberate: we send
  * back an identifier the provider itself published, never one we invented.
  */
-function matchesCountry(value: string | null, code: string, regionName: string): boolean {
+export function matchesCountry(value: string | null, code: string, regionName: string): boolean {
   const candidate = value?.trim().toLowerCase();
   if (!candidate) return false;
   if (candidate === code || candidate === regionName.trim().toLowerCase()) return true;
