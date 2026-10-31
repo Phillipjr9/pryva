@@ -70,7 +70,7 @@ export function WithdrawalsManager() {
 
   async function processWithdrawal(id: string, action: "approve" | "reject") {
     const confirmation = action === "approve"
-      ? "Approve this request and initiate a Paystack transfer? Initiation is not settlement. Check Paystack for any merchant authorization and final status before retrying or refunding."
+      ? "Send this queued request as a Paystack transfer now? Payouts are sent automatically on request, so this row predates that change or was left behind by an unconfirmed attempt. Initiation is not settlement — check Paystack for final status before retrying or refunding."
       : "Reject this pending request and refund its reserved wallet amount?";
     if (!confirm(confirmation)) {
       return;

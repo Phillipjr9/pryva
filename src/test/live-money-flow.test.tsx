@@ -28,7 +28,7 @@ const createdAt = "2026-10-27T12:00:00.000Z";
 const withdrawalReference = "WD-bbbbbbbbbbbbbbbbbbbbbbbb";
 const bank = { id: bankId, bankName: "Test Bank", bankCode: "044", accountNumber: "1234567890", accountName: "Test Customer", isDefault: true };
 const review: WithdrawalReview = { amount: 6000, fee: 60, bankAccountId: bankId, bankName: bank.bankName, accountNumber: bank.accountNumber, accountName: bank.accountName };
-const withdrawalReceipt: WithdrawalReceipt = { reference: withdrawalReference, amount: 6000, fee: 60, status: "pending", createdAt, bankName: bank.bankName, accountNumber: bank.accountNumber, accountName: bank.accountName, replayed: false, newBalance: 3940 };
+const withdrawalReceipt: WithdrawalReceipt = { reference: withdrawalReference, amount: 6000, fee: 60, status: "processing", createdAt, bankName: bank.bankName, accountNumber: bank.accountNumber, accountName: bank.accountName, replayed: false, newBalance: 3940 };
 
 function response(data: unknown, status = 200) {
   return { ok: status >= 200 && status < 300, status, json: async () => data } as Response;
@@ -169,7 +169,7 @@ describe("Paystack return confirmation", () => {
 });
 
 describe("withdrawal request review", () => {
-  it("waits for the actual response and labels a pending request as not paid", async () => {
+  it("waits for the actual response and labels a sent payout as not yet settled", async () => {
     vi.useFakeTimers();
     let resolve!: (result: { ok: true; receipt: WithdrawalReceipt }) => void;
     const onSubmit = vi.fn(() => new Promise<{ ok: true; receipt: WithdrawalReceipt }>((done) => { resolve = done; }));
@@ -177,25 +177,26 @@ describe("withdrawal request review", () => {
     expect(screen.getByText(/Test Bank · ••••••7890/)).toBeTruthy();
     expect(screen.queryByLabelText(/PIN/i)).toBeNull();
     expect(onSubmit).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Submit withdrawal request" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send payout" }));
     await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
-    expect(screen.getByRole("heading", { name: "Submitting your request" })).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Withdrawal request recorded" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Sending your payout" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Payout sent" })).toBeNull();
     await act(async () => { resolve({ ok: true, receipt: withdrawalReceipt }); });
-    expect(screen.getByRole("heading", { name: "Withdrawal request recorded" })).toBeTruthy();
-    expect(screen.getByText("Awaiting approval")).toBeTruthy();
-    expect(screen.getByText(/not confirmation of a completed bank payout/i)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Download request receipt" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Payout sent" })).toBeTruthy();
+    // The provider accepted it; that is not settlement, and the receipt says so.
+    expect(screen.getByText("Sent to bank")).toBeTruthy();
+    expect(screen.getByText(/once your bank confirms/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Download payout receipt" })).toBeTruthy();
   });
 
   it("never presents an uncertain request as a completed payout", async () => {
     vi.useFakeTimers();
     render(<WithdrawalReviewDialog review={review} onSubmit={vi.fn().mockResolvedValue({ ok: false, message: "Outcome unconfirmed." })} onClose={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Submit withdrawal request" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send payout" }));
     await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
-    expect(screen.getByRole("heading", { name: "Request needs attention" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Download request receipt" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Submit withdrawal request" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Payout needs attention" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Download payout receipt" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Send payout" })).toBeNull();
   });
 
   it("freezes bank details while resolving them and requires re-verification if the name changes", async () => {
@@ -253,8 +254,8 @@ describe("withdrawal request review", () => {
     fireEvent.click(screen.getByRole("button", { name: /Review withdrawal/ }));
     expect(screen.getByRole("heading", { name: "Review your withdrawal" })).toBeTruthy();
     expect(postCount).toBe(0);
-    fireEvent.click(screen.getByRole("button", { name: "Submit withdrawal request" }));
-    expect(await screen.findByRole("heading", { name: "Request needs attention" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Send payout" }));
+    expect(await screen.findByRole("heading", { name: "Payout needs attention" })).toBeTruthy();
     expect(postCount).toBe(1);
     expect(readWithdrawalIntents(localStorage, `pryva.withdrawal.pending.v1.${userId}`)).toEqual([{ requestId, amount: 6000, bankAccountId: bankId }]);
     fireEvent.click(screen.getByRole("button", { name: "View requests" }));

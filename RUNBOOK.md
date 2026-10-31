@@ -178,53 +178,32 @@ only a committed ledger entry is. If a verification fails, do not ask the custom
 to pay again until you have checked Paystack by reference.
 
 ### Withdrawals
-`pending → processing → completed|failed`. Approval claims the row and stores a
-unique Paystack reference **before** calling Paystack. Settlement now arrives
-through the signed webhook (see §7n):
+`processing → completed|failed`. The customer's request **is** the payout: the
+wallet is debited, the row is claimed and named with a Paystack reference, and the
+transfer is initiated — all before the response returns. There is no approval step.
 
-- `transfer.success` completes a `processing` row. A repeat of the same event is
-  a no-op; it cannot complete or pay anything twice.
-- `transfer.failed` / `transfer.abandoned` on a `processing` row marks it `failed`
-  and refunds the wallet `amount + fee` in one transaction, with a ledger entry.
-  A repeat is a no-op.
-- `transfer.reversed` also ends a row that had already been marked `completed` —
-  a bank can claw a payout back days later — and refunds it the same way.
-- A `transfer.failed` arriving after a success is a contradiction: it is **not**
-  applied, the row stays `completed`, and the event is logged for a person.
-- An event for an amount or currency we did not record is refused with a 400 and
-  changes nothing.
+- **Accepted** (Paystack `pending`/`processing`/`queued`): the row stays
+  `processing` with the transfer code. A signed `transfer.success`, or the nightly
+  sweep at 01:20, completes it. "Sent to bank" in the customer's UI means this.
+- **Refused** (`status: false`): the amount **and** fee are refunded with a ledger
+  row, and the row becomes `failed`. The customer is told, and the balance is right.
+- **Unknown** (timeout, 5xx, merchant `otp`, a response that does not match our
+  record): `processing` with a note, wallet still debited. Never refunded here —
+  that is how a payout gets paid twice. Read Paystack by reference first.
+- **Reversed later**: the bank claws the money back, the webhook ends the row and
+  refunds the wallet. The customer is made whole without anyone noticing it failed.
 
-What is left for a person is the exception:
+Exception actions, in order of preference:
 
-- An ambiguous transfer stays `processing`. Inspect Paystack by reference, amount
-  and recipient before doing anything else.
-- `complete` requires the stored initiation code plus `reconciliationConfirmed`
-  and a note. It is refused when there is no confirmed initiation. Use it only for
-  a transfer the provider never reported — otherwise let the webhook settle it.
-- `reject` refunds only a `pending` request with no provider reference. Once a
-  reference exists, reconcile before refunding.
-- Payouts may only go to the name frozen on the top-up that funded the wallet. A
-  profile rename cannot redirect money.
-- Merchant-side Paystack transfer OTP is not implemented; if Paystack asks for it,
-  complete that in the Paystack dashboard and record it in the reconciliation note.
+1. Wait for the nightly sweep, or press nothing and recheck Paystack: most
+   `processing` rows older than an hour are an event that was never delivered.
+2. `complete` requires the stored initiation code plus `reconciliationConfirmed`
+   and a note. Use it only when Paystack shows the transfer settled.
+3. `reject` refunds only a `pending` request with no provider reference — i.e. a
+   row created before payouts became instant. Once a reference exists, reconcile
+   before refunding.
 
-### Refunds
-Refunds use `POST /api/admin/refunds`. A `review` order needs
-`reconciliationConfirmed: true` **plus** a reason; a `processing` order cannot be
-refunded there at all. Refunding money without releasing a still-working unit
-flags the order for reconciliation — that flag is deliberate.
 
-### Marketplace orders stuck in `processing` / `review`
-There is no automatic resolver. Check the supplier with the recorded provider
-reference. If no request is in flight and the outcome is known, refund through the
-audited endpoint. Never blindly retry a purchase: the supplier offers no
-idempotency key and a retry can double-spend.
-
-### Gift cards
-Non-refundable by design, and issued from the buyer's own wallet — no supplier is
-involved. Treat support requests to refund one as policy questions, not bugs.
-
----
 
 ## 7. Monitoring
 
@@ -494,6 +473,39 @@ lands in `review` waits for an operator: confirm with the panel, then refund fro
 The supplier's name, service ids and wholesale rates never appear in customer
 copy or client bundles; `src/test/supplier-secrecy.test.ts` fails the build if
 they do.
+
+---
+
+## 7o. Payouts are instant — what that means for you
+
+There is no approval queue any more. A customer confirming a withdrawal debits the
+wallet and sends the transfer in the same request, so **you are not the gate**. The
+controls that replace the gate are all automatic and all before money moves: the
+destination name must match the name that funded the wallet, the amount must be
+inside the ₦1,000–₦5,000,000 band, a risk score is recorded (advisory, never
+blocking), and a request with no Paystack key is refused outright rather than
+accepted and stranded.
+
+**Your job is the exceptions, not the queue.** `/admin/withdrawals` now reads
+"Payouts". A row sitting in `processing` for more than an hour is an exception:
+look it up in Paystack by reference before touching it. The nightly job also asks
+Paystack about everything in flight older than ten minutes and settles it from the
+answer, so most exceptions resolve themselves by 01:20 — including ones where the
+webhook never arrived.
+
+**Three things will still land on you**, and all three are visible in the UI:
+
+| Case | What you see | What to do |
+|---|---|---|
+| Merchant OTP | `processing`, note says authorization required | Authorise in Paystack if you want it paid; the app does not refund it, because that transfer can still complete |
+| Provider refusal | `failed`, customer already refunded | Nothing, unless the reason repeats — then fix the cause (provider balance, blocked recipient) |
+| Unconfirmed outcome | `processing`, note says unconfirmed | Check Paystack; refund by hand only if it definitively did not send |
+
+**There is one thing to switch off, and it is in Paystack.** If merchant
+authorization (OTP) is enabled for transfers on your account, every payout stops at
+a human step this app cannot complete — the customer sees "Sent to bank" and the
+money waits for you. Check Paystack → Settings → Transfers. Instant payouts assume
+it is off.
 
 ---
 
