@@ -79,7 +79,15 @@ export function supplierItemsForCountry(snapshot: SupplierSnapshot, countryCode:
   for (const entry of snapshot.sms) {
     const id = readable(entry.id, 120), name = readable(entry.name, 80);
     if (!id || !name || !matchesCountry(entry.country, country.code)) continue;
-    const brand = VERIFICATION_EXAMPLES.find((item) => item.name.toLowerCase() === name.toLowerCase());
+    const lower = name.toLowerCase();
+    const brand = VERIFICATION_EXAMPLES.find((item) => {
+      const itemLower = item.name.toLowerCase();
+      if (itemLower === lower) return true;
+      if (item.brand === "x" && (lower === "twitter" || lower === "x.com")) return true;
+      if (item.brand === "chatgpt" && (lower === "openai" || lower.includes("chatgpt"))) return true;
+      if (item.brand === "google" && (lower === "gmail" || lower === "google mail")) return true;
+      return false;
+    });
     add({
       id: itemId("sms", id, country.code), category: "verification", name, description: "SMS verification listing",
       tag: brand?.tag ?? "Other", artwork: brand ? { kind: "brand", name: brand.brand } : { kind: "service", name: "numbers" },

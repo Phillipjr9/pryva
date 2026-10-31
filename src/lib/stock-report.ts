@@ -2,10 +2,7 @@ import type { BulkaccProduct } from "@/lib/bulkacc";
 import type { Plan } from "@/lib/catalog";
 import type { FleexaRentArea, FleexaSmsService } from "@/lib/fleexa";
 import { matchesCountry, type PlanIntent } from "@/lib/fulfillment";
-import { describeBoost, selectBoostServices } from "@/lib/smm-catalog";
-
-/** The intents the shop lists. Anything else is a feed row we do not sell. */
-const LISTED_TAGS = new Set(["Followers", "Likes", "Views", "Subscribers"]);
+import { describeBoost, LISTED_TAGS, selectBoostServices } from "@/lib/smm-catalog";
 import type { SmmService } from "@/lib/smm-panel";
 
 /**

@@ -47,15 +47,25 @@ function readable(value: string | null, max = 70): string | null {
 
 /** A plan covers a country only when the catalog says so explicitly. */
 function coversCountry(plan: BitcallEsimPlan, code: string, name: string): boolean {
-  const wanted = [code.toLowerCase(), name.toLowerCase()];
+  const wanted = [
+    code.toLowerCase(),
+    name.toLowerCase(),
+    ...(name.includes(",") ? [name.split(",")[0].trim().toLowerCase()] : []),
+    ...(name.includes("(") ? [name.replace(/\s*\([^)]*\)/g, "").trim().toLowerCase()] : []),
+  ];
   return plan.countries.some((entry) => {
     const value = entry.trim().toLowerCase();
-    return wanted.includes(value) || (code === "gb" && value === "uk") || (code === "us" && (value === "usa" || value === "united states of america"));
+    return (
+      wanted.includes(value) ||
+      (code === "gb" && value === "uk") ||
+      (code === "us" && (value === "usa" || value === "united states of america")) ||
+      (code === "ae" && value === "uae")
+    );
   });
 }
 
 function isGlobalRegion(plan: BitcallEsimPlan): boolean {
-  return /\b(?:global|world|worldwide)\b/i.test(plan.region ?? "");
+  return /\b(?:global|world|worldwide)\b/i.test(`${plan.region ?? ""} ${plan.name ?? ""}`);
 }
 
 /** Plan references are hashed; the provider's own identifiers never reach the browser. */
@@ -66,6 +76,14 @@ function itemId(planId: string): string {
 function planTag(plan: BitcallEsimPlan): string {
   const region = readable(plan.region, 24);
   return region ?? "eSIM";
+}
+
+function planDescription(plan: BitcallEsimPlan): string {
+  if (plan.allowance && plan.allowanceUnit) {
+    const validity = plan.validity ? ` · ${plan.validity} ${plan.validityUnit ?? "days"}` : "";
+    return `${plan.allowance}${plan.allowanceUnit}${validity} travel data`;
+  }
+  return "Travel data plan";
 }
 
 /**
@@ -106,7 +124,7 @@ export function esimItemsForCountry(snapshot: EsimSnapshot, countryCode: string)
       id,
       category: "esim",
       name,
-      description: "Travel data plan",
+      description: planDescription(plan),
       tag: planTag(plan),
       artwork: { kind: "service", name: "esim" },
       source: "live",
