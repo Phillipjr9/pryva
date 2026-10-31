@@ -5,9 +5,11 @@ import {
   discardInbox,
   InboxError,
   listInboxes,
+  mayHaveSpentMoney,
   messageFingerprint,
   pollInbox,
 } from "@/lib/disposable-inbox";
+import { FleexaError } from "@/lib/fleexa";
 
 /**
  * The free inbox spends real money every time one is created, so the tests that
@@ -18,6 +20,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   buy: vi.fn(),
+  products: vi.fn(),
   check: vi.fn(),
   cancel: vi.fn(),
   configured: vi.fn(),
@@ -31,12 +34,17 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/lib/fleexa", () => ({
-  buyFleexaEmail: mocks.buy,
-  checkFleexaEmail: mocks.check,
-  cancelFleexaEmail: mocks.cancel,
-  isFleexaConfigured: mocks.configured,
-}));
+vi.mock("@/lib/fleexa", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/fleexa")>();
+  return {
+    ...actual,
+    buyFleexaEmail: mocks.buy,
+    checkFleexaEmail: mocks.check,
+    cancelFleexaEmail: mocks.cancel,
+    isFleexaConfigured: mocks.configured,
+    listFleexaEmailProducts: mocks.products,
+  };
+});
 // Every level the real logger exposes: a partial mock turns a call to a missing
 // method into a TypeError that reads as a broken module rather than a broken test.
 vi.mock("@/lib/logger", () => ({
@@ -138,6 +146,11 @@ beforeEach(() => {
     mocks.state.calls.push("cancel");
   });
   mocks.check.mockResolvedValue({ messages: [], code: null, raw: {} });
+  // Default: one product, so the purchase names it. Tests that care override.
+  mocks.products.mockResolvedValue([
+    { id: "p-expensive", name: "30-day inbox", domain: null, priceNgn: 900, stock: 5 },
+    { id: "p-cheap", name: "10-minute inbox", domain: null, priceNgn: 100, stock: 5 },
+  ]);
 });
 
 afterEach(() => vi.resetAllMocks());
@@ -168,6 +181,51 @@ describe("the message fingerprint", () => {
 
   it("survives a mailbox whose fields are all missing", () => {
     expect(messageFingerprint({ subject: null, from: null, body: null, code: null, receivedAt: null })).toHaveLength(64);
+  });
+});
+
+describe("choosing what to buy", () => {
+  it("names the cheapest product with stock, because a free inbox is free to the customer", async () => {
+    await createFreeInbox(USER);
+    expect(mocks.buy).toHaveBeenCalledWith({ product: "p-cheap" });
+  });
+
+  it("skips a product the feed says has none left", async () => {
+    mocks.products.mockResolvedValue([
+      { id: "p-empty", name: "Sold out", domain: null, priceNgn: 50, stock: 0 },
+      { id: "p-stocked", name: "In stock", domain: null, priceNgn: 300, stock: 2 },
+    ]);
+    await createFreeInbox(USER);
+    expect(mocks.buy).toHaveBeenCalledWith({ product: "p-stocked" });
+  });
+
+  it("still buys when the product list cannot be read, rather than failing early", async () => {
+    mocks.products.mockRejectedValue(new FleexaError("Provider request failed", 502, "UPSTREAM_ERROR"));
+    await createFreeInbox(USER);
+    // The purchase falls back to the call it always made: some feeds need no product.
+    expect(mocks.buy).toHaveBeenCalledWith({});
+  });
+
+  it("does not invent a product when the feed lists none", async () => {
+    mocks.products.mockResolvedValue([]);
+    await createFreeInbox(USER);
+    expect(mocks.buy).toHaveBeenCalledWith({});
+  });
+});
+
+describe("deciding whether a failure may have cost money", () => {
+  it("treats a refusal as free, so the customer keeps their attempt", () => {
+    expect(mayHaveSpentMoney(new FleexaError("refused", 502, "UPSTREAM_ERROR"))).toBe(false);
+    expect(mayHaveSpentMoney(new FleexaError("slow down", 429, "RATE_LIMITED"))).toBe(false);
+    expect(mayHaveSpentMoney(new InboxError("DAILY_LIMIT", 429, "used today"))).toBe(false);
+    expect(mayHaveSpentMoney(new InboxError("NOT_CONFIGURED", 503, "off"))).toBe(false);
+  });
+
+  it("treats an ambiguous outcome as spent, so retries are not free", () => {
+    expect(mayHaveSpentMoney(new FleexaError("no answer", 502, "UPSTREAM_UNREACHABLE"))).toBe(true);
+    expect(mayHaveSpentMoney(new FleexaError("incomplete", 502, "INCOMPLETE_RECEIPT"))).toBe(true);
+    expect(mayHaveSpentMoney(new InboxError("RECONCILE_FAILED", 502, "checking"))).toBe(true);
+    expect(mayHaveSpentMoney(new Error("something else"))).toBe(true);
   });
 });
 

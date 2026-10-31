@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuthApi } from "@/lib/auth";
 import { clientIp } from "@/lib/auth-rate-limit";
 import { isPreviewDatabase } from "@/lib/demo-policy";
-import { createFreeInbox, InboxError, listInboxes } from "@/lib/disposable-inbox";
+import { createFreeInbox, InboxError, listInboxes, mayHaveSpentMoney } from "@/lib/disposable-inbox";
 import { isFleexaConfigured } from "@/lib/fleexa";
 import { logger } from "@/lib/logger";
 import { isSameOriginMutation } from "@/lib/net";
-import { apiRateLimiter, inboxCreateIpRateLimiter } from "@/lib/rate-limit";
+import { apiRateLimiter, inboxCreateIpRateLimiter, releaseRateLimit } from "@/lib/rate-limit";
 import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
@@ -31,8 +31,17 @@ export async function GET() {
     if (!limit.allowed) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
 
     const inboxes = await listInboxes(user.id);
+    // "Not switched on" covered two different situations and the page could not
+    // tell them apart: a preview deployment with no database behind it, and a
+    // deployment whose inbox feed has no credential. They need different fixes, so
+    // the response names the one that applies.
+    const reason = isPreviewDatabase()
+      ? ("preview" as const)
+      : !isFleexaConfigured()
+        ? ("not_configured" as const)
+        : null;
     return NextResponse.json(
-      { ok: true, inboxes, configured: isFleexaConfigured() && !isPreviewDatabase() },
+      { ok: true, inboxes, configured: reason === null, reason },
       { headers: { "cache-control": "no-store" } },
     );
   } catch (error) {
@@ -47,8 +56,21 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Cross-origin request denied" }, { status: 403 });
 
-    if (isPreviewDatabase() || !isFleexaConfigured()) {
-      return NextResponse.json({ error: "Temporary inboxes are not available in this environment." }, { status: 503 });
+    // Two different refusals, because they need two different fixes: a preview
+    // deployment has no database behind it, and a deployment without the inbox
+    // credential has nothing to buy from. One shared message made both look like
+    // "the feature is off".
+    if (isPreviewDatabase()) {
+      return NextResponse.json(
+        { error: "Temporary inboxes are unavailable on this deployment.", code: "PREVIEW" },
+        { status: 503 },
+      );
+    }
+    if (!isFleexaConfigured()) {
+      return NextResponse.json(
+        { error: "Temporary inboxes are not configured on this server.", code: "NOT_CONFIGURED" },
+        { status: 503 },
+      );
     }
 
     // Per-IP ceiling. Keyed by account instead when the IP cannot be determined,
@@ -79,13 +101,34 @@ export async function POST(request: NextRequest) {
       // An empty body is the normal case; a create takes no parameters.
     }
 
-    const inbox = await createFreeInbox(user.id);
-    return NextResponse.json({ ok: true, inbox }, { status: 201, headers: { "cache-control": "no-store" } });
+    try {
+      const inbox = await createFreeInbox(user.id);
+      return NextResponse.json({ ok: true, inbox }, { status: 201, headers: { "cache-control": "no-store" } });
+    } catch (error) {
+      // A failed attempt that cost nothing must not cost the customer tomorrow's
+      // inbox. The limiter counts attempts, so pressing a broken button three
+      // times used to lock that connection out for a day — turning one bug into a
+      // second, longer one. Where money may already have moved, the slot stands.
+      if (!mayHaveSpentMoney(error)) {
+        await releaseRateLimit(limitKey);
+      } else {
+        logger.error("Inbox creation may have spent without recording it", {
+          code: error instanceof Error && "code" in error ? String((error as { code: unknown }).code) : "unknown",
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+      throw error;
+    }
   } catch (error) {
     if (error instanceof InboxError) {
       return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     }
-    logger.error("Inbox creation failed", { reason: error instanceof Error ? error.message : String(error) });
+    logger.error("Inbox creation failed", {
+      // The provider's code, never its text: the message stays ours, and the code
+      // is what tells the owner whether this is a key, a price or an outage.
+      code: error instanceof Error && "code" in error ? String((error as { code: unknown }).code) : undefined,
+      reason: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json({ error: "Could not create an inbox." }, { status: 502 });
   }
 }

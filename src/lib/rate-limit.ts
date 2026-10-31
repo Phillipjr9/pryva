@@ -111,6 +111,45 @@ export const demoRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests
 export const authRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 5 });
 export const purchaseRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 10 });
 /**
+ * Give one slot back.
+ *
+ * Rate limits here count *attempts*, which is right when an attempt is the thing
+ * being protected against — but wrong when the attempt failed for a reason that
+ * cost nothing. The free-inbox limiter is the case that exposed it: it allows
+ * three creates per connection per day, and every failed attempt was burning one,
+ * so a customer who pressed a broken button three times was then told to come back
+ * tomorrow. That turns a bug into a lockout.
+ *
+ * Only ever decrements a live bucket, never below zero, and never extends a
+ * window: this cannot be used to buy extra allowance, only to undo a slot that
+ * was spent without the work happening. Callers must decide whether the failure
+ * was costless — releasing after a request that may have spent money would let an
+ * attacker retry a supplier call without limit.
+ */
+export async function releaseRateLimit(key: string): Promise<void> {
+  const hashedKey = digest(key);
+  if (isPreviewDatabase()) {
+    const record = previewStore.get(hashedKey);
+    if (record && Date.now() < record.resetTime) record.count = Math.max(0, record.count - 1);
+    return;
+  }
+  try {
+    await db.execute(sql`
+      UPDATE rate_limit_buckets
+      SET count = GREATEST(count - 1, 0)
+      WHERE key = ${hashedKey} AND reset_at > now()
+    `);
+  } catch (error) {
+    // Failing to give the slot back must never fail the request that already
+    // failed. The customer simply keeps a limit they did not use.
+    console.error(
+      "Rate-limit release failed:",
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
+/**
  * Refunds are the one customer action that both calls a provider and credits a
  * wallet, so it is throttled per account rather than per minute: ten genuine
  * refund requests in fifteen minutes is already unusual, and the eligibility
