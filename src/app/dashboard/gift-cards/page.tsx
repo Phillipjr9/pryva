@@ -12,7 +12,7 @@ export default async function GiftCardsPage() {
       <div>
         <ServiceTitle service="gift-cards">Gift Cards</ServiceTitle>
         <p className="mt-1 text-[0.86rem] text-ink-2">
-          Send Pryva credit to friends, family or team members.
+          Buy international digital gift cards (Steam, Apple, Google Play, PlayStation, Xbox, Amazon) with instant delivery, or send Pryva wallet credit.
         </p>
       </div>
       <GiftCardsManager user={user} />
