@@ -1373,3 +1373,50 @@ panel ⇒ the hub lists nothing to buy, the boost page 404s, and the API answers
 `503 {"ok":false,"error":"Boosting is not available right now. Nothing was charged."}`.
 A real purchase needs an owner-supplied panel key and endpoint; nothing was
 purchased against a supplier in this pass.
+
+## 33. Twenty-fifth pass — a 404 with a cartoon (31 Oct 2026)
+
+The 404 was a tidy card that apologised in prose. It is now a small animated
+cartoon: an astronaut who has drifted off the map, bobbing in a lavender sky with
+the digits of 404 floating around them like lost balloons.
+
+**It is drawn, not filmed.** The owner asked for an "animation cartoon live
+video"; this is a looping vector animation rather than an MP4, and that is a
+deliberate trade:
+
+| A video file would have needed | The vector scene instead |
+|---|---|
+| a decode, a poster frame and an autoplay policy | paints on the first frame and loops forever |
+| a bundle of megabytes on the one page nobody wanted | ~9 KB of inline SVG |
+| re-encoding for every breakpoint | sharp from 360 px to 4K |
+
+If a real video is still wanted later, it drops into the same card as a `<video>`
+next to this scene without touching the copy or the layout.
+
+**What moves** (`src/components/not-found/NotFoundScene.tsx`, keyframes in
+`globals.css`): the astronaut bobs and tilts, their eyes blink every six seconds,
+their right arm waves, the antenna glow pulses, twenty-one stars twinkle on
+staggered delays, two planets drift, the dashed tether crawls outward, the clouds
+slide, and a rocket crosses the sky every eighteen seconds. Every property is a
+`transform` or an `opacity`, so nothing reflows, and the existing global
+`prefers-reduced-motion` rule stops the whole scene without leaving a frame
+half-way through a slide.
+
+**The words still do the work.** "That page floated away. Your account didn't."
+says what happened and reassures that nothing was lost; the card offers *Back
+home* and *Go to dashboard*, and below it the Help centre and a route to a human.
+The scene is `aria-hidden` — a screen reader should not walk a doodle — and it
+contains no `<image>` and no URL, so the error page never waits on the network.
+
+One trap worth recording: `logo-removal.test.tsx` runs the 404 markup through
+`decodeURIComponent`, which throws on a stray `%`. SVG gradients written with
+`offset="0%"` were enough to break it, so the scene uses fraction values
+(`offset="0.52"`, `filter x="-0.4"`) instead — smaller markup and the older test
+untouched.
+
+**Verified:** 1,289 tests / 136 files · typecheck · lint · build. New
+`not-found-page.test.tsx` (4) checks the copy and the four exits, that the scene
+is decorative and network-free, that every `nf-*` class actually has an animation
+behind it in `globals.css`, and that the reduced-motion switch still exists. Live:
+`/definitely-not-a-page` answers 404 with the scene, both buttons and the
+compiled keyframes in the served CSS.
