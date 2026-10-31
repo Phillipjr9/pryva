@@ -17,10 +17,14 @@ export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
 
 const quickBuys = [
-  { label: "Number plans", note: "Single-use & rentals", href: "/dashboard/services?category=numbers", service: "numbers" as const },
-  { label: "eSIM data", note: "Travel data previews", href: "/dashboard/services?category=esim", service: "esim" as const },
-  { label: "Residential proxy", note: "Browse catalog plans", href: "/dashboard/services?category=proxies", service: "proxies" as const },
-  { label: "Email OTP", note: "Free temporary inbox", href: "/dashboard/services?category=email", service: "email-otp" as const },
+  { label: "Number plans", note: "Single-use & rentals", href: "/dashboard/services?country=ng&category=numbers", service: "numbers" as const },
+  { label: "Social boosts", note: "Followers, likes & views", href: "/dashboard/services?country=ng&category=social", service: "social-promotion" as const },
+  { label: "eSIM data", note: "120+ regional destinations", href: "/dashboard/services?country=ng&category=esim", service: "esim" as const },
+  { label: "Residential proxies", note: "Clean rotating IP pools", href: "/dashboard/services?country=ng&category=proxies", service: "proxies" as const },
+  { label: "Digital accounts", note: "Streaming & AI subscriptions", href: "/dashboard/services?country=ng&category=accounts", service: "accounts" as const },
+  { label: "Mobile data", note: "MTN, Airtel, Glo & 9mobile", href: "/dashboard/data", service: "data" as const },
+  { label: "Temporary inbox", note: "Free disposable email", href: "/dashboard/inbox", service: "email-otp" as const },
+  { label: "Bulk orders", note: "Volume basket discounts", href: "/dashboard/bulk-orders", service: "bulk" as const },
 ];
 
 function statusStyle(status: string) {
@@ -188,25 +192,25 @@ export default async function DashboardOverviewPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-[1rem] font-semibold">Explore categories</h2>
             <Link
-              href="/dashboard/services"
+              href="/dashboard/services?country=ng"
               className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline"
             >
               <Receipt className="h-3 w-3" /> All services
             </Link>
           </div>
-          <div className="mt-2.5 grid gap-1.5">
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {quickBuys.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
-                className="group flex items-center gap-2.5 rounded-xl border border-line bg-white px-3 py-2.5 transition-all hover:border-lav-200"
+                className="group flex items-center gap-2.5 rounded-xl border border-line bg-white p-2.5 transition-all hover:border-lav-300 hover:shadow-xs"
               >
                 <ServiceIcon service={item.service} size="sm" />
-                <span className="flex-1">
-                  <span className="block text-[0.8rem] font-semibold text-ink">{item.label}</span>
-                  <span className="block text-micro text-ink-3">{item.note}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[0.82rem] font-semibold text-ink group-hover:text-lav-700">{item.label}</span>
+                  <span className="block truncate text-micro text-ink-3">{item.note}</span>
                 </span>
-                <ArrowRight className="h-3.5 w-3.5 text-ink-3 transition-colors group-hover:text-lav-600" />
+                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-ink-3 transition-colors group-hover:text-lav-600" />
               </Link>
             ))}
           </div>
