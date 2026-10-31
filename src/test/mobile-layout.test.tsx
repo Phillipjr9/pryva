@@ -136,3 +136,22 @@ describe("tables on a narrow screen", () => {
     expect(offenders, `tables without a scroll container:\n${offenders.join("\n")}`).toHaveLength(0);
   });
 });
+
+describe("responsive overflow regressions", () => {
+  it("lets flex and grid children shrink instead of imposing min-content widths", () => {
+    expect(css).toContain(":where(.flex, .inline-flex, .grid) > * {");
+    expect(css).toContain("overflow-wrap: anywhere;");
+  });
+
+  it("keeps iOS input sizes above the zoom threshold even with text utilities or CSS modules", () => {
+    const rule = css.slice(css.lastIndexOf("@media"));
+    expect(rule).toContain("(max-width: 1023px), (pointer: coarse)");
+    expect(rule).toContain("font-size: max(1rem, 16px) !important;");
+  });
+
+  it("allows dashboard header actions to wrap on narrow screens", () => {
+    const shell = readFileSync("src/components/dashboard/DashboardShell.tsx", "utf8");
+    expect(shell).toContain("mb-4 flex flex-wrap items-center justify-between");
+    expect(shell).toContain("flex min-w-0 max-w-full flex-wrap items-center gap-1.5");
+  });
+});
