@@ -82,7 +82,7 @@ export default function DigitalServicesPage() {
                   </div>
                   <p className="text-sm text-ink-2 mb-4">{service.description}</p>
                   <div className="space-y-2 mb-4">
-                    {service.plans.slice(0, 2).map((plan) => (
+                    {service.plans.map((plan) => (
                       <div key={plan.id} className="flex items-center justify-between text-sm">
                         <span className="text-ink-2">{plan.name}</span>
                         <div className="text-right">
