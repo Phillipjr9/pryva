@@ -1127,7 +1127,32 @@ money. If a reason is wrong, the bug is in the fact it came from, not in the que
 - **No CAPTCHA and no device fingerprinting** — both were considered and both add a
   third party or a tracking surface for a problem the ceilings already bound.
 
-**Verified:** 1,220 tests / 129 files · typecheck · lint · build (new route:
+### 28.6 The alert has a design of its own
+
+The queue only helps if somebody is looking at it. High-severity signals now also
+send an operator email — and that email is built in the same shell as every customer
+receipt (gradient bar, 600px card, DM Sans and Manrope, a dark CTA) rather than as a
+bare log line, because the person reading it may be on a phone at midnight.
+
+It has its **own 3D hero**, `public/images/email/hero-fraud.jpg` — a glossy violet
+shield with an amber alert badge, rendered in the same lavender studio style as the
+seven receipt heroes rather than reusing the wallet or the parcel. A test pins the
+image path so a future template edit cannot quietly fall back to a receipt image.
+
+| Decision | Why |
+|---|---|
+| Only `high` is emailed | `warn` and `info` stay in the queue. An inbox that fires on a two-reason withdrawal stops being read, which is the same as no alert |
+| One alert per account and signal per 30 minutes | a script that trips a ceiling forty times must not send forty emails; the queue holds the rest |
+| Recipients come from `FRAUD_ALERT_EMAIL`, falling back to `ADMIN_EMAILS` | a shared security inbox may not be an admin login; a deployment with only `ADMIN_EMAILS` still gets alerts. Junk entries are dropped and the list is capped at five |
+| The customer is never mailed about a signal | the reasons are an internal opinion, not a finding, and the withdrawal itself is untouched |
+| Sent after the row is committed, with a 5s timeout, failures swallowed | a mail outage must not turn into a failed withdrawal, purchase or referral — the same rule `recordFraudEvent` already followed |
+
+Nothing in the email is a threshold, a hash or a network address: it carries the
+signal name, the severity, the account, the amount or reference, and the reasons in
+words, plus a link straight to `/admin/security`. Values that come from data are
+HTML-escaped.
+
+**Verified:** 1,241 tests / 130 files · typecheck · lint · build (new route:
 `/api/admin/security/fraud`). New suites: `fraud.test.ts` (19 — hashing is one-way,
 salted and stable; signals are written once and store no address; the assessment is
 silent about a mature account, flags a new one on a new destination, a withdrawal that
@@ -1137,4 +1162,9 @@ records reasons, empties once and never fails its caller; and a referral between
 accounts on one network is voided and logged while a genuine one is still paid) and
 `fraud-ui.test.tsx` (9 — the queue is admin-only and advisory, the withdrawal receipt
 never mentions risk, the customer is told to slow down and not why, and the reasons
-reach the operator).
+reach the operator) and `fraud-alerts.test.ts` (21 — the template has its own hero,
+subject, preheader and text fallback for every signal, escapes data, publishes no
+threshold or hash and says plainly that it moved no money; recipients prefer
+`FRAUD_ALERT_EMAIL` and fall back to `ADMIN_EMAILS`; warn events are never mailed; a
+repeat inside the window is suppressed while a different signal still rings; and an
+unconfigured or failing mail API resolves `false` rather than throwing).

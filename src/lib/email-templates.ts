@@ -512,3 +512,189 @@ export function emailVerificationEmail(name: string, verifyLink: string): EmailT
     preheader,
   };
 }
+
+/**
+ * Escape text that came from data rather than from this file.
+ *
+ * Alert copy includes an account address, a reference and the reason strings the
+ * detector produced. None of them are attacker-controlled today, but an email is
+ * a place where a stray `<` should never be able to change the layout of an
+ * operator's inbox.
+ */
+function escapeEmailText(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+const FRAUD_KIND_LABELS: Record<string, { label: string; heading: string; summary: string }> = {
+  withdrawal_review: {
+    label: "Withdrawal review",
+    heading: "A withdrawal needs your review",
+    summary:
+      "A withdrawal request scored high enough to warrant a second look. Nothing was blocked: the payout is still pending, so the money has not moved and is waiting on your decision.",
+  },
+  withdrawal_velocity: {
+    label: "Withdrawal velocity",
+    heading: "Withdrawals are arriving quickly",
+    summary:
+      "One account requested more payouts in a day than the ceiling allows. The extra request is held in the queue rather than paid automatically.",
+  },
+  referral_same_network: {
+    label: "Referral reward voided",
+    heading: "A referral reward was voided",
+    summary:
+      "A referral reward was withheld because the referrer and the referee reached Pryva from the same network. The reward was not paid; the referee's order is unaffected.",
+  },
+  purchase_velocity: {
+    label: "Purchase velocity",
+    heading: "A purchase ceiling was hit",
+    summary:
+      "One account crossed the hourly purchase ceiling, so further purchases were refused for the rest of the hour. Nothing that was already paid for was cancelled.",
+  },
+  gift_card_velocity: {
+    label: "Gift-card velocity",
+    heading: "A gift-card ceiling was hit",
+    summary:
+      "One account crossed the daily gift-card redemption ceiling. Further redemptions were refused for the rest of the day; cards already redeemed are untouched.",
+  },
+};
+
+/**
+ * Operator-facing fraud alert.
+ *
+ * Deliberately a different email from every customer receipt: its own 3D hero
+ * (a shield rather than a wallet or a parcel), a severity-tinted eyebrow, and a
+ * "why this fired" list so the reader does not have to open the queue to know
+ * what happened. It goes only to the addresses in FRAUD_ALERT_EMAIL, falling back
+ * to ADMIN_EMAILS — never to the customer whose action triggered it, because the
+ * reasons are an internal opinion, not a finding.
+ */
+export function fraudAlertEmail(alert: {
+  kind: string;
+  severity: "high" | "warn" | "info";
+  reasons: string[];
+  amount?: number | null;
+  reference?: string | null;
+  accountEmail?: string | null;
+  detectedAt?: Date;
+}): EmailTemplate {
+  const copy = FRAUD_KIND_LABELS[alert.kind] ?? {
+    label: "Fraud signal",
+    heading: "A fraud signal needs review",
+    summary: "A fraud signal was recorded and is waiting in the operator queue.",
+  };
+  const severityLabel = alert.severity === "high" ? "High" : alert.severity === "warn" ? "Warn" : "Info";
+  const accent =
+    alert.severity === "high" ? "#c0392b" : alert.severity === "warn" ? "#b26a00" : config.accentColor;
+  const detectedAt = alert.detectedAt ?? new Date();
+  const detected = detectedAt.toLocaleString("en-NG", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Africa/Lagos",
+  });
+  const amount = typeof alert.amount === "number" ? `₦${alert.amount.toLocaleString()}` : null;
+  const preheader = `${copy.label} · ${severityLabel.toLowerCase()} severity · ${alert.reasons.length} reason${
+    alert.reasons.length === 1 ? "" : "s"
+  } to read.`;
+
+  const infoRow = (label: string, value: string, last = false) => `
+      <tr>
+        <td style="padding:11px 0;border-bottom:${last ? "none" : `1px solid ${config.cardBorder}`};font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:12.5px;line-height:1.4;font-weight:500;color:${config.textSecondary};">${label}</td>
+        <td align="right" style="padding:11px 0;border-bottom:${last ? "none" : `1px solid ${config.cardBorder}`};font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:13.5px;line-height:1.4;font-weight:600;color:${config.darkColor};">${value}</td>
+      </tr>`;
+
+  const rows = [
+    infoRow("Signal", copy.label),
+    infoRow(
+      "Severity",
+      `<span style="color:${accent};">${severityLabel}</span>`,
+    ),
+    ...(alert.accountEmail ? [infoRow("Account", escapeEmailText(alert.accountEmail))] : []),
+    ...(amount ? [infoRow("Amount", amount)] : []),
+    ...(alert.reference ? [infoRow("Reference", escapeEmailText(alert.reference))] : []),
+    infoRow("Detected", detected, true),
+  ].join("");
+
+  const reasons = alert.reasons.length
+    ? `<ul style="margin:8px 0 0;padding-left:18px;">${alert.reasons
+        .map(
+          (reason) =>
+            `<li style="margin:0 0 4px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:13.5px;line-height:1.55;color:${config.textColor};">${escapeEmailText(reason)}</li>`,
+        )
+        .join("")}</ul>`
+    : "";
+
+  const content = `
+    <tr>
+      <td align="center" style="padding:0 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;" class="email-container">
+          <tr>
+            <td style="background-color:${config.cardBackground};border:1px solid ${config.cardBorder};border-radius:18px;overflow:hidden;">
+              <div style="height:5px;line-height:5px;font-size:0;background-color:${config.primaryColor};background-image:${config.primaryGradient};"> </div>
+              <img src="${config.siteUrl}/images/email/hero-fraud.jpg" width="600" alt="Pryva security shield" style="display:block;width:100%;max-width:600px;height:auto;border:0;outline:none;text-decoration:none;">
+              <div style="padding:32px 36px 30px;" class="email-padding">
+      <div style="margin:0 0 12px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${accent};">Fraud Signal &middot; ${severityLabel}</div>
+      <h1 style="margin:0 0 14px;font-family:'Manrope', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:27px;line-height:1.16;font-weight:600;letter-spacing:-.6px;color:${config.darkColor};">${copy.heading}</h1>
+      <p style="margin:0 0 14px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:15px;line-height:1.65;font-weight:400;color:${config.textColor};text-align:left;">${copy.summary}</p>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;background:${config.infoBackground};border:1px solid ${config.infoBorder};border-radius:12px;">
+    <tr><td style="padding:4px 18px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+    </td></tr>
+  </table>
+
+  ${
+    reasons
+      ? `<div style="margin:18px 0 4px;padding:15px 18px;border-radius:12px;background:${config.infoBackground};border:1px solid ${config.infoBorder};">
+      <div style="font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:${config.textSecondary};">Why this fired</div>
+      ${reasons}
+    </div>`
+      : ""
+  }
+
+  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0 4px;">
+    <tr>
+      <td align="center" bgcolor="${config.darkColor}" style="border-radius:12px;">
+        <a href="${config.siteUrl}/admin/security" style="display:inline-block;padding:14px 30px;border-radius:12px;background:${config.darkColor};font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:14px;font-weight:600;line-height:1;color:#ffffff;text-decoration:none;white-space:nowrap;">Open the fraud queue  &#8594;</a>
+      </td>
+    </tr>
+  </table>
+      <p style="margin:18px 0 2px;padding:13px 16px;border-radius:11px;background:${config.infoBackground};border:1px solid ${config.infoBorder};font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.6;color:${config.textSecondary};">This alert goes only to the operators configured for Pryva. A signal never moves money on its own &mdash; no payout is released, cancelled or refunded because of an email.</p>
+    </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>`;
+
+  const textLines = [
+    `${copy.label} — ${severityLabel.toLowerCase()} severity`,
+    "",
+    copy.summary,
+    "",
+    `Detected: ${detected}`,
+    ...(alert.accountEmail ? [`Account: ${alert.accountEmail}`] : []),
+    ...(amount ? [`Amount: ${amount}`] : []),
+    ...(alert.reference ? [`Reference: ${alert.reference}`] : []),
+    "",
+    "Why this fired:",
+    ...alert.reasons.map((reason) => `- ${reason}`),
+    "",
+    `Open the fraud queue: ${config.siteUrl}/admin/security`,
+    "",
+    "A signal never moves money on its own; the queue is where the decision is made.",
+  ];
+
+  return {
+    subject: `Fraud signal: ${copy.label} (${severityLabel.toLowerCase()})`,
+    html: emailWrapper(content, preheader),
+    text: textLines.join("\n"),
+    preheader,
+  };
+}

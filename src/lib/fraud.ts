@@ -13,6 +13,7 @@ import {
   withdrawals,
 } from "@/db/schema";
 import { clientIp } from "@/lib/auth-rate-limit";
+import { sendFraudAlertForEvent } from "@/lib/fraud-alerts";
 import { logger } from "@/lib/logger";
 
 /**
@@ -185,11 +186,15 @@ export async function assessWithdrawal(input: {
 }
 
 /**
- * Write a signal to the operator's queue.
+ * Write a signal to the operator's queue, and ring the doorbell.
  *
  * Never throws. It is called from inside money paths, and a failed audit insert
  * is not a reason to fail a purchase or a payout — the log records it and the
  * action stands.
+ *
+ * The email is sent after the row is committed and every failure inside it is
+ * swallowed by `sendFraudAlertForEvent`, so a mail outage is invisible to the
+ * caller in the only way that matters: the money path still completes.
  */
 export async function recordFraudEvent(input: {
   userId?: string | null;
@@ -201,15 +206,19 @@ export async function recordFraudEvent(input: {
   ipHash?: string | null;
 }): Promise<void> {
   try {
-    await db.insert(fraudEvents).values({
-      userId: input.userId ?? null,
-      kind: input.kind,
-      severity: input.severity ?? "warn",
-      reasons: input.reasons.join("; ").slice(0, 2_000),
-      amount: input.amount ?? null,
-      reference: input.reference ?? null,
-      ipHash: input.ipHash ?? null,
-    });
+    const [row] = await db
+      .insert(fraudEvents)
+      .values({
+        userId: input.userId ?? null,
+        kind: input.kind,
+        severity: input.severity ?? "warn",
+        reasons: input.reasons.join("; ").slice(0, 2_000),
+        amount: input.amount ?? null,
+        reference: input.reference ?? null,
+        ipHash: input.ipHash ?? null,
+      })
+      .returning({ id: fraudEvents.id });
+    if (row?.id) await sendFraudAlertForEvent(row.id);
   } catch (error) {
     logger.warn("Could not record fraud event", { kind: input.kind, error: error instanceof Error ? error.message : "unknown" });
   }
