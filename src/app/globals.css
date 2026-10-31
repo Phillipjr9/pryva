@@ -56,6 +56,19 @@
     background-color: var(--color-cream);
     color: var(--color-ink);
     font-family: var(--font-sans);
+    overflow-wrap: anywhere;
+  }
+
+  /* Flex/grid min-content sizing must not let addresses, references or wide
+     tables force their parent wider than the viewport. Explicit min-w utilities
+     still win when a locally scrollable surface needs a minimum width. */
+  :where(.flex, .inline-flex, .grid) > * {
+    min-width: 0;
+  }
+
+  input, select, textarea {
+    min-width: 0;
+    max-width: 100%;
   }
 
   ::selection {
@@ -147,7 +160,10 @@
     padding: 0.9rem 1.35rem;
     transition: transform 200ms ease, box-shadow 200ms ease, background-color 200ms ease,
       color 200ms ease, border-color 200ms ease;
-    white-space: nowrap;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
   }
 
   .btn:hover {
@@ -468,5 +484,16 @@
   .reveal {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* Keep this outside Tailwind's layers: text utilities and CSS-module fields
+   otherwise override the 16px iOS focus-zoom threshold. Include landscape
+   phones and tablets, not just portrait widths below 640px. */
+@media (max-width: 1023px), (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: max(1rem, 16px) !important;
   }
 }
