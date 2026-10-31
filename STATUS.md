@@ -1420,3 +1420,60 @@ is decorative and network-free, that every `nf-*` class actually has an animatio
 behind it in `globals.css`, and that the reduced-motion switch still exists. Live:
 `/definitely-not-a-page` answers 404 with the scene, both buttons and the
 compiled keyframes in the served CSS.
+
+## 34. Twenty-sixth pass — boosting pointed at a real panel (31 Oct 2026)
+
+The owner is using **justanotherpanel.com** (API v2) for boosting, so the
+integration stopped being a shape on paper and met a real catalogue. Two things
+had to change before a real panel could be sold from: the shop had no idea how
+much of it to show, and nothing told an operator why a configured panel was not
+selling.
+
+**A real panel is not a shop.** That supplier returns thousands of services —
+dozens of near-identical "Instagram followers" offers, plus SEO, web traffic,
+reviews, Spotify plays and panel cosmetics. `boostItems` used to map every row to
+a card, which on a real catalogue is a megabyte of JSON and a thousand cards on a
+phone. `selectBoostServices` now decides what is for sale:
+
+| Rule | Why |
+|---|---|
+| must match one of the seven platforms the hub knows | a boost has to say what it boosts; "Soundcloud plays" has no mark and no chip |
+| must be followers, likes, views or subscribers | those are the four intents a customer can filter by; comments, shares and saves have no chip and cannot be compared |
+| must be priced | an unpriced card cannot take money, and a USD panel with no rate would otherwise fill the shop with dead listings |
+| one offer per platform + intent | preferring one that includes a refill, then the cheapest thousand units, then the smallest minimum |
+
+So the shop is at most **28 cards** — seven platforms × four intents — whatever
+the panel returns, and `findBoostListing` selects identically, so a stale link
+cannot buy something the catalogue has stopped listing.
+
+**Switching it on is now observable.** `/admin/boosting` shows the ordered
+checklist (key, endpoint, margin, naira rate, the human test order), and **Run
+live check** asks the supplier two read-only questions — balance and catalogue —
+then reports reachability, billing currency, balance, and how many of its services
+are actually listed. It cannot place, refill or cancel an order; it never displays
+the key; and an unpriced catalogue names the missing variable instead of
+shrugging. `GET /api/admin/boosting` is admin-only, `no-store`, and maps a
+supplier failure to a sentence rather than a 500.
+
+**Configuration applied** (`.env.local`, gitignored; the same values must live in
+the deployment's environment): `SMM_PANEL_API_URL=https://justanotherpanel.com/api/v2`,
+`SMM_MARKUP_PERCENT=35`, `SMM_USD_NGN_RATE=1400`. The panel bills in USD and the
+rate is set above both the official (₦1,347) and street (₦1,385) rates for
+31 Oct 2026, because the dollars to fund it are bought — a rate below the cost of
+buying them sells every boost at a loss. `SMM_PANEL_API_KEY` is the one setting
+left, and it is the owner's to add: a credential does not belong in chat.
+
+**Verified:** 1,312 tests / 140 files · typecheck · lint · build. New
+`boosting-readiness.test.ts` (5), `admin-boosting-route.test.ts` (8),
+`admin-boosting-page.test.tsx` (4), `admin-boosting-ui.test.tsx` (3), plus three
+selection tests that pin the collapse, the non-social drop and the 28-card cap on
+an 11,200-service catalogue. `smm-catalog.test.ts` was rewritten where it assumed
+every panel row becomes a card. Live with the endpoint set and no key: the hub
+lists no boosts, the purchase page 404s, and the order API answers
+`503 {"ok":false,"error":"Boosting is not available right now. Nothing was charged."}` —
+fail-closed, nothing charged, nothing logged as an error.
+
+**What is still true:** no boost has been purchased from this supplier yet. The
+first real order is the owner's to place — smallest quantity, then read its status
+back — because that is the only proof the panel's billing currency, minimums and
+delivery all behave as documented.

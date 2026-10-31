@@ -14,8 +14,10 @@ vi.mock("@/lib/smm-panel", () => ({
 
 function service(overrides: Partial<SmmService> = {}): SmmService {
   return {
+    // A sellable default: naira-billed, priced, on a platform the hub lists. Tests
+    // that need a USD panel or an unusable service override it explicitly.
     id: "svc-101", name: "Instagram Followers", category: "Instagram - Followers", type: "Default",
-    ratePer1000: 0.74, currency: "USD", min: 10, max: 10_000_000,
+    ratePer1000: 1_500, currency: "NGN", min: 100, max: 10_000_000,
     refill: true, cancel: true, dripfeed: false,
     ...overrides,
   };
@@ -33,21 +35,22 @@ beforeEach(() => {
 });
 
 describe("boosting catalog listings", () => {
-  it("prices a listing only when the supplier's currency can be converted honestly", async () => {
+  it("lists nothing from a USD panel until a naira rate exists", async () => {
     const { boostItems } = await import("@/lib/smm-catalog");
+    const usdPanel = service({ currency: "USD", ratePer1000: 0.74, min: 10 });
 
-    // A USD panel with no configured naira rate has no defensible retail price,
-    // so it stays read-only rather than inventing an exchange rate.
+    // No rate means no defensible retail price. Rather than a shop full of cards
+    // that cannot be bought, the hub lists nothing and the admin checklist says
+    // why — inventing an exchange rate is how a platform sells below cost.
     delete process.env.SMM_USD_NGN_RATE;
-    const usd = boostItems(snapshot([service()]))[0];
-    expect(usd).toMatchObject({ price: null, action: null, stock: null, myUnits: null });
+    expect(boostItems(snapshot([usdPanel]))).toHaveLength(0);
 
-    // Give it a rate and the same listing becomes buyable: 0.74 USD per 1,000 at
-    // ₦1,600 and a 35% margin is ₦1,598.40 per 1,000, and the smallest order the
-    // panel accepts is 10 units.
+    // With a rate the same service becomes a real listing: 0.74 USD per 1,000 at
+    // ₦1,600 and a 35% margin is ₦1,598.40 per 1,000, and the panel's smallest
+    // order is 10 units.
     process.env.SMM_USD_NGN_RATE = "1600";
     try {
-      const priced = boostItems(snapshot([service()]))[0];
+      const priced = boostItems(snapshot([usdPanel]))[0];
       expect(priced.price).toBe(16); // ceil(1598.4 * 10 / 1000)
       expect(priced.priceFrom).toBe(true);
       expect(priced.action).toEqual({ label: "Buy boost", href: `/dashboard/services/boost/${priced.id}` });
@@ -72,9 +75,12 @@ describe("boosting catalog listings", () => {
 
   it("hides the panel's service identifiers and wholesale rate", async () => {
     const { boostItems } = await import("@/lib/smm-catalog");
-    const serialized = JSON.stringify(boostItems(snapshot([service({ id: "svc-secret-999", ratePer1000: 0.74 })])));
+    const serialized = JSON.stringify(boostItems(snapshot([service({ id: "svc-secret-999", ratePer1000: 1_500 })])));
     expect(serialized).not.toContain("svc-secret-999");
-    expect(serialized).not.toContain("0.74");
+    // The retail total for the smallest order (100 units at ₦2,025/1,000 = ₦203)
+    // is what ships; the wholesale rate per thousand is not.
+    expect(serialized).not.toContain("1500");
+    expect(serialized).toContain('"price":203');
     expect(serialized).not.toContain("177.69");
     expect(boostItems(snapshot([service()]))[0].id).toMatch(/^live-boost-[0-9a-f]{20}$/);
   });
@@ -97,30 +103,30 @@ describe("boosting catalog listings", () => {
       service({ id: "4", name: "WhatsApp API likes", category: "Supplier deals" }),
     ];
     const items = boostItems(snapshot(tainted));
-    // Coverage must not depend on how a panel words its catalog, so a tainted
-    // name falls back to a synthetic one instead of dropping the listing.
-    expect(items).toHaveLength(4);
+    // A tainted name falls back to a synthetic one instead of dropping a listing
+    // on a platform the hub actually sells; the WhatsApp entry is not listed at
+    // all, because WhatsApp status views are not one of the seven platforms the
+    // shop offers (and its name is a supplier's, not a product's).
+    expect(items).toHaveLength(3);
     const serialized = JSON.stringify(items).toLowerCase();
     for (const banned of ["cheapfollows", "smm", "panel", "reseller", "supplier", "wholesale", "api"]) {
       expect(serialized, banned).not.toContain(banned);
     }
-    expect(items.map((item) => item.name)).toEqual([
-      "Instagram likes", "TikTok views", "YouTube subscribers", "Social likes",
-    ]);
+    expect(items.map((item) => item.name)).toEqual(["Instagram likes", "TikTok views", "YouTube subscribers"]);
   });
 
-  it("derives the four filterable tags and keeps everything else under its own", async () => {
+  it("lists the four intents a customer can filter by, and nothing else", async () => {
     const { boostItems } = await import("@/lib/smm-catalog");
     const items = boostItems(snapshot([
       service({ id: "1", name: "Instagram Followers", category: "Instagram" }),
       service({ id: "2", name: "Instagram Likes", category: "Instagram" }),
       service({ id: "3", name: "TikTok Views", category: "TikTok" }),
       service({ id: "4", name: "YouTube Subscribers", category: "YouTube" }),
+      // Comments, shares and saves are real panel products and not part of the
+      // shop: they have no chip, and a customer cannot tell them apart.
       service({ id: "5", name: "Custom Comments", category: "Instagram - Comments" }),
     ]));
-    expect(items.map((item) => item.tag)).toEqual([
-      "Followers", "Likes", "Views", "Subscribers", "Instagram - Comments",
-    ]);
+    expect(items.map((item) => item.tag)).toEqual(["Followers", "Likes", "Views", "Subscribers"]);
   });
 
   it("matches a platform for artwork without matching a single letter loosely", async () => {
@@ -132,19 +138,77 @@ describe("boosting catalog listings", () => {
       // No known platform: falls back to a generic mark rather than a wrong brand.
       service({ id: "3", name: "Soundcloud Plays", category: "Soundcloud" }),
     ]));
+    expect(items.map((item) => item.platform)).toEqual(["X", "Instagram"]);
     expect(items[0]).toMatchObject({ platform: "X", artwork: { kind: "brand", name: "x" } });
     expect(items[1]).toMatchObject({ platform: "Instagram", artwork: { kind: "brand", name: "instagram" } });
-    expect(items[2]).toMatchObject({ platform: undefined, tag: "Views", artwork: { kind: "service", name: "bulk" } });
+    // No known platform means not listed: a generic mark on a real storefront
+    // would be selling a boost without saying what it boosts.
+    expect(items.some((item) => item.name.includes("Soundcloud"))).toBe(false);
   });
 
-  it("synthesizes a listing when the panel reports neither a usable name nor category", async () => {
+  it("does not list a service it cannot describe or place on a platform", async () => {
     const { boostItems } = await import("@/lib/smm-catalog");
-    // No name and no category still yields a listing, because the panel did
-    // report a service that can be ordered. Dropping it would silently reduce
-    // coverage based on how one panel words its catalog.
-    const [item] = boostItems(snapshot([service({ name: null, category: null })]));
-    expect(item.name).toBe("Social other");
-    expect(item.tag).toBe("Other");
+    // A name and category are how the shop knows what it is selling. Rather than
+    // invent "Social other", the service is left out — the panel still sells it,
+    // we simply cannot promise a customer what it does.
+    expect(boostItems(snapshot([service({ name: null, category: null })]))).toHaveLength(0);
+  });
+});
+
+describe("selecting from a real panel catalogue", () => {
+  it("collapses near-identical offers to one per platform and intent", async () => {
+    const { selectBoostServices } = await import("@/lib/smm-catalog");
+    // The shape a production panel actually returns: many variants of the same
+    // product, priced by speed and quality.
+    const catalogue = [
+      service({ id: "a", name: "Instagram Followers | 30 days refill", category: "Instagram", ratePer1000: 2_400, refill: true }),
+      service({ id: "b", name: "Instagram Followers | no refill", category: "Instagram", ratePer1000: 1_800, refill: false }),
+      service({ id: "c", name: "Instagram Followers | 90 days refill", category: "Instagram", ratePer1000: 3_100, refill: true }),
+      service({ id: "d", name: "Instagram Likes", category: "Instagram", ratePer1000: 400, refill: false }),
+      service({ id: "e", name: "TikTok Views", category: "TikTok", ratePer1000: 90 }),
+    ];
+    const selection = selectBoostServices(catalogue, "NGN");
+    expect(selection.considered).toBe(5);
+    expect(selection.listed).toBe(3);
+    // Refill wins over a cheaper offer without it; among refill offers the
+    // cheapest survives. A boost that drops off in a day is not the same product.
+    expect(selection.services.map((entry) => entry.id).sort()).toEqual(["a", "d", "e"]);
+  });
+
+  it("drops inventory that is not a social boost at all", async () => {
+    const { selectBoostServices } = await import("@/lib/smm-catalog");
+    const selection = selectBoostServices([
+      service({ id: "seo", name: "Website Traffic", category: "SEO" }),
+      service({ id: "spot", name: "Spotify Plays", category: "Spotify" }),
+      service({ id: "rev", name: "Trustpilot Reviews", category: "Reviews" }),
+      service({ id: "ig", name: "Instagram Followers", category: "Instagram" }),
+    ], "NGN");
+    expect(selection.considered).toBe(4);
+    expect(selection.services.map((entry) => entry.id)).toEqual(["ig"]);
+  });
+
+  it("keeps a large catalogue to a shop-sized list", async () => {
+    const { selectBoostServices } = await import("@/lib/smm-catalog");
+    const { PROMOTION_EXAMPLES } = await import("@/lib/service-explorer");
+    // Eleven thousand services: 400 variants per platform and intent.
+    const catalogue = PROMOTION_EXAMPLES.map((entry) => entry.name).flatMap((platform) =>
+      ["Followers", "Likes", "Views", "Subscribers"].flatMap((tag) =>
+        Array.from({ length: 400 }, (_, index) =>
+          service({
+            id: `${platform}-${tag}-${index}`,
+            name: `${platform} ${tag}`,
+            category: platform,
+            ratePer1000: 1_000 + index,
+          }),
+        ),
+      ),
+    );
+    expect(catalogue).toHaveLength(11_200);
+    const selection = selectBoostServices(catalogue, "NGN");
+    // Seven platforms × four intents, one offer each — and every one priced.
+    expect(selection.listed).toBe(28);
+    expect(selection.services).toHaveLength(28);
+    expect(new Set(selection.services.map((entry) => entry.name)).size).toBe(28);
   });
 });
 

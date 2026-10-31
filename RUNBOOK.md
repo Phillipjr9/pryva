@@ -416,6 +416,23 @@ Boosts are **live purchases**: wallet money out, a supplier order in. The flow i
 `POST /api/boosts/order` → `placeBoostOrder` → wallet debit + `orders` row in one
 transaction → one supplier order → `active` (or refund).
 
+**What is configured today.** The supplier endpoint is
+`https://justanotherpanel.com/api/v2` (API v2, form-encoded `key` + `action`),
+set in the environment as `SMM_PANEL_API_URL`. That panel bills in **USD**, so
+`SMM_USD_NGN_RATE` is required — it is set to **1400**, above both the official
+(₦1,347) and street (₦1,385) rates for 31 Oct 2026, because dollars to fund the
+panel are bought rather than awarded and a lower number sells at a loss. The key
+is the last switch: put it in the deployment's secret store as
+`SMM_PANEL_API_KEY`, then open **/admin/boosting** and press **Run live check**.
+
+**A large panel is not a large shop.** This supplier returns thousands of
+services; Pryva lists at most **28** — one offer per platform (Instagram, TikTok,
+YouTube, Facebook, X, Telegram, Twitch) and intent (followers, likes, views,
+subscribers), preferring one with a refill and then the cheapest. SEO, web
+traffic, reviews, comments and shares are deliberately not listed. The selection
+is `selectBoostServices` in `src/lib/smm-catalog.ts` and it is covered by
+`smm-catalog.test.ts`; the admin live check reports "listed of returned".
+
 **Turning it on.** Three settings, all on the server:
 
 | Variable | Effect when unset |
