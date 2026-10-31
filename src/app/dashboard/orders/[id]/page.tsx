@@ -12,6 +12,7 @@ import { ArrowLeft } from "@/components/icons";
 import { CredentialList } from "./CredentialList";
 import { OrderActions } from "@/components/dashboard/OrderActions";
 import { LIVE_OTP_PROVIDER } from "@/lib/order-providers";
+import { syncBoostOrderStatus, type BoostSyncResult } from "@/lib/boost-status";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -25,6 +26,24 @@ function parseAccounts(raw: string | null): string[] {
     // A single credential string, or something written before the JSON column.
     return raw.trim() ? [raw] : [];
   }
+}
+
+/**
+ * One line of delivery progress, in the customer's language.
+ *
+ * The panel speaks in `remains`; a person wants "340 of 1,000 delivered". Nothing
+ * here names where the units come from -- that is a sourcing detail and it has no
+ * place on a customer's receipt.
+ */
+function progressLine(sync: BoostSyncResult, quantity: number | null): string | null {
+  if (!sync.synced) return null;
+  if (sync.remains !== null && quantity && quantity > 0) {
+    const delivered = Math.max(0, quantity - sync.remains);
+    return `${delivered.toLocaleString("en-NG")} of ${quantity.toLocaleString("en-NG")} delivered so far.`;
+  }
+  if (sync.reportedState === "pending") return "Queued — delivery has not started yet.";
+  if (sync.reportedState === "in_progress") return "Delivery is under way.";
+  return null;
 }
 
 export default async function OrderDetailsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -46,10 +65,17 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
     notFound();
   }
 
+  // Ask the delivery side how far this order has got, for boosts only. Best
+  // effort: an unreachable panel leaves the stored status in place rather than
+  // failing the order page.
+  const boostSync = await syncBoostOrderStatus(order);
+  const status = boostSync.status ?? order.status;
+
   const credentials = parseAccounts(order.accounts);
   // Share the request-time clock with the client for hydration-safe countdowns.
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
+  const progress = progressLine(boostSync, order.quantity ?? null);
 
   const statusColors = {
     active: "info",
@@ -135,8 +161,8 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                   </div>
                   <div>
                     <p className="text-[0.82rem] text-ink-3 mb-1">Status</p>
-                    <Badge variant={statusColors[order.status as keyof typeof statusColors] || "default"}>
-                      {order.status}
+                    <Badge variant={statusColors[status as keyof typeof statusColors] || "default"}>
+                      {status}
                     </Badge>
                   </div>
                 </div>
@@ -154,7 +180,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
               </Card>
             )}
 
-            {order.status === "refunded" && (
+            {status === "refunded" && (
               <Card>
                 <CardHeader>
                   <CardTitle>Refunded</CardTitle>
@@ -172,16 +198,17 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
               </Card>
             )}
 
-            {(order.status === "processing" || order.status === "review") && (
+            {(status === "processing" || status === "review" || status === "active") && (
               <Card>
                 <CardHeader>
-                  <CardTitle>{order.status === "review" ? "Order needs review" : "Delivery in progress"}</CardTitle>
+                  <CardTitle>{status === "review" ? "Order needs review" : "Delivery in progress"}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-[0.88rem] text-ink-2">
                     Delivery has not been confirmed. Please don&apos;t place this order again; contact support
                     with your reference if you need help. Refunds require verification.
                   </p>
+                  {progress && <p className="mt-2 text-[0.88rem] font-medium text-ink">{progress}</p>}
                 </CardContent>
               </Card>
             )}
@@ -192,7 +219,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
             <OrderActions
               key={order.id}
               orderId={order.id}
-              status={order.status}
+              status={status}
               expiresAt={order.expiresAt ? new Date(order.expiresAt).toISOString() : null}
               amount={order.amount}
               referenceCode={order.referenceCode ?? null}
