@@ -32,12 +32,13 @@ Migration coverage is complete — every table in `src/db/schema.ts` is created 
 | Virtual numbers / rentals | **Live for 10 of 37 plans** | `FULFILMENT_MAP` in `src/lib/fulfillment.ts`; needs the number provider key + margin floor |
 | Accounts marketplace | **Wired, currently empty** | `BULKACC_API_KEY`; production `/api/accounts/categories` returns only an empty "Streaming" category (suspected unfunded supplier balance) |
 | Gift cards | **Live** | minted internally from the buyer's wallet (`PRYVA-` codes), no supplier needed |
+| Social boosting | **Live once a panel is configured** | `SMM_PANEL_API_KEY` + `SMM_PANEL_API_URL` + a price (`SMM_MARKUP_PERCENT`, and `SMM_USD_NGN_RATE` for a USD panel). Wallet debit → one supplier order → auto-refund on refusal. §32 |
 | Free disposable inbox | **Built** | migration `0013`, `POST /api/inbox`, `/api/inbox/poll`, `/api/inbox/discard`, `/dashboard/inbox`. The paid tier is not built |
 | Transactional email | **Built, poorly scheduled** | `wallet_email_outbox` + Resend + cron; `vercel.json` runs it **once a day** while README requires ~once a minute |
 | Admin console | **Live** | 10 pages; every `/api/admin/*` handler goes through `authorizeAdminApi()` |
 
 ### Demo-only or deliberately disabled
-eSIM, proxies, digital subscriptions, airtime/data, bulk orders, scheduled orders, SMM boosting, and all live supplier purchases outside the allowlist. Their routes return an actionable 503 or simulate in the preview database. The automatic-refund and scheduled-order crons **refuse a persistent database**, so they do nothing in production.
+eSIM, proxies, digital subscriptions, airtime/data, bulk orders, scheduled orders, and all live supplier purchases outside the allowlist. Their routes return an actionable 503 or simulate in the preview database. The automatic-refund and scheduled-order crons **refuse a persistent database**, so they do nothing in production.
 
 ---
 
@@ -1312,3 +1313,63 @@ screen reader should not hear it twice.
 `srcSet`, and both render sites. Live signed-in check: the dashboard and settings
 both serve `avatar-3` for the preview account (its hash), the initials circle is
 gone from the markup, and all four masters return 200.
+
+## 32. Twenty-fourth pass — boosting that can actually be bought (31 Oct 2026)
+
+The social catalogue used to be honest and useless: a live panel listing rendered
+with `price: null` and no action, so a customer could browse boosts and never buy
+one. The owner's instruction was blunt — **"remove the null, i want user to be
+able to purchase and the api should also works"** — with one condition attached:
+**"we already have a working system so don't ruin it for me"**. Nothing in the
+existing order, wallet, refund or fraud path was forked or altered.
+
+**Pricing is a server decision.** `src/lib/smm-pricing.ts` is the only place a
+retail price is computed:
+
+> retail per 1,000 = `max(1, ceil(wholesale × (1 + SMM_MARKUP_PERCENT / 100) × fx))`
+
+* `SMM_MARKUP_PERCENT` defaults to **35** and is clamped to 0–400.
+* `fx` is `SMM_USD_NGN_RATE`, and it has **no default**. A USD-billed panel
+  without a configured rate therefore has no price, and its listing stays
+  read-only. Inventing an exchange rate would quietly sell at a loss every time
+  the naira moves, which is worse than saying "not for sale".
+* The wholesale rate, the panel's service id and the panel's name never leave the
+  server. The hub shows a "from" price at the supplier's minimum quantity; the
+  purchase page shows the exact total for the quantity entered.
+
+**Ordering reuses the money path.** `src/lib/boost-orders.ts` debits and inserts
+one `orders` row (`status: "processing"`, `provider: "smm"`) in a single
+transaction, then places **exactly one** order with the supplier, then marks the
+row `active` with the supplier's reference. A supplier refusal refunds the full
+amount (`type: "refund"`) and marks the row `refunded` with the reason; if that
+refund itself fails the debit stands at `processing` with a note, because a
+visible unfulfilled order is recoverable and a silent loss is not. The supplier
+has no idempotency key of its own, so the customer-supplied `requestId` is the
+only thing preventing a retry from buying twice: `(userId, requestId)` is checked
+before the transaction and again inside it, and a replay returns the original
+order having charged nothing.
+
+**The API fails closed.** `POST /api/boosts/order` is signed-in, same-origin,
+JSON-only, rate-limited per minute and capped per hour by the fraud ceiling, and
+every branch has a status the form acts on: `401` no session, `403` cross-origin,
+`415` not JSON, `429` flood, `400` malformed, `402` shortfall (with balance and
+required amount), `502` supplier refused, `503` nothing configured to fulfil it.
+That last one is new this pass: an unconfigured panel used to escape as a `500`,
+which told the customer nothing and logged a stack trace for a normal state.
+
+Migration `0023` adds two nullable columns, `orders.target_link` and
+`orders.quantity` — no backfill, no change to existing rows — and the order
+detail page shows the boosted link for those orders only.
+
+**Verified:** 1,285 tests / 135 files · typecheck · lint · build. New
+`boost-orders.test.ts` (10, PGlite) covers the charge, the replay, the refusal
+plus refund, the ledger (`debit` + `refund`), a quantity the supplier rejects,
+an empty wallet, a price the browser tries to influence, and a catalogue read that
+throws; `boost-order-route.test.ts` (10) walks every guard and asserts the internal
+error text never reaches the response; `smm-pricing.test.ts` (7) pins the formula
+and the "no rate, no price" rule; `smm-catalog.test.ts` was rewritten where it used
+to assert the absence of a price. Live check on the preview build: unconfigured
+panel ⇒ the hub lists nothing to buy, the boost page 404s, and the API answers
+`503 {"ok":false,"error":"Boosting is not available right now. Nothing was charged."}`.
+A real purchase needs an owner-supplied panel key and endpoint; nothing was
+purchased against a supplier in this pass.

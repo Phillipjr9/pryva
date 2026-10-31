@@ -113,7 +113,7 @@ export function ServiceExplorer({ initialCountry, initialCategory, rejectedCount
   const filtered = useMemo(() => filterExplorerItems(items, category, search, tag), [items, category, search, tag]);
   const tags = category === "verification" ? VERIFICATION_TAGS : category === "social" ? SOCIAL_TAGS : [];
 
-  // Live supplier listings are read-only.
+  // Live listings: boosts are purchasable, the others are read-only until their ordering is wired.
   useEffect(() => {
     if (!country) return;
     const controller = new AbortController();
@@ -189,7 +189,7 @@ export function ServiceExplorer({ initialCountry, initialCategory, rejectedCount
           <div>
             <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Globe className="h-3.5 w-3.5" /> Step 01</p>
             <h2 id="choose-country-title" className="mt-2 text-[1.25rem] font-semibold text-ink">Start with a country.</h2>
-            <p className="mt-1.5 max-w-sm text-meta leading-relaxed text-ink-2">Select where you need the service. Coverage and availability still need confirmation before ordering.</p>
+            <p className="mt-1.5 max-w-sm text-meta leading-relaxed text-ink-2">Select where you need the service. Boosts can be ordered right away; other listings still need their coverage confirmed before ordering.</p>
           </div>
           <div className="rounded-2xl border border-white/80 bg-white/60 p-4 shadow-sm">
             <CountrySelector id="service-country" value={country} onChange={chooseCountry} />
@@ -227,7 +227,7 @@ export function ServiceExplorer({ initialCountry, initialCategory, rejectedCount
 
           <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-meta leading-relaxed border-amber-200 bg-amber-50/70 text-amber-900`}>
             <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-            {liveState?.country === country && !liveState.failed ? <p><strong>Live listings are read-only.</strong> Prices and stock are indicative, and coverage must be confirmed before ordering. Examples are separate and purchased units aren&apos;t tracked here yet. {liveState.partial && "Some listing types are temporarily unavailable. "}<Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p> : <p><strong>Examples, not a verified live catalog.</strong> Stock is unknown and purchased service units aren&apos;t tracked yet. Country coverage is unverified. <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
+            {liveState?.country === country && !liveState.failed ? <p><strong>Live listings are current.</strong> Boosting services can be bought now, from your wallet. Plan and eSIM listings are still indicative until ordering is switched on for them, and examples are separate. {liveState.partial && "Some listing types are temporarily unavailable. "}<Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p> : <p><strong>Examples, not a verified live catalog.</strong> Stock is unknown and purchased service units aren&apos;t tracked yet. Country coverage is unverified. <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
           </div>
 
           <section aria-labelledby="services-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 sm:p-6">

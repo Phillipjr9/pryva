@@ -8,6 +8,7 @@ import {
   type SmmService,
 } from "@/lib/smm-panel";
 import { PROMOTION_EXAMPLES, type ExplorerItem } from "@/lib/service-explorer";
+import { normalizeCurrency, retailPerThousand, totalForQuantity } from "@/lib/smm-pricing";
 
 export type BoostSnapshot = {
   services: SmmService[];
@@ -139,47 +140,112 @@ function itemId(providerId: string): string {
 }
 
 /**
+ * A boosting listing as the rest of the app needs it: what to call it, what one
+ * thousand units cost at retail, and the bounds the supplier will accept.
+ *
+ * `perThousand` is retail — the wholesale rate never leaves the server. When it
+ * is null (no rate, unknown currency, or a USD panel with no configured
+ * conversion) the listing stays read-only: an unpriced service must not offer a
+ * Buy button that cannot charge the right amount.
+ */
+export type BoostListing = {
+  id: string;
+  serviceId: string;
+  name: string;
+  tag: string;
+  platform: string | null;
+  artwork: ExplorerItem["artwork"];
+  perThousand: number | null;
+  min: number | null;
+  max: number | null;
+  currency: string | null;
+};
+
+export function describeBoost(service: SmmService, snapshotCurrency: string | null): BoostListing {
+  const platform = PROMOTION_EXAMPLES.find((candidate) =>
+    matchesPlatform(`${service.name ?? ""} ${service.category ?? ""}`, candidate.name));
+  const cleanName = readable(service.name);
+  const tag = boostTag(service, cleanName ?? "");
+  // A category is a grouping label, not a product name: "Instagram" on its own
+  // does not tell a customer what they would be buying. So when the panel's own
+  // name is unusable or would reveal provenance, synthesize one from the
+  // platform and the derived type. Coverage never depends on how a panel words
+  // its catalog.
+  const name = cleanName ?? `${platform?.name ?? "Social"} ${tag.toLowerCase()}`;
+  const currency = normalizeCurrency(service.currency) ? service.currency : snapshotCurrency;
+
+  return {
+    id: itemId(service.id),
+    serviceId: service.id,
+    name,
+    tag,
+    platform: platform?.name ?? null,
+    artwork: platform ? { kind: "brand", name: platform.brand } : { kind: "service", name: "bulk" },
+    perThousand: retailPerThousand({ wholesaleRatePerThousand: service.ratePer1000, currency }),
+    min: service.min,
+    max: service.max,
+    currency: normalizeCurrency(currency),
+  };
+}
+
+/**
  * Boosting targets a profile or post URL rather than a country, so listings are
- * not country-specific and are shown for every selection. Stock is null because
- * panels report a per-order maximum, not available inventory, and the two must
- * not be confused. Price and action are null by design: retail pricing is not
- * decided and ordering is not wired, so the hub renders these as read-only
- * listings rather than implying a checkout that does not exist.
+ * not country-specific and are shown for every selection.
+ *
+ * `stock` stays null: a panel reports a per-order maximum, not inventory, and
+ * the two must not be confused. `price` is the retail cost of the supplier's
+ * minimum quantity and the card says "from", because the customer chooses how
+ * many units to buy.
  */
 export function boostItems(snapshot: BoostSnapshot): ExplorerItem[] {
   const items: ExplorerItem[] = [];
   const ids = new Set<string>();
 
   for (const service of snapshot.services) {
-    const platform = PROMOTION_EXAMPLES.find((candidate) =>
-      matchesPlatform(`${service.name ?? ""} ${service.category ?? ""}`, candidate.name));
-    const cleanName = readable(service.name);
-    const tag = boostTag(service, cleanName ?? "");
-    // A category is a grouping label, not a product name: "Instagram" on its own
-    // does not tell a customer what they would be buying. So when the panel's own
-    // name is unusable or would reveal provenance, synthesize one from the
-    // platform and the derived type rather than falling back to the category.
-    // Coverage never depends on how a panel words its catalog.
-    const name = cleanName ?? `${platform?.name ?? "Social"} ${tag.toLowerCase()}`;
-    const id = itemId(service.id);
-    if (ids.has(id)) continue;
-    ids.add(id);
+    const listing = describeBoost(service, snapshot.currency);
+    if (ids.has(listing.id)) continue;
+    ids.add(listing.id);
+
+    // The supplier's minimum is the smallest quantity that can be bought, so it
+    // is the only honest "from" price. Without a minimum there is no quantity to
+    // price, and the listing stays read-only.
+    const price = listing.perThousand !== null && listing.min !== null
+      ? totalForQuantity(listing.perThousand, listing.min)
+      : null;
 
     items.push({
-      id,
+      id: listing.id,
       category: "social",
-      name,
+      name: listing.name,
       description: "Social promotion",
-      tag,
-      platform: platform?.name,
-      artwork: platform ? { kind: "brand", name: platform.brand } : { kind: "service", name: "bulk" },
+      tag: listing.tag,
+      platform: listing.platform ?? undefined,
+      artwork: listing.artwork,
       source: "live",
       coverage: "not-country-specific",
       stock: null,
       myUnits: null,
-      price: null,
-      action: null,
+      price,
+      priceFrom: price !== null,
+      action: price !== null ? { label: "Buy boost", href: `/dashboard/services/boost/${listing.id}` } : null,
     });
   }
   return items;
+}
+
+/**
+ * Resolve a listing from the id the browser holds.
+ *
+ * The id is a hash of the supplier's service id, so it cannot be inverted; the
+ * catalogue is re-read and hashed instead. Pricing is always recomputed here,
+ * never taken from the request.
+ */
+export async function findBoostListing(itemIdValue: string): Promise<{ listing: BoostListing; snapshot: BoostSnapshot } | null> {
+  if (!/^live-boost-[0-9a-f]{20}$/.test(itemIdValue)) return null;
+  const snapshot = await readBoostSnapshot();
+  for (const service of snapshot.services) {
+    const listing = describeBoost(service, snapshot.currency);
+    if (listing.id === itemIdValue) return { listing, snapshot };
+  }
+  return null;
 }
