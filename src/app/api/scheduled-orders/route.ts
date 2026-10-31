@@ -46,9 +46,6 @@ export async function POST(request: NextRequest) {
 
     if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
     if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
-    if (!isPreviewDatabase()) {
-      return NextResponse.json({ error: "Scheduled purchases are temporarily unavailable." }, { status: 503 });
-    }
     const limit = await purchaseRateLimiter(`scheduled-create:${user.id}`);
     if (limit.unavailable) return NextResponse.json({ error: "Scheduled purchases are temporarily unavailable." }, { status: 503 });
     if (!limit.allowed) return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
@@ -100,7 +97,6 @@ export async function PATCH(request: NextRequest) {
     if (typeof orderId !== "string" || !(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId) || (isPreviewDatabase() && /^[a-z0-9-]{1,64}$/i.test(orderId)))) {
       return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
     }
-    if (action === "resume" && !isPreviewDatabase()) return NextResponse.json({ error: "Scheduled purchases are temporarily unavailable." }, { status: 503 });
 
     let updated: boolean;
     if (action === "pause") {

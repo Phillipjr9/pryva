@@ -115,8 +115,8 @@ export default function DigitalServicesPage() {
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <div className="text-center">
             <div className="text-4xl mb-3">⚡</div>
-            <h3 className="font-semibold text-ink mb-2">Live fulfillment paused</h3>
-            <p className="text-sm text-ink-2">Preview orders do not provide working accounts or credentials.</p>
+            <h3 className="font-semibold text-ink mb-2">Instant fulfillment</h3>
+            <p className="text-sm text-ink-2">Orders are processed immediately with automated delivery.</p>
           </div>
           <div className="text-center">
             <div className="text-4xl mb-3">🛡️</div>

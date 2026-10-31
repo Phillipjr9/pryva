@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { calculateNextRun, type Frequency } from "@/lib/scheduled-orders";
+import { describe, it, expect, beforeEach } from "vitest";
+import { calculateNextRun, processScheduledOrder, type Frequency } from "@/lib/scheduled-orders";
+import { mutatePreviewDatabase } from "@/db";
 
 describe("Scheduled Orders", () => {
   describe("calculateNextRun", () => {
@@ -49,6 +50,100 @@ describe("Scheduled Orders", () => {
       expect(next.getFullYear()).toBe(2024);
       expect(next.getMonth()).toBe(1);
       expect(next.getDate()).toBe(29);
+    });
+  });
+
+  describe("processScheduledOrder", () => {
+    const userId = "test-sched-user-1";
+    const orderId = "sched-row-1";
+
+    beforeEach(() => {
+      mutatePreviewDatabase((draft) => {
+        draft.users = [{
+          id: userId,
+          email: "sched@example.com",
+          name: "Sched User",
+          walletBalance: 20000,
+        } as any];
+        draft.scheduledOrders = [{
+          id: orderId,
+          userId,
+          service: "numbers",
+          productSlug: "vn-ng",
+          frequency: "daily",
+          nextRunAt: new Date(Date.now() - 60_000),
+          status: "active",
+          createdAt: new Date(),
+        } as any];
+      });
+    });
+
+    it("processes a due scheduled order and debits wallet", async () => {
+      const dueRow = {
+        id: orderId,
+        userId,
+        service: "numbers",
+        productSlug: "vn-ng",
+        frequency: "daily" as Frequency,
+        nextRunAt: new Date(Date.now() - 60_000),
+        status: "active" as const,
+        lastRunAt: null,
+        lastOrderId: null,
+        createdAt: new Date(),
+      };
+
+      const result = await processScheduledOrder(dueRow as any);
+      expect(result).toBe(true);
+
+      mutatePreviewDatabase((draft) => {
+        const user = draft.users.find((u) => u.id === userId);
+        expect(user!.walletBalance).toBeLessThan(20000);
+        const order = draft.orders.find((o) => o.userId === userId);
+        expect(order).toBeDefined();
+        expect(order!.provider).toBe("scheduled");
+      });
+    });
+
+    it("skips scheduled order when not yet due", async () => {
+      const futureRow = {
+        id: orderId,
+        userId,
+        service: "numbers",
+        productSlug: "vn-ng",
+        frequency: "daily" as Frequency,
+        nextRunAt: new Date(Date.now() + 86_400_000),
+        status: "active" as const,
+        lastRunAt: null,
+        lastOrderId: null,
+        createdAt: new Date(),
+      };
+      mutatePreviewDatabase((draft) => {
+        draft.scheduledOrders[0].nextRunAt = futureRow.nextRunAt;
+      });
+
+      const result = await processScheduledOrder(futureRow as any);
+      expect(result).toBe(false);
+    });
+
+    it("skips scheduled order when paused", async () => {
+      const pausedRow = {
+        id: orderId,
+        userId,
+        service: "numbers",
+        productSlug: "vn-ng",
+        frequency: "daily" as Frequency,
+        nextRunAt: new Date(Date.now() - 60_000),
+        status: "paused" as const,
+        lastRunAt: null,
+        lastOrderId: null,
+        createdAt: new Date(),
+      };
+      mutatePreviewDatabase((draft) => {
+        draft.scheduledOrders[0].status = "paused";
+      });
+
+      const result = await processScheduledOrder(pausedRow as any);
+      expect(result).toBe(false);
     });
   });
 });

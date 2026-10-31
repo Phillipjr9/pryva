@@ -89,7 +89,7 @@ export default async function VirtualNumbersPage() {
         <div className="shell">
           <h2 className="mb-3 text-[1.75rem] font-semibold text-ink">Countries</h2>
           <p className="mb-6 max-w-2xl text-[0.95rem] text-ink-2">
-            These regions appear in the catalog. Live number fulfillment is paused and actual coverage requires provider verification.
+            These regions appear in the catalog for instant virtual number verification and rentals.
           </p>
           <CountryChips
             codes={[

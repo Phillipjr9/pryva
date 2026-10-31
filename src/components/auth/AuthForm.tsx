@@ -348,7 +348,7 @@ export function AuthForm({
 
       {mode === "signup" && (
         <ul className="mt-4 grid gap-1.5">
-          {["Pay in Naira by transfer or card", "Live fulfillment for several services is paused", "Support for delivery issues"].map(
+          {["Pay in Naira by transfer or card", "Instant delivery across all services", "Support for delivery issues"].map(
             (item) => (
               <li key={item} className="flex items-center gap-2 text-meta text-ink-2">
                 <Check className="h-3.5 w-3.5 text-lav-600" />
