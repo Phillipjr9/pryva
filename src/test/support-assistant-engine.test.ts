@@ -181,6 +181,35 @@ describe("asking instead of guessing", () => {
     expect(result.reply).toContain("stopped");
   });
 
+  it("answers a greeting instead of stonewalling it", async () => {
+    for (const message of ["hello", "Hi!", "can you help?", "help", "anyone there"]) {
+      const result = await run(message);
+      expect(result.playbookId, message).toBe("greeting");
+      expect(result.outcome, message).toBe("answered");
+      expect(result.actions, message).toEqual([]);
+      // It says what it can look at, and it reads the real account.
+      expect(result.reply, message).toContain("What I can settle on the spot");
+      expect(result.reply, message).toContain("wallet balance");
+    }
+  });
+
+  it("does not let a greeting swallow a real problem", async () => {
+    const results = [
+      await run("help my wallet is empty"),
+      await run("hi, my deposit is missing"),
+      await run("hello, my order has not arrived"),
+    ];
+    expect(results.map((r) => r.playbookId)).not.toContain("greeting");
+    for (const result of results) expect(result.reply).not.toContain("What I can settle on the spot");
+  });
+
+  it("offers the real possibilities when it has to fall back", async () => {
+    const result = await run("asdf qwerty zxcv");
+    expect(result.reply).toContain("What I can check, if one of these is closer");
+    // Still honest about the handover, still no invented figures beyond the account.
+    expect(result.outcome).toBe("escalated");
+  });
+
   it("does not recognise gibberish, and says so", async () => {
     const result = await run("asdf qwerty zxcv");
     expect(result.playbookId).toBe("unrecognised");

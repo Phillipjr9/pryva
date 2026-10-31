@@ -1797,3 +1797,70 @@ Postgres (PGlite); `disposable-inbox.test.ts` gained the product choice and
 **Not verified:** whether the feed now accepts the purchase. That needs one real
 call, and `/api/diagnostics/inbox` will say `ready` or name what is wrong before
 anybody presses the button.
+
+---
+
+## 42. Thirty-fourth pass — the chat that did not chat (31 Oct 2026)
+
+Asked: *"can you fix the ai chat support, its not interacting with user questions
+and messages"* and *"can you also add a live animation at the screen for support
+but it should be hideable."*
+
+**The defect was the interface, not the reading.** The engine was deciding things
+correctly and the screen was throwing the conversation away. On
+`/dashboard/support`, `SupportComposer` replaced itself with a single reply card
+and "Ask something else" discarded the exchange, so a follow-up had nowhere to go.
+On a ticket, `TicketReplyForm` wrote the reply into the database and only showed it
+after a server refresh — on a slow connection, a form that does nothing for several
+seconds and then silently reloads. Both behaviours read as an assistant that is not
+listening, which is exactly what was reported.
+
+**One transcript, both entry points.** `SupportChat` is now the only conversation
+surface: the empty one on `/dashboard/support` and the seeded one on a ticket. What
+you typed appears immediately as an optimistic bubble; the answer is appended
+underneath it; the next question is a message in the same thread, sent to
+`/api/support/tickets/<id>` once the first has created it. Enter sends, Shift+Enter
+is a newline. While the request is in flight the transcript says *"Checking your
+account…"* and the composer is disabled rather than accepting a second message.
+A failed send takes the optimistic bubble back and restores the text — losing a
+complaint to a network blip is worse than a retry — and a handover renders as a
+system line (*"This is with a person now"*), never as silence. `SupportComposer` and
+`TicketReplyForm` are deleted: two implementations of one conversation is how one
+of them ends up silent again.
+
+**A greeting is a question, and used to be a non-answer.** Pressing "hello",
+"can you help?" or "help" scored zero against every problem playbook and fell
+through to the fallback — *"I am not going to guess at this one"* — which is a cold
+thing to say to a hello. A `greeting` playbook now answers it with what the
+assistant can actually check plus the real wallet balance and order count. Every
+pattern is anchored to the **whole** message, which is the safety property: "help,
+my wallet is empty" stays a wallet problem. The fallback, meanwhile, now lists the
+problems it can settle before handing over, instead of only saying what it cannot.
+
+**The animation is hideable and stays hidden.** `AssistantPresence` is a CSS/SVG
+orb with two states — breathing while idle, fast pulse with ping rings and dots
+while a request is in flight — placed inside the support page, not a dashboard-wide
+floating widget. "Hide" removes it from the tree entirely (not a hidden class: it
+stops animating and costs nothing) and the choice persists in
+`localStorage["pryva:support-presence-hidden"]`, read through
+`useSyncExternalStore` so the server render and the client agree. The drawing is
+`aria-hidden`; the state is also written in words (*"Reading your message and
+checking the account…"*) in an `aria-live` line, so nothing is conveyed by motion
+alone. The global `prefers-reduced-motion` rule already stops every keyframe.
+
+**Still deterministic, on purpose.** No language model answers free-form questions
+yet: `polishSupportReply` needs both `AI_SUPPORT_MODEL_ENABLED=true` and a key, and
+may never decide an action. Adding an answering model is a decision with a cost
+line, and it is the owner's to make — until then the assistant widens its honesty
+(it names what it can check) rather than its claims.
+
+**Verified:** 1,448 tests / 157 files · typecheck · lint · build. New coverage:
+`support-chat-ui.test.tsx` (9) drives the screen the way a customer does — the
+optimistic bubble before the response, a follow-up in the same ticket, the thinking
+line while in flight, the restored draft on both a refused and a failed request, an
+escalation rendered as a handover, and the orb staying hidden across a remount.
+`support-assistant-engine.test.ts` gained the greeting answer, proof that a greeting
+cannot swallow a wallet or order problem, and the fallback's capability list.
+
+**Not verified:** the production build of the page on a real device, and anything
+about a model route that has not been enabled.

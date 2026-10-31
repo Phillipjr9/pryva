@@ -609,6 +609,55 @@ const humanRequest: Playbook = {
   },
 };
 
+/**
+ * "hi", "hello", "can you help?"
+ *
+ * The first thing most people type into a support box is a greeting, and until now
+ * it scored zero against every problem playbook and fell through to "I am not going
+ * to guess at this one" — a cold non-answer to "hello". That reads as an assistant
+ * that is not listening, which is precisely how it was reported.
+ *
+ * Every pattern here is anchored to the *whole* message. That is the safety
+ * property: "help, my wallet is empty" must stay a wallet problem, so a greeting
+ * only matches when there is nothing else in the sentence to act on. It carries no
+ * actions and invents no facts — it says what the assistant can check and asks
+ * what went wrong.
+ */
+const greeting: Playbook = {
+  id: "greeting",
+  title: "Just saying hello",
+  category: "other",
+  priority: "low",
+  mixing: { intent: 1, evidence: 0 },
+  intents: [
+    {
+      label: "greeting",
+      pattern: /^(hi|hey|hello|yo|hiya|good (morning|afternoon|evening)|anyone there|are you there)[\s!.?,]*$/,
+      weight: 0.9,
+    },
+    {
+      label: "asked for help",
+      pattern: /^(please[\s,]+)?(can|could) (you|someone|anyone) help( me)?[\s!.?]*$/,
+      weight: 0.9,
+    },
+    { label: "needs help", pattern: /^(i need (some )?help|help( me)?)[\s!.?]*$/, weight: 0.9 },
+  ],
+  corroborate() {
+    return [];
+  },
+  ask: "What is going wrong? A sentence is enough — what you expected, and what happened instead.",
+  answer({ facts }) {
+    return `Hello — tell me what is going wrong and I will look at the account rather than guess.
+
+What I can settle on the spot: a deposit that never reached the wallet, an order that has not arrived or arrived wrong, a refund that has not landed, a scheduled order you want stopped, a gift card that will not redeem, a verification email that never came, and sign-in trouble. Anything else I hand to a person with the account summary attached.
+
+As it stands I can see a wallet balance of ${formatCurrency(facts.account.walletBalance)} and ${facts.orders.length} recent order${facts.orders.length === 1 ? "" : "s"}.`;
+  },
+  needsHuman() {
+    return null;
+  },
+};
+
 const pricingQuestion: Playbook = {
   id: "pricing-question",
   title: "What something costs",
@@ -674,7 +723,9 @@ export const FALLBACK_PLAYBOOK: Playbook = {
   answer({ facts }) {
     return `I am not going to guess at this one. Nothing in what you wrote matches a problem I know how to check, and inventing an answer would waste your time.
 
-What I can see: wallet balance ${formatCurrency(facts.account.walletBalance)}, ${facts.orders.length} recent orders, ${facts.topUps.length} recent deposits. That summary goes to a person with this message, so you will not have to explain it twice. If it helps in the meantime, Orders, Wallet → History and the FAQ cover most of the common cases.`;
+What I can check, if one of these is closer: a deposit that never reached the wallet, an order that has not arrived or arrived wrong, a refund that has not landed, a scheduled order you want stopped, a business gift card that will not redeem, a verification email that never came, and sign-in trouble. Send one of those in your own words and I will look properly.
+
+What I can see right now: wallet balance ${formatCurrency(facts.account.walletBalance)}, ${facts.orders.length} recent orders, ${facts.topUps.length} recent deposits. That summary goes to a person with this message, so you will not have to explain it twice. Orders, Wallet → History and the FAQ cover most of the common cases in the meantime.`;
   },
   needsHuman() {
     return "The message did not match any problem the assistant can check.";
@@ -683,6 +734,7 @@ What I can see: wallet balance ${formatCurrency(facts.account.walletBalance)}, $
 
 export const PLAYBOOKS: Playbook[] = [
   suspiciousActivity,
+  greeting,
   humanRequest,
   depositMissing,
   refundMissing,
