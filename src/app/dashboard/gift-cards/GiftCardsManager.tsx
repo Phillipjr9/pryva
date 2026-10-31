@@ -64,7 +64,11 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
         fetch("/api/gift-cards/purchase", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount, recipientEmail: recipientEmail || undefined, message: message || undefined }),
+          body: JSON.stringify({
+            amount,
+            recipientEmail: recipientEmail.trim() || undefined,
+            message: message.trim() || undefined,
+          }),
         }),
         new Promise((resolve) => setTimeout(resolve, 1600)),
       ]);
@@ -100,7 +104,9 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
     try {
       const [response] = await Promise.all([
         fetch("/api/gift-cards/redeem", {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: redeemCode }),
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: redeemCode.trim() }),
         }),
         new Promise((resolve) => setTimeout(resolve, 1600)),
       ]);
@@ -130,7 +136,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
     }).catch(() => undefined);
   }
 
-  const presetAmounts = [2000, 5000, 10000, 25000, 50000];
+  const presetAmounts = [1000, 2000, 5000, 10000, 25000, 50000, 100000];
 
   return (
     <>
