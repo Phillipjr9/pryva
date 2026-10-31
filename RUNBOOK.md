@@ -448,6 +448,23 @@ minimum-size order** yourself and read its status back before announcing the
 service. The supplier accepts no idempotency key, so never retry a request you
 are unsure about — check the panel's order list first.
 
+**Reading a delivery back.** Opening a boost order in the dashboard asks the
+panel `action=status` for that one order (`syncBoostOrderStatus` in
+`src/lib/boost-status.ts`), at most once a minute per order per instance. The
+answer is mapped conservatively:
+
+| Panel says | Order row becomes | Why |
+|---|---|---|
+| `completed` | `delivered` | the only state that means the customer got what they paid for |
+| `pending` / `in progress` | unchanged | the row already says "in flight" |
+| `partial` | `review`, with a note naming the undelivered units | a refund decision, not a product state |
+| `canceled` | `review`, with a note saying no refund was issued | cancelling upstream and crediting the wallet are two acts; never fake one |
+| unreachable / unknown | unchanged | a failed read is not evidence of failure |
+
+Nothing here ever calls `add` again and nothing here moves money. A boost that
+lands in `review` waits for an operator: confirm with the panel, then refund from
+`/admin/orders` if it was not delivered.
+
 **When something goes wrong.**
 
 | What you see | What it means | What to do |
@@ -456,6 +473,8 @@ are unsure about — check the panel's order list first.
 | `orders.status = refunded` | the supplier refused and the wallet was credited back automatically | nothing, unless the same service fails repeatedly |
 | no boosts in the hub | panel not configured, or its catalogue returned nothing | check the two variables and the panel balance |
 | a listing is read-only | it has no retail price — a USD panel with no `SMM_USD_NGN_RATE` | set the rate, or switch to an NGN-billed supplier |
+| a boost order reads `active` for days | `active` means the panel accepted it, not that it finished; the row only advances when someone opens the order | open the order to refresh it, and check the panel's order list if it is old |
+| a boost order reads `review` | the panel reported `partial` or `canceled`, or a refund failed | read the note on `/admin/orders`; refund manually only after confirming with the panel |
 
 The supplier's name, service ids and wholesale rates never appear in customer
 copy or client bundles; `src/test/supplier-secrecy.test.ts` fails the build if

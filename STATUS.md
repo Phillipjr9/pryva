@@ -1516,3 +1516,48 @@ tab bar is still exactly five tabs, and no text below the phone floor.
 **Still true:** the badge appearing and `/admin` refusing would mean two-factor
 enrolment, not a wrong address — the page redirects to settings with the return path
 in that case.
+
+## 36. Twenty-eighth pass — a boost can now say whether it was delivered (31 Oct 2026)
+
+The live check came back with **20 of 5,000 panel services listed**, one offer per
+platform and intent, each priced in naira. That answers the catalogue question. It
+does not answer the delivery question, and reading the code before spending the
+owner's money showed why the planned test order would have been inconclusive:
+`getSmmOrderStatus` existed, was tested, and was **called from nowhere**. A boost row
+was write-once — `processing` at insert, `active` the moment `add` was accepted, and
+then never touched again. `active` is read by customers as "I have what I paid for",
+so a panel that later cancelled or half-delivered still told them they were served.
+
+**What changed.** `src/lib/boost-status.ts` reads one order back from `action=status`
+and records the answer, conservatively:
+
+- `completed` → `delivered` (the only state that means the units arrived);
+- `pending` / `in progress` → the row is left alone (it already says "in flight");
+- `partial` → `review` plus a note naming the undelivered units;
+- `canceled` → `review` plus a note saying **no refund was issued** — cancelling
+  upstream and crediting a wallet are two separate acts, and marking a row `refunded`
+  without moving money would be the same lie in the other direction;
+- unreachable or unknown → nothing changes; a failed read is not evidence of failure.
+
+The customer's order page calls it once per view (60-second window per order per
+instance, so a held-down refresh cannot become a status poll) and the "Delivery in
+progress" card now shows real progress — "340 of 1,000 delivered so far" — in the
+customer's language, never the panel's. It never calls `add` again and never moves
+money. The page was also showing that card only for `processing`/`review`; a boost
+sits at `active` while in flight, so the one card that explains the wait never
+appeared on a boost at all.
+
+**Deliberately unchanged:** `placeBoostOrder`, the debit and refund path, and both
+admin gates. This adds a read and a status transition; it cannot buy, retry or refund.
+
+**Verified:** 1,332 tests / 143 files · typecheck · lint · build. New
+`boost-status-sync.test.ts` (13): the mapping, the note wording, the guard that a
+settled row is never contradicted, that other providers and un-accepted boosts are
+never asked about, that an unreachable panel leaves the row alone, and the cooldown.
+The first draft failed `supplier-secrecy` on an identifier (`supplierState`); the
+field is now `reportedState` — the secrecy scan is about what a customer can read,
+and its verdict was obeyed rather than argued with.
+
+**Still true:** no boost has been purchased from this supplier. The owner's
+minimum-size order is what turns 20 listed services into a proven delivery path, and
+the order page is now the thing that will tell them whether it worked.
