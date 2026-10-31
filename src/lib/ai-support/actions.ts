@@ -234,8 +234,19 @@ export async function runSupportRemedy(input: {
           note: "A verification link was requested too recently; the newest one already sent is still valid.",
         };
       }
-      await issueEmailVerification(userId, userEmail, userName);
-      logger.info("Support assistant re-sent a verification link", { userId });
+      const delivery = await issueEmailVerification(userId, userEmail, userName);
+      logger.info("Support assistant re-sent a verification link", { userId, delivered: delivery.delivered });
+      if (!delivery.delivered) {
+        // Issuing a token is not the same as sending a link, and this assistant is
+        // the one place that would otherwise tell a customer to check an inbox
+        // nothing was sent to.
+        return {
+          remedy,
+          label,
+          status: "failed",
+          note: `A fresh link was created for ${userEmail}, but ${delivery.detail ?? "it could not be delivered"}. Earlier links stop working; nothing will arrive until delivery is fixed.`,
+        };
+      }
       return {
         remedy,
         label,

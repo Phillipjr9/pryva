@@ -37,17 +37,41 @@ export function rateLimitEmailVerification(key: string) {
 }
 
 /**
- * Best effort and silent about failure, matching the reset flow: mail delivery is
- * not a condition of the account existing, and the link can be requested again.
- * A wallet receipt is different -- that is a financial record needing guaranteed
- * delivery, which is why it uses the retrying outbox instead.
+ * What happened to the message, reported rather than swallowed.
+ *
+ * This used to be `Promise<void>` and never looked at the response, so a provider
+ * that refused the send was indistinguishable from one that accepted it. Signup
+ * has to tolerate that -- the account exists whether or not mail works, and the
+ * link can be requested again -- but the in-app resend cannot, because it answers
+ * a person who is standing there waiting for something to arrive.
  */
-async function sendVerificationEmail(to: string, name: string, token: string): Promise<void> {
+export type VerificationDelivery = {
+  delivered: boolean;
+  /** A short, human-readable reason. Null when the message was accepted. */
+  detail: string | null;
+};
+
+/** The provider's own words, bounded and stripped, so a form can show them. */
+function deliveryDetail(status: number, body: string): string {
+  const parsed = (() => {
+    try {
+      return JSON.parse(body) as { message?: unknown };
+    } catch {
+      return null;
+    }
+  })();
+  const message = typeof parsed?.message === "string" ? parsed.message : "";
+  const readable = message.replace(/\s+/g, " ").trim().slice(0, 140);
+  if (!readable) return `the mail service refused the message (${status})`;
+  return `the mail service refused the message (${status}): ${readable}`;
+}
+
+async function sendVerificationEmail(to: string, name: string, token: string): Promise<VerificationDelivery> {
   const key = process.env.RESEND_API_KEY?.trim();
   const from = process.env.RESEND_FROM_EMAIL?.trim();
   if (!key || !from) {
     console.error("[auth] verification email not sent: Resend is not configured");
-    return;
+    return { delivered: false, detail: "email delivery is not configured on this server" };
   }
   const base = (
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
@@ -60,7 +84,7 @@ async function sendVerificationEmail(to: string, name: string, token: string): P
   // <p> tags while a 463-line template library sat unused in the repository.
   const template = emailVerificationEmail(name, link);
   try {
-    await fetch("https://api.resend.com/emails", {
+    const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -71,8 +95,17 @@ async function sendVerificationEmail(to: string, name: string, token: string): P
         text: template.text,
       }),
     });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      // The status and the provider's message are logged in full for the owner;
+      // what reaches the user is bounded by `deliveryDetail`.
+      console.error("[auth] verification email refused", response.status, body.slice(0, 300));
+      return { delivered: false, detail: deliveryDetail(response.status, body) };
+    }
+    return { delivered: true, detail: null };
   } catch (error) {
     console.error("[auth] verification email failed", error);
+    return { delivered: false, detail: "the mail service could not be reached" };
   }
 }
 
@@ -86,7 +119,7 @@ export async function issueEmailVerification(
   userId: string,
   email: string,
   name: string,
-): Promise<void> {
+): Promise<VerificationDelivery> {
   const token = generateVerificationToken();
   // Supersede any outstanding token so only the newest link works.
   await db
@@ -98,7 +131,10 @@ export async function issueEmailVerification(
     tokenHash: hashToken(token),
     expiresAt: new Date(Date.now() + VERIFY_TOKEN_TTL_MS),
   });
-  await sendVerificationEmail(email, name, token);
+  // The token exists whether or not the message lands. Returning the delivery
+  // outcome lets the caller decide: signup ignores it, the resend route reports
+  // it, and the support assistant stops claiming a send it cannot confirm.
+  return sendVerificationEmail(email, name, token);
 }
 
 export async function confirmEmailVerification(
