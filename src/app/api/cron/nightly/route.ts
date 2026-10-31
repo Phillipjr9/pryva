@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { lagosDay, runDailyReconciliation } from "@/lib/daily-reconciliation";
 import { processAutoRefunds } from "@/lib/auto-refund";
 import { dispatchWalletEmails, walletEmailConfigured } from "@/lib/wallet-email-outbox";
+import { sweepBoostDeliveries } from "@/lib/boost-status";
+import { expireFinishedRentals } from "@/lib/rental-expiry";
 import { settleReferralRewards } from "@/lib/referrals";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { logger } from "@/lib/logger";
@@ -20,7 +22,15 @@ export const maxDuration = 60;
  *   1. **close yesterday's books** first, before today's auto-refunds write new
  *      ledger rows that would make the close read a moving target;
  *   2. **drain the wallet email outbox**, so the receipts for yesterday go out;
- *   3. **sweep auto-refunds** last, which is the only step that writes money.
+ *   3. **read every open boost back**, because a delivery state that only updates
+ *      when the customer opens the page is not supervision — a boost the panel
+ *      cancelled on Tuesday would read `active` on Friday for anyone who never
+ *      looked, and never reach a human;
+ *   4. **sweep auto-refunds**, which is the only step that writes money;
+ *   5. **close finished rentals** last, so a rental whose term ended stops reading
+ *      as live even if its owner never opens the page. It runs after the refund
+ *      sweep on purpose: a single-use number whose window closed unfulfilled must
+ *      reach the refund step while it still says `active`.
  *
  * Each step is isolated: a failure in one is reported and the next still runs,
  * because an email outage must never stop a refund sweep. The old per-task
@@ -77,9 +87,23 @@ async function handler(request: NextRequest) {
     return { ok: true, detail: `sent ${counts.sent}, retry ${counts.retry}, review ${counts.review}` };
   });
 
+  const boosts = await runStep("boost-status", async () => {
+    const result = await sweepBoostDeliveries();
+    if (result.skipped) return { ok: true, detail: `skipped: ${result.skipped}` };
+    return {
+      ok: true,
+      detail: `checked ${result.checked}, changed ${result.changed}, delivered ${result.delivered}, review ${result.review}, quiet ${result.quiet}, unanswered ${result.unanswered}`,
+    };
+  });
+
   const refunds = await runStep("auto-refund", async () => {
     const { refunded, cancelled } = await processAutoRefunds();
     return { ok: true, detail: `refunded ${refunded}, released ${cancelled}` };
+  });
+
+  const rentals = await runStep("rental-expiry", async () => {
+    const result = await expireFinishedRentals();
+    return { ok: true, detail: `expired ${result.expired}` };
   });
 
   // An invitation pays out when the invited account has a delivered order, and
@@ -94,18 +118,20 @@ async function handler(request: NextRequest) {
     };
   });
 
-  const allOk = close.ok && emails.ok && refunds.ok && referrals.ok;
+  const allOk = close.ok && emails.ok && boosts.ok && refunds.ok && rentals.ok && referrals.ok;
   logger.info("Nightly run finished", {
     day,
     allOk,
     close: close.detail,
     emails: emails.detail,
+    boosts: boosts.detail,
     refunds: refunds.detail,
+    rentals: rentals.detail,
     referrals: referrals.detail,
   });
 
   return NextResponse.json(
-    { ok: allOk, day, steps: { close, emails, refunds, referrals } },
+    { ok: allOk, day, steps: { close, emails, boosts, refunds, rentals, referrals } },
     { status: allOk ? 200 : 207, headers: { "Cache-Control": "no-store" } },
   );
 }

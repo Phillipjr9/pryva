@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 
 import { db } from "@/db";
 import { orders, type Order } from "@/db/schema";
@@ -158,6 +158,100 @@ export async function syncBoostOrderStatus(
       // The read still happened and is still worth showing; the write can be
       // repeated by the next viewer.
       console.error("[boosts] status write failed", error);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * The sweep.
+ *
+ * Reading an order back only when its owner opens the page is not delivery
+ * supervision — it is delivery supervision for the customers who happen to log
+ * in. A boost the panel cancelled on Tuesday would still read `active` on
+ * Friday for anyone who never looked, and the row would never reach a human.
+ *
+ * So the nightly job asks about every open boost. It stays a *read*: `add` is
+ * never repeated, terminal rows are never overwritten, and a panel that cannot
+ * be reached leaves the row exactly as it was. What changes is that an order
+ * left open by the panel now lands in `review` with a note, where somebody can
+ * see it, instead of sitting in `active` pretending to be a delivery.
+ *
+ * The cap exists because this runs inside a 60 s cron: one panel call per order,
+ * oldest first, so the long-running ones are asked about every night and the
+ * backlog still drains. Whatever is left over is picked up tomorrow.
+ */
+export type BoostSweepResult = {
+  checked: number;
+  changed: number;
+  delivered: number;
+  review: number;
+  /** The panel answered and nothing needs to change (still running). */
+  quiet: number;
+  /** No answer at all: unreachable panel or a cooldown that swallowed the read. */
+  unanswered: number;
+  skipped: string | null;
+};
+
+export async function sweepBoostDeliveries(limit = 25): Promise<BoostSweepResult> {
+  const result: BoostSweepResult = {
+    checked: 0,
+    changed: 0,
+    delivered: 0,
+    review: 0,
+    quiet: 0,
+    unanswered: 0,
+    skipped: null,
+  };
+
+  if (!isSmmPanelConfigured()) {
+    result.skipped = "panel not configured";
+    return result;
+  }
+
+  let open: Array<Pick<Order, "id" | "provider" | "providerRequestId" | "status"> & {
+    reconciliationNote: string | null;
+  }>;
+  try {
+    open = await db
+      .select({
+        id: orders.id,
+        provider: orders.provider,
+        providerRequestId: orders.providerRequestId,
+        status: orders.status,
+        reconciliationNote: orders.reconciliationNote,
+      })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.provider, BOOST_PROVIDER),
+          inArray(orders.status, [...OPEN_STATUSES]),
+          isNotNull(orders.providerRequestId),
+        ),
+      )
+      .orderBy(asc(orders.createdAt))
+      .limit(limit);
+  } catch (error) {
+    console.error("[boosts] sweep read failed", error);
+    result.skipped = "could not read open orders";
+    return result;
+  }
+
+  for (const order of open) {
+    result.checked += 1;
+    // The cooldown is for page views; a nightly sweep is allowed to ask.
+    const sync = await syncBoostOrderStatus(order, { skipCooldown: true });
+    if (!sync.synced) {
+      result.unanswered += 1;
+      continue;
+    }
+    if (sync.status && sync.status !== order.status) {
+      result.changed += 1;
+      if (sync.status === "delivered") result.delivered += 1;
+      if (sync.status === "review") result.review += 1;
+    } else {
+      result.quiet += 1;
     }
   }
 
