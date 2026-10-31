@@ -215,14 +215,12 @@ async function checkMailTm(
         };
         const subject = detail.subject || item.subject || null;
         const from = detail.from?.address || item.from?.address || null;
-        const rawText = detail.text?.trim() || "";
-        const rawIntro = detail.intro?.trim() || "";
-        const rawHtml =
-          Array.isArray(detail.html) && detail.html[0]
-            ? detail.html[0].replace(/<[^>]+>/g, " ").trim()
-            : "";
-        const body = rawText || rawIntro || rawHtml || null;
-        const code = extractVerificationCode(subject, body);
+        const htmlContent =
+          Array.isArray(detail.html) && detail.html[0]?.trim() ? detail.html[0].trim() : null;
+        const textContent = detail.text?.trim() || detail.intro?.trim() || null;
+        const body = htmlContent || textContent || null;
+        const plainForCode = textContent || (htmlContent ? htmlContent.replace(/<[^>]+>/g, " ") : "");
+        const code = extractVerificationCode(subject, plainForCode);
         const receivedAt = detail.createdAt || item.createdAt || null;
         messages.push({ subject, from, body, code, receivedAt });
       } catch {
@@ -290,10 +288,11 @@ async function checkGuerrillaMail(
         };
         const subject = detail.mail_subject || item.mail_subject || null;
         const from = detail.mail_from || item.mail_from || null;
-        const body = detail.mail_body
-          ? detail.mail_body.replace(/<[^>]+>/g, " ").trim()
-          : item.mail_excerpt || null;
-        const code = extractVerificationCode(subject, body);
+        const htmlContent = detail.mail_body?.trim() ? detail.mail_body.trim() : null;
+        const textContent = item.mail_excerpt?.trim() || null;
+        const body = htmlContent || textContent || null;
+        const plainForCode = htmlContent ? htmlContent.replace(/<[^>]+>/g, " ") : textContent || "";
+        const code = extractVerificationCode(subject, plainForCode);
         const receivedAt = detail.mail_date || item.mail_date || null;
         messages.push({ subject, from, body, code, receivedAt });
       } catch {
@@ -371,8 +370,11 @@ export async function checkTempMail(
               const detail = await readRes.json();
               const subject = detail?.subject || item?.subject || null;
               const from = detail?.from || item?.from || null;
-              const body = detail?.textBody || detail?.body || (detail?.htmlBody ? detail.htmlBody.replace(/<[^>]+>/g, " ").trim() : null);
-              const code = extractVerificationCode(subject, body);
+              const htmlContent = detail?.htmlBody && typeof detail.htmlBody === "string" && detail.htmlBody.trim() ? detail.htmlBody.trim() : null;
+              const textContent = detail?.textBody && typeof detail.textBody === "string" ? detail.textBody.trim() : detail?.body && typeof detail.body === "string" ? detail.body.trim() : null;
+              const body = htmlContent || textContent || null;
+              const plainForCode = textContent || (htmlContent ? htmlContent.replace(/<[^>]+>/g, " ") : "");
+              const code = extractVerificationCode(subject, plainForCode);
               messages.push({ subject, from, body, code, receivedAt: detail?.date || item?.date || null });
             } catch {
               messages.push({ subject: item?.subject || null, from: item?.from || null, body: null, code: null, receivedAt: item?.date || null });
