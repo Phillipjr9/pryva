@@ -1,6 +1,6 @@
 # Pryva — verified status review
 
-**Date:** 31 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** the eighteenth pass, §25
+**Date:** 31 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** the nineteenth pass, §25
 **Method:** every claim below was read out of the code or produced by running the project. Nothing is taken from `PLAN.md` without checking it first — and several `PLAN.md` entries turned out to be stale (section 4).
 
 ---
@@ -986,3 +986,69 @@ after the form on both screens, no passkey on sign-up, the card's empty state, t
 "no HTTPS" explanation instead of a dead button, base64url round-trip, option encoding,
 cancellation-is-not-an-error, and the route guards: same-origin, rate limit, lockout,
 generic 401, session required for enrolment).
+
+---
+
+## 27. Nineteenth pass — refer a friend, and get paid when they buy (31 Oct 2026)
+
+**The request.** "Now what else can you implement more to this project", answered with
+the recommendation that the only growth loop missing was referrals; the owner chose it
+and confirmed the terms: **5% of the invited friend's first order, capped at ₦2,000**.
+
+### 27.1 What a customer gets
+
+| Where | What |
+|---|---|
+| `/dashboard/referrals` | The invite code, the full link, a copy button for each, three counters (friends joined, waiting for a first order, paid to you), the list of invitations with masked addresses and their state, and the rules in plain words. |
+| `/dashboard` sidebar | **Refer & earn**, under *Manage*. Inviting a friend is not a purchase and not a setting. |
+| `/signup?ref=CODE` | The code is carried into the new account, and remembered in a 30-day cookie so a visitor who detours through Google and comes back is still attributed. |
+
+### 27.2 The five rules, and where each one lives
+
+| Rule | Enforced by |
+|---|---|
+| One reward per invited account | `referrals.referee_id` is **UNIQUE** — a second attribution cannot be inserted, whatever the code does |
+| One payout per referral | Settlement claims the row with `UPDATE … WHERE status = 'pending'` **and** writes a UNIQUE ledger reference; the claim and the wallet credit commit in one transaction |
+| Only a delivered order counts | `status IN ('active','delivered') AND refunded_at IS NULL`; a refunded or still-processing order earns nothing |
+| No self-referral | Refused in `attributeReferral`, and a CHECK constraint refuses it in the database too |
+| The reward is the approved number | `REFERRAL_REWARD_PERCENT` (5) and `REFERRAL_REWARD_CAP_NGN` (2,000), clamped, so a typo moves the offer rather than breaking it — and `0` switches the programme off |
+
+The qualifying order is the invited account's **first** delivered order by creation
+time, not its largest: a friend who buys an eSIM and then a car-sized accounts order
+earns on the eSIM, which is what "their first order" means.
+
+### 27.3 When it pays
+
+Two triggers, both idempotent:
+
+* the purchase path, immediately after a delivered order commits — so the reward moves
+  the same minute, and a `.catch()` makes sure it can never fail the purchase;
+* the **nightly** job, because a hand-sourced account order is fulfilled by a person
+  and may only be marked delivered days later. A referral that cannot be settled stays
+  `pending` rather than being dropped.
+
+### 27.4 What is deliberately conservative
+
+- **Wallet credit, not cash.** The reward is spendable on any service. It is not paid
+  out as a withdrawal on its own, which keeps the referral programme out of the payout
+  path entirely.
+- **A masked address for the inviter.** `b•••@example.com` is enough to recognise who
+  joined and not enough to build a list of other people's addresses.
+- **No reward for any refunded or undelivered order**, and no reward if the order is
+  refunded after delivery either — the row no longer matches the qualifying query, and
+  a paid reward is reversed by an operator (see `RUNBOOK.md` §7d).
+- **Terms updated** (§4 *Your wallet*) so the cap, the refund rule and the
+  self-referral exclusion are contractual rather than folklore.
+
+**Verified:** 1,192 tests / 127 files · typecheck · lint · build (new routes:
+`/dashboard/referrals`, `/api/referrals`). New suites: `referrals.test.ts` (24 —
+against a real PGlite database and every migration replayed: the 5%/₦2,000 arithmetic
+and its environment overrides, code minting and normalisation, attribution including
+unknown/self/duplicate codes, the CHECK constraint on self-referral, the cookie
+fallback, settling exactly once, paying nothing for a processing or refunded order,
+applying the cap, paying two inviters their own rewards, settling one invitation
+without touching another, choosing the first delivered order rather than the largest,
+and the dashboard view's masking and totals), `referrals-ui.test.tsx` (11 — the invite
+page's copy, link, states and empty/unavailable cases; the nav entry; the authenticated
+uncached API; `?ref=` reaching the signup form and the cookie; and the code never
+appearing in the sign-up markup).

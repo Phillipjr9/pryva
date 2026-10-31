@@ -128,6 +128,13 @@ const clauses: Clause[] = [
           that matches the account name. We may refuse or reverse a credit that we later establish
           was not paid, was paid twice, or was the subject of a chargeback.
         </p>
+        <p>
+          Referral credit is a reward, not a top-up. When an account you invited places its first
+          order and that order is delivered, we may credit your wallet a share of it, as the invite
+          page describes at the time. That share is capped, it is reversed if the order it was based
+          on is refunded, and it is never payable for an account you control yourself or create in
+          order to obtain it. Referral credit can be spent on any service; it is not cash on its own.
+        </p>
       </>
     ),
   },

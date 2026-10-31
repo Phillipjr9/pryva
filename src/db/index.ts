@@ -402,7 +402,8 @@ export type PreviewState = Record<
   | "securityViolations" | "withdrawals" | "bankAccounts" | "adminAuditLog"
   | "userTwoFactor" | "twoFactorRecoveryCodes" | "twoFactorChallenges"
   | "productReviews" | "supportTickets" | "supportMessages"
-  | "webauthnCredentials" | "webauthnChallenges",
+  | "webauthnCredentials" | "webauthnChallenges"
+  | "referralCodes" | "referrals",
   Array<Record<string, unknown>>
 >;
 
@@ -434,12 +435,14 @@ const mockState: PreviewState =
     supportMessages: [],
     webauthnCredentials: [],
     webauthnChallenges: [],
+    referralCodes: [],
+    referrals: [],
   };
 
 // Next can load route handlers and server components in separate bundles.
 // Share the in-memory preview state across those bundles in this process.
 if (!databaseUrl) {
-  for (const key of ["users", "sessions", "orders", "walletTransactions", "paymentTopups", "contactMessages", "giftCards", "scheduledOrders", "notifications", "securityViolations", "withdrawals", "bankAccounts", "adminAuditLog", "userTwoFactor", "twoFactorRecoveryCodes", "twoFactorChallenges", "productReviews", "supportTickets", "supportMessages", "webauthnCredentials", "webauthnChallenges"] as const) {
+  for (const key of ["users", "sessions", "orders", "walletTransactions", "paymentTopups", "contactMessages", "giftCards", "scheduledOrders", "notifications", "securityViolations", "withdrawals", "bankAccounts", "adminAuditLog", "userTwoFactor", "twoFactorRecoveryCodes", "twoFactorChallenges", "productReviews", "supportTickets", "supportMessages", "webauthnCredentials", "webauthnChallenges", "referralCodes", "referrals"] as const) {
     mockState[key] ??= [];
   }
   globalForDb.__arenaPryvaMockState = mockState;

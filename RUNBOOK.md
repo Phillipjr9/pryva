@@ -334,6 +334,41 @@ lockout, not a fix.
 cannot use it to remove someone else's device. If you must, do it with the customer on
 the line, and record why.
 
+## 7d. Referral rewards
+
+A customer shares a code; when the invited account's **first delivered** order exists,
+the inviter is credited **5% of it, capped at ₦2,000**, once per invited account. The
+rate lives in `REFERRAL_REWARD_PERCENT` and the cap in `REFERRAL_REWARD_CAP_NGN`; set
+the percentage to `0` to stop new rewards without a deploy (existing rows keep their
+state).
+
+**Where to look.** `/dashboard/referrals` is the customer's view. In the database,
+`referrals` has one row per invited account: `status` is `pending` until settlement,
+then `credited`, and `reward_reference` is the wallet ledger reference
+(`REFL-…`) — quote it when matching a reward to its ledger entry. `referral_codes` maps
+a code to the account that owns it.
+
+**Settling is idempotent.** Both the purchase path and the nightly job call the same
+function; re-running it cannot double-pay, because the row is claimed by a conditional
+update and the ledger reference is unique. Do not "fix" a stuck reward by editing a
+balance — re-run the nightly job (`/api/cron/nightly`) and read the `referrals` step in
+its output.
+
+**Suspected abuse** — self-referral rings, accounts created to farm the cap, or a
+refunded order that was already rewarded:
+1. Establish the link: `referral_codes.code` → owner, then `referrals` rows for that
+   owner, then the invited accounts and their first orders.
+2. Mark the referral `void` and record why. Do not delete the row: the paper trail is
+   the point.
+3. If a reward was already paid, reverse it through the admin wallet adjustment so the
+   ledger keeps both entries, and note the referral id in the audit row.
+4. Reward farming with fresh accounts is a signup problem as much as a referral one —
+   check whether disposable inboxes were used, and record what you find.
+
+**Changing the offer.** Raising the percentage or the cap applies to *future*
+settlements only; already-credited rows keep the amount they were paid at. Say so if
+you change it, because customers will notice the difference.
+
 ---
 
 ## 8. Incident playbooks

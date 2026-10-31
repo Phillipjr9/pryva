@@ -805,3 +805,55 @@ export const webauthnChallenges = pgTable(
   },
   (table) => [index("webauthn_challenges_challenge_idx").on(table.challenge)],
 );
+
+/**
+ * One invite code per account.
+ *
+ * A row per account rather than a code derived from the user id: a derivation
+ * can be recomputed only until it has to change, and changing it invalidates
+ * every link already shared. Minted lazily, the first time the account opens its
+ * invite page.
+ */
+export const referralCodes = pgTable("referral_codes", {
+  code: varchar("code", { length: 16 }).primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * An invitation, and the reward it earned.
+ *
+ * `refereeId` is unique: one reward per invited account, enforced by the
+ * database rather than by a code path a retry can bypass. `rewardReference` is
+ * the wallet ledger reference and is unique too, so two settlement workers
+ * racing over the same row cannot credit twice. `status` is
+ * `pending | credited | void`, and a row stays pending until the referee has a
+ * delivered order that has not been refunded.
+ */
+export const referrals = pgTable(
+  "referrals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    referrerId: uuid("referrer_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    refereeId: uuid("referee_id")
+      .notNull()
+      .unique()
+      .references(() => users.id, { onDelete: "cascade" }),
+    code: varchar("code", { length: 16 }).notNull(),
+    status: varchar("status", { length: 16 }).notNull().default("pending"),
+    qualifyingOrderId: uuid("qualifying_order_id").references(() => orders.id, { onDelete: "set null" }),
+    rewardAmount: integer("reward_amount"),
+    rewardReference: varchar("reward_reference", { length: 64 }).unique(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    creditedAt: timestamp("credited_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("referrals_referrer_idx").on(table.referrerId),
+    index("referrals_status_idx").on(table.status),
+  ],
+);
