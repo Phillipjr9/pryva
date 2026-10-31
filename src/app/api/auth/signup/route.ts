@@ -9,6 +9,7 @@ import { DISPOSABLE_EMAIL_ERROR, isDisposableEmailAddress } from "@/lib/disposab
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { attributeReferral, readReferralCodeFrom } from "@/lib/referrals";
+import { recordSignupSignal } from "@/lib/fraud";
 
 export async function POST(request: Request) {
   if (!isSameOriginMutation(request)) return Response.json({ ok: false, error: "Invalid origin." }, { status: 403 });
@@ -67,6 +68,10 @@ export async function POST(request: Request) {
     // somebody cannot sign up. The code arrives in the body (a link on the signup
     // page) or in the short-lived cookie the page sets, which is what lets a
     // Google signup hours later still be attributed.
+    // Where this account came from, as salted hashes. Best effort and silent:
+    // a missing signal costs one fraud check, never an account.
+    await recordSignupSignal(request, created.id);
+
     const referralCode = readReferralCodeFrom(request, fields.ref);
     if (referralCode) {
       await attributeReferral({ refereeId: created.id, code: referralCode }).catch((error) => {

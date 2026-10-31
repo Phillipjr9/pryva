@@ -159,6 +159,31 @@ The browser half (`src/lib/webauthn-browser.ts`) is written here rather than pul
 from a package, so the sign-in page loads no third-party script; a test fails if
 `@simplewebauthn/browser` ever becomes a dependency.
 
+## 3c. Fraud controls and what they deliberately are not
+
+`src/lib/fraud.ts` and `/admin/security` add abuse controls. The design rule is that
+a detector may **observe** and may **throttle**, but may not decide.
+
+| Control | Enforced how | Blast radius if wrong |
+|---|---|---|
+| Purchases per hour (40) | counted from `orders` in the last hour; 429 | a customer waits a few minutes |
+| Gift cards per day (10) | counted from `gift_cards.redeemed_at`; 429 | a support conversation |
+| Referral on one network | `account_signals` hash match; reward voided before the wallet is touched | a legitimate family member loses a reward — reversable by an operator |
+| Withdrawal risk | advisory columns on the row + a queue entry | **none**: nothing is blocked and no automated code reads it |
+
+- **No raw personal data is retained for this.** Signals are salted SHA-256 hashes of
+  the request's network and user agent. `FRAUD_HASH_SALT` makes them incomparable
+  across a rotation, and a hash cannot be reversed into an address by anyone reading a
+  backup.
+- **No automated account lock, freeze or payout block.** Those exist for credentials
+  (lockout) and for money (reconciliation), and both are already audited; adding a
+  third, silent one would create exactly the kind of unexplained refusal this
+  codebase avoids.
+- **The queue is not a money path.** It is read-only apart from marking a row
+  reviewed; the admin route imports no wallet function, and a test asserts that.
+- **The customer is told to slow down, never why.** Thresholds are not returned to a
+  browser, and the withdrawal receipt contains no risk field — a test pins both.
+
 ## 4. Known gaps — stated, not hidden
 
 - **No edge bot defence.** Rate limits are in the app. A credential-stuffing

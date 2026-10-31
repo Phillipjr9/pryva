@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { orders, referralCodes, referrals, users } from "@/db/schema";
 import { logger } from "@/lib/logger";
 import { creditWalletInTx } from "@/lib/wallet";
+import { recordFraudEvent, sameNetwork } from "@/lib/fraud";
 import {
   makeReferralCode,
   normalizeReferralCode,
@@ -145,7 +146,7 @@ export async function attributeReferral(input: {
   return { ok: true, referrerId: resolved.referrerId, code: resolved.code };
 }
 
-export type SettlementResult = { credited: number; pending: number; skipped: number };
+export type SettlementResult = { credited: number; pending: number; skipped: number; voided: number };
 
 /**
  * Pay every invitation whose referee now has a qualifying order.
@@ -157,7 +158,7 @@ export type SettlementResult = { credited: number; pending: number; skipped: num
  * without a marked row, would be money nobody can explain.
  */
 export async function settleReferralRewards(options: { refereeId?: string } = {}): Promise<SettlementResult> {
-  const result: SettlementResult = { credited: 0, pending: 0, skipped: 0 };
+  const result: SettlementResult = { credited: 0, pending: 0, skipped: 0, voided: 0 };
 
   const pendingRows = await db
     .select({
@@ -175,6 +176,29 @@ export async function settleReferralRewards(options: { refereeId?: string } = {}
     .limit(200);
 
   for (const row of pendingRows) {
+    // An invitation from your own network is not a referral: it is the cheapest
+    // way to pay yourself. Both accounts must have a signal to compare, so a
+    // missing one never blocks a genuine reward.
+    const selfNetwork = await sameNetwork(row.referrerId, row.refereeId).catch(() => false);
+    if (selfNetwork) {
+      const [voided] = await db
+        .update(referrals)
+        .set({ status: "void" })
+        .where(and(eq(referrals.id, row.id), eq(referrals.status, "pending")))
+        .returning({ id: referrals.id });
+      if (voided) {
+        result.voided += 1;
+        await recordFraudEvent({
+          userId: row.referrerId,
+          kind: "referral_same_network",
+          severity: "high",
+          reasons: ["the invited account was created from the same network as the inviter"],
+          reference: row.id,
+        });
+      }
+      continue;
+    }
+
     let credited = 0;
     try {
       credited = await db.transaction(async (tx: any) => {

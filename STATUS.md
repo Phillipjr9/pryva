@@ -1,6 +1,6 @@
 # Pryva — verified status review
 
-**Date:** 31 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** the nineteenth pass, §25
+**Date:** 31 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** the twentieth pass, §25
 **Method:** every claim below was read out of the code or produced by running the project. Nothing is taken from `PLAN.md` without checking it first — and several `PLAN.md` entries turned out to be stale (section 4).
 
 ---
@@ -1052,3 +1052,89 @@ and the dashboard view's masking and totals), `referrals-ui.test.tsx` (11 — th
 page's copy, link, states and empty/unavailable cases; the nav entry; the authenticated
 uncached API; `?ref=` reaching the signup form and the cookie; and the code never
 appearing in the sign-up markup).
+
+---
+
+## 28. Twentieth pass — fraud controls (31 Oct 2026)
+
+**The request.** "Now can you strict fraud on my platform."
+
+The platform already had good *money* safety — an idempotent ledger, a nightly
+arithmetic, a reconciliation queue, lockout, 2FA and passkeys. What it had almost
+nothing of was *abuse* safety: a script could have bought forty orders a minute, a
+stolen gift card could have been redeemed until it was empty, a withdrawal could
+have gone to a bank account added eight seconds earlier, and a referral ring could
+have paid itself through fresh accounts. Those are the holes this pass closes.
+
+### 28.1 Three layers, deliberately separate
+
+| Layer | What it is | Where |
+|---|---|---|
+| **Signals** | Where an account was created from — **salted hashes**, never the raw address | `account_signals`, `src/lib/fraud.ts` |
+| **Assessment** | A *score* on a money action, with sentences a person can check | `assessWithdrawal` → `withdrawals.risk_level` / `risk_reasons` |
+| **Ceilings** | Hard limits a script hits | purchases per hour, gift cards per day |
+
+### 28.2 What is actually enforced now
+
+| Control | Threshold | Behaviour |
+|---|---|---|
+| Purchases per hour | 40 per account | 429, "That is a lot of orders in a short time", event logged |
+| Gift-card redemptions per day | 10 per account | 429, "contact support", event logged |
+| Referral between two accounts created on one network | any match | reward **voided** before payment, high-severity event |
+| Withdrawal risk | see below | advisory flag on the row and in the admin queue |
+
+The withdrawal assessment adds a sentence for each fact that is true: the account is
+less than three days old (or a week), the payout account was added in the last 24
+hours, this payout account has never been paid before, the request is almost
+everything the account has ever deposited, three or more withdrawal requests in 24
+hours, and more than three accounts share this network. Three or more of those is
+`high`; one or two is `warn`; none is `low`.
+
+**It does not block anything.** The request keeps its `pending` status, so the
+approval flow that already moves money is untouched — a false positive costs a
+customer a badge on a screen an admin reads, not a refusal. This is stated in the
+column comment, in the API shape and in the admin copy.
+
+### 28.3 Why hashes, and what is not stored
+
+`account_signals.ip_hash` is `sha256(salt + ip)`. A hash is enough to answer the only
+question the platform needs — *did these two accounts arrive from the same place?* —
+and there are only 2^32 IPv4 addresses, so an unsalted hash would be a lookup away
+from the address itself. The salt is `FRAUD_HASH_SALT`; rotating it makes old hashes
+incomparable with new ones, which is a deliberate, documented trade.
+
+Never stored: the raw address, the raw user agent, a location, a device fingerprint,
+or anything that could be joined to another service's data.
+
+### 28.4 The operator's queue
+
+`/admin/security` now opens with **Fraud signals**: newest first, unreviewed by
+default, each row naming the kind, the severity, the account, the amount or
+reference, and the reasons in words — plus **Mark reviewed**, the only write, which
+also records an `admin_audit_log` entry (`fraud.review`). Nothing in the queue acts on
+its own: no automated code reads `fraud_events` back, and nothing in it can move
+money. If a reason is wrong, the bug is in the fact it came from, not in the queue.
+
+### 28.5 What this pass deliberately did not do
+
+- **No blocking on account age or "new device".** Those are the two signals most
+  likely to punish a first-time customer in Nigeria, and an advisory flag gets the
+  same information to an operator without a support ticket.
+- **No automated withdrawals freeze.** The money flow stays the money flow; the
+  operator decides.
+- **No raw IP retention**, so nothing here creates a location history that would
+  later need its own retention policy.
+- **No CAPTCHA and no device fingerprinting** — both were considered and both add a
+  third party or a tracking surface for a problem the ceilings already bound.
+
+**Verified:** 1,220 tests / 129 files · typecheck · lint · build (new route:
+`/api/admin/security/fraud`). New suites: `fraud.test.ts` (19 — hashing is one-way,
+salted and stable; signals are written once and store no address; the assessment is
+silent about a mature account, flags a new one on a new destination, a withdrawal that
+is almost the whole deposit history, a burst of requests and a crowded network; both
+velocity ceilings hold at their limit and ignore the previous hour/day; the queue
+records reasons, empties once and never fails its caller; and a referral between two
+accounts on one network is voided and logged while a genuine one is still paid) and
+`fraud-ui.test.tsx` (9 — the queue is admin-only and advisory, the withdrawal receipt
+never mentions risk, the customer is told to slow down and not why, and the reasons
+reach the operator).

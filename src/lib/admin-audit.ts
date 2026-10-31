@@ -40,7 +40,8 @@ export type AdminAuditAction =
   | "message.status"
   | "review.publish"
   | "review.reject"
-  | "support.reply";
+  | "support.reply"
+  | "fraud.review";
 
 export type AdminAuditTargetType =
   | "order"
@@ -49,7 +50,8 @@ export type AdminAuditTargetType =
   | "message"
   | "gift_card"
   | "review"
-  | "support_ticket";
+  | "support_ticket"
+  | "fraud_event";
 
 type AuditActor = Pick<PublicUser, "id" | "email">;
 

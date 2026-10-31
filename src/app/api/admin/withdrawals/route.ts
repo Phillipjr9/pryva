@@ -36,6 +36,8 @@ export async function GET(request: NextRequest) {
         paystackReference: withdrawals.paystackReference,
         transferReference: withdrawals.transferReference,
         failureReason: withdrawals.failureReason,
+        riskLevel: withdrawals.riskLevel,
+        riskReasons: withdrawals.riskReasons,
         createdAt: withdrawals.createdAt,
         processedAt: withdrawals.processedAt,
         completedAt: withdrawals.completedAt,
