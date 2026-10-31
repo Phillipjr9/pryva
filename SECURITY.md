@@ -183,6 +183,12 @@ a detector may **observe** and may **throttle**, but may not decide.
   reviewed; the admin route imports no wallet function, and a test asserts that.
 - **The customer is told to slow down, never why.** Thresholds are not returned to a
   browser, and the withdrawal receipt contains no risk field — a test pins both.
+- **Alerts leave the building, the reasoning does not.** A `high` signal is emailed to
+  operators only (`FRAUD_ALERT_EMAIL`, else `ADMIN_EMAILS`) after the row is committed.
+  The message carries the signal, severity, account, amount/reference and reason
+  sentences — never a threshold, a hash, a network address or anything a customer
+  would be shown. Delivery is best effort with a short timeout: a mail failure is
+  logged and resolves `false`, so it cannot fail a payout, purchase or referral.
 
 ## 4. Known gaps — stated, not hidden
 

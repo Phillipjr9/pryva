@@ -381,6 +381,15 @@ noticed; **none of it acts on its own**, and nothing in it can move money.
 | `purchase_velocity` | 40+ orders in an hour | a script or a shared session. Look at the account's orders and referrals |
 | `gift_card_velocity` | 10+ gift cards redeemed in a day | card-testing pattern. Do not void the credit without checking the codes first |
 
+**Alerts by email.** A `high` signal is also emailed to `FRAUD_ALERT_EMAIL`
+(falling back to `ADMIN_EMAILS` when that is unset), in the same branded template as
+every other Pryva email, with its own shield hero. The email repeats the signal, the
+account, the amount or reference and the reasons, and links to `/admin/security`.
+It is a doorbell, not a decision: it moves no money and the queue stays the record.
+Repeats are suppressed for 30 minutes per account and signal, so a script that trips a
+ceiling does not fill the inbox. `warn` and `info` events are never mailed. If mail is
+not configured the alert is skipped and logged — nothing about the money path changes.
+
 **Reading the queue.** Mark a row reviewed once you have judged it — that is the only
 write, and it is recorded in `admin_audit_log` as `fraud.review`. Leave a row open if
 it needs someone else.
