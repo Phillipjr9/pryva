@@ -40,6 +40,14 @@ describe("choosing services", () => {
     window.history.forward();
     await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "App verification" })).toBeTruthy());
     expect(screen.getByRole("heading", { name: "WhatsApp" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Number plans" }));
+    expect(screen.getByRole("heading", { level: 1, name: "Number plans" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Rental" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Single use" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Rental" }));
+    expect(screen.getAllByRole("heading", { name: "Nigeria rental" })).toHaveLength(3);
+    expect(screen.queryByRole("heading", { name: "Nigeria" })).toBeNull();
   });
 
   it("never retains another subscription or country as the active plan", () => {
