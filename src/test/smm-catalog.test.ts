@@ -115,18 +115,17 @@ describe("boosting catalog listings", () => {
     expect(items.map((item) => item.name)).toEqual(["Instagram likes", "TikTok views", "YouTube subscribers"]);
   });
 
-  it("lists the four intents a customer can filter by, and nothing else", async () => {
+  it("lists recognized social intents and drops unsupported services", async () => {
     const { boostItems } = await import("@/lib/smm-catalog");
     const items = boostItems(snapshot([
       service({ id: "1", name: "Instagram Followers", category: "Instagram" }),
       service({ id: "2", name: "Instagram Likes", category: "Instagram" }),
       service({ id: "3", name: "TikTok Views", category: "TikTok" }),
       service({ id: "4", name: "YouTube Subscribers", category: "YouTube" }),
-      // Comments, shares and saves are real panel products and not part of the
-      // shop: they have no chip, and a customer cannot tell them apart.
       service({ id: "5", name: "Custom Comments", category: "Instagram - Comments" }),
+      service({ id: "6", name: "Website Traffic", category: "SEO" }),
     ]));
-    expect(items.map((item) => item.tag)).toEqual(["Followers", "Likes", "Views", "Subscribers"]);
+    expect(items.map((item) => item.tag)).toEqual(["Followers", "Likes", "Views", "Subscribers", "Comments"]);
   });
 
   it("matches a platform for artwork without matching a single letter loosely", async () => {
@@ -136,14 +135,14 @@ describe("boosting catalog listings", () => {
       // "Max" contains an x but is not the X platform.
       service({ id: "2", name: "Max Quality Followers", category: "Instagram" }),
       // No known platform: falls back to a generic mark rather than a wrong brand.
-      service({ id: "3", name: "Soundcloud Plays", category: "Soundcloud" }),
+      service({ id: "3", name: "Myspace Plays", category: "Myspace" }),
     ]));
     expect(items.map((item) => item.platform)).toEqual(["X", "Instagram"]);
     expect(items[0]).toMatchObject({ platform: "X", artwork: { kind: "brand", name: "x" } });
     expect(items[1]).toMatchObject({ platform: "Instagram", artwork: { kind: "brand", name: "instagram" } });
     // No known platform means not listed: a generic mark on a real storefront
     // would be selling a boost without saying what it boosts.
-    expect(items.some((item) => item.name.includes("Soundcloud"))).toBe(false);
+    expect(items.some((item) => item.name.includes("Myspace"))).toBe(false);
   });
 
   it("does not list a service it cannot describe or place on a platform", async () => {
@@ -179,7 +178,7 @@ describe("selecting from a real panel catalogue", () => {
     const { selectBoostServices } = await import("@/lib/smm-catalog");
     const selection = selectBoostServices([
       service({ id: "seo", name: "Website Traffic", category: "SEO" }),
-      service({ id: "spot", name: "Spotify Plays", category: "Spotify" }),
+      service({ id: "maps", name: "Google Maps Reviews", category: "Google" }),
       service({ id: "rev", name: "Trustpilot Reviews", category: "Reviews" }),
       service({ id: "ig", name: "Instagram Followers", category: "Instagram" }),
     ], "NGN");
@@ -187,10 +186,19 @@ describe("selecting from a real panel catalogue", () => {
     expect(selection.services.map((entry) => entry.id)).toEqual(["ig"]);
   });
 
+  it("lists expanded platforms such as Spotify plays", async () => {
+    const { selectBoostServices } = await import("@/lib/smm-catalog");
+    const selection = selectBoostServices([
+      service({ id: "spot", name: "Spotify Plays", category: "Spotify" }),
+    ], "NGN");
+    expect(selection.listed).toBe(1);
+    expect(selection.services[0].id).toBe("spot");
+  });
+
   it("keeps a large catalogue to a shop-sized list", async () => {
     const { selectBoostServices } = await import("@/lib/smm-catalog");
     const { PROMOTION_EXAMPLES } = await import("@/lib/service-explorer");
-    // Eleven thousand services: 400 variants per platform and intent.
+    // Many variants per platform and intent.
     const catalogue = PROMOTION_EXAMPLES.map((entry) => entry.name).flatMap((platform) =>
       ["Followers", "Likes", "Views", "Subscribers"].flatMap((tag) =>
         Array.from({ length: 400 }, (_, index) =>
@@ -203,12 +211,13 @@ describe("selecting from a real panel catalogue", () => {
         ),
       ),
     );
-    expect(catalogue).toHaveLength(11_200);
+    expect(catalogue).toHaveLength(PROMOTION_EXAMPLES.length * 4 * 400);
     const selection = selectBoostServices(catalogue, "NGN");
-    // Seven platforms × four intents, one offer each — and every one priced.
-    expect(selection.listed).toBe(28);
-    expect(selection.services).toHaveLength(28);
-    expect(new Set(selection.services.map((entry) => entry.name)).size).toBe(28);
+    // Platforms × four intents, one offer each — and every one priced.
+    const expectedListed = PROMOTION_EXAMPLES.length * 4;
+    expect(selection.listed).toBe(expectedListed);
+    expect(selection.services).toHaveLength(expectedListed);
+    expect(new Set(selection.services.map((entry) => `${entry.category}|${entry.name}`)).size).toBe(expectedListed);
   });
 });
 

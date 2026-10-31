@@ -161,7 +161,7 @@ describe("boosts", () => {
   });
 
   it("ignores feed rows the shop does not sell", () => {
-    const lines = boostLines([service({ name: "Instagram Comments", category: "Instagram" })], "NGN");
+    const lines = boostLines([service({ name: "Instagram Story Poll Votes", category: "Instagram" })], "NGN");
     expect(lines).toEqual([]);
   });
 });
