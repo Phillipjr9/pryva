@@ -1698,3 +1698,52 @@ count is not a zero and that an unpriced catalogue is not an empty one;
 **Not verified:** the numbers themselves. This environment cannot call any feed,
 so the first real answer is the deployed page — and the numbers it shows are the
 owner's to read, not mine to assume.
+
+## 40. Thirty-second pass — the confirmation that never appeared (31 Oct 2026)
+
+Reported: *"when user click email me a link to verify there email nothing shows as
+confirmation."* Two defects, stacked, and either alone would have produced the same
+silence.
+
+**The page checked the wrong thing first.** `/verify-email` began its render with
+`!token ? intro : …`, so with no token in the URL the intro block rendered whatever
+happened next. Pressing **Email me a link** sent the request, stored the answer, and
+changed nothing on screen: the `Link sent`, `We could not send that email` and
+`That link did not work` branches were all unreachable without a token — which is
+precisely the state of a person pressing that button. It was not a missing
+confirmation, it was a confirmation that could not be shown. The result branches now
+come first, and the intro is what remains when there is no token *and* no result.
+
+A signed-out visitor got `401 Unauthorized` under a heading that said the link would
+go to "the address on your account". That case now has its own branch: **Sign in to
+get a link**, with the sign-in link carrying `?next=%2Fverify-email`, and no
+"Try again" button that can only fail the same way.
+
+**The server was claiming a send it had not checked.** `sendVerificationEmail`
+returned `void` and never read the provider's response — a `fetch` that resolves is
+not a message that was accepted. So the route answered `{ ok: true }` after storing a
+token even when the provider had refused the message, and the customer waited for
+mail that was never queued. It now returns `{ delivered, detail }`; the resend route
+answers **502** with the reason when delivery is refused, and success means the
+provider accepted the message. Signup still tolerates it — the account exists
+whether or not mail works — but the in-app request answers a person who is standing
+there, so it says what actually happened.
+
+The support assistant had the same flaw from the other side: it told customers
+"issued a fresh verification link" whenever a token was created. It now reports the
+delivery outcome and says the link exists but nothing will arrive when that is true.
+
+**This is what the existing `onboarding@resend.dev` sender produces for anyone but
+the account owner** — a real refusal, previously invisible. It will now be visible,
+with the provider's own reason, which is the point: the fix is a verified sending
+domain, not a quieter error.
+
+**Verified:** 1,412 tests / 151 files · typecheck · lint · build.
+`verify-email-page.test.tsx` (7) presses the button in each state — sent, refused,
+signed out, dead link, dead link recovered; `email-verification-delivery.test.ts` (6)
+pins that the token is stored before the send, and that a refusal is never reported
+as a delivery; `verify-email-route.test.ts` (5) pins the 502, the 503, the
+already-verified case and the existing refusals.
+
+**Not verified:** that mail now reaches a real inbox. That needs a verified sending
+domain, which is an owner action on the mail account, not a code change.
