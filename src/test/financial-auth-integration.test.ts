@@ -1157,6 +1157,200 @@ describe("Paystack top-up safety", () => {
   });
 });
 
+describe("payout settlement from the provider's own events", () => {
+  const BANK = "3f0f7d5e-2b1c-4a6f-9d1e-6a2b3c4d5e6f";
+
+  function eventBody(event: string, data: Record<string, unknown>) {
+    return JSON.stringify({ event, data });
+  }
+  function signed(body: string) {
+    return new NextRequest("https://pryva.test/api/webhooks/payment", {
+      method: "POST",
+      headers: { "x-paystack-signature": createHmac("sha512", "test-secret").update(body).digest("hex") },
+      body,
+    });
+  }
+  const send = (event: string, data: Record<string, unknown>) => webhookRoute.POST(signed(eventBody(event, data)));
+
+  /** A customer request that an operator has approved: wallet debited, row in flight. */
+  async function inFlightPayout(amount = 5000, requestId = "5c2a1f0e-0000-4000-8000-000000000001") {
+    await database.insert(schema.bankAccounts).values({
+      id: BANK, userId: USER, bankName: "Test Bank", bankCode: "044",
+      accountNumber: "1234567890", accountName: "Test Customer", recipientCode: "RCP-test",
+    });
+    // The name check compares the payout destination with the name frozen on a
+    // settled deposit, so a realistic fixture has one.
+    await database.insert(schema.paymentTopups).values({
+      reference: `TOP-payout-${amount}`, userId: USER, amount, status: "completed",
+      paidAt: new Date(), payerName: "Test Customer",
+    });
+    const created = await withdrawalRoute.POST(new NextRequest("https://pryva.test/api/wallet/withdraw", {
+      method: "POST",
+      headers: { host: "pryva.test", "x-forwarded-proto": "https", origin: "https://pryva.test", "content-type": "application/json" },
+      body: JSON.stringify({ requestId, amount, bankAccountId: BANK }),
+    }));
+    const body = await created.json();
+    if (created.status !== 200) throw new Error(`withdrawal fixture failed: ${JSON.stringify(body)}`);
+    const providerReference = `wd-${String(body.withdrawal.id).replace(/-/g, "")}`;
+    mocks.initiateTransfer.mockResolvedValueOnce({
+      status: true,
+      data: { transfer_code: "TRF-test", reference: providerReference, amount: amount * 100, currency: "NGN", status: "pending" },
+    });
+    const approval = await adminWithdrawalRoute.PUT(new NextRequest("https://pryva.test/api/admin/withdrawals", {
+      method: "PUT", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: body.withdrawal.id, action: "approve" }),
+    }));
+    expect(approval.status).toBe(200);
+    const [row] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, body.withdrawal.id));
+    expect(row).toMatchObject({ status: "processing", paystackReference: providerReference });
+    return { row, providerReference, fee: row.fee };
+  }
+
+  async function balance() {
+    const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+    return user.walletBalance;
+  }
+
+  it("completes an in-flight payout on transfer.success and never pays it twice", async () => {
+    const { row, providerReference, fee } = await inFlightPayout(5000);
+    const afterRequest = await balance();
+    expect(afterRequest).toBe(10000 - 5000 - fee);
+    expect(row.completedAt).toBeNull();
+
+    const first = await send("transfer.success", {
+      status: "success", reference: providerReference, amount: 500000, currency: "NGN", transfer_code: "TRF-1",
+    });
+    expect(first.status).toBe(200);
+    expect(await first.json()).toMatchObject({ ok: true, outcome: "settled" });
+
+    const [settled] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, row.id));
+    expect(settled.status).toBe("completed");
+    expect(settled.completedAt).toBeInstanceOf(Date);
+    expect(settled.transferReference).toBe("TRF-1");
+    // Settlement moves money out of our balance, not back into the wallet.
+    expect(await balance()).toBe(afterRequest);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+
+    const replay = await send("transfer.success", {
+      status: "success", reference: providerReference, amount: 500000, currency: "NGN", transfer_code: "TRF-1",
+    });
+    expect(await replay.json()).toMatchObject({ ok: true, outcome: "already_settled" });
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+    expect(await balance()).toBe(afterRequest);
+  });
+
+  it("refunds the wallet, once, when the provider says the payout failed", async () => {
+    const { row, providerReference } = await inFlightPayout(5000, "5c2a1f0e-0000-4000-8000-000000000002");
+    const debited = await balance();
+    expect(debited).toBeLessThan(10000);
+
+    const failed = await send("transfer.failed", {
+      status: "failed", reference: providerReference, amount: 500000, currency: "NGN",
+      transfer_code: "TRF-2", reason: "declined by the recipient bank",
+    });
+    expect(failed.status).toBe(200);
+    expect(await failed.json()).toMatchObject({ ok: true, outcome: "refunded" });
+
+    const [row2] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, row.id));
+    expect(row2.status).toBe("failed");
+    expect(row2.failureReason).toContain("declined by the recipient bank");
+    expect(row2.failureReason).toContain("refunded");
+
+    // Exactly what the request took: amount plus fee.
+    expect(await balance()).toBe(10000);
+    const ledger = await database.select().from(schema.walletTransactions);
+    expect(ledger).toHaveLength(2);
+    expect(ledger[1]).toMatchObject({ type: "refund", amount: row.amount + row.fee, balanceAfter: 10000 });
+
+    const replay = await send("transfer.failed", {
+      status: "failed", reference: providerReference, amount: 500000, currency: "NGN", transfer_code: "TRF-2",
+    });
+    expect(await replay.json()).toMatchObject({ ok: true, outcome: "already_failed" });
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(2);
+    expect(await balance()).toBe(10000);
+  });
+
+  it("refunds a payout the bank reverses after it looked settled", async () => {
+    const { row, providerReference } = await inFlightPayout(4000, "5c2a1f0e-0000-4000-8000-000000000003");
+    await send("transfer.success", { status: "success", reference: providerReference, amount: 400000, currency: "NGN", transfer_code: "TRF-3" });
+    const [completed] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, row.id));
+    expect(completed.status).toBe("completed");
+
+    const reversal = await send("transfer.reversed", {
+      status: "reversed", reference: providerReference, amount: 400000, currency: "NGN", transfer_code: "TRF-3",
+    });
+    expect(await reversal.json()).toMatchObject({ ok: true, outcome: "refunded" });
+    expect(await balance()).toBe(10000);
+    const [after] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, row.id));
+    expect(after.status).toBe("failed");
+    expect(after.failureReason).toContain("reversed");
+  });
+
+  it("refuses a contradictory event rather than crediting on it", async () => {
+    const { row, providerReference } = await inFlightPayout(3000, "5c2a1f0e-0000-4000-8000-000000000004");
+    await send("transfer.success", { status: "success", reference: providerReference, amount: 300000, currency: "NGN", transfer_code: "TRF-4" });
+    const settledBalance = await balance();
+
+    // A plain failure cannot follow a success. The wallet is not credited and the
+    // row is left as it was for a person to read.
+    const contradictory = await send("transfer.failed", {
+      status: "failed", reference: providerReference, amount: 300000, currency: "NGN", transfer_code: "TRF-4",
+    });
+    expect(await contradictory.json()).toMatchObject({ ok: true, outcome: "held" });
+    expect(await balance()).toBe(settledBalance);
+    const [after] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, row.id));
+    expect(after.status).toBe("completed");
+  });
+
+  it("refuses an event whose amount or currency disagrees with our record", async () => {
+    const { row, providerReference } = await inFlightPayout(2500, "5c2a1f0e-0000-4000-8000-000000000005");
+    const before = await balance();
+
+    const wrongAmount = await send("transfer.success", {
+      status: "success", reference: providerReference, amount: 1, currency: "NGN", transfer_code: "TRF-5",
+    });
+    expect(wrongAmount.status).toBe(400);
+    const wrongCurrency = await send("transfer.success", {
+      status: "success", reference: providerReference, amount: 250000, currency: "USD", transfer_code: "TRF-5",
+    });
+    expect(wrongCurrency.status).toBe(400);
+
+    const [after] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, row.id));
+    expect(after.status).toBe("processing");
+    expect(after.completedAt).toBeNull();
+    expect(await balance()).toBe(before);
+  });
+
+  it("acknowledges an event for a transfer it does not know, without moving money", async () => {
+    const response = await send("transfer.success", {
+      status: "success", reference: "wd-00000000000000000000000000000000", amount: 100000, currency: "NGN", transfer_code: "TRF-x",
+    });
+    // 200 so the provider stops retrying: no retry can conjure the row.
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, outcome: "unknown_reference" });
+    expect(mocks.log.error).toHaveBeenCalledWith(
+      expect.stringContaining("no withdrawal"),
+      expect.objectContaining({ reference: "wd-00000000000000000000000000000000" }),
+    );
+    expect(await balance()).toBe(10000);
+  });
+
+  it("refuses a transfer event that is not signed with the configured secret", async () => {
+    const { row, providerReference } = await inFlightPayout(1500, "5c2a1f0e-0000-4000-8000-000000000006");
+    const body = eventBody("transfer.success", {
+      status: "success", reference: providerReference, amount: 150000, currency: "NGN", transfer_code: "TRF-6",
+    });
+    const forged = await webhookRoute.POST(new NextRequest("https://pryva.test/api/webhooks/payment", {
+      method: "POST",
+      headers: { "x-paystack-signature": createHmac("sha512", "wrong-secret").update(body).digest("hex") },
+      body,
+    }));
+    expect(forged.status).toBe(401);
+    const [after] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, row.id));
+    expect(after.status).toBe("processing");
+  });
+});
+
 describe("profile and notification mutation guards", () => {
   const jsonRequest = (path: string, method: string, body: unknown, origin = "https://pryva.test") => new NextRequest(`https://pryva.test${path}`, {
     method, headers: { origin, "content-type": "application/json" }, body: JSON.stringify(body),

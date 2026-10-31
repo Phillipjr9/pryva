@@ -215,8 +215,17 @@ describe("Paystack webhook", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
-  it("ignores signed non-payment events", async () => {
-    expect((await POST(request(JSON.stringify({ event: "transfer.success" })))).status).toBe(200);
+  it("ignores signed events that describe neither a payment nor a payout", async () => {
+    expect((await POST(request(JSON.stringify({ event: "subscription.create", data: { id: 1 } })))).status).toBe(200);
+    expect((await POST(request(JSON.stringify({ event: "transfer.success" })))).status).toBe(400);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("refuses a payout event with no usable transfer details", async () => {
+    // A payout event is one we now act on, so a malformed one is a refusal that
+    // the provider keeps visible -- not something to acknowledge as handled.
+    const body = JSON.stringify({ event: "transfer.success", data: { status: "success", reference: "", amount: "500000" } });
+    expect((await POST(request(body))).status).toBe(400);
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 

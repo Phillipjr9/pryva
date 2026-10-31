@@ -178,14 +178,29 @@ only a committed ledger entry is. If a verification fails, do not ask the custom
 to pay again until you have checked Paystack by reference.
 
 ### Withdrawals
-`pending → processing → completed`. Approval claims the row and stores a unique
-Paystack reference **before** calling Paystack. There is no automatic settlement:
-`transfer.success`/`transfer.failed` webhooks are **not** handled.
+`pending → processing → completed|failed`. Approval claims the row and stores a
+unique Paystack reference **before** calling Paystack. Settlement now arrives
+through the signed webhook (see §7n):
+
+- `transfer.success` completes a `processing` row. A repeat of the same event is
+  a no-op; it cannot complete or pay anything twice.
+- `transfer.failed` / `transfer.abandoned` on a `processing` row marks it `failed`
+  and refunds the wallet `amount + fee` in one transaction, with a ledger entry.
+  A repeat is a no-op.
+- `transfer.reversed` also ends a row that had already been marked `completed` —
+  a bank can claw a payout back days later — and refunds it the same way.
+- A `transfer.failed` arriving after a success is a contradiction: it is **not**
+  applied, the row stays `completed`, and the event is logged for a person.
+- An event for an amount or currency we did not record is refused with a 400 and
+  changes nothing.
+
+What is left for a person is the exception:
 
 - An ambiguous transfer stays `processing`. Inspect Paystack by reference, amount
   and recipient before doing anything else.
 - `complete` requires the stored initiation code plus `reconciliationConfirmed`
-  and a note. It is refused when there is no confirmed initiation.
+  and a note. It is refused when there is no confirmed initiation. Use it only for
+  a transfer the provider never reported — otherwise let the webhook settle it.
 - `reject` refunds only a `pending` request with no provider reference. Once a
   reference exists, reconcile before refunding.
 - Payouts may only go to the name frozen on the top-up that funded the wallet. A
@@ -479,6 +494,39 @@ lands in `review` waits for an operator: confirm with the panel, then refund fro
 The supplier's name, service ids and wholesale rates never appear in customer
 copy or client bundles; `src/test/supplier-secrecy.test.ts` fails the build if
 they do.
+
+---
+
+## 7n. Payouts settle themselves — what still needs a person
+
+`/api/webhooks/payment` used to accept only `charge.success` and answer everything
+else `ok`, so a payout that Paystack paid sat at `processing` until somebody
+clicked "Mark as Completed", and a payout Paystack refused stayed `processing` with
+the customer's money still debited. Both now settle from the signed event:
+
+| Event | What happens | If it repeats |
+|---|---|---|
+| `transfer.success` | row `processing → completed`, `completed_at` set, transfer code stored | `already_settled`, nothing moves |
+| `transfer.failed` / `transfer.abandoned` | row `processing → failed`, wallet refunded `amount + fee` with a `refund` ledger entry | `already_failed`, nothing moves |
+| `transfer.reversed` | same refund, also from `completed` | second call finds `failed`, nothing moves |
+| any other event | acknowledged, no money moved | — |
+
+An event whose `amount` is not exactly `amount × 100` kobo, or whose currency is
+not NGN, is **refused** (HTTP 400) and changes nothing; that is a mismatch between
+Paystack and our record, and a person has to read it.
+
+**Check the webhook subscribes to transfer events.** In Paystack → Settings →
+API Keys & Webhooks, the endpoint URL must be
+`https://pryva-two.vercel.app/api/webhooks/payment` with `charge.success`,
+`transfer.success`, `transfer.failed` and `transfer.reversed` enabled. If transfer
+events are filtered out in the dashboard, this code is inert and every payout goes
+back to the manual queue.
+
+**What a person still owns.** Rows where the provider never sent an event (a
+merchant-OTP transfer, an outage, an unsubscribed event) are still resolved by
+"Mark as Completed" with a reconciliation note, or rejected/refunded by hand after
+checking Paystack. `/admin/reconciliation` lists every `processing` row older than
+an hour — that list is now the exception queue, not the routine.
 
 ---
 
