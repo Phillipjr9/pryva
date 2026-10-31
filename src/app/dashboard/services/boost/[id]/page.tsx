@@ -43,8 +43,8 @@ export default async function BoostPage({ params }: { params: Promise<{ id: stri
       <div>
         <p className="text-meta font-semibold uppercase tracking-[0.14em] text-lav-700">Social promotion</p>
         <h1 className="mt-2 flex items-center gap-2.5 text-[1.6rem] font-semibold text-ink">
-          {listing.platform && (
-            <BrandIcon brand={listing.platform.toLowerCase() as never} size={28} variant="tile" decorative />
+          {listing.artwork.kind === "brand" && (
+            <BrandIcon brand={listing.artwork.name} size={28} variant="tile" decorative />
           )}
           {listing.name}
         </h1>

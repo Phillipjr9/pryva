@@ -102,10 +102,17 @@ function readable(value: string | null, max = 70): string | null {
 }
 
 const BOOST_TAGS: Array<{ tag: string; pattern: RegExp }> = [
-  { tag: "Subscribers", pattern: /subscriber/i },
-  { tag: "Views", pattern: /\bviews?\b|\bplays?\b|watch time/i },
-  { tag: "Likes", pattern: /\blikes?\b/i },
-  { tag: "Followers", pattern: /follower|\bfans\b|\bmembers\b/i },
+  { tag: "Subscribers", pattern: /\bsubscribers?\b/i },
+  { tag: "Watch time", pattern: /\bwatch\s*time\b|\bwatchtime\b|\bhours\b/i },
+  { tag: "Plays", pattern: /\bplays?\b|\bstreams?\b/i },
+  { tag: "Views", pattern: /\bviews?\b|\bimpressions?\b/i },
+  { tag: "Likes", pattern: /\blikes?\b|\bupvotes?\b/i },
+  { tag: "Comments", pattern: /\bcomments?\b/i },
+  { tag: "Shares", pattern: /\bshares?\b|\breposts?\b|\bretweets?\b/i },
+  { tag: "Saves", pattern: /\bsaves?\b|\bbookmarks?\b/i },
+  { tag: "Members", pattern: /\bmembers?\b|\bgroup\s*members?\b/i },
+  { tag: "Reactions", pattern: /\breactions?\b|\bemojis?\b/i },
+  { tag: "Followers", pattern: /\bfollowers?\b|\bfans\b|\bconnections?\b/i },
 ];
 
 /** Panel `type` values that describe nothing a customer would understand. */
@@ -116,9 +123,7 @@ function boostTag(service: SmmService, displayName: string): string {
   for (const candidate of BOOST_TAGS) {
     if (candidate.pattern.test(haystack)) return candidate.tag;
   }
-  // Unmatched services (comments, shares, saves, poll answers) keep their own
-  // label. The four chips above still filter the common cases, and "All" shows
-  // everything, so no listing is hidden by falling outside the known tags.
+  // Unmatched services keep their own label if readable.
   const fromCategory = readable(service.category, 24);
   if (fromCategory) return fromCategory;
   const fromType = readable(service.type, 24);
@@ -131,7 +136,9 @@ function matchesPlatform(text: string, platform: string): boolean {
   const pattern = platform.length === 1
     ? new RegExp(`(?:^|[\\s|/,\\-])${escaped}(?:$|[\\s|/,\\-])`, "i")
     : new RegExp(`\\b${escaped}\\b`, "i");
-  return pattern.test(text);
+  if (pattern.test(text)) return true;
+  if (platform === "X" && /\btwitter\b/i.test(text)) return true;
+  return false;
 }
 
 /** Panel service identifiers are hashed; the raw id never reaches the browser. */
@@ -188,8 +195,20 @@ export function describeBoost(service: SmmService, snapshotCurrency: string | nu
   };
 }
 
-/** The four things a customer can filter by, and the only ones listed. */
-const LISTED_TAGS = new Set(["Followers", "Likes", "Views", "Subscribers"]);
+/** The intents a customer can filter by, and the ones listed in the shop. */
+export const LISTED_TAGS = new Set([
+  "Followers",
+  "Likes",
+  "Views",
+  "Subscribers",
+  "Comments",
+  "Shares",
+  "Saves",
+  "Members",
+  "Plays",
+  "Watch time",
+  "Reactions",
+]);
 
 export type BoostSelection = {
   /** One service per platform and intent, ready to sell. */

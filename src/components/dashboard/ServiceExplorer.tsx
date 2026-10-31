@@ -29,7 +29,19 @@ function truncate(value: string) {
   return clean.length > 24 ? `${clean.slice(0, 24)}\u2026` : clean;
 }
 const VERIFICATION_TAGS = ["Social", "Messaging", "Finance", "Travel", "Entertainment", "Work & other", "Other"];
-const SOCIAL_TAGS = ["Followers", "Likes", "Views", "Subscribers"];
+const SOCIAL_TAGS = [
+  "Followers",
+  "Likes",
+  "Views",
+  "Subscribers",
+  "Comments",
+  "Shares",
+  "Saves",
+  "Members",
+  "Plays",
+  "Watch time",
+  "Reactions",
+];
 
 function itemArt(item: ExplorerItem) {
   switch (item.artwork.kind) {
