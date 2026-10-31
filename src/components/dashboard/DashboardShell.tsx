@@ -300,7 +300,7 @@ export function DashboardShell({
 
   return (
     <div className="relative min-h-screen bg-cream">
-      <div className="pointer-events-none fixed inset-0 -z-10">
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-clip">
         <div className="absolute left-1/3 top-[-14rem] h-[30rem] w-[40rem] rounded-full bg-lav-200/25 blur-[130px]" />
       </div>
 
@@ -310,7 +310,7 @@ export function DashboardShell({
         </aside>
 
         <div className="min-w-0 flex-1">
-          <div className="mb-4 flex items-center justify-between gap-3 rounded-[1.25rem] border border-line bg-[#fffdfa]/80 px-3 py-2.5 backdrop-blur lg:mb-5 lg:px-5 lg:py-3">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-line bg-[#fffdfa]/80 px-3 py-2.5 backdrop-blur lg:mb-5 lg:px-5 lg:py-3">
             <div className="flex min-w-0 items-center gap-2.5">
               <button
                 type="button"
@@ -330,21 +330,21 @@ export function DashboardShell({
                 </p>
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
               <CommandPaletteTrigger onClick={() => setCommandPaletteOpen(true)} />
               {/* The balance belongs at the top of every dashboard page, on every
                   width — it is the number people come back to check. */}
               <Link
                 href="/dashboard/wallet"
                 aria-label={`Wallet balance ${formatNaira(user.walletBalance)} — open wallet`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-lav-200 bg-lav-50 px-2.5 py-1.5 text-meta font-semibold text-lav-800 transition-colors hover:border-lav-300 hover:bg-lav-100 sm:px-3"
+                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-lav-200 bg-lav-50 px-2.5 py-1.5 text-meta font-semibold text-lav-800 transition-colors hover:border-lav-300 hover:bg-lav-100 sm:px-3"
               >
                 <Wallet className="h-3.5 w-3.5 text-lav-600" />
                 {formatNaira(user.walletBalance)}
               </Link>
               <Link
                 href="/dashboard/notifications"
-                className="relative grid h-9 w-9 place-items-center rounded-full border border-line bg-white text-ink-2 transition-colors hover:text-ink"
+                className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-white text-ink-2 transition-colors hover:text-ink"
                 aria-label={
                   unreadNotifications > 0
                     ? `Notifications, ${unreadNotifications} unread`
