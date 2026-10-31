@@ -12,20 +12,22 @@ import { LiveCodeCard, type LiveCode } from "@/components/dashboard/LiveCodeCard
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { BalanceHero } from "@/components/dashboard/BalanceHero";
 import { CountryLaunch } from "@/components/dashboard/CountryLaunch";
+import { readServiceReadiness } from "@/lib/service-readiness";
+import { orderByReadiness, SERVICE_STATE_DOT, SERVICE_STATE_LABEL } from "@/lib/service-states";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
 
 const quickBuys = [
-  { label: "Number plans", note: "Single-use & rentals", href: "/dashboard/services?country=ng&category=numbers", service: "numbers" as const },
-  { label: "Social boosts", note: "Followers, likes & views", href: "/dashboard/services?country=ng&category=social", service: "social-promotion" as const },
-  { label: "eSIM data", note: "120+ regional destinations", href: "/dashboard/services?country=ng&category=esim", service: "esim" as const },
-  { label: "Residential proxies", note: "Clean rotating IP pools", href: "/dashboard/services?country=ng&category=proxies", service: "proxies" as const },
-  { label: "Digital accounts", note: "Streaming & AI subscriptions", href: "/dashboard/services?country=ng&category=accounts", service: "accounts" as const },
-  { label: "Mobile data", note: "MTN, Airtel, Glo & 9mobile", href: "/dashboard/data", service: "data" as const },
-  { label: "Temporary inbox", note: "Free disposable email", href: "/dashboard/inbox", service: "email-otp" as const },
-  { label: "Bulk orders", note: "Volume basket discounts", href: "/dashboard/bulk-orders", service: "bulk" as const },
-];
+  { label: "Number plans", note: "Single-use & rentals", href: "/dashboard/services?country=ng&category=numbers", service: "numbers" as const, category: "numbers" },
+  { label: "Social boosts", note: "Followers, likes & views", href: "/dashboard/services?country=ng&category=social", service: "social-promotion" as const, category: "social" },
+  { label: "eSIM data", note: "120+ regional destinations", href: "/dashboard/services?country=ng&category=esim", service: "esim" as const, category: "esim" },
+  { label: "Residential proxies", note: "Clean rotating IP pools", href: "/dashboard/services?country=ng&category=proxies", service: "proxies" as const, category: "proxies" },
+  { label: "Digital accounts", note: "Streaming & AI subscriptions", href: "/dashboard/services?country=ng&category=accounts", service: "accounts" as const, category: "accounts" },
+  { label: "Mobile data", note: "MTN, Airtel, Glo & 9mobile", href: "/dashboard/data", service: "data" as const, category: "data" },
+  { label: "Temporary inbox", note: "Free disposable email", href: "/dashboard/inbox", service: "email-otp" as const, category: "email" },
+  { label: "Bulk orders", note: "Volume basket discounts", href: "/dashboard/bulk-orders", service: "bulk" as const, category: "tools" },
+] as const;
 
 function statusStyle(status: string) {
   switch (status) {
@@ -45,6 +47,17 @@ function firstName(name: string | null | undefined) {
 
 export default async function DashboardOverviewPage() {
   const user = await requireUser("/dashboard");
+
+  // The tiles lead with what can actually be done on this deployment. States
+  // come from the same configuration the checkout reads, so a tile cannot
+  // promise more than the page behind it will honour.
+  const readiness = new Map(readServiceReadiness().map((entry) => [entry.id, entry]));
+  const serviceTiles = orderByReadiness(
+    quickBuys.map((item) => ({
+      ...item,
+      state: readiness.get(item.category)?.state ?? ("unavailable" as const),
+    })),
+  );
 
   const [recentOrders, recentTx, activeOrderRows, [orderCount], [activeCount], [refundedRow]] =
     await Promise.all([
@@ -160,7 +173,7 @@ export default async function DashboardOverviewPage() {
             `sm`, where each tile has room to be a full row again.
           */}
           <div className="mt-3 grid grid-cols-3 gap-1.5 min-[400px]:grid-cols-4 sm:grid-cols-2 sm:gap-2">
-            {quickBuys.map((item) => (
+            {serviceTiles.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
@@ -168,8 +181,12 @@ export default async function DashboardOverviewPage() {
               >
                 <ServiceIcon service={item.service} size="sm" />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-micro font-semibold leading-tight text-ink group-hover:text-lav-700 sm:truncate sm:text-[0.82rem]">{item.label}</span>
+                  <span className="flex min-w-0 items-center justify-center gap-1.5 sm:justify-start">
+                    <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${SERVICE_STATE_DOT[item.state]}`} />
+                    <span className="block min-w-0 text-micro font-semibold leading-tight text-ink group-hover:text-lav-700 sm:truncate sm:text-[0.82rem]">{item.label}</span>
+                  </span>
                   <span className="hidden truncate text-micro text-ink-3 sm:block">{item.note}</span>
+                  <span className="sr-only"> — {SERVICE_STATE_LABEL[item.state]}</span>
                 </span>
                 <ArrowRight className="hidden h-3.5 w-3.5 shrink-0 text-ink-3 transition-colors group-hover:text-lav-600 sm:block" />
               </Link>

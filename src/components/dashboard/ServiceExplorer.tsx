@@ -11,6 +11,13 @@ import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
 import { ArrowRight, Globe, Lock, Search, Shield, Sparkle } from "@/components/icons";
 import { formatNaira } from "@/lib/catalog";
 import {
+  orderByReadiness,
+  readinessSummary,
+  SERVICE_STATE_DOT,
+  SERVICE_STATE_LABEL,
+  type ServiceReadinessEntry,
+} from "@/lib/service-states";
+import {
   buildServiceExplorer,
   EXPLORER_CATEGORIES,
   explorerCategory,
@@ -163,12 +170,24 @@ function writeSelection(country: string, category: ExplorerFilter) {
   if (next !== `${window.location.pathname}${window.location.search}`) window.history.pushState(null, "", next);
 }
 
-export function ServiceExplorer({ initialCountry, initialCategory, rejectedCountry = null, rejectedCategory = null }: {
+export function ServiceExplorer({
+  initialCountry,
+  initialCategory,
+  rejectedCountry = null,
+  rejectedCategory = null,
+  readiness = [],
+}: {
   initialCountry: string | null;
   initialCategory: string | null;
   /** Link values the server could not honour, echoed so the reset is visible. */
   rejectedCountry?: string | null;
   rejectedCategory?: string | null;
+  /**
+   * What each category can actually do, computed by the server from the same
+   * configuration the checkout reads. Absent in unit tests, where the hub still
+   * renders — just without the labels.
+   */
+  readiness?: ServiceReadinessEntry[];
 }) {
   const [country, setCountry] = useState(() => explorerCountry(initialCountry)?.code ?? "");
   const [category, setCategory] = useState<ExplorerFilter>(() => explorerCategory(initialCategory));
@@ -194,6 +213,25 @@ export function ServiceExplorer({ initialCountry, initialCategory, rejectedCount
     : category === "data"
     ? DATA_TAGS
     : [];
+
+  const readinessById = useMemo(() => new Map(readiness.map((entry) => [entry.id, entry])), [readiness]);
+  const selectedReadiness = category === "all" ? null : readinessById.get(category) ?? null;
+  // Categories a customer can act on come first; ties keep the catalogue order.
+  // The constant itself is untouched, so links and tests stay stable.
+  const orderedCategories = useMemo(() => {
+    // Ordering is derived here as well as on the server: the prop arrives
+    // sorted, but a component that reorders silently when handed a different
+    // array is one refactor away from putting an unconnected category first.
+    const entries = EXPLORER_CATEGORIES.map((entry) => ({
+      entry,
+      state: readinessById.get(entry.id)?.state ?? ("unavailable" as const),
+      known: readinessById.has(entry.id),
+    }));
+    const known = orderByReadiness(entries.filter((item) => item.known)).map((item) => item.entry);
+    const unknown = entries.filter((item) => !item.known).map((item) => item.entry);
+    return [...known, ...unknown];
+  }, [readinessById]);
+  const summary = readinessSummary(readiness);
 
   // Live listings: boosts are purchasable, the others are read-only until their ordering is wired.
   useEffect(() => {
@@ -311,16 +349,48 @@ export function ServiceExplorer({ initialCountry, initialCategory, rejectedCount
                 <CountryFlag code={selectedCountry.code} size={18} decorative radius={9} /> {selectedCountry.name}
               </span>
             </div>
+            {summary ? <p className="mt-1.5 text-meta text-ink-3">{summary}</p> : null}
             <div className="-mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:mt-4 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:pb-0" aria-label="Service categories">
               <button type="button" onClick={() => chooseCategory("all")} aria-pressed={category === "all"} className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-meta font-semibold transition-colors sm:px-3.5 sm:py-2 ${category === "all" ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}>
                 <span aria-hidden="true">⚡</span> All categories
               </button>
-              {EXPLORER_CATEGORIES.map((entry) => (
-                <button key={entry.id} type="button" title={entry.description} onClick={() => chooseCategory(entry.id)} aria-pressed={category === entry.id} className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-meta font-semibold transition-colors sm:px-3.5 sm:py-2 ${category === entry.id ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}>
-                  <span aria-hidden="true">{CATEGORY_ICONS[entry.id] ?? "✨"}</span> {entry.label}
-                </button>
-              ))}
+              {orderedCategories.map((entry) => {
+                const state = readinessById.get(entry.id);
+                return (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    title={state ? `${entry.description} · ${SERVICE_STATE_LABEL[state.state]}` : entry.description}
+                    onClick={() => chooseCategory(entry.id)}
+                    aria-pressed={category === entry.id}
+                    className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-meta font-semibold transition-colors sm:px-3.5 sm:py-2 ${category === entry.id ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}
+                  >
+                    <span aria-hidden="true">{CATEGORY_ICONS[entry.id] ?? "✨"}</span> {entry.label}
+                    {state ? (
+                      <>
+                        <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${SERVICE_STATE_DOT[state.state]}`} />
+                        <span className="sr-only">— {SERVICE_STATE_LABEL[state.state]}</span>
+                      </>
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
+            {selectedReadiness && selectedReadiness.state !== "buy" && selectedReadiness.state !== "free" ? (
+              <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-line bg-white px-3.5 py-2.5 text-meta text-ink-2">
+                <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${SERVICE_STATE_DOT[selectedReadiness.state]}`} />
+                <span className="min-w-0 flex-1">
+                  <strong className="font-semibold text-ink">{SERVICE_STATE_LABEL[selectedReadiness.state]}.</strong>{" "}
+                  {selectedReadiness.detail}
+                </span>
+                <Link
+                  href={`/dashboard/support#ask=${encodeURIComponent(`When will ${selectedReadiness.label} be available to order?`)}`}
+                  className="shrink-0 font-semibold text-lav-700 underline underline-offset-2"
+                >
+                  Ask about it
+                </Link>
+              </div>
+            ) : null}
           </section>
 
           <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-meta leading-relaxed border-amber-200 bg-amber-50/70 text-amber-900`}>
