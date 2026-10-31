@@ -255,19 +255,26 @@ export async function getFoxreloadProduct(id: string): Promise<FoxreloadProduct>
 export async function createFoxreloadOrder(params: {
   itemId: string;
   quantity?: number;
-  note?: string;
+  note?: Record<string, unknown>;
   totalPrice?: number;
+  idempotencyKey?: string;
+  isMock?: boolean;
+  contactEmail?: string;
 }): Promise<FoxreloadOrder> {
-  const body: Record<string, unknown> = {
-    items: [
-      {
-        itemId: params.itemId,
-        quantity: params.quantity ?? 1,
-        ...(params.note ? { note: params.note } : {}),
-      },
-    ],
-    ...(params.totalPrice !== undefined ? { totalPrice: params.totalPrice } : {}),
+  const item: Record<string, unknown> = {
+    itemId: params.itemId,
+    quantity: params.quantity ?? 1,
   };
+  if (params.note) item.note = params.note;
+  if (params.totalPrice !== undefined) item.totalPrice = params.totalPrice.toFixed(2);
+
+  const body: Record<string, unknown> = {
+    items: [item],
+  };
+
+  if (params.idempotencyKey) body.idempotencyKey = params.idempotencyKey;
+  if (params.isMock !== undefined) body.isMock = params.isMock;
+  if (params.contactEmail) body.contactEmail = params.contactEmail;
 
   const data = (await foxreloadFetch("/api/orders/", {
     method: "POST",
@@ -275,6 +282,38 @@ export async function createFoxreloadOrder(params: {
   })) as any;
 
   return parseOrder(data);
+}
+
+/**
+ * Resolves the FoxReload product ID to use when ordering.
+ * If the denomination provides a known FoxReload product ID or UUID/TypeID, uses it.
+ * Otherwise queries FoxReload's product catalog/search for the matching denomination.
+ */
+export async function resolveFoxreloadProductId(params: {
+  brand: string;
+  amountUsd: number;
+  preferredId?: string;
+}): Promise<string> {
+  const preferred = params.preferredId?.trim();
+  if (preferred && /^(product_|offer_|[0-9a-f]{8}-[0-9a-f]{4})/i.test(preferred)) {
+    return preferred;
+  }
+
+  // Attempt search on live FoxReload catalog
+  try {
+    const searchResults = await searchFoxreloadProducts(`${params.brand} ${params.amountUsd}`);
+    if (searchResults.length > 0) {
+      const match = searchResults.find(
+        (p) => p.deliveryType === "code" || Math.abs(p.price - params.amountUsd) <= 1.0,
+      );
+      if (match) return match.id;
+      return searchResults[0].id;
+    }
+  } catch {
+    // If catalog search fails, continue with preferred fallback
+  }
+
+  return preferred || `${params.brand.toLowerCase()}-${params.amountUsd}-usd`;
 }
 
 export async function payFoxreloadOrder(orderId: string): Promise<{ orderId: string; status: string }> {

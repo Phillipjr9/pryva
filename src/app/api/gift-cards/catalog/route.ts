@@ -9,6 +9,6 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     cards,
-    liveSupplierConfigured: isFoxreloadConfigured(),
+    liveFulfillmentConfigured: isFoxreloadConfigured(),
   });
 }

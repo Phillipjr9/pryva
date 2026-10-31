@@ -1,19 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { orders, users, type Order } from "@/db/schema";
+import { orders, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { findGiftCardDenomination } from "@/lib/gift-cards-catalog";
 import {
   createFoxreloadOrder,
-  getFoxreloadProduct,
   isFoxreloadConfigured,
   payFoxreloadOrder,
   pollFoxreloadOrderCodes,
+  resolveFoxreloadProductId,
   FoxreloadError,
 } from "@/lib/foxreload";
-import { FOXRELOAD_PROVIDER, PREVIEW_PROVIDER } from "@/lib/order-providers";
-import { debitWalletInTx, makeReference } from "@/lib/wallet";
+import { FOXRELOAD_PROVIDER } from "@/lib/order-providers";
+import { creditWallet, debitWalletInTx, makeReference } from "@/lib/wallet";
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
@@ -21,14 +21,6 @@ import { purchaseRateLimiter } from "@/lib/rate-limit";
 export const dynamic = "force-dynamic";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function generateSimulatedCode(brandSlug: string): string {
-  const prefix = brandSlug.toUpperCase().slice(0, 4);
-  const part1 = Math.random().toString(36).substring(2, 6).toUpperCase();
-  const part2 = Math.random().toString(36).substring(2, 6).toUpperCase();
-  const part3 = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `${prefix}-${part1}-${part2}-${part3}`;
-}
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -83,6 +75,14 @@ export async function POST(request: Request) {
   }
   const requestId = rawRequestId.trim().toLowerCase();
 
+  // Real API requirement: ensure live fulfillment provider is configured
+  if (!isFoxreloadConfigured()) {
+    return Response.json(
+      { ok: false, error: "Live gift card purchases are currently unavailable. Provider API is not configured." },
+      { status: 503 },
+    );
+  }
+
   // Check current wallet balance
   const [currentUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
   if (!currentUser || currentUser.walletBalance < denomination.priceNgn) {
@@ -97,62 +97,37 @@ export async function POST(request: Request) {
     .limit(1);
 
   if (existing) {
-    return Response.json({
-      ok: true,
-      replayed: true,
-      balance: currentUser.walletBalance,
-      reference: existing.reference,
-      code: existing.referenceCode,
-      card: {
-        id: card.slug,
-        name: card.name,
-        denomination: `$${denomination.amountUsd} USD`,
-        instructions: card.redemptionGuide,
-      },
-    });
-  }
-
-  let voucherCode = "";
-  let providerRequestId: string | null = null;
-  let providerCostNgn: number | null = null;
-  const isLive = isFoxreloadConfigured();
-
-  if (isLive) {
-    try {
-      const order = await createFoxreloadOrder({
-        itemId: denomination.id,
-        quantity: 1,
+    if (existing.status === "delivered" && existing.referenceCode) {
+      return Response.json({
+        ok: true,
+        replayed: true,
+        balance: currentUser.walletBalance,
+        reference: existing.reference,
+        code: existing.referenceCode,
+        card: {
+          id: card.slug,
+          name: card.name,
+          denomination: `$${denomination.amountUsd} USD`,
+          instructions: card.redemptionGuide,
+        },
       });
-      providerRequestId = order.id;
-      await payFoxreloadOrder(order.id);
-      const codes = await pollFoxreloadOrderCodes(order.id);
-      voucherCode = codes[0] || "";
-      if (!voucherCode) {
-        throw new FoxreloadError("No voucher code received from provider", 502, "NO_CODE");
-      }
-    } catch (error) {
-      if (error instanceof FoxreloadError) {
-        return Response.json(
-          { ok: false, error: `Supplier order failed: ${error.message}` },
-          { status: error.status >= 400 && error.status < 600 ? error.status : 502 },
-        );
-      }
+    }
+    if (existing.status === "refunded") {
       return Response.json(
-        { ok: false, error: "Gift card fulfillment failed. Your wallet was not charged." },
-        { status: 502 },
+        { ok: false, error: "This order was previously refunded. Please try again with a new request." },
+        { status: 409 },
       );
     }
-  } else {
-    // Sandbox / preview fulfillment
-    voucherCode = generateSimulatedCode(card.brand);
   }
 
   const orderId = randomUUID();
   const reference = makeReference("GC");
 
+  // Step 1: Record order as 'processing' and debit wallet atomically
+  let balanceAfterDebit: number;
   try {
-    const outcome = await db.transaction(async (tx) => {
-      // Re-check for concurrency
+    balanceAfterDebit = await db.transaction(async (tx) => {
+      // Re-check for race conditions
       const [raced] = await tx
         .select()
         .from(orders)
@@ -160,7 +135,7 @@ export async function POST(request: Request) {
         .limit(1);
 
       if (raced) {
-        return { replayed: true, order: raced, balance: currentUser.walletBalance };
+        throw new Error("REPLAY_RACED");
       }
 
       await tx.insert(orders).values({
@@ -175,14 +150,11 @@ export async function POST(request: Request) {
         region: card.region,
         duration: "Digital Gift Card",
         amount: denomination.priceNgn,
-        status: "delivered",
-        provider: isLive ? FOXRELOAD_PROVIDER : PREVIEW_PROVIDER,
-        providerRequestId,
-        providerCostNgn,
-        referenceCode: voucherCode,
+        status: "processing",
+        provider: FOXRELOAD_PROVIDER,
       });
 
-      const newBalance = await debitWalletInTx(tx, {
+      return await debitWalletInTx(tx, {
         userId: user.id,
         amount: denomination.priceNgn,
         type: "debit",
@@ -190,14 +162,75 @@ export async function POST(request: Request) {
         orderId,
         reference,
       });
-
-      return { replayed: false, balance: newBalance };
     });
+  } catch (error: any) {
+    if (error?.message === "REPLAY_RACED") {
+      const [replayed] = await db
+        .select()
+        .from(orders)
+        .where(and(eq(orders.userId, user.id), eq(orders.requestId, requestId)))
+        .limit(1);
+      return Response.json({
+        ok: true,
+        replayed: true,
+        balance: currentUser.walletBalance,
+        reference: replayed.reference,
+        code: replayed.referenceCode,
+        card: {
+          id: card.slug,
+          name: card.name,
+          denomination: `$${denomination.amountUsd} USD`,
+          instructions: card.redemptionGuide,
+        },
+      });
+    }
+    console.error("Failed to commit gift card order debit", error);
+    return Response.json({ ok: false, error: "Failed to process gift card purchase." }, { status: 500 });
+  }
+
+  // Step 2: Execute real FoxReload API purchase
+  let voucherCode = "";
+  let providerOrderId = "";
+
+  try {
+    const foxreloadItemId = await resolveFoxreloadProductId({
+      brand: card.name,
+      amountUsd: denomination.amountUsd,
+      preferredId: denomination.foxreloadProductId || denomination.id,
+    });
+
+    const isMock = process.env.FOXRELOAD_IS_MOCK === "true";
+
+    const upstreamOrder = await createFoxreloadOrder({
+      itemId: foxreloadItemId,
+      quantity: 1,
+      idempotencyKey: requestId,
+      isMock,
+    });
+    providerOrderId = upstreamOrder.id;
+
+    await payFoxreloadOrder(upstreamOrder.id);
+    const codes = await pollFoxreloadOrderCodes(upstreamOrder.id);
+    voucherCode = codes[0] || "";
+
+    if (!voucherCode) {
+      throw new FoxreloadError("No voucher code received from provider", 502, "NO_CODE");
+    }
+
+    // Step 3: Mark order delivered with code
+    await db
+      .update(orders)
+      .set({
+        status: "delivered",
+        providerRequestId: providerOrderId,
+        referenceCode: voucherCode,
+      })
+      .where(eq(orders.id, orderId));
 
     return Response.json({
       ok: true,
-      replayed: outcome.replayed,
-      balance: outcome.balance,
+      replayed: false,
+      balance: balanceAfterDebit,
       reference,
       code: voucherCode,
       card: {
@@ -207,8 +240,43 @@ export async function POST(request: Request) {
         instructions: card.redemptionGuide,
       },
     });
-  } catch (error) {
-    console.error("Failed to commit gift card order transaction", error);
-    return Response.json({ ok: false, error: "Failed to process gift card purchase." }, { status: 500 });
+  } catch (err: any) {
+    console.error("FoxReload order fulfillment failed, rolling back wallet charge", err);
+    // Step 4: Reverse wallet debit and mark order as refunded
+    const errorMessage =
+      err instanceof FoxreloadError
+        ? err.message
+        : "Fulfillment provider unavailable";
+
+    try {
+      await creditWallet({
+        userId: user.id,
+        amount: denomination.priceNgn,
+        type: "refund",
+        description: `Refund · ${card.name} ($${denomination.amountUsd})`,
+        orderId,
+        reference: makeReference("RFB"),
+      });
+
+      await db
+        .update(orders)
+        .set({
+          status: "refunded",
+          refundedAt: new Date(),
+          providerRequestId: providerOrderId || null,
+          reconciliationNote: `Fulfillment failed: ${errorMessage}`,
+        })
+        .where(eq(orders.id, orderId));
+    } catch (refundErr) {
+      console.error("Critical: Failed to auto-refund gift card order", refundErr);
+    }
+
+    return Response.json(
+      {
+        ok: false,
+        error: `Gift card fulfillment failed: ${errorMessage}. Your wallet has been refunded.`,
+      },
+      { status: err instanceof FoxreloadError && err.status >= 400 && err.status < 600 ? err.status : 502 },
+    );
   }
 }
