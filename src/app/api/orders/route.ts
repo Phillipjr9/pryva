@@ -8,6 +8,7 @@ import { FleexaError } from "@/lib/fleexa";
 import { cancelUpstream, fulfillPlan, type FulfilledOrder } from "@/lib/fulfillment";
 import { debitWalletInTx, InsufficientFundsError, makeReference } from "@/lib/wallet";
 import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
+import { settleReferralRewards } from "@/lib/referrals";
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
@@ -257,6 +258,9 @@ export async function POST(request: Request) {
     }
 
     scheduleWalletEmails();
+    // Best effort: a reward for the person who invited this customer, paid once
+    // their first delivered order exists. It must never affect this purchase.
+    await settleReferralRewards({ refereeId: user.id }).catch(() => undefined);
     return receipt(
       {
         id: orderId,

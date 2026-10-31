@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Shield, Sparkle } from "@/components/icons";
 import { safeRedirectPath } from "@/lib/safe-redirect";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { BrandIcon } from "@/components/BrandIcon";
 import { PasskeySignInButton } from "@/components/auth/PasskeySignInButton";
+import {
+  normalizeReferralCode,
+  REFERRAL_COOKIE,
+  REFERRAL_COOKIE_MAX_AGE_SECONDS,
+} from "@/lib/referral-code";
 
 type Mode = "login" | "signup";
 
@@ -34,11 +39,15 @@ export function AuthForm({
   mode,
   next,
   errorParam,
+  refCode,
 }: {
   mode: Mode;
   next: string;
   errorParam?: string | null;
+  /** `?ref=` from an invite link. Sign-up only; ignored everywhere else. */
+  refCode?: string | null;
 }) {
+  const invite = mode === "signup" ? normalizeReferralCode(refCode) : null;
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [pending, setPending] = useState<"form" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +58,15 @@ export function AuthForm({
   const [challenge, setChallenge] = useState<string | null>(null);
   const [code, setCode] = useState("");
 
+  // Remember the invite for a while, because a visitor may leave for Google and
+  // come back to this form — or finish with Google instead. The server reads the
+  // same cookie in both signup paths. Not httpOnly: it is a public invite code,
+  // and the value is only ever used to credit somebody else's wallet.
+  useEffect(() => {
+    if (!invite) return;
+    document.cookie = `${REFERRAL_COOKIE}=${invite}; Path=/; Max-Age=${REFERRAL_COOKIE_MAX_AGE_SECONDS}; SameSite=Lax`;
+  }, [invite]);
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending("form");
@@ -57,7 +75,7 @@ export function AuthForm({
       const endpoint = mode === "signup" ? "/api/auth/signup" : "/api/auth/login";
       const payload =
         mode === "signup"
-          ? { name: form.name, email: form.email, password: form.password }
+          ? { name: form.name, email: form.email, password: form.password, ref: invite ?? undefined }
           : { email: form.email, password: form.password };
 
       const response = await fetch(endpoint, {

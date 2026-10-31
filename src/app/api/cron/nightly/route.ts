@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { lagosDay, runDailyReconciliation } from "@/lib/daily-reconciliation";
 import { processAutoRefunds } from "@/lib/auto-refund";
 import { dispatchWalletEmails, walletEmailConfigured } from "@/lib/wallet-email-outbox";
+import { settleReferralRewards } from "@/lib/referrals";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { logger } from "@/lib/logger";
 
@@ -81,11 +82,27 @@ async function handler(request: NextRequest) {
     return { ok: true, detail: `refunded ${refunded}, released ${cancelled}` };
   });
 
-  const allOk = close.ok && emails.ok && refunds.ok;
-  logger.info("Nightly run finished", { day, allOk, close: close.detail, emails: emails.detail, refunds: refunds.detail });
+  // An invitation pays out when the invited account has a delivered order, and
+  // that can happen days after the invite (a hand-sourced account order is
+  // fulfilled by a person). The purchase path settles the common case
+  // immediately; this is the sweep that catches the rest, and it is idempotent.
+  const referrals = await runStep("referrals", async () => {
+    const result = await settleReferralRewards();
+    return { ok: true, detail: `credited ${result.credited}, pending ${result.pending}, skipped ${result.skipped}` };
+  });
+
+  const allOk = close.ok && emails.ok && refunds.ok && referrals.ok;
+  logger.info("Nightly run finished", {
+    day,
+    allOk,
+    close: close.detail,
+    emails: emails.detail,
+    refunds: refunds.detail,
+    referrals: referrals.detail,
+  });
 
   return NextResponse.json(
-    { ok: allOk, day, steps: { close, emails, refunds } },
+    { ok: allOk, day, steps: { close, emails, refunds, referrals } },
     { status: allOk ? 200 : 207, headers: { "Cache-Control": "no-store" } },
   );
 }

@@ -9,6 +9,7 @@ import {
   Bell,
   Chat,
   Close,
+  Gift,
   Grid,
   Logout,
   Mail,
@@ -52,6 +53,9 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
       // Free, and the only thing on this list that is: one inbox a day, nothing
       // retained. It sits under Manage rather than Buy because no money moves.
       { href: "/dashboard/inbox", label: "Temporary inbox", icon: Mail },
+      // Inviting a friend is not a purchase and not a setting: it sits under
+      // Manage because it is about the account, and it costs nothing to open.
+      { href: "/dashboard/referrals", label: "Refer & earn", icon: Gift },
     ],
   },
   {
