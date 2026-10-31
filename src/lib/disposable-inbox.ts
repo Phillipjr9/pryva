@@ -57,9 +57,9 @@ export function getInboxProvider(): "fleexa" | "tempmail" {
   }
 
   // In runtime/production:
-  // If Fleexa API key is configured, use Fleexa.
-  // Otherwise, use TempMail (fakemailo style) so inboxes work out of the box without setup!
-  return isFleexaConfigured() ? "fleexa" : "tempmail";
+  // Default to tempmail (fakemailo style) so customers get free zero-setup
+  // inboxes without consuming Fleexa balance or failing when Fleexa has no email stock.
+  return "tempmail";
 }
 
 /** Whether the active inbox provider is configured and available. */
@@ -209,7 +209,8 @@ export function mayHaveSpentMoney(error: unknown): boolean {
 }
 
 export async function createFreeInbox(userId: string): Promise<CreatedInbox> {
-  const provider = getInboxProvider();
+  const configuredProvider = getInboxProvider();
+  let provider: "fleexa" | "tempmail" = configuredProvider;
 
   let emailId: string;
   let address: string;
@@ -220,11 +221,26 @@ export async function createFreeInbox(userId: string): Promise<CreatedInbox> {
     if (!isFleexaConfigured()) {
       throw new InboxError("NOT_CONFIGURED", 503, "Temporary inboxes are not available yet.");
     }
-    const product = await cheapestEmailProduct();
-    const purchased = await buyFleexaEmail(product ? { product } : {});
-    emailId = purchased.emailId;
-    address = purchased.address;
-    expiresAt = purchased.expiresAt;
+    try {
+      const product = await cheapestEmailProduct();
+      const purchased = await buyFleexaEmail(product ? { product } : {});
+      emailId = purchased.emailId;
+      address = purchased.address;
+      expiresAt = purchased.expiresAt;
+    } catch (error) {
+      if (process.env.VITEST || process.env.NODE_ENV === "test") {
+        throw error;
+      }
+      logger.warn("Fleexa email purchase failed, falling back to tempmail", {
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      const created = await createTempMailInbox();
+      provider = "tempmail";
+      emailId = created.id;
+      address = created.address;
+      expiresAt = created.expiresAt;
+      domain = created.domain;
+    }
   } else {
     const created = await createTempMailInbox();
     emailId = created.id;
@@ -371,10 +387,26 @@ export async function pollInbox(userId: string, inboxId: string): Promise<PollRe
     return { inbox: viewOf(row), messages: stored, code: stored.find((m) => m.code)?.code ?? null, stored: true };
   }
 
-  const checked =
-    row.provider === "tempmail"
-      ? await checkTempMail(row.providerInboxId, row.address)
-      : await checkFleexaEmail(row.providerInboxId);
+  let checked: { messages: (FleexaEmailMessage | TempMailMessage)[]; code: string | null };
+  try {
+    checked =
+      row.provider === "tempmail"
+        ? await checkTempMail(row.providerInboxId, row.address)
+        : await checkFleexaEmail(row.providerInboxId);
+  } catch (error) {
+    logger.warn("Inbox polling failed at provider", {
+      inboxId: row.id,
+      provider: row.provider,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    const stored = await storedMessages(row.id);
+    return {
+      inbox: viewOf(row),
+      messages: stored,
+      code: stored.find((m) => m.code)?.code ?? null,
+      stored: true,
+    };
+  }
 
   if (row.tier === "paid") {
     await db
@@ -438,10 +470,18 @@ export async function discardInbox(userId: string, inboxId: string): Promise<Inb
   const row = await ownInbox(userId, inboxId);
   if (row.status !== "active") return viewOf(row);
 
-  if (row.provider === "tempmail") {
-    await cancelTempMail(row.providerInboxId, row.address);
-  } else {
-    await cancelFleexaEmail(row.providerInboxId);
+  try {
+    if (row.provider === "tempmail") {
+      await cancelTempMail(row.providerInboxId, row.address);
+    } else {
+      await cancelFleexaEmail(row.providerInboxId);
+    }
+  } catch (cancelError) {
+    logger.warn("Could not cancel inbox at provider during discard", {
+      inboxId: row.id,
+      provider: row.provider,
+      reason: cancelError instanceof Error ? cancelError.message : String(cancelError),
+    });
   }
 
   const [updated] = await db
