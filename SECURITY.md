@@ -75,6 +75,17 @@ host), HSTS with preload, `nosniff`, `Referrer-Policy: origin-when-cross-origin`
 `Permissions-Policy` denying camera/microphone/geolocation, and a policy that a
 test compares against `next.config.ts` so the two cannot drift.
 
+**No banner, no version** — `src/lib/server-banner.ts`, `next.config.ts`, `scripts/check-headers.mjs`
+`poweredByHeader: false` stops Next advertising itself, the proxy removes
+`X-Powered-By`, `X-Matched-Path`, `X-Generator` and the other names in
+`FRAMEWORK_BANNERS` from every response, and `npm run headers:check` asks a running
+site whether anything still names the stack or a version. A self-hosted Node
+server sends **no** `Server` header at all, so there is no version to hide there.
+On Vercel the platform writes `Server: Vercel` *after* the app runs — app code
+cannot delete it, and it contains no version; removing it needs a proxy in front of
+the deployment. Stated here rather than implied by silence, because the check
+reports that header separately.
+
 **Data handling** — `src/lib/disposable-domains.ts`, `src/lib/sanitize.ts`
 Temporary inboxes cannot create accounts (the receipts and resets would die with
 the inbox); all SQL goes through Drizzle with bound parameters — the one raw

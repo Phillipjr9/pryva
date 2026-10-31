@@ -1864,3 +1864,53 @@ cannot swallow a wallet or order problem, and the fallback's capability list.
 
 **Not verified:** the production build of the page on a real device, and anything
 about a model route that has not been enabled.
+
+---
+
+## 43. Thirty-fifth pass — what the responses say about the stack (31 Oct 2026)
+
+Asked: *"remove the x-powered-by header and hide the server version on my web
+server."*
+
+**Half of it was already true; the other half cannot be done where it was asked
+for.** Both facts are now checkable rather than asserted.
+
+**`X-Powered-By`** was already off — `poweredByHeader: false` has been in
+`next.config.ts` since the security-headers pass — and a production build served
+locally confirmed it: `npm start`, then every path checked clean, `/`, `/login`,
+`/api/health` and a redirected dashboard route. What was missing was a *guard*: a
+config line can be dropped in a refactor and nothing would notice. The proxy now
+deletes `X-Powered-By` and the other stack-naming headers on every response it
+builds, and `src/test/server-banner.test.ts` fails if the config flag or the strip
+disappears.
+
+**The server banner is a different header, in a different place.** A self-hosted
+Node server sends no `Server` header at all — verified: the only headers on the
+response are the ones this app sets. On Vercel the platform writes `Server: Vercel`
+*after* the application has run, so no code in this repository can delete it; that
+needs a proxy in front of the deployment (Cloudflare, or a reverse proxy), which is
+the owner's call. It carries no version, so it names a host, not an exploitable
+build — and the check reports it as a note instead of pretending it is gone.
+
+**`scripts/check-headers.mjs`** (`npm run headers:check`) asks a live URL the
+question and exits non-zero when the answer is bad: `0` quiet, `1` something named,
+`2` unreachable. It imports the same rule the proxy uses, so the document cannot
+drift from the behaviour. Run against this app's own production build it reports
+nothing; run against a deliberately leaky test server (`X-Powered-By: Express`,
+`Server: nginx/1.25.3`, `X-Generator: WordPress 6.5`) it named all three and exited
+`1` — the positive control that keeps the pass from being a vacuous check.
+
+**Asymmetry fixed in the reporting.** `revealsVersion` is blunt on purpose: a digit
+anywhere in a `Server` value is a version disclosure (`nginx/1.25.3`,
+`Apache/2.4.58`, `PHP/8.3.12`), while `Vercel`, `cloudflare` and `Express` name
+software without a version and are reported as notices. A banner we do not
+recognise is exactly when guessing is the wrong move.
+
+**Verified:** 1,456 tests / 158 files · typecheck · lint · build. New coverage:
+`server-banner.test.ts` (8) pins the config flag, the strip list, the two reporting
+classes and the script's wiring; the live check was run against `next start` and
+against a leaky server by hand.
+
+**Not verified:** the headers of the live deployment from inside this sandbox — it
+has no network route to `pryva-two.vercel.app`. `npm run headers:check` is the one
+command that answers it from anywhere with a route.
