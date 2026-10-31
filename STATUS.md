@@ -1,6 +1,6 @@
 # Pryva — verified status review
 
-**Date:** 31 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** the twenty-second pass, §30
+**Date:** 31 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** the twenty-third pass, §31
 **Method:** every claim below was read out of the code or produced by running the project. Nothing is taken from `PLAN.md` without checking it first — and several `PLAN.md` entries turned out to be stale (section 4).
 
 ---
@@ -1273,3 +1273,42 @@ an unlicensed source, to redraw one by eye, or to generate one with an image mod
 all three would put a fake or non-redistributable mark next to a real one, so the
 wordmark in the brand's own colours stays. Closing it properly needs an owner-supplied
 asset pack or a licence.
+
+---
+
+## 31. Twenty-third pass — a profile picture (31 Oct 2026)
+
+**The request.** "Can you add 3d icon image for profile picture too."
+
+The account had no picture of any kind: the sidebar footer drew the customer's
+initials in a lavender gradient circle, which read as unfinished next to twelve 3D
+service tiles. There is no upload and no storage for one, so this is a drawn
+avatar rather than a photo — and it says so by never pretending to be one.
+
+### 31.1 What was added
+
+Four 512 px masters in `public/images/avatars/` — the same glossy 3D bust (a
+featureless silhouette, deliberately: no invented face) on a lavender backdrop with
+a peach, mint, sky or amber accent — each with 64/128/192 WebP derivatives, so a
+36 px circle downloads the 64 px file.
+
+`ProfileAvatar` picks one with `avatarNumberFor(email)` — a small deterministic
+hash, not randomness:
+
+| Property | Why it matters |
+|---|---|
+| Stable for an account | the picture must not change on navigation, refresh or redeploy |
+| Same on server and client | a random pick would mismatch during hydration and flicker |
+| Different between accounts | two customers in the same room should not share a face |
+
+It appears in the sidebar footer (replacing the initials) and at the head of the
+**Profile** section in `/dashboard/settings`, so the one place a customer looks for
+"profile picture" shows the same thing as the one they see all day. The image is
+decorative (`alt=""`, `aria-hidden`): the name is always the text next to it, and a
+screen reader should not hear it twice.
+
+**Verified:** 1,256 tests / 132 files · typecheck · lint · build. `profile-avatar.test.tsx`
+(6) pins determinism, the 1..4 range, spread across accounts, the derivative
+`srcSet`, and both render sites. Live signed-in check: the dashboard and settings
+both serve `avatar-3` for the preview account (its hash), the initials circle is
+gone from the markup, and all four masters return 200.

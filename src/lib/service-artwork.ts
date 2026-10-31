@@ -14,7 +14,7 @@
 /** Widths written by the generator. Keep the two files in step. */
 export const ARTWORK_WIDTHS = [64, 128, 192] as const;
 
-export type ArtworkFolder = "services" | "categories" | "nav";
+export type ArtworkFolder = "services" | "categories" | "nav" | "avatars";
 
 /** `/images/services/email-otp-64.webp 64w, …` for a `srcSet`. */
 export function artworkSrcSet(folder: ArtworkFolder, base: string): string {
