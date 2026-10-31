@@ -10,9 +10,12 @@ export default async function AdminWithdrawalsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[1.5rem] font-medium tracking-tight">Withdrawal Requests</h1>
+        <h1 className="text-[1.5rem] font-medium tracking-tight">Payouts</h1>
         <p className="mt-1 text-[0.86rem] text-ink-2">
-          Review withdrawal requests. The list and counts show at most the latest 200 matches. Paystack may require merchant authorization; verify the final status, amount and recipient before marking a transfer complete.
+          Payouts are sent the moment a customer confirms one, so this page is the exception queue, not a gate.
+          The provider&rsquo;s signed events settle them — a `processing` row that stays here for more than an hour is
+          something to read: check Paystack by reference, amount and recipient before refunding or retrying.
+          The list and counts show at most the latest 200 matches.
         </p>
       </div>
 

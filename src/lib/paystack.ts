@@ -146,6 +146,24 @@ export async function initiateTransfer(params: PaystackTransferRequest): Promise
   return parsePaystackResponse<PaystackTransferResponse>(response);
 }
 
+/**
+ * Ask the provider what actually happened to one transfer.
+ *
+ * A webhook can be missed — an outage, a filtered event, a URL that was never
+ * subscribed — and a payout is not allowed to depend on a message arriving.
+ * This is the same question the signed event answers, asked by us.
+ */
+export async function verifyTransfer(reference: string): Promise<PaystackTransferResponse> {
+  const response = await fetch(`${PAYSTACK_BASE_URL}/transfer/verify/${encodeURIComponent(reference)}`, {
+    signal: AbortSignal.timeout(PAYSTACK_TIMEOUT_MS),
+    headers: {
+      Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+    },
+  });
+
+  return parsePaystackResponse<PaystackTransferResponse>(response);
+}
+
 export async function getBanks(): Promise<Array<{ name: string; code: string }>> {
   const response = await fetch(`${PAYSTACK_BASE_URL}/bank?currency=NGN`, {
     signal: AbortSignal.timeout(PAYSTACK_TIMEOUT_MS),

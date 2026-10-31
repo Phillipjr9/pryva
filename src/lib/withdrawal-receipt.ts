@@ -29,11 +29,13 @@ export function parseWithdrawalReceipt(value: unknown, intent: WithdrawalIntent)
 
 export function withdrawalStatusLabel(status: WithdrawalStatus) {
   switch (status) {
-    case "pending": return "Awaiting approval";
-    case "processing": return "Processing / review";
-    case "completed": return "Marked paid out after review";
-    case "failed": return "Failed";
-    case "rejected": return "Rejected";
+    // Payouts leave on request, so nothing waits for approval any more. The only
+    // `pending` rows left are historical, and they say so.
+    case "pending": return "Queued";
+    case "processing": return "Sent to bank";
+    case "completed": return "Paid out";
+    case "failed": return "Failed — refunded";
+    case "rejected": return "Rejected — refunded";
   }
 }
 

@@ -205,7 +205,7 @@ export default async function AdminReconciliationPage() {
 
       <Section
         title="Withdrawals in flight"
-        description="The transfer was initiated, so money may already have left. Completion requires the Paystack reference, an explicit confirmation and a note. Rejecting these would refund a payout that may still arrive."
+        description="Sent on request, waiting for the provider to confirm. The webhook settles these by itself, and the nightly sweep asks the provider about anything older than ten minutes — a row here for more than an hour is an exception to read, not the normal queue."
         count={processingWithdrawals.length}
       >
         {processingWithdrawals.map((row) => (
@@ -224,7 +224,7 @@ export default async function AdminReconciliationPage() {
 
       <div className="flex flex-wrap items-center gap-3 text-[0.82rem] text-ink-2">
         <Link href="/admin/withdrawals" className="btn btn-ghost btn-sm">Open withdrawals</Link>
-        <span>{pendingWithdrawals.length >= 1_000 ? "1,000+" : pendingWithdrawals.length} awaiting approval (not listed here)</span>
+        <span>{pendingWithdrawals.length >= 1_000 ? "1,000+" : pendingWithdrawals.length} still queued from before payouts became instant (not listed here)</span>
       </div>
 
       <Section
