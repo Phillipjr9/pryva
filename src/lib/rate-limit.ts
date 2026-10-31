@@ -196,7 +196,7 @@ export const giftCardIpRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, 
  * ceiling underneath it, sized to tolerate a household or a shared carrier NAT
  * while making bulk account farming unprofitable.
  */
-export const inboxCreateIpRateLimiter = createRateLimiter({ windowMs: 24 * 60 * 60_000, maxRequests: 3 });
+export const inboxCreateIpRateLimiter = createRateLimiter({ windowMs: 24 * 60 * 60_000, maxRequests: 50 });
 /**
  * Polling an inbox re-reads the whole mailbox from the supplier, whose request
  * budget is shared across every customer at once. Without a per-user ceiling one
