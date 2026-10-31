@@ -42,6 +42,8 @@ const SOCIAL_TAGS = [
   "Watch time",
   "Reactions",
 ];
+const NUMBER_TAGS = ["Single use", "Rental", "Bundle"];
+const DATA_TAGS = ["MTN", "Airtel", "Glo", "9mobile"];
 
 const CATEGORY_ICONS: Record<string, string> = {
   verification: "💬",
@@ -152,7 +154,15 @@ export function ServiceExplorer({ initialCountry, initialCategory, rejectedCount
       ? interleaveExplorerItems([...liveState.items, ...base]) : base;
   }, [country, liveState]);
   const filtered = useMemo(() => filterExplorerItems(items, category, search, tag), [items, category, search, tag]);
-  const tags = category === "verification" ? VERIFICATION_TAGS : category === "social" ? SOCIAL_TAGS : [];
+  const tags = category === "verification"
+    ? VERIFICATION_TAGS
+    : category === "social"
+    ? SOCIAL_TAGS
+    : category === "numbers"
+    ? NUMBER_TAGS
+    : category === "data"
+    ? DATA_TAGS
+    : [];
 
   // Live listings: boosts are purchasable, the others are read-only until their ordering is wired.
   useEffect(() => {
