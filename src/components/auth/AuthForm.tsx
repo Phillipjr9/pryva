@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Check, Shield, Sparkle } from "@/components/icons";
 import { safeRedirectPath } from "@/lib/safe-redirect";
 import { PasswordInput } from "@/components/ui/PasswordInput";
+import { PasskeySignInButton } from "@/components/auth/PasskeySignInButton";
 
 type Mode = "login" | "signup";
 
@@ -183,21 +184,6 @@ export function AuthForm({
           </p>
         )}
 
-        <a
-          href={`/api/auth/google?next=${encodeURIComponent(next)}`}
-          className="btn w-full border border-line bg-white !py-3.5 text-ink shadow-sm hover:bg-lav-50/60"
-        >
-          Continue with Google
-        </a>
-
-        <div className="my-5 flex items-center gap-3">
-          <span className="h-px flex-1 bg-line" />
-          <span className="text-micro font-semibold uppercase tracking-[0.16em] text-ink-3">
-            or with email
-          </span>
-          <span className="h-px flex-1 bg-line" />
-        </div>
-
         <span className="eyebrow">
           <Sparkle className="h-3 w-3" />
           {mode === "signup" ? "Create your account" : "Welcome back"}
@@ -293,6 +279,26 @@ export function AuthForm({
           {pending !== "form" && <ArrowRight className="h-4 w-4" />}
         </button>
       </form>
+
+      <div className="my-5 flex items-center gap-3">
+        <span className="h-px flex-1 bg-line" />
+        <span className="text-micro font-semibold uppercase tracking-[0.16em] text-ink-3">
+          {mode === "signup" ? "or sign up with" : "or sign in with"}
+        </span>
+        <span className="h-px flex-1 bg-line" />
+      </div>
+
+      <div className="grid gap-2.5">
+        {/* A passkey only exists after an account does, so this is a sign-in
+            control and never a sign-up one. */}
+        {mode === "login" ? <PasskeySignInButton next={next} /> : null}
+        <a
+          href={`/api/auth/google?next=${encodeURIComponent(next)}`}
+          className="btn w-full border border-line bg-white !py-3.5 text-ink shadow-sm hover:bg-lav-50/60"
+        >
+          Continue with Google
+        </a>
+      </div>
 
       <p className="mt-6 text-center text-[0.85rem] text-ink-2">
         {mode === "signup" ? (

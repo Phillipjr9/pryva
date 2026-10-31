@@ -1,9 +1,12 @@
+import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { userTwoFactor } from "@/db/schema";
+import { listCredentialSummaries, relyingPartyFor } from "@/lib/passkeys";
 import { remainingRecoveryCodes, twoFactorAvailable } from "@/lib/two-factor";
 import type { PublicUser } from "@/lib/auth";
 import { Check, Clock, Shield, User } from "@/components/icons";
+import { PasskeysCard } from "@/components/settings/PasskeysCard";
 import { SessionsCard } from "./SessionsCard";
 import { TwoFactorCard } from "./TwoFactorCard";
 
@@ -33,6 +36,21 @@ export async function SecuritySection({ user }: { user: PublicUser }) {
   const twoFactorEnabled = Boolean(enrolment?.enabledAt);
   const recoveryCodesLeft = twoFactorEnabled ? await remainingRecoveryCodes(user.id) : 0;
 
+  // Whether this address can run a passkey ceremony at all is a server fact:
+  // WebAuthn needs a pinned HTTPS origin, so a deployment served over plain
+  // HTTP hides the control rather than offering one that always fails.
+  const headerList = await headers();
+  const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
+  const proto = headerList.get("x-forwarded-proto") ?? "https";
+  const passkeysAvailableHere = host
+    ? relyingPartyFor(
+        new Request(`${proto}://${host}/`, {
+          headers: { host, "x-forwarded-host": host, "x-forwarded-proto": proto },
+        }),
+      ) !== null
+    : false;
+  const passkeys = await listCredentialSummaries(user.id);
+
   return (
     <section id="security" className="scroll-mt-24 space-y-4">
       <div>
@@ -50,6 +68,8 @@ export async function SecuritySection({ user }: { user: PublicUser }) {
         />
         <SessionsCard />
       </div>
+
+      <PasskeysCard passkeys={passkeys} available={passkeysAvailableHere} />
 
       <div className="rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
         <h3 className="flex items-center gap-2 text-[0.95rem] font-semibold">

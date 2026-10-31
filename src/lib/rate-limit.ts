@@ -167,6 +167,12 @@ export const inboxPollRateLimiter = createRateLimiter({ windowMs: 60_000, maxReq
  * free provider-probing service.
  */
 export const supportMessageRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 20 });
+/**
+ * Passkey ceremonies. Each one is a round trip to an authenticator and, on the
+ * sign-in path, a signature check; the limit is per IP because the sign-in
+ * ceremony happens before anybody is known to be signed in.
+ */
+export const passkeyRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 12 });
 
 /** Drop one key's counter after successful authentication. */
 export async function resetRateLimit(key: string): Promise<void> {

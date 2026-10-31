@@ -138,6 +138,27 @@ down and tested rather than assumed.
   only. That is what makes an escalation auditable — and it is also why the trace
   must never contain a credential or another customer's data.
 
+## 3b. Passkeys
+
+`src/lib/passkeys.ts` and `src/app/api/auth/passkey/*` add WebAuthn sign-in. The
+threats that matter are replay, host confusion and a leaked server secret, and each
+one is answered by construction:
+
+| Threat | Why it does not work |
+|---|---|
+| Replayed assertion | The challenge is stored server-side, scoped to `register`/`authenticate`, expires after five minutes, and is spent by `UPDATE … WHERE consumed_at IS NULL` before verification runs. A second use finds nothing. |
+| A registration ceremony turned into a sign-in | Purpose is part of the lookup, so a `register` challenge cannot be spent by `authenticate`. |
+| A phishing site on another host | WebAuthn binds the origin into the signed client data, and the server pins the relying party from `WEBAUTHN_ORIGIN` / `NEXT_PUBLIC_SITE_URL` rather than from the request's `Host`. `WEBAUTHN_RP_ID` must be a suffix of that origin. |
+| A stolen database | Only public keys are stored (base64url COSE text), with the counter and a label. There is no server-side secret to steal that can impersonate a customer. |
+| Credential swap / cloning | The signature counter is compared with the stored value; a regression refuses the sign-in and logs a warning. |
+| A foreign device enrolled on someone else's account | `finishRegistration` writes the credential against the session's user id only, and a delete is scoped by `user_id` inside the query — an unfamiliar id returns 404, not someone else's row. |
+| Brute force / enumeration | Same-origin check on both routes, `passkeyRateLimiter`, one generic 401 for every failure, and the account lockout applies exactly as it does to a password. Failure reasons are kept in the server result and never serialised to the client. |
+| A passkey quietly replacing 2FA policy | A passkey satisfies the second factor because it *is* two factors; it does not exempt anyone from lockout, does not change the password, and cannot disable two-factor or reset a password. |
+
+The browser half (`src/lib/webauthn-browser.ts`) is written here rather than pulled
+from a package, so the sign-in page loads no third-party script; a test fails if
+`@simplewebauthn/browser` ever becomes a dependency.
+
 ## 4. Known gaps — stated, not hidden
 
 - **No edge bot defence.** Rate limits are in the app. A credential-stuffing
