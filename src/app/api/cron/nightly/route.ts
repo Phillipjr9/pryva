@@ -7,6 +7,7 @@ import { sweepBoostDeliveries } from "@/lib/boost-status";
 import { expireFinishedRentals } from "@/lib/rental-expiry";
 import { settleReferralRewards } from "@/lib/referrals";
 import { purgeExpiredClosedAccounts } from "@/lib/retention";
+import { reconcileInFlightPayouts } from "@/lib/payouts";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { logger } from "@/lib/logger";
 
@@ -31,7 +32,9 @@ export const maxDuration = 60;
  *   5. **close finished rentals** last, so a rental whose term ended stops reading
  *      as live even if its owner never opens the page. It runs after the refund
  *      sweep on purpose: a single-use number whose window closed unfulfilled must
- *      reach the refund step while it still says `active`.
+ *      reach the refund step while it still says `active`;
+ *   6. **ask about payouts the provider has not reported**, because a customer's
+ *      money must not depend on a webhook arriving.
  *
  * Each step is isolated: a failure in one is reported and the next still runs,
  * because an email outage must never stop a refund sweep. The old per-task
@@ -119,6 +122,20 @@ async function handler(request: NextRequest) {
     };
   });
 
+  // Payouts are sent on request now, and the fast path is the provider's signed
+  // event. This is the one that does not depend on a message arriving: it asks
+  // Paystack about anything still in flight after ten minutes, and applies the
+  // answer through the same guarded path a webhook uses. Without it a payout the
+  // provider settled and never reported would read "sent" forever.
+  const payouts = await runStep("payouts", async () => {
+    if (isPreviewDatabase()) return { ok: true, detail: "skipped: preview database" };
+    const result = await reconcileInFlightPayouts();
+    return {
+      ok: true,
+      detail: `checked ${result.checked}, settled ${result.settled}, refunded ${result.refunded}, still pending ${result.stillPending}, unreadable ${result.failed}`,
+    };
+  });
+
   // The retention horizon, last and off by default. With
   // `RETENTION_PURGE_ENABLED` unset this only counts what is due, which is the
   // point: the number is visible for as long as it takes to decide that deleting
@@ -133,7 +150,7 @@ async function handler(request: NextRequest) {
     };
   });
 
-  const allOk = close.ok && emails.ok && boosts.ok && refunds.ok && rentals.ok && referrals.ok && retention.ok;
+  const allOk = close.ok && emails.ok && boosts.ok && refunds.ok && rentals.ok && referrals.ok && payouts.ok && retention.ok;
   logger.info("Nightly run finished", {
     day,
     allOk,

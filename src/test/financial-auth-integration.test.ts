@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   initializePayment: vi.fn(),
   verifyPayment: vi.fn(),
   initiateTransfer: vi.fn(),
+  verifyTransfer: vi.fn(),
   checkSms: vi.fn(),
   rentalSms: vi.fn(),
   destroySession: vi.fn(),
@@ -79,6 +80,7 @@ vi.mock("@/lib/paystack", () => ({
   isPaystackConfigured: () => true, getBanks: mocks.getBanks,
   resolveBankAccount: mocks.resolveBank, createTransferRecipient: mocks.createRecipient,
   initializePayment: mocks.initializePayment, verifyPayment: mocks.verifyPayment, initiateTransfer: mocks.initiateTransfer,
+  verifyTransfer: mocks.verifyTransfer,
 }));
 
 const USER = "f5ca2925-6050-49d2-ab89-fc324953ed11";
@@ -189,7 +191,14 @@ beforeEach(async () => {
   vi.clearAllMocks();
   mocks.initializePayment.mockReset();
   mocks.verifyPayment.mockReset();
+  mocks.verifyTransfer.mockReset();
   mocks.initiateTransfer.mockReset();
+  // Payouts are sent as part of the request now, so the provider has to answer
+  // by default: it echoes the request back exactly as Paystack does.
+  mocks.initiateTransfer.mockImplementation(async (params: { reference: string; amount: number }) => ({
+    status: true,
+    data: { transfer_code: "TRF-auto", reference: params.reference, amount: params.amount, currency: "NGN", status: "pending" },
+  }));
   mocks.checkSms.mockReset();
   mocks.rentalSms.mockReset();
   vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db");
@@ -258,38 +267,100 @@ describe("withdrawal request idempotency on embedded PostgreSQL", () => {
     expect(await database.select().from(schema.withdrawals)).toHaveLength(0);
   });
 
-  it("persists a Paystack-compliant transfer reference before contacting the provider", async () => {
+  it("writes the provider reference before the money is asked for, and sends it in the same request", async () => {
     await addBank();
-    const submitted = await withdrawalRoute.POST(withdrawalRequest());
-    const { withdrawal } = await submitted.json();
-    const expected = `wd-${withdrawal.id.replace(/-/g, "")}`;
     mocks.initiateTransfer.mockImplementationOnce(async (params: { reference: string; amount: number; currency: string }) => {
-      const [during] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, withdrawal.id));
-      expect(during).toMatchObject({ status: "processing", paystackReference: expected });
-      expect(params).toMatchObject({ reference: expected, amount: 600000, currency: "NGN" });
-      expect(params.reference).toMatch(/^[a-z0-9_-]{16,50}$/);
-      return { status: true, data: { transfer_code: "TRF-test", reference: expected, amount: 600000, currency: "NGN", status: "pending" } };
+      // Read the database from inside the provider call: the row has to be
+      // claimed and named *before* the request leaves, or a crash mid-call leaves
+      // a debit nobody can trace to a transfer.
+      const [during] = await database.select().from(schema.withdrawals);
+      expect(during).toMatchObject({ status: "processing", paystackReference: `wd-${during.id.replace(/-/g, "")}` });
+      expect(params).toMatchObject({ reference: during.paystackReference, amount: 600000, currency: "NGN" });
+      expect(String(params.reference)).toMatch(/^[a-z0-9_-]{16,50}$/);
+      return { status: true, data: { transfer_code: "TRF-test", reference: params.reference, amount: 600000, currency: "NGN", status: "pending" } };
     });
-    const approval = new NextRequest("https://pryva.test/api/admin/withdrawals", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: withdrawal.id, action: "approve" }) });
-    const result = await adminWithdrawalRoute.PUT(approval);
-    expect(await result.json()).toMatchObject({ ok: true, needsReview: false, paystackReference: expected, transferCode: "TRF-test" });
-    const [stored] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, withdrawal.id));
-    expect(stored).toMatchObject({ status: "processing", paystackReference: expected, transferReference: "TRF-test" });
+
+    const submitted = await withdrawalRoute.POST(withdrawalRequest());
+    expect(submitted.status).toBe(200);
+    const body = await submitted.json();
+    // No approval step: the customer's request is the payout.
+    expect(body.withdrawal.status).toBe("processing");
+    expect(body.message).toContain("Payout sent to your bank");
+    const [stored] = await database.select().from(schema.withdrawals);
+    expect(stored).toMatchObject({ status: "processing", paystackReference: `wd-${stored.id.replace(/-/g, "")}`, transferReference: "TRF-test" });
     expect((await database.select().from(schema.users))[0].walletBalance).toBe(3940);
   });
 
-  it("claims one withdrawal only once when two admins approve concurrently", async () => {
+  it("refunds instead of leaving the money stranded when the provider refuses the payout", async () => {
     await addBank();
-    const { withdrawal } = await (await withdrawalRoute.POST(withdrawalRequest())).json();
-    mocks.initiateTransfer.mockImplementation(async ({ reference }: { reference: string }) => ({
-      status: true, data: { transfer_code: "TRF-race", reference, amount: 600000, currency: "NGN", status: "pending" },
+    mocks.initiateTransfer.mockResolvedValueOnce({
+      status: false, message: "Your balance is not enough to process this transfer", data: undefined as never,
+    } as never);
+    const submitted = await withdrawalRoute.POST(withdrawalRequest());
+    expect(submitted.status).toBe(200);
+    const body = await submitted.json();
+    expect(body.withdrawal.status).toBe("failed");
+    expect(body.message).toContain("returned to your wallet");
+    expect(body.newBalance).toBe(10000);
+    const [stored] = await database.select().from(schema.withdrawals);
+    expect(stored.status).toBe("failed");
+    expect(stored.failureReason).toContain("refused");
+    const ledger = await database.select().from(schema.walletTransactions);
+    expect(ledger).toHaveLength(2);
+    expect(ledger[1]).toMatchObject({ type: "refund", amount: stored.amount + stored.fee, balanceAfter: 10000 });
+  });
+
+  it("never refunds a payout whose outcome it could not confirm", async () => {
+    await addBank();
+    // A timeout can arrive after Paystack accepted the transfer. Refunding here
+    // is the one mistake that pays the customer twice.
+    mocks.initiateTransfer.mockRejectedValueOnce(new Error("socket hang up"));
+    const submitted = await withdrawalRoute.POST(withdrawalRequest());
+    expect(submitted.status).toBe(200);
+    const body = await submitted.json();
+    expect(body.withdrawal.status).toBe("processing");
+    const [stored] = await database.select().from(schema.withdrawals);
+    expect(stored.status).toBe("processing");
+    // The wallet stays debited and the ledger has no refund to give back.
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(3940);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+  });
+
+  it("refuses a request whose bank account cannot receive a payout, before any debit", async () => {
+    await database.insert(schema.bankAccounts).values({
+      id: BANK_ID, userId: USER, bankName: "Test Bank", bankCode: "044",
+      accountNumber: "1234567890", accountName: "Test Customer", recipientCode: null,
+    });
+    await database.insert(schema.paymentTopups).values({
+      reference: "TOP-norecipient", userId: USER, amount: 5000, status: "completed",
+      paidAt: new Date(), payerName: "Test Customer",
+    });
+    const response = await withdrawalRoute.POST(new NextRequest("https://pryva.test/api/wallet/withdraw", {
+      method: "POST",
+      headers: { host: "pryva.test", "x-forwarded-proto": "https", origin: "https://pryva.test", "content-type": "application/json" },
+      body: JSON.stringify({ requestId: "5c2a1f0e-0000-4000-8000-000000000009", amount: 3000, bankAccountId: BANK_ID }),
     }));
-    const approve = () => new NextRequest("https://pryva.test/api/admin/withdrawals", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: withdrawal.id, action: "approve" }) });
+    expect(response.status).toBe(409);
+    expect((await database.select().from(schema.users))[0].walletBalance).toBe(10000);
+    expect(await database.select().from(schema.withdrawals)).toHaveLength(0);
+    expect(mocks.initiateTransfer).not.toHaveBeenCalled();
+  });
+
+  it("still settles a legacy queued request by hand, at most once", async () => {
+    await addBank();
+    // Rows created before payouts became instant are `pending` with no provider
+    // reference; the admin action stays for them and for the exception queue.
+    await database.insert(schema.withdrawals).values({
+      userId: USER, amount: 6000, fee: 60, bankName: "Test Bank", accountNumber: "1234567890",
+      accountName: "Test Customer", recipientCode: "RCP-test", status: "pending", reference: "WD-legacy0000000000000001",
+    });
+    const [legacy] = await database.select().from(schema.withdrawals);
+    const approve = () => new NextRequest("https://pryva.test/api/admin/withdrawals", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: legacy.id, action: "approve" }) });
     const results = await Promise.all([adminWithdrawalRoute.PUT(approve()), adminWithdrawalRoute.PUT(approve())]);
     expect(results.map((result) => result.status).sort()).toEqual([200, 409]);
     expect(mocks.initiateTransfer).toHaveBeenCalledTimes(1);
-    const [stored] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, withdrawal.id));
-    expect(stored).toMatchObject({ status: "processing", paystackReference: `wd-${withdrawal.id.replace(/-/g, "")}`, transferReference: "TRF-race" });
+    const [stored] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, legacy.id));
+    expect(stored).toMatchObject({ status: "processing", paystackReference: `wd-${legacy.id.replace(/-/g, "")}`, transferReference: "TRF-auto" });
   });
 
   it("enforces unique Paystack transfer references in the migrated database", async () => {
@@ -306,7 +377,7 @@ describe("withdrawal request idempotency on embedded PostgreSQL", () => {
     const first = await withdrawalRoute.POST(withdrawalRequest());
     expect(first.status).toBe(200);
     const firstReceipt = await first.json();
-    expect(firstReceipt).toMatchObject({ replayed: false, withdrawal: { amount: 6000, fee: 60, status: "pending", createdAt: expect.any(String) } });
+    expect(firstReceipt).toMatchObject({ replayed: false, withdrawal: { amount: 6000, fee: 60, status: "processing", createdAt: expect.any(String) } });
     await database.delete(schema.bankAccounts).where(eq(schema.bankAccounts.id, BANK_ID));
     const repeated = await withdrawalRoute.POST(withdrawalRequest());
     expect(repeated.status).toBe(200);
@@ -1172,7 +1243,7 @@ describe("payout settlement from the provider's own events", () => {
   }
   const send = (event: string, data: Record<string, unknown>) => webhookRoute.POST(signed(eventBody(event, data)));
 
-  /** A customer request that an operator has approved: wallet debited, row in flight. */
+  /** A payout that left on request: wallet debited, row in flight, provider accepted. */
   async function inFlightPayout(amount = 5000, requestId = "5c2a1f0e-0000-4000-8000-000000000001") {
     await database.insert(schema.bankAccounts).values({
       id: BANK, userId: USER, bankName: "Test Bank", bankCode: "044",
@@ -1192,17 +1263,11 @@ describe("payout settlement from the provider's own events", () => {
     const body = await created.json();
     if (created.status !== 200) throw new Error(`withdrawal fixture failed: ${JSON.stringify(body)}`);
     const providerReference = `wd-${String(body.withdrawal.id).replace(/-/g, "")}`;
-    mocks.initiateTransfer.mockResolvedValueOnce({
-      status: true,
-      data: { transfer_code: "TRF-test", reference: providerReference, amount: amount * 100, currency: "NGN", status: "pending" },
-    });
-    const approval = await adminWithdrawalRoute.PUT(new NextRequest("https://pryva.test/api/admin/withdrawals", {
-      method: "PUT", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id: body.withdrawal.id, action: "approve" }),
-    }));
-    expect(approval.status).toBe(200);
+    // No approval step exists any more: the request is the payout.
+    expect(mocks.initiateTransfer).toHaveBeenCalled();
     const [row] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, body.withdrawal.id));
     expect(row).toMatchObject({ status: "processing", paystackReference: providerReference });
+    expect(row.transferReference).toBe("TRF-auto");
     return { row, providerReference, fee: row.fee };
   }
 
@@ -1333,6 +1398,37 @@ describe("payout settlement from the provider's own events", () => {
       expect.objectContaining({ reference: "wd-00000000000000000000000000000000" }),
     );
     expect(await balance()).toBe(10000);
+  });
+
+  it("settles a payout the provider never reported, by asking, in the sweep", async () => {
+    const { row, providerReference } = await inFlightPayout(5000, "5c2a1f0e-0000-4000-8000-000000000007");
+    // Older than the sweep's window, which is what makes it a candidate.
+    await database.update(schema.withdrawals)
+      .set({ createdAt: new Date(Date.now() - 30 * 60_000) })
+      .where(eq(schema.withdrawals.id, row.id));
+    const payouts = await import("@/lib/payouts");
+
+    // Not settled yet: the provider says it is still processing.
+    mocks.verifyTransfer.mockResolvedValueOnce({
+      status: true, message: "ok",
+      data: { transfer_code: "TRF-auto", status: "processing", reference: providerReference, amount: 500000, currency: "NGN" },
+    });
+    const pendingRun = await payouts.reconcileInFlightPayouts();
+    expect(pendingRun.checked).toBeGreaterThanOrEqual(1);
+    expect(pendingRun.settled).toBe(0);
+    const [stillProcessing] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, row.id));
+    expect(stillProcessing.status).toBe("processing");
+
+    // Now the provider says it landed.
+    mocks.verifyTransfer.mockResolvedValueOnce({
+      status: true, message: "ok",
+      data: { transfer_code: "TRF-auto", status: "success", reference: providerReference, amount: 500000, currency: "NGN" },
+    });
+    const settledRun = await payouts.reconcileInFlightPayouts();
+    expect(settledRun.settled).toBe(1);
+    const [settled] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, row.id));
+    expect(settled.status).toBe("completed");
+    expect(settled.completedAt).toBeInstanceOf(Date);
   });
 
   it("refuses a transfer event that is not signed with the configured secret", async () => {

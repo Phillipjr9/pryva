@@ -12,6 +12,9 @@ vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.currentUser }));
 // method into a TypeError that the route's catch reports as a 500, which reads as
 // "the route broke" when it was the test double that was incomplete.
 vi.mock("@/lib/logger", () => ({ logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/paystack", () => ({ isPaystackConfigured: () => true }));
+// Payouts leave as part of the request now; the provider is not this file's subject.
+vi.mock("@/lib/payouts", () => ({ sendPayout: vi.fn(async () => ({ outcome: "sent", transferCode: "TRF-test", providerStatus: "pending" })) }));
 vi.mock("@/lib/rate-limit", () => ({
   purchaseRateLimiter: async () => ({ allowed: true }),
   createRateLimiter: () => async () => ({ allowed: true }),
@@ -19,6 +22,7 @@ vi.mock("@/lib/rate-limit", () => ({
 const dialect = new PgDialect();
 
 const REQUEST_ID = "da16d859-1301-4851-a124-b9dddf107333";
+const WITHDRAWAL_ID = "b1a2c3d4-0000-4000-8000-00000000000a";
 const OTHER_REQUEST_ID = "47a7c568-8781-416b-8393-57ed13b89d42";
 
 function request(amount: unknown, origin = "https://pryva.test", requestId = REQUEST_ID) {
@@ -48,6 +52,7 @@ function fakeDatabase() {
           if (table === withdrawals) return state.withdrawals.filter((row) => row.userId === params[0] && row.requestId === params[1]);
           if (table === bankAccounts) return params[0] === state.bank.id && params[1] === state.bank.userId ? [{ ...state.bank }] : [];
           // depositorNameFor() reads the frozen payer name, oldest deposit first.
+          if (table === users) return params[0] === "user-id" ? [{ balance: state.balance }] : [];
           if (table === paymentTopups) return state.topups
             .filter((row) => row.userId === params[0] && row.payerName !== null)
             .map((row) => ({ payerName: row.payerName }));
@@ -68,6 +73,14 @@ function fakeDatabase() {
               return {
                 async returning() {
                   const params = dialect.sqlToQuery(condition).params;
+                  if (table === withdrawals) {
+                    const index = state.withdrawals.findIndex((row) => row.id === params[0]);
+                    if (index === -1) return [];
+                    // The route claims the row and names the provider reference
+                    // inside the same transaction as the debit.
+                    state.withdrawals[index] = { ...state.withdrawals[index], ...values };
+                    return [{ ...state.withdrawals[index] }];
+                  }
                   if (table !== users || params[0] !== "user-id" || state.balance < Number(params[1])) return [];
                   state.balance -= Number(dialect.sqlToQuery(values.walletBalance as SQL).params[0]);
                   return [{ balance: state.balance }];
@@ -86,7 +99,7 @@ function fakeDatabase() {
               onConflictDoNothing: () => ({
                 async returning() {
                   if (state.withdrawals.some((row) => row.userId === value.userId && row.requestId === value.requestId)) return [];
-                  const row = { ...value, id: "withdrawal-id" };
+                  const row = { ...value, id: WITHDRAWAL_ID };
                   state.withdrawals.push(row);
                   return [row];
                 },

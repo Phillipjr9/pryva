@@ -2087,3 +2087,73 @@ guards from either `UPDATE` fails three of them.
 real payout, and the owner must confirm the webhook endpoint subscribes to the
 `transfer.*` events. If it does not, everything above is inert and the manual queue
 is the only path again.
+
+---
+
+## 47. Thirty-ninth pass — the payout leaves when the customer asks (31 Oct 2026)
+
+The owner, plainly: *"i want instant withdrawal without admin approval, admin can't
+approve over thousands of user requests at the same time."* He is right, and the
+queue was not a safety feature — it was a single operator standing in front of every
+customer's money. A request that waited six hours for a click was indistinguishable,
+from the customer's side, from a request that had been lost.
+
+**The request is the payout.** `POST /api/wallet/withdraw` now does the whole thing:
+the row, the wallet debit, the ledger row and the Paystack reference commit in one
+transaction — the reference written *before* the money is asked for, so a crash
+mid-call still leaves a row that names its transfer — and then the transfer is
+initiated inside the same HTTP request. `processing` means "sent to your bank";
+`completed` means the bank confirmed; `failed` means refunded. Nothing waits for a
+person.
+
+**Every ending is stated, and three of them are not the same.**
+
+| What the provider said | Row | Wallet |
+|---|---|---|
+| accepted (`pending`/`queued`) | `processing`, transfer code stored | stays debited — the money left |
+| refused (`status: false`) | `failed`, reason recorded | **refunded** `amount + fee`, with a ledger row |
+| no answer (timeout, 5xx, mismatched response) | `processing`, note | stays debited — refunding here can pay twice |
+| merchant OTP | `processing`, note | stays debited — that transfer can still complete |
+
+The middle two are the whole design. A refusal is refunded immediately because
+nothing left; an *unconfirmed* outcome is never refunded automatically because it
+might have left. `sendPayout` returns one of four named outcomes and the route says
+which one to the customer, so "sent", "failed — money back" and "we are checking"
+are never confused for each other in the UI.
+
+**The gate is replaced by checks that run before the money moves**: the destination
+name must match the name that funded the wallet, the amount band, the advisory risk
+score, and — new in this pass — a bank account with no provider recipient is refused
+(409) *before* any debit, rather than being debited and then found unpayable. With
+no `PAYSTACK_SECRET_KEY` the endpoint is a 503 and nothing is deducted: a payout
+system that accepts requests it cannot pay is worse than one that says "not now".
+
+**A payout no longer depends on a webhook arriving.** `reconcileInFlightPayouts()`
+asks Paystack about every `processing` row older than ten minutes — at most twenty a
+run — and applies the answer through the same guarded path the signed event uses, so
+the two can never disagree about what "settled" means. It is the `payouts` step of
+the nightly job, after the refund sweep. Combined with R82's event handling, a payout
+settles three ways: the event, the sweep, or an operator on the exception.
+
+**The admin queue did not disappear; it stopped being a gate.** "Mark as Completed"
+remains for a transfer the provider never reported, and `/admin/withdrawals` is now
+titled "Payouts" and described as an exception queue. Rows created before this change
+that are still `pending` can still be approved by hand — that path is tested and
+still safe — but nothing new is ever created that way.
+
+**Verified:** 1,513 tests / 162 files · typecheck · lint · build. New coverage, on
+real PostgreSQL: the reference is written before the provider is called and the row
+is `processing` with the transfer code after; a refusal refunds `amount + fee` with a
+ledger row and a `failed` receipt; a timeout leaves the wallet debited and the row in
+flight with no refund (sabotage-proven — treating a refusal as "unknown" fails it);
+a bank account with no recipient is refused before any write; a legacy `pending` row
+still settles exactly once under two concurrent approvals; and the sweep asks the
+provider, leaves a `processing` row alone when the provider says so, and completes it
+when the provider says success. The theme's withdrawal dialog and dashboard tests
+follow the new copy and headings.
+
+**Not verified:** no live payout has been sent by this code. The first real one is
+the owner's test. Two things to check in Paystack before it: the webhook must
+subscribe to `transfer.*` events (§7n), and **merchant authorization / OTP must be
+off for transfers** (§7o) — if it is on, every payout stops at a human step this app
+cannot complete.

@@ -1,11 +1,11 @@
 import "server-only";
-import { randomBytes } from "node:crypto";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { users, walletTransactions, withdrawals } from "@/db/schema";
+import { withdrawals } from "@/db/schema";
 import { logger } from "@/lib/logger";
 import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
+import { refundWithdrawal } from "@/lib/withdrawal-refund";
 
 /**
  * Settling a payout from the provider's own word.
@@ -179,48 +179,24 @@ export async function settleTransferEvent(input: TransferEventInput): Promise<Tr
     return current?.status === "completed" ? "already_settled" : "held";
   }
 
-  const refundAmount = row.amount + row.fee;
-  const note = failureNote(input);
   // A bank can reverse a payout days after it looked settled, so a `reversed`
   // event may end a `completed` row. A plain `failed`/`abandoned` may not: it
   // cannot meaningfully follow a success, and if one arrives anyway a person has
   // to look at it rather than have the wallet credited on a contradiction.
-  const mayEnd: string[] = input.event === "transfer.reversed" ? ["processing", "completed"] : ["processing"];
-
-  const refunded = await db.transaction(async (tx) => {
-    const [claimed] = await tx
-      .update(withdrawals)
-      .set({ status: "failed", processedAt: new Date(), failureReason: note })
-      .where(and(eq(withdrawals.id, row.id), inArray(withdrawals.status, mayEnd)))
-      .returning();
-    if (!claimed) return null;
-
-    const [user] = await tx
-      .update(users)
-      .set({ walletBalance: sql`${users.walletBalance} + ${refundAmount}` })
-      .where(eq(users.id, claimed.userId))
-      .returning({ balance: users.walletBalance });
-    if (!user) throw new Error("Withdrawal user not found");
-
-    await tx.insert(walletTransactions).values({
-      userId: claimed.userId,
-      type: "refund",
-      amount: refundAmount,
-      balanceAfter: user.balance,
-      description: `Refund for ${input.providerStatus || "failed"} withdrawal ${claimed.reference}`,
-      reference: `RWD-${randomBytes(12).toString("hex")}`,
-    });
-
-    return claimed;
+  const refund = await refundWithdrawal({
+    withdrawalId: row.id,
+    from: input.event === "transfer.reversed" ? ["processing", "completed"] : ["processing"],
+    to: "failed",
+    note: failureNote(input),
   });
 
-  if (refunded) {
+  if (refund) {
     logger.warn("Withdrawal failed at the provider and was refunded", {
-      withdrawalId: refunded.id,
-      reference: refunded.reference,
+      withdrawalId: row.id,
+      reference: row.reference,
       event: input.event,
       providerStatus: input.providerStatus,
-      refunded: refundAmount,
+      refunded: refund.amount,
     });
     scheduleWalletEmails();
     return "refunded";
