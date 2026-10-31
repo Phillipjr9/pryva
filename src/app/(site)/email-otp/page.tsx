@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { serviceMap } from "@/lib/catalog";
+import { ServiceIcon } from "@/components/ServiceIcon";
 
 export const metadata: Metadata = {
   title: "Free Temporary Email",
@@ -38,7 +39,8 @@ export default function EmailOTPPage() {
       <section className="py-16 sm:py-20">
         <div className="shell">
           <div className="max-w-3xl">
-            <span className="inline-block rounded-full bg-lav-100 px-4 py-1.5 text-[0.78rem] font-semibold text-lav-700 mb-4">
+            <ServiceIcon service="email-otp" size="lg" className="mb-5" />
+            <span className="inline-block rounded-full bg-lav-100 px-4 py-1.5 text-meta font-semibold text-lav-700 mb-4">
               {service.eyebrow}
             </span>
             <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3.5rem]">
@@ -53,7 +55,7 @@ export default function EmailOTPPage() {
       <section className="pb-12">
         <div className="shell">
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 sm:p-8">
-            <p className="text-[0.72rem] uppercase tracking-[0.14em] font-semibold text-emerald-800">
+            <p className="text-meta uppercase tracking-[0.14em] font-semibold text-emerald-800">
               No price, no plan, no charge
             </p>
             <h2 className="mt-3 text-[1.5rem] font-semibold text-emerald-950">

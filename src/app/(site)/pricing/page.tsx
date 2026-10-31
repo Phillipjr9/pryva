@@ -70,7 +70,7 @@ export default function PricingPage() {
                   >
                     {plan.popular && (
                       <div className="mb-4">
-                        <span className="inline-block rounded-full bg-lav-100 px-3 py-1 text-[0.72rem] font-semibold text-lav-700">
+                        <span className="inline-block rounded-full bg-lav-100 px-3 py-1 text-meta font-semibold text-lav-700">
                           Most Popular
                         </span>
                       </div>
@@ -79,7 +79,7 @@ export default function PricingPage() {
                       {hasCountryFlag(plan.region) && <CountryFlag region={plan.region} size={20} decorative />}
                       {plan.name}
                     </h3>
-                    <p className="text-[0.72rem] text-ink-2 mb-2 sm:text-[0.86rem] sm:mb-4">
+                    <p className="text-meta text-ink-2 mb-2 sm:text-[0.86rem] sm:mb-4">
                       {plan.planLabel}
                     </p>
                     <div className="mb-4">
@@ -87,12 +87,12 @@ export default function PricingPage() {
                         {formatNaira(plan.price)}
                       </span>
                       {plan.compareAt && (
-                        <span className="ml-1.5 text-[0.74rem] text-ink-3 line-through sm:ml-2 sm:text-[1rem]">
+                        <span className="ml-1.5 text-meta text-ink-3 line-through sm:ml-2 sm:text-[1rem]">
                           {formatNaira(plan.compareAt)}
                         </span>
                       )}
                     </div>
-                    <p className="text-[0.72rem] text-ink-2 mb-3 sm:text-[0.86rem] sm:mb-6">
+                    <p className="text-meta text-ink-2 mb-3 sm:text-[0.86rem] sm:mb-6">
                       {plan.duration}
                     </p>
                     <ul className="space-y-1 mb-3 sm:space-y-2 sm:mb-6">
@@ -101,7 +101,7 @@ export default function PricingPage() {
                       {plan.features.map((feature, index) => (
                         <li
                           key={index}
-                          className={`${index >= 2 ? "hidden sm:flex" : "flex"} items-start gap-1.5 text-[0.72rem] text-ink-2 sm:gap-2 sm:text-[0.86rem]`}
+                          className={`${index >= 2 ? "hidden sm:flex" : "flex"} items-start gap-1.5 text-meta text-ink-2 sm:gap-2 sm:text-[0.86rem]`}
                         >
                           <Check className="h-3 w-3 text-lav-600 shrink-0 mt-0.5 sm:h-4 sm:w-4" />
                           {feature}
@@ -111,7 +111,7 @@ export default function PricingPage() {
                     {deliverable ? (
                       <Link
                         href={`/signup?plan=${plan.slug}`}
-                        className={`block w-full rounded-lg px-3 py-2 text-center text-[0.78rem] font-semibold transition-colors sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.9rem] ${
+                        className={`block w-full rounded-lg px-3 py-2 text-center text-meta font-semibold transition-colors sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.9rem] ${
                           plan.popular
                             ? "bg-lav-600 text-white hover:bg-lav-700"
                             : "border border-line bg-white text-ink hover:bg-cream"
@@ -120,7 +120,7 @@ export default function PricingPage() {
                         Get Started
                       </Link>
                     ) : (
-                      <p className="block w-full rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-center text-[0.7rem] font-semibold leading-relaxed text-amber-900 sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.78rem]">
+                      <p className="block w-full rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-center text-meta font-semibold leading-relaxed text-amber-900 sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.78rem]">
                         This plan cannot be delivered yet, so it cannot be ordered or charged.
                       </p>
                     )}

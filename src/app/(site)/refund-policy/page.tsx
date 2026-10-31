@@ -68,9 +68,9 @@ export default function RefundPolicyPage() {
       </section>
 
       <section className="shell py-10">
-        <div className="overflow-hidden rounded-2xl border border-line bg-white">
-          <table className="w-full text-left">
-            <thead className="bg-cream/70 text-[0.72rem] uppercase tracking-[0.12em] text-ink-3">
+        <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+          <table className="w-full min-w-[32rem] text-left">
+            <thead className="bg-cream/70 text-meta uppercase tracking-[0.12em] text-ink-3">
               <tr>
                 <th className="px-4 py-3 font-semibold">Product</th>
                 <th className="px-4 py-3 font-semibold">Refund</th>
@@ -83,7 +83,7 @@ export default function RefundPolicyPage() {
                   <td className="px-4 py-4 text-[0.88rem] font-medium text-ink">{row.product}</td>
                   <td className="px-4 py-4">
                     <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-semibold ${
+                      className={`inline-flex rounded-full px-2.5 py-1 text-meta font-semibold ${
                         row.refund === "Not refundable"
                           ? "bg-red-50 text-red-700"
                           : row.refund === "Automatic"

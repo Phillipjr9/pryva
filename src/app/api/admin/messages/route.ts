@@ -1,4 +1,5 @@
 import { authorizeAdminApi } from "@/lib/admin-auth";
+import { recordAdminAction } from "@/lib/admin-audit";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { contactMessages } from "@/db/schema";
@@ -98,6 +99,17 @@ export async function PATCH(request: NextRequest) {
       .where(eq(contactMessages.id, messageId));
 
     logger.info("Message status updated", { messageId, status });
+
+    await recordAdminAction({
+      actor: access.user,
+      action: "message.status",
+      targetType: "message",
+      targetId: messageId,
+      // The message body is never copied here: a support message can contain
+      // anything the customer chose to send, and an audit row is not the place
+      // for it.
+      summary: `Support message status set to ${status}`,
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {

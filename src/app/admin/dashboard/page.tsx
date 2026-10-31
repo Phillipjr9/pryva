@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/db";
-import { users, orders, contactMessages } from "@/db/schema";
+import { users, orders, contactMessages, supportTickets } from "@/db/schema";
 import { count, sum, desc, eq } from "drizzle-orm";
 import Link from "next/link";
 import { Users, ShoppingCart, DollarSign, MessageCircle } from "@/components/icons";
@@ -20,6 +20,15 @@ export default async function AdminDashboardPage() {
     .select({ count: count() })
     .from(contactMessages)
     .where(eq(contactMessages.status, "open"));
+
+  // The number worth showing is the one somebody has to act on. "Open support
+  // messages" counted form submissions nobody had touched; tickets the assistant
+  // could not settle are the ones with a person's name on them.
+  const [escalatedRow] = await db
+    .select({ count: count() })
+    .from(supportTickets)
+    .where(eq(supportTickets.status, "escalated"));
+  const escalatedTickets = Number(escalatedRow?.count ?? 0);
 
   const recentOrders = await db.query.orders.findMany({
     orderBy: [desc(orders.createdAt)],
@@ -51,11 +60,11 @@ export default async function AdminDashboardPage() {
     {
       // This used to be a hard-coded "+12%" growth figure: an invented number
       // presented as a metric, linking to a page that does not compute it.
-      label: "Open support messages",
-      value: openMessages?.count || 0,
+      label: "Tickets needing a person",
+      value: escalatedTickets ?? 0,
       icon: MessageCircle,
       color: "blue",
-      href: "/admin/messages",
+      href: "/admin/support?status=escalated",
     },
   ];
 
@@ -139,7 +148,7 @@ export default async function AdminDashboardPage() {
                     <p className="text-[0.9rem] font-semibold text-ink">
                       ₦{order.amount.toLocaleString()}
                     </p>
-                    <p className="text-[0.78rem] text-ink-2 capitalize">
+                    <p className="text-meta text-ink-2 capitalize">
                       {order.status}
                     </p>
                   </div>

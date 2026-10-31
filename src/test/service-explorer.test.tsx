@@ -44,10 +44,16 @@ describe("country-first service explorer", () => {
 
   it("includes every product family and explicitly separates social promotion from app verification", () => {
     const ids = EXPLORER_CATEGORIES.map((category) => category.id);
-    expect(ids).toEqual(["verification", "social", "numbers", "esim", "proxies", "email", "accounts", "subscriptions", "data", "gift-cards", "tools"]);
+    expect(ids).toEqual(["verification", "social", "numbers", "esim", "proxies", "email", "accounts", "subscriptions", "data", "tools"]);
     const items = buildServiceExplorer("ng");
     expect(new Set(items.map((item) => item.id)).size).toBe(items.length);
     for (const category of ids) expect(items.some((item) => item.category === category), category).toBe(true);
+
+    // Gift cards are wallet credit Pryva issues itself, not a service family:
+    // no chip, no card. The page itself is /dashboard/gift-cards.
+    expect(ids).not.toContain("gift-cards");
+    expect(items.some((item) => item.id === "gift-cards")).toBe(false);
+    expect(items.some((item) => item.category === ("gift-cards" as never))).toBe(false);
     expect(items.find((item) => item.id === "verification-instagram")?.description).toBe("SMS verification");
     expect(items.find((item) => item.id === "social-instagram-followers")?.description).toBe("Social promotion");
     for (const brand of ["whatsapp", "instagram", "facebook", "tiktok", "telegram", "google", "youtube", "paypal", "uber"]) {

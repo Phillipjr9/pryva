@@ -8,6 +8,8 @@ import { exchangeGoogleCode, fetchGoogleUser, googleConfigured } from "@/lib/goo
 import { relativeRedirect } from "@/lib/net";
 import { creditWallet } from "@/lib/wallet";
 import { safeRedirectPath } from "@/lib/safe-redirect";
+import { attributeReferral, readReferralCodeFrom } from "@/lib/referrals";
+import { recordSignupSignal } from "@/lib/fraud";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +79,16 @@ export async function GET(request: Request) {
         .returning();
       user = created;
 
+      await recordSignupSignal(request, created.id);
+
+      // A Google signup is a signup: the invite cookie set on /signup counts
+      // here too, or every customer who used Google would be unattributable.
+      const referralCode = readReferralCodeFrom(request);
+      if (referralCode) {
+        await attributeReferral({ refereeId: created.id, code: referralCode }).catch((error) => {
+          console.error("[referrals] attribution failed", error);
+        });
+      }
     }
 
     if (!user) return clearCookies(goToLogin("google-exchange"));

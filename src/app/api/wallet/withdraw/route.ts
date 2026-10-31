@@ -16,6 +16,7 @@ import {
 } from "@/lib/withdrawal-name-check";
 import { MAX_WITHDRAWAL, MIN_WITHDRAWAL, withdrawalFee } from "@/lib/withdrawal";
 import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
+import { assessWithdrawal, recordFraudEvent, type RiskAssessment } from "@/lib/fraud";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +105,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: PAYOUT_NAME_MESSAGES[nameCheck.reason] }, { status: 403 });
     }
 
+    // Advisory risk score for the operator's queue. It never blocks the request
+    // and a failure here defaults to "no opinion" rather than to a refusal: a
+    // customer must not be unable to withdraw because a scoring query failed.
+    let risk: RiskAssessment = { level: "low", severity: "warn", reasons: [], ipHash: null };
+    try {
+      risk = await assessWithdrawal({ userId: user.id, amount, bankAccountId });
+    } catch (error) {
+      logger.warn("Withdrawal risk assessment skipped", { userId: user.id, error: error instanceof Error ? error.message : "unknown" });
+    }
+
     const fee = withdrawalFee(amount);
     const totalDeduction = amount + fee;
     const reference = `WD-${randomBytes(12).toString("hex")}`;
@@ -122,6 +133,8 @@ export async function POST(request: NextRequest) {
         accountName: bankAccount.accountName,
         recipientCode: bankAccount.recipientCode,
         status: "pending",
+        riskLevel: risk.level,
+        riskReasons: risk.reasons.length > 0 ? risk.reasons.join("; ") : null,
         reference,
       }).onConflictDoNothing({ target: [withdrawals.userId, withdrawals.requestId] }).returning();
       if (!created) {
@@ -151,6 +164,17 @@ export async function POST(request: NextRequest) {
 
     if (!result.replayed) {
       logger.info("Withdrawal request created", { userId: user.id, withdrawalId: result.withdrawal.id, amount, fee, reference });
+      if (risk.level !== "low") {
+        await recordFraudEvent({
+          userId: user.id,
+          kind: "withdrawal_review",
+          severity: risk.severity,
+          reasons: risk.reasons,
+          amount,
+          reference,
+          ipHash: risk.ipHash,
+        });
+      }
     }
     scheduleWalletEmails();
     return receipt(result.withdrawal, amount, bankAccountId, result.replayed, result.replayed ? undefined : result.balance);

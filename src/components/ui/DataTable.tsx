@@ -72,7 +72,7 @@ interface DataTableHeadProps {
 
 export function DataTableHead({ children, className }: DataTableHeadProps) {
   return (
-    <th className={cn("px-4 py-3 text-left text-[0.78rem] font-semibold uppercase tracking-wider text-ink-2", className)}>
+    <th className={cn("px-4 py-3 text-left text-meta font-semibold uppercase tracking-wider text-ink-2", className)}>
       {children}
     </th>
   );

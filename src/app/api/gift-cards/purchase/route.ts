@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createGiftCard } from "@/lib/gift-cards";
+import { GIFT_CARD_MAX_AMOUNT, GIFT_CARD_MIN_AMOUNT } from "@/lib/gift-card-rules";
 import { requireAuthApi } from "@/lib/auth";
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
@@ -26,8 +27,18 @@ export async function POST(request: NextRequest) {
     }
     if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     const { amount, recipientEmail, message } = body as { amount?: unknown; recipientEmail?: unknown; message?: unknown };
-    if (typeof amount !== "number" || !Number.isSafeInteger(amount) || amount < 1000 || amount > 500000) {
-      return NextResponse.json({ error: "Enter a whole-naira amount between ₦1,000 and ₦500,000." }, { status: 400 });
+    if (
+      typeof amount !== "number" ||
+      !Number.isSafeInteger(amount) ||
+      amount < GIFT_CARD_MIN_AMOUNT ||
+      amount > GIFT_CARD_MAX_AMOUNT
+    ) {
+      return NextResponse.json(
+        {
+          error: `Enter a whole-naira amount between ₦${GIFT_CARD_MIN_AMOUNT.toLocaleString("en-NG")} and ₦${GIFT_CARD_MAX_AMOUNT.toLocaleString("en-NG")}.`,
+        },
+        { status: 400 },
+      );
     }
     if (recipientEmail != null && (typeof recipientEmail !== "string" || !!validateEmail(recipientEmail.trim()))) {
       return NextResponse.json({ error: "Invalid recipient email" }, { status: 400 });

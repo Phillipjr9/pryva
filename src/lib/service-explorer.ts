@@ -18,7 +18,6 @@ export const EXPLORER_CATEGORIES = [
   { id: "accounts", label: "Digital accounts", description: "Account marketplace" },
   { id: "subscriptions", label: "Subscriptions", description: "Entertainment & tools" },
   { id: "data", label: "Mobile data", description: "Local network plans" },
-  { id: "gift-cards", label: "Gift cards", description: "Pryva wallet credit" },
   { id: "tools", label: "Order tools", description: "Bulk & scheduled orders" },
 ] as const;
 
@@ -26,7 +25,7 @@ export type ExplorerCategory = (typeof EXPLORER_CATEGORIES)[number]["id"];
 export type ExplorerFilter = ExplorerCategory | "all";
 export type ExplorerArtwork =
   | { kind: "brand"; name: BrandSlug | "disney-plus" }
-  | { kind: "service"; name: "numbers" | "esim" | "proxies" | "email-otp" | "accounts" | "gift-cards" | "bulk" | "scheduled" }
+  | { kind: "service"; name: "numbers" | "esim" | "proxies" | "email-otp" | "accounts" | "bulk" | "scheduled" }
   | { kind: "network"; name: AirtimeProvider };
 export type ExplorerItem = {
   id: string;
@@ -273,12 +272,6 @@ function additionalItems(country: ExplorerCountry): ExplorerItem[] {
       description: "Browse live listings", tag: "Digital accounts", artwork: { kind: "service", name: "accounts" },
       source: "catalog", coverage: "unconfirmed", stock: null, myUnits: null, price: null,
       action: { label: "Browse accounts", href: "/dashboard/accounts" },
-    },
-    {
-      id: "gift-cards", category: "gift-cards", name: "Pryva gift cards",
-      description: "Share Pryva wallet credit", tag: "Wallet credit", artwork: { kind: "service", name: "gift-cards" },
-      source: "catalog", coverage: "not-country-specific", stock: null, myUnits: null, price: null,
-      action: { label: "View gift cards", href: "/dashboard/gift-cards" },
     },
     {
       id: "bulk-orders", category: "tools", name: "Bulk orders",

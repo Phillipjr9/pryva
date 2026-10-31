@@ -1,0 +1,1422 @@
+# Pryva — verified status review
+
+**Date:** 31 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** the twenty-third pass, §31
+**Method:** every claim below was read out of the code or produced by running the project. Nothing is taken from `PLAN.md` without checking it first — and several `PLAN.md` entries turned out to be stale (section 4).
+
+---
+
+## 0. Health check (run in this checkout)
+
+| Check | Result |
+|---|---|
+| `npm ci` | clean install, 534 packages |
+| `npm run typecheck` | **0 errors** |
+| `npm run lint` | **0 warnings/errors** |
+| `npm test` | **1,120 tests / 123 files, all passing** (no `.skip`, no `.only`) |
+| `npm run build` | **passes**; 75 API route handlers, 23 public pages, 17 dashboard pages, 12 admin pages |
+| Boot with no `DATABASE_URL` | `npm start` → `/api/health` = `{"status":"healthy","mode":"preview"}`; `/`, `/pricing`, `/status`, `/accounts` = 200; `/dashboard` = 307 (auth redirect) |
+
+Codebase size: ~52,600 lines under `src/`, 101 modules in `src/lib/`, 23 database tables, 17 migrations (`0000`–`0016`).
+Migration coverage is complete — every table in `src/db/schema.ts` is created by a migration.
+
+**Summary in one line:** the engineering is in better shape than the planning docs suggest; the real gaps are (a) product surface that was never built, (b) operations/deployment wiring, and (c) documentation that no longer matches the code.
+
+---
+
+## 1. What can actually serve a paying customer today
+
+| Capability | State | Gate / caveat |
+|---|---|---|
+| Paystack wallet top-up | **Live** | `PAYSTACK_SECRET_KEY` + `NEXT_PUBLIC_APP_URL`; signed webhook + browser verify, single credit |
+| Withdrawals | **Partly live** | request → admin approve → **manual** completion. No `transfer.success/failed` settlement (README says so; no handler exists) |
+| Virtual numbers / rentals | **Live for 10 of 37 plans** | `FULFILMENT_MAP` in `src/lib/fulfillment.ts`; needs the number provider key + margin floor |
+| Accounts marketplace | **Wired, currently empty** | `BULKACC_API_KEY`; production `/api/accounts/categories` returns only an empty "Streaming" category (suspected unfunded supplier balance) |
+| Gift cards | **Live** | minted internally from the buyer's wallet (`PRYVA-` codes), no supplier needed |
+| Social boosting | **Live once a panel is configured** | `SMM_PANEL_API_KEY` + `SMM_PANEL_API_URL` + a price (`SMM_MARKUP_PERCENT`, and `SMM_USD_NGN_RATE` for a USD panel). Wallet debit → one supplier order → auto-refund on refusal. §32 |
+| Free disposable inbox | **Built** | migration `0013`, `POST /api/inbox`, `/api/inbox/poll`, `/api/inbox/discard`, `/dashboard/inbox`. The paid tier is not built |
+| Transactional email | **Built, poorly scheduled** | `wallet_email_outbox` + Resend + cron; `vercel.json` runs it **once a day** while README requires ~once a minute |
+| Admin console | **Live** | 10 pages; every `/api/admin/*` handler goes through `authorizeAdminApi()` |
+
+### Demo-only or deliberately disabled
+eSIM, proxies, digital subscriptions, airtime/data, bulk orders, scheduled orders, and all live supplier purchases outside the allowlist. Their routes return an actionable 503 or simulate in the preview database. The automatic-refund and scheduled-order crons **refuse a persistent database**, so they do nothing in production.
+
+---
+
+## 2. Not built at all (verified absent — zero hits in `src/`)
+
+| # | Feature | Notes |
+|---|---|---|
+| 1 | **Referral program** | no codes, tables, routes or pages |
+| 2 | **Wishlist / saved listings** | nothing |
+| 3 | ~~**Reviews & ratings**~~ | **Built in the eighth pass** — verified-purchase reviews, published only after moderation; `/testimonials` remains curated copy and says so |
+| 4 | **Coupons / discount codes** | only supplier promo codes on the marketplace; no Pryva coupon system |
+| 5 | **Support tickets** | `/dashboard/support` + `/admin/messages` handle flat `contact_messages`; no threads, priorities or SLA |
+| 6 | ~~**Two-factor authentication**~~ | **Built in the fourth pass** — TOTP enrolment, recovery codes and a two-step sign-in; migration `0015` |
+| 7 | **SMS / WhatsApp notifications** | nothing (no Termii/Twilio/WhatsApp client) |
+| 8 | ~~**PWA**~~ | **Built in the sixth pass** — web manifest, installable icons, offline page and a deliberately narrow service worker |
+| 9 | **Product analytics / Web Vitals** | nothing — no GA4, no `@vercel/analytics`, no `web-vitals` |
+| 10 | ~~**Admin audit log**~~ | **Built in the second pass** — `admin_audit_log` (migration `0014`), `/admin/audit`, `GET /api/admin/audit` |
+| 11 | ~~**Admin reconciliation view**~~ | **Built in the third pass** — `/admin/reconciliation` lists in-flight withdrawals, orders with an unknown supplier outcome, refunded-but-not-released orders and stale pending deposits, oldest first |
+| 12 | **Paid inbox tier** | schema supports `tier='paid'`, the code only issues `free`; price needs the supplier's real `priceNgn` |
+| 13 | ~~**CSP**~~ | **Added in the fifth pass** — `src/lib/security-headers.ts`, served by the proxy, with the asset hosts pinned by a test |
+| 14 | **Dockerfile** | CI (`.github/workflows/ci.yml`) and an operations runbook (`RUNBOOK.md`) were added in these passes; no Dockerfile — deployment is Vercel-only |
+| 15 | ~~**Gift-card explainer page**~~ | **Built in the seventh pass** — `/gift-cards`, generated from the same rule constants the checkout enforces |
+| 16 | **Self-service account deletion** | deliberately returns 503; panel points at support |
+
+Rough sizing: 1, 2 and 4 are S–M; 5, 10, 11, 13 are M; 7 is M; 9 is S.
+
+---
+
+## 3. Built but incomplete
+
+| Area | What exists | What is missing |
+|---|---|---|
+| Marketplace inventory | 3-lane routing (`p1`/`p2`/`p3`), pricing engine, checkout, manual fulfilment queue | **No products coming back from the supplier** — the catalog is connected and empty. This is the biggest revenue blocker and probably an account-balance problem |
+| Withdrawal settlement | approve + manual complete, idempotency, name-match rule | no Paystack `transfer.*` webhook handling; no merchant OTP finalisation. Every payout needs an operator |
+| Live fulfilment | number/rental allowlist, margin guard, compensation cancel | eSIM, proxies, subscriptions, airtime and data have **no live provider mapping at all** |
+| Crons | 3 routes, all secret-gated | only 2 are scheduled in `vercel.json`; `scheduled-orders` is never invoked; the email worker is daily, not minutely |
+| Email verification | tokens, `/verify-email`, resend, admin requires a verified address | not enforced for ordinary password signups (README:92 admits this) |
+| Demo ↔ live parity | large simulated demo | demo behaviour diverges from live in refunds, scheduled runs and marketplace |
+
+---
+
+## 4. Needs correcting (documentation and configuration drift)
+
+These are wrong *today*, not feature requests.
+
+1. ✅ **`README.md:167` contradicted the shipped code.** *(fixed — the paragraph now says numbers/rentals run for the ten allowlisted plans when the provider is configured, and only the genuinely disabled categories are listed as disabled)* It says "Live virtual-number, email, eSIM, proxy, digital/data, airtime, bulk and scheduled purchases are disabled", but `src/lib/fulfillment.ts` implements live number/rental purchases for 10 plans, `/pricing` sells them, and `/status` advertises "Automatic · 10 of 12". Either the README is stale or that purchase path is unintended — this needs a decision, because both readings are defensible from the repo.
+
+2. 🟡 **`PLAN.md`'s backlog is stale and will mislead the next session.** *(a warning now sits above §0 pointing at this file; the tables themselves are **not** rewritten)* It still marks as missing: README, the refund/cookie policies, the settings data-export UI, admin user/order/refund/message/margin pages, admin role gating, and the disposable inbox — all of which now exist. It also claims (#15) that `transfer.success/failed` webhooks settle or refund withdrawals; there is no such handler and the README correctly says there isn't.
+
+3. ✅ **`/status` rendered a hardcoded false row.** *(fixed — gift cards now have their own Available row, and the remaining categories say "preview only, no verified live fulfilment"; a test pins it)* `src/app/(site)/status/page.tsx:70` prints *"Digital subscriptions, gift cards, data, bulk and scheduled orders — Not available"*, but gift cards work and are sold. Same class of bug as the "Number fulfillment: Paused" literal that was already fixed once.
+
+4. ⬜ **Cron scheduling is incomplete and mismatched.** *(not touched — needs your call on plan/tier and whether these jobs should run live at all)* `vercel.json` lists only `wallet-emails` (daily 03:10) and `auto-refund` (daily 03:40).
+   - **Correction to the first version of this report:** `scheduled-orders` is *deliberately* absent. It exports only `POST`, while Vercel Cron issues `GET`, so scheduling it would register a job that is answered `405` forever. `src/test/cron-schedule.test.ts` pins exactly that, plus the Hobby plan's two-job daily limit.
+   - The real gap is that live scheduled fulfilment and live automatic refunds are disabled anyway (both routes refuse a persistent database), so no schedule would help until that changes.
+   - The wallet-email outbox README requires a **per-minute** scheduler and a 23-hour cutoff; a daily run cannot meet it. Moving it needs Pro or an external scheduler — your call.
+
+5. ✅ **`DIAGNOSTICS_SECRET` was missing from `.env.example`** *(added, with a note on why it is separate from `CRON_SECRET`)* although `src` reads it and README documents it. A new deployment cannot discover the variable from the template.
+
+6. ✅ **Package identity was still the template.** *(renamed to `pryva`)*
+
+7. ✅ **Two Drizzle configs.** *(the `.json` with its hardcoded `postgresql://postgres:postgres@127.0.0.1:5432/app_db` is deleted; the `.ts` comment no longer claims 12 tables)*
+
+8. **The repository is public and contains wholesale cost data.** `data/cost-sheet.json`, `data/manual-catalog.json` and the sourcing notes are readable by anyone. README warns about it; nobody has acted on it.
+
+9. **Preview deployments still read and write the production database.** `PGHOST`/`PGUSER`/… target `preview` and `production`; the migration *build step* is gated on `VERCEL_ENV`, but runtime data access is not. Recorded as the owner's call in `PLAN.md`.
+
+10. 🟡 **Deployment wiring is half in the repo.** *(partly fixed — `.github/workflows/ci.yml` now exists and `RUNBOOK.md` documents the build command, migration gate and env scoping; the workflow has never run because GitHub Actions is blocked on this account's billing, so treat CI as unproven)* Env scoping and the cron cadence still live only in the Vercel dashboard, and a fresh clone cannot see which environment variables are scoped to which environment.
+
+---
+
+## 5. Open pull requests worth deciding on
+
+| PR | Title | State |
+|---|---|---|
+| **#17** | *Run the checks on every change, and make one of them able to fail* | **Open, now superseded** — its two substantive changes (CI workflow, `pricing:audit` exit code) were ported into this branch directly. Close it, or rebase if its extra bundle-scanning step is still wanted |
+| **#34** | *Record that the probe is blocked by egress, not by the credential* | Open — docs only; records that this sandbox cannot reach production |
+| **#8** | *Payment flow design: paying overlay, receipt, funding receipt and money motion* | Open since 27 Oct — likely superseded; close or rebase |
+
+---
+
+## 6. Dependencies worth updating
+
+`npm outdated` (majors available): **TypeScript 5.9 → 7.0**, **ESLint 9 → 10**, **Vitest 4 → 5**, **jsdom 26 → 30**, **dotenv 17 → 18**, **Tailwind 4.1 → 4.3**, `@types/node` 22 → 26. Minor/patch: `react` 19.2.6 → 19.3.1, `pg` 8.20 → 8.23, `drizzle-orm` 0.45.2 → 0.45.4.
+These are healthy upgrades to schedule, not emergencies. Pin them behind the CI in PR #17 rather than doing them blind.
+
+---
+
+## 7. Blocked on you, not on code
+
+1. **Account-supplier balance.** The feed is connected and returns zero products. Until that account can serve a catalog, the marketplace is a storefront with empty shelves.
+2. **Are live number purchases on or off?** Answering this resolves item 4.1 and lets the README, `/status` and `/pricing` agree.
+3. **Paid inbox price.** It must be derived from the supplier's real per-inbox cost through the existing 30–50% band; the standing rule is not to guess pricing.
+4. **Email domain / Resend sender**, then decide whether signup must verify ownership before spending.
+5. **Make the repository private**, or move the cost sheets out of it, before launch.
+6. **Preview database isolation** — whether PR previews may keep touching production data.
+7. **Switch the support assistant's prose model on?** It is off and the assistant
+   works without it. Turning it on (`AI_SUPPORT_MODEL_ENABLED=true` + a key) sends
+   the drafted reply — the customer's own words and their amounts, never the
+   account — to the provider you name. Your call on the privacy and the cost, not
+   an engineering one.
+
+---
+
+## 8. Recommended order
+
+1. ~~Merge PR #17 / add CI.~~ **Done in this pass** — the workflow is in the branch and the price gate now fails correctly.
+2. ~~Make the truth surfaces agree.~~ **Done for README and `/status`**; the `PLAN.md` tables still need a proper rewrite, and the "are numbers live?" question is now answered by the documentation rather than left ambiguous.
+3. 🟡 **Fix operations** — the scheduled-orders mystery is resolved (it cannot be scheduled as written); still open: the email worker's cadence, and whether transfer webhooks will ever settle withdrawals or operators always will.
+4. 🟡 **Finish the money loop** — the admin audit log and the reconciliation view are done; still open: reconcile the supplier balance and enforce email verification on signup.
+5. 🟢 **Then growth features** — referrals, coupons, wishlist, analytics. 2FA, the PWA, the CSP and verified-purchase reviews are built (sections 12–16). What remains is additive; none of it unblocks revenue the way 1–4 do — and referrals and coupons need your reward figures before they can be written.
+
+---
+
+## 9. What changed in this pass (30 Oct 2026, branch `arena/0c5fc242-pryva`)
+
+| Change | Why |
+|---|---|
+| `README.md:167` rewritten | It said live number purchases were disabled; the code, `/pricing` and `/status` all said otherwise. The paragraph now describes what the code does: live numbers/rentals for the ten allowlisted plans when the provider is configured, free inbox live, and only eSIM/proxy/digital/data/airtime/bulk/scheduled still disabled |
+| `/status` gift-card row fixed **and tested** | The page told visitors gift cards were unavailable while the dashboard sold them. Gift cards now have their own `Available` row; the rest say "preview only". Sabotage-proven: restoring the old row fails the new test |
+| `scripts/build-prices.mjs` exit fix | `pricing:audit -- --check` printed `1 OUT OF BAND` and still exited **0** — a gate that could never fail. Now exits 1. Verified both directions with a temporary out-of-band cost and a byte-identical restore |
+| `.github/workflows/ci.yml` added | Typecheck → lint → profit-band check → tests → production build on every PR and push to `main`. No secrets needed |
+| `DIAGNOSTICS_SECRET` added to `.env.example` | The variable is read by `src` and documented in the README, but a new deployment could not discover it from the template |
+| `package.json` renamed to `pryva` | It was still the template name |
+| `drizzle.config.json` deleted, comment corrected | Duplicate config with a hardcoded localhost credential; the surviving `.ts` comment claimed 12 tables when there are 17 |
+| `PLAN.md` staleness warning | §2 still marks ~10 shipped items as missing and wrongly credits transfer webhooks. The tables are left intact deliberately — rewriting 66 KB of history is a separate job — but no future session should read them as current |
+| `STATUS.md` added | This file: the verified snapshot everything above is measured against |
+
+**Verified after the changes:** `typecheck` 0 errors · `lint` clean · **844/844 tests** · `build` passes · `pricing:audit -- --check` exits 0 in band and 1 when sabotaged.
+
+**Still open from §4:** cron scheduling (#4), the public repo exposing cost sheets (#8), preview/production database sharing (#9), and deployment wiring living only in the Vercel dashboard (#10).
+
+---
+
+---
+
+## 10. Second pass — the admin audit trail (30 Oct 2026)
+
+The first pass found that privileged actions left a line in the application log and nothing durable in the database. That is now built.
+
+| Piece | Detail |
+|---|---|
+| Migration `0014_admin_audit_log.sql` | `admin_audit_log`: actor id **and** a snapshotted email, dotted action verb, target type/id, a redacted summary, timestamp. Append-only; indices on time, actor and target |
+| `src/lib/admin-audit.ts` | `recordAdminAction()`. Best-effort by design: it returns `false` and logs loudly when the insert fails rather than throwing, because it runs *after* money has already moved — a failed audit write must not make a committed refund look retryable. The wallet ledger remains the authoritative financial record; the file says so |
+| Wired into | refunds (`order.refund`), withdrawal approve/reject/complete, fulfilment deliver/unsourceable, admin wallet credit/debit, support message status |
+| Surfaces | `/admin/audit` page with action filters, search and pagination; `GET /api/admin/audit` (read-only, admin-gated); "Audit" in the admin nav |
+| Secrecy | The delivery summary records the **item count**, never the credentials — pinned by a test that fails if `credentials` is interpolated. Support message bodies are never copied |
+
+**Verified:** 855 tests / 95 files · typecheck · lint · build. Sabotage-proven three ways: rethrowing from `recordAdminAction` fails two tests, interpolating credentials into the summary fails the secrecy guard, and removing an audit call is caught by the static route scan.
+
+**Also in this pass:** `RUNBOOK.md` — the operations document that did not exist. It covers the deploy/migration gate, secret rotation, what each cron does (and why one is deliberately unscheduled), withdrawal and refund reconciliation, incident playbooks and the guards that must not be deleted.
+
+**Fixture lesson:** adding a migration makes four PGlite fixtures fail on purpose — `withdrawal-name-check.test.ts` asserts every fixture replays every migration. They now include `0014`, and the manual migration list in `migrations/README.md` was replaced with a glob so it cannot fall behind the directory again.
+
+---
+
+---
+
+## 11. Third pass — the reconciliation queue
+
+The money loop had one gap left that a coder could close: nothing showed an operator **what was still unresolved**, only what had already happened.
+
+`/admin/reconciliation` (nav: Reconciliation) is read-only and separates four classes, because the action differs:
+
+| Class | Why it is here |
+|---|---|
+| Withdrawals in `processing` | the transfer may already have left; rejecting would refund a payout that could still arrive |
+| Orders in `processing` / `review` | supplier outcome unknown, or unsourceable and awaiting a refund decision |
+| Refunded orders carrying a reconciliation note | customer credited but the upstream unit may still be live — exposure, not a task to close |
+| Deposits `pending` for over an hour | an abandoned checkout and an unconfirmed payment look identical; only Paystack distinguishes them |
+
+Ages are bucketed (`fresh` under an hour, `watch` under a day, `urgent` beyond) with the count older than a day in the header. Bank **account numbers are never selected**, and no supplier is named — the operator gets the reference to reconcile with, which is what the job needs.
+
+`src/lib/reconciliation-queue.ts` holds the age arithmetic: a future timestamp clamps to zero instead of sorting above older items, and an unparseable date counts as new instead of becoming `NaN`, which would compare false against every threshold and hide the row.
+
+**Verified:** 861 tests / 97 files · typecheck · lint · build. The page test seeds one row of each class and asserts they render, that the age appears, that `0123456789` does **not**, and that the page says nothing resolves itself — sabotage-proven by rendering the account number, which fails the test.
+
+---
+
+### How this was verified
+
+```sh
+npm ci && npm run typecheck && npm run lint && npm test && npm run build
+PORT=3000 npm start   # then curl /, /api/health, /status, /pricing, /accounts, /dashboard
+grep -rni "referral|wishlist|coupon|totp|termii|whatsapp|manifest|gtag|audit_log" src
+find src/app/api/admin -name route.ts; cat vercel.json; cat next.config.ts
+```
+
+Feature claims marked "absent" mean zero matching code in `src/`; "built" means the file was read, not that a live third-party call was made. No live supplier, Paystack or Resend credentials are present in this environment, so nothing here proves a third-party integration works — only that the code path exists.
+
+---
+
+## 12. Fourth pass — two-factor authentication (30 Oct 2026)
+
+**What was wrong.** `/dashboard/security` told customers 2FA was "not available yet" and not to rely on it, and sign-in issued a session on the password alone. On an app that holds customer wallets, that was the last self-service security gap. It is now closed.
+
+| Piece | File | Behaviour |
+|---|---|---|
+| TOTP | `src/lib/totp.ts` | dependency-free RFC 6238: base32, six-digit codes, ±1 step window, constant-time compare |
+| Enrolment, recovery, challenges | `src/lib/two-factor.ts` | AES-256-GCM secret, ten single-use recovery codes, hashed challenge tokens |
+| Enrol / confirm / disable | `src/app/api/security/2fa/{start,confirm,disable}/route.ts` | session-authenticated; disable needs the password **and** a code |
+| Sign-in second step | `src/app/api/auth/2fa/route.ts` | spends the challenge; shares the login rate-limit bucket |
+| UI | `src/app/dashboard/security/TwoFactorCard.tsx`, `src/components/auth/AuthForm.tsx` | one-time secret + `otpauth` link, recovery list, and the code step at sign-in |
+| Migration | `migrations/0015_two_factor.sql` | `user_two_factor`, `two_factor_recovery_codes`, `two_factor_challenges` |
+
+**The decisions that matter**
+
+- **Fail closed.** `TWO_FACTOR_KEY` (at least 16 characters) encrypts every secret. Without it an account that has 2FA enabled gets a **503 at sign-in and no session** — never a silent downgrade to password-only. Starting enrolment is refused too.
+- **Replay is rejected, not merely windowed.** The accepted time-step is stored (`last_used_step`) and advanced with a conditional update, so the same six digits cannot be used twice inside their 30-second window — including the code used to confirm enrolment.
+- **Challenges are single-use and cheap to revoke.** 32 random bytes go to the browser; only their SHA-256 is stored. Five-minute TTL, five wrong codes kill the challenge, a successful use consumes it with a conditional update.
+- **Recovery is real.** Ten `abcde-fghij` codes, hashed, each spendable exactly once, shown once at confirmation and never again.
+- **A stolen session cannot remove the factor.** Disable requires the password plus a current TOTP code or a recovery code.
+- **No enumeration.** Unknown, expired, consumed and wrong all return one indistinguishable message; an outage returns 503 without spending one of the five attempts.
+
+**The operational consequence:** rotating `TWO_FACTOR_KEY` makes every existing enrolment unreadable. Those accounts are locked out of the second step rather than let in without one — which is the intended failure, and why the runbook has a recovery procedure.
+
+**Verified:** 886 tests / 100 files · typecheck · lint · build. New tests: `src/test/totp.test.ts` (8 — the RFC 6238 published vectors), `src/test/two-factor.test.ts` (14 — fail-closed, replay, single-use recovery, challenge hashing) and `src/test/auth-two-factor-login.test.ts` (3 — a correct password yields a challenge, not a session, and 503 when the server cannot check). Sabotage-proven twice: dropping `rejectUpToStep` and the conditional step advance fails two tests, and disabling the login branch issues a session it should not; both restored, all pass.
+
+**Deliberately not done:** SMS or email one-time codes (an attacker with the password usually has the mailbox too), and an admin "reset 2FA" button. A reset is an audited operator action that needs an owner decision; the runbook describes how to handle a lockout manually in the meantime.
+
+---
+
+## 13. Fifth pass — a content security policy (30 Oct 2026)
+
+The only security header missing from `src/proxy.ts` was the one that constrains where the browser may load anything from. It is now sent on every response:
+
+```
+default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self';
+form-action 'self'; script-src 'self' 'unsafe-inline';
+style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+font-src 'self' data: https://fonts.gstatic.com;
+img-src 'self' data: blob: https://images.pexels.com; connect-src 'self';
+media-src 'self'; worker-src 'self' blob:; manifest-src 'self'; frame-src 'none'
+```
+
+> **Superseded in §22:** the two Google Fonts hosts are gone. The webfonts are self-hosted
+> from `@fontsource` packages, so `style-src` and `font-src` are plain `'self'` now. The rest
+> of the policy below is unchanged.
+
+**What it actually stops.** A third-party origin cannot supply a script, style, font or image unless it is on that list; the page cannot be framed by anyone but itself; forms cannot post off-site; plugins/objects cannot load at all. That closes the "inject a tag from a supplier's error page" class and makes a new external dependency a visible, reviewable change rather than a silent one.
+
+**What it does not stop, stated plainly.** `script-src` still includes `'unsafe-inline'`, so HTML injection that gets past React's escaping would still execute. Next.js emits its own inline bootstrap, the home page emits JSON-LD, and `BuildGuard` installs a stale-bundle check before hydration; a nonce-based policy would force every page to render dynamically and would still need those scripts rewritten to carry the nonce. That is a real follow-up, not a one-line change, and it is recorded here rather than pretended away.
+
+**Environment differences are deliberate and tested.** Development adds `'unsafe-eval'` and `ws:`/`wss:` for hot reload; production has neither. The embedded preview keeps `frame-ancestors *` (and continues to omit `X-Frame-Options`) so the Arena viewer can frame the demo; a real deployment keeps `'self'`. `isEmbeddedPreviewHost` is anchored so `e2b.app.evil.com` does not match.
+
+**Drift is the failure mode, so the tests read the sources.** `src/test/content-security-policy.test.ts` parses the policy and compares it with `layout.tsx` (since §22: that no Google Fonts host is
+linked) and `next.config.ts` (`images.remotePatterns`), so adding an image host in one place and forgetting the other fails locally instead of silently blocking the image in production. It also fails if a form posts off-origin, if a wildcard appears in a script/style/image/font/connect source, or if a directive is emitted empty.
+
+**Verified:** 896 tests / 101 files · typecheck · lint · build. Booted `next start` and checked the real headers on `/`, `/login`, `/pricing` and `/api/health`, and with `Host: 3000-abc.e2b.app` to confirm the preview branch (`frame-ancestors *`, no `X-Frame-Options`). Sabotage-proven: removing the Pexels host and hard-coding `frame-ancestors *` fails three tests; restored, all pass.
+
+---
+
+## 14. Sixth pass — installable app and a careful service worker (30 Oct 2026)
+
+The app can now be installed, and survives a dead connection without pretending to work offline.
+
+| Piece | File | Notes |
+|---|---|---|
+| Manifest | `src/app/manifest.ts` | generated route, so the name and description cannot drift from the metadata; `display: standalone`, cream theme |
+| Icons | `public/icons/*` | 192 and 512 from the existing brand shield, plus a padded 512 `maskable` |
+| Offline page | `src/app/offline/page.tsx` | static, no account data, `noindex` |
+| Service worker | `public/sw.js` | versioned cache; see the rules below |
+| Registration | `src/components/system/ServiceWorkerRegistration.tsx` | production only, two seconds after paint, failure is silent |
+
+**The cache rules are the design.** A service worker outlives the tab and is shared by every profile on the device, so a careless cache is a data leak rather than a performance tweak. It caches exactly two things:
+
+1. the offline fallback page, which contains no account data;
+2. content-hashed `/_next/static/` assets and the app icons.
+
+Navigations are network-first and **never** written to the cache. `/api` is skipped on every method. A failed navigation falls back to `/offline`; a failed asset is returned as-is and not cached, because an error page stored under an asset URL would break the app until the next version bump. The cache is capped at 80 entries and wiped on `VERSION` change.
+
+**No offline money.** There is no background sync, no queued purchase, no push. A wallet that replays a payment after reconnecting is a double-spend risk, so the app simply requires the network to move money — the offline page says so.
+
+**Verified:** 907 tests / 102 files · typecheck · lint · build. New tests execute `public/sw.js` in a Worker sandbox with a fake Cache API rather than grepping it: install precaches only the three files, API/POST/cross-origin requests are not intercepted, a navigation response is never stored, a repeated hashed asset is served without a second fetch, a 500 is not cached, and an older cache version is deleted on activate. The manifest test reads the PNG headers and fails if a declared size no longer matches the file. Sabotage-proven: dropping the method guard and caching navigations each fail a test. Also checked live with `next start`: `/manifest.webmanifest`, `/offline`, `/sw.js` and all three icons return 200 with the manifest linked in the HTML.
+
+---
+
+## 15. Seventh pass — the gift-card explainer page (30 Oct 2026)
+
+Gift cards were live and sold from the dashboard with no page explaining them, so the rules only surfaced at the moment of purchase. `/gift-cards` now exists: how it works in three steps, the six rules in full, what a gift card is *not*, and the questions people actually ask.
+
+**The copy is generated from the code that enforces it.** The amount range and twelve-month validity moved into `src/lib/gift-card-rules.ts`, which the checkout validates against and the page renders. The rules the page states come from `redeemGiftCard` and `refundGiftCard`: one redemption for the whole amount, validity one year, non-refundable, cannot redeem your own card, recipient needs an account, and the recipient email is a record rather than a delivery address — the buyer sends the code themselves.
+
+`src/test/gift-card-page.test.tsx` renders the page and fails if the range stops matching the constants, if the checkout starts hard-coding numbers instead of using them, if the copy stops saying "not refundable" or "one redemption", if it promises to email the code, or if the buy button bypasses `/login?next=…`. Sabotage-proven in both directions: hard-coding the range in `gift-cards.ts` and rewriting the copy to "refundable if unused" each fail a test.
+
+**Also wired:** the page is in the sitemap and linked from the footer's Services column, so it is reachable without typing the URL — the same defect the footer comment already records for the help centre and testimonials.
+
+**Verified:** 913 tests / 103 files · typecheck · lint · build. `next start` checked `/gift-cards` = 200 with the canonical tag, the footer link on `/`, and the sitemap entry. The supplier-secrecy scan covers the new page; an early draft said "no supplier is involved" and was rewritten, because that scan is right that even naming the category tells a customer something.
+
+---
+
+## 16. Eighth pass — verified-purchase reviews (30 Oct 2026)
+
+Customers had no way to record what happened after an order, and the site's only "feedback" was curated marketing copy. Reviews now exist, with three constraints that are structural rather than editorial:
+
+| Rule | Where it lives |
+|---|---|
+| Only the account that bought the order can review it | the order lookup includes `userId`, so someone else's order is indistinguishable from a missing one |
+| Only a `delivered` or `completed` order can be reviewed | `REVIEWABLE_STATUSES`; refunded, cancelled, processing and failed orders are refused |
+| One review per order, enforced by a unique index | `product_reviews_order_id_key`, plus a check before the insert |
+| Nothing is public until an operator publishes it | every review starts `pending`; the public list selects `status = 'published'` only |
+| Every decision is audited | `moderateReview` writes `review.publish` / `review.reject` with the note |
+
+**What is deliberately absent.** No seed data, no imported reviews, no "example" quotes and nothing generated — when there are none, `/reviews` says so in as many words. The public list carries **no customer identity at all**: not a name, not an initial, not a masked email. A wallet is a financial account; a review is not a reason to publish who holds one. Operators see the account in `/admin/reviews`, because judging a review means knowing whose order it came from.
+
+**Where it surfaces.** `/reviews` (public, published only), `/dashboard/reviews` (write one, and see your own status with the reason if it was not published), `/admin/reviews` (queue with waiting / published / not-published / all tabs), plus a footer link and a sitemap entry.
+
+**Moderation policy, documented rather than implied:** publish when the review is about a real experience and contains no contact details, credentials, other people's data or abuse; reject with a note the customer can read. Editing a review's words is not offered, and should not be done in SQL either — the audit trail says what was decided, not what was rewritten.
+
+**Verified:** 942 tests / 106 files · typecheck · lint · build. New tests: the eligibility matrix (another account's order, five non-delivered statuses, duplicate attempt), input bounds, publish/reject with audit, a second decision refused, and two page renders proving the public page shows published reviews only and no identity while the queue shows the account. Sabotage-proven twice: making the public list read pending reviews fails three tests, and dropping the delivery check fails the eligibility test. Migration `0016` applied in all four PGlite fixtures.
+
+---
+
+## 17. Ninth pass — every service shows its own icon (30 Oct 2026)
+
+**The report.** "Under email otp all the services doesn't use their logo icon" — so the whole
+service vocabulary was audited, surface by surface, against what actually renders.
+
+### What the audit found
+
+| Defect | Where | Why it mattered |
+|---|---|---|
+| The service page had **no icon at all** | `/email-otp`, `/esim`, `/proxies`, `/virtual-numbers`, `/gift-cards`; the dashboard sections for inbox, accounts, data, gift cards, bulk and scheduled orders | the cards that link to a service showed its artwork; the page it opened did not, so the two surfaces did not look like the same product |
+| A silent **wrong-logo fallback** | `src/components/ServiceIcon.tsx` — `FALLBACK_IMAGE = "/images/services/virtual-numbers.png"` | any unmapped or misspelt slug drew the **virtual-numbers** artwork, so an e-mail page could show a number icon indefinitely |
+| A silent **wrong-network fallback** | `src/components/NetworkBadge.tsx` — `return <BrandIcon brand="airtel" …>` | every provider without a wordmark entry rendered **Airtel's** logo. Four providers exist today so it never showed; a fifth would have displayed a rival network's mark |
+
+All three are now impossible rather than merely fixed: `ServiceIcon` renders a neutral, named
+tile and logs in development instead of borrowing another service's art, `NetworkBadge` is an
+exhaustive `Record<AirtimeProvider, …>` (a new provider fails typecheck until it has its own
+mark), and the site heroes plus the dashboard headers use the service's own artwork through
+`ServiceTitle`.
+
+### Surface-by-surface result
+
+| Surface | Renders | Verdict |
+|---|---|---|
+| `/` — service cards, quick picker, price rows | `ServiceIcon` (own artwork / real marks) | correct |
+| `/` — platform marquee | `BrandIcon` real marks | correct |
+| `/pricing` — group headings | `ServiceIcon` | correct |
+| `/digital-services` | `ServiceIcon` → real marks (Netflix, Spotify, YouTube, Disney+, ChatGPT, Canva) | correct |
+| `/email-otp`, `/esim`, `/proxies`, `/virtual-numbers`, `/gift-cards` | hero `ServiceIcon` | **added** |
+| `/accounts` | hero `ServiceIcon` **added**; listings use `PlatformBadge` real marks | fixed |
+| `/dashboard`, `/dashboard/services` | `ServiceIcon` / `BrandIcon` / `NetworkBadge` | correct |
+| `/dashboard/{inbox,accounts,data,gift-cards,bulk-orders,scheduled}` | `ServiceTitle` with the section's artwork | **added** |
+| `/dashboard/digital`, `/dashboard/data` | per-service mark; `NetworkBadge` per plan | correct |
+| Dashboard sidebar and bottom tabs | `ServiceIcon size="xs"` | correct |
+| `/admin/*` | service names only; no logo is claimed anywhere | nothing to verify |
+| Transactional email | Pryva's own mark only | deliberate — no third-party logo is reproduced in email |
+
+### Where a real mark does not exist, and what is shown instead
+
+`BRAND_MARKS` holds 36 official marks generated by `scripts/extract-brand-marks.mjs` from
+`simple-icons` (CC0), `@iconify-json/logos` (CC0) and `devicon` (MIT); Pryva's own nine
+catalogue services use nine distinct 3D artwork files. Five brands publish **no mark those sets
+may redistribute**, and both sets were re-checked in this pass: `siDisneyplus` does not exist
+and the `logos` set has no Disney icon. Those five render a wordmark tile in the brand's own
+colours — `WORDMARK_BRANDS` — and a test pins that list to exactly these five, so a brand with a
+real mark can never be painted as a wordmark and a brand without one can never be invented:
+
+| Brand | Why | Shown as |
+|---|---|---|
+| Disney+ | withdrawn from `simple-icons`; absent from the CC0 `logos` set | wordmark tile, `#0E1C6B` gradient |
+| Outlook (Microsoft) | not in either set | wordmark tile, `#0F6CBD` gradient |
+| MTN, Glo, 9mobile | no redistributable logo | wordmark tile in each carrier's own colours (Airtel *does* ship a mark and uses it) |
+
+Nothing here was redrawn by eye or generated with an image model — the header of
+`src/lib/brand-marks.ts` forbids it, and it is the reason this section exists rather than a set
+of invented logos.
+
+**Verified:** 953 tests / 107 files · typecheck · lint · build. New file
+`src/test/service-logos.test.tsx` (11 tests) asserts that each catalogue service resolves to its
+own artwork file and no two share one, that the nine files exist and are byte-distinct, that every
+third-party product resolves to a real mark and never to artwork, that an unknown key draws
+neither (`not-a-service` must not emit `/images/services/`), that all four networks get their own
+badge, that every platform the explorer or the accounts grid can show renders something with an
+accessible name, that the wordmark list is exactly the five brands above, and that each of the
+twelve service surfaces still contains its icon — the last one is a source-level check because
+rendering those pages needs a database. `src/test/logo-removal.test.tsx` keeps its original
+assertions unchanged; Pryva's own catalogue still uses its 3D artwork, which remains the right
+answer now that the audit has established there is no official mark for those services.
+
+---
+
+## 18. Tenth pass — the homepage, deduplicated (30 Oct 2026)
+
+**The report:** services were appearing twice on the homepage. They were appearing up to three
+times, and one of the repeats had a stale price in it.
+
+| Repeat | What was on the page | Now |
+|---|---|---|
+| Quick service picker | numbers, eSIM, proxies and Email OTP as four cards, sitting **directly above** the nine-card grid that contains the same four | removed — the grid is the list |
+| Price list | the same four services again, with the same four `from` prices the cards above already show, and the same icons | removed; the panel keeps only what the cards do not say — which plans are priced inside the dashboard — plus the link to the full list and a new link to `/status` |
+| Accounts platform chips | Facebook, Instagram, TikTok, X as chips, while the platform marquee **40 px below** shows the same marks at the same size | chips removed; the marquee is the strip |
+| Section numbering | `06 / Pricing` was followed by `08 / Questions` — nothing on the page was 07 | `07 / Questions` |
+
+The homepage is now 918 lines (was 1005), 10 sections (was 11), and draws **nine service
+artworks instead of seventeen** — one `ServiceIcon` per catalogue service. The pages it links to
+are unchanged; `/pricing` still carries the full list, so nothing was lost but the repetition.
+
+**What the page still needs — measured, not guessed.** `next.config.ts` sets
+`images.unoptimized: true`, so every service icon is served as its full-size PNG: the nine
+files total **2,197 KB** to fill slots between 32 px and 64 px. The categories artwork adds
+1.2 MB and the flag set 2.3 MB (not used on the homepage). Switching those nine to generated
+64/128 px WebP derivatives would take the same page from ~2.2 MB of icon bytes to roughly 40 KB,
+and it is the largest improvement available on this page — larger than any further copy or
+layout change. It is not done here because it touches `ServiceIcon`, the artwork tests and a
+build step, and belongs in its own pass.
+
+**Verified:** 955 tests / 107 files · typecheck · lint · build. New assertions in
+`src/test/homepage.test.tsx`: each of the nine artwork files appears in exactly one `<img>` on
+the page (sabotage-proven — adding a second `ServiceIcon` fails it with "appears 2 time(s)"), and
+the section eyebrow numbers run 01–07 with no gap. The existing eighteen homepage assertions —
+nine services present, no dashboard link for a signed-out visitor, `₦1,340` from the catalogue,
+no price on a free inbox, the fulfilment-allowlist agreement — all still hold.
+
+---
+
+## 19. Eleventh pass — the artwork stops shipping at full size (30 Oct 2026)
+
+Continuing the homepage assessment from §18, item 1: the icons were the heaviest thing on the
+busiest page.
+
+**Why it was happening.** `next.config.ts` sets `images.unoptimized: true`, so `next/image` hands
+the browser the file it is given. Every service icon is a 512×512 PNG master of 220–270 KB, drawn
+into slots of 20, 32, 48 and 64 px. The nine icons on the homepage came to **2,197 KB** of PNG to
+paint nine thumbnails, and the four category images added another 1.1 MB.
+
+**What changed.** `scripts/build-service-artwork.mjs` (`npm run artwork:build`) writes 64, 128 and
+192 px WebP derivatives next to each master, and `src/lib/service-artwork.ts` builds the `srcSet`.
+`ServiceIcon` and `CategoryIcon` render a plain `<img>` — not `next/image`, which cannot offer a
+`srcSet` when the optimiser is off — with `sizes` set to the slot width, so a 48 px slot on a 2×
+screen takes the 128 px file and nothing larger. The master PNG stays as the `src`, so a browser
+that will not take a WebP still works, and the masters remain the source of truth.
+
+| | Before | After |
+|---|---|---|
+| Nine homepage icons | 2,197 KB (PNG masters) | **6 KB** at 64 px, ~12 KB at 128 px |
+| Every derivative, both folders (39 files) | 3,325 KB of masters | **71 KB** of WebP |
+| Largest single icon request | 270 KB | 3.3 KB |
+
+The derivatives are committed, so a deploy never depends on the script having run. They are
+generated output: regenerate after changing a master, never edit one by hand.
+
+**Verified:** 959 tests / 107 files · typecheck · lint · build. Four new assertions in
+`src/test/service-logos.test.tsx` are on bytes rather than intent, because this regression is
+invisible — the page looks identical at 3,000 KB and at 6 KB: a derivative exists at every width,
+none is over 20 KB, the rendered `<img>` carries `srcSet` + `sizes="48px"` + the PNG fallback, and
+the nine 64 px icons total under 20 KB (sabotage-proven: dropping the `srcSet` fails with
+"expected … to contain 'srcSet='").
+
+### Not done: the hero photo (assessment item 2)
+
+The hero is still `https://images.pexels.com/...`, and it could not be brought in-house from here:
+this sandbox has no outbound access to `images.pexels.com` (`curl` fails at TLS with
+`SSL_ERROR_SYSCALL`), so the file cannot be copied into `public/`. Until it is local, the remote
+host has to stay in both `next.config.ts` (`images.remotePatterns`) and the CSP
+(`img-src https://images.pexels.com`). Two ways to finish it:
+
+1. **Owner drops the original file in** `public/images/hero/` (it is 1080×1260 today) — then I
+   generate 640/1080 WebP copies, point `PHOTOS.hero` at them, and delete both the remote pattern
+   and the CSP allowance. That is the strictly better outcome: no third-party host on the LCP
+   element.
+2. **Authorise a replacement** and I generate one locally — but that replaces a real photograph of
+   a person with a synthetic one, which is a branding decision, not a technical one.
+
+---
+
+## 20. Twelfth pass — the site on a phone (30 Oct 2026)
+
+**The report:** on a phone, the visitor had to adjust the zoom to use the site. That is three
+separate faults, and only the third one is a layout bug.
+
+| Cause | Measured | Fixed by |
+|---|---|---|
+| The small print was genuinely tiny | **369** separate `text-[0.5…0.79rem]` declarations across 72 files, the smallest **9.3 px** — a badge, a table header, a price note | two named steps, `text-micro` and `text-meta`, with a **13 px floor below `sm`**. Desktop keeps the sizes the design was drawn at; a phone never goes below 13 px |
+| iOS zoomed the page itself | `.field` is `0.92rem` = **14.7 px**. Safari zooms the whole page in when a focused control is under 16 px, and does not zoom back out | form controls set to **16 px below `sm`** — the threshold, not a preference |
+| Tables were clipped, not scrollable | six tables in `overflow-hidden` wrappers (admin orders, users, audit, reconciliation; cookie and refund policy), two with `whitespace-nowrap` cells | `overflow-x-auto` plus a `min-w` on each, so the columns scroll instead of disappearing |
+
+**Also corrected while in there:** an explicit `viewport` export (`width=device-width`,
+`initial-scale=1`, `viewport-fit=cover` for the dashboard's bottom tab bar, `colorScheme: "light"`
+so iOS does not draw dark controls on a cream page) — and deliberately **no** `maximum-scale` or
+`user-scalable: no`, because disabling pinch-zoom is how a fix like this usually makes a page
+unusable for the people who need it; `-webkit-text-size-adjust: 100%` so rotating the device does
+not re-inflate the type; `overflow-x: clip` on `html` as a guard against a stray decorative blur
+(`clip`, not `hidden`, so the sticky header and fixed tab bar keep working); the hero call-to-action
+rows wrap instead of overflowing at 320 px; and the wallet's three money columns stack to one on a
+phone, where three columns of truncated currency hid the balance.
+
+**Verified:** 968 tests / 108 files · typecheck · lint · build. New file
+`src/test/mobile-layout.test.tsx` (9 tests): no unprefixed text under 0.8 rem anywhere (only
+`sm:`-prefixed desktop overrides may be small), both steps defined with the 639 px floor, controls
+at 16 px, `overflow-x: clip` and not `hidden`, no `maximumScale`/`userScalable`, no table wrapped in
+`overflow-hidden`, and every table in a scroll container. Sabotage-proven three ways: dropping the
+16 px rule, re-clipping the orders table (fails both table tests), and re-adding one `text-[0.7rem]`
+all fail.
+
+**What this pass could not do:** there is no browser in this environment, so this is verified at the
+source, CSS and served-HTML level — not by looking at a 360 px render. The counts above are real;
+the pixel result is not something I can claim to have seen. A pass on an actual handset is still
+worth doing before calling mobile done.
+
+---
+
+## 21. Thirteenth pass — gift cards are not a service (30 Oct 2026)
+
+**The report:** gift cards should not be part of the categories, because they are not services.
+Correct — nothing is fulfilled and nothing is supplied: a gift card is wallet credit Pryva issues
+itself, the moment it is paid for.
+
+| Where gift cards were a "service" | Now |
+|---|---|
+| `serviceDefinitions` in `catalog.ts` — one of the nine service cards, with `fromPrice`, `unit`, highlights and FAQs | removed from the catalogue; the homepage grid shows **eight** services |
+| `EXPLORER_CATEGORIES` — a "Gift cards · Pryva wallet credit" chip, plus a card in that category | chip and card removed; the dashboard hub no longer offers a gift-cards category |
+| Dashboard sidebar, under **Buy**, pointing at the services hub with `category: "gift-cards"` | links straight to `/dashboard/gift-cards`, still in the sidebar and the command palette |
+| Footer, under **Services** | moved to the product links, beside Pricing |
+| Terms: "…data plans, gift cards, bulk ordering…" | the sentence now lists the services, then says Pryva also issues gift cards that carry wallet credit |
+
+`/gift-cards`, `/dashboard/gift-cards`, the purchase and redeem routes, the email template and the
+sitemap entry are untouched — the product exists and works; only its classification changed. The
+`gift-cards` string stays in `ServiceSlug`, `service-timeouts` and the pricing markup table as an
+internal identifier, which is why old orders and the gift-card rules still typecheck.
+
+**One deliberate exception:** `/status` still lists "Gift cards — Available". That page reports
+*which products can be ordered and delivered* (its own words), not which services exist, and a
+visitor looking for whether gift cards work should not have to guess. Say the word and the row goes.
+
+**Verified:** 969 tests / 108 files · typecheck · lint · build. Assertions moved rather than
+deleted: the homepage test now requires eight service names and asserts gift cards is absent from
+the grid, the explorer test asserts there is no `gift-cards` category and no item, and the
+dashboard-shell test asserts the sidebar has no `category: "gift-cards"` while `/dashboard/gift-cards`
+is still reachable. `/gift-cards` remains in the footer (moved column) and in the sitemap.
+
+---
+
+## 22. Fourteenth pass — fonts on our own origin, and structured data (30 Oct 2026)
+
+Two upgrades, both invisible in a screenshot and measurable in the source of the page.
+
+**1. The webfonts are self-hosted.** `<head>` used to carry two `preconnect` hints and a
+`<link rel="stylesheet" href="https://fonts.googleapis.com/css2?...">` for Plus Jakarta Sans
+and Instrument Serif. That is a third-party request **on the critical path**: the browser
+cannot finish painting until Google answers, and the only reason the Content-Security-Policy
+named `style-src https://fonts.googleapis.com` and `font-src https://fonts.gstatic.com` was
+that stylesheet. Both families ship as npm packages, so `src/app/layout.tsx` now imports the
+eight cuts the design actually uses (`@fontsource/plus-jakarta-sans` 300–800, and
+`@fontsource/instrument-serif` 400 + italic) and the `<link>` tags are gone.
+
+- Files are emitted into `/_next/static/media` with the same hashed, `immutable` caching as
+  every other asset — verified: `Cache-Control: public, max-age=31536000, immutable`,
+  `content-type: font/woff2`.
+- Each `@fontsource` file declares a `unicode-range`, so a browser downloads latin, and
+  latin-ext only when a glyph outside it appears. The naira sign (`U+20A6`) lives in
+  latin-ext (`U+20A0-20AB`), so prices keep the right face instead of falling back.
+- `font-display: swap` is preserved from the packages, so text paints immediately.
+- **The policy narrowed rather than widened:** `style-src 'self' 'unsafe-inline'` and
+  `font-src 'self' data:`. Two hosts left the CSP, and a test now fails if a `<link>` to
+  either host comes back.
+
+**2. Structured data for the publisher, not just the page.** The homepage emitted `FAQPage`
+and nothing else, so a crawler learned the questions but not who was answering them. The root
+layout now emits `Organization` (name, url, logo, description, `areaServed` Nigeria) and
+`WebSite` (`inLanguage: en-NG`, `publisher` by `@id` reference) from `src/lib/structured-data.ts`.
+
+It deliberately claims **nothing Pryva cannot show**: no `aggregateRating`, no `review`, no
+`foundingDate`, no `address`, no `telephone`, no `sameAs`. A rich result won for an invented
+rating is the same lie as a seeded testimonial, in a format crawlers believe — a test pins
+each of those keys as absent. The serializer escapes `<`/`>` so a string can never close its
+own `<script>` block.
+
+**Verified:** 976 tests / 109 files · typecheck · lint · build. Served HTML checked directly:
+no third-party host in `<head>`, two JSON-LD blocks (`Organization` + `WebSite`, plus the
+homepage's `FAQPage`), 8 self-hosted `@font-face` families in the emitted CSS, no
+`fonts.googleapis`/`fonts.gstatic` anywhere in it, and the CSP header narrowed as above.
+HTML weight unchanged at 55 KB gzipped.
+
+---
+
+## 23. Fifteenth pass — the security and money-operations request (30 Oct 2026)
+
+Seven things were asked for. Six are done and one needs an answer from the owner
+(§23.8). Every claim below is enforced by code or a test, not by intent.
+
+### 23.1 Temporary inboxes cannot create an account
+
+`src/lib/disposable-domains.ts` refuses ~150 providers at signup, matched on the
+domain and any subdomain of it, before the row is created — so the answer never
+reveals whether an address has been tried before. The refusal explains itself:
+a deleted inbox takes the verification link, receipts and every password reset
+with it. Deliberately conservative — gmail, outlook, yahoo, icloud, proton, zoho,
+gmx, yandex, aol and ordinary company domains are untouched, and a test pins that
+list. It is a speed bump, and the module says so.
+
+### 23.2 Accounts lock after repeated wrong passwords
+
+8 consecutive failures lock the account for 30 minutes (`migrations/0017`,
+`src/lib/account-lockout.ts`). The counter lives on the account row, so it
+survives a deploy and a second instance — the rate limiter's fixed windows never
+could. The increment and the lock are one atomic `UPDATE`; a locked account is
+refused before the password is compared; the reply is the same `429` +
+`Retry-After` the limiter already uses, so the status cannot be used to learn
+which emails have accounts. A successful sign-in clears the run; a completed
+password reset clears the lock, because proving the mailbox beats a forgotten
+password. The admin user list shows the state, read-only.
+
+### 23.3 Terms rewritten to match the product
+
+Fifteen dated, anchored clauses replacing eleven generic paragraphs that predated
+gift cards, 2FA, lockout, verified reviews, withdrawals and the switched-off
+products. It rendered in `prose` classes from a typography plugin this build does
+not load, so it was unstyled body text — that is gone too. It claims no
+registration number, no address and no delivery guarantee, and a test keeps the
+limitations stated.
+
+### 23.4 Backups, and a drill that has to be run
+
+Two copies, because they fail differently: the provider's PITR covers every
+write; `npm run db:backup` writes a verified logical snapshot (manifest + one line
+per table, SHA-256 per table) that survives the provider. The archive is data
+only — the schema is replayed from `migrations/`. `npm run db:restore` orders
+tables parents-first from the foreign keys recorded in the manifest, runs in one
+transaction, verifies every checksum before writing a row, and refuses three
+ways: no `--confirm-restore`, a non-empty target, or the live database. The
+backup verifies the file before pruning anything older. RUNBOOK §8a has the
+drill, and its log starts empty **because it has not been run yet**.
+
+### 23.5 A security pass that found three real things
+
+`SECURITY.md` is the audit: threat model, controls by file, known gaps, and the
+operator checklist for the things code cannot do. It opens with "no system is
+unhackable" because that is true.
+
+Found and fixed:
+* **administrators were not required to have 2FA** while being able to approve
+  withdrawals and issue refunds — now enforced on admin pages *and* admin APIs,
+  with `ADMIN_2FA_REQUIRED=false` as the documented recovery hatch;
+* **`zod < 4.6.6`** reachable through `@vercel/functions → @vercel/oidc →
+  @vercel/cli-config` (GHSA-mrhx-c7xc-m3w5) — pinned by an `overrides` entry;
+  `npm audit --omit=dev` now reports **0 vulnerabilities**, and CI fails on a high
+  advisory;
+* **no CI gate on advisories at all** — added to `ci.yml` with `--audit-level=high`
+  on production dependencies only.
+
+`public/.well-known/security.txt` publishes the contact, with an expiry a test
+keeps in the future.
+
+### 23.6 Each transaction tracked, and a daily close
+
+`/admin/transactions` lists every wallet movement with its account, running
+balance and reference — read-only, because a ledger you can edit is not a ledger.
+The nightly job (`/api/cron/nightly`, 02:20 Lagos) writes a `reconciliation_runs`
+row per day with the day's deposits, spend, refunds, gift cards and withdrawals,
+and checks the ledger invariant for **every** account: each `balance_after` must
+follow from the previous one (debits down, credits and refunds up), and the last
+must equal `users.wallet_balance`. A break marks the day `attention` and lists the
+accounts with the difference. The row is written as `running` before the work, so
+a crash leaves evidence rather than nothing, and a re-run corrects the same day.
+
+Vercel's Hobby plan allows two cron entries and this app needs three tasks, so
+they are one job with a defined order: close the books, drain the email outbox,
+then sweep refunds. Each step is isolated.
+
+### 23.7 What was deliberately not automated
+
+The **external** side of reconciliation. Comparing our deposits with Paystack's
+settled total is an operator step, and both the admin page and the runbook say so
+rather than implying a check that never ran. Same for SPF/DKIM/DMARC, PITR and the
+WAF: they are DNS records, provider settings and money, not code.
+
+### 23.8 Social platforms, shown without pretending
+
+TikTok and X are in the footer now, with real brand marks from `BRAND_MARKS`
+(the extractor's marks, never drawn by hand). The profiles do not exist yet, so
+each link goes to the platform's own home page and its label — the tooltip and
+what a screen reader hears — says "Pryva on X — profile coming soon". That is the
+compromise the owner chose over an icon that points nowhere or a link to a 404.
+
+`src/lib/social.ts` holds the whole decision: `profileUrl` is the real account and
+is `null` today; `socialHref` and `socialIsPlaceholder` read it; the footer renders
+through them. Setting one field switches a placeholder to a real link with no
+other edit, and the module's comment says so.
+
+**Verified:** 1,067 tests / 117 files · typecheck · lint · build · `npm audit`
+clean for production dependencies.
+
+---
+
+## 24. Sixteenth pass — security is part of settings (30 Oct 2026)
+
+**The correction.** "Security should be under settings on user profile, they can't be
+separate." It was right, and not only cosmetically: password, two-factor and
+sessions are three properties of one account, and the app had them on two sibling
+pages that both sounded correct. A customer who wanted to turn on two-factor went
+to Settings — the page that already held the password field — and found no mention
+of it. The separate page also made the two halves disagree about what "Settings"
+meant.
+
+**What is there now.** `/dashboard/settings` is the whole account page, in one
+scroll: the `?require=2fa` explanation (when the administrator area has just
+refused someone), the profile and password form, then `#security` — the two-factor
+card, the active-sessions card, what we do on our side and the habits section that
+used to be the separate page's only other content. `src/app/dashboard/settings/
+SecuritySection.tsx` reads the 2FA state itself and is a server component, so the
+client cards kept their boundaries; `TwoFactorCard` and `SessionsCard` moved with
+`git mv`, not copied, so there is one implementation of each.
+
+**What did not change.** Every link that already pointed at the old address still
+arrives: `src/app/dashboard/security/page.tsx` is now a redirect to
+`/dashboard/settings` **carrying the query string and the `#security` anchor**
+forward. That matters for the case that is easy to miss — an administrator
+without 2FA is bounced out of `/admin/*` to `?require=2fa&next=…`, so a plain
+redirect would drop the explanation and land them on a page that looks unrelated
+to what just happened. Command palette entry renamed to "Security settings" and
+pointed at the section; the sidebar has **Settings** and no Security row; the
+terms page links to the anchor; `src/lib/auth.ts` bounces to the section directly.
+
+**Tests.** `src/test/legacy-redirects.test.ts` (new, 4) covers the forwarding
+helper directly; `src/test/settings-security.test.tsx` (new, 7) pins the shape: the
+section renders on the settings page with `id="security"`, both cards and the
+guidance came across, the sidebar has no security destination, the old route is a
+redirect that keeps the query and the anchor and no longer renders a heading, the
+moved files exist only in their new directory, the admin bounce carries the
+anchor, and the palette points at the section. Three older tests asserted the
+two-page layout and were rewritten rather than deleted: the sidebar list, the
+terms href, and the admin-2FA banner — that banner's text is now read out of the
+settings page.
+
+**Verified:** 1,078 tests / 119 files · typecheck · lint · build. The
+query-forwarding — the part with any logic in it — moved to
+`securityRedirectTarget` in `src/lib/legacy-redirects.ts` and is tested directly
+(empty, the admin bounce, repeated keys, blank values, escaping), because the
+page cannot be exercised over HTTP here: middleware answers `/dashboard/*`
+before the page runs, so an unauthenticated `curl /dashboard/security` gets
+`307 → /login?next=%2Fdashboard` for every dashboard route alike. That is stated
+rather than papered over; the signed-in path is the unit-tested helper plus a
+two-line page.
+
+---
+
+## 25. Seventeenth pass — support that answers, and an assistant with hands (30 Oct 2026)
+
+**The request.** "Fix the support system, and I want AI support that will have engine
+and brain to think just like the way you think — every solution shouldn't come from
+admin only; the AI can also be able to fix whatever problem the user is facing."
+
+**What was there.** A contact form, a list of what you had already sent, and the
+words "response times may vary" where an answer belongs. Messages were stored in
+`contact_messages` and read back on one admin screen with a status dropdown. It was
+one-way, it had no thread, and nothing in it could do anything about a problem.
+
+### 25.1 A real ticket system
+
+Two tables (`migrations/0019`): `support_tickets` (subject, category, status,
+priority, who finished it, the assistant's last confidence) and `support_messages`
+(the thread, and the assistant's reasoning beside its own replies). Status says
+where the ball is — `open`, `waiting_on_customer`, `escalated`, `resolved`,
+`closed` — and a customer writing back reopens the thread instead of starting a
+second one, clearing `resolvedAt` and `handledBy` with it, because a ticket marked
+"resolved by the assistant" with an unanswered complaint on top is worse than no
+status at all.
+
+`contact_messages` is untouched and still serves the public form, which is
+anonymous and one-way by nature. The admin nav now separates them: **Support**
+(the queue) and **Contact form** (the inbox).
+
+### 25.2 The engine — how it thinks
+
+`src/lib/ai-support/engine.ts` is a deterministic loop, and being deterministic is
+the point: the same ticket gets the same answer twice, every step can be shown to
+an operator, and nothing it says can be invented.
+
+1. **read** — which explanation does the wording fit? each pattern scores.
+2. **gather** — what does this account actually look like now?
+3. **think** — score every explanation the brain knows: wording weight × account
+   evidence weight, with the notes kept.
+4. **decide** — act (≥72%), ask one question (40–72%), or hand to a person (<40%).
+   Two explanations within 6 points are not guessed between; it asks.
+5. **act** — run the remedy, if the explanation has one.
+6. **verify** — re-read the account and confirm the fix landed. If it did not, the
+   ticket escalates rather than claiming success.
+7. **conclude** — the reply, and where the ticket now sits.
+
+The evidence rule matters: the **strongest** fact decides and further facts add a
+little. Averaging them meant one decisive fact (an unsettled deposit) was diluted
+by a weak one (an empty wallet) — the assistant would ask a question it could
+already answer.
+
+### 25.3 The brain — what it knows
+
+`src/lib/ai-support/knowledge.ts` holds thirteen playbooks: deposit not credited,
+order not delivered or not working, refund missing, balance looks wrong,
+verification link, sign-in/lockout/two-factor, account-access concern (urgent),
+scheduled-order stop, gift-card redemption, withdrawal not paid, human requested,
+pricing question, acknowledgement — plus an explicit "I don't recognise this".
+
+Each one carries how it sounds, what in the account corroborates it, what the reply
+is, what it can do, when a person must take over, and — where several things on the
+account could be the subject — the one question that settles which.
+
+Two rules are enforced by tests across every reply: **no invented numbers** (a
+pricing question is answered by pointing at the live price, never by quoting one)
+and **no supplier language** (supplier/reseller/vendor/wholesale/upstream/our cost
+never appear on a customer ticket).
+
+### 25.4 The hands — three things it can actually do
+
+* **`recheck_topup`** — the flagship. A customer says "I paid and my wallet is
+  empty"; the engine finds the unsettled deposit, asks Paystack what happened and,
+  only if the provider confirms it, credits the wallet. This moved the checks out
+  of the browser-return route into `src/lib/topup-reconciliation.ts` so there is
+  **one** opinion about what counts as a confirmed payment — the route and the
+  assistant now share it, which is why that route's 52 existing tests still pass
+  unchanged.
+* **`resend_verification`** — one fresh link, rate-limited, only to the account's
+  own address, and refused outright when mail is not configured instead of telling
+  someone to check an inbox nothing was sent to.
+* **`cancel_schedule`** — stops one of the customer's own schedules; the ownership
+  check is in the query.
+
+Deliberately absent, and asserted absent: crediting a wallet by hand, refunds,
+withdrawals, payouts, unlocks, switching off two-factor. Those move money or move
+privilege and stay with a person. `src/test/support-surfaces.test.tsx` fails if the
+actions module ever imports a wallet, refund or payout function.
+
+### 25.5 The optional model
+
+`src/lib/ai-support/model.ts` can rewrite a decided reply for tone. It is **off**
+unless `AI_SUPPORT_MODEL_ENABLED=true` and a key exists; it never decides anything;
+it never sees the account (only the drafted reply); any error, timeout or odd length
+returns `null` and the engine's own wording ships. Escalation replies are never
+re-worded, so the hand-over sentence is exactly the one the engine wrote. Turning it
+on is owner decision 7 in §7 — it sends customer text to a third party, which is a
+judgement call, not an engineering one.
+
+### 25.6 What a person still gets
+
+Escalated tickets arrive with the whole trail: every option considered with its
+percentage and the reasons, what was run, what the verification said. `/admin/support`
+sorts by **least confident first** by default with a toggle, because the doubtful
+tickets are the ones worth opening. `/admin/support/[id]` shows the trace under each
+assistant reply. The customer's own thread shows the replies and never the trace:
+"confidence 91%" is not information a customer can use.
+
+**Verified:** 1,120 tests / 123 files · typecheck · lint · build (new routes:
+`/dashboard/support/[id]`, `/admin/support`, `/admin/support/[id]`,
+`/api/support/tickets[/[id]]`, `/api/admin/support/[id]`). New suites:
+`support-assistant-engine.test.ts` (18 — pure decisions: it fixes what it can,
+refuses to credit an unconfirmed charge, escalates when its own fix does not
+verify, asks instead of picking between two schedules, quotes no price, and never
+says "supplier"), `support-tickets.test.ts` (12 — threads, ownership, reopening,
+and a real end-to-end credit through PGlite that is not repeated on the second
+run), `support-surfaces.test.tsx` (10 — the capability list, the scoping, the admin
+gate and the audit entry) and `support-preview-shim.test.ts` (2 — the same flow
+against the in-memory preview adapter, including that it will not pretend it can
+reach Paystack from there).
+
+---
+
+## 26. Eighteenth pass — Google moves down, and passkeys (31 Oct 2026)
+
+**The request.** "Can you put the google login below the sign in and also add passkey
+login."
+
+### 26.1 Continue with Google, after the form
+
+The sign-in page opened with a full-width Google button above the email field, so the
+first thing a customer was offered was the option most of them would not use. The form
+now comes first, then a divider that says what it is a divider for — "or sign in with" /
+"or sign up with" — and *then* the alternatives.
+
+The anchor keeps its shape — same `href="/api/auth/google?next=…"`, same "Continue with
+Google" text — and now carries Google's own four-colour **G** before the label, taken from
+the same `BRAND_MARKS` table the service pages use and drawn `bare` at 18px. It is never
+`pryva-mark` and never redrawn by hand: `logo-removal.test.tsx` still pins the absence of
+our mark inside that anchor, and now also pins the four Google fill colours and the fact
+that the mark precedes the words. Sign-up keeps Google (with the same mark) and does
+**not** get a passkey button, because a passkey needs an account to belong to before it
+can exist.
+
+### 26.2 Passkeys — what a customer gets
+
+| Where | What |
+|---|---|
+| `/login` | **Sign in with a passkey**, directly under the divider, above Google. No email, no password, no code. |
+| `/dashboard/settings#security` | **Passkeys** — the list, "Add a passkey", and a remove button per entry. It sits with the two-factor and sessions cards, because it is the same account's protection. |
+
+Signing in is two requests: `POST /api/auth/passkey/options` issues a server-known
+challenge, the device signs it, and `POST /api/auth/passkey/verify` checks the
+signature and only then creates the session. Nothing about the account is revealed
+before the signature verifies — the options response names no user, which is what makes
+username-less sign-in possible at all.
+
+A passkey **satisfies the second factor** (it is possession plus a biometric or a device
+PIN, both in one gesture) but it does **not** bypass the account lockout: a locked
+account refuses a passkey exactly as it refuses a password, and a successful passkey
+clears the failure counter the same way a successful password does. Every failure returns
+one generic 401 — wrong credential, unverified assertion, counter that went backwards —
+because telling an attacker which part was wrong is a gift.
+
+### 26.3 The three properties that matter
+
+1. **The challenge is the server's, and is spent once.** `webauthn_challenges` holds it
+   with a purpose (`register` / `authenticate`), a five-minute TTL, and a `consumed_at`
+   that `consumeChallenge` sets with a conditional `UPDATE … WHERE consumed_at IS NULL`.
+   A captured assertion therefore cannot buy a second session, and a registration
+   challenge cannot be replayed as a sign-in because the purpose is part of the clause.
+2. **The relying party is pinned, not inferred.** `WEBAUTHN_ORIGIN` (or
+   `NEXT_PUBLIC_SITE_URL`) wins; the request's own origin is the fallback, accepted only
+   over HTTPS or on localhost. `WEBAUTHN_RP_ID` must be a suffix of that origin, and is
+   refused at configuration time rather than at the browser. When none of this can be
+   satisfied the routes return 503 and **the UI hides the control** — a button that always
+   fails teaches people the feature is broken.
+3. **A failed ceremony returns a reason, never a session.** `finishAuthentication`
+   returns `no-challenge`, `unknown-credential`, `verification-failed` or
+   `counter-regressed`, and the route turns all four into one 401. The counter case is
+   logged as a possible cloned credential but is not described to the caller.
+
+### 26.4 What is stored, and what is not
+
+Only the public key (base64url COSE, text — not `bytea`, so a backup is readable and a
+mistake is visible), the signature counter, the transports, the device type, whether it
+is synced, a human label, and when it was last used. The private key never leaves the
+device; there is no server-side secret that can be stolen to impersonate a customer.
+Ten per account, enforced in the query that starts an enrolment.
+
+### 26.5 Deliberately not done
+
+- **No third-party browser bundle.** `@simplewebauthn/server` is a dependency; the
+  browser half (`src/lib/webauthn-browser.ts`) is ~120 lines of `ArrayBuffer` conversion
+  written here, so the sign-in screen loads nothing extra. A test asserts the absence.
+- **A passkey is never a password reset.** It gets you in; changing the password still
+  needs the current password.
+- **No "skip 2FA" flag.** A passkey is a second factor, not an exemption from one.
+- **No recovery codes for passkeys.** Losing every device leaves the password and the
+  existing 2FA recovery codes; `RUNBOOK.md` §7c says so in as many words.
+
+**Verified:** 1,157 tests / 125 files · typecheck · lint · build (new routes:
+`/api/auth/passkey/options`, `/api/auth/passkey/verify`,
+`/api/security/passkeys`, `/api/security/passkeys/options`,
+`/api/security/passkeys/verify`, `/api/security/passkeys/[id]`). New suites:
+`passkeys.test.ts` (19 — a real PGlite database, the cryptography mocked, because what
+belongs to this app is the orchestration: replay is refused, a registration challenge
+cannot sign anyone in, an expired challenge dies, an unknown credential never reaches the
+verifier, a counter that goes backwards is refused and the stored counter is not moved
+backwards, a foreign device is refused as a duplicate, the eleventh passkey is refused, and
+a delete scoped to another account removes nothing), `passkey-ui.test.tsx` (18 — Google
+after the form on both screens, no passkey on sign-up, the card's empty state, the
+"no HTTPS" explanation instead of a dead button, base64url round-trip, option encoding,
+cancellation-is-not-an-error, and the route guards: same-origin, rate limit, lockout,
+generic 401, session required for enrolment).
+
+---
+
+## 27. Nineteenth pass — refer a friend, and get paid when they buy (31 Oct 2026)
+
+**The request.** "Now what else can you implement more to this project", answered with
+the recommendation that the only growth loop missing was referrals; the owner chose it
+and confirmed the terms: **5% of the invited friend's first order, capped at ₦2,000**.
+
+### 27.1 What a customer gets
+
+| Where | What |
+|---|---|
+| `/dashboard/referrals` | The invite code, the full link, a copy button for each, three counters (friends joined, waiting for a first order, paid to you), the list of invitations with masked addresses and their state, and the rules in plain words. |
+| `/dashboard` sidebar | **Refer & earn**, under *Manage*. Inviting a friend is not a purchase and not a setting. |
+| `/signup?ref=CODE` | The code is carried into the new account, and remembered in a 30-day cookie so a visitor who detours through Google and comes back is still attributed. |
+
+### 27.2 The five rules, and where each one lives
+
+| Rule | Enforced by |
+|---|---|
+| One reward per invited account | `referrals.referee_id` is **UNIQUE** — a second attribution cannot be inserted, whatever the code does |
+| One payout per referral | Settlement claims the row with `UPDATE … WHERE status = 'pending'` **and** writes a UNIQUE ledger reference; the claim and the wallet credit commit in one transaction |
+| Only a delivered order counts | `status IN ('active','delivered') AND refunded_at IS NULL`; a refunded or still-processing order earns nothing |
+| No self-referral | Refused in `attributeReferral`, and a CHECK constraint refuses it in the database too |
+| The reward is the approved number | `REFERRAL_REWARD_PERCENT` (5) and `REFERRAL_REWARD_CAP_NGN` (2,000), clamped, so a typo moves the offer rather than breaking it — and `0` switches the programme off |
+
+The qualifying order is the invited account's **first** delivered order by creation
+time, not its largest: a friend who buys an eSIM and then a car-sized accounts order
+earns on the eSIM, which is what "their first order" means.
+
+### 27.3 When it pays
+
+Two triggers, both idempotent:
+
+* the purchase path, immediately after a delivered order commits — so the reward moves
+  the same minute, and a `.catch()` makes sure it can never fail the purchase;
+* the **nightly** job, because a hand-sourced account order is fulfilled by a person
+  and may only be marked delivered days later. A referral that cannot be settled stays
+  `pending` rather than being dropped.
+
+### 27.4 What is deliberately conservative
+
+- **Wallet credit, not cash.** The reward is spendable on any service. It is not paid
+  out as a withdrawal on its own, which keeps the referral programme out of the payout
+  path entirely.
+- **A masked address for the inviter.** `b•••@example.com` is enough to recognise who
+  joined and not enough to build a list of other people's addresses.
+- **No reward for any refunded or undelivered order**, and no reward if the order is
+  refunded after delivery either — the row no longer matches the qualifying query, and
+  a paid reward is reversed by an operator (see `RUNBOOK.md` §7d).
+- **Terms updated** (§4 *Your wallet*) so the cap, the refund rule and the
+  self-referral exclusion are contractual rather than folklore.
+
+**Verified:** 1,192 tests / 127 files · typecheck · lint · build (new routes:
+`/dashboard/referrals`, `/api/referrals`). New suites: `referrals.test.ts` (24 —
+against a real PGlite database and every migration replayed: the 5%/₦2,000 arithmetic
+and its environment overrides, code minting and normalisation, attribution including
+unknown/self/duplicate codes, the CHECK constraint on self-referral, the cookie
+fallback, settling exactly once, paying nothing for a processing or refunded order,
+applying the cap, paying two inviters their own rewards, settling one invitation
+without touching another, choosing the first delivered order rather than the largest,
+and the dashboard view's masking and totals), `referrals-ui.test.tsx` (11 — the invite
+page's copy, link, states and empty/unavailable cases; the nav entry; the authenticated
+uncached API; `?ref=` reaching the signup form and the cookie; and the code never
+appearing in the sign-up markup).
+
+---
+
+## 28. Twentieth pass — fraud controls (31 Oct 2026)
+
+**The request.** "Now can you strict fraud on my platform."
+
+The platform already had good *money* safety — an idempotent ledger, a nightly
+arithmetic, a reconciliation queue, lockout, 2FA and passkeys. What it had almost
+nothing of was *abuse* safety: a script could have bought forty orders a minute, a
+stolen gift card could have been redeemed until it was empty, a withdrawal could
+have gone to a bank account added eight seconds earlier, and a referral ring could
+have paid itself through fresh accounts. Those are the holes this pass closes.
+
+### 28.1 Three layers, deliberately separate
+
+| Layer | What it is | Where |
+|---|---|---|
+| **Signals** | Where an account was created from — **salted hashes**, never the raw address | `account_signals`, `src/lib/fraud.ts` |
+| **Assessment** | A *score* on a money action, with sentences a person can check | `assessWithdrawal` → `withdrawals.risk_level` / `risk_reasons` |
+| **Ceilings** | Hard limits a script hits | purchases per hour, gift cards per day |
+
+### 28.2 What is actually enforced now
+
+| Control | Threshold | Behaviour |
+|---|---|---|
+| Purchases per hour | 40 per account | 429, "That is a lot of orders in a short time", event logged |
+| Gift-card redemptions per day | 10 per account | 429, "contact support", event logged |
+| Referral between two accounts created on one network | any match | reward **voided** before payment, high-severity event |
+| Withdrawal risk | see below | advisory flag on the row and in the admin queue |
+
+The withdrawal assessment adds a sentence for each fact that is true: the account is
+less than three days old (or a week), the payout account was added in the last 24
+hours, this payout account has never been paid before, the request is almost
+everything the account has ever deposited, three or more withdrawal requests in 24
+hours, and more than three accounts share this network. Three or more of those is
+`high`; one or two is `warn`; none is `low`.
+
+**It does not block anything.** The request keeps its `pending` status, so the
+approval flow that already moves money is untouched — a false positive costs a
+customer a badge on a screen an admin reads, not a refusal. This is stated in the
+column comment, in the API shape and in the admin copy.
+
+### 28.3 Why hashes, and what is not stored
+
+`account_signals.ip_hash` is `sha256(salt + ip)`. A hash is enough to answer the only
+question the platform needs — *did these two accounts arrive from the same place?* —
+and there are only 2^32 IPv4 addresses, so an unsalted hash would be a lookup away
+from the address itself. The salt is `FRAUD_HASH_SALT`; rotating it makes old hashes
+incomparable with new ones, which is a deliberate, documented trade.
+
+Never stored: the raw address, the raw user agent, a location, a device fingerprint,
+or anything that could be joined to another service's data.
+
+### 28.4 The operator's queue
+
+`/admin/security` now opens with **Fraud signals**: newest first, unreviewed by
+default, each row naming the kind, the severity, the account, the amount or
+reference, and the reasons in words — plus **Mark reviewed**, the only write, which
+also records an `admin_audit_log` entry (`fraud.review`). Nothing in the queue acts on
+its own: no automated code reads `fraud_events` back, and nothing in it can move
+money. If a reason is wrong, the bug is in the fact it came from, not in the queue.
+
+### 28.5 What this pass deliberately did not do
+
+- **No blocking on account age or "new device".** Those are the two signals most
+  likely to punish a first-time customer in Nigeria, and an advisory flag gets the
+  same information to an operator without a support ticket.
+- **No automated withdrawals freeze.** The money flow stays the money flow; the
+  operator decides.
+- **No raw IP retention**, so nothing here creates a location history that would
+  later need its own retention policy.
+- **No CAPTCHA and no device fingerprinting** — both were considered and both add a
+  third party or a tracking surface for a problem the ceilings already bound.
+
+### 28.6 The alert has a design of its own
+
+The queue only helps if somebody is looking at it. High-severity signals now also
+send an operator email — and that email is built in the same shell as every customer
+receipt (gradient bar, 600px card, DM Sans and Manrope, a dark CTA) rather than as a
+bare log line, because the person reading it may be on a phone at midnight.
+
+It has its **own 3D hero**, `public/images/email/hero-fraud.jpg` — a glossy violet
+shield with an amber alert badge, rendered in the same lavender studio style as the
+seven receipt heroes rather than reusing the wallet or the parcel. A test pins the
+image path so a future template edit cannot quietly fall back to a receipt image.
+
+| Decision | Why |
+|---|---|
+| Only `high` is emailed | `warn` and `info` stay in the queue. An inbox that fires on a two-reason withdrawal stops being read, which is the same as no alert |
+| One alert per account and signal per 30 minutes | a script that trips a ceiling forty times must not send forty emails; the queue holds the rest |
+| Recipients come from `FRAUD_ALERT_EMAIL`, falling back to `ADMIN_EMAILS` | a shared security inbox may not be an admin login; a deployment with only `ADMIN_EMAILS` still gets alerts. Junk entries are dropped and the list is capped at five |
+| The customer is never mailed about a signal | the reasons are an internal opinion, not a finding, and the withdrawal itself is untouched |
+| Sent after the row is committed, with a 5s timeout, failures swallowed | a mail outage must not turn into a failed withdrawal, purchase or referral — the same rule `recordFraudEvent` already followed |
+
+Nothing in the email is a threshold, a hash or a network address: it carries the
+signal name, the severity, the account, the amount or reference, and the reasons in
+words, plus a link straight to `/admin/security`. Values that come from data are
+HTML-escaped.
+
+**Verified:** 1,241 tests / 130 files · typecheck · lint · build (new route:
+`/api/admin/security/fraud`). New suites: `fraud.test.ts` (19 — hashing is one-way,
+salted and stable; signals are written once and store no address; the assessment is
+silent about a mature account, flags a new one on a new destination, a withdrawal that
+is almost the whole deposit history, a burst of requests and a crowded network; both
+velocity ceilings hold at their limit and ignore the previous hour/day; the queue
+records reasons, empties once and never fails its caller; and a referral between two
+accounts on one network is voided and logged while a genuine one is still paid) and
+`fraud-ui.test.tsx` (9 — the queue is admin-only and advisory, the withdrawal receipt
+never mentions risk, the customer is told to slow down and not why, and the reasons
+reach the operator) and `fraud-alerts.test.ts` (21 — the template has its own hero,
+subject, preheader and text fallback for every signal, escapes data, publishes no
+threshold or hash and says plainly that it moved no money; recipients prefer
+`FRAUD_ALERT_EMAIL` and fall back to `ADMIN_EMAILS`; warn events are never mailed; a
+repeat inside the window is suppressed while a different signal still rings; and an
+unconfigured or failing mail API resolves `false` rather than throwing).
+
+---
+
+## 29. Twenty-first pass — the dashboard's missing marks (31 Oct 2026)
+
+**The request.** "Can you check what icon logo is missing and what service is
+missing on the user dashboard." The audit was run against the rendered sidebar,
+signed in to the running build, not against the source alone.
+
+### 29.1 What was actually missing
+
+| Defect | Where it showed | Why it mattered |
+|---|---|---|
+| **App verification** had no mark — a generic phone glyph | sidebar → Buy | it is a service shelf a customer pays through; every neighbouring row had artwork and this one looked like a placeholder |
+| **Social promotion** had no mark — a generic people glyph | sidebar → Buy | same, and the glyph is indistinguishable from "Support" at 16 px |
+| **Subscriptions borrowed the Digital Accounts tile** | sidebar → Buy | two destinations rendered the *same* 3D icon, so the sidebar implied they were one product |
+| **`/dashboard/reviews` had no entry point at all** | anywhere | a delivered order can be reviewed exactly once, and the page that does it was reachable only by typing the URL — every other dashboard route is in the sidebar |
+
+Everything else checked out: the nine catalogue services each render their own
+512 px artwork and no two share a file (asserted since §17); the six digital
+products render real brand marks; all ten hub categories are reachable — nine
+through the hub, and the two order tools through their own pages, which is a
+better destination than a pre-filtered hub.
+
+Gift cards are still not one of the hub's categories. That is the owner's rule
+from §16, unchanged: wallet credit is not a service.
+
+### 29.2 What was added
+
+Three new masters in the same 3D set as the other nine — `subscriptions.png` (a
+play tile with a peach star), `app-verification.png` (a phone with a check bubble)
+and `social-promotion.png` (speech bubbles with a heart) — each with the 64/128/192
+WebP derivatives the UI actually downloads. They are Pryva's own category marks,
+not brand marks: nothing here reproduces a third party's logo, and
+`scripts/build-service-artwork.mjs` regenerated the derivatives so a deploy never
+depends on the generator having run.
+
+`ServiceIcon` gained the three keys as an exhaustive map (a missing file is still
+a type error rather than a silent fallback to another service), the sidebar's Buy
+group now uses `art` for all three, and **Reviews** sits under *You* with a star.
+
+**Verified:** 1,247 tests / 131 files · typecheck · lint · build. New
+`dashboard-nav-coverage.test.tsx` (6) renders the real sidebar and asserts that
+every Buy row draws an image, that Subscriptions and Accounts no longer share one,
+that every hub category (and both order tools, and gift cards) has a link, and that
+Reviews is reachable. Live check after sign-in: all twelve Buy rows returned their
+own `img`, `/dashboard/reviews` 200, and the three new files served 200 in both
+master and 64 px form.
+
+---
+
+## 30. Twenty-second pass — real images on every dashboard row (31 Oct 2026)
+
+**The correction.** "I am talking about real images icon that's missing." The
+previous pass looked at *which services* the sidebar listed and gave three of them
+artwork. It did not look at the rows that had **no image at all**, which is what the
+owner meant: after the fix, twenty-two of the sidebar's links still split into
+twelve with a 3D image and **ten with a stroked 16 px SVG** — and the whole mobile
+tab bar was glyphs.
+
+### 30.1 What was still missing
+
+| Group | Rows on a generic glyph |
+|---|---|
+| Manage | Overview, Orders, Wallet, Temporary inbox, Refer & earn |
+| Buy | All services |
+| You | Notifications, Reviews, Settings, Support |
+| Mobile bar | Home, Orders, Wallet, Services, Support |
+
+The mix was the defect: half a list drawn as pictures, half as line art, reads as two
+different navigation systems stacked on top of each other.
+
+### 30.2 What was added
+
+Ten masters in `public/images/nav/` — overview (2×2 tiles), orders (box with a
+receipt), wallet (wallet and coin), inbox (open envelope), referrals (gift box),
+services (fanned tiles and a sparkle), notifications (bell), reviews (star on a
+stand), settings (cog), support (two speech bubbles) — each drawn in the same
+lavender/indigo/peach 3D set as the twelve service tiles, and each given the
+64/128/192 WebP derivatives by `npm run artwork:build`, which now walks
+`public/images/nav` as well.
+
+`NavIcon` renders them; the sidebar and the mobile tab bar use it for those ten
+destinations. The `icon` prop stays in the shell for anything that should remain a
+glyph, but today nothing in the navigation uses it. Alt text is empty on purpose:
+the destination's name is always the next node in the row.
+
+**Verified:** 1,250 tests / 131 files · typecheck · lint · build. The live signed-in
+dashboard was re-read after the build: **22 of 22 sidebar links render an `<img>`**
+(10 from `/images/nav`, 12 from `/images/services`), the five mobile tabs render
+`/images/nav`, and all ten masters return 200. `dashboard-nav-coverage.test.tsx`
+grew to 9 tests and now parses both `<nav>` blocks, so a row that falls back to a
+glyph fails the suite.
+
+### 30.3 Still open, and why
+
+Five third-party marks remain wordmark tiles rather than logos: **Disney+**,
+**Outlook**, **MTN**, **Glo** and **9mobile**. This is a licensing limit, not an
+oversight — `simple-icons` (CC0) has no Disney, MTN, Glo or Outlook entry, and the
+CC0 `logos` set has none either (re-checked this pass against
+`@iconify-json/logos@1.2.18`, 2,282 icons). The alternatives are to fetch a logo from
+an unlicensed source, to redraw one by eye, or to generate one with an image model;
+all three would put a fake or non-redistributable mark next to a real one, so the
+wordmark in the brand's own colours stays. Closing it properly needs an owner-supplied
+asset pack or a licence.
+
+---
+
+## 31. Twenty-third pass — a profile picture (31 Oct 2026)
+
+**The request.** "Can you add 3d icon image for profile picture too."
+
+The account had no picture of any kind: the sidebar footer drew the customer's
+initials in a lavender gradient circle, which read as unfinished next to twelve 3D
+service tiles. There is no upload and no storage for one, so this is a drawn
+avatar rather than a photo — and it says so by never pretending to be one.
+
+### 31.1 What was added
+
+Four 512 px masters in `public/images/avatars/` — the same glossy 3D bust (a
+featureless silhouette, deliberately: no invented face) on a lavender backdrop with
+a peach, mint, sky or amber accent — each with 64/128/192 WebP derivatives, so a
+36 px circle downloads the 64 px file.
+
+`ProfileAvatar` picks one with `avatarNumberFor(email)` — a small deterministic
+hash, not randomness:
+
+| Property | Why it matters |
+|---|---|
+| Stable for an account | the picture must not change on navigation, refresh or redeploy |
+| Same on server and client | a random pick would mismatch during hydration and flicker |
+| Different between accounts | two customers in the same room should not share a face |
+
+It appears in the sidebar footer (replacing the initials) and at the head of the
+**Profile** section in `/dashboard/settings`, so the one place a customer looks for
+"profile picture" shows the same thing as the one they see all day. The image is
+decorative (`alt=""`, `aria-hidden`): the name is always the text next to it, and a
+screen reader should not hear it twice.
+
+**Verified:** 1,256 tests / 132 files · typecheck · lint · build. `profile-avatar.test.tsx`
+(6) pins determinism, the 1..4 range, spread across accounts, the derivative
+`srcSet`, and both render sites. Live signed-in check: the dashboard and settings
+both serve `avatar-3` for the preview account (its hash), the initials circle is
+gone from the markup, and all four masters return 200.
+
+## 32. Twenty-fourth pass — boosting that can actually be bought (31 Oct 2026)
+
+The social catalogue used to be honest and useless: a live panel listing rendered
+with `price: null` and no action, so a customer could browse boosts and never buy
+one. The owner's instruction was blunt — **"remove the null, i want user to be
+able to purchase and the api should also works"** — with one condition attached:
+**"we already have a working system so don't ruin it for me"**. Nothing in the
+existing order, wallet, refund or fraud path was forked or altered.
+
+**Pricing is a server decision.** `src/lib/smm-pricing.ts` is the only place a
+retail price is computed:
+
+> retail per 1,000 = `max(1, ceil(wholesale × (1 + SMM_MARKUP_PERCENT / 100) × fx))`
+
+* `SMM_MARKUP_PERCENT` defaults to **35** and is clamped to 0–400.
+* `fx` is `SMM_USD_NGN_RATE`, and it has **no default**. A USD-billed panel
+  without a configured rate therefore has no price, and its listing stays
+  read-only. Inventing an exchange rate would quietly sell at a loss every time
+  the naira moves, which is worse than saying "not for sale".
+* The wholesale rate, the panel's service id and the panel's name never leave the
+  server. The hub shows a "from" price at the supplier's minimum quantity; the
+  purchase page shows the exact total for the quantity entered.
+
+**Ordering reuses the money path.** `src/lib/boost-orders.ts` debits and inserts
+one `orders` row (`status: "processing"`, `provider: "smm"`) in a single
+transaction, then places **exactly one** order with the supplier, then marks the
+row `active` with the supplier's reference. A supplier refusal refunds the full
+amount (`type: "refund"`) and marks the row `refunded` with the reason; if that
+refund itself fails the debit stands at `processing` with a note, because a
+visible unfulfilled order is recoverable and a silent loss is not. The supplier
+has no idempotency key of its own, so the customer-supplied `requestId` is the
+only thing preventing a retry from buying twice: `(userId, requestId)` is checked
+before the transaction and again inside it, and a replay returns the original
+order having charged nothing.
+
+**The API fails closed.** `POST /api/boosts/order` is signed-in, same-origin,
+JSON-only, rate-limited per minute and capped per hour by the fraud ceiling, and
+every branch has a status the form acts on: `401` no session, `403` cross-origin,
+`415` not JSON, `429` flood, `400` malformed, `402` shortfall (with balance and
+required amount), `502` supplier refused, `503` nothing configured to fulfil it.
+That last one is new this pass: an unconfigured panel used to escape as a `500`,
+which told the customer nothing and logged a stack trace for a normal state.
+
+Migration `0023` adds two nullable columns, `orders.target_link` and
+`orders.quantity` — no backfill, no change to existing rows — and the order
+detail page shows the boosted link for those orders only.
+
+**Verified:** 1,285 tests / 135 files · typecheck · lint · build. New
+`boost-orders.test.ts` (10, PGlite) covers the charge, the replay, the refusal
+plus refund, the ledger (`debit` + `refund`), a quantity the supplier rejects,
+an empty wallet, a price the browser tries to influence, and a catalogue read that
+throws; `boost-order-route.test.ts` (10) walks every guard and asserts the internal
+error text never reaches the response; `smm-pricing.test.ts` (7) pins the formula
+and the "no rate, no price" rule; `smm-catalog.test.ts` was rewritten where it used
+to assert the absence of a price. Live check on the preview build: unconfigured
+panel ⇒ the hub lists nothing to buy, the boost page 404s, and the API answers
+`503 {"ok":false,"error":"Boosting is not available right now. Nothing was charged."}`.
+A real purchase needs an owner-supplied panel key and endpoint; nothing was
+purchased against a supplier in this pass.
+
+## 33. Twenty-fifth pass — a 404 with a cartoon (31 Oct 2026)
+
+The 404 was a tidy card that apologised in prose. It is now a small animated
+cartoon: an astronaut who has drifted off the map, bobbing in a lavender sky with
+the digits of 404 floating around them like lost balloons.
+
+**It is drawn, not filmed.** The owner asked for an "animation cartoon live
+video"; this is a looping vector animation rather than an MP4, and that is a
+deliberate trade:
+
+| A video file would have needed | The vector scene instead |
+|---|---|
+| a decode, a poster frame and an autoplay policy | paints on the first frame and loops forever |
+| a bundle of megabytes on the one page nobody wanted | ~9 KB of inline SVG |
+| re-encoding for every breakpoint | sharp from 360 px to 4K |
+
+If a real video is still wanted later, it drops into the same card as a `<video>`
+next to this scene without touching the copy or the layout.
+
+**What moves** (`src/components/not-found/NotFoundScene.tsx`, keyframes in
+`globals.css`): the astronaut bobs and tilts, their eyes blink every six seconds,
+their right arm waves, the antenna glow pulses, twenty-one stars twinkle on
+staggered delays, two planets drift, the dashed tether crawls outward, the clouds
+slide, and a rocket crosses the sky every eighteen seconds. Every property is a
+`transform` or an `opacity`, so nothing reflows, and the existing global
+`prefers-reduced-motion` rule stops the whole scene without leaving a frame
+half-way through a slide.
+
+**The words still do the work.** "That page floated away. Your account didn't."
+says what happened and reassures that nothing was lost; the card offers *Back
+home* and *Go to dashboard*, and below it the Help centre and a route to a human.
+The scene is `aria-hidden` — a screen reader should not walk a doodle — and it
+contains no `<image>` and no URL, so the error page never waits on the network.
+
+One trap worth recording: `logo-removal.test.tsx` runs the 404 markup through
+`decodeURIComponent`, which throws on a stray `%`. SVG gradients written with
+`offset="0%"` were enough to break it, so the scene uses fraction values
+(`offset="0.52"`, `filter x="-0.4"`) instead — smaller markup and the older test
+untouched.
+
+**Verified:** 1,289 tests / 136 files · typecheck · lint · build. New
+`not-found-page.test.tsx` (4) checks the copy and the four exits, that the scene
+is decorative and network-free, that every `nf-*` class actually has an animation
+behind it in `globals.css`, and that the reduced-motion switch still exists. Live:
+`/definitely-not-a-page` answers 404 with the scene, both buttons and the
+compiled keyframes in the served CSS.

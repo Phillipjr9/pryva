@@ -48,7 +48,7 @@ const COMMANDS: Command[] = [
   { id: "bulk", label: "Bulk orders", icon: ShoppingCart, group: "Navigate", href: "/dashboard/bulk-orders" },
   { id: "scheduled", label: "Scheduled orders", icon: Calendar, group: "Navigate", href: "/dashboard/scheduled" },
   { id: "notifications", label: "Notifications", icon: Bell, group: "Manage", href: "/dashboard/notifications" },
-  { id: "security", label: "Security", icon: Shield, group: "Manage", href: "/dashboard/security" },
+  { id: "security", label: "Security settings", icon: Shield, group: "Manage", href: "/dashboard/settings#security" },
   { id: "settings", label: "Settings", icon: Settings, group: "Manage", href: "/dashboard/settings" },
   { id: "support", label: "Support", icon: Chat, group: "Manage", href: "/dashboard/support" },
   { id: "home", label: "Marketing site", icon: Home, group: "Manage", href: "/" },
@@ -258,7 +258,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             className="min-w-0 flex-1 bg-transparent text-[0.95rem] text-ink outline-none placeholder:text-ink-3"
             autoFocus
           />
-          <kbd className="hidden rounded border border-line bg-cream px-2 py-0.5 text-[0.7rem] font-medium text-ink-2 sm:block">
+          <kbd className="hidden rounded border border-line bg-cream px-2 py-0.5 text-meta font-medium text-ink-2 sm:block">
             ESC
           </kbd>
         </div>
@@ -282,7 +282,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
           {grouped.map(({ group, entries }) => (
             <div key={group} className="mb-1">
-              <p className="px-4 pb-1 pt-2 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
+              <p className="px-4 pb-1 pt-2 text-micro font-semibold uppercase tracking-[0.16em] text-ink-3">
                 {group}
               </p>
               {entries.map(({ entry, position }) => {
@@ -305,11 +305,11 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[0.88rem] font-medium text-ink">{entry.label}</span>
                       {entry.hint && (
-                        <span className="block truncate text-[0.72rem] text-ink-3">{entry.hint}</span>
+                        <span className="block truncate text-meta text-ink-3">{entry.hint}</span>
                       )}
                     </span>
                     {isActive && (
-                      <span className="shrink-0 text-[0.66rem] font-semibold text-ink-3">↵</span>
+                      <span className="shrink-0 text-micro font-semibold text-ink-3">↵</span>
                     )}
                   </button>
                 );
@@ -318,7 +318,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           ))}
         </div>
 
-        <p className="border-t border-line px-4 py-2 text-[0.68rem] text-ink-3">
+        <p className="border-t border-line px-4 py-2 text-micro text-ink-3">
           ↑↓ to move · ↵ to open · esc to close
         </p>
       </div>
@@ -358,7 +358,7 @@ export function CommandPaletteTrigger({ onClick }: { onClick: () => void }) {
       >
         <Search className="h-4 w-4" />
         <span>Search…</span>
-        <kbd className="rounded border border-line bg-cream px-1.5 py-0.5 text-[0.65rem] font-semibold text-ink-3">
+        <kbd className="rounded border border-line bg-cream px-1.5 py-0.5 text-micro font-semibold text-ink-3">
           ⌘K
         </kbd>
       </button>

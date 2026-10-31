@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import {
+  CONTENT_SECURITY_POLICY_HEADER,
+  contentSecurityPolicy,
+  isEmbeddedPreviewHost,
+} from "@/lib/security-headers";
 
 export function proxy(request: NextRequest) {
   const response = NextResponse.next();
@@ -10,8 +15,15 @@ export function proxy(request: NextRequest) {
   // The isolated in-memory preview must be embeddable in the Arena viewer.
   // Keep clickjacking protection for real databases and non-preview hosts.
   const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? request.nextUrl.host;
-  const embeddedPreview = !process.env.DATABASE_URL?.trim() && /(?:^|\.)e2b\.app(?::\d+)?$/i.test(host);
+  const embeddedPreview = !process.env.DATABASE_URL?.trim() && isEmbeddedPreviewHost(host);
   if (!embeddedPreview) response.headers.set("X-Frame-Options", "SAMEORIGIN");
+  response.headers.set(
+    CONTENT_SECURITY_POLICY_HEADER,
+    contentSecurityPolicy({
+      embeddedPreview,
+      development: process.env.NODE_ENV !== "production",
+    }),
+  );
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "origin-when-cross-origin");
   response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");

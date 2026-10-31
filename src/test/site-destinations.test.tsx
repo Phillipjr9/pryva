@@ -28,12 +28,24 @@ describe("public site destinations", () => {
 
   it("keeps every footer link pointing at a real route", () => {
     for (const href of footerHrefs()) {
+      // The social links are the only external hrefs, and they are deliberately
+      // absolute. Everything else has to resolve to a page that exists.
+      if (href.startsWith("https://")) continue;
+      expect(href.startsWith("/"), `relative or absolute only: ${href}`).toBe(true);
       const path = href.split("?")[0].replace(/^\//, "");
       const exists = ["app", "app/(site)", "app/(auth)"].some((base) =>
         existsSync(join(root, base, path, "page.tsx")),
       );
       expect(exists, href).toBe(true);
     }
+  });
+
+  it("never links a footer destination off-site by accident", () => {
+    const external = footerHrefs().filter((href) => href.startsWith("http"));
+    // Every external link is an https URL, and there are only as many as there
+    // are social platforms: a typo'd internal path must not come back as one.
+    for (const href of external) expect(href.startsWith("https://")).toBe(true);
+    expect(external.length).toBeLessThanOrEqual(4);
   });
 
   it("lists the help centre, feedback page and every blog post in the sitemap", () => {

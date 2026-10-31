@@ -1,7 +1,11 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
+  boolean,
+  date,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -28,6 +32,10 @@ export const users = pgTable("users", {
   // by matching this row's email (ADMIN_EMAILS) must not treat an unverified
   // address as the owner's: signup accepted any string.
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+  // Consecutive wrong passwords. Reset on success, on lock, and on reset.
+  // The lock is an instant rather than a flag so it expires without a job.
+  failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -122,6 +130,14 @@ export const orders = pgTable(
     otpCode: varchar("otp_code", { length: 12 }),
     /** JSON array of delivered credential strings (marketplace accounts only). */
     accounts: text("accounts"),
+    /**
+     * Boosting orders only: the profile/post the customer asked us to grow, and
+     * how many units they bought. Null on every other service. The link is kept
+     * because it is what was ordered and the only way to settle a delivery
+     * dispute after the fact.
+     */
+    targetLink: varchar("target_link", { length: 500 }),
+    quantity: integer("quantity"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     refundedAt: timestamp("refunded_at", { withTimezone: true }),
     /**
@@ -349,6 +365,15 @@ export const withdrawals = pgTable(
     paystackReference: varchar("paystack_reference", { length: 50 }),
     transferReference: varchar("transfer_reference", { length: 100 }),
     failureReason: text("failure_reason"),
+    /**
+     * Advisory fraud flag for the admin queue.
+     *
+     * `low` by default, so every existing row keeps its meaning and no payout
+     * path changes behaviour because this column appeared. It is read by an
+     * operator, never by an automated payment decision.
+     */
+    riskLevel: varchar("risk_level", { length: 16 }).notNull().default("low"),
+    riskReasons: text("risk_reasons"),
     processedAt: timestamp("processed_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -485,6 +510,43 @@ export type User = typeof users.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type WalletTransaction = typeof walletTransactions.$inferSelect;
 export type ContactMessage = typeof contactMessages.$inferSelect;
+/**
+ * A review of an order that was actually delivered.
+ *
+ * `orderId` is unique in the migration, so one purchase yields at most one
+ * review. `service` and `productName` are copied from the order rather than
+ * joined, so delisting a product cannot silently detach or rewrite a published
+ * review. Nothing is public until `status` becomes 'published'.
+ */
+export const productReviews = pgTable(
+  "product_reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    service: varchar("service", { length: 40 }).notNull(),
+    productName: varchar("product_name", { length: 160 }).notNull(),
+    rating: integer("rating").notNull(),
+    headline: varchar("headline", { length: 80 }),
+    body: text("body").notNull(),
+    status: varchar("status", { length: 16 }).notNull().default("pending"),
+    moderatorNote: text("moderator_note"),
+    moderatedBy: uuid("moderated_by").references(() => users.id, { onDelete: "set null" }),
+    moderatedAt: timestamp("moderated_at", { withTimezone: true }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("product_reviews_order_id_key").on(table.orderId),
+    index("product_reviews_status_created_idx").on(table.status, table.createdAt),
+    index("product_reviews_user_idx").on(table.userId),
+  ],
+);
+
 export type GiftCard = typeof giftCards.$inferSelect;
 export type ScheduledOrder = typeof scheduledOrders.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
@@ -493,3 +555,371 @@ export type Withdrawal = typeof withdrawals.$inferSelect;
 export type BankAccount = typeof bankAccounts.$inferSelect;
 export type DisposableInbox = typeof disposableInboxes.$inferSelect;
 export type InboxMessage = typeof inboxMessages.$inferSelect;
+export type ProductReview = typeof productReviews.$inferSelect;
+
+/**
+ * Who did what in the admin console, and to whom.
+ *
+ * Every privileged mutation that moves money or changes an account writes one
+ * row here. It is deliberately append-only: nothing in the app updates or
+ * deletes an entry, and there is no route that exposes one to a customer.
+ *
+ * `actor_email` is snapshotted rather than joined. An email is the identity a
+ * human recognises in a dispute, and the account it came from may be renamed or
+ * removed later; the ledger has to keep saying what was true when the action ran.
+ *
+ * The entry is a *record*, not the source of truth: the wallet ledger remains
+ * authoritative for money. A failed insert is logged loudly and does not roll
+ * back an action that already moved funds -- see `src/lib/admin-audit.ts` for why
+ * that trade was chosen and what it costs.
+ */
+/**
+ * One row per business day: the nightly close, and the evidence that it ran.
+ *
+ * `status` starts at 'running' and is updated when the sweep finishes, so a
+ * crashed run leaves a visible row instead of no trace. `totals` is a report
+ * (jsonb) — nothing joins to it; the money stays in the tables that constrain it.
+ */
+export const reconciliationRuns = pgTable(
+  "reconciliation_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    day: date("day").notNull().unique(),
+    status: varchar("status", { length: 16 }).notNull().default("running"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    accountsChecked: integer("accounts_checked").notNull().default(0),
+    discrepancies: integer("discrepancies").notNull().default(0),
+    totals: jsonb("totals"),
+    notes: text("notes"),
+  },
+  (table) => [index("reconciliation_runs_started_idx").on(table.startedAt)],
+);
+
+export const adminAuditLog = pgTable(
+  "admin_audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** NULL only if the acting account is later deleted (deletion is not offered yet). */
+    actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+    actorEmail: varchar("actor_email", { length: 200 }).notNull(),
+    /** Dotted verbs such as `withdrawal.approve`, so filters stay stable. */
+    action: varchar("action", { length: 64 }).notNull(),
+    /** `order` | `withdrawal` | `user` | `message` | `gift_card`. */
+    targetType: varchar("target_type", { length: 32 }).notNull(),
+    /** An id or reference. Not a foreign key: targets live in several tables. */
+    targetId: varchar("target_id", { length: 191 }).notNull(),
+    /** Human-readable, already redacted. Never credentials, codes or full account numbers. */
+    summary: text("summary").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("admin_audit_log_created_idx").on(table.createdAt),
+    index("admin_audit_log_actor_idx").on(table.actorId),
+    index("admin_audit_log_target_idx").on(table.targetType, table.targetId),
+  ],
+);
+
+export type AdminAuditEntry = typeof adminAuditLog.$inferSelect;
+
+/**
+ * A user's TOTP enrolment. `enabledAt` NULL means an enrolment was started and
+ * abandoned; sign-in only demands a code once it is set.
+ *
+ * The secret is encrypted here, never stored as issued: a database dump must not
+ * hand over the second factor. See `src/lib/two-factor.ts`.
+ */
+export const userTwoFactor = pgTable("user_two_factor", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  secretCiphertext: text("secret_ciphertext").notNull(),
+  enabledAt: timestamp("enabled_at", { withTimezone: true }),
+  /**
+   * The last TOTP time-step accepted, so a code cannot be replayed within its
+   * own validity window. BIGINT because a step is seconds since the epoch / 30.
+   */
+  lastUsedStep: bigint("last_used_step", { mode: "number" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** One-way hashes of the ten single-use recovery codes. Plaintext is shown once. */
+export const twoFactorRecoveryCodes = pgTable(
+  "two_factor_recovery_codes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    codeHash: varchar("code_hash", { length: 64 }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("two_factor_recovery_codes_hash_idx").on(table.userId, table.codeHash),
+    index("two_factor_recovery_codes_user_idx").on(table.userId),
+  ],
+);
+
+/** Short-lived sign-in challenge. Only the SHA-256 of the token is stored. */
+export const twoFactorChallenges = pgTable(
+  "two_factor_challenges",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+    attempts: integer("attempts").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("two_factor_challenges_user_idx").on(table.userId),
+    index("two_factor_challenges_expires_idx").on(table.expiresAt),
+  ],
+);
+
+/**
+ * A support conversation, not a support form submission.
+ *
+ * `contact_messages` is the public form: anonymous, one-way, no thread. A
+ * customer with a problem needs the other shape — a thread they can add to, that
+ * can be answered by the assistant or by a person, and whose state is visible to
+ * both sides. That is this table.
+ *
+ * `status` drives who the ball is with:
+ *   open               the customer wrote, nobody has answered yet
+ *   waiting_on_customer the assistant asked a question and needs an answer
+ *   escalated          a person has to look; the assistant says why in the thread
+ *   resolved           answered or fixed; the customer can still reply
+ *   closed             read-only
+ *
+ * `handled_by` records who finished it (assistant | admin), because "the AI
+ * resolved 40% of tickets" should be a measured claim, not a hope.
+ */
+export const supportTickets = pgTable(
+  "support_tickets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    subject: varchar("subject", { length: 160 }).notNull(),
+    category: varchar("category", { length: 40 }).notNull().default("other"),
+    status: varchar("status", { length: 24 }).notNull().default("open"),
+    priority: varchar("priority", { length: 16 }).notNull().default("normal"),
+    channel: varchar("channel", { length: 16 }).notNull().default("dashboard"),
+    handledBy: varchar("handled_by", { length: 16 }),
+    assignedAdminId: uuid("assigned_admin_id").references(() => users.id, { onDelete: "set null" }),
+    /**
+     * The assistant's own confidence in its last decision, 0-100.
+     *
+     * Stored so an operator can sort by "least sure first" instead of reading
+     * every thread, and so the claim "it escalated rather than guessed" can be
+     * checked after the fact.
+     */
+    assistantConfidence: integer("assistant_confidence"),
+    escalatedAt: timestamp("escalated_at", { withTimezone: true }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("support_tickets_user_idx").on(table.userId),
+    index("support_tickets_status_idx").on(table.status),
+    index("support_tickets_activity_idx").on(table.lastActivityAt),
+  ],
+);
+
+/**
+ * One message in a ticket thread.
+ *
+ * `trace` holds the assistant's reasoning for its own messages: the evidence it
+ * read, the options it scored, what it ran and whether the fix verified. It is
+ * deliberately *not* shown to the customer (the reply is), and it is the reason
+ * an escalated ticket does not start the operator from zero.
+ */
+export const supportMessages = pgTable(
+  "support_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ticketId: uuid("ticket_id")
+      .notNull()
+      .references(() => supportTickets.id, { onDelete: "cascade" }),
+    authorRole: varchar("author_role", { length: 16 }).notNull(),
+    authorUserId: uuid("author_user_id").references(() => users.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    trace: text("trace"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("support_messages_ticket_idx").on(table.ticketId, table.createdAt)],
+);
+
+/**
+ * A passkey: a WebAuthn credential the customer's own device holds the private
+ * half of.
+ *
+ * The public key is stored as base64url COSE bytes in a text column rather than
+ * `bytea`, because the value is not secret and every layer of this app — the
+ * preview adapter included — handles strings without a driver-specific codec.
+ *
+ * `counter` is the authenticator's signature counter. A credential that reports
+ * a number that has not moved forward has been cloned, and the WebAuthn library
+ * refuses it; keeping the value is what makes that check possible on the next
+ * sign-in.
+ */
+export const webauthnCredentials = pgTable(
+  "webauthn_credentials",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** base64url credential id, exactly as the authenticator reports it. */
+    credentialId: text("credential_id").notNull().unique(),
+    /** base64url COSE public key. Public by definition — never a secret. */
+    publicKey: text("public_key").notNull(),
+    counter: integer("counter").notNull().default(0),
+    /** Comma-separated transports the authenticator advertised ("internal,hybrid"). */
+    transports: varchar("transports", { length: 120 }),
+    /** "singleDevice" (this phone/laptop) or "multiDevice" (synced passkey). */
+    deviceType: varchar("device_type", { length: 24 }),
+    backedUp: boolean("backed_up").notNull().default(false),
+    /** What the customer called it, so a list of three passkeys means something. */
+    label: varchar("label", { length: 80 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("webauthn_credentials_user_idx").on(table.userId),
+  ],
+);
+
+/**
+ * The challenge a WebAuthn ceremony must sign.
+ *
+ * Server-side and single-use on purpose. A challenge the client picks, or one
+ * that can be spent twice, turns a signature into a replayable token; consuming
+ * this row with a conditional update is what makes an assertion good for exactly
+ * one sign-in.
+ *
+ * `user_id` is NULL for the username-less sign-in flow, where the authenticator
+ * names the account by returning its credential id.
+ */
+export const webauthnChallenges = pgTable(
+  "webauthn_challenges",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    purpose: varchar("purpose", { length: 16 }).notNull(),
+    challenge: text("challenge").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("webauthn_challenges_challenge_idx").on(table.challenge)],
+);
+
+/**
+ * One invite code per account.
+ *
+ * A row per account rather than a code derived from the user id: a derivation
+ * can be recomputed only until it has to change, and changing it invalidates
+ * every link already shared. Minted lazily, the first time the account opens its
+ * invite page.
+ */
+export const referralCodes = pgTable("referral_codes", {
+  code: varchar("code", { length: 16 }).primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * An invitation, and the reward it earned.
+ *
+ * `refereeId` is unique: one reward per invited account, enforced by the
+ * database rather than by a code path a retry can bypass. `rewardReference` is
+ * the wallet ledger reference and is unique too, so two settlement workers
+ * racing over the same row cannot credit twice. `status` is
+ * `pending | credited | void`, and a row stays pending until the referee has a
+ * delivered order that has not been refunded.
+ */
+export const referrals = pgTable(
+  "referrals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    referrerId: uuid("referrer_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    refereeId: uuid("referee_id")
+      .notNull()
+      .unique()
+      .references(() => users.id, { onDelete: "cascade" }),
+    code: varchar("code", { length: 16 }).notNull(),
+    status: varchar("status", { length: 16 }).notNull().default("pending"),
+    qualifyingOrderId: uuid("qualifying_order_id").references(() => orders.id, { onDelete: "set null" }),
+    rewardAmount: integer("reward_amount"),
+    rewardReference: varchar("reward_reference", { length: 64 }).unique(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    creditedAt: timestamp("credited_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("referrals_referrer_idx").on(table.referrerId),
+    index("referrals_status_idx").on(table.status),
+  ],
+);
+
+/**
+ * Where an account was created from — as salted hashes, never a raw address.
+ *
+ * This is the only signal that makes multi-accounting visible: two accounts on
+ * one network look identical in every other table. A hash answers "same place or
+ * not?" and cannot be turned back into a location from a backup.
+ */
+export const accountSignals = pgTable(
+  "account_signals",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    ipHash: varchar("ip_hash", { length: 64 }),
+    userAgentHash: varchar("user_agent_hash", { length: 64 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("account_signals_ip_idx").on(table.ipHash)],
+);
+
+/**
+ * A record of something that looked wrong, and who dealt with it.
+ *
+ * Deliberately a log rather than a policy engine: nothing automated reads this
+ * table back, so a false positive costs a customer nothing. `reviewed_at` is what
+ * empties the operator's queue.
+ */
+export const fraudEvents = pgTable(
+  "fraud_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    kind: varchar("kind", { length: 40 }).notNull(),
+    severity: varchar("severity", { length: 16 }).notNull().default("warn"),
+    reasons: text("reasons").notNull(),
+    amount: integer("amount"),
+    reference: varchar("reference", { length: 64 }),
+    ipHash: varchar("ip_hash", { length: 64 }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("fraud_events_user_idx").on(table.userId),
+    index("fraud_events_kind_idx").on(table.kind),
+    index("fraud_events_created_idx").on(table.createdAt),
+  ],
+);
