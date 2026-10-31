@@ -482,6 +482,26 @@ they do.
 
 ---
 
+## 7f-bis. What the nightly job now sweeps
+
+`/api/cron/nightly` (01:20 Lagos) runs five steps, in this order because the order
+is a dependency:
+
+1. **close yesterday's books** — `/api/cron/nightly` reconciliation;
+2. **drain the wallet email outbox**;
+3. **read every open boost back** from the panel (max 25, oldest first) — a
+   cancelled boost becomes `review` with a note rather than staying `active`;
+4. **sweep auto-refunds** — the only step that writes money;
+5. **close finished rentals** — after the refunds, so a single-use number whose
+   window closed unfulfilled is still `active` when the refund looks at it.
+
+Step 3 is a read, never a retry: if a boost's state looks wrong, the fix is on
+`/admin/orders`, and nothing in the job will place a second order. If step 3
+reports `unanswered` for everything, the panel is down or the key is gone — check
+`/admin/boosting` before assuming orders are stuck.
+
+---
+
 ## 7g. Answering "is everything working?"
 
 Open **/admin/services**. It is the one screen that answers the owner's question with

@@ -1607,3 +1607,39 @@ switched off after trading reads *not for sale* rather than healthy, and that an
 sandbox cannot reach any of them. Whether Fleexa, BulkAcc or the boosting panel
 answer today is a question only the deployed diagnostics and the first real orders
 can settle — and the page is now the place those answers accumulate.
+
+## 38. Thirtieth pass — the two lanes that only worked if the customer looked (31 Oct 2026)
+
+Auditing "does everyone get their service entirely" turned up two places where
+delivery was supervised by page view rather than by the system.
+
+**Boosts.** `active` on a boost means *the panel accepted the order*, nothing more.
+The read-back added in §36 fixed the lie for anyone who opened their order page —
+and only for them. A boost the panel cancelled on Tuesday still said `active` on
+Friday to a customer who never logged in, and nothing ever reached a human. The
+nightly job now asks the panel about every open boost (oldest first, capped at 25
+so it fits the 60 s cron), and writes what it hears: `completed → delivered`,
+`partial`/`canceled → review` with a note saying no automatic refund was issued. It
+is still only a read — `add` is never repeated for an existing order, terminal rows
+are never overwritten, and an unreachable panel changes nothing.
+
+**Rentals.** Same shape, cheaper: a rental only became `expired` when its owner
+opened the page, so thirty days that ran out in June still read `active` in October
+and the dashboard kept counting a finished thing as live. A new step closes them by
+date — after the refund sweep, not before, and excluding single-use numbers
+entirely: a number whose window closed unfulfilled must reach the refund sweep while
+it still says `active`, and an exclusion is safer than an ordering.
+
+Neither step writes money. The refund sweep remains the only thing in the nightly
+job that does, and it still runs before the close-books step has any chance to be
+confused by new ledger rows.
+
+**Verified:** 1,360 tests / 145 files · typecheck · lint · build. `boost-sweep.test.ts`
+(8) pins that the sweep only reads, that an unreachable panel writes nothing, and
+that a cancelled boost lands in `review` with its note; `rental-expiry.test.ts` (3)
+pins the status it writes and the no-op case.
+
+**Not verified:** the panel call itself. This environment cannot reach it, so the
+first real proof remains one small boost order whose status is read back — the
+nightly sweep does not replace that, it only means the answer keeps arriving after
+the customer stops looking.
