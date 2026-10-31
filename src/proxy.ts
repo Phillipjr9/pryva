@@ -5,6 +5,7 @@ import {
   contentSecurityPolicy,
   isEmbeddedPreviewHost,
 } from "@/lib/security-headers";
+import { FRAMEWORK_BANNERS } from "@/lib/server-banner";
 
 export function proxy(request: NextRequest) {
   const response = NextResponse.next();
@@ -27,6 +28,16 @@ export function proxy(request: NextRequest) {
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "origin-when-cross-origin");
   response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+
+  // No banner, no version. `poweredByHeader: false` in next.config.ts is what
+  // stops Next adding `X-Powered-By`; this removes the rest (and covers a
+  // middleware short-circuit, whose response is built here rather than by a
+  // route). `Server` is platform-written after this runs, so it is documented
+  // rather than claimed: `scripts/check-headers.mjs` reports what actually goes
+  // out, including the one header the app cannot reach.
+  for (const banner of [...FRAMEWORK_BANNERS, "server"]) {
+    response.headers.delete(banner);
+  }
 
   // API responses are per-user and must never be cached by a proxy or CDN.
   // No CORS headers are set on purpose: every caller is the app itself, so a
