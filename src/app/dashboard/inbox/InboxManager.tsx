@@ -441,9 +441,7 @@ export function InboxManager() {
                           </span>
                         </button>
                         {isOpen && message.body && (
-                          <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words border-t border-line/60 bg-slate-50/50 p-4 text-meta leading-relaxed text-ink-2">
-                            {message.body}
-                          </pre>
+                          <EmailContentViewer body={message.body} />
                         )}
                       </li>
                     );
@@ -582,6 +580,104 @@ export function InboxManager() {
             })}
           </ul>
         </div>
+      )}
+    </div>
+  );
+}
+
+function EmailContentViewer({ body }: { body: string }) {
+  const [viewMode, setViewMode] = useState<"html" | "text">("html");
+  const [iframeHeight, setIframeHeight] = useState(380);
+  const [copied, setCopied] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const isHtml = /<\/?[a-z][\s\S]*>/i.test(body);
+
+  const preparedHtml = isHtml
+    ? body.includes("<head>")
+      ? body.replace("<head>", '<head><base target="_blank">')
+      : `<!DOCTYPE html><html><head><base target="_blank"><style>body{margin:0;padding:12px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#1e293b;}</style></head><body>${body}</body></html>`
+    : "";
+
+  const handleIframeLoad = () => {
+    try {
+      if (iframeRef.current?.contentWindow?.document?.body) {
+        const scrollH = iframeRef.current.contentWindow.document.body.scrollHeight;
+        if (scrollH > 100) {
+          setIframeHeight(Math.max(250, Math.min(scrollH + 30, 800)));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleCopy = async () => {
+    try {
+      const textToCopy = isHtml
+        ? body.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim()
+        : body;
+      await navigator.clipboard.writeText(textToCopy);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore
+    }
+  };
+
+  return (
+    <div className="border-t border-line/60 bg-slate-50/50 p-4">
+      {isHtml && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-line/40 pb-2.5">
+          <div className="flex items-center gap-1 rounded-lg border border-line bg-white p-0.5 text-[0.75rem]">
+            <button
+              type="button"
+              onClick={() => setViewMode("html")}
+              className={`rounded px-2.5 py-1 font-medium transition ${
+                viewMode === "html" ? "bg-lav-100 text-ink shadow-xs" : "text-ink-3 hover:text-ink"
+              }`}
+            >
+              Rich Template
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("text")}
+              className={`rounded px-2.5 py-1 font-medium transition ${
+                viewMode === "text" ? "bg-lav-100 text-ink shadow-xs" : "text-ink-3 hover:text-ink"
+              }`}
+            >
+              Plain Text
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleCopy()}
+            className="btn border border-line bg-white !px-2.5 !py-1 !text-[0.75rem] text-ink hover:border-lav-200"
+          >
+            {copied ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+            {copied ? "Copied" : "Copy text"}
+          </button>
+        </div>
+      )}
+
+      {isHtml && viewMode === "html" ? (
+        <div className="overflow-hidden rounded-xl border border-line bg-white shadow-xs">
+          <iframe
+            ref={iframeRef}
+            srcDoc={preparedHtml}
+            sandbox="allow-same-origin allow-popups"
+            onLoad={handleIframeLoad}
+            style={{ height: `${iframeHeight}px` }}
+            className="w-full border-0 transition-[height]"
+            title="Email template design"
+          />
+        </div>
+      ) : (
+        <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-line bg-white p-4 font-mono text-[0.8rem] leading-relaxed text-ink-2">
+          {isHtml
+            ? body.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim()
+            : body}
+        </pre>
       )}
     </div>
   );

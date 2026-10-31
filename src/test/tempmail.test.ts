@@ -164,6 +164,45 @@ describe("checkTempMail and cancelTempMail", () => {
     expect(result.code).toBe("591024");
   });
 
+  it("preserves HTML email templates and extracts verification codes", async () => {
+    const rawHtml = `<!DOCTYPE html><html><body><div style="background:#f4f4f4;padding:20px;"><h1 style="color:#333;">Welcome!</h1><p>Your verification code is <strong>928374</strong>.</p><a href="https://example.com/verify">Verify Account</a></div></body></html>`;
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/token")) {
+        return Promise.resolve({ ok: true, json: async () => ({ token: "jwt-test-token" }) });
+      }
+      if (url.includes("/messages") && !url.includes("/messages/")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            "hydra:member": [
+              { id: "msg-html", subject: "Verify your email", from: { address: "no-reply@company.com" }, createdAt: "2026-10-31" },
+            ],
+          }),
+        });
+      }
+      if (url.includes("/messages/msg-html")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            subject: "Verify your email",
+            from: { address: "no-reply@company.com" },
+            html: [rawHtml],
+            text: "Welcome! Your verification code is 928374.",
+            createdAt: "2026-10-31",
+          }),
+        });
+      }
+      return Promise.resolve({ ok: false });
+    });
+
+    const result = await checkTempMail("mailtm:acc-html:pass", "test@domain.com");
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.body).toBe(rawHtml);
+    expect(result.messages[0]?.code).toBe("928374");
+    expect(result.code).toBe("928374");
+  });
+
   it("polls and formats incoming Guerrilla Mail messages", async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes("check_email")) {
