@@ -6,6 +6,7 @@ import { Check, Loader2, Lock, Mail, Shield, User } from "@/components/icons";
 import type { PublicUser } from "@/lib/auth";
 import { AccountDataPanel } from "./AccountDataPanel";
 import { PasswordInput } from "@/components/ui/PasswordInput";
+import { ProfileAvatar } from "@/components/dashboard/ProfileAvatar";
 
 interface SettingsFormProps {
   user: PublicUser;
@@ -35,11 +36,14 @@ function Notice({ kind, children }: { kind: "error" | "success"; children: strin
 
 function Section({
   icon: Icon,
+  media,
   title,
   note,
   children,
 }: {
   icon: (props: { className?: string }) => React.ReactNode;
+  /** Replaces the small icon square — used by Profile, which shows the avatar. */
+  media?: React.ReactNode;
   title: string;
   note: string;
   children: React.ReactNode;
@@ -47,9 +51,11 @@ function Section({
   return (
     <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
       <div className="flex items-start gap-2.5">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-lav-50 text-lav-700">
-          <Icon className="h-4 w-4" />
-        </span>
+        {media ?? (
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-lav-50 text-lav-700">
+            <Icon className="h-4 w-4" />
+          </span>
+        )}
         <div>
           <h2 className="text-[0.95rem] font-semibold">{title}</h2>
           <p className="mt-0.5 text-meta text-ink-2">{note}</p>
@@ -137,7 +143,12 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
       {error && <Notice kind="error">{error}</Notice>}
       {success && <Notice kind="success">{success}</Notice>}
 
-      <Section icon={User} title="Profile" note="The name shown on orders and support replies.">
+      <Section
+        icon={User}
+        media={<ProfileAvatar seed={user.email} size={32} />}
+        title="Profile"
+        note="The name shown on orders and support replies."
+      >
         <div>
           <label htmlFor="profile-name" className="field-label">
             Name

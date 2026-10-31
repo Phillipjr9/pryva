@@ -27,6 +27,8 @@ const TARGETS = [
   // The dashboard's own destinations (Overview, Orders, Wallet, Inbox,
   // Referrals, All services, Notifications, Reviews, Settings, Support).
   { dir: "public/images/nav", label: "nav" },
+  // The four profile pictures an account is assigned from its address.
+  { dir: "public/images/avatars", label: "avatar" },
 ];
 
 let totalIn = 0;

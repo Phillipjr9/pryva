@@ -7,6 +7,7 @@ import { CommandPalette, CommandPaletteTrigger } from "@/components/command/Comm
 import { ArrowRight, Bell, Close, Logout, Menu, Plus, Wallet } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { NavIcon, type NavArt } from "@/components/dashboard/NavIcon";
+import { ProfileAvatar } from "@/components/dashboard/ProfileAvatar";
 import { BrandLockup } from "@/components/brand/BrandLockup";
 import { formatNaira } from "@/lib/catalog";
 import { EXPLORER_COUNTRIES } from "@/lib/explorer-countries";
@@ -161,12 +162,6 @@ export function DashboardShell({
   const selectedCategory = searchParams.get("category");
   const [open, setOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const initials = user.name
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 
   const sidebar = (
     <div className="flex h-full flex-col">
@@ -251,9 +246,9 @@ export function DashboardShell({
 
       <div className="mt-auto border-t border-line pt-4">
         <div className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-lav-200 to-lav-400 text-micro font-bold text-lav-800">
-            {initials || "P"}
-          </span>
+          {/* The profile picture: a 3D avatar chosen from the account itself,
+              instead of initials in a gradient circle. */}
+          <ProfileAvatar seed={user.email} size={36} />
           <div className="min-w-0">
             <p className="truncate text-[0.82rem] font-semibold text-ink">{user.name}</p>
             <p className="truncate text-micro text-ink-3">{user.email}</p>
