@@ -242,6 +242,13 @@ export async function createFreeInbox(userId: string): Promise<CreatedInbox> {
       domain = created.domain;
     }
   } else {
+    // Before creating a new inbox, preserve any existing active inboxes as 'saved'
+    // so previous inboxes are kept and can be used again.
+    await db
+      .update(disposableInboxes)
+      .set({ status: "saved" })
+      .where(and(eq(disposableInboxes.userId, userId), eq(disposableInboxes.status, "active")));
+
     const created = await createTempMailInbox();
     emailId = created.id;
     address = created.address;
@@ -249,7 +256,8 @@ export async function createFreeInbox(userId: string): Promise<CreatedInbox> {
     domain = created.domain;
   }
 
-  const dailyKey = dailyKeyFor(userId);
+  // Tempmail inboxes are free and reusable; only Fleexa enforces the single dailyKey
+  const dailyKey = provider === "fleexa" ? dailyKeyFor(userId) : null;
 
   try {
     const [row] = await db
@@ -408,7 +416,7 @@ export async function pollInbox(userId: string, inboxId: string): Promise<PollRe
     };
   }
 
-  if (row.tier === "paid") {
+  if (row.tier === "paid" || row.provider === "tempmail") {
     await db
       .insert(inboxMessages)
       .values(
@@ -466,9 +474,36 @@ async function storedMessages(inboxId: string): Promise<InboxMessageView[]> {
  * Retained messages are deliberately not deleted: for a paid inbox they are what
  * was purchased, and they go when the account does, by cascade.
  */
+/**
+ * Activate a saved inbox, setting it as the user's active inbox and marking any
+ * previously active inbox as 'saved'.
+ */
+export async function activateInbox(userId: string, inboxId: string): Promise<InboxView> {
+  const row = await ownInbox(userId, inboxId);
+
+  // Transition any currently active inbox for this user to 'saved'
+  await db
+    .update(disposableInboxes)
+    .set({ status: "saved" })
+    .where(and(eq(disposableInboxes.userId, userId), eq(disposableInboxes.status, "active")));
+
+  // Activate the selected inbox
+  const [activated] = await db
+    .update(disposableInboxes)
+    .set({ status: "active", discardedAt: null })
+    .where(and(eq(disposableInboxes.id, row.id), eq(disposableInboxes.userId, userId)))
+    .returning();
+
+  if (!activated) {
+    throw new InboxError("NOT_FOUND", 404, "Could not activate that inbox.");
+  }
+
+  return viewOf(activated);
+}
+
 export async function discardInbox(userId: string, inboxId: string): Promise<InboxView> {
   const row = await ownInbox(userId, inboxId);
-  if (row.status !== "active") return viewOf(row);
+  if (row.status === "discarded") return viewOf(row);
 
   try {
     if (row.provider === "tempmail") {
@@ -487,9 +522,7 @@ export async function discardInbox(userId: string, inboxId: string): Promise<Inb
   const [updated] = await db
     .update(disposableInboxes)
     .set({ status: "discarded", discardedAt: new Date() })
-    // Guarded on the status still being active, so two concurrent discards cannot
-    // both believe they were the one that closed it.
-    .where(and(eq(disposableInboxes.id, row.id), eq(disposableInboxes.status, "active")))
+    .where(and(eq(disposableInboxes.id, row.id), eq(disposableInboxes.userId, userId)))
     .returning();
 
   if (!updated) throw new InboxError("RECONCILE_FAILED", 409, "That inbox changed while you were discarding it.");
