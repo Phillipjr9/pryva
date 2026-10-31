@@ -8,6 +8,7 @@ export interface GiftCardDenomination {
   amountUsd: number;
   priceNgn: number;
   popular?: boolean;
+  foxreloadProductId?: string;
 }
 
 export interface BrandGiftCardCatalogEntry {
