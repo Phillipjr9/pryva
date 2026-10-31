@@ -130,6 +130,14 @@ export const orders = pgTable(
     otpCode: varchar("otp_code", { length: 12 }),
     /** JSON array of delivered credential strings (marketplace accounts only). */
     accounts: text("accounts"),
+    /**
+     * Boosting orders only: the profile/post the customer asked us to grow, and
+     * how many units they bought. Null on every other service. The link is kept
+     * because it is what was ordered and the only way to settle a delivery
+     * dispute after the fact.
+     */
+    targetLink: varchar("target_link", { length: 500 }),
+    quantity: integer("quantity"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     refundedAt: timestamp("refunded_at", { withTimezone: true }),
     /**

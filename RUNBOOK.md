@@ -410,6 +410,42 @@ ones: do it only with a reason, and record it.
 
 ---
 
+## 7f. Boosting (social promotion)
+
+Boosts are **live purchases**: wallet money out, a supplier order in. The flow is
+`POST /api/boosts/order` → `placeBoostOrder` → wallet debit + `orders` row in one
+transaction → one supplier order → `active` (or refund).
+
+**Turning it on.** Three settings, all on the server:
+
+| Variable | Effect when unset |
+|---|---|
+| `SMM_PANEL_API_KEY` + `SMM_PANEL_API_URL` | no boosts are listed at all; the API answers 503 and charges nothing |
+| `SMM_USD_NGN_RATE` | a USD-billed panel has no retail price, so its listings are read-only |
+| `SMM_MARKUP_PERCENT` | defaults to 35; the retail margin |
+
+Enable in this order: fund the panel with a small float, set the key and the
+endpoint, confirm the panel's **billing currency** with an `action=balance` call,
+set `SMM_USD_NGN_RATE` only if that currency is USD, then place **one
+minimum-size order** yourself and read its status back before announcing the
+service. The supplier accepts no idempotency key, so never retry a request you
+are unsure about — check the panel's order list first.
+
+**When something goes wrong.**
+
+| What you see | What it means | What to do |
+|---|---|---|
+| customer says they were charged but no boost | supplier refused and the refund failed, so the row is `processing` with a note | refund from `/admin/orders` after confirming with the supplier that no order exists |
+| `orders.status = refunded` | the supplier refused and the wallet was credited back automatically | nothing, unless the same service fails repeatedly |
+| no boosts in the hub | panel not configured, or its catalogue returned nothing | check the two variables and the panel balance |
+| a listing is read-only | it has no retail price — a USD panel with no `SMM_USD_NGN_RATE` | set the rate, or switch to an NGN-billed supplier |
+
+The supplier's name, service ids and wholesale rates never appear in customer
+copy or client bundles; `src/test/supplier-secrecy.test.ts` fails the build if
+they do.
+
+---
+
 ## 8. Incident playbooks
 
 **Suspected double credit.** Compare `wallet_transactions` references for the
