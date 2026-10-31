@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth";
 import { ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
 import { explorerCategory, explorerCountry } from "@/lib/service-explorer";
+import { readServiceReadiness } from "@/lib/service-readiness";
 
 export const metadata: Metadata = { title: "Service hub" };
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ export default async function DashboardServicesPage({
 }) {
   await requireUser("/dashboard/services");
   const params = await searchParams;
+  const readiness = readServiceReadiness();
   const country = typeof params.country === "string" ? params.country : null;
   const category = typeof params.category === "string" ? params.category : null;
   // An unrecognisable link value falls back to the picker rather than 404ing,
@@ -29,6 +31,7 @@ export default async function DashboardServicesPage({
       initialCategory={category}
       rejectedCountry={rejectedCountry}
       rejectedCategory={rejectedCategory}
+      readiness={readiness}
     />
   );
 }

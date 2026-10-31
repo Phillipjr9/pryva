@@ -282,3 +282,31 @@ describe("the animation", () => {
     expect(window.localStorage.getItem("pryva:support-presence-hidden")).toBe("0");
   });
 });
+
+describe("a link that already carries the question", () => {
+  const reset = () => window.history.replaceState(null, "", "/dashboard/support");
+  afterEach(reset);
+
+  it("drafts the question from the fragment and sends nothing", () => {
+    const question = "When will Mobile data be available to order?";
+    window.history.replaceState(null, "", `/dashboard/support#ask=${encodeURIComponent(question)}`);
+    const fetchMock = stubFetch([]);
+    render(<SupportChat />);
+    expect(composer().value).toBe(question);
+    expect(fetchMock).not.toHaveBeenCalled();
+    // A draft is not a message: the transcript stays empty until send.
+    expect(transcript().textContent).not.toContain(question);
+  });
+
+  it("ignores a query parameter, which the page must not read", () => {
+    window.history.replaceState(null, "", `/dashboard/support?ask=${encodeURIComponent("spoofed")}`);
+    render(<SupportChat />);
+    expect(composer().value).toBe("");
+  });
+
+  it("ignores a malformed fragment instead of throwing", () => {
+    window.history.replaceState(null, "", "/dashboard/support#ask=%E0%A4%A");
+    render(<SupportChat />);
+    expect(composer().value).toBe("");
+  });
+});

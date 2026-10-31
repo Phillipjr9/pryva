@@ -1,6 +1,14 @@
 import { findPlan } from "./catalog";
 import { CATALOG_PRICES } from "./prices.generated";
 
+/**
+ * The most units one checkout will buy from the supplier.
+ *
+ * Shared by the route (which enforces it) and the form (which warns before a
+ * basket is built), so the two cannot drift.
+ */
+export const MAX_BULK_UNITS = 20;
+
 export interface BulkOrderItem {
   productSlug: string;
   quantity: number;
