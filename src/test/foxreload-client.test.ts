@@ -11,6 +11,7 @@ import {
   payFoxreloadOrder,
   getFoxreloadOrder,
   pollFoxreloadOrderCodes,
+  resolveFoxreloadProductId,
   resetFoxreloadRateBudget,
   FoxreloadError,
 } from "@/lib/foxreload";
@@ -112,7 +113,7 @@ describe("FoxReload client", () => {
   });
 
   it("creates, pays, and polls for delivered voucher codes", async () => {
-    vi.spyOn(globalThis, "fetch")
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
         // POST /api/orders/
         new Response(
@@ -154,14 +155,63 @@ describe("FoxReload client", () => {
         ),
       );
 
-    const order = await createFoxreloadOrder({ itemId: "steam_10_usd", quantity: 1 });
+    const order = await createFoxreloadOrder({
+      itemId: "steam_10_usd",
+      quantity: 1,
+      idempotencyKey: "test-req-123",
+      isMock: true,
+    });
     expect(order.id).toBe("ord_fox123");
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://public-api.foxreload.com/api/orders/",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          items: [{ itemId: "steam_10_usd", quantity: 1 }],
+          idempotencyKey: "test-req-123",
+          isMock: true,
+        }),
+      }),
+    );
 
     const payResult = await payFoxreloadOrder(order.id);
     expect(payResult.status).toBe("processing");
 
     const codes = await pollFoxreloadOrderCodes(order.id, { maxWaitMs: 3000, intervalMs: 100 });
     expect(codes).toEqual(["RBLX-X7K2-9MPQ-4WR1"]);
+  });
+
+  it("resolves FoxReload product ID from preferred ID or search query", async () => {
+    // 1. Direct typeid or uuid resolves without fetch
+    const direct = await resolveFoxreloadProductId({
+      brand: "Steam",
+      amountUsd: 10,
+      preferredId: "product_01krgfgww8eth9xvvysd6y7r4j",
+    });
+    expect(direct).toBe("product_01krgfgww8eth9xvvysd6y7r4j");
+
+    // 2. Search resolution
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          items: [
+            {
+              id: "product_resolved_steam10",
+              name: "Steam $10 USD Gift Card",
+              price: 10,
+              deliveryType: "code",
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    const resolved = await resolveFoxreloadProductId({
+      brand: "Steam",
+      amountUsd: 10,
+    });
+    expect(resolved).toBe("product_resolved_steam10");
   });
 
   it("propagates provider errors cleanly without crash", async () => {
