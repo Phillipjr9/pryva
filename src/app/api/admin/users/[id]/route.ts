@@ -1,4 +1,5 @@
 import { authorizeAdminApi } from "@/lib/admin-auth";
+import { recordAdminAction } from "@/lib/admin-audit";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, orders, walletTransactions, withdrawals } from "@/db/schema";
@@ -178,6 +179,16 @@ export async function PUT(
     } as const;
     const newBalance = action === "credit" ? await creditWallet(entry) : await debitWallet(entry);
     logger.info("Admin adjusted user wallet", { adminId: admin.id, userId, amount, action, reason });
+    await recordAdminAction({
+      actor: admin,
+      action: action === "credit" ? "user.credit" : "user.debit",
+      targetType: "user",
+      targetId: userId,
+      summary:
+        `${action === "credit" ? "Credited" : "Debited"} ₦${amount.toLocaleString("en-NG")} ` +
+        `${action === "credit" ? "to" : "from"} ${user.email}` +
+        (typeof reason === "string" && reason.trim() ? ` — ${reason.trim()}` : ""),
+    });
     return NextResponse.json({ ok: true, message: `₦${amount.toLocaleString()} ${action === "credit" ? "credited to" : "debited from"} user wallet`, newBalance });
   } catch (error) {
     if (error instanceof InsufficientFundsError) {

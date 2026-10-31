@@ -46,14 +46,14 @@ export function PaymentSuccess({
           <Check className="h-10 w-10" />
           <Sparkle className="absolute -right-2 -top-2 h-5 w-5 text-lav-600" />
         </div>
-        <p className="mt-6 text-[0.63rem] font-bold uppercase tracking-[0.18em] text-lav-700">All done</p>
+        <p className="mt-6 text-micro font-bold uppercase tracking-[0.18em] text-lav-700">All done</p>
         <h2 id="payment-success-title" className="mt-2 text-[1.45rem] font-semibold text-ink">{title}</h2>
         <p id="payment-success-message" className="mt-2 text-[0.84rem] leading-relaxed text-ink-2">{message}</p>
         {autoRedirect ? (
           <div className="mt-6">
-            <p className="text-[0.7rem] text-ink-3">Opening your details…</p>
+            <p className="text-meta text-ink-3">Opening your details…</p>
             <div aria-hidden="true" className="mt-3 h-1.5 overflow-hidden rounded-full bg-lav-100"><div className="flow-progress h-full w-1/3 rounded-full bg-lav-600" /></div>
-            <a href={redirectUrl} className="mt-4 inline-flex text-[0.75rem] font-semibold text-lav-700 underline underline-offset-2">Continue now</a>
+            <a href={redirectUrl} className="mt-4 inline-flex text-meta font-semibold text-lav-700 underline underline-offset-2">Continue now</a>
           </div>
         ) : (
           <button type="button" onClick={onClose} className="btn btn-primary mt-6 w-full">Done</button>

@@ -65,7 +65,7 @@ export function ExportTransactionsButton() {
         disabled={exporting}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[0.74rem] font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-ink disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-meta font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-ink disabled:opacity-50"
       >
         {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
         {exporting ? "Exporting…" : "Export"}

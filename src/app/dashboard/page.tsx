@@ -139,7 +139,7 @@ export default async function DashboardOverviewPage() {
             <h2 className="text-[1rem] font-semibold">Recent orders</h2>
             <Link
               href="/dashboard/orders"
-              className="inline-flex items-center gap-1 text-[0.76rem] font-semibold text-lav-700 hover:underline"
+              className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline"
             >
               View all <ArrowRight className="h-3 w-3" />
             </Link>
@@ -161,7 +161,7 @@ export default async function DashboardOverviewPage() {
                     <p className="truncate text-[0.86rem] font-semibold text-ink">
                       {order.productName} · {order.planLabel}
                     </p>
-                    <p className="truncate text-[0.7rem] text-ink-3">
+                    <p className="truncate text-meta text-ink-3">
                       {order.reference} ·{" "}
                       {new Date(order.createdAt).toLocaleDateString("en-NG", {
                         day: "numeric",
@@ -172,7 +172,7 @@ export default async function DashboardOverviewPage() {
                   <div className="flex shrink-0 items-center gap-2.5">
                     <span className="text-[0.82rem] font-semibold">{formatNaira(order.amount)}</span>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[0.62rem] font-semibold capitalize ${statusStyle(order.status)}`}
+                      className={`rounded-full px-2 py-0.5 text-micro font-semibold capitalize ${statusStyle(order.status)}`}
                     >
                       {order.status}
                     </span>
@@ -189,7 +189,7 @@ export default async function DashboardOverviewPage() {
             <h2 className="text-[1rem] font-semibold">Explore categories</h2>
             <Link
               href="/dashboard/services"
-              className="inline-flex items-center gap-1 text-[0.72rem] font-semibold text-lav-700 hover:underline"
+              className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline"
             >
               <Receipt className="h-3 w-3" /> All services
             </Link>
@@ -204,7 +204,7 @@ export default async function DashboardOverviewPage() {
                 <ServiceIcon service={item.service} size="sm" />
                 <span className="flex-1">
                   <span className="block text-[0.8rem] font-semibold text-ink">{item.label}</span>
-                  <span className="block text-[0.66rem] text-ink-3">{item.note}</span>
+                  <span className="block text-micro text-ink-3">{item.note}</span>
                 </span>
                 <ArrowRight className="h-3.5 w-3.5 text-ink-3 transition-colors group-hover:text-lav-600" />
               </Link>
@@ -220,7 +220,7 @@ export default async function DashboardOverviewPage() {
             <h2 className="text-[1rem] font-semibold">Wallet activity</h2>
             <Link
               href="/dashboard/wallet"
-              className="text-[0.72rem] font-semibold text-lav-700 hover:underline"
+              className="text-meta font-semibold text-lav-700 hover:underline"
             >
               Statement
             </Link>
@@ -233,7 +233,7 @@ export default async function DashboardOverviewPage() {
                 <div key={tx.id} className="flex items-start justify-between gap-2 py-2.5">
                   <div className="min-w-0">
                     <p className="truncate text-[0.8rem] font-medium text-ink">{tx.description}</p>
-                    <p className="text-[0.66rem] text-ink-3">
+                    <p className="text-micro text-ink-3">
                       {tx.reference} · Bal. {formatNaira(tx.balanceAfter)}
                     </p>
                   </div>
@@ -262,13 +262,13 @@ export default async function DashboardOverviewPage() {
           <div className="mt-1 grid gap-1.5">
             <Link
               href="/dashboard/orders"
-              className="flex items-center justify-between rounded-lg bg-white/80 px-3 py-2 text-[0.78rem] font-medium text-ink-2 hover:text-lav-700"
+              className="flex items-center justify-between rounded-lg bg-white/80 px-3 py-2 text-meta font-medium text-ink-2 hover:text-lav-700"
             >
               Find an order code <ArrowRight className="h-3.5 w-3.5" />
             </Link>
             <Link
               href="/dashboard/support"
-              className="flex items-center justify-between rounded-lg bg-white/80 px-3 py-2 text-[0.78rem] font-medium text-ink-2 hover:text-lav-700"
+              className="flex items-center justify-between rounded-lg bg-white/80 px-3 py-2 text-meta font-medium text-ink-2 hover:text-lav-700"
             >
               <span className="inline-flex items-center gap-1.5">
                 <Chat className="h-3.5 w-3.5" /> Message support
@@ -279,7 +279,7 @@ export default async function DashboardOverviewPage() {
         </section>
       </div>
 
-      <p className="text-center text-[0.7rem] text-ink-3">
+      <p className="text-center text-meta text-ink-3">
         {totalOrders} order{totalOrders === 1 ? "" : "s"} with Pryva
       </p>
     </div>

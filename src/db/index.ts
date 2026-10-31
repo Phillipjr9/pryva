@@ -399,7 +399,12 @@ function sortDescendingByCreatedAt<T extends Record<string, unknown>>(items: T[]
 export type PreviewState = Record<
   | "users" | "sessions" | "orders" | "walletTransactions" | "paymentTopups"
   | "contactMessages" | "giftCards" | "scheduledOrders" | "notifications"
-  | "securityViolations" | "withdrawals" | "bankAccounts",
+  | "securityViolations" | "withdrawals" | "bankAccounts" | "adminAuditLog"
+  | "userTwoFactor" | "twoFactorRecoveryCodes" | "twoFactorChallenges"
+  | "productReviews" | "supportTickets" | "supportMessages"
+  | "webauthnCredentials" | "webauthnChallenges"
+  | "referralCodes" | "referrals"
+  | "accountSignals" | "fraudEvents",
   Array<Record<string, unknown>>
 >;
 
@@ -422,12 +427,25 @@ const mockState: PreviewState =
     securityViolations: [],
     withdrawals: [],
     bankAccounts: [],
+    adminAuditLog: [],
+    userTwoFactor: [],
+    twoFactorRecoveryCodes: [],
+    twoFactorChallenges: [],
+    productReviews: [],
+    supportTickets: [],
+    supportMessages: [],
+    webauthnCredentials: [],
+    webauthnChallenges: [],
+    referralCodes: [],
+    referrals: [],
+    accountSignals: [],
+    fraudEvents: [],
   };
 
 // Next can load route handlers and server components in separate bundles.
 // Share the in-memory preview state across those bundles in this process.
 if (!databaseUrl) {
-  for (const key of ["users", "sessions", "orders", "walletTransactions", "paymentTopups", "contactMessages", "giftCards", "scheduledOrders", "notifications", "securityViolations", "withdrawals", "bankAccounts"] as const) {
+  for (const key of ["users", "sessions", "orders", "walletTransactions", "paymentTopups", "contactMessages", "giftCards", "scheduledOrders", "notifications", "securityViolations", "withdrawals", "bankAccounts", "adminAuditLog", "userTwoFactor", "twoFactorRecoveryCodes", "twoFactorChallenges", "productReviews", "supportTickets", "supportMessages", "webauthnCredentials", "webauthnChallenges", "referralCodes", "referrals", "accountSignals", "fraudEvents"] as const) {
     mockState[key] ??= [];
   }
   globalForDb.__arenaPryvaMockState = mockState;
@@ -835,22 +853,25 @@ const mockDb: any = {
   insert(table: unknown) {
     const tableKey = tableNameFor(table) as keyof PreviewState;
     return {
-      values(value: Record<string, unknown>) {
+      values(value: Record<string, unknown> | Array<Record<string, unknown>>) {
         const rows = mockState[tableKey] ?? [];
-        const row: Record<string, unknown> = {
+        // Drizzle accepts a single row or an array; the preview adapter has to
+        // accept both or a multi-row insert silently writes nothing useful.
+        const inputs = Array.isArray(value) ? value : [value];
+        const inserted = inputs.map((input) => ({
           status: tableKey === "orders" ? "active" : tableKey === "contactMessages" ? "open" : undefined,
           provider: tableKey === "orders" ? "preview" : undefined,
           walletBalance: tableKey === "users" ? 0 : undefined,
-          ...value,
-          id: value.id ?? randomBytes(16).toString("hex"),
-          createdAt: value.createdAt ?? new Date(),
-        };
-        rows.push(row);
+          ...input,
+          id: input.id ?? randomBytes(16).toString("hex"),
+          createdAt: input.createdAt ?? new Date(),
+        }));
+        rows.push(...inserted);
 
-        const insertedList = [{ ...row }];
+        const insertedList = inserted.map((row) => ({ ...row }));
         return Object.assign(insertedList, {
           returning(selection?: Record<string, unknown>) {
-            return [projectRow(selection, { [tableKey]: row }, tableKey)];
+            return inserted.map((row) => projectRow(selection, { [tableKey]: row }, tableKey));
           },
         });
       },

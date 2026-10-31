@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
+import { ServiceTitle } from "@/components/ServiceTitle";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ export default async function ScheduledOrdersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Scheduled Purchases</h1>
+        <ServiceTitle service="scheduled">Scheduled Purchases</ServiceTitle>
         <p className="mt-1 text-[0.86rem] text-ink-2">
           Recurring orders are not available yet.
         </p>

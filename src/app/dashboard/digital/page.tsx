@@ -30,7 +30,7 @@ export default async function DigitalServicesPage({
 
   return (
     <div className="grid gap-4">
-      {country && <Link href={`/dashboard/services?country=${country.code}&category=subscriptions`} className="w-fit text-[0.78rem] font-semibold text-lav-700 hover:underline">← Back to subscription services</Link>}
+      {country && <Link href={`/dashboard/services?country=${country.code}&category=subscriptions`} className="w-fit text-meta font-semibold text-lav-700 hover:underline">← Back to subscription services</Link>}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">
@@ -41,17 +41,17 @@ export default async function DigitalServicesPage({
               ? "Compare catalog plans. Digital subscriptions cannot be delivered yet."
               : "Explore subscription examples. Digital subscriptions cannot be delivered yet."}
           </p>
-          {country && <p className="mt-1 text-[0.73rem] text-ink-3">Browsing for {country.name}. This selection does not confirm real coverage.</p>}
+          {country && <p className="mt-1 text-meta text-ink-3">Browsing for {country.name}. This selection does not confirm real coverage.</p>}
         </div>
         {selectedService ? (
           <Link
             href={allSubscriptions}
-            className="btn border border-line bg-white !px-3.5 !py-2 !text-[0.76rem] text-ink hover:border-lav-200"
+            className="btn border border-line bg-white !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.76rem] text-ink hover:border-lav-200"
           >
             All subscriptions
           </Link>
         ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-[0.68rem] text-ink-3">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-micro text-ink-3">
             <Shield className="h-3 w-3 text-lav-600" /> Wallet balance {formatNaira(user.walletBalance)}
           </span>
         )}
@@ -71,7 +71,7 @@ export default async function DigitalServicesPage({
                 <ServiceIcon service={service.slug as never} size="md" />
                 <div className="min-w-0">
                   <h2 className="truncate text-[0.95rem] font-semibold text-ink">{service.name}</h2>
-                  <p className="text-[0.7rem] text-ink-3">
+                  <p className="text-meta text-ink-3">
                     {service.plans.length} plan{service.plans.length === 1 ? "" : "s"}
                   </p>
                 </div>
@@ -81,12 +81,12 @@ export default async function DigitalServicesPage({
               </p>
               <div className="mt-auto flex items-end justify-between gap-2 pt-3.5">
                 <div>
-                  <p className="text-[0.62rem] uppercase tracking-[0.12em] text-ink-3">From</p>
+                  <p className="text-micro uppercase tracking-[0.12em] text-ink-3">From</p>
                   <p className="text-[0.95rem] font-semibold text-ink">
                     {formatNaira(Math.min(...service.plans.map((plan) => plan.price)))}
                   </p>
                 </div>
-                <span className="inline-flex items-center gap-1 text-[0.74rem] font-semibold text-lav-700">
+                <span className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700">
                   Choose plan <ArrowRight className="h-3 w-3" />
                 </span>
               </div>

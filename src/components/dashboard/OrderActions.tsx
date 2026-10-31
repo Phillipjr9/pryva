@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ArrowRight, Check, Clock, Copy, Shield } from "@/components/icons";
 import { formatNaira } from "@/lib/catalog";
 
@@ -139,7 +140,7 @@ export function OrderActions({
     <div className="grid gap-3.5">
       <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
+          <p className="text-micro font-semibold uppercase tracking-[0.16em] text-ink-3">
             {service === "numbers"
               ? "Your number & code"
               : service === "esim"
@@ -154,13 +155,13 @@ export function OrderActions({
           </p>
           <span className="flex items-center gap-1.5">
             {isLiveProvider && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-lav-50 px-2.5 py-1 text-[0.62rem] font-semibold text-lav-700">
+              <span className="inline-flex items-center gap-1 rounded-full bg-lav-50 px-2.5 py-1 text-micro font-semibold text-lav-700">
                 <span className="h-1 w-1 rounded-full bg-emerald-500" />
                 Live
               </span>
             )}
             <span
-              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.66rem] font-semibold ${
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-micro font-semibold ${
                 active
                   ? expired
                     ? "bg-amber-50 text-amber-700"
@@ -176,7 +177,7 @@ export function OrderActions({
         </div>
 
         {active && remaining && (
-          <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-lav-50 px-3 py-1.5 text-[0.72rem] font-medium text-lav-700">
+          <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-lav-50 px-3 py-1.5 text-meta font-medium text-lav-700">
             <Clock className="h-3.5 w-3.5" /> Delivery window closes in {remaining}
           </p>
         )}
@@ -190,7 +191,7 @@ export function OrderActions({
               <button
                 type="button"
                 onClick={() => copy(referenceCode, "reference")}
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line bg-white px-2.5 py-1.5 text-[0.66rem] font-semibold text-ink-2 hover:border-lav-300"
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line bg-white px-2.5 py-1.5 text-micro font-semibold text-ink-2 hover:border-lav-300"
               >
                 {copied === "reference" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                 {copied === "reference" ? "Copied" : "Copy"}
@@ -204,7 +205,7 @@ export function OrderActions({
         )}
 
         {isLiveProvider && settledStatus === "active" && liveWindowOpen && !liveOtp && (
-          <p className="mt-3 flex items-center gap-2 rounded-xl bg-lav-50 px-3.5 py-3 text-[0.78rem] font-medium text-lav-800">
+          <p className="mt-3 flex items-center gap-2 rounded-xl bg-lav-50 px-3.5 py-3 text-meta font-medium text-lav-800">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-lav-600" />
             Waiting for the code — this page checks roughly every 25 seconds.
           </p>
@@ -213,10 +214,10 @@ export function OrderActions({
         {liveOtp && (
           <div role="status" aria-live="polite" className="mt-3 rounded-2xl border border-lav-100 bg-gradient-to-br from-lav-50 to-white p-4">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-lav-700">
+              <p className="text-micro font-semibold uppercase tracking-[0.14em] text-lav-700">
                 Verification code
               </p>
-              <button type="button" onClick={() => copy(liveOtp, "otp")} className="inline-flex items-center gap-1 text-[0.68rem] font-semibold text-lav-700">
+              <button type="button" onClick={() => copy(liveOtp, "otp")} className="inline-flex items-center gap-1 text-micro font-semibold text-lav-700">
                 {copied === "otp" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                 {copied === "otp" ? "Copied" : "Copy code"}
               </button>
@@ -226,11 +227,11 @@ export function OrderActions({
                 <span key={index} aria-hidden="true" className="otp-arrive grid h-11 min-w-0 flex-1 place-items-center rounded-lg border border-lav-200 bg-white font-mono text-[1.15rem] font-semibold text-lav-800" style={{ animationDelay: `${index * 70}ms` }}>{digit}</span>
               ))}
             </button>
-            {!revealed && <p className="mt-2 text-[0.7rem] text-ink-3">Tap the code to reveal it.</p>}
+            {!revealed && <p className="mt-2 text-meta text-ink-3">Tap the code to reveal it.</p>}
           </div>
         )}
 
-        {error && <p role="alert" className="mt-3 text-[0.78rem] font-medium text-rose-600">{error}</p>}
+        {error && <p role="alert" className="mt-3 text-meta font-medium text-rose-600">{error}</p>}
       </div>
 
       <div className="rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
@@ -257,12 +258,13 @@ export function OrderActions({
               {refunding ? "Requesting refund…" : "Refund this order"}
             </button>
             {refundError && (
-              <p role="alert" className="mt-2 text-[0.78rem] font-medium text-rose-600">{refundError}</p>
+              <p role="alert" className="mt-2 text-meta font-medium text-rose-600">{refundError}</p>
             )}
           </div>
         ) : active || settledStatus === "review" || settledStatus === "processing" ? (
           <p className="mt-2 text-[0.82rem] text-ink-2">
-            Refunds require review. <a href="/dashboard/support" className="font-semibold underline">Contact support</a> with your order reference.
+            Refunds require review. <Link href="/dashboard/support" className="font-semibold underline">Ask support</Link> with
+            your order reference — the assistant can check the order and tell you where it stands straight away.
           </p>
         ) : (
           <p className="mt-2 flex items-center gap-2 text-[0.82rem] text-ink-2">

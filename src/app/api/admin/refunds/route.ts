@@ -6,6 +6,7 @@ import { orders, users, walletTransactions } from "@/db/schema";
 import { eq, and, isNull, ne, sql } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { flagReconciliation } from "@/lib/reconciliation";
+import { recordAdminAction } from "@/lib/admin-audit";
 import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { isSameOriginMutation } from "@/lib/net";
@@ -128,6 +129,16 @@ export async function POST(request: NextRequest) {
     // record it: money returned and a number that may still be working.
     if (reconciliationConfirmed === true) await flagReconciliation(orderId);
     logger.info("Manual refund processed", { orderId, amount: result.amount, adminId: access.user.id });
+    await recordAdminAction({
+      actor: access.user,
+      action: "order.refund",
+      targetType: "order",
+      targetId: result.id,
+      summary:
+        `Refunded ₦${result.amount.toLocaleString("en-NG")} for ${result.reference} (${result.productName})` +
+        (typeof reason === "string" && reason.trim() ? ` — ${reason.trim()}` : "") +
+        (reconciliationConfirmed === true ? " [reconciliation confirmed]" : ""),
+    });
     scheduleWalletEmails();
     return NextResponse.json({ ok: true, message: "Refund processed successfully", refundAmount: result.amount });
   } catch (error) {

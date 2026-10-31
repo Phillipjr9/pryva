@@ -1,5 +1,6 @@
 import { GiftCardsManager } from "./GiftCardsManager";
 import { requireUser } from "@/lib/auth";
+import { ServiceTitle } from "@/components/ServiceTitle";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ export default async function GiftCardsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Gift Cards</h1>
+        <ServiceTitle service="gift-cards">Gift Cards</ServiceTitle>
         <p className="mt-1 text-[0.86rem] text-ink-2">
           Send Pryva credit to friends, family or team members.
         </p>

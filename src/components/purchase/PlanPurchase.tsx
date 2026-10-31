@@ -168,7 +168,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
                   key={group.label}
                   type="button"
                   onClick={() => changeTab(index)}
-                  className={`rounded-full px-3 py-1.5 text-[0.78rem] font-semibold transition-all sm:px-4 sm:py-2 sm:text-[0.82rem] ${
+                  className={`rounded-full px-3 py-1.5 text-meta font-semibold transition-all sm:px-4 sm:py-2 sm:text-[0.82rem] ${
                     tab === index
                       ? "bg-ink text-white shadow-sm"
                       : "text-ink-2 hover:bg-lav-50 hover:text-lav-700"
@@ -207,7 +207,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
                         )}
                         {plan.name}
                       </span>
-                      <span className="mt-1 block text-[0.76rem] text-ink-3">{plan.planLabel}</span>
+                      <span className="mt-1 block text-meta text-ink-3">{plan.planLabel}</span>
                     </div>
                     <span
                       className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border transition-colors ${
@@ -225,12 +225,12 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
                       {formatNaira(plan.price)}
                     </span>
                     {plan.compareAt && (
-                      <span className="pb-0.5 text-[0.78rem] text-ink-3 line-through">
+                      <span className="pb-0.5 text-meta text-ink-3 line-through">
                         {formatNaira(plan.compareAt)}
                       </span>
                     )}
                   </div>
-                  <span className="mt-1.5 text-[0.74rem] text-ink-3">{plan.duration}</span>
+                  <span className="mt-1.5 text-meta text-ink-3">{plan.duration}</span>
                   <span className="mt-2 block w-full sm:mt-3"><UnitsStatus /></span>
 
                   <ul className="mt-2.5 space-y-1 sm:mt-4 sm:space-y-1.5">
@@ -239,7 +239,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
                     {plan.features.map((feature, index) => (
                       <li
                         key={feature}
-                        className={`${index >= 2 ? "hidden sm:flex" : "flex"} items-start gap-1.5 text-[0.72rem] text-ink-2 sm:text-[0.78rem]`}
+                        className={`${index >= 2 ? "hidden sm:flex" : "flex"} items-start gap-1.5 text-meta text-ink-2 sm:text-[0.78rem]`}
                       >
                         <Check className="mt-0.5 h-3 w-3 shrink-0 text-lav-500" />
                         {feature}
@@ -248,7 +248,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
                   </ul>
 
                   {plan.badge && (
-                    <span className="absolute -top-2.5 right-4 inline-flex items-center gap-1 rounded-full bg-lav-100 px-2.5 py-1 text-[0.62rem] font-bold uppercase tracking-[0.1em] text-lav-700">
+                    <span className="absolute -top-2.5 right-4 inline-flex items-center gap-1 rounded-full bg-lav-100 px-2.5 py-1 text-micro font-bold uppercase tracking-[0.1em] text-lav-700">
                       <Sparkle className="h-2.5 w-2.5" />
                       {plan.badge}
                     </span>
@@ -260,13 +260,13 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
 
           <div className="mt-6 flex flex-col gap-4 rounded-3xl border border-line bg-gradient-to-br from-white to-lav-50/70 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
             <div>
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
+              <p className="text-meta font-semibold uppercase tracking-[0.16em] text-ink-3">
                 Your selection
               </p>
               <p className="mt-1 text-[0.95rem] font-semibold text-ink">
                 {selected ? `${selected.name} · ${selected.planLabel}` : "Choose a plan"}
               </p>
-              <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.74rem] text-ink-3">
+              <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-ink-3">
                 <span className="inline-flex items-center gap-1">
                   <Shield className="h-3 w-3 text-lav-500" /> Support for delivery issues
                 </span>
@@ -283,7 +283,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
 
             <div className="flex flex-col items-stretch gap-2 sm:items-end">
               <div className="flex items-center gap-3 sm:justify-end">
-                <span className="text-[0.78rem] text-ink-3">Total</span>
+                <span className="text-meta text-ink-3">Total</span>
                 <span className="text-[1.5rem] font-semibold leading-none">
                   {selected ? formatNaira(selected.price) : "—"}
                 </span>
@@ -308,7 +308,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
                 </Link>
               )}
               {error && (
-                <p className="max-w-xs text-right text-[0.76rem] font-medium text-rose-600">
+                <p className="max-w-xs text-right text-meta font-medium text-rose-600">
                   {error}
                   {needsFunds && (
                     <>

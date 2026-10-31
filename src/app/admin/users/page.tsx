@@ -17,6 +17,35 @@ function formatDate(value: Date | string) {
   return date.toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+/**
+ * Shows whether an account is locked, and how many consecutive failures it has.
+ * A lock is deliberately left to expire on its own: it exists to stop online
+ * guessing, and an operator unlocking it on request would hand that back to the
+ * person who was guessing. A customer who cannot wait resets their password,
+ * which releases the lock because it proves control of the mailbox.
+ */
+function SignInState({ lockedUntil, attempts }: { lockedUntil: Date | string | null; attempts: number }) {
+  const until = lockedUntil ? new Date(lockedUntil) : null;
+  // This is a server component rendered once per request, so "now" is the request
+  // time, not a value that has to be stable across re-renders. The purity rule
+  // exists for client components; suppressing it here keeps the label honest
+  // instead of turning it into a hydration-only value.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
+  if (until && until.getTime() > now) {
+    const minutes = Math.max(1, Math.ceil((until.getTime() - now) / 60_000));
+    return (
+      <span className="inline-flex rounded-full bg-red-50 px-2 py-0.5 text-meta font-semibold text-red-700">
+        Locked · {minutes} min
+      </span>
+    );
+  }
+  if (attempts > 0) {
+    return <span className="text-meta text-amber-700">{attempts} failed</span>;
+  }
+  return <span className="text-meta text-ink-3">—</span>;
+}
+
 export default async function AdminUsersPage({
   searchParams,
 }: {
@@ -40,6 +69,11 @@ export default async function AdminUsersPage({
       email: users.email,
       walletBalance: users.walletBalance,
       createdAt: users.createdAt,
+      // Lockout state, so a support call can be answered without SQL. Both
+      // columns are read-only here: releasing a lock from the admin UI would be
+      // a second, unaudited way to undo a security control.
+      lockedUntil: users.lockedUntil,
+      failedLoginAttempts: users.failedLoginAttempts,
     })
     .from(users)
     .where(query ? or(ilike(users.name, term), ilike(users.email, term)) : undefined)
@@ -85,7 +119,7 @@ export default async function AdminUsersPage({
           </p>
         </div>
         <div className="rounded-xl border border-line bg-white px-4 py-2 text-right">
-          <p className="text-[0.7rem] uppercase tracking-wide text-ink-3">Wallet balance on this page</p>
+          <p className="text-meta uppercase tracking-wide text-ink-3">Wallet balance on this page</p>
           <p className="text-[1rem] font-semibold text-ink">{formatNaira(walletTotal)}</p>
         </div>
       </div>
@@ -109,21 +143,22 @@ export default async function AdminUsersPage({
         )}
       </form>
 
-      <div className="overflow-hidden rounded-2xl border border-line bg-white">
-        <table className="w-full text-left text-[0.84rem]">
-          <thead className="bg-cream/70 text-[0.72rem] uppercase tracking-wide text-ink-3">
+      <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+        <table className="w-full min-w-[36rem] text-left text-[0.84rem]">
+          <thead className="bg-cream/70 text-meta uppercase tracking-wide text-ink-3">
             <tr>
               <th className="px-4 py-3 font-semibold">User</th>
               <th className="px-4 py-3 font-semibold">Wallet</th>
               <th className="px-4 py-3 font-semibold">Orders</th>
               <th className="px-4 py-3 font-semibold">Spent</th>
+              <th className="px-4 py-3 font-semibold">Sign-in</th>
               <th className="px-4 py-3 font-semibold">Joined</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-ink-2">
+                <td colSpan={6} className="px-4 py-10 text-center text-ink-2">
                   No users match that search.
                 </td>
               </tr>
@@ -134,11 +169,14 @@ export default async function AdminUsersPage({
                 <tr key={row.id} className="border-t border-line/70">
                   <td className="px-4 py-3">
                     <p className="font-medium text-ink">{row.name}</p>
-                    <p className="text-[0.76rem] text-ink-3">{row.email}</p>
+                    <p className="text-meta text-ink-3">{row.email}</p>
                   </td>
                   <td className="px-4 py-3 font-medium">{formatNaira(row.walletBalance)}</td>
                   <td className="px-4 py-3">{stats?.orders ?? 0}</td>
                   <td className="px-4 py-3">{formatNaira(stats?.spent ?? 0)}</td>
+                  <td className="px-4 py-3">
+                    <SignInState lockedUntil={row.lockedUntil} attempts={row.failedLoginAttempts} />
+                  </td>
                   <td className="px-4 py-3 text-ink-2">{formatDate(row.createdAt)}</td>
                 </tr>
               );

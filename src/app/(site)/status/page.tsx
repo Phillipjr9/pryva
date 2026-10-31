@@ -67,9 +67,18 @@ export default function StatusPage() {
         : "Payments are not configured, so the wallet cannot be funded yet.",
     },
     {
-      name: "Digital subscriptions, gift cards, data, bulk and scheduled orders",
+      // Gift cards were previously listed here with the categories that have no
+      // live fulfilment, which told visitors they could not be bought while the
+      // dashboard was selling them. A gift card is issued by Pryva from the
+      // buyer's own wallet, so it has no supplier feed to wait for.
+      name: "Gift cards",
+      status: "Available",
+      detail: "Gift cards are issued by Pryva from your wallet balance the moment you buy one, so they do not depend on a third-party catalogue.",
+    },
+    {
+      name: "Digital subscriptions, data, bulk and scheduled orders",
       status: "Not available",
-      detail: "These categories cannot be delivered automatically yet, so they cannot be ordered or charged.",
+      detail: "These categories are simulated in the preview and have no verified live fulfilment yet, so they cannot be ordered or charged.",
     },
     {
       name: "Automatic refunds",

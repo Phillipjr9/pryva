@@ -25,7 +25,7 @@ export const metadata: Metadata = {
  */
 function BounceNotice({ arenaPreview }: { arenaPreview: boolean }) {
   return (
-    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-[0.78rem] text-ink">
+    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-meta text-ink">
       <p className="font-semibold text-amber-900">Just signed in and landed back here?</p>
       <p className="mt-1 leading-relaxed text-ink-2">
         {arenaPreview

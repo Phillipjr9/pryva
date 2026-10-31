@@ -1,10 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Shield, Sparkle } from "@/components/icons";
 import { safeRedirectPath } from "@/lib/safe-redirect";
 import { PasswordInput } from "@/components/ui/PasswordInput";
+import { BrandIcon } from "@/components/BrandIcon";
+import { PasskeySignInButton } from "@/components/auth/PasskeySignInButton";
+import {
+  normalizeReferralCode,
+  REFERRAL_COOKIE,
+  REFERRAL_COOKIE_MAX_AGE_SECONDS,
+} from "@/lib/referral-code";
 
 type Mode = "login" | "signup";
 
@@ -32,14 +39,33 @@ export function AuthForm({
   mode,
   next,
   errorParam,
+  refCode,
 }: {
   mode: Mode;
   next: string;
   errorParam?: string | null;
+  /** `?ref=` from an invite link. Sign-up only; ignored everywhere else. */
+  refCode?: string | null;
 }) {
+  const invite = mode === "signup" ? normalizeReferralCode(refCode) : null;
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [pending, setPending] = useState<"form" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Set only when the password was accepted and a second factor is required.
+  // Kept in client state on purpose: the challenge token is single-use, short
+  // lived and bound to this sign-in attempt, so it must not go in a URL or a
+  // cookie the browser might replay later.
+  const [challenge, setChallenge] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+
+  // Remember the invite for a while, because a visitor may leave for Google and
+  // come back to this form — or finish with Google instead. The server reads the
+  // same cookie in both signup paths. Not httpOnly: it is a public invite code,
+  // and the value is only ever used to credit somebody else's wallet.
+  useEffect(() => {
+    if (!invite) return;
+    document.cookie = `${REFERRAL_COOKIE}=${invite}; Path=/; Max-Age=${REFERRAL_COOKIE_MAX_AGE_SECONDS}; SameSite=Lax`;
+  }, [invite]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,7 +75,7 @@ export function AuthForm({
       const endpoint = mode === "signup" ? "/api/auth/signup" : "/api/auth/login";
       const payload =
         mode === "signup"
-          ? { name: form.name, email: form.email, password: form.password }
+          ? { name: form.name, email: form.email, password: form.password, ref: invite ?? undefined }
           : { email: form.email, password: form.password };
 
       const response = await fetch(endpoint, {
@@ -57,9 +83,19 @@ export function AuthForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = (await response.json()) as { ok?: boolean; error?: string };
+      const data = (await response.json()) as {
+        ok?: boolean;
+        error?: string;
+        twoFactorRequired?: boolean;
+        challengeToken?: string;
+      };
       if (!response.ok || !data.ok) {
         setError(data.error ?? "That didn't work. Please try again.");
+        setPending(null);
+        return;
+      }
+      if (data.twoFactorRequired && data.challengeToken) {
+        setChallenge(data.challengeToken);
         setPending(null);
         return;
       }
@@ -71,29 +107,101 @@ export function AuthForm({
     }
   }
 
+  async function verifySecondFactor(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!challenge) return;
+    setPending("form");
+    setError(null);
+    try {
+      const response = await fetch("/api/auth/2fa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeToken: challenge, code }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!response.ok || !data.ok) {
+        setError(data.error ?? "That code did not work.");
+        setPending(null);
+        return;
+      }
+      window.location.replace(safeRedirectPath(next));
+      return;
+    } catch {
+      setError("Network hiccup. Please try again.");
+      setPending(null);
+    }
+  }
+
+  if (challenge) {
+    return (
+      <div>
+        <span className="eyebrow">
+          <Shield className="h-3 w-3" />
+          Two-step verification
+        </span>
+        <h1 className="mt-3 text-[2rem] font-medium leading-[1.1] tracking-[-0.03em] sm:text-[2.3rem]">
+          Enter the code from
+          <br />
+          <span className="text-display italic text-lav-700">your authenticator.</span>
+        </h1>
+        <p className="mt-3 text-[0.9rem] leading-relaxed text-ink-2">
+          Your password was accepted. This sign-in needs the six-digit code, or one of your saved
+          recovery codes.
+        </p>
+
+        <form onSubmit={verifySecondFactor} className="mt-5 grid gap-3.5">
+          <div>
+            <label htmlFor="two-factor-code" className="field-label">
+              Code or recovery code
+            </label>
+            <input
+              id="two-factor-code"
+              autoFocus
+              required
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              className="field"
+              placeholder="123456 or abcde-fghij"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+            />
+          </div>
+
+          {error && (
+            <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-meta font-medium text-red-700">
+              {error}
+            </p>
+          )}
+
+          <button type="submit" disabled={pending !== null || code.length < 6} className="btn btn-primary w-full !py-3.5">
+            {pending ? "Checking…" : "Continue"}
+            {!pending && <ArrowRight className="h-4 w-4" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setChallenge(null);
+              setCode("");
+              setError(null);
+            }}
+            className="text-meta font-semibold text-ink-2 underline underline-offset-2"
+          >
+            Start over
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="mb-6">
         {errorParam && GOOGLE_ERRORS[errorParam] && (
-          <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[0.78rem] font-medium text-amber-800">
+          <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-meta font-medium text-amber-800">
             {GOOGLE_ERRORS[errorParam]}
           </p>
         )}
-
-        <a
-          href={`/api/auth/google?next=${encodeURIComponent(next)}`}
-          className="btn w-full border border-line bg-white !py-3.5 text-ink shadow-sm hover:bg-lav-50/60"
-        >
-          Continue with Google
-        </a>
-
-        <div className="my-5 flex items-center gap-3">
-          <span className="h-px flex-1 bg-line" />
-          <span className="text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
-            or with email
-          </span>
-          <span className="h-px flex-1 bg-line" />
-        </div>
 
         <span className="eyebrow">
           <Sparkle className="h-3 w-3" />
@@ -191,6 +299,29 @@ export function AuthForm({
         </button>
       </form>
 
+      <div className="my-5 flex items-center gap-3">
+        <span className="h-px flex-1 bg-line" />
+        <span className="text-micro font-semibold uppercase tracking-[0.16em] text-ink-3">
+          {mode === "signup" ? "or sign up with" : "or sign in with"}
+        </span>
+        <span className="h-px flex-1 bg-line" />
+      </div>
+
+      <div className="grid gap-2.5">
+        {/* A passkey only exists after an account does, so this is a sign-in
+            control and never a sign-up one. */}
+        {mode === "login" ? <PasskeySignInButton next={next} /> : null}
+        <a
+          href={`/api/auth/google?next=${encodeURIComponent(next)}`}
+          className="btn w-full border border-line bg-white !py-3.5 text-ink shadow-sm hover:bg-lav-50/60"
+        >
+          {/* Google's own four-colour G, from the same brand-mark table the
+              service pages use — never our mark, and never redrawn by hand. */}
+          <BrandIcon brand="google" variant="bare" size={18} decorative />
+          Continue with Google
+        </a>
+      </div>
+
       <p className="mt-6 text-center text-[0.85rem] text-ink-2">
         {mode === "signup" ? (
           <>
@@ -209,7 +340,7 @@ export function AuthForm({
         )}
       </p>
 
-      <p className="mt-6 flex items-start gap-2 rounded-xl bg-lav-50/80 px-3.5 py-3 text-[0.74rem] leading-relaxed text-ink-2">
+      <p className="mt-6 flex items-start gap-2 rounded-xl bg-lav-50/80 px-3.5 py-3 text-meta leading-relaxed text-ink-2">
         <Shield className="mt-0.5 h-4 w-4 shrink-0 text-lav-600" />
         Passwords are stored salted and hashed. Pryva never asks for your BVN, bank login or OTP from
         other platforms.
@@ -219,7 +350,7 @@ export function AuthForm({
         <ul className="mt-4 grid gap-1.5">
           {["Pay in Naira by transfer or card", "Live fulfillment for several services is paused", "Support for delivery issues"].map(
             (item) => (
-              <li key={item} className="flex items-center gap-2 text-[0.76rem] text-ink-2">
+              <li key={item} className="flex items-center gap-2 text-meta text-ink-2">
                 <Check className="h-3.5 w-3.5 text-lav-600" />
                 {item}
               </li>

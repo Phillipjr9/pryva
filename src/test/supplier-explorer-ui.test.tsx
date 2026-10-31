@@ -24,8 +24,27 @@ describe("service explorer live listings", () => {
     expect(within(card).getByText("7 left")).toBeTruthy();
     expect(within(card).getByText("Not tracked")).toBeTruthy();
     expect(within(card).getByRole("button", { name: "Ordering paused" }).hasAttribute("disabled")).toBe(true);
-    expect(screen.getByText(/Live listings are read-only/)).toBeTruthy();
+    expect(screen.getByText(/Live listings are current/)).toBeTruthy();
     expect(screen.getByText("2026-01-01 12:34:56 UTC")).toBeTruthy();
+  });
+
+  it("links a priced boost straight into its purchase page", async () => {
+    // Boosts are the one live listing that can actually be bought: no country
+    // gate, a "from" price, and a link — not a disabled button.
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+      ok: true, country: "ng", partial: false, fetchedAt: "2026-01-01T12:34:56.000Z", items: [{
+        id: "live-boost-0123456789abcdef0123", category: "social", name: "Instagram Followers", description: "Followers boost",
+        tag: "Followers", artwork: { kind: "brand", name: "instagram" }, source: "live", coverage: "not-country-specific",
+        stock: null, myUnits: null, price: 1600, priceFrom: true,
+        action: { label: "Buy boost", href: "/dashboard/services/boost/live-boost-0123456789abcdef0123" },
+      }],
+    }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="ng" initialCategory="social" />);
+    const card = (await screen.findByRole("heading", { name: "Instagram Followers" })).closest("article")!;
+    const buy = within(card).getByRole("link", { name: /Buy boost/ });
+    expect(buy.getAttribute("href")).toBe("/dashboard/services/boost/live-boost-0123456789abcdef0123");
+    expect(within(card).getByText(/from ₦1,600/)).toBeTruthy();
   });
 
   it("requests the live catalog and never a demo endpoint", async () => {

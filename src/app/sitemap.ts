@@ -8,6 +8,7 @@ const routes = [
   "/proxies",
   "/email-otp",
   "/accounts",
+  "/gift-cards",
   "/digital-services",
   "/blog",
   // These were published pages that no route list mentioned: the help centre
@@ -15,6 +16,7 @@ const routes = [
   // nowhere at all.
   "/help",
   "/testimonials",
+  "/reviews",
   "/status",
   "/terms",
   "/privacy",

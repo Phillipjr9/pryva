@@ -22,7 +22,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <div className="shell relative grid gap-10 pb-16 pt-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:gap-16 lg:pt-10">
         <div className="order-2 hidden lg:order-1 lg:block">
           <div className="relative overflow-hidden rounded-[2rem] border border-white/80 bg-white/60 p-8 shadow-[var(--shadow-card)] backdrop-blur">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-lav-200 bg-white/80 px-3 py-1.5 text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-lav-700">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-lav-200 bg-white/80 px-3 py-1.5 text-micro font-semibold uppercase tracking-[0.16em] text-lav-700">
               <Sparkle className="h-3 w-3" /> Simple. Secure. Scalable.
             </span>
             <h2 className="mt-5 max-w-sm text-[1.9rem] font-medium leading-[1.1]">
@@ -50,13 +50,13 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
                   </span>
                   <div>
                     <p className="text-[0.84rem] font-semibold text-ink">{item.title}</p>
-                    <p className="text-[0.76rem] text-ink-2">{item.body}</p>
+                    <p className="text-meta text-ink-2">{item.body}</p>
                   </div>
                 </div>
               ))}
             </div>
 
-            <p className="mt-6 flex items-center gap-2 text-[0.72rem] text-ink-3">
+            <p className="mt-6 flex items-center gap-2 text-meta text-ink-3">
               <Shield className="h-3.5 w-3.5 text-lav-600" />
               Support for account and order questions
             </p>

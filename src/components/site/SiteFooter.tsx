@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ArrowRight, Card, Shield, Check } from "@/components/icons";
 import { services } from "@/lib/catalog";
 import { BrandLockup } from "@/components/brand/BrandLockup";
+import { BrandIcon } from "@/components/BrandIcon";
+import { SOCIAL_LINKS, socialHref, socialIsPlaceholder, socialLabel } from "@/lib/social";
 
 const columns = [
   {
@@ -28,11 +30,14 @@ const columns = [
       { href: "/about", label: "About Pryva" },
       { href: "/how-it-works", label: "How it works" },
       { href: "/pricing", label: "Pricing" },
+      // Wallet credit is a product of its own, not one of the services above.
+      { href: "/gift-cards", label: "Gift cards" },
       { href: "/faq", label: "FAQ" },
       // The blog, help centre, status page and customer-feedback page all
       // existed but nothing on the site linked to them — they were reachable
       // only by typing the URL.
       { href: "/blog", label: "Guides & blog" },
+      { href: "/reviews", label: "Customer reviews" },
       { href: "/testimonials", label: "Customer feedback" },
     ],
   },
@@ -90,7 +95,7 @@ export function SiteFooter() {
               Pryva is a Nigerian digital services platform for virtual numbers, eSIM data,
               residential proxies and email OTP. Built for people who value calm, reliable access.
             </p>
-            <div className="mt-5 flex flex-wrap items-center gap-2 text-[0.7rem] font-semibold text-ink-2">
+            <div className="mt-5 flex flex-wrap items-center gap-2 text-meta font-semibold text-ink-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/80 px-2.5 py-1.5">
                 <Card className="h-3.5 w-3.5 text-lav-600" />
                 Bank transfer
@@ -104,6 +109,29 @@ export function SiteFooter() {
                 Live fulfillment paused
               </span>
             </div>
+
+            {/* Our accounts are still being set up: until a `profileUrl` exists in
+                src/lib/social.ts these go to the platform and say "coming soon".
+                The label is not decoration — it is the difference between a
+                placeholder and a dead link. */}
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <span className="text-meta font-semibold uppercase tracking-[0.18em] text-ink-3">
+                Follow
+              </span>
+              {SOCIAL_LINKS.map((link) => (
+                <a
+                  key={link.id}
+                  href={socialHref(link)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={socialLabel(link)}
+                  title={socialLabel(link)}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white/80 transition-colors hover:border-lav-300"
+                >
+                  <BrandIcon brand={link.mark} size={18} variant="bare" decorative />
+                </a>
+              ))}
+            </div>
           </div>
 
           <div className="mt-10 flex flex-col gap-3 border-t border-line/70 pt-8 sm:flex-row sm:items-center sm:justify-between">
@@ -113,7 +141,7 @@ export function SiteFooter() {
                 Nigerian digital services — numbers, data, proxies and accounts, priced in Naira.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5 text-[0.76rem] text-ink-3">
+            <div className="flex flex-wrap items-center gap-1.5 text-meta text-ink-3">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/80 px-2.5 py-1.5">
                 <Shield className="h-3.5 w-3.5 text-lav-600" />
                 Paystack when configured
@@ -128,7 +156,7 @@ export function SiteFooter() {
           <div className="mt-8 grid grid-cols-2 gap-8 sm:grid-cols-3">
             {columns.map((column) => (
               <div key={column.title}>
-                <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-ink-3">
+                <p className="text-meta font-semibold uppercase tracking-[0.18em] text-ink-3">
                   {column.title}
                 </p>
                 <ul className="mt-4 space-y-2.5">
@@ -148,7 +176,7 @@ export function SiteFooter() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-line py-6 text-[0.76rem] text-ink-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-t border-line py-6 text-meta text-ink-3 sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} Pryva Technologies. Made in Lagos, for Nigeria.</p>
           <div className="flex flex-wrap items-center gap-4">
             <span className="inline-flex items-center gap-1.5">

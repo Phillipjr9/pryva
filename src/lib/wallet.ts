@@ -41,29 +41,41 @@ function validateWalletEntry(input: WalletEntryInput, direction: "credit" | "deb
   }
 }
 
+/**
+ * Credit inside a caller-supplied transaction.
+ *
+ * Needed wherever the money and the reason for it have to commit together — a
+ * referral that is marked paid but never credited (or credited but never marked)
+ * is a payout nobody can explain. The unlocked credit path below is the same
+ * arithmetic in its own transaction.
+ */
+export async function creditWalletInTx(tx: any, input: WalletEntryInput): Promise<number> {
+  validateWalletEntry(input, "credit");
+
+  const [updated] = await tx
+    .update(users)
+    .set({ walletBalance: sql`${users.walletBalance} + ${input.amount}` })
+    .where(and(eq(users.id, input.userId), lte(users.walletBalance, MAX_DATABASE_INTEGER - input.amount)))
+    .returning({ balance: users.walletBalance });
+
+  if (!updated) throw new Error("User not found or wallet balance would exceed its limit");
+
+  await tx.insert(walletTransactions).values({
+    userId: input.userId,
+    orderId: input.orderId ?? null,
+    type: input.type,
+    amount: input.amount,
+    balanceAfter: updated.balance,
+    description: input.description,
+    reference: input.reference ?? makeReference("TOP"),
+  });
+
+  return updated.balance;
+}
+
 export async function creditWallet(input: WalletEntryInput): Promise<number> {
   validateWalletEntry(input, "credit");
-  const balance = await db.transaction(async (tx: any) => {
-    const [updated] = await tx
-      .update(users)
-      .set({ walletBalance: sql`${users.walletBalance} + ${input.amount}` })
-      .where(and(eq(users.id, input.userId), lte(users.walletBalance, MAX_DATABASE_INTEGER - input.amount)))
-      .returning({ balance: users.walletBalance });
-
-    if (!updated) throw new Error("User not found or wallet balance would exceed its limit");
-
-    await tx.insert(walletTransactions).values({
-      userId: input.userId,
-      orderId: input.orderId ?? null,
-      type: input.type,
-      amount: input.amount,
-      balanceAfter: updated.balance,
-      description: input.description,
-      reference: input.reference ?? makeReference("TOP"),
-    });
-
-    return updated.balance;
-  });
+  const balance = await db.transaction((tx: any) => creditWalletInTx(tx, input));
   scheduleWalletEmails();
   return balance;
 }

@@ -72,29 +72,29 @@ export default async function WalletPage({
       <div className="grid gap-2.5 sm:grid-cols-3">
         <div className="rounded-2xl bg-ink p-5 text-white">
           <div className="flex items-center justify-between">
-            <p className="text-[0.64rem] uppercase tracking-[0.16em] text-white/55">Available now</p>
+            <p className="text-micro uppercase tracking-[0.16em] text-white/55">Available now</p>
             <Wallet className="h-4 w-4 text-lav-200" />
           </div>
           <p className="mt-2 text-[1.9rem] font-semibold leading-none">
             {formatNaira(user.walletBalance)}
           </p>
-          <p className="mt-2 text-[0.68rem] text-white/55">See transaction history below</p>
+          <p className="mt-2 text-micro text-white/55">See transaction history below</p>
         </div>
         <div className="rounded-2xl border border-line bg-[#fffdfa] p-5">
           <div className="flex items-center justify-between">
-            <p className="text-[0.64rem] uppercase tracking-[0.16em] text-ink-3">Added in total</p>
+            <p className="text-micro uppercase tracking-[0.16em] text-ink-3">Added in total</p>
             <Card className="h-4 w-4 text-lav-600" />
           </div>
           <p className="mt-2 text-[1.55rem] font-semibold leading-none">{formatNaira(added)}</p>
-          <p className="mt-2 text-[0.68rem] text-ink-3">Credits and refunds (including gift-card redemptions)</p>
+          <p className="mt-2 text-micro text-ink-3">Credits and refunds (including gift-card redemptions)</p>
         </div>
         <div className="rounded-2xl border border-line bg-[#fffdfa] p-5">
           <div className="flex items-center justify-between">
-            <p className="text-[0.64rem] uppercase tracking-[0.16em] text-ink-3">Spent in total</p>
+            <p className="text-micro uppercase tracking-[0.16em] text-ink-3">Spent in total</p>
             <Refresh className="h-4 w-4 text-lav-600" />
           </div>
           <p className="mt-2 text-[1.55rem] font-semibold leading-none">{formatNaira(spent)}</p>
-          <p className="mt-2 text-[0.68rem] text-ink-3">{spendCount} purchase or gift-card charge{spendCount === 1 ? "" : "s"}; excludes withdrawals</p>
+          <p className="mt-2 text-micro text-ink-3">{spendCount} purchase or gift-card charge{spendCount === 1 ? "" : "s"}; excludes withdrawals</p>
         </div>
       </div>
 
@@ -109,7 +109,7 @@ export default async function WalletPage({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-[1.05rem] font-semibold">Transaction history</h2>
               <div className="flex items-center gap-2.5">
-                <span className="text-[0.68rem] text-ink-3">{transactions.length} newest entries</span>
+                <span className="text-micro text-ink-3">{transactions.length} newest entries</span>
                 {transactions.length > 0 && <ExportTransactionsButton />}
               </div>
             </div>
@@ -123,7 +123,7 @@ export default async function WalletPage({
                   <div key={tx.id} className="flex items-start justify-between gap-3 py-2.5">
                     <div className="min-w-0">
                       <p className="truncate text-[0.82rem] font-medium text-ink">{tx.description}</p>
-                      <p className="truncate text-[0.66rem] text-ink-3">
+                      <p className="truncate text-micro text-ink-3">
                         {tx.reference} ·{" "}
                         {new Date(tx.createdAt).toLocaleString("en-NG", {
                           day: "numeric",
@@ -142,7 +142,7 @@ export default async function WalletPage({
                         {walletEntrySign(tx.type)}
                         {formatNaira(tx.amount)}
                       </p>
-                      <p className="text-[0.64rem] text-ink-3">Bal. {formatNaira(tx.balanceAfter)}</p>
+                      <p className="text-micro text-ink-3">Bal. {formatNaira(tx.balanceAfter)}</p>
                     </div>
                   </div>
                 ))}
@@ -170,7 +170,7 @@ export default async function WalletPage({
             </ul>
             <Link
               href="/dashboard/orders"
-              className="mt-3.5 inline-flex items-center gap-1.5 text-[0.78rem] font-semibold text-lav-700 hover:underline"
+              className="mt-3.5 inline-flex items-center gap-1.5 text-meta font-semibold text-lav-700 hover:underline"
             >
               View your orders
               <ArrowRight className="h-3.5 w-3.5" />

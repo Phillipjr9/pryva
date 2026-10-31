@@ -4,6 +4,7 @@ import { requireAuthApi } from "@/lib/auth";
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { giftCardAttemptLimit, normalizeGiftCardCode } from "@/lib/gift-card-requests";
+import { giftCardVelocity, recordFraudEvent } from "@/lib/fraud";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,24 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       return NextResponse.json({ error: "Invalid request" }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
     }
-    const code = body && typeof body === "object" && !Array.isArray(body) ? normalizeGiftCardCode((body as { code?: unknown }).code) : null;
+    // A stolen card is monetised by redeeming it, so redemptions have a daily
+    // ceiling as well as an attempt budget. Counted from the database: an
+    // in-memory counter would be per-instance.
+    const velocity = await giftCardVelocity(user.id).catch(() => ({ allowed: true, count: 0, limit: 0 }));
+    if (!velocity.allowed) {
+      await recordFraudEvent({
+        userId: user.id,
+        kind: "gift_card_velocity",
+        severity: "warn",
+        reasons: [`${velocity.count} gift cards redeemed in the last day (limit ${velocity.limit})`],
+      });
+      return NextResponse.json(
+        { error: "That is a lot of gift cards in one day. Please contact support." },
+        { status: 429 },
+      );
+    }
+
+    const code = body && body !== null && typeof body === "object" && !Array.isArray(body) ? normalizeGiftCardCode((body as { code?: unknown }).code) : null;
     if (!code) return NextResponse.json({ error: "Invalid code" }, { status: 400 });
     const result = await redeemGiftCard({ userId: user.id, code });
     return NextResponse.json({ ok: true, amount: result.amount }, { headers: { "Cache-Control": "private, no-store" } });

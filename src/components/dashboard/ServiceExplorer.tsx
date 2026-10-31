@@ -51,26 +51,26 @@ function ServiceCard({ item, countryName }: { item: ExplorerItem; countryName: s
     <article className="group flex h-full min-w-0 flex-col rounded-2xl border border-line bg-white p-4 transition-colors hover:border-lav-200">
       <div className="flex items-start justify-between gap-2">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-lav-50/70">{itemArt(item)}</div>
-        <span className={`rounded-full px-2 py-1 text-[0.59rem] font-bold uppercase tracking-[0.08em] ${item.source === "example" ? "bg-lav-50 text-lav-700" : "bg-cream-2 text-ink-2"}`}>
+        <span className={`rounded-full px-2 py-1 text-micro font-bold uppercase tracking-[0.08em] ${item.source === "example" ? "bg-lav-50 text-lav-700" : "bg-cream-2 text-ink-2"}`}>
           {item.source === "live" ? "Live listing" : item.source === "example" ? "Example" : item.source === "tool" ? "Tool" : "Catalog"}
         </span>
       </div>
       <div className="mt-3 min-w-0">
         <h3 className="break-words text-[0.91rem] font-semibold leading-snug text-ink">{item.name}</h3>
-        <p className="mt-1 text-[0.71rem] text-ink-3">{item.description} · <span className="capitalize">{item.tag}</span></p>
+        <p className="mt-1 text-meta text-ink-3">{item.description} · <span className="capitalize">{item.tag}</span></p>
       </div>
-      <p className="mt-3 text-[0.68rem] leading-relaxed text-ink-3">{coverage}</p>
+      <p className="mt-3 text-micro leading-relaxed text-ink-3">{coverage}</p>
       <div className="mt-auto pt-3">
-        <p className="min-h-[1.2rem] text-[0.73rem] font-semibold text-ink-2">
+        <p className="min-h-[1.2rem] text-meta font-semibold text-ink-2">
           {price !== null ? `${item.source === "live" ? "Indicative" : "Listed"} ${item.priceFrom ? "from " : "price "}${formatNaira(price)}` : item.source === "example" ? "Price not connected" : "See details"}
         </p>
         <div className="mt-2"><UnitsStatus stock={item.stock} owned={item.myUnits} /></div>
         {action ? (
-          <Link href={action.href} className="mt-3 flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-lav-200 bg-lav-50 px-3 py-2 text-center text-[0.75rem] font-semibold text-lav-800 transition-colors hover:border-lav-400 hover:bg-lav-100">
+          <Link href={action.href} className="mt-3 flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-lav-200 bg-lav-50 px-3 py-2 text-center text-meta font-semibold text-lav-800 transition-colors hover:border-lav-400 hover:bg-lav-100">
             {action.label} <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         ) : (
-          <button type="button" disabled className="mt-3 flex min-h-10 w-full items-center justify-center rounded-xl border border-line bg-cream/60 px-3 py-2 text-[0.75rem] font-semibold text-ink-3/80 disabled:cursor-not-allowed">
+          <button type="button" disabled className="mt-3 flex min-h-10 w-full items-center justify-center rounded-xl border border-line bg-cream/60 px-3 py-2 text-meta font-semibold text-ink-3/80 disabled:cursor-not-allowed">
             {noAction}
           </button>
         )}
@@ -113,7 +113,7 @@ export function ServiceExplorer({ initialCountry, initialCategory, rejectedCount
   const filtered = useMemo(() => filterExplorerItems(items, category, search, tag), [items, category, search, tag]);
   const tags = category === "verification" ? VERIFICATION_TAGS : category === "social" ? SOCIAL_TAGS : [];
 
-  // Live supplier listings are read-only.
+  // Live listings: boosts are purchasable, the others are read-only until their ordering is wired.
   useEffect(() => {
     if (!country) return;
     const controller = new AbortController();
@@ -164,15 +164,15 @@ export function ServiceExplorer({ initialCountry, initialCategory, rejectedCount
     <div className="grid gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[0.65rem] font-bold uppercase tracking-[0.16em] text-lav-700">Explore Pryva</p>
+          <p className="text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Explore Pryva</p>
           <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">{selectedCategory?.label ?? "Your service hub"}</h1>
           <p className="mt-1.5 max-w-2xl text-[0.82rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Choose a country, then select a service below.` : "Choose a country, then browse categories and service examples in one place."}</p>
         </div>
-        <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-[0.76rem] font-semibold text-lav-700 hover:underline">My orders <ArrowRight className="h-3.5 w-3.5" /></Link>
+        <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline">My orders <ArrowRight className="h-3.5 w-3.5" /></Link>
       </div>
 
       {rejectedCountry || rejectedCategory ? (
-        <p role="status" className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-[0.76rem] leading-relaxed text-amber-900">
+        <p role="status" className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-meta leading-relaxed text-amber-900">
           <Shield className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
             That link asked for{rejectedCountry ? <> country <strong className="font-semibold">&ldquo;{truncate(rejectedCountry)}&rdquo;</strong></> : null}
@@ -187,9 +187,9 @@ export function ServiceExplorer({ initialCountry, initialCategory, rejectedCount
         <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 h-48 w-48 rounded-full bg-lav-300/30 blur-3xl" />
         <div className="relative grid gap-4 md:grid-cols-[1fr_1.1fr] md:items-center">
           <div>
-            <p className="inline-flex items-center gap-1.5 text-[0.64rem] font-bold uppercase tracking-[0.16em] text-lav-700"><Globe className="h-3.5 w-3.5" /> Step 01</p>
+            <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Globe className="h-3.5 w-3.5" /> Step 01</p>
             <h2 id="choose-country-title" className="mt-2 text-[1.25rem] font-semibold text-ink">Start with a country.</h2>
-            <p className="mt-1.5 max-w-sm text-[0.78rem] leading-relaxed text-ink-2">Select where you need the service. Coverage and availability still need confirmation before ordering.</p>
+            <p className="mt-1.5 max-w-sm text-meta leading-relaxed text-ink-2">Select where you need the service. Boosts can be ordered right away; other listings still need their coverage confirmed before ordering.</p>
           </div>
           <div className="rounded-2xl border border-white/80 bg-white/60 p-4 shadow-sm">
             <CountrySelector id="service-country" value={country} onChange={chooseCountry} />
@@ -208,66 +208,66 @@ export function ServiceExplorer({ initialCountry, initialCategory, rejectedCount
           <section aria-labelledby="categories-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-[0.64rem] font-bold uppercase tracking-[0.16em] text-lav-700">Step 02</p>
+                <p className="text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Step 02</p>
                 <h2 id="categories-title" className="mt-1 text-[1.05rem] font-semibold text-ink">Choose a category</h2>
               </div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-[0.72rem] font-semibold text-ink-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-meta font-semibold text-ink-2">
                 <CountryFlag code={selectedCountry.code} size={18} decorative radius={9} /> {selectedCountry.name}
               </span>
             </div>
             <div className="mt-4 flex flex-wrap gap-2" aria-label="Service categories">
-              <button type="button" onClick={() => chooseCategory("all")} aria-pressed={category === "all"} className={`rounded-full border px-3.5 py-2 text-[0.73rem] font-semibold transition-colors ${category === "all" ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}>All categories</button>
+              <button type="button" onClick={() => chooseCategory("all")} aria-pressed={category === "all"} className={`rounded-full border px-3.5 py-2 text-meta font-semibold transition-colors ${category === "all" ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}>All categories</button>
               {EXPLORER_CATEGORIES.map((entry) => (
-                <button key={entry.id} type="button" title={entry.description} onClick={() => chooseCategory(entry.id)} aria-pressed={category === entry.id} className={`rounded-full border px-3.5 py-2 text-[0.73rem] font-semibold transition-colors ${category === entry.id ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}>
+                <button key={entry.id} type="button" title={entry.description} onClick={() => chooseCategory(entry.id)} aria-pressed={category === entry.id} className={`rounded-full border px-3.5 py-2 text-meta font-semibold transition-colors ${category === entry.id ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}>
                   {entry.label}
                 </button>
               ))}
             </div>
           </section>
 
-          <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-[0.73rem] leading-relaxed border-amber-200 bg-amber-50/70 text-amber-900`}>
+          <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-meta leading-relaxed border-amber-200 bg-amber-50/70 text-amber-900`}>
             <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-            {liveState?.country === country && !liveState.failed ? <p><strong>Live listings are read-only.</strong> Prices and stock are indicative, and coverage must be confirmed before ordering. Examples are separate and purchased units aren&apos;t tracked here yet. {liveState.partial && "Some listing types are temporarily unavailable. "}<Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p> : <p><strong>Examples, not a verified live catalog.</strong> Stock is unknown and purchased service units aren&apos;t tracked yet. Country coverage is unverified. <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
+            {liveState?.country === country && !liveState.failed ? <p><strong>Live listings are current.</strong> Boosting services can be bought now, from your wallet. Plan and eSIM listings are still indicative until ordering is switched on for them, and examples are separate. {liveState.partial && "Some listing types are temporarily unavailable. "}<Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p> : <p><strong>Examples, not a verified live catalog.</strong> Stock is unknown and purchased service units aren&apos;t tracked yet. Country coverage is unverified. <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
           </div>
 
           <section aria-labelledby="services-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 sm:p-6">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <p className="inline-flex items-center gap-1.5 text-[0.64rem] font-bold uppercase tracking-[0.16em] text-lav-700"><Sparkle className="h-3.5 w-3.5" /> Step 03</p>
+                <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Sparkle className="h-3.5 w-3.5" /> Step 03</p>
                 <h2 id="services-title" className="mt-1 text-[1.05rem] font-semibold text-ink">{selectedCategory ? `Explore ${selectedCategory.label}` : "Explore services"}</h2>
-                <p aria-live="polite" className="mt-1 text-[0.71rem] text-ink-3">{filtered.length} {`listing${filtered.length === 1 ? "" : "s"} and examples`} · {selectedCountry.name} selected</p>
-                {liveState?.country === country && liveState.fetchedAt && <p className="mt-1 text-[0.68rem] text-ink-3">Stock checked: <time dateTime={liveState.fetchedAt}>{new Date(liveState.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
+                <p aria-live="polite" className="mt-1 text-meta text-ink-3">{filtered.length} {`listing${filtered.length === 1 ? "" : "s"} and examples`} · {selectedCountry.name} selected</p>
+                {liveState?.country === country && liveState.fetchedAt && <p className="mt-1 text-micro text-ink-3">Stock checked: <time dateTime={liveState.fetchedAt}>{new Date(liveState.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
               </div>
               <div className="relative w-full sm:max-w-[260px]">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
-                <input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setVisible(PAGE_SIZE); }} aria-label="Search services" placeholder="Search services or platforms" className="min-h-11 w-full rounded-xl border border-line bg-white py-2 pl-9 pr-3 text-[0.78rem] text-ink outline-none placeholder:text-ink-3 focus:border-lav-400 focus:ring-4 focus:ring-lav-100" />
+                <input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setVisible(PAGE_SIZE); }} aria-label="Search services" placeholder="Search services or platforms" className="min-h-11 w-full rounded-xl border border-line bg-white py-2 pl-9 pr-3 text-meta text-ink outline-none placeholder:text-ink-3 focus:border-lav-400 focus:ring-4 focus:ring-lav-100" />
               </div>
             </div>
 
             {tags.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-1.5 border-t border-line pt-4" aria-label="Service types">
-                <button type="button" onClick={() => { setTag("all"); setVisible(PAGE_SIZE); }} aria-pressed={tag === "all"} className={`rounded-lg px-2.5 py-1.5 text-[0.68rem] font-semibold ${tag === "all" ? "bg-lav-100 text-lav-800" : "text-ink-3 hover:bg-cream"}`}>All types</button>
-                {tags.map((type) => <button key={type} type="button" onClick={() => { setTag(type); setVisible(PAGE_SIZE); }} aria-pressed={tag === type} className={`rounded-lg px-2.5 py-1.5 text-[0.68rem] font-semibold ${tag === type ? "bg-lav-100 text-lav-800" : "text-ink-3 hover:bg-cream"}`}>{type}</button>)}
+                <button type="button" onClick={() => { setTag("all"); setVisible(PAGE_SIZE); }} aria-pressed={tag === "all"} className={`rounded-lg px-2.5 py-1.5 text-micro font-semibold ${tag === "all" ? "bg-lav-100 text-lav-800" : "text-ink-3 hover:bg-cream"}`}>All types</button>
+                {tags.map((type) => <button key={type} type="button" onClick={() => { setTag(type); setVisible(PAGE_SIZE); }} aria-pressed={tag === type} className={`rounded-lg px-2.5 py-1.5 text-micro font-semibold ${tag === type ? "bg-lav-100 text-lav-800" : "text-ink-3 hover:bg-cream"}`}>{type}</button>)}
               </div>
             )}
 
-            {liveState?.country === country && (liveState.failed || liveState.partial) && <p role="status" className="mt-4 text-[0.72rem] text-amber-800">Some live listings couldn&apos;t be loaded. <button type="button" className="font-semibold underline" onClick={() => setLiveRevision((value) => value + 1)}>Retry</button></p>}
+            {liveState?.country === country && (liveState.failed || liveState.partial) && <p role="status" className="mt-4 text-meta text-amber-800">Some live listings couldn&apos;t be loaded. <button type="button" className="font-semibold underline" onClick={() => setLiveRevision((value) => value + 1)}>Retry</button></p>}
             <div className="mt-4 grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-3">
               {filtered.slice(0, visible).map((item) => <ServiceCard key={item.id} item={item} countryName={selectedCountry.name} />)}
             </div>
             {filtered.length === 0 && (
               <div className="rounded-2xl border border-dashed border-line bg-cream/50 p-8 text-center">
                 <p className="text-[0.88rem] font-semibold text-ink">No examples match these filters</p>
-                <p className="mt-1 text-[0.76rem] text-ink-2">Try another search, category or country. This doesn&apos;t indicate live availability.</p>
-                {(search || tag !== "all") && <button type="button" onClick={() => { setSearch(""); setTag("all"); setVisible(PAGE_SIZE); }} className="mt-3 text-[0.75rem] font-semibold text-lav-700 underline underline-offset-2">Clear filters</button>}
+                <p className="mt-1 text-meta text-ink-2">Try another search, category or country. This doesn&apos;t indicate live availability.</p>
+                {(search || tag !== "all") && <button type="button" onClick={() => { setSearch(""); setTag("all"); setVisible(PAGE_SIZE); }} className="mt-3 text-meta font-semibold text-lav-700 underline underline-offset-2">Clear filters</button>}
               </div>
             )}
             {visible < filtered.length && (
               <div className="mt-5 text-center">
-                <button type="button" onClick={() => setVisible((current) => current + PAGE_SIZE)} className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2.5 text-[0.76rem] font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-lav-700">Show more <span className="text-ink-3">({filtered.length - visible} remaining)</span></button>
+                <button type="button" onClick={() => setVisible((current) => current + PAGE_SIZE)} className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2.5 text-meta font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-lav-700">Show more <span className="text-ink-3">({filtered.length - visible} remaining)</span></button>
               </div>
             )}
-            <p className="mt-5 border-t border-line pt-4 text-[0.69rem] leading-relaxed text-ink-3">Stock means available inventory. My units means your remaining purchased units. Unknown and not tracked are not the same as zero. Examples do not imply platform support or verified coverage.</p>
+            <p className="mt-5 border-t border-line pt-4 text-micro leading-relaxed text-ink-3">Stock means available inventory. My units means your remaining purchased units. Unknown and not tracked are not the same as zero. Examples do not imply platform support or verified coverage.</p>
           </section>
         </>
       )}

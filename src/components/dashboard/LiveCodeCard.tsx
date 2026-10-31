@@ -84,7 +84,7 @@ export function LiveCodeCard({ codes, initialNow }: { codes: LiveCode[]; initial
         </h2>
         <Link
           href="/dashboard/orders"
-          className="inline-flex items-center gap-1 text-[0.74rem] font-semibold text-lav-700 hover:underline"
+          className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline"
         >
           All orders <ArrowRight className="h-3 w-3" />
         </Link>
@@ -106,19 +106,19 @@ export function LiveCodeCard({ codes, initialNow }: { codes: LiveCode[]; initial
                   <p className="truncate text-[0.88rem] font-semibold text-ink">
                     {code.referenceCode ?? code.planLabel}
                   </p>
-                  <p className="truncate text-[0.7rem] text-ink-3">
+                  <p className="truncate text-meta text-ink-3">
                     {code.productName} · {code.planLabel} · {formatNaira(code.amount)}
                   </p>
                 </div>
               </div>
 
               {code.secondsLeft === null ? (
-                <span className="shrink-0 rounded-full bg-lav-50 px-2.5 py-1 text-[0.62rem] font-semibold text-lav-700">
+                <span className="shrink-0 rounded-full bg-lav-50 px-2.5 py-1 text-micro font-semibold text-lav-700">
                   No expiry
                 </span>
               ) : (
                 <span
-                  className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[0.66rem] font-semibold tabular-nums ${
+                  className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-micro font-semibold tabular-nums ${
                     expired
                       ? "bg-amber-50 text-amber-700"
                       : urgent
@@ -148,7 +148,7 @@ export function LiveCodeCard({ codes, initialNow }: { codes: LiveCode[]; initial
                 <button
                   type="button"
                   onClick={() => copy(code, code.otpCode ?? "")}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-ink px-3.5 text-[0.76rem] font-semibold text-white transition-colors hover:bg-ink/90"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-ink px-3.5 text-meta font-semibold text-white transition-colors hover:bg-ink/90"
                   aria-label={`Copy code ${code.otpCode}`}
                 >
                   {copied === code.id ? (
@@ -167,12 +167,12 @@ export function LiveCodeCard({ codes, initialNow }: { codes: LiveCode[]; initial
             <div className="mt-3 flex items-center justify-between gap-3">
               <Link
                 href={`/dashboard/orders/${code.id}`}
-                className="text-[0.74rem] font-semibold text-lav-700 hover:underline"
+                className="text-meta font-semibold text-lav-700 hover:underline"
               >
                 Open order
               </Link>
               {expired && !code.otpCode && (
-                <span className="text-[0.7rem] text-ink-3">
+                <span className="text-meta text-ink-3">
                   Contact support to review refund eligibility.
                 </span>
               )}

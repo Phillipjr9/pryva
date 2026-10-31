@@ -12,7 +12,7 @@ export function CountryLaunch() {
       <div aria-hidden="true" className="pointer-events-none absolute -right-14 -top-16 h-48 w-48 rounded-full bg-lav-300/30 blur-3xl" />
       <div className="relative grid gap-5 md:grid-cols-[1fr_1.05fr] md:items-center">
         <div>
-          <p className="inline-flex items-center gap-1.5 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-lav-700">
+          <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700">
             <Sparkle className="h-3.5 w-3.5" /> Your service hub
           </p>
           <h2 id="country-launch-title" className="mt-2 text-[1.4rem] font-semibold leading-tight text-ink sm:text-[1.6rem]">

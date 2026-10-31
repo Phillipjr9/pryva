@@ -59,10 +59,17 @@ describe("brand presentation", () => {
 
   it("keeps Google sign-in working next to the brand", () => {
     const html = renderToStaticMarkup(<AuthForm mode="login" next="/dashboard" />);
-    const googleLink = html.match(/<a[^>]*href="\/api\/auth\/google[^>]*>[\s\S]*?<\/a>/)?.[0];
+    const googleLink = String(html.match(/<a[^>]*href="\/api\/auth\/google[^>]*>[\s\S]*?<\/a>/)?.[0]);
     expect(googleLink).toContain("Continue with Google");
     // The Google button must keep Google's own mark, never ours.
     expect(googleLink).not.toContain("pryva-mark");
+    // ...and it now carries that mark: the four-colour G from the shared brand
+    // table, drawn before the label.
+    expect(googleLink).toContain('viewBox="0 0 256 262"');
+    for (const colour of ["#4285f4", "#34a853", "#fbbc05", "#eb4335"]) {
+      expect(googleLink).toContain(colour);
+    }
+    expect(googleLink.indexOf("<svg")).toBeLessThan(googleLink.indexOf("Continue with Google"));
   });
 
   it("gives every digital service its real brand mark", () => {

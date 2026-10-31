@@ -25,26 +25,29 @@ To apply them by hand instead, run **all** of these in order with
 `ON_ERROR_STOP=1`:
 
 ```bash
-for f in migrations/0000_base_schema.sql migrations/0001_google_subject.sql \
-         migrations/0002_shared_rate_limits.sql migrations/0003_withdrawal_idempotency.sql \
-         migrations/0004_paystack_transfer_reference.sql migrations/0005_wallet_email_outbox.sql \
-         migrations/0006_order_idempotency.sql migrations/0007_order_reconciliation_note.sql \
-         migrations/0008_order_provider_cost.sql migrations/0009_password_reset_tokens.sql \
-         migrations/0010_order_provider_no_default.sql \
-         migrations/0011_email_verification.sql; do
+# Every four-digit migration, in order. The glob is deliberate: this README has
+# twice been the stale list that left a database missing tables, and a glob cannot
+# fall behind the directory.
+for f in migrations/[0-9][0-9][0-9][0-9]_*.sql; do
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f" || break
 done
 ```
 
 The baseline creates the 12 original application tables and their indexes/foreign keys.
 The incremental migrations add the unique nullable Google subject used by
-sign-in, the shared rate-limit table, withdrawal request idempotency keys, a durable Paystack transfer reference, and the transactional wallet email outbox.
+sign-in, the shared rate-limit table, withdrawal request idempotency keys, a durable Paystack transfer reference, the transactional wallet email outbox, order idempotency and reconciliation notes, the provider-cost column, the password-reset and email-verification token tables, the frozen payout payer name, the disposable inbox tables (`0013`), the admin audit log (`0014`), two-factor
+enrolment and recovery codes (`0015`), verified-purchase reviews (`0016`), login
+lockout (`0017`), reconciliation runs (`0018`), support threads (`0019`) and
+WebAuthn credentials and challenges (`0020`).
 Back up existing databases before applying migrations and verify the schema before routing traffic.
 
 ## Existing databases
 
-An installation already on the baseline must apply `0001_google_subject.sql`,
-`0002_shared_rate_limits.sql`, `0003_withdrawal_idempotency.sql`, `0004_paystack_transfer_reference.sql` and `0005_wallet_email_outbox.sql` before deploying this version. Missing the
+An installation already on the baseline must apply every migration after it — the
+runner does this in order, so use `npm run db:migrate` rather than a hand-written
+list. In particular `0011` adds email verification, `0012` the frozen payout payer
+name, `0013` the disposable inboxes and `0014` the admin audit log; skipping any of
+them fails at query time in the request that needed it, not at setup time. Missing the
 rate-limit migration makes protected endpoints fail closed with HTTP 503; missing either withdrawal migration prevents withdrawal processing and may break queries selecting withdrawal rows. Migration 0004 leaves existing references NULL: reconcile pre-existing pending and `processing` withdrawals with Paystack before approval, retry, refund or state changes, especially any rows manually reset to pending. Never infer that an unknown reference means a transfer did not happen.
 Migration 0005 queues new wallet entries, withdrawal status updates, and saved marketplace purchase deliveries atomically using PostgreSQL triggers; it does not backfill historical emails. Apply it before accepting wallet activity and verify the application role can insert/update the outbox. The worker is separately configured and must be monitored. See the email setup in the main README.
 Earlier installations must first establish that

@@ -4,25 +4,10 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CommandPalette, CommandPaletteTrigger } from "@/components/command/CommandPalette";
-import {
-  ArrowRight,
-  Bell,
-  Chat,
-  Close,
-  Grid,
-  Logout,
-  Mail,
-  Menu,
-  Plus,
-  Receipt,
-  Settings,
-  Shield,
-  Sparkle,
-  Phone,
-  Users,
-  Wallet,
-} from "@/components/icons";
+import { ArrowRight, Bell, Close, Logout, Menu, Plus, Wallet } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
+import { NavIcon, type NavArt } from "@/components/dashboard/NavIcon";
+import { ProfileAvatar } from "@/components/dashboard/ProfileAvatar";
 import { BrandLockup } from "@/components/brand/BrandLockup";
 import { formatNaira } from "@/lib/catalog";
 import { EXPLORER_COUNTRIES } from "@/lib/explorer-countries";
@@ -38,7 +23,21 @@ type NavItem = {
   href: string;
   label: string;
   icon?: (props: { className?: string }) => ReactNode;
-  art?: "numbers" | "esim" | "email-otp" | "accounts" | "data" | "gift-cards" | "bulk" | "scheduled" | "proxies";
+  /** A real image tile for a dashboard destination (see `NavIcon`). */
+  nav?: NavArt;
+  art?:
+    | "numbers"
+    | "esim"
+    | "email-otp"
+    | "accounts"
+    | "data"
+    | "gift-cards"
+    | "bulk"
+    | "scheduled"
+    | "proxies"
+    | "subscriptions"
+    | "app-verification"
+    | "social-promotion";
   /** Category links enter the country-first hub, rather than bypassing it. */
   category?: ExplorerCategory;
 };
@@ -47,28 +46,33 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "Manage",
     items: [
-      { href: "/dashboard", label: "Overview", icon: Grid },
-      { href: "/dashboard/orders", label: "Orders", icon: Receipt },
-      { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
+      { href: "/dashboard", label: "Overview", nav: "overview" },
+      { href: "/dashboard/orders", label: "Orders", nav: "orders" },
+      { href: "/dashboard/wallet", label: "Wallet", nav: "wallet" },
       // Free, and the only thing on this list that is: one inbox a day, nothing
       // retained. It sits under Manage rather than Buy because no money moves.
-      { href: "/dashboard/inbox", label: "Temporary inbox", icon: Mail },
+      { href: "/dashboard/inbox", label: "Temporary inbox", nav: "inbox" },
+      // Inviting a friend is not a purchase and not a setting: it sits under
+      // Manage because it is about the account, and it costs nothing to open.
+      { href: "/dashboard/referrals", label: "Refer & earn", nav: "referrals" },
     ],
   },
   {
     label: "Buy",
     items: [
-      { href: "/dashboard/services", label: "All services", icon: Sparkle },
-      { href: "/dashboard/services", label: "App verification", icon: Phone, category: "verification" },
-      { href: "/dashboard/services", label: "Social promotion", icon: Users, category: "social" },
+      { href: "/dashboard/services", label: "All services", nav: "services" },
+      { href: "/dashboard/services", label: "App verification", art: "app-verification", category: "verification" },
+      { href: "/dashboard/services", label: "Social promotion", art: "social-promotion", category: "social" },
       { href: "/dashboard/services", label: "Number plans", art: "numbers", category: "numbers" },
       { href: "/dashboard/services", label: "eSIM", art: "esim", category: "esim" },
       { href: "/dashboard/services", label: "Proxies", art: "proxies", category: "proxies" },
       { href: "/dashboard/services", label: "Email OTP", art: "email-otp", category: "email" },
       { href: "/dashboard/services", label: "Accounts", art: "accounts", category: "accounts" },
-      { href: "/dashboard/services", label: "Subscriptions", art: "accounts", category: "subscriptions" },
+      { href: "/dashboard/services", label: "Subscriptions", art: "subscriptions", category: "subscriptions" },
       { href: "/dashboard/services", label: "Data Plans", art: "data", category: "data" },
-      { href: "/dashboard/services", label: "Gift Cards", art: "gift-cards", category: "gift-cards" },
+      // Gift cards are wallet credit Pryva issues itself, not a service in the
+      // catalogue, so this links straight at the page instead of the hub.
+      { href: "/dashboard/gift-cards", label: "Gift cards", art: "gift-cards" },
       { href: "/dashboard/bulk-orders", label: "Bulk Orders", art: "bulk" },
       { href: "/dashboard/scheduled", label: "Scheduled", art: "scheduled" },
     ],
@@ -76,21 +80,25 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "You",
     items: [
-      { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
-      { href: "/dashboard/security", label: "Security", icon: Shield },
-      { href: "/dashboard/settings", label: "Settings", icon: Settings },
-      { href: "/dashboard/support", label: "Support", icon: Chat },
+      { href: "/dashboard/notifications", label: "Notifications", nav: "notifications" },
+      // Delivered orders can be reviewed once, but the page had no entry point
+      // anywhere in the app -- it was reachable only by typing the URL.
+      { href: "/dashboard/reviews", label: "Reviews", nav: "reviews" },
+      // Security is a section of Settings, not a destination of its own: one
+      // account, one page that changes it. The old route redirects here.
+      { href: "/dashboard/settings", label: "Settings", nav: "settings" },
+      { href: "/dashboard/support", label: "Support", nav: "support" },
     ],
   },
 ];
 
 /** The five things worth a thumb-reach on a phone. */
-const mobileTabs: Array<{ href: string; label: string; icon: NavItem["icon"] }> = [
-  { href: "/dashboard", label: "Home", icon: Grid },
-  { href: "/dashboard/orders", label: "Orders", icon: Receipt },
-  { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
-  { href: "/dashboard/services", label: "Services", icon: Sparkle },
-  { href: "/dashboard/support", label: "Support", icon: Chat },
+const mobileTabs: Array<{ href: string; label: string; nav: NavArt }> = [
+  { href: "/dashboard", label: "Home", nav: "overview" },
+  { href: "/dashboard/orders", label: "Orders", nav: "orders" },
+  { href: "/dashboard/wallet", label: "Wallet", nav: "wallet" },
+  { href: "/dashboard/services", label: "Services", nav: "services" },
+  { href: "/dashboard/support", label: "Support", nav: "support" },
 ];
 
 function LogoutButton({ compact = false }: { compact?: boolean }) {
@@ -118,7 +126,7 @@ function LogoutButton({ compact = false }: { compact?: boolean }) {
         type="button"
         onClick={signOut}
         disabled={pending}
-        className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[0.78rem] font-medium text-ink-3 transition-colors hover:bg-white hover:text-ink disabled:opacity-60 ${
+        className={`flex items-center gap-2 rounded-xl px-3 py-2 text-meta font-medium text-ink-3 transition-colors hover:bg-white hover:text-ink disabled:opacity-60 ${
           compact ? "" : "w-full"
         }`}
       >
@@ -154,12 +162,6 @@ export function DashboardShell({
   const selectedCategory = searchParams.get("category");
   const [open, setOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const initials = user.name
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 
   const sidebar = (
     <div className="flex h-full flex-col">
@@ -184,11 +186,11 @@ export function DashboardShell({
         onClick={() => setOpen(false)}
         className="mt-5 block rounded-2xl bg-gradient-to-br from-ink to-[#3b2f56] p-4 text-white"
       >
-        <p className="text-[0.58rem] uppercase tracking-[0.16em] text-white/55">Wallet balance</p>
+        <p className="text-micro uppercase tracking-[0.16em] text-white/55">Wallet balance</p>
         <p className="mt-1.5 text-[1.35rem] font-semibold leading-none">
           {formatNaira(user.walletBalance)}
         </p>
-        <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[0.62rem] font-semibold">
+        <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-micro font-semibold">
           <Plus className="h-2.5 w-2.5" /> Top up wallet
         </span>
       </Link>
@@ -196,7 +198,7 @@ export function DashboardShell({
       <nav aria-label="Dashboard navigation" className="mt-5 grid min-h-0 flex-1 content-start gap-4 overflow-y-auto">
         {navGroups.map((group) => (
           <div key={group.label} className="grid gap-0.5">
-            <p className="px-3 text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
+            <p className="px-3 text-micro font-semibold uppercase tracking-[0.16em] text-ink-3">
               {group.label}
             </p>
             {group.items.map((item) => {
@@ -222,12 +224,14 @@ export function DashboardShell({
                 >
                   {item.art ? (
                     <span aria-hidden="true"><ServiceIcon service={item.art} size="xs" className="overflow-hidden rounded-[5px]" /></span>
+                  ) : item.nav ? (
+                    <NavIcon name={item.nav} />
                   ) : (
                     Icon && <Icon className={`h-4 w-4 ${active ? "text-lav-700" : "text-ink-3"}`} />
                   )}
                   {item.label}
                   {badge ? (
-                    <span className="ml-auto rounded-full bg-lav-600 px-1.5 py-0.5 text-[0.6rem] font-bold text-white">
+                    <span className="ml-auto rounded-full bg-lav-600 px-1.5 py-0.5 text-micro font-bold text-white">
                       {badge}
                     </span>
                   ) : (
@@ -242,12 +246,12 @@ export function DashboardShell({
 
       <div className="mt-auto border-t border-line pt-4">
         <div className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-lav-200 to-lav-400 text-[0.66rem] font-bold text-lav-800">
-            {initials || "P"}
-          </span>
+          {/* The profile picture: a 3D avatar chosen from the account itself,
+              instead of initials in a gradient circle. */}
+          <ProfileAvatar seed={user.email} size={36} />
           <div className="min-w-0">
             <p className="truncate text-[0.82rem] font-semibold text-ink">{user.name}</p>
-            <p className="truncate text-[0.68rem] text-ink-3">{user.email}</p>
+            <p className="truncate text-micro text-ink-3">{user.email}</p>
           </div>
         </div>
         <div className="mt-2.5">
@@ -283,7 +287,7 @@ export function DashboardShell({
                 <BrandLockup size="xs" />
               </span>
               <div className="hidden lg:block">
-                <p className="text-[0.68rem] uppercase tracking-[0.16em] text-ink-3">Dashboard</p>
+                <p className="text-micro uppercase tracking-[0.16em] text-ink-3">Dashboard</p>
                 <p className="text-[0.88rem] font-semibold leading-tight text-ink">
                   Hello, {user.name.split(" ")[0]}
                 </p>
@@ -296,7 +300,7 @@ export function DashboardShell({
               <Link
                 href="/dashboard/wallet"
                 aria-label={`Wallet balance ${formatNaira(user.walletBalance)} — open wallet`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-lav-200 bg-lav-50 px-2.5 py-1.5 text-[0.74rem] font-semibold text-lav-800 transition-colors hover:border-lav-300 hover:bg-lav-100 sm:px-3"
+                className="inline-flex items-center gap-1.5 rounded-full border border-lav-200 bg-lav-50 px-2.5 py-1.5 text-meta font-semibold text-lav-800 transition-colors hover:border-lav-300 hover:bg-lav-100 sm:px-3"
               >
                 <Wallet className="h-3.5 w-3.5 text-lav-600" />
                 {formatNaira(user.walletBalance)}
@@ -312,13 +316,13 @@ export function DashboardShell({
               >
                 <Bell className="h-4 w-4" />
                 {unreadNotifications > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-lav-600 px-1 text-[0.58rem] font-bold text-white">
+                  <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-lav-600 px-1 text-micro font-bold text-white">
                     {unreadNotifications}
                   </span>
                 )}
               </Link>
 
-              <Link href="/dashboard/services" className="btn btn-primary !px-3.5 !py-2 !text-[0.76rem] max-[374px]:!hidden">
+              <Link href="/dashboard/services" className="btn btn-primary !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.76rem] max-[374px]:!hidden">
                 Services
                 <ArrowRight className="h-3 w-3" />
               </Link>
@@ -331,7 +335,7 @@ export function DashboardShell({
             /* In development only. If a page looks unchanged after a deploy,
                this line is the fastest way to tell a stale tab from a real bug:
                compare it with /api/version. */
-            <p className="pb-6 text-center text-[0.62rem] text-ink-3/70">
+            <p className="pb-6 text-center text-micro text-ink-3/70">
               build <span data-testid="build-id">{buildId}</span>
             </p>
           )}
@@ -360,14 +364,13 @@ export function DashboardShell({
       >
         <div className="mx-auto flex max-w-md items-stretch justify-between px-1.5">
           {mobileTabs.map((tab) => {
-            const Icon = tab.icon;
             const active = isRouteActive(pathname, tab.href);
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-2 text-[0.6rem] font-semibold transition-colors ${
+                className={`flex flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-2 text-micro font-semibold transition-colors ${
                   active ? "text-lav-700" : "text-ink-3 hover:text-ink"
                 }`}
               >
@@ -376,7 +379,7 @@ export function DashboardShell({
                     active ? "bg-lav-100" : ""
                   }`}
                 >
-                  {Icon && <Icon className="h-4 w-4" />}
+                  <NavIcon name={tab.nav} size="sm" />
                 </span>
                 {tab.label}
               </Link>

@@ -133,7 +133,7 @@ export default async function AdminOrdersPage({
           </p>
         </div>
         <div className="rounded-xl border border-line bg-white px-4 py-2 text-right">
-          <p className="text-[0.7rem] uppercase tracking-wide text-ink-3">Paid value on this page</p>
+          <p className="text-meta uppercase tracking-wide text-ink-3">Paid value on this page</p>
           <p className="text-[1rem] font-semibold text-ink">{formatNaira(revenueOnPage)}</p>
         </div>
       </div>
@@ -169,9 +169,11 @@ export default async function AdminOrdersPage({
         </form>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-line bg-white">
-        <table className="w-full text-left text-[0.84rem]">
-          <thead className="bg-cream/70 text-[0.72rem] uppercase tracking-wide text-ink-3">
+      <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+        {/* Six columns do not fit a phone. Scroll them rather than clipping the
+            last two, which `overflow-hidden` used to do. */}
+        <table className="w-full min-w-[40rem] text-left text-[0.84rem]">
+          <thead className="bg-cream/70 text-meta uppercase tracking-wide text-ink-3">
             <tr>
               <th className="px-4 py-3 font-semibold">Order</th>
               <th className="px-4 py-3 font-semibold">Buyer</th>
@@ -191,33 +193,33 @@ export default async function AdminOrdersPage({
             )}
             {rows.map((row) => (
               <tr key={row.id} className="border-t border-line/70">
-                <td className="px-4 py-3 font-mono text-[0.76rem] text-ink-2">{row.reference}</td>
+                <td className="px-4 py-3 font-mono text-meta text-ink-2">{row.reference}</td>
                 <td className="px-4 py-3 text-[0.8rem] text-ink-2">
                   {emailById.get(row.userId) ?? "—"}
                 </td>
                 <td className="px-4 py-3">
                   <p className="font-medium text-ink">{row.productName}</p>
-                  <p className="text-[0.74rem] text-ink-3">
+                  <p className="text-meta text-ink-3">
                     {row.service} · {row.planLabel}
                   </p>
                   {row.provider === "accounts" && row.providerRequestId && (
-                    <p className="mt-1 break-all font-mono text-[0.68rem] text-ink-3">Provider reference: {row.providerRequestId}</p>
+                    <p className="mt-1 break-all font-mono text-micro text-ink-3">Provider reference: {row.providerRequestId}</p>
                   )}
                 </td>
                 <td className="px-4 py-3 font-medium">{formatNaira(row.amount)}</td>
                 <td className="px-4 py-3">
                   <span
-                    className={`rounded-full px-2 py-0.5 text-[0.7rem] font-semibold capitalize ${
+                    className={`rounded-full px-2 py-0.5 text-meta font-semibold capitalize ${
                       STATUS_STYLES[row.status] ?? "bg-slate-100 text-slate-600"
                     }`}
                   >
                     {row.status}
                   </span>
                   {row.refundedAt && (
-                    <p className="mt-1 text-[0.7rem] text-ink-3">refunded {formatDate(row.refundedAt)}</p>
+                    <p className="mt-1 text-meta text-ink-3">refunded {formatDate(row.refundedAt)}</p>
                   )}
                   {row.reconciliationNote && (
-                    <p className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-[0.7rem] font-medium leading-snug text-amber-800">
+                    <p className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-meta font-medium leading-snug text-amber-800">
                       {row.reconciliationNote}
                     </p>
                   )}

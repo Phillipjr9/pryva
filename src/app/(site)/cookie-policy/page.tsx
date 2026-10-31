@@ -30,9 +30,9 @@ export default function CookiePolicyPage() {
       </section>
 
       <section className="shell py-10">
-        <div className="overflow-hidden rounded-2xl border border-line bg-white">
-          <table className="w-full text-left">
-            <thead className="bg-cream/70 text-[0.72rem] uppercase tracking-[0.12em] text-ink-3">
+        <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+          <table className="w-full min-w-[34rem] text-left">
+            <thead className="bg-cream/70 text-meta uppercase tracking-[0.12em] text-ink-3">
               <tr>
                 <th className="px-4 py-3 font-semibold">Cookie</th>
                 <th className="px-4 py-3 font-semibold">Type</th>
@@ -45,7 +45,7 @@ export default function CookiePolicyPage() {
                 <tr key={cookie.name} className="align-top">
                   <td className="px-4 py-4 font-mono text-[0.8rem] text-ink">{cookie.name}</td>
                   <td className="px-4 py-4">
-                    <span className="inline-flex rounded-full bg-lav-50 px-2.5 py-1 text-[0.7rem] font-semibold text-lav-700">
+                    <span className="inline-flex rounded-full bg-lav-50 px-2.5 py-1 text-meta font-semibold text-lav-700">
                       {cookie.type}
                     </span>
                   </td>

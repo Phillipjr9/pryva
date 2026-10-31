@@ -78,7 +78,7 @@ There are no notifications stored for this account.
                         <p className="mt-0.5 text-[0.82rem] text-ink-2">{notification.message}</p>
                       </div>
                     </div>
-                    <div className="mt-2 flex items-center gap-3 text-[0.72rem] text-ink-3">
+                    <div className="mt-2 flex items-center gap-3 text-meta text-ink-3">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {new Date(notification.createdAt).toLocaleString("en-NG", {

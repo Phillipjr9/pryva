@@ -33,18 +33,41 @@ beforeEach(() => {
 });
 
 describe("boosting catalog listings", () => {
-  it("renders read-only listings with no price and no checkout", async () => {
+  it("prices a listing only when the supplier's currency can be converted honestly", async () => {
     const { boostItems } = await import("@/lib/smm-catalog");
-    const items = boostItems(snapshot([service()]));
-    expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({
-      category: "social", name: "Instagram Followers", tag: "Followers", platform: "Instagram",
-      artwork: { kind: "brand", name: "instagram" }, source: "live", coverage: "not-country-specific",
-      // Pricing is deliberately undecided and ordering is not wired, so neither
-      // is implied: stock is null because a panel's `max` is a per-order limit,
-      // not inventory, and the two must not be confused.
-      stock: null, myUnits: null, price: null, action: null,
-    });
+
+    // A USD panel with no configured naira rate has no defensible retail price,
+    // so it stays read-only rather than inventing an exchange rate.
+    delete process.env.SMM_USD_NGN_RATE;
+    const usd = boostItems(snapshot([service()]))[0];
+    expect(usd).toMatchObject({ price: null, action: null, stock: null, myUnits: null });
+
+    // Give it a rate and the same listing becomes buyable: 0.74 USD per 1,000 at
+    // ₦1,600 and a 35% margin is ₦1,598.40 per 1,000, and the smallest order the
+    // panel accepts is 10 units.
+    process.env.SMM_USD_NGN_RATE = "1600";
+    try {
+      const priced = boostItems(snapshot([service()]))[0];
+      expect(priced.price).toBe(16); // ceil(1598.4 * 10 / 1000)
+      expect(priced.priceFrom).toBe(true);
+      expect(priced.action).toEqual({ label: "Buy boost", href: `/dashboard/services/boost/${priced.id}` });
+      expect(priced.stock).toBeNull();
+    } finally {
+      delete process.env.SMM_USD_NGN_RATE;
+    }
+  });
+
+  it("readies an NGN-billed service without any exchange rate", async () => {
+    const { boostItems } = await import("@/lib/smm-catalog");
+    process.env.SMM_MARKUP_PERCENT = "50";
+    try {
+      const [item] = boostItems(snapshot([service({ ratePer1000: 1000, currency: "NGN", min: 1000 })]));
+      // ₦1,000 per 1,000 wholesale, 50% margin, 1,000 units.
+      expect(item.price).toBe(1500);
+      expect(item.action?.label).toBe("Buy boost");
+    } finally {
+      delete process.env.SMM_MARKUP_PERCENT;
+    }
   });
 
   it("hides the panel's service identifiers and wholesale rate", async () => {

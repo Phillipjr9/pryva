@@ -7,12 +7,17 @@ import { BrandLockup } from "@/components/brand/BrandLockup";
 const LINKS = [
   { href: "/admin/dashboard", label: "Overview" },
   { href: "/admin/orders", label: "Orders" },
+  { href: "/admin/transactions", label: "Ledger" },
   { href: "/admin/refunds", label: "Refunds" },
   { href: "/admin/margin", label: "Margin" },
   { href: "/admin/fulfilment", label: "Fulfilment" },
   { href: "/admin/users", label: "Users" },
-  { href: "/admin/messages", label: "Support" },
+  { href: "/admin/support", label: "Support" },
+  { href: "/admin/messages", label: "Contact form" },
   { href: "/admin/withdrawals", label: "Withdrawals" },
+  { href: "/admin/reconciliation", label: "Reconciliation" },
+  { href: "/admin/reviews", label: "Reviews" },
+  { href: "/admin/audit", label: "Audit" },
   { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/security", label: "Security" },
 ];
@@ -25,7 +30,7 @@ export function AdminNav() {
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
         <span className="flex items-center gap-2">
           <BrandLockup size="xs" />
-          <span className="rounded-full bg-lav-100 px-2 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-lav-800">
+          <span className="rounded-full bg-lav-100 px-2 py-0.5 text-micro font-semibold uppercase tracking-[0.12em] text-lav-800">
             Admin
           </span>
         </span>

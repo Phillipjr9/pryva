@@ -18,7 +18,7 @@ export function CountrySelector({ id, value, onChange, name }: Props) {
 
   return (
     <div>
-      <label htmlFor={id} className="mb-2 block text-[0.72rem] font-semibold text-ink-2">
+      <label htmlFor={id} className="mb-2 block text-meta font-semibold text-ink-2">
         Country of service
       </label>
       <div className="relative flex items-center rounded-xl border border-line bg-white transition-colors focus-within:border-lav-500 focus-within:ring-4 focus-within:ring-lav-100">
@@ -39,7 +39,7 @@ export function CountrySelector({ id, value, onChange, name }: Props) {
         <span className="pointer-events-none absolute right-4 text-ink-3" aria-hidden="true">⌄</span>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-1.5" aria-label="Quick country choices">
-        <span className="mr-1 text-[0.67rem] text-ink-3">Quick select:</span>
+        <span className="mr-1 text-micro text-ink-3">Quick select:</span>
         {QUICK_COUNTRIES.map((code) => {
           const country = explorerCountry(code)!;
           const active = value === code;
@@ -49,7 +49,7 @@ export function CountrySelector({ id, value, onChange, name }: Props) {
               type="button"
               aria-pressed={active}
               onClick={() => onChange(code)}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[0.67rem] font-semibold transition-colors ${active ? "border-lav-400 bg-lav-100 text-lav-800" : "border-line bg-white/75 text-ink-2 hover:border-lav-300"}`}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-micro font-semibold transition-colors ${active ? "border-lav-400 bg-lav-100 text-lav-800" : "border-line bg-white/75 text-ink-2 hover:border-lav-300"}`}
             >
               <CountryFlag code={country.code} size={15} decorative radius={8} />
               {country.name === "United States" ? "US" : country.name === "United Kingdom" ? "UK" : country.name}
