@@ -357,6 +357,15 @@ export const withdrawals = pgTable(
     paystackReference: varchar("paystack_reference", { length: 50 }),
     transferReference: varchar("transfer_reference", { length: 100 }),
     failureReason: text("failure_reason"),
+    /**
+     * Advisory fraud flag for the admin queue.
+     *
+     * `low` by default, so every existing row keeps its meaning and no payout
+     * path changes behaviour because this column appeared. It is read by an
+     * operator, never by an automated payment decision.
+     */
+    riskLevel: varchar("risk_level", { length: 16 }).notNull().default("low"),
+    riskReasons: text("risk_reasons"),
     processedAt: timestamp("processed_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -855,5 +864,54 @@ export const referrals = pgTable(
   (table) => [
     index("referrals_referrer_idx").on(table.referrerId),
     index("referrals_status_idx").on(table.status),
+  ],
+);
+
+/**
+ * Where an account was created from — as salted hashes, never a raw address.
+ *
+ * This is the only signal that makes multi-accounting visible: two accounts on
+ * one network look identical in every other table. A hash answers "same place or
+ * not?" and cannot be turned back into a location from a backup.
+ */
+export const accountSignals = pgTable(
+  "account_signals",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    ipHash: varchar("ip_hash", { length: 64 }),
+    userAgentHash: varchar("user_agent_hash", { length: 64 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("account_signals_ip_idx").on(table.ipHash)],
+);
+
+/**
+ * A record of something that looked wrong, and who dealt with it.
+ *
+ * Deliberately a log rather than a policy engine: nothing automated reads this
+ * table back, so a false positive costs a customer nothing. `reviewed_at` is what
+ * empties the operator's queue.
+ */
+export const fraudEvents = pgTable(
+  "fraud_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    kind: varchar("kind", { length: 40 }).notNull(),
+    severity: varchar("severity", { length: 16 }).notNull().default("warn"),
+    reasons: text("reasons").notNull(),
+    amount: integer("amount"),
+    reference: varchar("reference", { length: 64 }),
+    ipHash: varchar("ip_hash", { length: 64 }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("fraud_events_user_idx").on(table.userId),
+    index("fraud_events_kind_idx").on(table.kind),
+    index("fraud_events_created_idx").on(table.createdAt),
   ],
 );

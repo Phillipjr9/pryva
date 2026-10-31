@@ -9,6 +9,7 @@ import { cancelUpstream, fulfillPlan, type FulfilledOrder } from "@/lib/fulfillm
 import { debitWalletInTx, InsufficientFundsError, makeReference } from "@/lib/wallet";
 import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 import { settleReferralRewards } from "@/lib/referrals";
+import { purchaseVelocity, recordFraudEvent } from "@/lib/fraud";
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
@@ -108,6 +109,24 @@ export async function POST(request: Request) {
   const limit = await purchaseRateLimiter(`order-create:${user.id}`);
   if (limit.unavailable) return Response.json({ ok: false, error: "Purchases are temporarily unavailable." }, { status: 503 });
   if (!limit.allowed) return Response.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
+
+  // A ceiling on orders per hour, counted from the database so it holds across
+  // instances. The per-minute limiter above stops a burst; this stops a script
+  // that paces itself. Failing to read the count is not a reason to refuse a
+  // purchase, so the check is best effort in that direction only.
+  const velocity = await purchaseVelocity(user.id).catch(() => ({ allowed: true, count: 0, limit: 0 }));
+  if (!velocity.allowed) {
+    await recordFraudEvent({
+      userId: user.id,
+      kind: "purchase_velocity",
+      severity: "warn",
+      reasons: [`${velocity.count} orders in the last hour (limit ${velocity.limit})`],
+    });
+    return Response.json(
+      { ok: false, error: "That is a lot of orders in a short time. Please try again in a few minutes." },
+      { status: 429 },
+    );
+  }
 
   let body: unknown;
   try {

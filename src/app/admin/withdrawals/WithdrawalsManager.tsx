@@ -22,6 +22,9 @@ interface Withdrawal {
   paystackReference?: string | null;
   transferReference?: string | null;
   failureReason?: string;
+  /** Advisory fraud flag; the payout flow itself is unchanged by it. */
+  riskLevel?: string;
+  riskReasons?: string | null;
   createdAt: string;
   processedAt?: string;
   completedAt?: string;
@@ -283,6 +286,29 @@ export function WithdrawalsManager() {
               )}
               {withdrawal.status === "processing" && !withdrawal.transferReference && (
                 <p className="mb-3 text-sm text-red-800">Transfer outcome is unconfirmed. Reconcile it manually; do not retry or refund while it may be in flight.</p>
+              )}
+              {withdrawal.riskLevel && withdrawal.riskLevel !== "low" && (
+                <div
+                  className={`mb-4 rounded-lg border p-3 ${
+                    withdrawal.riskLevel === "high"
+                      ? "border-red-200 bg-red-50"
+                      : "border-amber-200 bg-amber-50"
+                  }`}
+                >
+                  <p
+                    className={`text-sm font-semibold ${
+                      withdrawal.riskLevel === "high" ? "text-red-800" : "text-amber-800"
+                    }`}
+                  >
+                    Fraud signal: {withdrawal.riskLevel}
+                  </p>
+                  <p className={`text-sm ${withdrawal.riskLevel === "high" ? "text-red-700" : "text-amber-700"}`}>
+                    {withdrawal.riskReasons ?? "Flagged by the risk assessment."}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Advisory only. Check the reasons before approving; the request has not been actioned.
+                  </p>
+                </div>
               )}
               {withdrawal.failureReason && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">

@@ -369,6 +369,36 @@ refunded order that was already rewarded:
 settlements only; already-credited rows keep the amount they were paid at. Say so if
 you change it, because customers will notice the difference.
 
+## 7e. Fraud signals
+
+`/admin/security` opens with the fraud queue. Every row is something the platform
+noticed; **none of it acts on its own**, and nothing in it can move money.
+
+| Kind | What it means | What to do |
+|---|---|---|
+| `withdrawal_review` | the risk assessment found reasons on a request (account age, new payout account, never-paid destination, amount vs deposit history, 3+ requests in 24h, a crowded network) | read the reasons on the withdrawal itself (`/admin/withdrawals` shows them in the card) and decide normally. The request is still `pending`; nothing was actioned |
+| `referral_same_network` | an invited account was created from the same network as the inviter, so the reward was voided before payment | check the two accounts, then look for a ring: `account_signals` grouped by `ip_hash` |
+| `purchase_velocity` | 40+ orders in an hour | a script or a shared session. Look at the account's orders and referrals |
+| `gift_card_velocity` | 10+ gift cards redeemed in a day | card-testing pattern. Do not void the credit without checking the codes first |
+
+**Reading the queue.** Mark a row reviewed once you have judged it — that is the only
+write, and it is recorded in `admin_audit_log` as `fraud.review`. Leave a row open if
+it needs someone else.
+
+**If a signal is wrong.** The detector only repeats facts; a wrong reason means the
+fact is wrong upstream (an account age, a payout history, a duplicated code). Fix the
+fact, not the detector.
+
+**Tuning.** Ceilings live in `src/lib/fraud.ts` as exported constants
+(`PURCHASES_PER_HOUR`, `GIFT_CARDS_PER_DAY`, `WITHDRAWALS_PER_DAY`,
+`SHARED_NETWORK_ACCOUNTS`); the withdrawal reasons are sentences in
+`assessWithdrawal`. Both are covered by `src/test/fraud.test.ts`, so a change means a
+test change — deliberately.
+
+**What is never stored.** A raw IP address, a raw user agent, a location or a device
+fingerprint. Rotating `FRAUD_HASH_SALT` makes stored hashes incomparable with new
+ones: do it only with a reason, and record it.
+
 ---
 
 ## 8. Incident playbooks

@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import { SecurityDashboard } from "./SecurityDashboard";
+import { FraudQueue } from "./FraudQueue";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ export default async function AdminSecurityPage() {
           Monitor and analyze security violations, reverse engineering attempts, and suspicious activity.
         </p>
       </div>
+
+      <FraudQueue />
 
       <SecurityDashboard />
     </div>

@@ -88,7 +88,10 @@ async function handler(request: NextRequest) {
   // immediately; this is the sweep that catches the rest, and it is idempotent.
   const referrals = await runStep("referrals", async () => {
     const result = await settleReferralRewards();
-    return { ok: true, detail: `credited ${result.credited}, pending ${result.pending}, skipped ${result.skipped}` };
+    return {
+      ok: true,
+      detail: `credited ${result.credited}, pending ${result.pending}, skipped ${result.skipped}, voided ${result.voided}`,
+    };
   });
 
   const allOk = close.ok && emails.ok && refunds.ok && referrals.ok;
