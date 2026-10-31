@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuthApi } from "@/lib/auth";
 import { clientIp } from "@/lib/auth-rate-limit";
 import { isPreviewDatabase } from "@/lib/demo-policy";
-import { createFreeInbox, InboxError, listInboxes, mayHaveSpentMoney } from "@/lib/disposable-inbox";
-import { isFleexaConfigured } from "@/lib/fleexa";
+import {
+  createFreeInbox,
+  InboxError,
+  isInboxConfigured,
+  listInboxes,
+  mayHaveSpentMoney,
+} from "@/lib/disposable-inbox";
 import { logger } from "@/lib/logger";
 import { isSameOriginMutation } from "@/lib/net";
 import { apiRateLimiter, inboxCreateIpRateLimiter, releaseRateLimit } from "@/lib/rate-limit";
@@ -37,7 +42,7 @@ export async function GET() {
     // the response names the one that applies.
     const reason = isPreviewDatabase()
       ? ("preview" as const)
-      : !isFleexaConfigured()
+      : !isInboxConfigured()
         ? ("not_configured" as const)
         : null;
     return NextResponse.json(
@@ -66,7 +71,7 @@ export async function POST(request: NextRequest) {
         { status: 503 },
       );
     }
-    if (!isFleexaConfigured()) {
+    if (!isInboxConfigured()) {
       return NextResponse.json(
         { error: "Temporary inboxes are not configured on this server.", code: "NOT_CONFIGURED" },
         { status: 503 },

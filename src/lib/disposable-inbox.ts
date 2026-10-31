@@ -11,6 +11,14 @@ import {
   listFleexaEmailProducts,
   type FleexaEmailMessage,
 } from "@/lib/fleexa";
+import {
+  cancelTempMail,
+  checkTempMail,
+  createTempMailInbox,
+  isTempMailConfigured,
+  TempMailError,
+  type TempMailMessage,
+} from "@/lib/tempmail";
 import { logger } from "@/lib/logger";
 
 /**
@@ -30,6 +38,38 @@ import { logger } from "@/lib/logger";
  */
 
 export const INBOX_PROVIDER = "fleexa";
+
+/**
+ * Which provider to use for disposable inboxes.
+ *
+ * - "fleexa": Wholesale Nigerian B2B email provider (requires FLEEXA_API_KEY and NGN balance).
+ * - "tempmail": Zero-setup public disposable email provider (fakemailo style, requires no custom domain or keys).
+ */
+export function getInboxProvider(): "fleexa" | "tempmail" {
+  const env = process.env.INBOX_PROVIDER?.trim().toLowerCase();
+  if (env === "fleexa") return "fleexa";
+  if (env === "tempmail" || env === "public" || env === "fakemailo") return "tempmail";
+
+  // In test environments (Vitest) without explicit INBOX_PROVIDER, default to fleexa
+  // so existing Fleexa unit tests run against their mocked Fleexa endpoints.
+  if (process.env.VITEST || process.env.NODE_ENV === "test") {
+    return "fleexa";
+  }
+
+  // In runtime/production:
+  // If Fleexa API key is configured, use Fleexa.
+  // Otherwise, use TempMail (fakemailo style) so inboxes work out of the box without setup!
+  return isFleexaConfigured() ? "fleexa" : "tempmail";
+}
+
+/** Whether the active inbox provider is configured and available. */
+export function isInboxConfigured(): boolean {
+  const provider = getInboxProvider();
+  if (provider === "fleexa") {
+    return isFleexaConfigured();
+  }
+  return isTempMailConfigured();
+}
 
 /** One free inbox per account per day. The database enforces it; this documents it. */
 export const FREE_INBOXES_PER_DAY = 1;
@@ -164,16 +204,35 @@ export function mayHaveSpentMoney(error: unknown): boolean {
   if (error instanceof FleexaError) {
     return ["INCOMPLETE_RECEIPT", "UPSTREAM_UNREACHABLE"].includes(error.code ?? "");
   }
+  if (error instanceof TempMailError) return false;
   return true;
 }
 
 export async function createFreeInbox(userId: string): Promise<CreatedInbox> {
-  if (!isFleexaConfigured()) {
-    throw new InboxError("NOT_CONFIGURED", 503, "Temporary inboxes are not available yet.");
+  const provider = getInboxProvider();
+
+  let emailId: string;
+  let address: string;
+  let expiresAt: string | null = null;
+  let domain: string | null = null;
+
+  if (provider === "fleexa") {
+    if (!isFleexaConfigured()) {
+      throw new InboxError("NOT_CONFIGURED", 503, "Temporary inboxes are not available yet.");
+    }
+    const product = await cheapestEmailProduct();
+    const purchased = await buyFleexaEmail(product ? { product } : {});
+    emailId = purchased.emailId;
+    address = purchased.address;
+    expiresAt = purchased.expiresAt;
+  } else {
+    const created = await createTempMailInbox();
+    emailId = created.id;
+    address = created.address;
+    expiresAt = created.expiresAt;
+    domain = created.domain;
   }
 
-  const product = await cheapestEmailProduct();
-  const purchased = await buyFleexaEmail(product ? { product } : {});
   const dailyKey = dailyKeyFor(userId);
 
   try {
@@ -181,14 +240,14 @@ export async function createFreeInbox(userId: string): Promise<CreatedInbox> {
       .insert(disposableInboxes)
       .values({
         userId,
-        provider: INBOX_PROVIDER,
-        providerInboxId: purchased.emailId,
-        address: purchased.address,
-        domain: null,
+        provider,
+        providerInboxId: emailId,
+        address,
+        domain,
         tier: "free",
         status: "active",
         dailyKey,
-        expiresAt: parseExpiry(purchased.expiresAt),
+        expiresAt: parseExpiry(expiresAt),
       })
       .returning();
 
@@ -205,14 +264,19 @@ export async function createFreeInbox(userId: string): Promise<CreatedInbox> {
     const code = classifyUniqueViolation(error);
     if (!code) throw error;
 
-    // Compensate: give the purchased inbox back so the refused request does not
+    // Compensate: give the purchased/created inbox back so the refused request does not
     // consume anything. A failure to cancel is logged and does not change the
     // answer to the customer — the limit still stands either way.
     try {
-      await cancelFleexaEmail(purchased.emailId);
+      if (provider === "fleexa") {
+        await cancelFleexaEmail(emailId);
+      } else {
+        await cancelTempMail(emailId, address);
+      }
     } catch (cancelError) {
       logger.error("Could not cancel an inbox the daily limit refused", {
         userId,
+        provider,
         code,
         reason: cancelError instanceof Error ? cancelError.message : String(cancelError),
       });
@@ -307,7 +371,10 @@ export async function pollInbox(userId: string, inboxId: string): Promise<PollRe
     return { inbox: viewOf(row), messages: stored, code: stored.find((m) => m.code)?.code ?? null, stored: true };
   }
 
-  const checked = await checkFleexaEmail(row.providerInboxId);
+  const checked =
+    row.provider === "tempmail"
+      ? await checkTempMail(row.providerInboxId, row.address)
+      : await checkFleexaEmail(row.providerInboxId);
 
   if (row.tier === "paid") {
     await db
@@ -371,7 +438,11 @@ export async function discardInbox(userId: string, inboxId: string): Promise<Inb
   const row = await ownInbox(userId, inboxId);
   if (row.status !== "active") return viewOf(row);
 
-  await cancelFleexaEmail(row.providerInboxId);
+  if (row.provider === "tempmail") {
+    await cancelTempMail(row.providerInboxId, row.address);
+  } else {
+    await cancelFleexaEmail(row.providerInboxId);
+  }
 
   const [updated] = await db
     .update(disposableInboxes)
