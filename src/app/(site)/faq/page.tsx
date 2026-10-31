@@ -76,7 +76,7 @@ const faqCategories = [
       },
       {
         q: "Can I withdraw money from my wallet?",
-        a: "Withdrawal requests require administrator review and a payment provider that can settle them. A request or transfer initiation is not proof of settlement.",
+        a: "Withdrawals are sent to your bank as soon as you confirm them, through our payment provider. \"Sent to bank\" means the provider accepted the transfer; it shows as \"Paid out\" once the bank confirms. If the transfer cannot be sent, the amount and fee return to your wallet automatically.",
       },
       {
         q: "Do wallet balances expire?",

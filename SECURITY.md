@@ -61,6 +61,17 @@ the event is refused (400) and left for a person. A failure event that follows a
 success is *not* applied — the pair contradicts itself and a credit on a
 contradiction would be a guess.
 
+**Payouts** — `src/app/api/wallet/withdraw/route.ts`, `src/lib/payouts.ts`, `src/lib/withdrawal-refund.ts`
+A withdrawal is sent on request, with no operator in the path, so the controls are
+the ones that run before the money leaves: the destination name must match the name
+that funded the wallet (frozen on the first settled deposit, not the editable
+profile), the amount is banded, a risk score is recorded, and the request is
+refused outright when no provider key is configured. The row, the wallet debit, the
+ledger entry and the provider reference commit in one transaction. A provider
+refusal refunds the amount **and** the fee with a ledger row; an *unconfirmed*
+outcome is never refunded, because a refund there could pay twice, and it is left
+for the sweep and a person.
+
 **Money movement** — `src/lib/wallet.ts`, `src/lib/payment-integrity.ts`, routes
 Every debit is a conditional `UPDATE ... WHERE balance >= amount` inside a
 transaction with its ledger row; purchases carry a per-user idempotency key, so a

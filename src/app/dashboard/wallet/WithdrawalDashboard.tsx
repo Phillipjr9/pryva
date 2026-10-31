@@ -62,11 +62,11 @@ const statusStyles: Record<string, string> = {
 };
 
 const statusLabels: Record<string, string> = {
-  pending: "Awaiting approval",
-  processing: "Processing / review",
+  pending: "Queued",
+  processing: "Sent to bank",
   completed: "Paid out",
-  failed: "Failed",
-  rejected: "Rejected",
+  failed: "Failed — refunded",
+  rejected: "Rejected — refunded",
 };
 
 function StatusPill({ status, testMode }: { status: string; testMode: boolean }) {
@@ -301,7 +301,19 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
         } catch {
           setRecoveryState("unavailable");
         }
-        addToast({ type: "success", message: receipt.replayed ? "Existing withdrawal request found" : "Withdrawal request submitted for review" });
+        addToast({
+          // The receipt carries the truth, not the HTTP status: a payout that the
+          // provider refused has already been refunded, and telling the customer
+          // "sent" would be wrong in the one case that matters most.
+          type: receipt.status === "failed" || receipt.status === "rejected" ? "error" : "success",
+          message: receipt.replayed
+            ? "Existing withdrawal request found"
+            : receipt.status === "failed" || receipt.status === "rejected"
+              ? "Payout could not be sent — the amount and fee are back in your wallet"
+              : receipt.status === "completed"
+                ? "Payout sent and confirmed"
+                : "Payout sent to your bank",
+        });
         setAmount("");
         setSelectedBankAccountId("");
         setActiveTab("history");
@@ -407,7 +419,9 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
         <div>
           <h2 className="text-[1.05rem] font-semibold">Withdraw to your bank</h2>
           <p className="mt-0.5 text-[0.8rem] text-ink-2">
-            {testMode ? "Test requests are reviewed; Paystack test transfers do not make real payouts." : "Requests are reviewed, then paid out through Paystack Transfers."}
+            {testMode
+              ? "Test requests do not make real payouts; Paystack test transfers settle in its sandbox."
+              : "Payouts are sent to your bank immediately through Paystack Transfers. If a transfer cannot be sent, the amount and fee return to your wallet automatically."}
           </p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-micro text-ink-3">
@@ -537,7 +551,8 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
 
               <p className="flex items-start gap-2 rounded-xl bg-lav-50 px-3 py-2.5 text-meta leading-relaxed text-lav-800">
                 <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                Requests are reviewed. An initiated transfer is not confirmation of settlement; uncertain outcomes require manual reconciliation.
+                No approval step: your payout is sent as soon as you confirm. “Sent to bank” means the provider accepted it; the status changes to
+                “Paid out” when the bank confirms, and a transfer that fails is refunded to your wallet.
               </p>
             </div>
           )}
