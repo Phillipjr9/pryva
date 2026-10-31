@@ -1,6 +1,6 @@
 # Pryva — verified status review
 
-**Date:** 31 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** the twentieth pass, §25
+**Date:** 31 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** the twenty-first pass, §29
 **Method:** every claim below was read out of the code or produced by running the project. Nothing is taken from `PLAN.md` without checking it first — and several `PLAN.md` entries turned out to be stale (section 4).
 
 ---
@@ -1168,3 +1168,51 @@ threshold or hash and says plainly that it moved no money; recipients prefer
 `FRAUD_ALERT_EMAIL` and fall back to `ADMIN_EMAILS`; warn events are never mailed; a
 repeat inside the window is suppressed while a different signal still rings; and an
 unconfigured or failing mail API resolves `false` rather than throwing).
+
+---
+
+## 29. Twenty-first pass — the dashboard's missing marks (31 Oct 2026)
+
+**The request.** "Can you check what icon logo is missing and what service is
+missing on the user dashboard." The audit was run against the rendered sidebar,
+signed in to the running build, not against the source alone.
+
+### 29.1 What was actually missing
+
+| Defect | Where it showed | Why it mattered |
+|---|---|---|
+| **App verification** had no mark — a generic phone glyph | sidebar → Buy | it is a service shelf a customer pays through; every neighbouring row had artwork and this one looked like a placeholder |
+| **Social promotion** had no mark — a generic people glyph | sidebar → Buy | same, and the glyph is indistinguishable from "Support" at 16 px |
+| **Subscriptions borrowed the Digital Accounts tile** | sidebar → Buy | two destinations rendered the *same* 3D icon, so the sidebar implied they were one product |
+| **`/dashboard/reviews` had no entry point at all** | anywhere | a delivered order can be reviewed exactly once, and the page that does it was reachable only by typing the URL — every other dashboard route is in the sidebar |
+
+Everything else checked out: the nine catalogue services each render their own
+512 px artwork and no two share a file (asserted since §17); the six digital
+products render real brand marks; all ten hub categories are reachable — nine
+through the hub, and the two order tools through their own pages, which is a
+better destination than a pre-filtered hub.
+
+Gift cards are still not one of the hub's categories. That is the owner's rule
+from §16, unchanged: wallet credit is not a service.
+
+### 29.2 What was added
+
+Three new masters in the same 3D set as the other nine — `subscriptions.png` (a
+play tile with a peach star), `app-verification.png` (a phone with a check bubble)
+and `social-promotion.png` (speech bubbles with a heart) — each with the 64/128/192
+WebP derivatives the UI actually downloads. They are Pryva's own category marks,
+not brand marks: nothing here reproduces a third party's logo, and
+`scripts/build-service-artwork.mjs` regenerated the derivatives so a deploy never
+depends on the generator having run.
+
+`ServiceIcon` gained the three keys as an exhaustive map (a missing file is still
+a type error rather than a silent fallback to another service), the sidebar's Buy
+group now uses `art` for all three, and **Reviews** sits under *You* with a star.
+
+**Verified:** 1,247 tests / 131 files · typecheck · lint · build. New
+`dashboard-nav-coverage.test.tsx` (6) renders the real sidebar and asserts that
+every Buy row draws an image, that Subscriptions and Accounts no longer share one,
+that every hub category (and both order tools, and gift cards) has a link, and that
+Reviews is reachable. Live check after sign-in: all twelve Buy rows returned their
+own `img`, `/dashboard/reviews` 200, and the three new files served 200 in both
+master and 64 px form.

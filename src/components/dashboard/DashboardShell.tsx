@@ -18,8 +18,7 @@ import {
   Receipt,
   Settings,
   Sparkle,
-  Phone,
-  Users,
+  Star,
   Wallet,
 } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
@@ -38,7 +37,19 @@ type NavItem = {
   href: string;
   label: string;
   icon?: (props: { className?: string }) => ReactNode;
-  art?: "numbers" | "esim" | "email-otp" | "accounts" | "data" | "gift-cards" | "bulk" | "scheduled" | "proxies";
+  art?:
+    | "numbers"
+    | "esim"
+    | "email-otp"
+    | "accounts"
+    | "data"
+    | "gift-cards"
+    | "bulk"
+    | "scheduled"
+    | "proxies"
+    | "subscriptions"
+    | "app-verification"
+    | "social-promotion";
   /** Category links enter the country-first hub, rather than bypassing it. */
   category?: ExplorerCategory;
 };
@@ -62,14 +73,14 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
     label: "Buy",
     items: [
       { href: "/dashboard/services", label: "All services", icon: Sparkle },
-      { href: "/dashboard/services", label: "App verification", icon: Phone, category: "verification" },
-      { href: "/dashboard/services", label: "Social promotion", icon: Users, category: "social" },
+      { href: "/dashboard/services", label: "App verification", art: "app-verification", category: "verification" },
+      { href: "/dashboard/services", label: "Social promotion", art: "social-promotion", category: "social" },
       { href: "/dashboard/services", label: "Number plans", art: "numbers", category: "numbers" },
       { href: "/dashboard/services", label: "eSIM", art: "esim", category: "esim" },
       { href: "/dashboard/services", label: "Proxies", art: "proxies", category: "proxies" },
       { href: "/dashboard/services", label: "Email OTP", art: "email-otp", category: "email" },
       { href: "/dashboard/services", label: "Accounts", art: "accounts", category: "accounts" },
-      { href: "/dashboard/services", label: "Subscriptions", art: "accounts", category: "subscriptions" },
+      { href: "/dashboard/services", label: "Subscriptions", art: "subscriptions", category: "subscriptions" },
       { href: "/dashboard/services", label: "Data Plans", art: "data", category: "data" },
       // Gift cards are wallet credit Pryva issues itself, not a service in the
       // catalogue, so this links straight at the page instead of the hub.
@@ -82,6 +93,9 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
     label: "You",
     items: [
       { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
+      // Delivered orders can be reviewed once, but the page had no entry point
+      // anywhere in the app -- it was reachable only by typing the URL.
+      { href: "/dashboard/reviews", label: "Reviews", icon: Star },
       // Security is a section of Settings, not a destination of its own: one
       // account, one page that changes it. The old route redirects here.
       { href: "/dashboard/settings", label: "Settings", icon: Settings },
