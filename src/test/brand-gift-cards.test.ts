@@ -52,13 +52,14 @@ describe("Brand Gift Cards catalog", () => {
 });
 
 describe("Brand Gift Cards API routes", () => {
-  it("GET /api/gift-cards/catalog returns the curated brands and supplier status", async () => {
+  it("GET /api/gift-cards/catalog returns the curated brands and fulfillment status", async () => {
     const response = await getCatalogRoute();
     const data = await response.json();
     expect(response.status).toBe(200);
     expect(data.ok).toBe(true);
     expect(Array.isArray(data.cards)).toBe(true);
     expect(data.cards.length).toBeGreaterThanOrEqual(8);
+    expect(typeof data.liveFulfillmentConfigured).toBe("boolean");
   });
 
   it("POST /api/gift-cards/order rejects unauthenticated requests", async () => {
