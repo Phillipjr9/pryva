@@ -120,9 +120,12 @@ describe("support surfaces are scoped to the account", () => {
     }
   });
 
-  it("offers a way out of the assistant from inside the thread", () => {
-    const form = read("src/components/support/TicketReplyForm.tsx");
-    expect(form).toContain("Ask for a person instead");
-    expect(form).toContain('action: "escalate"');
+  it("offers a way out of the assistant from inside the conversation", () => {
+    // The guarantee survived the rewrite: the button lives in the chat now, which
+    // is the only component either entry point uses.
+    const chat = read("src/components/support/SupportChat.tsx");
+    expect(chat).toContain("Ask for a person instead");
+    expect(chat).toContain('action: "escalate"');
+    expect(chat).toContain("/api/support/tickets/");
   });
 });

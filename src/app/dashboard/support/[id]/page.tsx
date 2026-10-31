@@ -4,9 +4,9 @@ import { notFound } from "next/navigation";
 
 import { requireUser } from "@/lib/auth";
 import { SupportStatusPill } from "@/components/support/SupportStatusPill";
-import { TicketReplyForm } from "@/components/support/TicketReplyForm";
+import { SupportChat, type ChatMessage } from "@/components/support/SupportChat";
 import { getThread, getTicketForUser } from "@/lib/support-tickets";
-import { AlertCircle, ArrowLeft, Sparkle, User } from "@/components/icons";
+import { AlertCircle, ArrowLeft } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -57,61 +57,30 @@ export default async function SupportThreadPage({ params }: { params: Promise<{ 
         </div>
       ) : null}
 
-      <div className="grid gap-2.5">
-        {messages.map((message) => {
-          const mine = message.authorRole === "customer";
-          const assistant = message.authorRole === "assistant";
-          const admin = message.authorRole === "admin";
-          return (
-            <div
-              key={message.id}
-              className={
-                mine
-                  ? "ml-auto w-full max-w-[46rem] rounded-2xl rounded-br-md border border-line bg-ink px-4 py-3 text-white"
-                  : assistant
-                    ? "mr-auto w-full max-w-[46rem] rounded-2xl rounded-bl-md border border-lav-200 bg-lav-50/60 px-4 py-3"
-                    : "mr-auto w-full max-w-[46rem] rounded-2xl rounded-bl-md border border-line bg-[#fffdfa] px-4 py-3"
-              }
-            >
-              <div className="flex items-center gap-1.5">
-                {assistant ? (
-                  <>
-                    <Sparkle className="h-3.5 w-3.5 text-lav-700" />
-                    <span className="text-micro font-semibold text-lav-800">Pryva assistant</span>
-                  </>
-                ) : admin ? (
-                  <>
-                    <User className="h-3.5 w-3.5 text-ink-2" />
-                    <span className="text-micro font-semibold text-ink">Pryva support team</span>
-                  </>
-                ) : (
-                  <span className="text-micro font-semibold text-white/80">You</span>
-                )}
-                <span className={mine ? "text-micro text-white/60" : "text-micro text-ink-3"}>
-                  ·{" "}
-                  {new Date(message.createdAt).toLocaleString("en-NG", {
-                    day: "numeric",
-                    month: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-              </div>
-              <div
-                className={
-                  mine
-                    ? "mt-1.5 whitespace-pre-line text-[0.86rem] leading-relaxed text-white/90"
-                    : "mt-1.5 whitespace-pre-line text-[0.86rem] leading-relaxed text-ink-2"
-                }
-              >
-                {message.body}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <TicketReplyForm ticketId={ticket.id} closed={ticket.status === "closed"} />
+      {/*
+        The transcript is rendered by the client chat, seeded with what the server
+        already has. It used to be server-rendered bubbles plus a form, and the form
+        only showed its result after `router.refresh()` — so on a slow connection a
+        reply looked like nothing happening at all.
+      */}
+      <SupportChat
+        ticketId={ticket.id}
+        closed={ticket.status === "closed"}
+        escalated={escalated}
+        initialMessages={messages.map(
+          (message): ChatMessage => ({
+            id: message.id,
+            role:
+              message.authorRole === "customer"
+                ? "customer"
+                : message.authorRole === "assistant"
+                  ? "assistant"
+                  : "admin",
+            body: message.body,
+            createdAt: message.createdAt.toISOString(),
+          }),
+        )}
+      />
     </div>
   );
 }
