@@ -2208,3 +2208,41 @@ imports a writer.
 `transfer.*`. That is exactly what the new endpoint will say the first time it is
 called — and if it says `only_topups`, the answer is in the Paystack dashboard, not
 in this repository.
+
+## Dashboard service selection — mobile density
+
+Reported: *"on mobile the grid is too big for mobile selections"*. Two grids were
+the cause, and both stacked desktop-sized boxes on a 375 px screen.
+
+**The overview (`/dashboard`) service grid.** "Explore categories" rendered eight
+`p-2.5` rows, one per line, each with an icon, a label, a note and an arrow —
+about 536 px before the first service was even reachable. It is now **Select a
+service**: compact tiles, three per row (four from 400 px), with the note and
+arrow returning at `sm`, where the same eight entries become full rows again.
+That is roughly **250 px instead of 536 px** at 375 px, and **~170 px on a 400 px
+phone**. The section also moved ahead of Recent orders in the phone flow
+(`lg:order-2` keeps the desktop two-column arrangement unchanged), so choosing a
+service no longer sits below a screen of order history.
+
+**The hub (`/dashboard/services`) service cards.** Twelve cards sat two-up at
+375 px, each with a badge, heading, description, coverage line, price line, a
+two-cell stock/units box and a full-width button — around **255 px tall**. Phones
+now get a **68 px row**: 48 px artwork, the name on one line, one compact line
+with the type and price, and a single 44 px action (the arrow carries the old
+label as its accessible name, the unavailable state carries a lock and its
+reason). Description, coverage, stock, units and the labelled button return at
+`sm`. It is the same markup with responsive classes, not a second mobile card, so
+no service is announced twice.
+
+Supporting trims: the country step, category panel and results frame use phone
+padding (`p-4`/`p-3.5` rather than `p-5`/`p-6`), the ten category chips scroll in
+one row instead of wrapping to four, and the dashboard country prompt is shorter
+on a phone. The 13 px phone floor in `globals.css` is untouched — this is density,
+not smaller type.
+
+**Verified:** 1,566 tests / 168 files · typecheck · lint · build · `GET /dashboard`
+and `GET /dashboard/services?country=ng&category=numbers` render `200` with the
+new classes, and the compiled CSS contains the `min-width: 400px` rule. New
+coverage in `service-grid-density.test.tsx` asserts that both grids start
+single-column, that the phone row keeps a 44 px action with an accessible name,
+and that each service renders exactly one heading and one control.
