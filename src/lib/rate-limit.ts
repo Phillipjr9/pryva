@@ -133,6 +133,9 @@ export const passwordChangeRateLimiter = createRateLimiter({ windowMs: 15 * 60_0
  */
 export const notificationRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 30 });
 export const giftCardUserRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 15 });
+// Reviews are written once per order, so a handful per hour is generous; the cap
+// exists to stop an automated account filling the moderation queue.
+export const reviewRateLimiter = createRateLimiter({ windowMs: 60 * 60_000, maxRequests: 6 });
 export const giftCardIpRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 60 });
 
 /**
@@ -157,6 +160,19 @@ export const inboxCreateIpRateLimiter = createRateLimiter({ windowMs: 24 * 60 * 
  * for a verification code.
  */
 export const inboxPollRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 12 });
+/**
+ * Support messages run the assistant, which reads the account and may call the
+ * payment provider. Twenty in fifteen minutes is well past what a real
+ * conversation needs and low enough that a script cannot use the assistant as a
+ * free provider-probing service.
+ */
+export const supportMessageRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 20 });
+/**
+ * Passkey ceremonies. Each one is a round trip to an authenticator and, on the
+ * sign-in path, a signature check; the limit is per IP because the sign-in
+ * ceremony happens before anybody is known to be signed in.
+ */
+export const passkeyRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 12 });
 
 /** Drop one key's counter after successful authentication. */
 export async function resetRateLimit(key: string): Promise<void> {

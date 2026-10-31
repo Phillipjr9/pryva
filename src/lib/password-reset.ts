@@ -139,7 +139,14 @@ export async function resetPassword(
   if (!row) return { ok: false, error: RESET_INVALID_MESSAGE };
 
   await db.transaction(async (tx) => {
-    await tx.update(users).set({ passwordHash: hashPassword(newPassword) }).where(eq(users.id, row.userId));
+    // A completed reset also releases an account lockout: the token proves
+    // control of the mailbox, which is a stronger signal than a forgotten
+    // password, and leaving the lock on would refuse the sign-in the customer
+    // just earned.
+    await tx
+      .update(users)
+      .set({ passwordHash: hashPassword(newPassword), failedLoginAttempts: 0, lockedUntil: null })
+      .where(eq(users.id, row.userId));
     await tx.update(passwordResetTokens).set({ usedAt: new Date() }).where(eq(passwordResetTokens.id, row.id));
     // Every existing session dies. If someone else had already got in, this is
     // what locks them out — resetting the password alone would not.

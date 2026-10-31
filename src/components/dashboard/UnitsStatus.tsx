@@ -5,12 +5,12 @@ export function UnitsStatus({ stock = null, owned = null }: { stock?: number | n
   return (
     <span className="grid grid-cols-2 gap-2 rounded-xl bg-cream/80 px-3 py-2.5 text-left">
       <span className="block">
-        <span className="block text-[0.59rem] font-medium uppercase tracking-[0.08em] text-ink-3">Stock</span>
-        <span className="mt-0.5 block text-[0.72rem] font-semibold text-ink">{formatUnitCount(stock, "Unknown")}</span>
+        <span className="block text-micro font-medium uppercase tracking-[0.08em] text-ink-3">Stock</span>
+        <span className="mt-0.5 block text-meta font-semibold text-ink">{formatUnitCount(stock, "Unknown")}</span>
       </span>
       <span className="block">
-        <span className="block text-[0.59rem] font-medium uppercase tracking-[0.08em] text-ink-3">My units</span>
-        <span className="mt-0.5 block text-[0.72rem] font-semibold text-ink">{formatUnitCount(owned, "Not tracked")}</span>
+        <span className="block text-micro font-medium uppercase tracking-[0.08em] text-ink-3">My units</span>
+        <span className="mt-0.5 block text-meta font-semibold text-ink">{formatUnitCount(owned, "Not tracked")}</span>
       </span>
     </span>
   );

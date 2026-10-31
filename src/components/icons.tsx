@@ -583,6 +583,15 @@ export function Settings(props: IconProps) {
   );
 }
 
+export function Send(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M22 2 11 13" />
+      <path d="M22 2l-7 20-4-9-9-4z" />
+    </svg>
+  );
+}
+
 export function Trash2(props: IconProps) {
   return (
     <svg {...base(props)}>

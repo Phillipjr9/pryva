@@ -113,6 +113,20 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                       {order.duration}
                     </p>
                   </div>
+                  {order.targetLink && (
+                    <div className="sm:col-span-2">
+                      <p className="text-[0.82rem] text-ink-3 mb-1">Boosted link</p>
+                      <a
+                        href={order.targetLink}
+                        target="_blank"
+                        rel="noopener noreferrer nofollow"
+                        className="break-all text-[0.9rem] font-medium text-lav-700 underline underline-offset-2"
+                      >
+                        {order.targetLink}
+                      </a>
+                      {order.quantity ? <span className="ml-2 text-meta text-ink-3">· {order.quantity.toLocaleString("en-NG")} units</span> : null}
+                    </div>
+                  )}
                   <div>
                     <p className="text-[0.82rem] text-ink-3 mb-1">Amount</p>
                     <p className="text-[0.95rem] font-medium text-ink">

@@ -53,10 +53,10 @@ export function StickyMobileCta({
       >
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[0.78rem] font-semibold text-ink">
+            <p className="truncate text-meta font-semibold text-ink">
               {price === undefined ? "Start free" : <>Start with {formatNaira(price)}</>}
             </p>
-            <p className="truncate text-[0.66rem] text-ink-3">{label}</p>
+            <p className="truncate text-micro text-ink-3">{label}</p>
           </div>
           <Link href="/signup" className="btn btn-primary !px-5 !py-3 !text-[0.86rem]">
             Get started

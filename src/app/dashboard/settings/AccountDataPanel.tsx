@@ -51,7 +51,7 @@ export function AccountDataPanel() {
         </span>
         <div>
           <h2 className="text-[0.95rem] font-semibold">Your data</h2>
-          <p className="mt-0.5 text-[0.78rem] text-ink-2">
+          <p className="mt-0.5 text-meta text-ink-2">
             Download a JSON copy of your profile, orders, wallet activity, gift cards and schedules.
           </p>
         </div>
@@ -75,7 +75,7 @@ export function AccountDataPanel() {
           )}
         </button>
 
-        <p className="flex items-start gap-2 rounded-xl bg-cream/70 px-3.5 py-2.5 text-[0.74rem] leading-relaxed text-ink-2">
+        <p className="flex items-start gap-2 rounded-xl bg-cream/70 px-3.5 py-2.5 text-meta leading-relaxed text-ink-2">
           <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
           <span>
             The file can contain redeemable gift-card codes — store it somewhere private. It covers
@@ -83,7 +83,7 @@ export function AccountDataPanel() {
           </span>
         </p>
 
-        <p className="text-[0.76rem] leading-relaxed text-ink-2">
+        <p className="text-meta leading-relaxed text-ink-2">
           Closing your account permanently is not self-service yet: remaining balances, settled
           payments and record retention have to be reviewed first.{" "}
           <Link

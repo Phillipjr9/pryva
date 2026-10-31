@@ -19,7 +19,7 @@ describe("homepage structure", () => {
     expect(html).toContain("without the friction");
   });
 
-  it("renders all nine services, not the old four", () => {
+  it("renders all eight services, not the old four", () => {
     for (const name of [
       "Virtual Numbers",
       "eSIM",
@@ -27,13 +27,26 @@ describe("homepage structure", () => {
       "Email OTP",
       "Digital Accounts",
       "Data Plans",
-      "Gift Cards",
       "Bulk Orders",
       "Scheduled Purchases",
     ]) {
       expect(html).toContain(name);
     }
     expect(html).not.toContain("Four services");
+  });
+
+  /**
+   * Gift cards are not a service.
+   *
+   * They were one of the nine cards here, one chip in the dashboard's service
+   * categories, and one row in the sidebar's "Buy" list. They are wallet credit
+   * that Pryva issues itself — nothing is fulfilled, nothing is supplied — so
+   * they belong with the wallet, reachable from the footer and `/dashboard`,
+   * not in a catalogue next to virtual numbers.
+   */
+  it("does not list gift cards among the services", () => {
+    expect(html).not.toContain("Gift Cards");
+    expect(html).not.toContain("/dashboard/gift-cards");
   });
 
   it("never sends a signed-out visitor straight at a dashboard route", () => {
@@ -176,5 +189,52 @@ describe("homepage hero", () => {
     expect(html).not.toContain("482069");
     // The photo and its call to action stay; only the overlay went.
     expect(html).toContain("Create your account");
+  });
+});
+
+/**
+ * One service, one card.
+ *
+ * The homepage used to render the same four services three times: a quick
+ * service picker above the grid, the grid itself, and a price list that repeated
+ * the same four icons and the same four "from" prices. The accounts banner also
+ * carried a row of platform chips that the marquee directly beneath it repeated
+ * four lines later. Removing them is only half the job — the duplication is easy
+ * to add back — so the artwork paths are counted here.
+ *
+ * Each catalogue service has exactly one 3D artwork file, and the grid is the
+ * only place that should draw it. A second hit means a service has crept back
+ * onto the page in a second place.
+ */
+describe("homepage service list", () => {
+  it("draws each service's artwork exactly once", () => {
+    // Gift cards are deliberately not here: they left the catalogue, so their
+    // artwork belongs on /gift-cards and in the dashboard, not on this page.
+    const artwork = [
+      "virtual-numbers",
+      "esim",
+      "proxies",
+      "email-otp",
+      "digital-accounts",
+      "data",
+      "bulk",
+      "scheduled",
+    ];
+
+    // Counted as <img> elements, not as string hits: outside a real Next build
+    // `next/image` emits `/_next/image?url=%2Fimages%2F...` in `src` AND in the
+    // 1x/2x entries of `srcSet`, so a substring count reports three.
+    const images = [...html.matchAll(/<img\b[^>]*>/g)].map((match) => match[0]);
+
+    for (const file of artwork) {
+      const hits = images.filter((tag) => tag.includes(`${file}.png`)).length;
+      expect(hits, `${file}.png appears ${hits} time(s) on the homepage`).toBe(1);
+    }
+  });
+
+  it("numbers its sections without a gap", () => {
+    // The last section was labelled "08" while nothing on the page was "07".
+    const numbers = [...html.matchAll(/eyebrow">(\d{2}) \/ /g)].map((match) => match[1]);
+    expect(numbers).toEqual(["01", "02", "03", "04", "05", "06", "07"]);
   });
 });

@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { getCurrentUser, isAdminUser, type PublicUser } from "@/lib/auth";
 import { db } from "@/db";
 import * as analytics from "@/app/api/admin/analytics/route";
+import * as auditLog from "@/app/api/admin/audit/route";
 import * as exportData from "@/app/api/admin/export/route";
 import * as giftCards from "@/app/api/admin/gift-cards/route";
 import * as messages from "@/app/api/admin/messages/route";
@@ -31,6 +32,7 @@ const account = (email: string, verified = true): PublicUser => ({
 type Handler = (request: NextRequest, context: { params: Promise<{ id: string }> }) => Promise<Response>;
 const handlers: Array<{ path: string; method: string; handler: Handler }> = [
   { path: "analytics", method: "GET", handler: analytics.GET },
+  { path: "audit", method: "GET", handler: auditLog.GET },
   { path: "export", method: "GET", handler: exportData.GET },
   { path: "gift-cards", method: "GET", handler: giftCards.GET },
   { path: "messages", method: "GET", handler: messages.GET },

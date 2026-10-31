@@ -38,6 +38,18 @@
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /* Stop iOS Safari inflating type when a phone is turned sideways. Without
+       it, rotating the device re-flows the copy at a size nobody chose. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /*
+     * `clip` rather than `hidden`: it stops a stray absolutely-positioned blur
+     * or a nowrap string from giving the page a horizontal scrollbar, without
+     * turning the element into a scroll container (which would break the sticky
+     * header and the fixed mobile tab bar). Sources of overflow are fixed as
+     * well — this is the belt, not the braces.
+     */
+    overflow-x: clip;
   }
 
   body {
@@ -88,6 +100,39 @@
     letter-spacing: 0.22em;
     text-transform: uppercase;
     color: var(--color-lav-700);
+  }
+
+  /*
+   * Two type steps for the small print, and a floor on phones.
+   *
+   * The UI had 369 separate `text-[0.5…0.79rem]` declarations — down to 9.3 px —
+   * which is why a phone needed pinch-zoom to read a badge, a table header or a
+   * price note. They are now two named steps: `text-micro` for the smallest
+   * labels and `text-meta` for the secondary line. Desktop keeps the sizes the
+   * design was drawn at; below the `sm` breakpoint both rise to 13 px, which is
+   * the smallest size that is comfortable without zooming.
+   */
+  .text-micro {
+    font-size: 0.68rem;
+    line-height: 1.45;
+  }
+
+  .text-meta {
+    font-size: 0.75rem;
+    line-height: 1.45;
+  }
+
+  @media (max-width: 639px) {
+    .text-micro,
+    .text-meta {
+      font-size: 0.8125rem;
+      line-height: 1.45;
+    }
+
+    .eyebrow {
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+    }
   }
 
   .btn {
@@ -171,6 +216,22 @@
     letter-spacing: 0.02em;
     color: var(--color-ink-2);
     margin-bottom: 0.4rem;
+  }
+
+  /*
+   * iOS Safari zooms the entire page in when a form control is focused and its
+   * text is smaller than 16px, and it does not zoom back out when the field
+   * blurs. `.field` is 14.7px, so every tap on the login form left the visitor
+   * on a zoomed page that had to be pinched back. 16px is the threshold, not a
+   * style preference, which is why it is a media query and not a design token.
+   */
+  @media (max-width: 639px) {
+    .field,
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    select,
+    textarea {
+      font-size: 16px;
+    }
   }
 }
 

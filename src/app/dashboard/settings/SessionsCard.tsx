@@ -90,7 +90,7 @@ export function SessionsCard() {
             type="button"
             onClick={() => void revoke(undefined, true)}
             disabled={busy === "all"}
-            className="btn border border-line bg-white !px-3 !py-1.5 !text-[0.74rem] text-ink hover:border-lav-200 disabled:opacity-50"
+            className="btn border border-line bg-white !px-3 !py-1.5 !text-[0.8125rem] sm:!text-[0.74rem] text-ink hover:border-lav-200 disabled:opacity-50"
           >
             {busy === "all" ? (
               <>
@@ -119,12 +119,12 @@ export function SessionsCard() {
               <p className="text-[0.82rem] font-medium text-ink">
                 {session.isCurrent ? "This device" : "Another device"}
                 {session.isCurrent && (
-                  <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[0.66rem] font-semibold text-emerald-700">
+                  <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-micro font-semibold text-emerald-700">
                     Active now
                   </span>
                 )}
               </p>
-              <p className="text-[0.74rem] text-ink-3">
+              <p className="text-meta text-ink-3">
                 Signed in {when(session.createdAt)} · expires {when(session.expiresAt)}
               </p>
             </div>
@@ -133,7 +133,7 @@ export function SessionsCard() {
                 type="button"
                 onClick={() => void revoke(session.id)}
                 disabled={busy === session.id}
-                className="rounded-full px-2.5 py-1 text-[0.72rem] font-semibold text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50"
+                className="rounded-full px-2.5 py-1 text-meta font-semibold text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50"
               >
                 {busy === session.id ? "Signing out…" : "Sign out"}
               </button>

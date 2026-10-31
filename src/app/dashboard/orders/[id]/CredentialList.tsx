@@ -33,13 +33,13 @@ export function CredentialList({ accounts }: { accounts: string[] }) {
     <div className="space-y-2">
       {accounts.map((account, index) => (
         <div key={`${index}-${account.slice(0, 8)}`} className="flex items-center gap-2">
-          <code className="min-w-0 flex-1 break-all rounded-lg border border-line bg-white px-3 py-2 font-mono text-[0.78rem] text-ink">
+          <code className="min-w-0 flex-1 break-all rounded-lg border border-line bg-white px-3 py-2 font-mono text-meta text-ink">
             {account}
           </code>
           <button
             type="button"
             onClick={() => void copy(account, index)}
-            className="shrink-0 rounded-lg border border-line bg-white px-2.5 py-1.5 text-[0.72rem] font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-ink"
+            className="shrink-0 rounded-lg border border-line bg-white px-2.5 py-1.5 text-meta font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-ink"
           >
             {copied === index ? "Copied" : "Copy"}
           </button>
@@ -49,12 +49,12 @@ export function CredentialList({ accounts }: { accounts: string[] }) {
       <button
         type="button"
         onClick={() => void copy(accounts.join("\n"), "all")}
-        className="mt-1 rounded-lg border border-line bg-white px-3 py-1.5 text-[0.74rem] font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-ink"
+        className="mt-1 rounded-lg border border-line bg-white px-3 py-1.5 text-meta font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-ink"
       >
         {copied === "all" ? "All copied" : "Copy all"}
       </button>
 
-      <p className="pt-1 text-[0.72rem] text-ink-3">
+      <p className="pt-1 text-meta text-ink-3">
         Treat these like passwords. Each line is one account, exactly as described.
       </p>
     </div>

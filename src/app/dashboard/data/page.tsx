@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { DataPlansForm } from "./DataPlansForm";
 import { requireUser } from "@/lib/auth";
 import { findDataPlan } from "@/lib/airtime";
+import { ServiceTitle } from "@/components/ServiceTitle";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export default async function DataPlansPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Data Plans</h1>
+        <ServiceTitle service="data">Data Plans</ServiceTitle>
         <p className="mt-1 text-[0.86rem] text-ink-2">
           Browse data plans and pricing. Data plans cannot be delivered yet.
         </p>

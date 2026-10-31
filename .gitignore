@@ -9,3 +9,8 @@ out
 npm-debug.log*
 
 *.tsbuildinfo
+
+# Local database copies. They contain every customer row: never commit one,
+# and never leave one on a laptop longer than the drill needs.
+backups/
+*.ndjson.gz
