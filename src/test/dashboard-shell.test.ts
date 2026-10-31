@@ -55,7 +55,8 @@ describe("dashboard navigation", () => {
       expect(shell, `${category} should have a hub shortcut`).toContain(`category: "${category}"`);
     }
     expect(shell).not.toContain('category: "gift-cards"');
-    expect(shell).toContain('label: "Services", icon: Sparkle');
+    // Every row, including this one, carries a real image rather than a glyph.
+    expect(shell).toContain('label: "All services", nav: "services"');
   });
 
   it("gives the bottom bar exactly five thumb-reach tabs", () => {
