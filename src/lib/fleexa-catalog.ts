@@ -86,6 +86,12 @@ export function supplierItemsForCountry(snapshot: SupplierSnapshot, countryCode:
       if (item.brand === "x" && (lower === "twitter" || lower === "x.com")) return true;
       if (item.brand === "chatgpt" && (lower === "openai" || lower.includes("chatgpt"))) return true;
       if (item.brand === "google" && (lower === "gmail" || lower === "google mail")) return true;
+      if (item.brand === "anthropic" && (lower === "claude" || lower.includes("claude"))) return true;
+      if (item.brand === "ubereats" && (lower.includes("uber eats") || lower === "ubereats")) return true;
+      if (item.brand === "doordash" && (lower.includes("door dash") || lower === "doordash")) return true;
+      if (item.brand === "riotgames" && (lower.includes("valorant") || lower.includes("riot"))) return true;
+      if (item.brand === "battledotnet" && (lower.includes("blizzard") || lower.includes("battle.net"))) return true;
+      if (item.brand === "playstation" && (lower.includes("psn") || lower.includes("playstation"))) return true;
       return false;
     });
     add({
