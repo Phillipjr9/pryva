@@ -38,6 +38,10 @@ const POLL_INTERVAL_MS = 15_000;
 export function InboxManager() {
   const [inboxes, setInboxes] = useState<InboxView[]>([]);
   const [configured, setConfigured] = useState(true);
+  // Which reason, not just whether: a preview deployment and a server missing the
+  // inbox credential need different fixes, and one shared sentence made both look
+  // like "the feature is off".
+  const [disabledReason, setDisabledReason] = useState<"preview" | "not_configured" | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [messages, setMessages] = useState<MessageView[]>([]);
   const [code, setCode] = useState<string | null>(null);
@@ -76,6 +80,9 @@ export function InboxManager() {
         if (controller.signal.aborted) return;
         setInboxes(Array.isArray(data.inboxes) ? data.inboxes : []);
         setConfigured(data.configured !== false);
+        setDisabledReason(
+          data.reason === "preview" || data.reason === "not_configured" ? data.reason : null,
+        );
         setLoadState("ready");
       })
       .catch(() => {
@@ -237,8 +244,16 @@ export function InboxManager() {
     return (
       <EmptyState
         icon={Mail}
-        title="Temporary inboxes are not switched on yet"
-        body="This is free and will let you create one inbox at a time, read what arrives in it and discard it. It is not available in this environment yet."
+        title={
+          disabledReason === "preview"
+            ? "Temporary inboxes are not available on this deployment"
+            : "Temporary inboxes are not switched on yet"
+        }
+        body={
+          disabledReason === "preview"
+            ? "This is the preview environment, which has no mailbox provider behind it. The feature works on production."
+            : "The mailbox provider is not configured on this server, so there is nothing to create an inbox from. This is a server setting, not something wrong with your account."
+        }
       />
     );
   }

@@ -6,7 +6,9 @@ import {
   buyFleexaEmail,
   cancelFleexaEmail,
   checkFleexaEmail,
+  FleexaError,
   isFleexaConfigured,
+  listFleexaEmailProducts,
   type FleexaEmailMessage,
 } from "@/lib/fleexa";
 import { logger } from "@/lib/logger";
@@ -116,12 +118,62 @@ export type CreatedInbox = {
  * holding an inbox we have paid for and cannot record. Cancelling it is what
  * keeps a limit from becoming a way to spend money on nothing.
  */
+/**
+ * Which product to buy, when the feed sells more than one kind of inbox.
+ *
+ * `buyFleexaEmail()` was called with no parameters at all. That works only if the
+ * feed has exactly one product or treats the purchase as "give me whatever is
+ * cheapest" — an assumption nothing supports: the feed publishes a product list
+ * with ids, prices and stock, which is the shape of an API that expects you to
+ * name the product. A refusal there reached the customer as the generic
+ * "Could not create an inbox", which is the least useful way to learn this.
+ *
+ * The cheapest listed product with stock is chosen, because a free inbox is free
+ * to the customer and costs Pryva real money: the free tier is a marketing
+ * expense, not a subsidy for the priciest inbox on the shelf. Nothing is guessed
+ * if the list cannot be read — the purchase falls back to the no-parameter call
+ * it always made, so a feed that genuinely needs no product keeps working.
+ */
+async function cheapestEmailProduct(): Promise<string | null> {
+  try {
+    const products = await listFleexaEmailProducts();
+    const usable = products
+      .filter((product) => Boolean(product.id) && (product.stock === null || product.stock > 0))
+      .sort((a, b) => (a.priceNgn ?? Number.POSITIVE_INFINITY) - (b.priceNgn ?? Number.POSITIVE_INFINITY));
+    return usable[0]?.id ?? null;
+  } catch (error) {
+    logger.warn("Could not read the inbox product list; buying without naming a product", {
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+/**
+ * Whether a failed create might already have bought something.
+ *
+ * The distinction decides two things: whether the customer's daily attempt is
+ * given back, and whether we say "try again" or "we are checking". A refusal from
+ * the feed (an error envelope, a 4xx, a missing price) means nothing was bought. A
+ * timeout, an unreachable host or an incomplete receipt means the opposite may be
+ * true, and guessing in the customer's favour there would spend real money on
+ * every retry.
+ */
+export function mayHaveSpentMoney(error: unknown): boolean {
+  if (error instanceof InboxError) return error.code === "RECONCILE_FAILED";
+  if (error instanceof FleexaError) {
+    return ["INCOMPLETE_RECEIPT", "UPSTREAM_UNREACHABLE"].includes(error.code ?? "");
+  }
+  return true;
+}
+
 export async function createFreeInbox(userId: string): Promise<CreatedInbox> {
   if (!isFleexaConfigured()) {
     throw new InboxError("NOT_CONFIGURED", 503, "Temporary inboxes are not available yet.");
   }
 
-  const purchased = await buyFleexaEmail();
+  const product = await cheapestEmailProduct();
+  const purchased = await buyFleexaEmail(product ? { product } : {});
   const dailyKey = dailyKeyFor(userId);
 
   try {

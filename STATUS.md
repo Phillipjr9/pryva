@@ -1747,3 +1747,53 @@ already-verified case and the existing refusals.
 
 **Not verified:** that mail now reaches a real inbox. That needs a verified sending
 domain, which is an owner action on the mail account, not a code change.
+
+## 41. Thirty-third pass — why a free inbox would not create (31 Oct 2026)
+
+Asked: *"check why we cant create free inbox."* Four different refusals were
+reaching the customer as two sentences, and one of them was self-inflicted.
+
+**The purchase named no product.** `createFreeInbox` called `buyFleexaEmail()`
+with an empty body — which works only if the feed has a single product or treats a
+purchase as "whatever is cheapest". The feed publishes a product list with ids,
+prices and stock, which is the shape of an API that expects you to name what you
+are buying; a refusal there surfaced as the generic *"Could not create an inbox"*.
+It now picks the cheapest listed product with stock: a free inbox is free to the
+customer and costs Pryva money, so the free tier is a marketing expense, not a
+subsidy for the priciest inbox on the shelf. If the list cannot be read the call
+falls back to the parameterless form, so a feed that genuinely needs no product
+keeps working.
+
+**A failed attempt burned the daily allowance.** The per-connection limiter counts
+*attempts* — three per 24 hours — and every failure spent one. Pressing a broken
+button three times therefore answered "daily limit reached, try again tomorrow",
+turning one bug into a second, longer one. `releaseRateLimit` now gives a slot back
+when the failure provably cost nothing (a refusal, an unconfigured feed, a
+daily-limit row we compensated by cancelling). It deliberately does **not** release
+when the outcome is ambiguous — a timeout, an unreachable host, an incomplete
+receipt — because that is exactly when a retry might spend real money twice.
+
+**Two situations shared one sentence.** "Not available in this environment" covered
+both a preview deployment (no database) and a deployment with no inbox credential;
+"Could not create an inbox" covered both a feed with nothing to sell and a feed that
+refused. The endpoint now returns `PREVIEW` or `NOT_CONFIGURED` with different
+messages, the dashboard explains which one applies, and the generic 502 logs the
+provider's code (never its text) so the owner can tell a price problem from an
+outage.
+
+**`GET /api/diagnostics/inbox`** answers the question directly, and spends nothing:
+gates, whether the product list is readable, how many products have stock, the
+cheapest one, and how many inboxes exist by state in the last day. Verdicts:
+`ready`, `preview`, `not_configured`, `no_products`, `unreachable`. A probe that
+buys an inbox to see whether buying works is not a diagnostic, it is a sale.
+
+**Verified:** 1,436 tests / 151 files · typecheck · lint · build. New coverage:
+`inbox-route.test.ts` (9) pins the release-on-costless-failure rule and both 503s;
+`inbox-diagnostics.test.ts` (7) pins every verdict and that the probe never calls
+anything; `shared-rate-limit.test.ts` gained the release arithmetic against a real
+Postgres (PGlite); `disposable-inbox.test.ts` gained the product choice and
+`mayHaveSpentMoney` (25 total).
+
+**Not verified:** whether the feed now accepts the purchase. That needs one real
+call, and `/api/diagnostics/inbox` will say `ready` or name what is wrong before
+anybody presses the button.
