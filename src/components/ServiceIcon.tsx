@@ -5,7 +5,18 @@ import { artworkMaster, artworkSrcSet } from "@/lib/service-artwork";
 
 type DigitalServiceType = "netflix" | "spotify" | "youtube" | "disney" | "chatgpt" | "canva";
 type CoreServiceType = "numbers" | "esim" | "proxies" | "email-otp";
-type AdditionalServiceType = "data" | "gift-cards" | "bulk" | "scheduled" | "accounts";
+type AdditionalServiceType =
+  | "data"
+  | "gift-cards"
+  | "bulk"
+  | "scheduled"
+  | "accounts"
+  // Categories, not catalogue slugs: they are the two ways to buy a
+  // third-party platform's service, and the subscription shelf. Each needed a
+  // mark of its own so no sidebar row borrows another one's artwork.
+  | "subscriptions"
+  | "app-verification"
+  | "social-promotion";
 export type ServiceType = DigitalServiceType | CoreServiceType | AdditionalServiceType;
 type CategoryType = "streaming" | "music" | "gaming" | "productivity";
 
@@ -49,6 +60,9 @@ const additionalServiceArtwork: Record<AdditionalServiceType, string> = {
   "gift-cards": "gift-cards",
   bulk: "bulk",
   scheduled: "scheduled",
+  subscriptions: "subscriptions",
+  "app-verification": "app-verification",
+  "social-promotion": "social-promotion",
 };
 
 const serviceArtwork: Record<Exclude<ServiceType, DigitalServiceType>, string> = {
@@ -72,6 +86,9 @@ const serviceNames: Record<ServiceType, string> = {
   "gift-cards": "Gift Cards",
   bulk: "Bulk Orders",
   scheduled: "Scheduled Purchases",
+  subscriptions: "Subscriptions",
+  "app-verification": "App Verification",
+  "social-promotion": "Social Promotion",
 };
 
 const sizeMap = {
