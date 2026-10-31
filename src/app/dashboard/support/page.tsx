@@ -5,7 +5,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { contactMessages } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
-import { SupportComposer } from "@/components/support/SupportComposer";
+import { SupportChat } from "@/components/support/SupportChat";
 import { SupportStatusPill } from "@/components/support/SupportStatusPill";
 import { listTicketsForUser } from "@/lib/support-tickets";
 import { ArrowRight, CheckCircle, Clock, MessageCircle, Refresh, Sparkle } from "@/components/icons";
@@ -56,7 +56,7 @@ export default async function SupportPage() {
         </p>
       </div>
 
-      <SupportComposer examples={EXAMPLES} />
+      <SupportChat examples={EXAMPLES} />
 
       <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start">
         <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">

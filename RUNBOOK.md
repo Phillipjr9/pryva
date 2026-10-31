@@ -482,6 +482,37 @@ they do.
 
 ---
 
+## 7j. "The support chat is not answering me"
+
+Read this before assuming the assistant is broken — the failure has three
+different shapes and only one of them is the engine.
+
+| What you see | What it means | What to do |
+|---|---|---|
+| the message appears, then *"Checking your account…"* stays | the request is still open — slow database or a long engine run | wait; the composer is disabled on purpose so a second message cannot double-create a ticket |
+| *"That did not send. Please try again."* and the text is back in the box | nothing was recorded — the route refused (401/403/415/413/429/503) | the text is restored deliberately; try again, and if it repeats check the status code in the network tab |
+| *"I am not going to guess at this one."* | the engine matched no playbook below 0.4 confidence | this is the honest path, not a bug: it has already run `getThread`-scoped remedies it does recognise and handed the thread to a person. If it happens constantly for a real problem, that problem needs a playbook in `src/lib/ai-support/knowledge.ts` |
+| *"Hello"* answered with a list of what it can check | working as intended (`greeting`) | — |
+
+Things worth knowing:
+
+- **Both entry points are one component.** `/dashboard/support` (empty) and a ticket
+  (seeded) both render `SupportChat`; there is no second implementation to drift.
+  A follow-up after the first reply posts to `/api/support/tickets/<id>`.
+- **The animation is customer preference, not a setting you control.** It lives in
+  the browser (`localStorage["pryva:support-presence-hidden"]`) and hidden means not
+  rendered. There is nothing server-side to toggle, and nothing to reset for them —
+  "Show assistant" on the same screen brings it back.
+- **Escalation is one click and does not need a message.** `{action:"escalate"}` sets
+  the ticket to `escalated`; the customer sees *"This is with a person now"* and the
+  button disappears.
+- **The assistant still cannot answer free-form questions.** Replies come from
+  14 playbooks plus a fallback; `polishSupportReply` is off unless
+  `AI_SUPPORT_MODEL_ENABLED=true` **and** `AI_SUPPORT_API_KEY` are set, and even then
+  it only rewords a reply the engine already decided — it never picks an action.
+
+---
+
 ## 7i. "I cannot create a free inbox"
 
 One request answers it. The endpoint is read-only and cannot buy anything:
