@@ -30,8 +30,10 @@ describe("platform marks", () => {
     expect(platformFor("Spotify premium", "Streaming")).toBe("spotify");
     // Category alone is enough when the title is generic.
     expect(platformFor("Premium account", null, "Instagram")).toBe("instagram");
+    expect(platformFor("LinkedIn recruiter account")).toBe("linkedin");
+    expect(platformFor("Reddit 1000 karma account")).toBe("reddit");
     // Unknown platforms fall back rather than guessing.
-    expect(platformFor("LinkedIn recruiter account")).toBe("generic");
+    expect(platformFor("Myspace musician account")).toBe("generic");
     expect(platformFor(null, undefined)).toBe("generic");
   });
 
@@ -60,6 +62,17 @@ describe("platform marks", () => {
       "netflix",
       "spotify",
       "steam",
+      "reddit",
+      "snapchat",
+      "linkedin",
+      "pinterest",
+      "apple",
+      "chatgpt",
+      "twitch",
+      "canva",
+      "threads",
+      "kick",
+      "soundcloud",
     ];
 
     const shapes = new Set<string>();
