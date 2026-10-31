@@ -1,7 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, Check, Clock, Copy, Loader2, Mail, Plus, Refresh, Trash2 } from "@/components/icons";
+import {
+  AlertCircle,
+  ArrowRight,
+  Check,
+  Clock,
+  Copy,
+  Loader2,
+  Mail,
+  Plus,
+  Refresh,
+  Trash2,
+} from "@/components/icons";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 
 type InboxView = {
@@ -24,49 +35,31 @@ type MessageView = {
 
 /**
  * How often an open inbox checks itself for mail.
- *
- * Deliberately slow. Every check re-reads the whole mailbox from the source, and
- * that request budget is shared across every customer at once — so a brisk
- * auto-refresh here would be a way for one open tab to slow down everybody
- * else's orders. Fifteen seconds is quick enough to feel responsive while
- * waiting for a code and slow enough that a handful of open tabs cannot exhaust
- * it. Polling also stops when the tab is hidden, because a background tab has no
- * reason to spend a request nobody is looking at.
  */
 const POLL_INTERVAL_MS = 15_000;
 
 export function InboxManager() {
   const [inboxes, setInboxes] = useState<InboxView[]>([]);
   const [configured, setConfigured] = useState(true);
-  // Which reason, not just whether: a preview deployment and a server missing the
-  // inbox credential need different fixes, and one shared sentence made both look
-  // like "the feature is off".
   const [disabledReason, setDisabledReason] = useState<"preview" | "not_configured" | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [messages, setMessages] = useState<MessageView[]>([]);
   const [code, setCode] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [discarding, setDiscarding] = useState(false);
+  const [discardingId, setDiscardingId] = useState<string | null>(null);
+  const [selectingId, setSelectingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
-  // Guards against two polls overlapping, which would double the requests spent
-  // and could put a slower response's older mailbox over a newer one.
   const inFlight = useRef(false);
 
   const active = inboxes.find((inbox) => inbox.status === "active") ?? null;
+  const savedInboxes = inboxes.filter((inbox) => inbox.status !== "discarded");
 
-  /**
-   * Bumping this key is how the list is re-read. Fetching inside the effect
-   * rather than calling a shared loader keeps the effect body free of state
-   * updates, which would otherwise cascade a render per call, and the
-   * AbortController stops a slow response from landing over a newer one.
-   */
   const [reloadKey, setReloadKey] = useState(0);
   const reload = useCallback(() => {
-    // The "loading" flip belongs to the click, not to the effect that follows it.
     setLoadState("loading");
     setReloadKey((key) => key + 1);
   }, []);
@@ -105,8 +98,6 @@ export function InboxManager() {
         });
         const data = await response.json();
         if (!response.ok || !data.ok) {
-          // A background check that is throttled is not worth interrupting for;
-          // the next one will come round on its own.
           if (!silent) setError(data?.error ?? "Could not read that inbox.");
           return;
         }
@@ -124,23 +115,20 @@ export function InboxManager() {
     [],
   );
 
-  // Check as soon as an inbox becomes active, then on the interval while the tab
-  // is actually on screen.
+  // Check as soon as an inbox becomes active, then on interval
   useEffect(() => {
     if (!active) return;
     const tick = () => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       void checkForMail(active.id, true);
     };
-    // The first check is deferred rather than called here, so the effect body
-    // only ever subscribes to a timer and never updates state itself.
     const first = window.setTimeout(tick, 0);
     const id = window.setInterval(tick, POLL_INTERVAL_MS);
     return () => {
       window.clearTimeout(first);
       window.clearInterval(id);
     };
-  }, [active, checkForMail]);
+  }, [active?.id, checkForMail]);
 
   async function handleCreate() {
     setCreating(true);
@@ -160,7 +148,13 @@ export function InboxManager() {
       setMessages([]);
       setCode(null);
       setLastChecked(null);
-      setInboxes((current) => [data.inbox as InboxView, ...current]);
+
+      const newInbox = data.inbox as InboxView;
+      setInboxes((current) => [
+        newInbox,
+        ...current.map((ib) => (ib.status === "active" ? { ...ib, status: "saved" } : ib)),
+      ]);
+      void checkForMail(newInbox.id);
     } catch {
       setError("Could not create an inbox. Try again.");
     } finally {
@@ -168,42 +162,84 @@ export function InboxManager() {
     }
   }
 
-  async function handleDiscard() {
-    if (!active) return;
-    setDiscarding(true);
+  async function handleSelect(inboxId: string) {
+    setSelectingId(inboxId);
+    setError(null);
+    try {
+      const response = await fetch("/api/inbox/select", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ inboxId }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        setError(data?.error ?? "Could not switch to that inbox.");
+        return;
+      }
+      const activated = data.inbox as InboxView;
+      setInboxes((current) =>
+        current.map((ib) =>
+          ib.id === inboxId
+            ? activated
+            : ib.status === "active"
+              ? { ...ib, status: "saved" }
+              : ib,
+        ),
+      );
+      setMessages([]);
+      setCode(null);
+      setLastChecked(null);
+      void checkForMail(inboxId);
+    } catch {
+      setError("Could not switch inboxes. Try again.");
+    } finally {
+      setSelectingId(null);
+    }
+  }
+
+  async function handleDiscard(inboxId: string) {
+    setDiscardingId(inboxId);
     setError(null);
     try {
       const response = await fetch("/api/inbox/discard", {
         method: "POST",
         headers: { "content-type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({ inboxId: active.id }),
+        body: JSON.stringify({ inboxId }),
       });
       const data = await response.json();
       if (!response.ok || !data.ok) {
         setError(data?.error ?? "Could not discard that inbox.");
         return;
       }
-      // Applied from the response rather than by re-fetching, so discarding does
-      // not blank the page into a loading state to confirm what just happened.
       setInboxes((current) =>
-        current.map((inbox) => (inbox.id === active.id ? (data.inbox as InboxView) : inbox)),
+        current.map((ib) => (ib.id === inboxId ? (data.inbox as InboxView) : ib)),
       );
-      setMessages([]);
-      setCode(null);
-      setLastChecked(null);
+
+      // If we discarded the active one, auto-switch to the next saved inbox
+      if (active?.id === inboxId) {
+        const nextSaved = inboxes.find((ib) => ib.id !== inboxId && ib.status !== "discarded");
+        if (nextSaved) {
+          void handleSelect(nextSaved.id);
+        } else {
+          setMessages([]);
+          setCode(null);
+          setLastChecked(null);
+        }
+      }
     } catch {
       setError("Could not discard that inbox. Try again.");
     } finally {
-      setDiscarding(false);
+      setDiscardingId(null);
     }
   }
 
-  async function copyAddress(address: string) {
+  async function copyAddress(address: string, id: string) {
     try {
       await navigator.clipboard.writeText(address);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
+      setCopiedId(id);
+      window.setTimeout(() => setCopiedId(null), 2000);
     } catch {
       setError("Could not copy. Select the address and copy it manually.");
     }
@@ -218,8 +254,6 @@ export function InboxManager() {
   }
 
   if (loadState === "error") {
-    // EmptyState's action is a Link, so a retry that re-runs the fetch has to be
-    // a button beside it rather than the action prop.
     return (
       <div className="space-y-3">
         <EmptyState
@@ -252,7 +286,7 @@ export function InboxManager() {
         body={
           disabledReason === "preview"
             ? "This is the preview environment, which has no mailbox provider behind it. The feature works on production."
-            : "The mailbox provider is not configured on this server, so there is nothing to create an inbox from. This is a server setting, not something wrong with your account."
+            : "The mailbox provider is not configured on this server, so there is nothing to create an inbox from."
         }
       />
     );
@@ -260,15 +294,15 @@ export function InboxManager() {
 
   return (
     <div className="space-y-5">
+      {/* Active Mailbox Card */}
       <div className="rounded-2xl border border-line bg-white p-5">
         {!active ? (
           <div className="space-y-4">
             <div>
-              <h2 className="text-[1rem] font-medium text-ink">Create a free inbox</h2>
+              <h2 className="text-[1.05rem] font-medium text-ink">Create a disposable email</h2>
               <p className="mt-1 text-[0.84rem] leading-relaxed text-ink-2">
-                One free inbox per day. It stays alive until you discard it, and nothing is kept
-                afterwards — read your code while it is open. If you need several at once or want
-                messages retained, that is what the paid inbox is for.
+                Generate instant temporary email addresses to receive emails and verification codes.
+                All your emails and received messages are saved so you can reuse them anytime.
               </p>
             </div>
             <button
@@ -292,26 +326,55 @@ export function InboxManager() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-meta uppercase tracking-wide text-ink-3">Your inbox</p>
-                <p className="mt-1 font-mono text-[0.95rem] text-ink sm:text-[1.05rem]">{active.address}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-meta uppercase tracking-wide text-ink-3">Active inbox</p>
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[0.68rem] font-medium text-emerald-700">
+                    Live
+                  </span>
+                </div>
+                <p className="mt-1 font-mono text-[1rem] font-medium text-ink sm:text-[1.15rem]">
+                  {active.address}
+                </p>
               </div>
-              <div className="flex gap-2">
+
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => void copyAddress(active.address)}
+                  onClick={() => void copyAddress(active.address, active.id)}
                   className="btn border border-line bg-white !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.84rem] text-ink hover:border-lav-200"
                 >
-                  {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                  {copied ? "Copied" : "Copy"}
+                  {copiedId === active.id ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-600" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                  {copiedId === active.id ? "Copied" : "Copy"}
                 </button>
                 <button
                   type="button"
                   onClick={() => void checkForMail(active.id)}
                   disabled={checking}
-                  className="btn border border-line bg-white !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.78rem] text-ink hover:border-lav-200 disabled:opacity-50"
+                  className="btn border border-line bg-white !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.84rem] text-ink hover:border-lav-200 disabled:opacity-50"
                 >
-                  {checking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Refresh className="h-3.5 w-3.5" />}
-                  Check for mail
+                  {checking ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Refresh className="h-3.5 w-3.5" />
+                  )}
+                  Check mail
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleCreate()}
+                  disabled={creating}
+                  className="btn btn-primary !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.84rem] disabled:opacity-50"
+                >
+                  {creating ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Plus className="h-3.5 w-3.5" />
+                  )}
+                  New email
                 </button>
               </div>
             </div>
@@ -321,72 +384,88 @@ export function InboxManager() {
                 <Clock className="h-3.5 w-3.5" />
                 {lastChecked
                   ? `Checked at ${lastChecked.toLocaleTimeString()}`
-                  : "Checking for mail every 15 seconds"}
+                  : "Auto-refreshing every 15 seconds"}
               </span>
-              {active.expiresAt && <span>Expires {new Date(active.expiresAt).toLocaleString()}</span>}
+              {active.expiresAt && (
+                <span>Expires {new Date(active.expiresAt).toLocaleString()}</span>
+              )}
             </div>
 
+            {/* OTP Banner */}
             {code && (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                <p className="text-meta uppercase tracking-wide text-emerald-700">Verification code</p>
-                <p className="mt-1 font-mono text-[1.5rem] font-semibold tracking-widest text-emerald-900">{code}</p>
+                <p className="text-meta uppercase tracking-wide text-emerald-700">
+                  Verification code
+                </p>
+                <p className="mt-1 font-mono text-[1.5rem] font-semibold tracking-widest text-emerald-900">
+                  {code}
+                </p>
               </div>
             )}
 
+            {/* Messages List */}
             {messages.length === 0 ? (
               <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-[0.8rem] text-ink-3">
-                Nothing has arrived yet. Send something to the address above and it will show up here.
+                Nothing has arrived yet. Send an email to the address above and it will appear here
+                automatically.
               </p>
             ) : (
-              <ul className="divide-y divide-line rounded-xl border border-line">
-                {messages.map((message, index) => {
-                  const key = `${message.receivedAt ?? ""}-${message.subject ?? ""}-${index}`;
-                  const isOpen = opened === key;
-                  return (
-                    <li key={key}>
-                      <button
-                        type="button"
-                        onClick={() => setOpened(isOpen ? null : key)}
-                        className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left hover:bg-lav-50/40"
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate text-[0.84rem] font-medium text-ink">
-                            {message.subject ?? "(no subject)"}
+              <div className="space-y-2">
+                <p className="text-meta font-medium uppercase tracking-wide text-ink-3">
+                  Received messages ({messages.length})
+                </p>
+                <ul className="divide-y divide-line rounded-xl border border-line">
+                  {messages.map((message, index) => {
+                    const key = `${message.receivedAt ?? ""}-${message.subject ?? ""}-${index}`;
+                    const isOpen = opened === key;
+                    return (
+                      <li key={key}>
+                        <button
+                          type="button"
+                          onClick={() => setOpened(isOpen ? null : key)}
+                          className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left hover:bg-lav-50/40"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-[0.84rem] font-medium text-ink">
+                              {message.subject ?? "(no subject)"}
+                            </span>
+                            <span className="mt-0.5 block truncate text-meta text-ink-3">
+                              {message.from ?? "unknown sender"}
+                              {message.code ? ` · code ${message.code}` : ""}
+                            </span>
                           </span>
-                          <span className="mt-0.5 block truncate text-meta text-ink-3">
-                            {message.from ?? "unknown sender"}
-                            {message.code ? ` · code ${message.code}` : ""}
+                          <span className="shrink-0 text-meta text-ink-3">
+                            {message.receivedAt
+                              ? new Date(message.receivedAt).toLocaleTimeString()
+                              : ""}
                           </span>
-                        </span>
-                        <span className="shrink-0 text-meta text-ink-3">
-                          {message.receivedAt ? new Date(message.receivedAt).toLocaleTimeString() : ""}
-                        </span>
-                      </button>
-                      {isOpen && message.body && (
-                        <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words px-4 pb-4 text-meta leading-relaxed text-ink-2">
-                          {message.body}
-                        </pre>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+                        </button>
+                        {isOpen && message.body && (
+                          <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words border-t border-line/60 bg-slate-50/50 p-4 text-meta leading-relaxed text-ink-2">
+                            {message.body}
+                          </pre>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             )}
 
-            <div className="border-t border-line pt-4">
+            <div className="border-t border-line pt-3">
               <button
                 type="button"
-                onClick={() => void handleDiscard()}
-                disabled={discarding}
-                className="btn border border-rose-200 bg-white !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.78rem] text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                onClick={() => void handleDiscard(active.id)}
+                disabled={discardingId === active.id}
+                className="btn border border-rose-200 bg-white !px-3 !py-1.5 !text-[0.78rem] text-rose-700 hover:bg-rose-50 disabled:opacity-50"
               >
-                {discarding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                Discard inbox
+                {discardingId === active.id ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                Discard this email
               </button>
-              <p className="mt-2 text-meta leading-relaxed text-ink-3">
-                Discarding ends this inbox immediately and anything still in it is lost. It does not
-                give you another free one today.
-              </p>
             </div>
           </div>
         )}
@@ -402,26 +481,106 @@ export function InboxManager() {
         </p>
       )}
 
-      {inboxes.filter((inbox) => inbox.status !== "active").length > 0 && (
+      {/* Saved / Previous Inboxes List */}
+      {savedInboxes.length > 0 && (
         <div className="rounded-2xl border border-line bg-white p-5">
-          <h2 className="text-[0.95rem] font-medium text-ink">Previous inboxes</h2>
-          <ul className="mt-3 divide-y divide-line">
-            {inboxes
-              .filter((inbox) => inbox.status !== "active")
-              .slice(0, 10)
-              .map((inbox) => (
-                <li key={inbox.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-                  <span className="font-mono text-[0.8rem] text-ink-2">{inbox.address}</span>
-                  <span className="text-meta text-ink-3">
-                    {inbox.status} · {new Date(inbox.createdAt).toLocaleDateString()}
-                  </span>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-[0.95rem] font-medium text-ink">Saved inboxes</h2>
+              <p className="mt-0.5 text-meta text-ink-3">
+                Your email addresses are saved here. Click &ldquo;Use this inbox&rdquo; to switch back
+                to any saved email.
+              </p>
+            </div>
+            {!active && (
+              <button
+                type="button"
+                onClick={() => void handleCreate()}
+                disabled={creating}
+                className="btn btn-primary !px-3.5 !py-2 !text-[0.8125rem]"
+              >
+                <Plus className="h-3.5 w-3.5" /> Create new email
+              </button>
+            )}
+          </div>
+
+          <ul className="mt-4 divide-y divide-line rounded-xl border border-line">
+            {savedInboxes.map((inbox) => {
+              const isActive = inbox.id === active?.id;
+              const isSelecting = selectingId === inbox.id;
+              const isDiscarding = discardingId === inbox.id;
+
+              return (
+                <li
+                  key={inbox.id}
+                  className={`flex flex-wrap items-center justify-between gap-3 p-3.5 ${
+                    isActive ? "bg-lav-50/20" : ""
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[0.88rem] font-medium text-ink">
+                        {inbox.address}
+                      </span>
+                      {isActive && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-emerald-800">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <span className="mt-0.5 block text-meta text-ink-3">
+                      Created {new Date(inbox.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void copyAddress(inbox.address, inbox.id)}
+                      className="btn border border-line bg-white !p-2 text-ink hover:border-lav-200"
+                      title="Copy address"
+                    >
+                      {copiedId === inbox.id ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+
+                    {!isActive && (
+                      <button
+                        type="button"
+                        onClick={() => void handleSelect(inbox.id)}
+                        disabled={isSelecting}
+                        className="btn border border-line bg-white !px-3 !py-1.5 !text-[0.78rem] text-ink hover:border-lav-200 disabled:opacity-50"
+                      >
+                        {isSelecting ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <ArrowRight className="h-3 w-3" />
+                        )}
+                        Use this inbox
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => void handleDiscard(inbox.id)}
+                      disabled={isDiscarding}
+                      className="btn border border-line bg-white !p-2 text-rose-600 hover:border-rose-200 hover:bg-rose-50 disabled:opacity-50"
+                      title="Delete inbox"
+                    >
+                      {isDiscarding ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
                 </li>
-              ))}
+              );
+            })}
           </ul>
-          <p className="mt-3 text-meta leading-relaxed text-ink-3">
-            A free inbox keeps nothing once it ends, so these addresses are a record that you used
-            one — not a place to read old mail.
-          </p>
         </div>
       )}
     </div>

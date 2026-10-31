@@ -2,14 +2,14 @@ import { randomBytes } from "node:crypto";
 import { logger } from "@/lib/logger";
 
 /**
- * Public Temporary Mailbox Provider (Fakemailo / 1secmail style).
+ * Public Disposable Mailbox Provider.
  *
- * Provides instant, zero-setup disposable email addresses on public active MX domains.
- * Requires no custom domains, no mail exchange servers (MTA), and no paid API credentials.
+ * Provides instant, zero-setup temporary email addresses on live active MX domains.
+ * Supports:
+ * 1. Mail.tm / Mail.gw (Primary: persistent accounts, active MX domains, OpenAPI v3)
+ * 2. Guerrilla Mail (Secondary: 15+ years active, instant inbox, sharklasers.com/guerrillamail.com)
+ * 3. 1secmail / Public fallback (Stateless fallback)
  */
-
-const ONESECMAIL_BASE_URL = "https://www.1secmail.com/api/v1/";
-const PUBLIC_DOMAINS = ["1secmail.com", "1secmail.net", "1secmail.org"];
 
 export type TempMailOrder = {
   id: string;
@@ -77,25 +77,242 @@ export function extractVerificationCode(
 }
 
 export function isTempMailConfigured(): boolean {
-  // Public tempmail operates over standard public HTTP API and requires no secret keys or MX setups
   return true;
 }
 
 /**
- * Generate a new disposable mailbox address on active public MX domains.
+ * Generate a new disposable mailbox on active public MX domains.
  */
 export async function createTempMailInbox(): Promise<TempMailOrder> {
-  const login = randomBytes(5).toString("hex"); // 10 chars, e.g. "a9f3b21c0e"
-  const domain = PUBLIC_DOMAINS[Math.floor(Math.random() * PUBLIC_DOMAINS.length)] ?? "1secmail.com";
-  const address = `${login}@${domain}`;
-  const id = `${login}:${domain}`;
+  // 1. Try Mail.tm (api.mail.tm)
+  try {
+    const domainsRes = await fetch("https://api.mail.tm/domains", {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(6_000),
+    });
+    if (domainsRes.ok) {
+      const data = (await domainsRes.json()) as { "hydra:member"?: Array<{ domain?: string; isActive?: boolean }> };
+      const domains = Array.isArray(data?.["hydra:member"])
+        ? data["hydra:member"].filter((d) => d.isActive && d.domain)
+        : [];
+      if (domains.length > 0) {
+        const domain = domains[Math.floor(Math.random() * domains.length)]!.domain!;
+        const username = "pryva_" + randomBytes(4).toString("hex");
+        const address = `${username}@${domain}`;
+        const password = "PryvaPass!" + randomBytes(4).toString("hex");
 
+        const regRes = await fetch("https://api.mail.tm/accounts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ address, password }),
+          signal: AbortSignal.timeout(6_000),
+        });
+        if (regRes.ok) {
+          const regData = (await regRes.json()) as { id?: string };
+          const accountId = regData?.id || username;
+          return {
+            id: `mailtm:${accountId}:${password}`,
+            address,
+            domain,
+            expiresAt: null,
+          };
+        }
+      }
+    }
+  } catch (error) {
+    logger.warn("Mail.tm inbox creation skipped, attempting Guerrilla Mail", {
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  // 2. Try Guerrilla Mail
+  try {
+    const gRes = await fetch("https://api.guerrillamail.com/ajax.php?f=get_email_address&lang=en", {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(6_000),
+    });
+    if (gRes.ok) {
+      const gData = (await gRes.json()) as { email_addr?: string; sid_token?: string };
+      if (gData.email_addr && gData.sid_token) {
+        const address = gData.email_addr;
+        const domain = address.split("@")[1] || "sharklasers.com";
+        return {
+          id: `guerrilla:${gData.sid_token}:${address}`,
+          address,
+          domain,
+          expiresAt: null,
+        };
+      }
+    }
+  } catch (error) {
+    logger.warn("Guerrilla Mail inbox creation skipped", {
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  // 3. Fallback: Generate an address on an active public temp mail domain
+  const login = randomBytes(5).toString("hex");
+  const domain = "sharklasers.com";
+  const address = `${login}@${domain}`;
   return {
-    id,
+    id: `guerrilla:${login}:${address}`,
     address,
     domain,
     expiresAt: null,
   };
+}
+
+/**
+ * Check Mail.tm inbox for incoming emails.
+ */
+async function checkMailTm(
+  address: string,
+  password: string,
+): Promise<{ messages: TempMailMessage[]; code: string | null }> {
+  try {
+    const tokenRes = await fetch("https://api.mail.tm/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ address, password }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!tokenRes.ok) return { messages: [], code: null };
+    const tokenData = (await tokenRes.json()) as { token?: string };
+    const token = tokenData?.token;
+    if (!token) return { messages: [], code: null };
+
+    const msgRes = await fetch("https://api.mail.tm/messages", {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!msgRes.ok) return { messages: [], code: null };
+    const msgData = (await msgRes.json()) as { "hydra:member"?: unknown[] };
+    const items = Array.isArray(msgData?.["hydra:member"]) ? msgData["hydra:member"] : [];
+    if (items.length === 0) return { messages: [], code: null };
+
+    const messages: TempMailMessage[] = [];
+    for (const item of items.slice(0, 10) as Array<{
+      id?: string;
+      subject?: string;
+      from?: { address?: string; name?: string };
+      intro?: string;
+      createdAt?: string;
+    }>) {
+      if (!item?.id) continue;
+      try {
+        const detailRes = await fetch(`https://api.mail.tm/messages/${item.id}`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (!detailRes.ok) throw new Error("Could not fetch detail");
+        const detail = (await detailRes.json()) as {
+          subject?: string;
+          from?: { address?: string; name?: string };
+          text?: string;
+          intro?: string;
+          html?: string[];
+          createdAt?: string;
+        };
+        const subject = detail.subject || item.subject || null;
+        const from = detail.from?.address || item.from?.address || null;
+        const rawText = detail.text?.trim() || "";
+        const rawIntro = detail.intro?.trim() || "";
+        const rawHtml =
+          Array.isArray(detail.html) && detail.html[0]
+            ? detail.html[0].replace(/<[^>]+>/g, " ").trim()
+            : "";
+        const body = rawText || rawIntro || rawHtml || null;
+        const code = extractVerificationCode(subject, body);
+        const receivedAt = detail.createdAt || item.createdAt || null;
+        messages.push({ subject, from, body, code, receivedAt });
+      } catch {
+        const subject = item.subject || null;
+        const from = item.from?.address || null;
+        const body = item.intro || null;
+        const code = extractVerificationCode(subject, body);
+        messages.push({ subject, from, body, code, receivedAt: item.createdAt || null });
+      }
+    }
+
+    const directCode = messages.find((m) => m.code)?.code ?? null;
+    return { messages, code: directCode };
+  } catch (error) {
+    logger.warn("Mail.tm poll failed", {
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    return { messages: [], code: null };
+  }
+}
+
+/**
+ * Check Guerrilla Mail inbox for incoming emails.
+ */
+async function checkGuerrillaMail(
+  sidToken: string,
+): Promise<{ messages: TempMailMessage[]; code: string | null }> {
+  try {
+    const url = `https://api.guerrillamail.com/ajax.php?f=check_email&seq=0&sid_token=${encodeURIComponent(sidToken)}`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(10_000),
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return { messages: [], code: null };
+    const data = (await res.json()) as {
+      list?: Array<{
+        mail_id?: string;
+        mail_from?: string;
+        mail_subject?: string;
+        mail_excerpt?: string;
+        mail_date?: string;
+      }>;
+    };
+    const items = Array.isArray(data?.list) ? data.list : [];
+    // Filter out Guerrilla's initial system greeting email
+    const userItems = items.filter(
+      (m) => m.mail_from && !m.mail_from.includes("guerrillamail.com") && m.mail_id,
+    );
+    if (userItems.length === 0) return { messages: [], code: null };
+
+    const messages: TempMailMessage[] = [];
+    for (const item of userItems.slice(0, 10)) {
+      try {
+        const readUrl = `https://api.guerrillamail.com/ajax.php?f=fetch_email&email_id=${encodeURIComponent(String(item.mail_id))}&sid_token=${encodeURIComponent(sidToken)}`;
+        const readRes = await fetch(readUrl, {
+          signal: AbortSignal.timeout(10_000),
+          headers: { Accept: "application/json" },
+        });
+        if (!readRes.ok) throw new Error("read failed");
+        const detail = (await readRes.json()) as {
+          mail_subject?: string;
+          mail_from?: string;
+          mail_body?: string;
+          mail_date?: string;
+        };
+        const subject = detail.mail_subject || item.mail_subject || null;
+        const from = detail.mail_from || item.mail_from || null;
+        const body = detail.mail_body
+          ? detail.mail_body.replace(/<[^>]+>/g, " ").trim()
+          : item.mail_excerpt || null;
+        const code = extractVerificationCode(subject, body);
+        const receivedAt = detail.mail_date || item.mail_date || null;
+        messages.push({ subject, from, body, code, receivedAt });
+      } catch {
+        const subject = item.mail_subject || null;
+        const from = item.mail_from || null;
+        const body = item.mail_excerpt || null;
+        const code = extractVerificationCode(subject, body);
+        messages.push({ subject, from, body, code, receivedAt: item.mail_date || null });
+      }
+    }
+
+    const directCode = messages.find((m) => m.code)?.code ?? null;
+    return { messages, code: directCode };
+  } catch (error) {
+    logger.warn("Guerrilla Mail poll failed", {
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    return { messages: [], code: null };
+  }
 }
 
 /**
@@ -105,6 +322,25 @@ export async function checkTempMail(
   providerInboxId: string,
   address?: string,
 ): Promise<{ messages: TempMailMessage[]; code: string | null }> {
+  // 1. Mail.tm handle
+  if (providerInboxId.startsWith("mailtm:")) {
+    const parts = providerInboxId.split(":");
+    const password = parts.slice(2).join(":") || parts[2] || "";
+    if (address && password) {
+      return checkMailTm(address, password);
+    }
+  }
+
+  // 2. Guerrilla Mail handle
+  if (providerInboxId.startsWith("guerrilla:")) {
+    const parts = providerInboxId.split(":");
+    const sidToken = parts[1] || "";
+    if (sidToken) {
+      return checkGuerrillaMail(sidToken);
+    }
+  }
+
+  // 3. Generic / legacy 1secmail fallback
   let login = "";
   let domain = "";
 
@@ -116,108 +352,41 @@ export async function checkTempMail(
     const parts = address.split("@");
     login = parts[0] ?? "";
     domain = parts[1] ?? "";
-  } else if (providerInboxId.includes("@")) {
-    const parts = providerInboxId.split("@");
-    login = parts[0] ?? "";
-    domain = parts[1] ?? "";
   }
 
-  if (!login || !domain) {
-    return { messages: [], code: null };
-  }
-
-  const url = `${ONESECMAIL_BASE_URL}?action=getMessages&login=${encodeURIComponent(login)}&domain=${encodeURIComponent(domain)}`;
-
-  let listData: unknown;
-  try {
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(10_000),
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) {
-      logger.warn("Tempmail provider returned non-200 response", { status: res.status });
-      return { messages: [], code: null };
-    }
-    listData = await res.json();
-  } catch (error) {
-    logger.warn("Could not check tempmail mailbox", {
-      reason: error instanceof Error ? error.message : String(error),
-    });
-    return { messages: [], code: null };
-  }
-
-  if (!Array.isArray(listData) || listData.length === 0) {
-    return { messages: [], code: null };
-  }
-
-  // Fetch full details for the top messages (max 10)
-  const items = listData.slice(0, 10);
-  const messages: TempMailMessage[] = [];
-
-  for (const item of items) {
-    const id = item?.id;
-    if (!id) continue;
-
+  if (login && domain) {
     try {
-      const readUrl = `${ONESECMAIL_BASE_URL}?action=readMessage&login=${encodeURIComponent(login)}&domain=${encodeURIComponent(domain)}&id=${encodeURIComponent(String(id))}`;
-      const readRes = await fetch(readUrl, {
-        signal: AbortSignal.timeout(10_000),
-        headers: { Accept: "application/json" },
-      });
-      if (!readRes.ok) continue;
-
-      const detail = (await readRes.json()) as Record<string, unknown>;
-      const subject =
-        typeof detail?.subject === "string"
-          ? detail.subject
-          : typeof item?.subject === "string"
-            ? item.subject
-            : null;
-      const from =
-        typeof detail?.from === "string"
-          ? detail.from
-          : typeof item?.from === "string"
-            ? item.from
-            : null;
-
-      const rawText = typeof detail?.textBody === "string" ? detail.textBody.trim() : "";
-      const rawBody = typeof detail?.body === "string" ? detail.body.trim() : "";
-      const rawHtml =
-        typeof detail?.htmlBody === "string" ? detail.htmlBody.replace(/<[^>]+>/g, " ").trim() : "";
-
-      const body = rawText || rawBody || rawHtml || null;
-      const code = extractVerificationCode(subject, body);
-      const receivedAt =
-        typeof detail?.date === "string"
-          ? detail.date
-          : typeof item?.date === "string"
-            ? item.date
-            : null;
-
-      messages.push({
-        subject,
-        from,
-        body,
-        code,
-        receivedAt,
-      });
+      const url = `https://www.1secmail.com/api/v1/?action=getMessages&login=${encodeURIComponent(login)}&domain=${encodeURIComponent(domain)}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(8_000), headers: { Accept: "application/json" } });
+      if (res.ok) {
+        const listData = await res.json();
+        if (Array.isArray(listData) && listData.length > 0) {
+          const messages: TempMailMessage[] = [];
+          for (const item of listData.slice(0, 10)) {
+            if (!item?.id) continue;
+            try {
+              const readUrl = `https://www.1secmail.com/api/v1/?action=readMessage&login=${encodeURIComponent(login)}&domain=${encodeURIComponent(domain)}&id=${encodeURIComponent(String(item.id))}`;
+              const readRes = await fetch(readUrl, { signal: AbortSignal.timeout(8_000), headers: { Accept: "application/json" } });
+              if (!readRes.ok) continue;
+              const detail = await readRes.json();
+              const subject = detail?.subject || item?.subject || null;
+              const from = detail?.from || item?.from || null;
+              const body = detail?.textBody || detail?.body || (detail?.htmlBody ? detail.htmlBody.replace(/<[^>]+>/g, " ").trim() : null);
+              const code = extractVerificationCode(subject, body);
+              messages.push({ subject, from, body, code, receivedAt: detail?.date || item?.date || null });
+            } catch {
+              messages.push({ subject: item?.subject || null, from: item?.from || null, body: null, code: null, receivedAt: item?.date || null });
+            }
+          }
+          return { messages, code: messages.find((m) => m.code)?.code ?? null };
+        }
+      }
     } catch {
-      // Fallback to item summary if full message read fails
-      const subject = typeof item?.subject === "string" ? item.subject : null;
-      const from = typeof item?.from === "string" ? item.from : null;
-      const code = extractVerificationCode(subject, null);
-      messages.push({
-        subject,
-        from,
-        body: null,
-        code,
-        receivedAt: typeof item?.date === "string" ? item.date : null,
-      });
+      // ignore
     }
   }
 
-  const directCode = messages.find((m) => m.code)?.code ?? null;
-  return { messages, code: directCode };
+  return { messages: [], code: null };
 }
 
 /**
@@ -227,6 +396,5 @@ export async function cancelTempMail(
   _providerInboxId: string,
   _address?: string,
 ): Promise<void> {
-  // 1secmail mailboxes are stateless and do not require server-side teardown
   return Promise.resolve();
 }
