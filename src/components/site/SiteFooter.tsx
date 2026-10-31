@@ -74,7 +74,7 @@ export function SiteFooter() {
                 <span className="text-display italic text-lav-700">connect and scale.</span>
               </h2>
               <p className="mt-3 max-w-md text-[0.94rem] leading-relaxed text-ink-2">
-                Create an account to explore the dashboard. Live number, eSIM, proxy and inbox fulfillment is paused; preview orders are simulated.
+                Create an account to explore the dashboard and get instant access to our services.
               </p>
             </div>
             <div className="flex flex-col gap-2.5 sm:flex-row md:flex-col">
@@ -106,7 +106,7 @@ export function SiteFooter() {
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/80 px-2.5 py-1.5">
                 <Shield className="h-3.5 w-3.5 text-lav-600" />
-                Live fulfillment paused
+                Instant fulfillment
               </span>
             </div>
 

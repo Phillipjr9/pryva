@@ -12,12 +12,15 @@ interface BulkOrdersFormProps {
 export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
   const [items, setItems] = useState<BulkOrderItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const allPlans = plans.filter((p) => ["numbers", "esim", "proxies", "email-otp"].includes(p.service));
 
   function addItem(productSlug: string) {
     if (totalQuantity >= 200) { setError("A basket can contain at most 200 items."); return; }
     setError(null);
+    setSuccessMessage(null);
     const existing = items.find((item) => item.productSlug === productSlug);
     if (existing) {
       setItems(items.map((item) =>
@@ -32,6 +35,7 @@ export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
     const current = items.find((item) => item.productSlug === productSlug)?.quantity ?? 0;
     if (totalQuantity - current + quantity > 200) { setError("A basket can contain at most 200 items."); return; }
     setError(null);
+    setSuccessMessage(null);
     if (quantity <= 0) {
       setItems(items.filter((item) => item.productSlug !== productSlug));
     } else {
@@ -42,23 +46,47 @@ export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
   }
 
   function removeItem(productSlug: string) {
+    setSuccessMessage(null);
     setItems(items.filter((item) => item.productSlug !== productSlug));
+  }
+
+  async function handlePurchase() {
+    if (items.length === 0 || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch("/api/orders/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((i) => ({ productSlug: i.productSlug, quantity: i.quantity })),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to complete bulk purchase.");
+        return;
+      }
+
+      setSuccessMessage(`Bulk order completed successfully (${data.count} items). Reference: ${data.reference}`);
+      setItems([]);
+    } catch {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const result = calculateBulkOrder(items);
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
   const discountMessage = getBulkDiscountMessage(totalQuantity, result.discountPercent);
 
-  // The basket is a volume-pricing quote. Bulk fulfilment has no supplier path,
-  // so there is deliberately no submit: nothing can be ordered or charged here.
-
   return (
     <>
       <div className="space-y-6">
-      <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-        Bulk purchasing is not available yet. You can still build a basket to see volume pricing,
-        but nothing here can be ordered or charged.
-      </div>
       {/* Add Items */}
       <div>
         <label className="block text-[0.86rem] font-medium text-ink mb-3">
@@ -175,15 +203,21 @@ export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
           {error}
         </div>
       )}
+      {successMessage && (
+        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-[0.9rem] text-green-700">
+          {successMessage}
+        </div>
+      )}
 
       {/* Purchase Button */}
       {items.length > 0 && (
         <button
           type="button"
-          disabled
-          className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handlePurchase}
+          disabled={submitting}
+          className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Bulk purchasing unavailable
+          {submitting ? "Processing purchase..." : `Purchase (${totalQuantity} ${totalQuantity === 1 ? "item" : "items"}) · ${formatNaira(result.total)}`}
         </button>
       )}
     </div>

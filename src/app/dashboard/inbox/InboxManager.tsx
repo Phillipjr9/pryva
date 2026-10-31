@@ -328,7 +328,7 @@ export function InboxManager() {
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-meta uppercase tracking-wide text-ink-3">Active inbox</p>
-                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[0.68rem] font-medium text-emerald-700">
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-micro font-medium text-emerald-700">
                     Live
                   </span>
                 </div>
@@ -455,7 +455,7 @@ export function InboxManager() {
                 type="button"
                 onClick={() => void handleDiscard(active.id)}
                 disabled={discardingId === active.id}
-                className="btn border border-rose-200 bg-white !px-3 !py-1.5 !text-[0.78rem] text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                className="btn border border-rose-200 bg-white !px-3 !py-1.5 !text-[0.8125rem] text-rose-700 hover:bg-rose-50 disabled:opacity-50"
               >
                 {discardingId === active.id ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -521,7 +521,7 @@ export function InboxManager() {
                         {inbox.address}
                       </span>
                       {isActive && (
-                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-emerald-800">
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-micro font-semibold uppercase tracking-wider text-emerald-800">
                           Active
                         </span>
                       )}
@@ -550,7 +550,7 @@ export function InboxManager() {
                         type="button"
                         onClick={() => void handleSelect(inbox.id)}
                         disabled={isSelecting}
-                        className="btn border border-line bg-white !px-3 !py-1.5 !text-[0.78rem] text-ink hover:border-lav-200 disabled:opacity-50"
+                        className="btn border border-line bg-white !px-3 !py-1.5 !text-[0.8125rem] text-ink hover:border-lav-200 disabled:opacity-50"
                       >
                         {isSelecting ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -629,7 +629,7 @@ function EmailContentViewer({ body }: { body: string }) {
     <div className="border-t border-line/60 bg-slate-50/50 p-4">
       {isHtml && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-line/40 pb-2.5">
-          <div className="flex items-center gap-1 rounded-lg border border-line bg-white p-0.5 text-[0.75rem]">
+          <div className="flex items-center gap-1 rounded-lg border border-line bg-white p-0.5 text-[0.8125rem]">
             <button
               type="button"
               onClick={() => setViewMode("html")}
@@ -652,7 +652,7 @@ function EmailContentViewer({ body }: { body: string }) {
           <button
             type="button"
             onClick={() => void handleCopy()}
-            className="btn border border-line bg-white !px-2.5 !py-1 !text-[0.75rem] text-ink hover:border-lav-200"
+            className="btn border border-line bg-white !px-2.5 !py-1 !text-[0.8125rem] text-ink hover:border-lav-200"
           >
             {copied ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
             {copied ? "Copied" : "Copy text"}
