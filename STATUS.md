@@ -906,11 +906,14 @@ first thing a customer was offered was the option most of them would not use. Th
 now comes first, then a divider that says what it is a divider for — "or sign in with" /
 "or sign up with" — and *then* the alternatives.
 
-The anchor itself is untouched: same `href="/api/auth/next=…"` shape, same "Continue
-with Google" text, no brand mark inside it. That is deliberate; `logo-removal.test.tsx`
-pins both, and a layout change is not a licence to rewrite the thing it pins. Sign-up
-keeps Google and does **not** get a passkey button, because a passkey needs an account
-to belong to before it can exist.
+The anchor keeps its shape — same `href="/api/auth/google?next=…"`, same "Continue with
+Google" text — and now carries Google's own four-colour **G** before the label, taken from
+the same `BRAND_MARKS` table the service pages use and drawn `bare` at 18px. It is never
+`pryva-mark` and never redrawn by hand: `logo-removal.test.tsx` still pins the absence of
+our mark inside that anchor, and now also pins the four Google fill colours and the fact
+that the mark precedes the words. Sign-up keeps Google (with the same mark) and does
+**not** get a passkey button, because a passkey needs an account to belong to before it
+can exist.
 
 ### 26.2 Passkeys — what a customer gets
 
