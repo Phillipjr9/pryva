@@ -167,6 +167,13 @@ export const contactRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, max
  */
 export const passwordChangeRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 5 });
 /**
+ * Closing an account is destructive, authenticated by a password and bounded by a
+ * fresh session, so three attempts in fifteen minutes is generous — a mistyped
+ * address or password accounts for all of them. The limit exists because the
+ * endpoint compares a password, which makes repeat attempts expensive.
+ */
+export const accountDeletionRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 3 });
+/**
  * Notifications are polled rather than submitted, so this is sized to tolerate a
  * client refreshing on an interval without ever throttling a real user.
  */

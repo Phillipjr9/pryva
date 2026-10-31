@@ -1,7 +1,11 @@
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { resendConfigured } from "@/lib/resend-config";
 import { SettingsForm } from "./SettingsForm";
 import { SecuritySection } from "./SecuritySection";
+import { DangerZone } from "./DangerZone";
 
 // The dashboard layout already provides the shell — nesting it here rendered a
 // second sidebar inside the content column.
@@ -14,6 +18,13 @@ export default async function SettingsPage({
 }) {
   const user = await requireUser("/dashboard/settings");
   const params = await searchParams;
+  // Whether this account has a password at all: a Google-created account never
+  // had one, so asking for it would make closing the account impossible for
+  // exactly the people who signed up with Google.
+  const account = await db.query.users.findFirst({
+    where: eq(users.id, user.id),
+    columns: { googleSubject: true },
+  });
   // Set by `requireAdmin` when an administrator has no second factor yet: the
   // admin tools stay closed until the second factor exists, and the reason is
   // shown here rather than as a 403 on a page they cannot open.
@@ -48,6 +59,12 @@ export default async function SettingsPage({
       <SettingsForm user={user} canSendVerification={resendConfigured()} />
 
       <SecuritySection user={user} />
+
+      <DangerZone
+        email={user.email}
+        walletBalance={user.walletBalance}
+        hasPassword={account?.googleSubject == null}
+      />
     </div>
   );
 }

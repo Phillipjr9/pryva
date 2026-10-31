@@ -53,6 +53,7 @@ vi.mock("@/lib/rate-limit", () => ({
   giftCardUserRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   contactRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   passwordChangeRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
+  accountDeletionRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   notificationRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   createRateLimiter: () => async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   resetRateLimit: async () => {},
@@ -156,6 +157,7 @@ beforeAll(async () => {
   await pg.exec(await readFile("migrations/0021_referrals.sql", "utf8"));
   await pg.exec(await readFile("migrations/0022_fraud.sql", "utf8"));
   await pg.exec(await readFile("migrations/0023_boost_orders.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0024_account_deletions.sql", "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
   [purchaseRoute, refundRoute, bankRoute, verifyBankRoute, googleRoute, contactRoute, deleteRoute, passwordRoute, sessionsRoute, autoRefund, giftPurchaseRoute, giftCheckRoute, giftRedeemRoute, topUpRoute, verifyTopUpRoute, webhookRoute, profileRoute, notificationsRoute, markReadRoute, logoutRoute, syncRoute, scheduledRoute, promoRoute, withdrawalRoute, adminWithdrawalRoute, integrity] = await Promise.all([
@@ -634,12 +636,133 @@ describe("Google subject binding and account protection", () => {
     expect((await database.select().from(schema.sessions)).map((session) => session.token)).toEqual(["current-token"]);
   });
 
-  it("refuses self-service deletion and preserves the user and financial records", async () => {
+  it("refuses a cross-origin deletion and changes nothing", async () => {
+    const request = new NextRequest("https://pryva.test/api/user/delete", {
+      method: "POST",
+      headers: { origin: "https://evil.pryva.test", "content-type": "application/json" },
+      body: JSON.stringify({ confirm: "buyer@example.com", password: "hash" }),
+    });
+    expect((await deleteRoute.POST(request)).status).toBe(403);
+    const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+    expect(user.deletedAt).toBeNull();
+    expect(user.email).toBe("buyer@example.com");
+  });
+
+  it("closes the account, scrubs the identity, and keeps the financial record", async () => {
     await database.insert(schema.orders).values({ reference: "ORDER-1", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "NG", duration: "20 min", amount: 1000, provider: "fleexa" });
-    const request = new NextRequest("https://pryva.test/api/user/delete", { method: "DELETE", headers: { origin: "https://pryva.test" } });
-    expect((await deleteRoute.DELETE(request)).status).toBe(503);
-    expect(await database.select().from(schema.users)).toHaveLength(1);
+    await database.insert(schema.walletTransactions).values({ userId: USER, type: "debit", amount: 1000, balanceAfter: 9000, description: "Order ORDER-1", reference: "LEDGER-1" });
+    await database.insert(schema.sessions).values({ userId: USER, token: "current-token", expiresAt: new Date(Date.now() + 60_000), createdAt: new Date() });
+    await database.insert(schema.passwordResetTokens).values({ userId: USER, tokenHash: "deadbeef", expiresAt: new Date(Date.now() + 60_000) });
+    await database.update(schema.users).set({ walletBalance: 0 }).where(eq(schema.users.id, USER));
+    mocks.user.mockResolvedValue({ id: USER, email: "buyer@example.com", name: "Buyer", walletBalance: 0 });
+    mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session" ? { value: "current-token" } : undefined });
+
+    const request = new NextRequest("https://pryva.test/api/user/delete", {
+      method: "POST",
+      headers: { origin: "https://pryva.test", "content-type": "application/json" },
+      body: JSON.stringify({ confirm: "buyer@example.com", password: "hash" }),
+    });
+    const response = await deleteRoute.POST(request);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, deleted: true, retained: { orders: 1, walletTransactions: 1 } });
+
+    // The row survives — 20+ tables point at it — but it is no longer a person.
+    const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+    expect(user).toBeDefined();
+    expect(user.deletedAt).not.toBeNull();
+    expect(user.name).toBe("Deleted account");
+    expect(user.email).toBe(`deleted+${USER}@deleted.pryva.invalid`);
+    expect(user.deletedEmailHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(user.emailVerifiedAt).toBeNull();
+    expect(user.googleSubject).toBeNull();
+    expect(user.walletBalance).toBe(0);
+    // A password nobody knows, in the ordinary format.
+    expect(user.passwordHash).not.toBe("hash");
+
+    // Credentials and devices are gone.
+    expect(await database.select().from(schema.sessions)).toHaveLength(0);
+    expect(await database.select().from(schema.passwordResetTokens)).toHaveLength(0);
+
+    // The record is not: this is the whole point of closing, not deleting.
     expect(await database.select().from(schema.orders)).toHaveLength(1);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+
+    // And there is a receipt saying what was retained.
+    const [receipt] = await database.select().from(schema.accountDeletions);
+    expect(receipt.userId).toBe(USER);
+    expect(receipt.reason).toBe("self_service");
+    expect(receipt.retained).toMatchObject({ orders: 1, walletTransactions: 1 });
+
+    // Closing twice is not a second deletion. In production the session row is
+    // gone, so this is a 401; here the auth helper is mocked, so the typed address
+    // no longer matches either. Either way: refused, and no second receipt.
+    mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session" ? { value: "current-token" } : undefined });
+    const again = await deleteRoute.POST(request);
+    expect([400, 401, 409]).toContain(again.status);
+    expect(await database.select().from(schema.accountDeletions)).toHaveLength(1);
+  });
+
+  it("will not close an account that still holds money", async () => {
+    await database.insert(schema.sessions).values({ userId: USER, token: "current-token", expiresAt: new Date(Date.now() + 60_000), createdAt: new Date() });
+    mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session" ? { value: "current-token" } : undefined });
+
+    const request = new NextRequest("https://pryva.test/api/user/delete", {
+      method: "POST",
+      headers: { origin: "https://pryva.test", "content-type": "application/json" },
+      body: JSON.stringify({ confirm: "buyer@example.com", password: "hash" }),
+    });
+    const response = await deleteRoute.POST(request);
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.code).toBe("BALANCE_REMAINING");
+    expect(body.error).toContain("10,000");
+
+    const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+    expect(user.deletedAt).toBeNull();
+    expect(user.walletBalance).toBe(10_000);
+  });
+
+  it("refuses a session that has been open too long, and a wrong password", async () => {
+    await database.insert(schema.sessions).values({ userId: USER, token: "old-token", expiresAt: new Date(Date.now() + 60_000), createdAt: new Date(Date.now() - 30 * 60_000) });
+    mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session" ? { value: "old-token" } : undefined });
+    await database.update(schema.users).set({ walletBalance: 0 }).where(eq(schema.users.id, USER));
+
+    const body = JSON.stringify({ confirm: "buyer@example.com", password: "hash" });
+    const stale = await deleteRoute.POST(new NextRequest("https://pryva.test/api/user/delete", {
+      method: "POST", headers: { origin: "https://pryva.test", "content-type": "application/json" }, body,
+    }));
+    expect(stale.status).toBe(403);
+    expect((await stale.json()).code).toBe("SESSION_TOO_OLD");
+
+    // A fresh session, but the wrong password, still changes nothing.
+    await database.delete(schema.sessions);
+    await database.insert(schema.sessions).values({ userId: USER, token: "fresh-token", expiresAt: new Date(Date.now() + 60_000), createdAt: new Date() });
+    mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session" ? { value: "fresh-token" } : undefined });
+    const wrong = await deleteRoute.POST(new NextRequest("https://pryva.test/api/user/delete", {
+      method: "POST", headers: { origin: "https://pryva.test", "content-type": "application/json" },
+      body: JSON.stringify({ confirm: "buyer@example.com", password: "not-the-password" }),
+    }));
+    expect(wrong.status).toBe(401);
+    expect((await wrong.json()).code).toBe("PASSWORD_MISMATCH");
+
+    const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+    expect(user.deletedAt).toBeNull();
+  });
+
+  it("requires the address to be typed, and the password where one exists", async () => {
+    await database.insert(schema.sessions).values({ userId: USER, token: "current-token", expiresAt: new Date(Date.now() + 60_000), createdAt: new Date() });
+    mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session" ? { value: "current-token" } : undefined });
+    await database.update(schema.users).set({ walletBalance: 0 }).where(eq(schema.users.id, USER));
+
+    const post = (payload: unknown) => deleteRoute.POST(new NextRequest("https://pryva.test/api/user/delete", {
+      method: "POST", headers: { origin: "https://pryva.test", "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    }));
+
+    expect((await post({ confirm: "someone@else.com", password: "hash" })).status).toBe(400);
+    expect((await post({ confirm: "buyer@example.com" })).status).toBe(400);
+    const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+    expect(user.deletedAt).toBeNull();
   });
 
   it("associates support messages with the authenticated user, not an asserted user ID", async () => {

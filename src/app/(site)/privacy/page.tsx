@@ -69,7 +69,7 @@ export default function PrivacyPage() {
 
             <h2>7. Your Rights</h2>
             <p>
-              Contact support to request access, correction or deletion. Self-service account deletion is currently unavailable while financial-record retention and settlement are reviewed.
+              You can download a copy of your account activity yourself in Settings, and you can close your account yourself in Settings without asking anyone. Closing removes your name, email address, password, passkeys, second factor and signed-in devices. The record of what the account paid for and was paid — orders, wallet history, deposits, withdrawals, payment references, support conversations and fraud signals — is kept without your name or email attached, for as long as the law or a payment dispute requires, because a bank or a payment provider can question a payment months later. You can also contact support for access, correction or deletion.
             </p>
 
             <h2>8. Children&apos;s Privacy</h2>

@@ -37,7 +37,51 @@ export const users = pgTable("users", {
   failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
   lockedUntil: timestamp("locked_until", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+  /**
+   * When the customer closed the account.
+   *
+   * Set instead of deleting the row, because orders, ledger rows, withdrawals,
+   * gift cards and payment records cascade from here and those records have to
+   * outlive the account (chargebacks, refunds, supplier disputes, fraud review).
+   * Every auth path reads this: a row with a timestamp can never be signed into,
+   * whatever else survived. See `migrations/0024_account_deletions.sql`.
+   */
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  /**
+   * Salted one-way fingerprint of the address the account used.
+   *
+   * The email itself is replaced with an unreachable tombstone, so without this a
+   * person writing in months later about a payout could not be matched to their
+   * retained records. Same construction as the fraud signals; the salt is what
+   * keeps it un-reversible.
+   */
+  deletedEmailHash: varchar("deleted_email_hash", { length: 64 }),
+}, (table) => [index("users_deleted_idx").on(table.deletedAt)]);
+
+/**
+ * The receipt for a closed account.
+ *
+ * Not a copy of anything — counts of what was kept, when, why, and the network the
+ * request came from (hashed). The rows themselves stay where they always were, so
+ * a dispute can still be answered with the real order and the real ledger.
+ */
+export const accountDeletions = pgTable(
+  "account_deletions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }).notNull().defaultNow(),
+    reason: varchar("reason", { length: 40 }).notNull().default("self_service"),
+    retained: jsonb("retained").notNull().default({}),
+    ipHash: varchar("ip_hash", { length: 64 }),
+  },
+  (table) => [
+    index("account_deletions_user_idx").on(table.userId),
+    index("account_deletions_deleted_idx").on(table.deletedAt),
+  ],
+);
 
 export const sessions = pgTable(
   "sessions",
