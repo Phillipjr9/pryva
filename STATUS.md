@@ -1,6 +1,6 @@
 # Pryva — verified status review
 
-**Date:** 31 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** the twenty-first pass, §29
+**Date:** 31 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** the twenty-second pass, §30
 **Method:** every claim below was read out of the code or produced by running the project. Nothing is taken from `PLAN.md` without checking it first — and several `PLAN.md` entries turned out to be stale (section 4).
 
 ---
@@ -1216,3 +1216,60 @@ that every hub category (and both order tools, and gift cards) has a link, and t
 Reviews is reachable. Live check after sign-in: all twelve Buy rows returned their
 own `img`, `/dashboard/reviews` 200, and the three new files served 200 in both
 master and 64 px form.
+
+---
+
+## 30. Twenty-second pass — real images on every dashboard row (31 Oct 2026)
+
+**The correction.** "I am talking about real images icon that's missing." The
+previous pass looked at *which services* the sidebar listed and gave three of them
+artwork. It did not look at the rows that had **no image at all**, which is what the
+owner meant: after the fix, twenty-two of the sidebar's links still split into
+twelve with a 3D image and **ten with a stroked 16 px SVG** — and the whole mobile
+tab bar was glyphs.
+
+### 30.1 What was still missing
+
+| Group | Rows on a generic glyph |
+|---|---|
+| Manage | Overview, Orders, Wallet, Temporary inbox, Refer & earn |
+| Buy | All services |
+| You | Notifications, Reviews, Settings, Support |
+| Mobile bar | Home, Orders, Wallet, Services, Support |
+
+The mix was the defect: half a list drawn as pictures, half as line art, reads as two
+different navigation systems stacked on top of each other.
+
+### 30.2 What was added
+
+Ten masters in `public/images/nav/` — overview (2×2 tiles), orders (box with a
+receipt), wallet (wallet and coin), inbox (open envelope), referrals (gift box),
+services (fanned tiles and a sparkle), notifications (bell), reviews (star on a
+stand), settings (cog), support (two speech bubbles) — each drawn in the same
+lavender/indigo/peach 3D set as the twelve service tiles, and each given the
+64/128/192 WebP derivatives by `npm run artwork:build`, which now walks
+`public/images/nav` as well.
+
+`NavIcon` renders them; the sidebar and the mobile tab bar use it for those ten
+destinations. The `icon` prop stays in the shell for anything that should remain a
+glyph, but today nothing in the navigation uses it. Alt text is empty on purpose:
+the destination's name is always the next node in the row.
+
+**Verified:** 1,250 tests / 131 files · typecheck · lint · build. The live signed-in
+dashboard was re-read after the build: **22 of 22 sidebar links render an `<img>`**
+(10 from `/images/nav`, 12 from `/images/services`), the five mobile tabs render
+`/images/nav`, and all ten masters return 200. `dashboard-nav-coverage.test.tsx`
+grew to 9 tests and now parses both `<nav>` blocks, so a row that falls back to a
+glyph fails the suite.
+
+### 30.3 Still open, and why
+
+Five third-party marks remain wordmark tiles rather than logos: **Disney+**,
+**Outlook**, **MTN**, **Glo** and **9mobile**. This is a licensing limit, not an
+oversight — `simple-icons` (CC0) has no Disney, MTN, Glo or Outlook entry, and the
+CC0 `logos` set has none either (re-checked this pass against
+`@iconify-json/logos@1.2.18`, 2,282 icons). The alternatives are to fetch a logo from
+an unlicensed source, to redraw one by eye, or to generate one with an image model;
+all three would put a fake or non-redistributable mark next to a real one, so the
+wordmark in the brand's own colours stays. Closing it properly needs an owner-supplied
+asset pack or a licence.

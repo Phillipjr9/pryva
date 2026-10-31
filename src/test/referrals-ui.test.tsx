@@ -95,7 +95,7 @@ describe("the wiring behind it", () => {
   });
 
   it("is reachable from the dashboard nav", () => {
-    expect(shell).toContain('{ href: "/dashboard/referrals", label: "Refer & earn", icon: Gift }');
+    expect(shell).toContain('{ href: "/dashboard/referrals", label: "Refer & earn", nav: "referrals" }');
   });
 
   it("serves the code and the stats over an authenticated, uncached API", () => {

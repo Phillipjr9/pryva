@@ -24,6 +24,9 @@ export const WIDTHS = [64, 128, 192];
 const TARGETS = [
   { dir: "public/images/services", label: "service" },
   { dir: "public/images/categories", label: "category" },
+  // The dashboard's own destinations (Overview, Orders, Wallet, Inbox,
+  // Referrals, All services, Notifications, Reviews, Settings, Support).
+  { dir: "public/images/nav", label: "nav" },
 ];
 
 let totalIn = 0;

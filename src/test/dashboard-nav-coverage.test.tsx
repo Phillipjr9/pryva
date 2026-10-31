@@ -96,6 +96,61 @@ describe("dashboard sidebar coverage", () => {
   });
 });
 
+describe("sidebar and tab artwork", () => {
+  /** The markup between a nav's opening tag and its closing tag. */
+  function navBlock(html: string, label: string): string {
+    const start = html.indexOf(`aria-label="${label}"`);
+    expect(start, `${label} nav is missing`).toBeGreaterThan(-1);
+    return html.slice(start, html.indexOf("</nav>", start));
+  }
+
+  it("draws a real image on every sidebar row, including the account rows", () => {
+    const html = render();
+    const rows = anchors(navBlock(html, "Dashboard navigation"));
+
+    // Overview, Orders, Wallet, Inbox, Referrals, All services, 10 service rows,
+    // Notifications, Reviews, Settings, Support.
+    expect(rows.length).toBeGreaterThanOrEqual(20);
+    for (const row of rows) {
+      expect(row.html, `${row.href} still draws a line glyph`).toContain("<img");
+    }
+
+    // The account rows specifically: these were the last ten on stroked SVGs.
+    for (const [href, file] of [
+      ["/dashboard", "overview"],
+      ["/dashboard/orders", "orders"],
+      ["/dashboard/wallet", "wallet"],
+      ["/dashboard/inbox", "inbox"],
+      ["/dashboard/referrals", "referrals"],
+      ["/dashboard/notifications", "notifications"],
+      ["/dashboard/reviews", "reviews"],
+      ["/dashboard/settings", "settings"],
+      ["/dashboard/support", "support"],
+    ] as const) {
+      const row = rows.find((anchor) => anchor.href === href);
+      expect(row, `${href} is missing from the sidebar`).toBeTruthy();
+      expect(row!.html).toContain(`/images/nav/${file}.png`);
+    }
+
+    const allServices = rows.find((anchor) => anchor.href === "/dashboard/services");
+    expect(allServices!.html).toContain("/images/nav/services.png");
+  });
+
+  it("draws images in the mobile tab bar too", () => {
+    const rows = anchors(navBlock(render(), "Dashboard sections"));
+    expect(rows).toHaveLength(5);
+    for (const row of rows) {
+      expect(row.html, `${row.href} still draws a line glyph`).toContain("/images/nav/");
+    }
+  });
+
+  it("serves a 64px derivative for a sidebar row", () => {
+    const html = render();
+    expect(html).toContain("/images/nav/wallet-64.webp 64w");
+    expect(html).toContain("/images/nav/wallet-192.webp 192w");
+  });
+});
+
 describe("category artwork", () => {
   it("resolves each shelf to its own file", () => {
     const expected: Array<[ServiceType, string]> = [

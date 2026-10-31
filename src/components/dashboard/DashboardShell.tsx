@@ -4,24 +4,9 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CommandPalette, CommandPaletteTrigger } from "@/components/command/CommandPalette";
-import {
-  ArrowRight,
-  Bell,
-  Chat,
-  Close,
-  Gift,
-  Grid,
-  Logout,
-  Mail,
-  Menu,
-  Plus,
-  Receipt,
-  Settings,
-  Sparkle,
-  Star,
-  Wallet,
-} from "@/components/icons";
+import { ArrowRight, Bell, Close, Logout, Menu, Plus, Wallet } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
+import { NavIcon, type NavArt } from "@/components/dashboard/NavIcon";
 import { BrandLockup } from "@/components/brand/BrandLockup";
 import { formatNaira } from "@/lib/catalog";
 import { EXPLORER_COUNTRIES } from "@/lib/explorer-countries";
@@ -37,6 +22,8 @@ type NavItem = {
   href: string;
   label: string;
   icon?: (props: { className?: string }) => ReactNode;
+  /** A real image tile for a dashboard destination (see `NavIcon`). */
+  nav?: NavArt;
   art?:
     | "numbers"
     | "esim"
@@ -58,21 +45,21 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "Manage",
     items: [
-      { href: "/dashboard", label: "Overview", icon: Grid },
-      { href: "/dashboard/orders", label: "Orders", icon: Receipt },
-      { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
+      { href: "/dashboard", label: "Overview", nav: "overview" },
+      { href: "/dashboard/orders", label: "Orders", nav: "orders" },
+      { href: "/dashboard/wallet", label: "Wallet", nav: "wallet" },
       // Free, and the only thing on this list that is: one inbox a day, nothing
       // retained. It sits under Manage rather than Buy because no money moves.
-      { href: "/dashboard/inbox", label: "Temporary inbox", icon: Mail },
+      { href: "/dashboard/inbox", label: "Temporary inbox", nav: "inbox" },
       // Inviting a friend is not a purchase and not a setting: it sits under
       // Manage because it is about the account, and it costs nothing to open.
-      { href: "/dashboard/referrals", label: "Refer & earn", icon: Gift },
+      { href: "/dashboard/referrals", label: "Refer & earn", nav: "referrals" },
     ],
   },
   {
     label: "Buy",
     items: [
-      { href: "/dashboard/services", label: "All services", icon: Sparkle },
+      { href: "/dashboard/services", label: "All services", nav: "services" },
       { href: "/dashboard/services", label: "App verification", art: "app-verification", category: "verification" },
       { href: "/dashboard/services", label: "Social promotion", art: "social-promotion", category: "social" },
       { href: "/dashboard/services", label: "Number plans", art: "numbers", category: "numbers" },
@@ -92,25 +79,25 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "You",
     items: [
-      { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
+      { href: "/dashboard/notifications", label: "Notifications", nav: "notifications" },
       // Delivered orders can be reviewed once, but the page had no entry point
       // anywhere in the app -- it was reachable only by typing the URL.
-      { href: "/dashboard/reviews", label: "Reviews", icon: Star },
+      { href: "/dashboard/reviews", label: "Reviews", nav: "reviews" },
       // Security is a section of Settings, not a destination of its own: one
       // account, one page that changes it. The old route redirects here.
-      { href: "/dashboard/settings", label: "Settings", icon: Settings },
-      { href: "/dashboard/support", label: "Support", icon: Chat },
+      { href: "/dashboard/settings", label: "Settings", nav: "settings" },
+      { href: "/dashboard/support", label: "Support", nav: "support" },
     ],
   },
 ];
 
 /** The five things worth a thumb-reach on a phone. */
-const mobileTabs: Array<{ href: string; label: string; icon: NavItem["icon"] }> = [
-  { href: "/dashboard", label: "Home", icon: Grid },
-  { href: "/dashboard/orders", label: "Orders", icon: Receipt },
-  { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
-  { href: "/dashboard/services", label: "Services", icon: Sparkle },
-  { href: "/dashboard/support", label: "Support", icon: Chat },
+const mobileTabs: Array<{ href: string; label: string; nav: NavArt }> = [
+  { href: "/dashboard", label: "Home", nav: "overview" },
+  { href: "/dashboard/orders", label: "Orders", nav: "orders" },
+  { href: "/dashboard/wallet", label: "Wallet", nav: "wallet" },
+  { href: "/dashboard/services", label: "Services", nav: "services" },
+  { href: "/dashboard/support", label: "Support", nav: "support" },
 ];
 
 function LogoutButton({ compact = false }: { compact?: boolean }) {
@@ -242,6 +229,8 @@ export function DashboardShell({
                 >
                   {item.art ? (
                     <span aria-hidden="true"><ServiceIcon service={item.art} size="xs" className="overflow-hidden rounded-[5px]" /></span>
+                  ) : item.nav ? (
+                    <NavIcon name={item.nav} />
                   ) : (
                     Icon && <Icon className={`h-4 w-4 ${active ? "text-lav-700" : "text-ink-3"}`} />
                   )}
@@ -380,7 +369,6 @@ export function DashboardShell({
       >
         <div className="mx-auto flex max-w-md items-stretch justify-between px-1.5">
           {mobileTabs.map((tab) => {
-            const Icon = tab.icon;
             const active = isRouteActive(pathname, tab.href);
             return (
               <Link
@@ -396,7 +384,7 @@ export function DashboardShell({
                     active ? "bg-lav-100" : ""
                   }`}
                 >
-                  {Icon && <Icon className="h-4 w-4" />}
+                  <NavIcon name={tab.nav} size="sm" />
                 </span>
                 {tab.label}
               </Link>
