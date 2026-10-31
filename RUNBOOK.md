@@ -482,6 +482,37 @@ they do.
 
 ---
 
+## 7g. Answering "is everything working?"
+
+Open **/admin/services**. It is the one screen that answers the owner's question with
+evidence rather than configuration, lane by lane:
+
+| Verdict | Means |
+|---|---|
+| **Delivering** | something reached a customer in the last 7 days |
+| **Untested** | the credential is set, but nobody has ever bought — no evidence either way |
+| **Needs attention** | orders exist and none was delivered, or the last delivery is older than the window, or work is stuck past the lane's threshold |
+| **Not for sale** | the gates refuse money for that lane. Correct when there is no supplier; a fault only if you expected one |
+
+Stuck thresholds are per lane on purpose: a number resolves in minutes, an account
+takes a day, a boost of ten thousand followers takes a week. "Stuck" means older than
+that, and those rows are the ones worth looking at on `/admin/orders`.
+
+**It reads history, not the supplier's mood.** A supplier that went down this morning
+still reads *delivering* until a purchase fails. For "is it up right now":
+
+- boosting panel: `/admin/boosting` → **Run live check** (balance, currency, how much
+  of its catalogue is listed);
+- everything else: `curl -H "Authorization: Bearer $DIAGNOSTICS_SECRET"
+  https://<host>/api/diagnostics/integrations` — balance and catalogue probes per
+  supplier, read-only.
+
+The page also names what is deliberately unsold (eSIM, data plans, proxies,
+subscriptions, bulk, airtime) and why, so a missing product is not mistaken for a
+broken one. Gift cards are Pryva-issued credit and never appear as a lane.
+
+---
+
 ## 8. Incident playbooks
 
 **Suspected double credit.** Compare `wallet_transactions` references for the
