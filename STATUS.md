@@ -2034,3 +2034,56 @@ warning, the second tick and the receipt.
 **Not verified:** nothing has been purged on production, because the sweep is off —
 that is the intended state until the owner arms it. `RETENTION_PURGE_ENABLED` is
 documented in `.env.example` and `RUNBOOK.md` §7m.
+
+---
+
+## 46. Thirty-eighth pass — a payout settles itself (31 Oct 2026)
+
+The webhook endpoint accepted exactly one event, `charge.success`, and answered
+everything else `ok`. So a payout Paystack actually paid stayed `processing` until
+somebody clicked "Mark as Completed" in `/admin/withdrawals`, and a payout Paystack
+refused stayed `processing` **with the customer's money still debited** — no refund,
+no status, no alert. The two failure modes are opposite and both expensive: a
+customer staring at "pending" for money already in their bank, and a customer whose
+payout never landed and whose balance never came back.
+
+**Now the provider's own word settles it.** `src/lib/paystack-transfer-settlement.ts`
+applies the signed event to the withdrawal it names:
+
+| Event | Effect | Repeat |
+|---|---|---|
+| `transfer.success` | `processing → completed`, `completed_at`, transfer code stored | `already_settled` |
+| `transfer.failed` / `transfer.abandoned` | `processing → failed`, wallet refunded `amount + fee` + `refund` ledger row | `already_failed` |
+| `transfer.reversed` | same refund, also from `completed` — a bank can claw back a settled payout | finds `failed`, nothing moves |
+
+Three guards do the work. The status is part of the `UPDATE ... WHERE`, so a
+twice-delivered event is a no-op rather than a second completion or a second
+refund — the whole reason webhooks are safe to retry. A refund commits with the
+status change and the ledger row in one transaction, so a crash cannot leave a
+`failed` row that was never refunded. And a `transfer.failed` arriving after a
+success is a **contradiction**: it is logged and not applied, because crediting a
+wallet on a contradiction is guessing.
+
+**What is refused.** An event whose `amount` is not exactly `amount × 100` kobo, or
+whose currency is not NGN, is answered 400 and changes nothing. An event naming a
+reference we have no row for is answered 200 with `unknown_reference` and logged at
+error level — no retry can conjure the row, so retrying only hides it.
+
+**What is still a person's job**, and now says so: a transfer the provider never
+reported (merchant OTP, outage, transfer events not subscribed in the Paystack
+dashboard). "Mark as Completed" remains as an override that demands a reconciliation
+note, and `/admin/reconciliation` is now an exception queue rather than the routine
+path. The withdrawal state machine in `RUNBOOK.md` §7 now describes this, together
+with §7n — including the one dashboard setting that makes all of it inert.
+
+**Verified:** 1,509 tests / 162 files · typecheck · lint · build. Seven new
+real-PostgreSQL cases drive the whole path — a customer request, an operator
+approval, then the signed event — and assert the wallet arithmetic, the ledger rows,
+the status, the idempotent repeat, the contradiction, the amount/currency refusal,
+the unknown reference and a forged signature. Sabotage-proven: removing the status
+guards from either `UPDATE` fails three of them.
+
+**Not verified:** no live Paystack transfer has been settled this way — that needs a
+real payout, and the owner must confirm the webhook endpoint subscribes to the
+`transfer.*` events. If it does not, everything above is inert and the manual queue
+is the only path again.

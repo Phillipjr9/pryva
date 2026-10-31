@@ -9,7 +9,7 @@ cannot.
 > that takes money is attacked on a schedule, not by accident, so the useful
 > question is not "are we secure" but "what would we notice, and how fast".
 
-Last reviewed: **30 October 2026**, alongside the changes in `STATUS.md` §23.
+Last reviewed: **31 October 2026**, alongside the changes in `STATUS.md` §46.
 
 ---
 
@@ -21,7 +21,7 @@ Last reviewed: **30 October 2026**, alongside the changes in `STATUS.md` §23.
 | Password grinding | one account, many guesses spread over days | 8-failure lockout for 30 minutes, stored on the account row |
 | Account takeover by 2FA-less admin | a phished admin password | administrators must enrol a second factor before the admin area opens |
 | Payment forgery | a POST to the webhook endpoint with a made-up event | HMAC-SHA512 signature, verified with `timingSafeEqual` before the body is parsed |
-| Double credit | the same top-up event delivered twice | unique reference on `payment_topups`, idempotent apply |
+| Double credit | the same top-up or payout event delivered twice | unique reference on `payment_topups`; a payout's status is inside its `UPDATE ... WHERE`, so the second event matches no row |
 | Double spend | two purchases racing the same balance | balance decrement and ledger insert in one transaction, conditional update |
 | Refund abuse | "nothing arrived", claimed repeatedly | refunds require the delivery outcome; auto-refunds pause until both ends confirm |
 | Privilege escalation | a customer reaching `/admin` or an admin API | `ADMIN_EMAILS` **plus** verified email, checked server-side on every page and API |
@@ -52,7 +52,14 @@ is a **503**, never a silent fallback to counting in memory.
 
 **Payment webhook** — `src/lib/paystack-webhook.ts`, `src/app/api/webhooks/payment/route.ts`
 HMAC-SHA512 over the raw body, compared with `timingSafeEqual` before the payload
-is parsed, so a forged event never reaches the credit path.
+is parsed, so a forged event never reaches the credit path. Two kinds of event are
+acted on: a top-up credit and a payout's fate
+(`src/lib/paystack-transfer-settlement.ts`). Both are applied only to a row we
+already hold, with the guard inside the `UPDATE ... WHERE` so a replayed event is a
+no-op; a payout's amount and currency must agree with the recorded withdrawal or
+the event is refused (400) and left for a person. A failure event that follows a
+success is *not* applied — the pair contradicts itself and a credit on a
+contradiction would be a guess.
 
 **Money movement** — `src/lib/wallet.ts`, `src/lib/payment-integrity.ts`, routes
 Every debit is a conditional `UPDATE ... WHERE balance >= amount` inside a

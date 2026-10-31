@@ -2,12 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { verifyPaystackSignature } from "@/lib/paystack-webhook";
 import { completeTopUp } from "@/lib/topups";
+import { isTransferEvent, settleTransferEvent } from "@/lib/paystack-transfer-settlement";
 import { logger } from "@/lib/logger";
 import { readTextWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
 
-/** Verify the raw Paystack payload and credit only a matching pending top-up. */
+/**
+ * Paystack's signed word on two things: a customer paid us, and a payout reached
+ * its destination (or did not).
+ *
+ * The body is untrusted until the HMAC over the raw bytes checks out, and every
+ * event is applied against a row we already have. See
+ * `src/lib/paystack-transfer-settlement.ts` for why a `transfer.success` only
+ * completes an in-flight row and a `transfer.failed` refunds the wallet.
+ */
 export async function POST(request: NextRequest) {
   const secret = process.env.PAYSTACK_SECRET_KEY?.trim();
   if (!secret || isPreviewDatabase()) {
@@ -33,6 +42,9 @@ export async function POST(request: NextRequest) {
       requested_amount?: unknown;
       currency?: unknown;
       metadata?: unknown;
+      transfer_code?: unknown;
+      reason?: unknown;
+      gateway_response?: unknown;
     };
   };
   try {
@@ -44,7 +56,11 @@ export async function POST(request: NextRequest) {
   if (!payload || typeof payload !== "object") {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
-  // Other Paystack events do not credit a wallet.
+  if (typeof payload.event === "string" && isTransferEvent(payload.event)) {
+    return applyTransferEvent(payload.event, payload.data);
+  }
+
+  // Other Paystack events do not move money here.
   if (payload.event !== "charge.success") return NextResponse.json({ ok: true });
 
   const data = payload.data;
@@ -109,6 +125,60 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, duplicate: result === "duplicate" });
   } catch (error) {
     logger.error("Payment webhook processing failed", { error, reference });
+    return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
+  }
+}
+
+/**
+ * A payout event. The provider decides the fate of a transfer we initiated; this
+ * only checks that the event describes the transfer we think it does.
+ */
+async function applyTransferEvent(
+  event: Parameters<typeof settleTransferEvent>[0]["event"],
+  data: { status?: unknown; reference?: unknown; amount?: unknown; currency?: unknown; transfer_code?: unknown; reason?: unknown; gateway_response?: unknown } | undefined,
+) {
+  const reference = data?.reference;
+  const amountKobo = data?.amount;
+  const providerStatus = typeof data?.status === "string" ? data.status : "";
+  const transferCode = typeof data?.transfer_code === "string" && data.transfer_code.length <= 100 ? data.transfer_code : null;
+  const reasonSource = typeof data?.reason === "string" ? data.reason : data?.gateway_response;
+
+  if (
+    typeof reference !== "string" || reference.length === 0 || reference.length > 50 ||
+    typeof amountKobo !== "number" || !Number.isSafeInteger(amountKobo) || amountKobo <= 0 ||
+    data?.currency !== "NGN"
+  ) {
+    logger.warn("Paystack transfer event rejected: invalid details", {
+      event,
+      reference: typeof reference === "string" ? reference : null,
+      status: data?.status,
+      currency: data?.currency,
+      amountType: typeof amountKobo,
+    });
+    return NextResponse.json({ error: "Invalid transfer details" }, { status: 400 });
+  }
+
+  try {
+    const outcome = await settleTransferEvent({
+      event,
+      reference,
+      amountKobo,
+      currency: "NGN",
+      providerStatus,
+      transferCode,
+      reason: typeof reasonSource === "string" ? reasonSource : null,
+    });
+
+    if (outcome === "mismatch") {
+      // A 400 makes the provider keep the failed delivery visible; a mismatch is
+      // something a person has to read, not something a retry can fix.
+      return NextResponse.json({ error: "Transfer event does not match a recorded withdrawal" }, { status: 400 });
+    }
+
+    logger.info("Paystack transfer webhook processed", { event, reference, outcome });
+    return NextResponse.json({ ok: true, outcome });
+  } catch (error) {
+    logger.error("Paystack transfer webhook processing failed", { error, event, reference });
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
   }
 }
