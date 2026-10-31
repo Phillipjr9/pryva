@@ -9,29 +9,65 @@ export interface DataPlan {
   price: number;
 }
 
+export interface AirtimePlan {
+  id: string;
+  provider: AirtimeProvider;
+  name: string;
+  amount: number;
+}
+
 export const dataPlans: DataPlan[] = [
   // MTN
   { id: "mtn-500mb", provider: "mtn", name: "MTN 500MB", size: "500MB", duration: "30 days", price: 500 },
   { id: "mtn-1gb", provider: "mtn", name: "MTN 1GB", size: "1GB", duration: "30 days", price: 1000 },
   { id: "mtn-2gb", provider: "mtn", name: "MTN 2GB", size: "2GB", duration: "30 days", price: 2000 },
+  { id: "mtn-3gb", provider: "mtn", name: "MTN 3GB", size: "3GB", duration: "30 days", price: 3000 },
   { id: "mtn-5gb", provider: "mtn", name: "MTN 5GB", size: "5GB", duration: "30 days", price: 4500 },
   { id: "mtn-10gb", provider: "mtn", name: "MTN 10GB", size: "10GB", duration: "30 days", price: 8000 },
-  
+  { id: "mtn-15gb", provider: "mtn", name: "MTN 15GB", size: "15GB", duration: "30 days", price: 12000 },
+  { id: "mtn-20gb", provider: "mtn", name: "MTN 20GB", size: "20GB", duration: "30 days", price: 15000 },
+
   // Airtel
   { id: "airtel-500mb", provider: "airtel", name: "Airtel 500MB", size: "500MB", duration: "30 days", price: 500 },
   { id: "airtel-1gb", provider: "airtel", name: "Airtel 1GB", size: "1GB", duration: "30 days", price: 1000 },
   { id: "airtel-2gb", provider: "airtel", name: "Airtel 2GB", size: "2GB", duration: "30 days", price: 2000 },
+  { id: "airtel-3gb", provider: "airtel", name: "Airtel 3GB", size: "3GB", duration: "30 days", price: 3000 },
   { id: "airtel-5gb", provider: "airtel", name: "Airtel 5GB", size: "5GB", duration: "30 days", price: 4500 },
-  
+  { id: "airtel-10gb", provider: "airtel", name: "Airtel 10GB", size: "10GB", duration: "30 days", price: 8000 },
+  { id: "airtel-15gb", provider: "airtel", name: "Airtel 15GB", size: "15GB", duration: "30 days", price: 12000 },
+  { id: "airtel-20gb", provider: "airtel", name: "Airtel 20GB", size: "20GB", duration: "30 days", price: 15000 },
+
   // Glo
+  { id: "glo-500mb", provider: "glo", name: "Glo 500MB", size: "500MB", duration: "30 days", price: 500 },
   { id: "glo-1gb", provider: "glo", name: "Glo 1GB", size: "1GB", duration: "30 days", price: 1000 },
   { id: "glo-2gb", provider: "glo", name: "Glo 2GB", size: "2GB", duration: "30 days", price: 2000 },
+  { id: "glo-3gb", provider: "glo", name: "Glo 3GB", size: "3GB", duration: "30 days", price: 3000 },
   { id: "glo-5gb", provider: "glo", name: "Glo 5GB", size: "5GB", duration: "30 days", price: 4500 },
-  
+  { id: "glo-10gb", provider: "glo", name: "Glo 10GB", size: "10GB", duration: "30 days", price: 8000 },
+  { id: "glo-15gb", provider: "glo", name: "Glo 15GB", size: "15GB", duration: "30 days", price: 12000 },
+  { id: "glo-20gb", provider: "glo", name: "Glo 20GB", size: "20GB", duration: "30 days", price: 15000 },
+
   // 9mobile
+  { id: "9mobile-500mb", provider: "9mobile", name: "9mobile 500MB", size: "500MB", duration: "30 days", price: 500 },
   { id: "9mobile-1gb", provider: "9mobile", name: "9mobile 1GB", size: "1GB", duration: "30 days", price: 1000 },
   { id: "9mobile-2gb", provider: "9mobile", name: "9mobile 2GB", size: "2GB", duration: "30 days", price: 2000 },
+  { id: "9mobile-3gb", provider: "9mobile", name: "9mobile 3GB", size: "3GB", duration: "30 days", price: 3000 },
+  { id: "9mobile-5gb", provider: "9mobile", name: "9mobile 5GB", size: "5GB", duration: "30 days", price: 4500 },
+  { id: "9mobile-10gb", provider: "9mobile", name: "9mobile 10GB", size: "10GB", duration: "30 days", price: 8000 },
+  { id: "9mobile-15gb", provider: "9mobile", name: "9mobile 15GB", size: "15GB", duration: "30 days", price: 12000 },
+  { id: "9mobile-20gb", provider: "9mobile", name: "9mobile 20GB", size: "20GB", duration: "30 days", price: 15000 },
 ];
+
+export const AIRTIME_DENOMINATIONS = [100, 200, 500, 1000, 2000, 5000, 10000] as const;
+
+export const airtimePlans: AirtimePlan[] = (["mtn", "airtel", "glo", "9mobile"] as const).flatMap((provider) =>
+  AIRTIME_DENOMINATIONS.map((amount) => ({
+    id: `${provider}-airtime-${amount}`,
+    provider,
+    name: `${provider.toUpperCase()} ₦${amount.toLocaleString()} Airtime`,
+    amount,
+  })),
+);
 
 export function getDataPlansByProvider(provider: AirtimeProvider): DataPlan[] {
   return dataPlans.filter((plan) => plan.provider === provider);
@@ -39,4 +75,12 @@ export function getDataPlansByProvider(provider: AirtimeProvider): DataPlan[] {
 
 export function findDataPlan(id: string): DataPlan | undefined {
   return dataPlans.find((plan) => plan.id === id);
+}
+
+export function getAirtimePlansByProvider(provider: AirtimeProvider): AirtimePlan[] {
+  return airtimePlans.filter((plan) => plan.provider === provider);
+}
+
+export function findAirtimePlan(id: string): AirtimePlan | undefined {
+  return airtimePlans.find((plan) => plan.id === id);
 }
