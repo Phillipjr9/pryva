@@ -482,6 +482,40 @@ they do.
 
 ---
 
+## 7k. "Is the site still announcing what it runs?"
+
+One command, after a deploy:
+
+```bash
+npm run headers:check -- https://pryva-two.vercel.app
+# or against a local production build
+npm run headers:check -- http://localhost:3111
+```
+
+It exits `0` when nothing names the framework or a version, `1` when something
+does (printing the header, its value and which path served it), and `2` when a URL
+cannot be reached. Pass paths to narrow it: `... https://pryva.example / /login`.
+
+| What you see | What it means | Fix |
+|---|---|---|
+| `✓ No framework banner and no version in any response header.` | nothing to remove | — |
+| `x-powered-by: Next.js` | `poweredByHeader: false` was lost from `next.config.ts`, or a dependency is writing it | restore the setting, redeploy, re-run |
+| `server: nginx/1.25.3`, `Apache/2.4.x`, `PHP/8.x` | a reverse proxy in front of the app is naming its version | turn off server tokens (`server_tokens off;` in nginx, `ServerTokens Prod` in Apache) |
+| `Note: server: Vercel …` | expected on Vercel: the platform writes it after the app runs | nothing to do *in this repo* — it carries no version. To remove it, put Cloudflare (or your own proxy) in front |
+
+Two things worth knowing:
+
+- **The app's half is enforced, not just declared.** `poweredByHeader: false` stops
+  Next adding `X-Powered-By`; `src/proxy.ts` deletes `FRAMEWORK_BANNERS` on every
+  response; `src/test/server-banner.test.ts` fails if either is removed, and the
+  check script imports the same list.
+- **`Server` is platform-written.** It is reported as a note rather than a failure
+  precisely because this repository cannot remove it on Vercel, and claiming
+  otherwise would make the check lie. A plain `Server: Vercel` discloses a host, not
+  an exploitable build.
+
+---
+
 ## 7j. "The support chat is not answering me"
 
 Read this before assuming the assistant is broken — the failure has three

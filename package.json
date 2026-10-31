@@ -9,6 +9,7 @@
     "db:verify-backup": "node --experimental-strip-types scripts/backup-db.mjs --verify",
     "db:restore": "node --experimental-strip-types scripts/restore-db.mjs",
     "start": "next start",
+    "headers:check": "node scripts/check-headers.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
