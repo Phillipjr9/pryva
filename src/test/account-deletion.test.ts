@@ -7,6 +7,7 @@ import {
   TOMBSTONE_NAME,
   confirmationMatches,
   deletionBlock,
+  forfeitureWarning,
   retentionSummary,
   sessionIsFresh,
   tombstoneEmail,
@@ -42,23 +43,28 @@ describe("the confirmation is a sentence, not a click", () => {
   });
 });
 
-describe("money the owner cannot claim is money kept", () => {
-  it("refuses to close an account that still holds a balance", () => {
-    const block = deletionBlock({ walletBalance: 4_500, pendingWithdrawals: 0 });
-    expect(block).toMatchObject({ code: "BALANCE_REMAINING", action: { href: "/dashboard/wallet" } });
-    // The amount is in the sentence: "your balance is too high" helps nobody.
-    expect(block?.error).toContain("4,500");
-    expect(block?.detail).toEqual({ balance: 4_500 });
+describe("money in the wallet: warned, acknowledged, forfeited", () => {
+  it("names the amount that closing will destroy", () => {
+    const warning = forfeitureWarning(4_500);
+    expect(warning).toMatchObject({ amount: 4_500 });
+    expect(warning?.message).toContain("4,500");
+    expect(warning?.message.toLowerCase()).toContain("forfeits");
+    expect(warning?.message.toLowerCase()).toContain("not refunded");
+    // It says what to do about it, rather than only what will happen.
+    expect(warning?.message.toLowerCase()).toContain("withdraw");
   });
 
-  it("refuses while a payout is still in the air", () => {
-    const block = deletionBlock({ walletBalance: 0, pendingWithdrawals: 1 });
+  it("says nothing when there is nothing to lose", () => {
+    expect(forfeitureWarning(0)).toBeNull();
+    expect(forfeitureWarning(-1)).toBeNull();
+  });
+
+  it("no longer refuses a balance — only a payout that is still moving", () => {
+    // The decision: a customer may leave with money, forfeiting it knowingly.
+    expect(deletionBlock({ pendingWithdrawals: 0 })).toBeNull();
+    const block = deletionBlock({ pendingWithdrawals: 1 });
     expect(block?.code).toBe("WITHDRAWAL_IN_FLIGHT");
     expect(block?.error.toLowerCase()).toContain("withdraw");
-  });
-
-  it("allows a settled, empty account", () => {
-    expect(deletionBlock({ walletBalance: 0, pendingWithdrawals: 0 })).toBeNull();
   });
 });
 
@@ -123,6 +129,15 @@ describe("what the customer is told before they confirm", () => {
     for (const item of DELETION_TERMS.kept) expect(item.why.length).toBeGreaterThan(30);
   });
 
+  it("never tells the customer how long the records are kept", () => {
+    // The owner's decision: ten years, and not disclosed. The horizon lives in a
+    // server-only module, so it cannot reach the bundle this panel ships in.
+    const copy = JSON.stringify(DELETION_TERMS) + read("src/app/dashboard/settings/DangerZone.tsx");
+    expect(copy).not.toMatch(/\b(10|ten)\s*years?\b/i);
+    expect(copy).not.toContain("RETENTION_YEARS");
+    expect(read("src/lib/account-deletion.ts")).not.toContain("RETENTION_YEARS");
+  });
+
   it("says plainly that it cannot be undone", () => {
     expect(DELETION_TERMS.summary.toLowerCase()).toContain("cannot be undone");
     expect(DELETION_TERMS.summary.toLowerCase()).toContain("without your name or email");
@@ -148,8 +163,12 @@ describe("what the customer is told before they confirm", () => {
     }
     // The financial record is never touched.
     expect(route).not.toMatch(/delete\((orders|walletTransactions|paymentTopups|withdrawals|giftCards)\)/);
-    // And the two refusals exist in code, not only in copy.
+    // And the guards exist in code, not only in copy.
     expect(route).toContain("deletionBlock(");
     expect(route).toContain("sessionIsFresh(");
+    // A balance is forfeited through the ledger, never destroyed silently.
+    expect(route).toContain("forfeitAcknowledged");
+    expect(route).toContain("debitWalletInTx(");
+    expect(route).toContain("balance forfeited");
   });
 });

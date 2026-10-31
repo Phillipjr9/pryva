@@ -1977,3 +1977,60 @@ afterwards.
 an owner decision (see `SECURITY.md` §4 and `RUNBOOK.md` §7l): nothing purges a
 closed account today, so "kept while the law or a dispute requires" is accurate only
 because nothing is deleted.
+
+---
+
+## 45. Thirty-seventh pass — ten years, and leaving with money (31 Oct 2026)
+
+Two decisions from the owner, both about closure: *"we can save the data for 10
+years but it shouldn't be known to users"* and *"allow the deletion while there's
+balance but just warn user their balance will be forfeited."*
+
+**The horizon is ten years, and it is invisible to customers.** `RETENTION_YEARS =
+10` lives in `src/lib/retention.ts`, a server-only module that no client component
+imports, so the number cannot reach a browser bundle. The customer-facing copy still
+says the record is kept *"for as long as the law and disputes require"* — true, and
+deliberately unspecific. A test fails if "10 years", "ten years" or the constant
+appears in `DELETION_TERMS`, the closure panel or the privacy page, and a second test
+fails if the panel ever imports the retention module.
+
+**The horizon has a mechanism, and it is disarmed.** `purgeExpiredClosedAccounts()`
+removes closed accounts whose `deletedAt` is past the cutoff — deleting the `users`
+row is the only complete removal this system has, because every financial table
+cascades from it, which is exactly what a retention limit is for. It never touches an
+open account, holds any closure with a payout that is not finished (a decade later
+that row is still the only way to trace money), removes at most 25 rows per run, and
+**does nothing unless `RETENTION_PURGE_ENABLED=true`**. With the flag unset the
+nightly job still counts what is due and reports it, so the horizon is measurable
+before anyone arms it. `GET /api/diagnostics/retention` answers "how much are we
+holding, and when does it start going" behind the bearer token; it is read-only by
+construction.
+
+**A balance no longer blocks closure — it is forfeited, on the record.** The request
+is refused (409 `FORFEITURE_NOT_ACKNOWLEDGED`) unless it carries
+`forfeitAcknowledged: true`, so a client that never rendered the warning cannot cost
+someone their money. The panel names the exact amount ("You will lose ₦4,500") and
+requires a second, specific tick — a different action from the general "I understand"
+one. The money is then written down twice: as a `debit` in the wallet ledger
+(`Account closed — balance forfeited`, `balanceAfter: 0`, so the nightly close's
+`previous ± amount = balance_after` invariant still holds on a closed account) and as
+`account_deletions.forfeited`. A payout still in flight is still refused, and now by
+any non-terminal status rather than only `pending` — an unrecognised status is
+treated as live, because guessing in the customer's favour there would be guessing
+with their money.
+
+**Verified:** 1,501 tests / 162 files · typecheck · lint · build. New coverage:
+`retention.test.ts` (7) pins the horizon arithmetic, the off-by-default flag (only
+`true`, in so many words) and that the number stays out of customer copy and client
+bundles, and `retention-diagnostics.test.ts` (7) holds the read-out to its two
+promises — it never purges (the route does not import the sweep) and it says
+"disarmed" rather than implying the data is gone; `financial-auth-integration.test.ts` gained four real-PostgreSQL retention
+cases (armed vs disarmed, a nine-year-old closure untouched, an open account
+untouched, a closure with an unfinished payout held) and the forfeiture cases (no
+acknowledgement → 409 with the amount named and nothing changed; acknowledged →
+closure with the ledger debit and `forfeited` on the receipt); the UI tests cover the
+warning, the second tick and the receipt.
+
+**Not verified:** nothing has been purged on production, because the sweep is off —
+that is the intended state until the owner arms it. `RETENTION_PURGE_ENABLED` is
+documented in `.env.example` and `RUNBOOK.md` §7m.

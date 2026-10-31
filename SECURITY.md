@@ -83,11 +83,13 @@ row lock first. The `users` row itself is not deleted: orders, the wallet ledger
 deposits, withdrawals, gift cards, support messages, reviews and fraud signals
 cascade from it, and those records have to outlive the account for chargebacks,
 refunds and payout questions. `deleted_at` is the switch every auth path reads, so a
-closed account cannot be signed into even if a session row survived. The endpoint
-refuses an account holding a balance or with a withdrawal in flight, requires a
-session created in the last 15 minutes, the account's own address typed out, and the
-password where the account has one. `account_deletions` records what was retained
-(counts, never contents).
+closed account cannot be signed into even if a session row survived. A remaining balance does not block closure: it is forfeited, but only
+against an explicit `forfeitAcknowledged` from the client, and it is written into the
+ledger as a debit (so the balance invariant still holds) and onto the closure receipt.
+A withdrawal that is not finished does block. The endpoint also requires a session
+created in the last 15 minutes, the account's own address typed out, and the password
+where the account has one. `account_deletions` records what was retained (counts,
+never contents).
 
 **No banner, no version** — `src/lib/server-banner.ts`, `next.config.ts`, `scripts/check-headers.mjs`
 `poweredByHeader: false` stops Next advertising itself, the proxy removes
@@ -240,12 +242,13 @@ a detector may **observe** and may **throttle**, but may not decide.
 - **Preview deployments may share the production database** (see
   `migrations/README.md`). Until they are isolated, a preview has production
   data behind it.
-- **Retention after closure is a policy, not a deadline.** A closed account keeps
-  its financial record indefinitely — there is no scheduled purge, because the
-  events that need it (chargebacks, disputes, tax) have no fixed horizon here. If a
-  retention period is chosen, it needs a job and an owner; until then "kept for as
-  long as the law or a dispute requires" is what the privacy page says, and it is
-  accurate only because nothing is deleted.
+- **Retention after closure is ten years, and the sweep is disarmed.** A closed
+  account keeps its financial record for ten years (`src/lib/retention.ts`); after
+  that the nightly job removes it, but only when `RETENTION_PURGE_ENABLED=true`,
+  which is off today. So the honest statement is: the horizon is set, the mechanism
+  exists and is tested, and nothing is being deleted yet. The customer is told only
+  "as long as the law and disputes require" — the owner's decision — which means a
+  support reply must never volunteer the number either.
 - **The tombstone email is freed, not blocked.** Someone can register the same
   address again and gets a new, unrelated account; the retained record stays tied to
   the old id. That is deliberate (closure is not a ban) and the fraud signals on the

@@ -482,6 +482,47 @@ they do.
 
 ---
 
+## 7m. How long closed-account records are kept, and how the sweep works
+
+**Ten years from the day the account was closed** (the owner's decision, 31 Oct
+2026). Customers are **not told the number** — the copy says "for as long as the law
+and disputes require" — so do not add it to the privacy page, the closure panel or a
+support reply. The constant lives in `src/lib/retention.ts`, which no client
+component imports.
+
+After ten years the account becomes eligible for removal. Removing it is the only
+complete deletion this system has: the `users` row is the root of every financial
+table, so the orders, ledger, deposits, withdrawals, gift cards, support threads and
+the closure receipt all go with it (cascade).
+
+**The sweep is off unless you arm it:**
+
+```bash
+# Vercel → Project → Settings → Environment Variables
+RETENTION_PURGE_ENABLED=true
+```
+
+With it unset (the default), the nightly job still *counts* what is due and says so
+in the run log: `not armed: due N`. Armed, it reports `armed: due N, purged M, held
+H`. Either way it:
+
+| Guard | Behaviour |
+|---|---|
+| Open account | never touched — the clock only measures `deleted_at` |
+| Payout not finished | held, whatever the date: a `processing` withdrawal is still the only trace of that money |
+| Batch size | at most 25 rows per run, so a bad clock cannot empty the table overnight |
+
+**Check the position without changing anything:**
+
+```bash
+curl -s -H "Authorization: Bearer $DIAGNOSTICS_SECRET" \
+  "https://pryva-two.vercel.app/api/diagnostics/retention" | jq '{verdict, retentionYears, closedAccounts, dueForPurge, armed}'
+```
+
+Read-only by construction — it cannot purge, whatever it is asked.
+
+---
+
 ## 7l. "A customer closed their account — where did their data go?"
 
 Nowhere. Closing removes the **person** and keeps the **record**. There is no

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { AlertTriangle, CheckCircle, Loader2, Logout, Shield, Trash2, XCircle } from "@/components/icons";
-import { DELETION_TERMS } from "@/lib/account-deletion";
+import { DELETION_TERMS, forfeitureWarning } from "@/lib/account-deletion";
 
 /**
  * Closing the account, on the customer's own terms.
@@ -45,12 +45,21 @@ export function DangerZone({
   const [typedEmail, setTypedEmail] = useState("");
   const [password, setPassword] = useState("");
   const [understood, setUnderstood] = useState(false);
+  const [forfeitAcknowledged, setForfeitAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Failure | null>(null);
-  const [done, setDone] = useState<{ retained: Record<string, number> } | null>(null);
+  const [done, setDone] = useState<{ retained: Record<string, number>; forfeited: number } | null>(null);
 
   const emailMatches = typedEmail.trim().toLowerCase() === email.trim().toLowerCase();
-  const canSubmit = emailMatches && understood && (!hasPassword || password.length > 0) && !busy;
+  // Money on the table gets its own acknowledgement, in the amount the customer
+  // is giving up — a second tick, not a sentence inside a longer one.
+  const forfeiture = forfeitureWarning(walletBalance);
+  const canSubmit =
+    emailMatches &&
+    understood &&
+    (!forfeiture || forfeitAcknowledged) &&
+    (!hasPassword || password.length > 0) &&
+    !busy;
 
   async function submit() {
     if (!canSubmit) return;
@@ -60,18 +69,23 @@ export function DangerZone({
       const response = await fetch("/api/user/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirm: typedEmail, password: hasPassword ? password : undefined }),
+        body: JSON.stringify({
+          confirm: typedEmail,
+          password: hasPassword ? password : undefined,
+          forfeitAcknowledged: forfeiture ? true : undefined,
+        }),
       });
       const data = (await response.json().catch(() => ({}))) as Failure & {
         ok?: boolean;
         deleted?: boolean;
         retained?: Record<string, number>;
+        forfeited?: number;
       };
       if (!response.ok || !data.ok) {
         setError(data);
         return;
       }
-      setDone({ retained: data.retained ?? {} });
+      setDone({ retained: data.retained ?? {}, forfeited: data.forfeited ?? 0 });
       // The session cookie is gone; the shell this page sits in is not.
       router.refresh();
     } catch {
@@ -108,6 +122,12 @@ export function DangerZone({
               {Object.values(done.retained).every((value) => !value) ? (
                 <li className="rounded-lg bg-white/70 px-3 py-1.5">
                   Nothing to keep: this account never made a purchase.
+                </li>
+              ) : null}
+              {done.forfeited > 0 ? (
+                <li className="flex items-center justify-between rounded-lg bg-white/70 px-3 py-1.5">
+                  <span>Balance forfeited</span>
+                  <span className="font-semibold">₦{done.forfeited.toLocaleString()}</span>
                 </li>
               ) : null}
             </ul>
@@ -188,17 +208,32 @@ export function DangerZone({
             {DELETION_TERMS.summary}
           </p>
 
-          {walletBalance > 0 ? (
-            <p className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-meta leading-relaxed text-amber-900">
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>
-                Your wallet holds ₦{walletBalance.toLocaleString()}. The account cannot be closed while it does —
-                withdraw first, so the money does not stay behind with no one able to claim it.{" "}
-                <Link href="/dashboard/wallet" className="font-semibold underline">
-                  Go to wallet
-                </Link>
-              </span>
-            </p>
+          {forfeiture ? (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-meta leading-relaxed text-amber-900">
+              <p className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>
+                  <span className="font-semibold">You will lose ₦{forfeiture.amount.toLocaleString()}.</span>{" "}
+                  Closing your account forfeits the balance in it — it is not refunded, cannot be withdrawn
+                  afterwards, and nobody will be able to claim it. Withdraw it first if you want to keep it:{" "}
+                  <Link href="/dashboard/wallet" className="font-semibold underline">
+                    go to wallet
+                  </Link>
+                  .
+                </span>
+              </p>
+              <label className="mt-2.5 flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={forfeitAcknowledged}
+                  onChange={(event) => setForfeitAcknowledged(event.target.checked)}
+                  className="mt-0.5"
+                  disabled={busy}
+                />
+                I understand my ₦{forfeiture.amount.toLocaleString()} will be forfeited and I cannot claim it
+                afterwards.
+              </label>
+            </div>
           ) : null}
 
           <div className="grid gap-3">
