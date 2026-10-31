@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Check, Shield, Sparkle } from "@/components/icons";
 import { safeRedirectPath } from "@/lib/safe-redirect";
 import { PasswordInput } from "@/components/ui/PasswordInput";
+import { BrandIcon } from "@/components/BrandIcon";
 import { PasskeySignInButton } from "@/components/auth/PasskeySignInButton";
 
 type Mode = "login" | "signup";
@@ -296,6 +297,9 @@ export function AuthForm({
           href={`/api/auth/google?next=${encodeURIComponent(next)}`}
           className="btn w-full border border-line bg-white !py-3.5 text-ink shadow-sm hover:bg-lav-50/60"
         >
+          {/* Google's own four-colour G, from the same brand-mark table the
+              service pages use — never our mark, and never redrawn by hand. */}
+          <BrandIcon brand="google" variant="bare" size={18} decorative />
           Continue with Google
         </a>
       </div>
