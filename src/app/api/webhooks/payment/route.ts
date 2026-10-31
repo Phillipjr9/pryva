@@ -4,6 +4,7 @@ import { verifyPaystackSignature } from "@/lib/paystack-webhook";
 import { completeTopUp } from "@/lib/topups";
 import { isTransferEvent, settleTransferEvent } from "@/lib/paystack-transfer-settlement";
 import { logger } from "@/lib/logger";
+import { recordWebhookEvent } from "@/lib/webhook-events";
 import { readTextWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,10 @@ export const dynamic = "force-dynamic";
  * event is applied against a row we already have. See
  * `src/lib/paystack-transfer-settlement.ts` for why a `transfer.success` only
  * completes an in-flight row and a `transfer.failed` refunds the wallet.
+ *
+ * Every delivery that gets this far is recorded afterwards, including a refused
+ * signature, because "is the webhook arriving?" has to be answerable without
+ * waiting for a customer to complain.
  */
 export async function POST(request: NextRequest) {
   const secret = process.env.PAYSTACK_SECRET_KEY?.trim();
@@ -30,6 +35,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid payload" }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
   }
   if (!verifyPaystackSignature(rawBody, request.headers.get("x-paystack-signature"), secret)) {
+    // The body is attacker-controlled at this point, so nothing from it is stored.
+    void recordWebhookEvent({ event: null, signatureValid: false, outcome: "rejected_signature" });
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
@@ -61,7 +68,15 @@ export async function POST(request: NextRequest) {
   }
 
   // Other Paystack events do not move money here.
-  if (payload.event !== "charge.success") return NextResponse.json({ ok: true });
+  if (payload.event !== "charge.success") {
+    void recordWebhookEvent({
+      event: payload.event,
+      reference: (payload.data as { reference?: unknown } | undefined)?.reference,
+      signatureValid: true,
+      outcome: "ignored",
+    });
+    return NextResponse.json({ ok: true });
+  }
 
   const data = payload.data;
   // Paystack metadata can be returned as an object or a JSON string. Both
@@ -109,6 +124,7 @@ export async function POST(request: NextRequest) {
         ? data.requested_amount
         : null,
     });
+    void recordWebhookEvent({ event: payload.event, reference, signatureValid: true, outcome: "rejected_details" });
     return NextResponse.json({ error: "Invalid payment details" }, { status: 400 });
   }
   const amount = kobo / 100;
@@ -118,9 +134,16 @@ export async function POST(request: NextRequest) {
 
     if (result === "mismatch") {
       logger.warn("Paystack event did not match a pending top-up", { reference });
+      void recordWebhookEvent({ event: payload.event, reference, signatureValid: true, outcome: "mismatch" });
       return NextResponse.json({ error: "Payment does not match a pending top-up" }, { status: 400 });
     }
 
+    void recordWebhookEvent({
+      event: payload.event,
+      reference,
+      signatureValid: true,
+      outcome: result === "duplicate" ? "duplicate" : "credited",
+    });
     logger.info("Paystack webhook processed", { reference, result });
     return NextResponse.json({ ok: true, duplicate: result === "duplicate" });
   } catch (error) {
@@ -148,6 +171,7 @@ async function applyTransferEvent(
     typeof amountKobo !== "number" || !Number.isSafeInteger(amountKobo) || amountKobo <= 0 ||
     data?.currency !== "NGN"
   ) {
+    void recordWebhookEvent({ event, reference, signatureValid: true, outcome: "rejected_details" });
     logger.warn("Paystack transfer event rejected: invalid details", {
       event,
       reference: typeof reference === "string" ? reference : null,
@@ -168,6 +192,8 @@ async function applyTransferEvent(
       transferCode,
       reason: typeof reasonSource === "string" ? reasonSource : null,
     });
+
+    void recordWebhookEvent({ event, reference, signatureValid: true, outcome });
 
     if (outcome === "mismatch") {
       // A 400 makes the provider keep the failed delivery visible; a mismatch is

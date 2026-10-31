@@ -65,6 +65,33 @@ export const users = pgTable("users", {
  * request came from (hashed). The rows themselves stay where they always were, so
  * a dispute can still be answered with the real order and the real ledger.
  */
+/**
+ * Every delivery the payment webhook received, including the ones it refused.
+ *
+ * Written best-effort after the money decision has already been made, so a logging
+ * failure can never turn a settled payout into a retry. It holds an event name, a
+ * reference, a verdict and a timestamp — never a payload, never bank details —
+ * which is what an operator needs to answer "is the webhook arriving, and is it
+ * doing anything?" without reading a log stream.
+ *
+ * Pruned to 30 days by the nightly job.
+ */
+export const webhookEvents = pgTable(
+  "webhook_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    event: varchar("event", { length: 60 }).notNull(),
+    reference: varchar("reference", { length: 60 }),
+    signatureValid: boolean("signature_valid").notNull(),
+    outcome: varchar("outcome", { length: 40 }).notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("webhook_events_received_idx").on(table.receivedAt),
+    index("webhook_events_event_idx").on(table.event),
+  ],
+);
+
 export const accountDeletions = pgTable(
   "account_deletions",
   {

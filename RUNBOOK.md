@@ -476,6 +476,38 @@ they do.
 
 ---
 
+## 7p. Is the webhook actually arriving?
+
+Every delivery is now recorded — accepted, refused, or ignored — so this is a
+question with an answer rather than an inference:
+
+```bash
+curl -s -H "Authorization: Bearer $DIAGNOSTICS_SECRET" \
+  "https://pryva-two.vercel.app/api/diagnostics/webhooks" | jq '{verdict, explanation, counts, lastDeliveryAt, refusedSignatures}'
+```
+
+| `verdict` | What it means | The fix |
+|---|---|---|
+| `receiving` | Payout events are arriving and being applied | nothing |
+| `only_topups` | Top-ups arrive; no `transfer.*` event has been seen | the endpoint works, so the provider is not sending payout events to it — check the events enabled for that webhook |
+| `silent` | Nothing at all in the window | the URL is not saved, the deployment is failing, or the secret does not match (a wrong secret shows as `refusedSignatures` climbing) |
+
+`lastDeliveryAt` is the last time *anything* arrived, which is the fastest way to
+tell "the provider stopped" from "the app stopped". `refusedSignatures` counts
+deliveries whose HMAC did not verify in the window — a non-zero figure means the key
+in this deployment is not the key the provider is signing with.
+
+The log holds an event name, a reference, a verdict and a timestamp; **never a
+payload, a bank account or a customer's details**, and never anything from a body
+whose signature failed. It is pruned to 30 days by the nightly job, so it can also
+be used as "what did we receive around the time of the incident" without keeping
+customer data longer than the incident needs.
+
+This is not a substitute for the sweep: with `verdict: silent` the app still settles
+payouts through the nightly `payouts` step, just far more slowly.
+
+---
+
 ## 7o. Payouts are instant — what that means for you
 
 There is no approval queue any more. A customer confirming a withdrawal debits the
