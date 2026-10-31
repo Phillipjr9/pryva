@@ -6,6 +6,7 @@ import { dispatchWalletEmails, walletEmailConfigured } from "@/lib/wallet-email-
 import { sweepBoostDeliveries } from "@/lib/boost-status";
 import { expireFinishedRentals } from "@/lib/rental-expiry";
 import { settleReferralRewards } from "@/lib/referrals";
+import { purgeExpiredClosedAccounts } from "@/lib/retention";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { logger } from "@/lib/logger";
 
@@ -118,7 +119,21 @@ async function handler(request: NextRequest) {
     };
   });
 
-  const allOk = close.ok && emails.ok && boosts.ok && refunds.ok && rentals.ok && referrals.ok;
+  // The retention horizon, last and off by default. With
+  // `RETENTION_PURGE_ENABLED` unset this only counts what is due, which is the
+  // point: the number is visible for as long as it takes to decide that deleting
+  // financial records is what should happen next.
+  const retention = await runStep("retention", async () => {
+    const sweep = await purgeExpiredClosedAccounts();
+    return {
+      ok: true,
+      detail: sweep.armed
+        ? `armed: due ${sweep.due}, purged ${sweep.purged}, held ${sweep.held}`
+        : `not armed: due ${sweep.due} (set RETENTION_PURGE_ENABLED=true to remove them)`,
+    };
+  });
+
+  const allOk = close.ok && emails.ok && boosts.ok && refunds.ok && rentals.ok && referrals.ok && retention.ok;
   logger.info("Nightly run finished", {
     day,
     allOk,
@@ -128,10 +143,11 @@ async function handler(request: NextRequest) {
     refunds: refunds.detail,
     rentals: rentals.detail,
     referrals: referrals.detail,
+    retention: retention.detail,
   });
 
   return NextResponse.json(
-    { ok: allOk, day, steps: { close, emails, boosts, refunds, rentals, referrals } },
+    { ok: allOk, day, steps: { close, emails, boosts, refunds, rentals, referrals, retention } },
     { status: allOk ? 200 : 207, headers: { "Cache-Control": "no-store" } },
   );
 }

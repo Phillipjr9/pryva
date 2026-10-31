@@ -49,37 +49,25 @@ export function tombstoneEmail(userId: string): string {
 /** What replaces the person's name on any screen that still joins to this row. */
 export const TOMBSTONE_NAME = "Deleted account";
 
-/** Why a deletion cannot proceed right now. Both reasons protect the customer. */
+/** Why a deletion cannot proceed right now. */
 export type DeletionBlock = {
-  code: "BALANCE_REMAINING" | "WITHDRAWAL_IN_FLIGHT";
+  code: "WITHDRAWAL_IN_FLIGHT" | "FORFEITURE_NOT_ACKNOWLEDGED";
   error: string;
   /** Where the customer can fix it, so the refusal is actionable. */
   action: { label: string; href: string };
-  /** Machine-readable detail for the screen (never money leaving the account). */
-  detail?: { balance?: number; withdrawals?: number };
+  detail?: { withdrawals?: number };
 };
 
 /**
- * Never take an account with money in it.
+ * Never close an account whose payout is still moving.
  *
- * A zero-balance requirement is not a technicality: deleting an account holding
- * ₦4,500 would leave the owner of that money with no way to ask for it, and Pryva
- * holding it. Withdrawing first costs one tap. The same applies to a withdrawal
- * already in flight — the payout would be sent to a bank account whose owner can
- * no longer sign in to see whether it arrived.
+ * A withdrawal in flight is the one case where closing costs the customer
+ * something they cannot get back: the money would be sent to a bank account whose
+ * owner can no longer sign in to see whether it arrived, and the payout record
+ * would be the only trace. A balance is different — that decision is theirs, and
+ * they are warned in as many words (`forfeitureWarning`).
  */
-export function deletionBlock(account: {
-  walletBalance: number;
-  pendingWithdrawals: number;
-}): DeletionBlock | null {
-  if (account.walletBalance > 0) {
-    return {
-      code: "BALANCE_REMAINING",
-      error: `Your wallet still holds ₦${account.walletBalance.toLocaleString()}. Withdraw it before closing the account — we will not keep money belonging to a closed account.`,
-      action: { label: "Withdraw my balance", href: "/dashboard/wallet" },
-      detail: { balance: account.walletBalance },
-    };
-  }
+export function deletionBlock(account: { pendingWithdrawals: number }): DeletionBlock | null {
   if (account.pendingWithdrawals > 0) {
     return {
       code: "WITHDRAWAL_IN_FLIGHT",
@@ -90,6 +78,23 @@ export function deletionBlock(account: {
     };
   }
   return null;
+}
+
+/**
+ * The money that closing will destroy.
+ *
+ * Allowed, deliberately (the owner's decision, 31 Oct 2026): a customer may leave
+ * with a balance, it is forfeited, and they are told so in the amount they will
+ * lose rather than in principle. The route refuses a request that has not
+ * acknowledged this, so the warning cannot be skipped by a client that does not
+ * render it.
+ */
+export function forfeitureWarning(walletBalance: number): { amount: number; message: string } | null {
+  if (walletBalance <= 0) return null;
+  return {
+    amount: walletBalance,
+    message: `Your wallet holds ₦${walletBalance.toLocaleString()}. Closing your account forfeits it: the money is not refunded, cannot be withdrawn afterwards, and nobody will be able to claim it. Withdraw it first if you want to keep it.`,
+  };
 }
 
 /**
