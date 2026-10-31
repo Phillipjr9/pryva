@@ -123,10 +123,11 @@ describe("features that had an endpoint but no screen", () => {
     expect(panel).toContain("Download my data");
     expect(read("app/dashboard/settings/AccountDataPanel.tsx")).toContain("/api/user/export");
     expect(read("app/dashboard/settings/SettingsForm.tsx")).toContain("<AccountDataPanel />");
-    // Self-service deletion is deliberately unavailable; the panel must not
-    // offer a control that always fails.
-    expect(panel).toContain("not self-service yet");
-    expect(panel).toContain("/dashboard/support");
+    // Closing the account is self-service now, so the panel points at the section
+    // that does it (with the deletion terms) instead of at support.
+    expect(panel).toContain("Close my account");
+    expect(panel).toContain("#close-account");
+    expect(read("app/dashboard/settings/page.tsx")).toContain("<DangerZone");
   });
 
   it("offers the wallet ledger export on the wallet page", () => {
