@@ -35,7 +35,10 @@ done
 
 The baseline creates the 12 original application tables and their indexes/foreign keys.
 The incremental migrations add the unique nullable Google subject used by
-sign-in, the shared rate-limit table, withdrawal request idempotency keys, a durable Paystack transfer reference, the transactional wallet email outbox, order idempotency and reconciliation notes, the provider-cost column, the password-reset and email-verification token tables, the frozen payout payer name, the disposable inbox tables (`0013`) and the admin audit log (`0014`).
+sign-in, the shared rate-limit table, withdrawal request idempotency keys, a durable Paystack transfer reference, the transactional wallet email outbox, order idempotency and reconciliation notes, the provider-cost column, the password-reset and email-verification token tables, the frozen payout payer name, the disposable inbox tables (`0013`), the admin audit log (`0014`), two-factor
+enrolment and recovery codes (`0015`), verified-purchase reviews (`0016`), login
+lockout (`0017`), reconciliation runs (`0018`), support threads (`0019`) and
+WebAuthn credentials and challenges (`0020`).
 Back up existing databases before applying migrations and verify the schema before routing traffic.
 
 ## Existing databases

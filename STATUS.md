@@ -1,6 +1,6 @@
 # Pryva — verified status review
 
-**Date:** 30 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** the seventeenth pass, §25
+**Date:** 31 October 2026 (updated) · **Base commit:** `19113f0` (`main`) · **Branch reviewed:** `arena/0c5fc242-pryva` · **Last verified head:** the eighteenth pass, §25
 **Method:** every claim below was read out of the code or produced by running the project. Nothing is taken from `PLAN.md` without checking it first — and several `PLAN.md` entries turned out to be stale (section 4).
 
 ---
@@ -891,3 +891,95 @@ run), `support-surfaces.test.tsx` (10 — the capability list, the scoping, the 
 gate and the audit entry) and `support-preview-shim.test.ts` (2 — the same flow
 against the in-memory preview adapter, including that it will not pretend it can
 reach Paystack from there).
+
+---
+
+## 26. Eighteenth pass — Google moves down, and passkeys (31 Oct 2026)
+
+**The request.** "Can you put the google login below the sign in and also add passkey
+login."
+
+### 26.1 Continue with Google, after the form
+
+The sign-in page opened with a full-width Google button above the email field, so the
+first thing a customer was offered was the option most of them would not use. The form
+now comes first, then a divider that says what it is a divider for — "or sign in with" /
+"or sign up with" — and *then* the alternatives.
+
+The anchor itself is untouched: same `href="/api/auth/next=…"` shape, same "Continue
+with Google" text, no brand mark inside it. That is deliberate; `logo-removal.test.tsx`
+pins both, and a layout change is not a licence to rewrite the thing it pins. Sign-up
+keeps Google and does **not** get a passkey button, because a passkey needs an account
+to belong to before it can exist.
+
+### 26.2 Passkeys — what a customer gets
+
+| Where | What |
+|---|---|
+| `/login` | **Sign in with a passkey**, directly under the divider, above Google. No email, no password, no code. |
+| `/dashboard/settings#security` | **Passkeys** — the list, "Add a passkey", and a remove button per entry. It sits with the two-factor and sessions cards, because it is the same account's protection. |
+
+Signing in is two requests: `POST /api/auth/passkey/options` issues a server-known
+challenge, the device signs it, and `POST /api/auth/passkey/verify` checks the
+signature and only then creates the session. Nothing about the account is revealed
+before the signature verifies — the options response names no user, which is what makes
+username-less sign-in possible at all.
+
+A passkey **satisfies the second factor** (it is possession plus a biometric or a device
+PIN, both in one gesture) but it does **not** bypass the account lockout: a locked
+account refuses a passkey exactly as it refuses a password, and a successful passkey
+clears the failure counter the same way a successful password does. Every failure returns
+one generic 401 — wrong credential, unverified assertion, counter that went backwards —
+because telling an attacker which part was wrong is a gift.
+
+### 26.3 The three properties that matter
+
+1. **The challenge is the server's, and is spent once.** `webauthn_challenges` holds it
+   with a purpose (`register` / `authenticate`), a five-minute TTL, and a `consumed_at`
+   that `consumeChallenge` sets with a conditional `UPDATE … WHERE consumed_at IS NULL`.
+   A captured assertion therefore cannot buy a second session, and a registration
+   challenge cannot be replayed as a sign-in because the purpose is part of the clause.
+2. **The relying party is pinned, not inferred.** `WEBAUTHN_ORIGIN` (or
+   `NEXT_PUBLIC_SITE_URL`) wins; the request's own origin is the fallback, accepted only
+   over HTTPS or on localhost. `WEBAUTHN_RP_ID` must be a suffix of that origin, and is
+   refused at configuration time rather than at the browser. When none of this can be
+   satisfied the routes return 503 and **the UI hides the control** — a button that always
+   fails teaches people the feature is broken.
+3. **A failed ceremony returns a reason, never a session.** `finishAuthentication`
+   returns `no-challenge`, `unknown-credential`, `verification-failed` or
+   `counter-regressed`, and the route turns all four into one 401. The counter case is
+   logged as a possible cloned credential but is not described to the caller.
+
+### 26.4 What is stored, and what is not
+
+Only the public key (base64url COSE, text — not `bytea`, so a backup is readable and a
+mistake is visible), the signature counter, the transports, the device type, whether it
+is synced, a human label, and when it was last used. The private key never leaves the
+device; there is no server-side secret that can be stolen to impersonate a customer.
+Ten per account, enforced in the query that starts an enrolment.
+
+### 26.5 Deliberately not done
+
+- **No third-party browser bundle.** `@simplewebauthn/server` is a dependency; the
+  browser half (`src/lib/webauthn-browser.ts`) is ~120 lines of `ArrayBuffer` conversion
+  written here, so the sign-in screen loads nothing extra. A test asserts the absence.
+- **A passkey is never a password reset.** It gets you in; changing the password still
+  needs the current password.
+- **No "skip 2FA" flag.** A passkey is a second factor, not an exemption from one.
+- **No recovery codes for passkeys.** Losing every device leaves the password and the
+  existing 2FA recovery codes; `RUNBOOK.md` §7c says so in as many words.
+
+**Verified:** 1,157 tests / 125 files · typecheck · lint · build (new routes:
+`/api/auth/passkey/options`, `/api/auth/passkey/verify`,
+`/api/security/passkeys`, `/api/security/passkeys/options`,
+`/api/security/passkeys/verify`, `/api/security/passkeys/[id]`). New suites:
+`passkeys.test.ts` (19 — a real PGlite database, the cryptography mocked, because what
+belongs to this app is the orchestration: replay is refused, a registration challenge
+cannot sign anyone in, an expired challenge dies, an unknown credential never reaches the
+verifier, a counter that goes backwards is refused and the stored counter is not moved
+backwards, a foreign device is refused as a duplicate, the eleventh passkey is refused, and
+a delete scoped to another account removes nothing), `passkey-ui.test.tsx` (18 — Google
+after the form on both screens, no passkey on sign-up, the card's empty state, the
+"no HTTPS" explanation instead of a dead button, base64url round-trip, option encoding,
+cancellation-is-not-an-error, and the route guards: same-origin, rate limit, lockout,
+generic 401, session required for enrolment).

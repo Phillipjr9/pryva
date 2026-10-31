@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
   date,
   index,
   integer,
@@ -738,4 +739,69 @@ export const supportMessages = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("support_messages_ticket_idx").on(table.ticketId, table.createdAt)],
+);
+
+/**
+ * A passkey: a WebAuthn credential the customer's own device holds the private
+ * half of.
+ *
+ * The public key is stored as base64url COSE bytes in a text column rather than
+ * `bytea`, because the value is not secret and every layer of this app — the
+ * preview adapter included — handles strings without a driver-specific codec.
+ *
+ * `counter` is the authenticator's signature counter. A credential that reports
+ * a number that has not moved forward has been cloned, and the WebAuthn library
+ * refuses it; keeping the value is what makes that check possible on the next
+ * sign-in.
+ */
+export const webauthnCredentials = pgTable(
+  "webauthn_credentials",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** base64url credential id, exactly as the authenticator reports it. */
+    credentialId: text("credential_id").notNull().unique(),
+    /** base64url COSE public key. Public by definition — never a secret. */
+    publicKey: text("public_key").notNull(),
+    counter: integer("counter").notNull().default(0),
+    /** Comma-separated transports the authenticator advertised ("internal,hybrid"). */
+    transports: varchar("transports", { length: 120 }),
+    /** "singleDevice" (this phone/laptop) or "multiDevice" (synced passkey). */
+    deviceType: varchar("device_type", { length: 24 }),
+    backedUp: boolean("backed_up").notNull().default(false),
+    /** What the customer called it, so a list of three passkeys means something. */
+    label: varchar("label", { length: 80 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("webauthn_credentials_user_idx").on(table.userId),
+  ],
+);
+
+/**
+ * The challenge a WebAuthn ceremony must sign.
+ *
+ * Server-side and single-use on purpose. A challenge the client picks, or one
+ * that can be spent twice, turns a signature into a replayable token; consuming
+ * this row with a conditional update is what makes an assertion good for exactly
+ * one sign-in.
+ *
+ * `user_id` is NULL for the username-less sign-in flow, where the authenticator
+ * names the account by returning its credential id.
+ */
+export const webauthnChallenges = pgTable(
+  "webauthn_challenges",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    purpose: varchar("purpose", { length: 16 }).notNull(),
+    challenge: text("challenge").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("webauthn_challenges_challenge_idx").on(table.challenge)],
 );

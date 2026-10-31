@@ -300,6 +300,40 @@ said — so you are reading a diagnosis, not a complaint.
   `SECURITY.md` gap is open. It is off by default for a reason and it never
   changes a decision, only the wording.
 
+## 7c. Passkeys (WebAuthn)
+
+A passkey is an alternative to the password, not an addition to it: signing in with
+one creates the session **without** a second step, because the device has already
+proved possession and the customer has already touched a biometric sensor or typed a
+device PIN.
+
+**Setup.** Nothing is required for local development — the request's own origin is
+used on `localhost`. In production, set `NEXT_PUBLIC_SITE_URL` (or `WEBAUTHN_ORIGIN`)
+to the exact public origin. If the routes answer `503 "Passkeys are not available on
+this address"`, the server refused the relying party: the configured origin is not
+HTTPS, or `WEBAUTHN_RP_ID` is not a suffix of it. Fix the configuration; do not add a
+fallback to "trust the Host header", which is the thing the check exists to prevent.
+
+**Changing the domain.** Existing passkeys stop working when the RP ID changes — that
+is WebAuthn behaving correctly, not a bug. Announce it, keep password sign-in open,
+and let customers re-enrol. Never silently move an origin: the credentials are bound
+to it.
+
+**A customer with no devices left.** There is no passkey recovery code by design. They
+sign in with the password and, if two-factor is on, with a recovery code. Only if both
+are gone does §8's identity check apply.
+
+**Suspected cloned credential.** We store the signature counter, and a counter that
+goes backwards refuses the sign-in and writes a warning to the log — search for
+"possible cloned credential". The refusal is correct; investigate the account. Do not
+delete other credentials to "clean up": removing the customer's remaining devices is a
+lockout, not a fix.
+
+**Removing one.** `/dashboard/settings#security` for the customer; `DELETE
+/api/security/passkeys/<id>` is scoped to the session's own account, so an operator
+cannot use it to remove someone else's device. If you must, do it with the customer on
+the line, and record why.
+
 ---
 
 ## 8. Incident playbooks
