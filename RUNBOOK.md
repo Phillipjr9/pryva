@@ -482,6 +482,36 @@ they do.
 
 ---
 
+## 7i. "I cannot create a free inbox"
+
+One request answers it. The endpoint is read-only and cannot buy anything:
+
+```bash
+curl -s -H "Authorization: Bearer $DIAGNOSTICS_SECRET" \
+  "https://pryva-two.vercel.app/api/diagnostics/inbox" | jq '{verdict, explanation, products}'
+```
+
+| Verdict | What it means | Fix |
+|---|---|---|
+| **ready** | the feed lists products with stock | a creation should work; if it still fails, the failure is at purchase time — check the server log for the provider code |
+| **preview** | this deployment has no persistent database | nothing runs on preview; use production |
+| **not_configured** | no inbox credential on this deployment | set the key, redeploy |
+| **no_products** | the feed answered with nothing in stock | do not sell it; wait for stock |
+| **unreachable** | the feed could not be read | key, network or rate limit — the `products.error` field says which |
+
+Two behaviours worth knowing when reading support messages:
+
+- **A failed attempt is given back.** The per-connection allowance (3 per 24 h)
+  counts attempts, but a refusal returns the slot, so pressing a broken button no
+  longer locks that connection out until tomorrow. Ambiguous failures — a timeout,
+  an unreachable host, an incomplete receipt — deliberately keep the slot, because
+  those are the cases where a retry might spend twice.
+- **The product is chosen, not assumed.** The cheapest listed inbox with stock is
+  bought. If the feed starts returning products with no price or no id, creation
+  falls back to the parameterless call rather than failing early.
+
+---
+
 ## 7h. "I asked for a verification link and nothing arrived"
 
 First, what the page says now. Pressing **Email me a link** on `/verify-email`
