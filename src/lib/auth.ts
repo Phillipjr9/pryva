@@ -1,7 +1,7 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
 import { isArenaPreviewHost, isLocalHost, requestProto } from "@/lib/net";
@@ -137,7 +137,16 @@ async function sessionUser(token: string): Promise<User | null> {
     .select({ user: users })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
-    .where(and(eq(sessions.token, token), gt(sessions.expiresAt, new Date())))
+    .where(
+      and(
+        eq(sessions.token, token),
+        gt(sessions.expiresAt, new Date()),
+        // A closed account cannot be signed into, whatever else survived. Closing
+        // deletes every session row as well; this is the second lock, because
+        // "every session was deleted" is a fact about a previous request.
+        isNull(users.deletedAt),
+      ),
+    )
     .limit(1);
   return rows[0]?.user ?? null;
 }
