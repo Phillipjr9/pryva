@@ -8,6 +8,7 @@ import { expireFinishedRentals } from "@/lib/rental-expiry";
 import { settleReferralRewards } from "@/lib/referrals";
 import { purgeExpiredClosedAccounts } from "@/lib/retention";
 import { reconcileInFlightPayouts } from "@/lib/payouts";
+import { pruneWebhookEvents } from "@/lib/webhook-events";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { logger } from "@/lib/logger";
 
@@ -136,6 +137,14 @@ async function handler(request: NextRequest) {
     };
   });
 
+  // The delivery log is a receipt, not a ledger: keeping 30 days is enough to
+  // answer "is the webhook arriving?" and short enough that a flood of forged
+  // requests cannot grow the table without bound.
+  const webhookLog = await runStep("webhook-log", async () => {
+    const pruned = await pruneWebhookEvents(30);
+    return { ok: true, detail: `pruned ${pruned} delivery record(s) older than 30 days` };
+  });
+
   // The retention horizon, last and off by default. With
   // `RETENTION_PURGE_ENABLED` unset this only counts what is due, which is the
   // point: the number is visible for as long as it takes to decide that deleting
@@ -150,7 +159,7 @@ async function handler(request: NextRequest) {
     };
   });
 
-  const allOk = close.ok && emails.ok && boosts.ok && refunds.ok && rentals.ok && referrals.ok && payouts.ok && retention.ok;
+  const allOk = close.ok && emails.ok && boosts.ok && refunds.ok && rentals.ok && referrals.ok && payouts.ok && webhookLog.ok && retention.ok;
   logger.info("Nightly run finished", {
     day,
     allOk,
