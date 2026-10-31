@@ -482,6 +482,41 @@ they do.
 
 ---
 
+## 7g-bis. Seeing stock
+
+**`/admin/stock`** (or `GET /api/diagnostics/stock` with the diagnostics secret)
+reads every feed and reports, per sellable thing, one of:
+
+| State | Means |
+|---|---|
+| In stock / Low | the feed reported units (under five is low) |
+| Out of stock | it counted zero, or below its own minimum |
+| Not listed | nothing for that destination — the checkout would refuse |
+| Unknown | listed, but the feed did not say how many. **Not zero.** |
+| No price | offered, but no honest retail price can be computed |
+| Not sold | the feed answers and nothing of ours is mapped to it |
+
+Curl, if you would rather see the JSON:
+
+```bash
+curl -s -H "Authorization: Bearer $DIAGNOSTICS_SECRET" \
+  "https://pryva-two.vercel.app/api/diagnostics/stock" | jq '.lanes[] | {lane, headline}'
+```
+
+`?refresh=1` skips the 30 s read cache.
+
+Reading it: **"No price" on boosts** means the panel bills in a currency with no
+configured rate — set `SMM_USD_NGN_RATE`; nothing is wrong with the panel. **"Not
+listed" on a number** means that destination is advertised but not buyable today,
+which is a catalogue decision, not an outage. **"Feed not connected"** is a
+credential, and it is the only state that stops a whole lane.
+
+Stock is what a feed says about itself. Whether orders actually arrive is
+`/admin/services` (§7g). When the two disagree, the feed is lying: cancel the
+listings until a real order passes.
+
+---
+
 ## 7f-bis. What the nightly job now sweeps
 
 `/api/cron/nightly` (01:20 Lagos) runs five steps, in this order because the order
