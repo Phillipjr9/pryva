@@ -188,6 +188,73 @@ export function describeBoost(service: SmmService, snapshotCurrency: string | nu
   };
 }
 
+/** The four things a customer can filter by, and the only ones listed. */
+const LISTED_TAGS = new Set(["Followers", "Likes", "Views", "Subscribers"]);
+
+export type BoostSelection = {
+  /** One service per platform and intent, ready to sell. */
+  services: SmmService[];
+  /** How many the panel returned. */
+  considered: number;
+  /** How many of those survived selection. */
+  listed: number;
+};
+
+/**
+ * Reduce a real panel's catalogue to the shop.
+ *
+ * A production panel is not seven services — JustAnotherPanel alone returns
+ * thousands, most of them SEO, web traffic, "panel balance", reviews and dozens
+ * of near-identical variants of the same Instagram followers offer. Rendering
+ * that raw would bury the shop under a thousand cards, ship a megabyte of JSON
+ * to a phone and put categories on sale that Pryva does not sell.
+ *
+ * So a service is listed only when it is:
+ *   • on one of the seven social platforms the hub knows, by name or category;
+ *   • one of the four intents the chips filter by — followers, likes, views,
+ *     subscribers;
+ *   • priced, because an unpriced card cannot take money.
+ *
+ * And exactly one offer survives per platform+intent: the cheapest, preferring
+ * one that includes a refill, because a boost that silently drops off in a day is
+ * not the same product at a lower price. The purchase page then sells that offer
+ * by quantity.
+ *
+ * The panel's identity is irrelevant to every rule here, so the same selection
+ * works for any supplier.
+ */
+export function selectBoostServices(services: SmmService[], snapshotCurrency: string | null): BoostSelection {
+  type Candidate = { service: SmmService; listing: BoostListing };
+  const best = new Map<string, Candidate>();
+
+  for (const service of services) {
+    const listing = describeBoost(service, snapshotCurrency);
+    if (!listing.platform) continue;
+    if (!LISTED_TAGS.has(listing.tag)) continue;
+    if (listing.perThousand === null) continue;
+
+    const key = `${listing.platform}|${listing.tag}`;
+    const current = best.get(key);
+    if (!current || beats(listing, service, current.listing, current.service)) {
+      best.set(key, { service, listing });
+    }
+  }
+
+  return { services: [...best.values()].map((entry) => entry.service), considered: services.length, listed: best.size };
+}
+
+/**
+ * Offer quality order: a refill-included service wins outright, then the cheaper
+ * thousand units, then the smaller minimum order (the lower entry price).
+ */
+function beats(listing: BoostListing, service: SmmService, other: BoostListing, otherService: SmmService): boolean {
+  if (service.refill !== otherService.refill) return service.refill;
+  const price = listing.perThousand ?? Number.POSITIVE_INFINITY;
+  const otherPrice = other.perThousand ?? Number.POSITIVE_INFINITY;
+  if (price !== otherPrice) return price < otherPrice;
+  return (listing.min ?? Number.POSITIVE_INFINITY) < (other.min ?? Number.POSITIVE_INFINITY);
+}
+
 /**
  * Boosting targets a profile or post URL rather than a country, so listings are
  * not country-specific and are shown for every selection.
@@ -201,7 +268,7 @@ export function boostItems(snapshot: BoostSnapshot): ExplorerItem[] {
   const items: ExplorerItem[] = [];
   const ids = new Set<string>();
 
-  for (const service of snapshot.services) {
+  for (const service of selectBoostServices(snapshot.services, snapshot.currency).services) {
     const listing = describeBoost(service, snapshot.currency);
     if (ids.has(listing.id)) continue;
     ids.add(listing.id);
@@ -243,7 +310,9 @@ export function boostItems(snapshot: BoostSnapshot): ExplorerItem[] {
 export async function findBoostListing(itemIdValue: string): Promise<{ listing: BoostListing; snapshot: BoostSnapshot } | null> {
   if (!/^live-boost-[0-9a-f]{20}$/.test(itemIdValue)) return null;
   const snapshot = await readBoostSnapshot();
-  for (const service of snapshot.services) {
+  // The same selection the shop renders: an id outside it must not be buyable,
+  // or a stale link could sell something the catalogue has stopped listing.
+  for (const service of selectBoostServices(snapshot.services, snapshot.currency).services) {
     const listing = describeBoost(service, snapshot.currency);
     if (listing.id === itemIdValue) return { listing, snapshot };
   }

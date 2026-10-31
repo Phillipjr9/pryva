@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/admin/refunds", label: "Refunds" },
   { href: "/admin/margin", label: "Margin" },
   { href: "/admin/fulfilment", label: "Fulfilment" },
+  { href: "/admin/boosting", label: "Boosting" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/support", label: "Support" },
   { href: "/admin/messages", label: "Contact form" },
