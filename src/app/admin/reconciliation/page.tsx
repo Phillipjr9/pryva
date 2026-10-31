@@ -405,9 +405,11 @@ export default async function AdminReconciliationPage() {
       )}
 
       <p className="rounded-xl border border-line bg-cream/60 px-4 py-3 text-[0.8rem] text-ink-2">
-        There is no automatic resolver for any row on this page. Paystack settles top-ups through
-        its webhook; transfers and supplier orders are completed by a person after checking the
-        provider. Every action you take is recorded in{" "}
+        There is no automatic resolver for any row on this page. Paystack now settles payouts
+        through the same signed webhook as top-ups — a successful transfer completes the row and a
+        failed or reversed one refunds the wallet — so what reaches this page is what the provider
+        did not settle, contradicted, or never reported. Supplier orders are still completed by a
+        person after checking the provider. Every action you take is recorded in{" "}
         <Link href="/admin/audit" className="font-semibold underline underline-offset-2">the audit log</Link>.
       </p>
     </div>

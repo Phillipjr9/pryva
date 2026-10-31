@@ -348,6 +348,10 @@ export function WithdrawalsManager() {
                   </>
                 )}
                 {withdrawal.status === "processing" && withdrawal.transferReference && (
+                  // Settlement arrives by itself now: a signed provider event
+                  // completes this row or refunds it. This button is the override
+                  // for the cases the provider never reports, which is why it
+                  // demands a reconciliation note rather than just a click.
                   <Button
                     onClick={() => completeWithdrawal(withdrawal.id)}
                     disabled={processing === withdrawal.id}
