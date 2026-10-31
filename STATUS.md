@@ -2157,3 +2157,54 @@ the owner's test. Two things to check in Paystack before it: the webhook must
 subscribe to `transfer.*` events (§7n), and **merchant authorization / OTP must be
 off for transfers** (§7o) — if it is on, every payout stops at a human step this app
 cannot complete.
+
+---
+
+## 48. Fortieth pass — proof the webhook is arriving (31 Oct 2026)
+
+The owner: *"the webhook is added on paystack already."* Probably true — and there
+was no way to tell. A missing URL, a filtered event type, a rotated secret and an
+endpoint that answers 500 all present identically from outside: nothing happens, and
+the first sign is a customer asking why their payout says "Sent to bank" a day
+later. "It is configured" is a belief, not a fact, and this codebase is supposed to
+prefer the second.
+
+**Every delivery is now recorded.** `webhook_events` (migration `0026`) keeps an
+event name, a reference, whether the signature verified, the outcome, and a
+timestamp — after the money decision, best-effort, so a logging failure can never
+turn a settled payout into a redelivery. A body whose signature fails stores
+**nothing from it**: an unverified payload is an attacker's text, so the row says
+`unverified` with no reference. That distinction is tested by asserting the
+attacker's chosen reference does not appear anywhere in the stored row.
+
+**The question is answered in one call.**
+`GET /api/diagnostics/webhooks` (bearer `DIAGNOSTICS_SECRET`, read-only, cannot
+resend or apply anything) returns a verdict with a fix attached:
+
+| verdict | meaning |
+|---|---|
+| `receiving` | payout events are arriving and being applied — nothing to do |
+| `only_topups` | the endpoint works, but no `transfer.*` event has been seen: the provider is not sending payout events |
+| `silent` | nothing at all — the URL, the deployment or the key is wrong |
+
+`lastDeliveryAt` separates "the provider stopped" from "the app stopped", and
+`refusedSignatures` counts failed HMACs — non-zero means the deployment's key is not
+the key the provider signs with, which is the failure that looks most like success.
+
+**Bounded on purpose.** The nightly job prunes records older than 30 days, so a flood
+of forged requests cannot grow the table, and the log never becomes a copy of
+customer data kept longer than the incident needs. There is deliberately no foreign
+key: a record of what arrived must survive whatever happened to the rows it
+describes.
+
+**Verified:** 1,522 tests / 163 files · typecheck · lint · build. New coverage: the
+route records a settled delivery with its reference and outcome; a forged signature
+records `unverified` with no reference and no trace of the body's text; the verdict
+moves `silent → only_topups → receiving` as deliveries accumulate; and the
+diagnostics endpoint is proven read-only by a test that fails if the route ever
+imports a writer.
+
+**Not verified:** that the owner's Paystack webhook is actually subscribed to
+`transfer.*`. That is exactly what the new endpoint will say the first time it is
+called — and if it says `only_topups`, the answer is in the Paystack dashboard, not
+in this repository.

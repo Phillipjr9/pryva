@@ -167,6 +167,7 @@ beforeAll(async () => {
   await pg.exec(await readFile("migrations/0023_boost_orders.sql", "utf8"));
   await pg.exec(await readFile("migrations/0024_account_deletions.sql", "utf8"));
   await pg.exec(await readFile("migrations/0025_account_deletion_forfeiture.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0026_webhook_events.sql", "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
   [purchaseRoute, refundRoute, bankRoute, verifyBankRoute, googleRoute, contactRoute, deleteRoute, passwordRoute, sessionsRoute, autoRefund, giftPurchaseRoute, giftCheckRoute, giftRedeemRoute, topUpRoute, verifyTopUpRoute, webhookRoute, profileRoute, notificationsRoute, markReadRoute, logoutRoute, syncRoute, scheduledRoute, promoRoute, withdrawalRoute, adminWithdrawalRoute, integrity] = await Promise.all([
@@ -205,6 +206,9 @@ beforeEach(async () => {
   vi.stubEnv("MARKETPLACE_LIVE_PURCHASES", "true");
   vi.stubEnv("PAYSTACK_SECRET_KEY", "test-secret");
   await pg.exec('TRUNCATE TABLE "users" CASCADE');
+  // The delivery log has no foreign key on purpose (it must outlive the rows it
+  // describes), so it is cleared explicitly.
+  await pg.exec('TRUNCATE TABLE "webhook_events"');
   await database.insert(schema.users).values({ id: USER, name: "Buyer", email: "buyer@example.com", passwordHash: "hash", walletBalance: 10000 });
   mocks.user.mockResolvedValue({ id: USER, email: "buyer@example.com", name: "Buyer", walletBalance: 10000 });
   mocks.getListing.mockResolvedValue({ id: 7, slug: "listing", title: "Test listing", price: "1.00", available_stock: 10, category: null, subcategory: null });
@@ -1429,6 +1433,54 @@ describe("payout settlement from the provider's own events", () => {
     const [settled] = await database.select().from(schema.withdrawals).where(eq(schema.withdrawals.id, row.id));
     expect(settled.status).toBe("completed");
     expect(settled.completedAt).toBeInstanceOf(Date);
+  });
+
+  it("records every delivery, and records nothing from a body it does not trust", async () => {
+    const { providerReference } = await inFlightPayout(5000, "5c2a1f0e-0000-4000-8000-000000000008");
+    await send("transfer.success", {
+      status: "success", reference: providerReference, amount: 500000, currency: "NGN", transfer_code: "TRF-8",
+    });
+    const recorded = await database.select().from(schema.webhookEvents);
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]).toMatchObject({
+      event: "transfer.success",
+      reference: providerReference,
+      signatureValid: true,
+      outcome: "settled",
+    });
+
+    // A forged body carries an attacker's text; none of it may be stored.
+    const forged = JSON.stringify({ event: "transfer.success", data: { reference: "attacker-chosen", amount: 1, currency: "NGN" } });
+    await webhookRoute.POST(new NextRequest("https://pryva.test/api/webhooks/payment", {
+      method: "POST",
+      headers: { "x-paystack-signature": createHmac("sha512", "wrong-secret").update(forged).digest("hex") },
+      body: forged,
+    }));
+    const after = await database.select().from(schema.webhookEvents);
+    expect(after).toHaveLength(2);
+    expect(after[1]).toMatchObject({ event: "unverified", reference: null, signatureValid: false, outcome: "rejected_signature" });
+    expect(JSON.stringify(after[1])).not.toContain("attacker-chosen");
+  });
+
+  it("answers the operator's question: are payout events arriving?", async () => {
+    const activity = await import("@/lib/webhook-events");
+
+    // Nothing delivered yet.
+    const empty = await activity.recentWebhookActivity();
+    expect(empty.verdict).toBe("silent");
+
+    // A top-up settles, which proves the endpoint works but not that transfers do.
+    await database.insert(schema.webhookEvents).values({ event: "charge.success", reference: "TOP-one", signatureValid: true, outcome: "credited" });
+    const topupsOnly = await activity.recentWebhookActivity();
+    expect(topupsOnly.verdict).toBe("only_topups");
+    expect(topupsOnly.explanation).toContain("transfer");
+
+    // And now a payout event, which is the one that matters here.
+    await database.insert(schema.webhookEvents).values({ event: "transfer.success", reference: "wd-one", signatureValid: true, outcome: "settled" });
+    const receiving = await activity.recentWebhookActivity();
+    expect(receiving.verdict).toBe("receiving");
+    expect(receiving.counts).toMatchObject({ "charge.success": 1, "transfer.success": 1 });
+    expect(receiving.lastDeliveryAt).toBeInstanceOf(Date);
   });
 
   it("refuses a transfer event that is not signed with the configured secret", async () => {
