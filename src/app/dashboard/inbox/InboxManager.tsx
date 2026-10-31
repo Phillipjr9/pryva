@@ -325,14 +325,14 @@ export function InboxManager() {
         ) : (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
+              <div className="min-w-0 max-w-full">
                 <div className="flex items-center gap-2">
                   <p className="text-meta uppercase tracking-wide text-ink-3">Active inbox</p>
                   <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-micro font-medium text-emerald-700">
                     Live
                   </span>
                 </div>
-                <p className="mt-1 font-mono text-[1rem] font-medium text-ink sm:text-[1.15rem]">
+                <p className="mt-1 [overflow-wrap:anywhere] font-mono text-[1rem] font-medium text-ink sm:text-[1.15rem]">
                   {active.address}
                 </p>
               </div>
@@ -397,7 +397,7 @@ export function InboxManager() {
                 <p className="text-meta uppercase tracking-wide text-emerald-700">
                   Verification code
                 </p>
-                <p className="mt-1 font-mono text-[1.5rem] font-semibold tracking-widest text-emerald-900">
+                <p className="mt-1 [overflow-wrap:anywhere] font-mono text-[1.5rem] font-semibold tracking-widest text-emerald-900">
                   {code}
                 </p>
               </div>
@@ -511,13 +511,13 @@ export function InboxManager() {
               return (
                 <li
                   key={inbox.id}
-                  className={`flex flex-wrap items-center justify-between gap-3 p-3.5 ${
+                  className={`grid min-w-0 grid-cols-1 items-center gap-3 p-3.5 xl:grid-cols-[minmax(0,1fr)_auto] ${
                     isActive ? "bg-lav-50/20" : ""
                   }`}
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[0.88rem] font-medium text-ink">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <span className="min-w-0 [overflow-wrap:anywhere] font-mono text-[0.88rem] font-medium text-ink">
                         {inbox.address}
                       </span>
                       {isActive && (
@@ -531,11 +531,11 @@ export function InboxManager() {
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2" role="group" aria-label={`Actions for ${inbox.address}`}>
                     <button
                       type="button"
                       onClick={() => void copyAddress(inbox.address, inbox.id)}
-                      className="btn border border-line bg-white !p-2 text-ink hover:border-lav-200"
+                      className="btn min-h-11 min-w-11 shrink-0 border border-line bg-white !p-2 text-ink hover:border-lav-200"
                       title="Copy address"
                     >
                       {copiedId === inbox.id ? (
@@ -550,7 +550,7 @@ export function InboxManager() {
                         type="button"
                         onClick={() => void handleSelect(inbox.id)}
                         disabled={isSelecting}
-                        className="btn border border-line bg-white !px-3 !py-1.5 !text-[0.8125rem] text-ink hover:border-lav-200 disabled:opacity-50"
+                        className="btn min-h-11 border border-line bg-white !px-3 !py-1.5 !text-[0.8125rem] text-ink hover:border-lav-200 disabled:opacity-50"
                       >
                         {isSelecting ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -565,7 +565,7 @@ export function InboxManager() {
                       type="button"
                       onClick={() => void handleDiscard(inbox.id)}
                       disabled={isDiscarding}
-                      className="btn border border-line bg-white !p-2 text-rose-600 hover:border-rose-200 hover:bg-rose-50 disabled:opacity-50"
+                      className="btn min-h-11 min-w-11 shrink-0 border border-line bg-white !p-2 text-rose-600 hover:border-rose-200 hover:bg-rose-50 disabled:opacity-50"
                       title="Delete inbox"
                     >
                       {isDiscarding ? (
@@ -673,7 +673,7 @@ function EmailContentViewer({ body }: { body: string }) {
           />
         </div>
       ) : (
-        <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-line bg-white p-4 font-mono text-[0.8rem] leading-relaxed text-ink-2">
+        <pre className="max-h-80 overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] rounded-xl border border-line bg-white p-4 font-mono text-[0.8rem] leading-relaxed text-ink-2">
           {isHtml
             ? body.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim()
             : body}
