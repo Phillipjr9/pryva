@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
+import { AccessLevel } from "./AccessLevel";
 import { db } from "@/db";
 import { users, orders } from "@/db/schema";
 import { count, desc, ilike, inArray, or, sql } from "drizzle-orm";
@@ -69,6 +70,9 @@ export default async function AdminUsersPage({
       email: users.email,
       walletBalance: users.walletBalance,
       createdAt: users.createdAt,
+      // Needed to answer "can this account open the console?": admin access is
+      // the allowlist AND a verified address, not either one. Read-only.
+      emailVerifiedAt: users.emailVerifiedAt,
       // Lockout state, so a support call can be answered without SQL. Both
       // columns are read-only here: releasing a lock from the admin UI would be
       // a second, unaudited way to undo a security control.
@@ -117,6 +121,9 @@ export default async function AdminUsersPage({
             {Number(total).toLocaleString("en-NG")} registered {Number(total) === 1 ? "account" : "accounts"}
             {query ? ` matching “${query}”` : ""}.
           </p>
+          <p className="mt-1 text-meta text-ink-3">
+            Administrator access is the address in <code className="font-mono text-micro">ADMIN_EMAILS</code> plus a verified email. Both are needed; neither is a role column.
+          </p>
         </div>
         <div className="rounded-xl border border-line bg-white px-4 py-2 text-right">
           <p className="text-meta uppercase tracking-wide text-ink-3">Wallet balance on this page</p>
@@ -147,7 +154,7 @@ export default async function AdminUsersPage({
         <table className="w-full min-w-[36rem] text-left text-[0.84rem]">
           <thead className="bg-cream/70 text-meta uppercase tracking-wide text-ink-3">
             <tr>
-              <th className="px-4 py-3 font-semibold">User</th>
+              <th className="px-4 py-3 font-semibold">User · access</th>
               <th className="px-4 py-3 font-semibold">Wallet</th>
               <th className="px-4 py-3 font-semibold">Orders</th>
               <th className="px-4 py-3 font-semibold">Spent</th>
@@ -170,6 +177,7 @@ export default async function AdminUsersPage({
                   <td className="px-4 py-3">
                     <p className="font-medium text-ink">{row.name}</p>
                     <p className="text-meta text-ink-3">{row.email}</p>
+                    <AccessLevel email={row.email} emailVerifiedAt={row.emailVerifiedAt} />
                   </td>
                   <td className="px-4 py-3 font-medium">{formatNaira(row.walletBalance)}</td>
                   <td className="px-4 py-3">{stats?.orders ?? 0}</td>
