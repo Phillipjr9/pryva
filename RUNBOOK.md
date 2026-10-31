@@ -482,6 +482,31 @@ they do.
 
 ---
 
+## 7h. "I asked for a verification link and nothing arrived"
+
+First, what the page says now. Pressing **Email me a link** on `/verify-email`
+answers one of four ways, and each one points at a different cause:
+
+| Message | Cause |
+|---|---|
+| **Link sent** | the mail service accepted the message. If it is not in the inbox, check spam; the newest link replaces the older ones |
+| **Sign in to get a link** | the request was anonymous. The link goes to the address on the account, so it cannot be sent to a stranger |
+| **We could not send that email** + reason | the service refused the message. **This is the case that used to look like silence** |
+| **That link did not work** | the token expired (24 h) or a newer link replaced it |
+
+A refusal carrying **403** or "you can only send testing emails to your own email
+address" means the sending address is still a test sender: it will only deliver to
+the mail account's own owner. That is fixed by **verifying a domain with the mail
+provider and changing `RESEND_FROM_EMAIL`**, not by changing code. Until then,
+verification mail works for the owner's address and fails honestly for everyone
+else.
+
+The token is stored *before* the send is attempted, so a refused message still
+leaves a retryable account: fixing the sender and pressing the button again issues a
+new link and invalidates the old one.
+
+---
+
 ## 7g-bis. Seeing stock
 
 **`/admin/stock`** (or `GET /api/diagnostics/stock` with the diagnostics secret)

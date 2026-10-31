@@ -16,6 +16,11 @@ export const dynamic = "force-dynamic";
  * The caller is already identified, so there is no address to enumerate: this
  * route can say plainly whether a link was sent, unlike the password reset
  * endpoint which must answer identically for known and unknown addresses.
+ *
+ * "Sent" is now a claim the route can stand behind. It used to answer ok as soon
+ * as a token was stored, even when the mail provider had refused the message —
+ * the provider's answer was never read. A person pressing "Email me a link" got a
+ * success, waited, and received nothing.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -54,8 +59,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await issueEmailVerification(user.id, user.email, user.name);
-    return NextResponse.json({ ok: true });
+    const delivery = await issueEmailVerification(user.id, user.email, user.name);
+    if (!delivery.delivered) {
+      // The link exists and is valid, but nothing was delivered. Answering ok here
+      // is what made the button look like it did nothing: the person waited for a
+      // message the provider had already refused.
+      return NextResponse.json(
+        {
+          error: `A new link was created, but ${delivery.detail ?? "the mail service refused the message"}. Nothing will arrive until that is fixed.`,
+          delivered: false,
+        },
+        { status: 502 },
+      );
+    }
+    return NextResponse.json({ ok: true, delivered: true });
   } catch (error) {
     console.error("[auth] verification request failed", error);
     return NextResponse.json(
