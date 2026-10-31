@@ -43,6 +43,27 @@ const SOCIAL_TAGS = [
   "Reactions",
 ];
 
+const CATEGORY_ICONS: Record<string, string> = {
+  verification: "💬",
+  social: "🚀",
+  numbers: "📱",
+  esim: "🌐",
+  proxies: "🛡️",
+  email: "✉️",
+  accounts: "👤",
+  subscriptions: "🎬",
+  data: "📶",
+  tools: "⚙️",
+};
+
+const POPULAR_COUNTRIES = [
+  { code: "ng", name: "Nigeria", desc: "Local numbers & data" },
+  { code: "us", name: "United States", desc: "US numbers & proxies" },
+  { code: "gb", name: "United Kingdom", desc: "UK verification numbers" },
+  { code: "ca", name: "Canada", desc: "Canadian plans" },
+  { code: "gh", name: "Ghana", desc: "Regional African plans" },
+];
+
 function itemArt(item: ExplorerItem) {
   switch (item.artwork.kind) {
     case "brand": return <BrandIcon brand={item.artwork.name} size={42} decorative />;
@@ -60,20 +81,28 @@ function ServiceCard({ item, countryName }: { item: ExplorerItem; countryName: s
   const price = item.price;
 
   return (
-    <article className="group flex h-full min-w-0 flex-col rounded-2xl border border-line bg-white p-4 transition-colors hover:border-lav-200">
+    <article className="group flex h-full min-w-0 flex-col rounded-2xl border border-line bg-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-lav-300 hover:shadow-md">
       <div className="flex items-start justify-between gap-2">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-lav-50/70">{itemArt(item)}</div>
-        <span className={`rounded-full px-2 py-1 text-micro font-bold uppercase tracking-[0.08em] ${item.source === "example" ? "bg-lav-50 text-lav-700" : "bg-cream-2 text-ink-2"}`}>
+        <span className={`rounded-full px-2.5 py-1 text-micro font-bold uppercase tracking-[0.08em] ${
+          item.source === "live"
+            ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
+            : item.source === "example"
+            ? "border border-lav-200 bg-lav-50 text-lav-700"
+            : item.source === "tool"
+            ? "border border-indigo-200 bg-indigo-50 text-indigo-700"
+            : "border border-line bg-cream-2 text-ink-2"
+        }`}>
           {item.source === "live" ? "Live listing" : item.source === "example" ? "Example" : item.source === "tool" ? "Tool" : "Catalog"}
         </span>
       </div>
       <div className="mt-3 min-w-0">
-        <h3 className="break-words text-[0.91rem] font-semibold leading-snug text-ink">{item.name}</h3>
+        <h3 className="break-words text-[0.92rem] font-semibold leading-snug text-ink">{item.name}</h3>
         <p className="mt-1 text-meta text-ink-3">{item.description} · <span className="capitalize">{item.tag}</span></p>
       </div>
       <p className="mt-3 text-micro leading-relaxed text-ink-3">{coverage}</p>
       <div className="mt-auto pt-3">
-        <p className="min-h-[1.2rem] text-meta font-semibold text-ink-2">
+        <p className="min-h-[1.2rem] text-meta font-semibold text-ink">
           {price !== null ? `${item.source === "live" ? "Indicative" : "Listed"} ${item.priceFrom ? "from " : "price "}${formatNaira(price)}` : item.source === "example" ? "Price not connected" : "See details"}
         </p>
         <div className="mt-2"><UnitsStatus stock={item.stock} owned={item.myUnits} /></div>
@@ -214,6 +243,20 @@ export function ServiceExplorer({ initialCountry, initialCategory, rejectedCount
           <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-lav-50 text-lav-700"><Globe className="h-5 w-5" /></span>
           <h2 className="mt-3 text-[1rem] font-semibold text-ink">Choose a country to explore</h2>
           <p className="mx-auto mt-1.5 max-w-md text-[0.8rem] leading-relaxed text-ink-2">We&apos;ll show the service categories and example plans after you make your selection.</p>
+          <div className="mx-auto mt-6 grid max-w-xl grid-cols-2 gap-3 sm:grid-cols-3">
+            {POPULAR_COUNTRIES.map((c) => (
+              <button
+                key={c.code}
+                type="button"
+                onClick={() => chooseCountry(c.code)}
+                className="flex flex-col items-center justify-center rounded-2xl border border-line bg-white p-3.5 transition-all hover:-translate-y-0.5 hover:border-lav-300 hover:shadow-xs"
+              >
+                <CountryFlag code={c.code} size={28} decorative />
+                <span className="mt-2 text-[0.85rem] font-semibold text-ink">{c.name}</span>
+                <span className="mt-0.5 text-micro text-ink-3">{c.desc}</span>
+              </button>
+            ))}
+          </div>
         </div>
       ) : (
         <>
@@ -228,10 +271,12 @@ export function ServiceExplorer({ initialCountry, initialCategory, rejectedCount
               </span>
             </div>
             <div className="mt-4 flex flex-wrap gap-2" aria-label="Service categories">
-              <button type="button" onClick={() => chooseCategory("all")} aria-pressed={category === "all"} className={`rounded-full border px-3.5 py-2 text-meta font-semibold transition-colors ${category === "all" ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}>All categories</button>
+              <button type="button" onClick={() => chooseCategory("all")} aria-pressed={category === "all"} className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-meta font-semibold transition-colors ${category === "all" ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}>
+                <span aria-hidden="true">⚡</span> All categories
+              </button>
               {EXPLORER_CATEGORIES.map((entry) => (
-                <button key={entry.id} type="button" title={entry.description} onClick={() => chooseCategory(entry.id)} aria-pressed={category === entry.id} className={`rounded-full border px-3.5 py-2 text-meta font-semibold transition-colors ${category === entry.id ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}>
-                  {entry.label}
+                <button key={entry.id} type="button" title={entry.description} onClick={() => chooseCategory(entry.id)} aria-pressed={category === entry.id} className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-meta font-semibold transition-colors ${category === entry.id ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}>
+                  <span aria-hidden="true">{CATEGORY_ICONS[entry.id] ?? "✨"}</span> {entry.label}
                 </button>
               ))}
             </div>
