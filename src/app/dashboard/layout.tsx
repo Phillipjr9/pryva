@@ -3,7 +3,7 @@ import Link from "next/link";
 import { and, count, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
+import { isAdminUser, requireUser } from "@/lib/auth";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { resendConfigured } from "@/lib/resend-config";
@@ -24,6 +24,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       user={{ name: user.name, email: user.email, walletBalance: user.walletBalance }}
       unreadNotifications={Number(unread?.value ?? 0)}
       buildId={BUILD_ID}
+      isAdmin={isAdminUser(user)}
     >
       {/*
         /verify-email existed with no link to it anywhere in the app, so the only
