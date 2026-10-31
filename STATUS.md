@@ -1477,3 +1477,42 @@ fail-closed, nothing charged, nothing logged as an error.
 first real order is the owner's to place — smallest quantity, then read its status
 back — because that is the only proof the panel's billing currency, minimums and
 delivery all behave as documented.
+
+## 35. Twenty-seventh pass — an administrator is visible from inside the app (31 Oct 2026)
+
+The owner signed in as the allowlisted account and reported that it "still shows as
+a user account". Nothing was misconfigured: `ADMIN_EMAILS` held the right address and
+the address was verified, so `isAdminUser` returned true and `/admin` was open. The
+defect was that **nothing in the product said so**. Administrator access is derived
+(`ADMIN_EMAILS` plus a verified address), never a column on the user row, and no page
+rendered it: the customer dashboard showed a console-less sidebar, and `/admin/users`
+listed every account identically. The reasonable question "am I an administrator?"
+had no answer short of trying a URL.
+
+**What changed.**
+
+- `DashboardShell` takes `isAdmin` (from the layout, which alone may run
+  `isAdminUser` — the shell is a client component and the allowlist must not ship to
+  the browser). When true it appends an **Operator** group with *Admin console* →
+  `/admin/dashboard`, and shows an **Administrator** badge under the account email.
+  Appended, not substituted: an operator still buys, tops up and reads orders from
+  the same dashboard, so every customer destination stays where it was.
+- `/admin/users` labels each row **Administrator** (allowlisted and verified),
+  **Admin · email unverified** (allowlisted, the one state the account's owner can
+  fix), or **Customer**. The page also says out loud that access is `ADMIN_EMAILS`
+  plus a verified email, so the next person does not read a role column into it.
+
+**Deliberately unchanged:** `isAdminUser` and both gates. This is a display fix; it
+grants nothing and hides nothing, and it does not soften the rule that an
+unverified address cannot administer.
+
+**Verified:** 1,319 tests / 142 files · typecheck · lint · build. New
+`admin-identity.test.tsx` (3: console link and badge for an administrator, neither
+for a customer, customer destinations intact for both) and `admin-access-level.test.tsx`
+(4: the three states, and verification alone is not a promotion). Two existing
+assertions caught the first draft and were obeyed rather than adjusted — the mobile
+tab bar is still exactly five tabs, and no text below the phone floor.
+
+**Still true:** the badge appearing and `/admin` refusing would mean two-factor
+enrolment, not a wrong address — the page redirects to settings with the return path
+in that case.

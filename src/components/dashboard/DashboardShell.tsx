@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CommandPalette, CommandPaletteTrigger } from "@/components/command/CommandPalette";
-import { ArrowRight, Bell, Close, Logout, Menu, Plus, Wallet } from "@/components/icons";
+import { ArrowRight, Bell, Close, Logout, Menu, Plus, Shield, Wallet } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { NavIcon, type NavArt } from "@/components/dashboard/NavIcon";
 import { ProfileAvatar } from "@/components/dashboard/ProfileAvatar";
@@ -93,6 +93,19 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
 ];
 
 /** The five things worth a thumb-reach on a phone. */
+/**
+ * The console entry, shown only to an administrator.
+ *
+ * Declared here rather than inside the component so it sits beside the other nav
+ * tables and is described in one place. It is deliberately *not* a mobile tab:
+ * the bottom bar is five thumb-reach destinations for buying and managing, and an
+ * operator's console does not need to be one of them.
+ */
+const operatorGroup: { label: string; items: NavItem[] } = {
+  label: "Operator",
+  items: [{ href: "/admin/dashboard", label: "Admin console", icon: Shield }],
+};
+
 const mobileTabs: Array<{ href: string; label: string; nav: NavArt }> = [
   { href: "/dashboard", label: "Home", nav: "overview" },
   { href: "/dashboard/orders", label: "Orders", nav: "orders" },
@@ -149,12 +162,26 @@ export function DashboardShell({
   user,
   unreadNotifications = 0,
   buildId,
+  isAdmin = false,
 }: {
   children: ReactNode;
   user: { name: string; email: string; walletBalance: number };
   unreadNotifications?: number;
   /** The server's build ID, passed as a prop so hydration sees the same value. */
   buildId: string;
+  /**
+   * Whether this account is an administrator.
+   *
+   * Administrator access is not a column on the user row -- it is derived from
+   * `ADMIN_EMAILS` plus a verified address (`isAdminUser`) -- so the dashboard had
+   * no way to know, and an operator signing in saw exactly what a customer sees:
+   * no console link, no marker, nothing to suggest the privilege exists. That is
+   * why "am I an admin?" was unanswerable from inside the product.
+   *
+   * Passed down from the layout rather than computed here: the shell is a client
+   * component, and the allowlist must never ship to the browser.
+   */
+  isAdmin?: boolean;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -162,6 +189,11 @@ export function DashboardShell({
   const selectedCategory = searchParams.get("category");
   const [open, setOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // An operator's console is appended, never substituted: an administrator still
+  // buys and spends from the same dashboard as everyone else, and hiding the
+  // customer destinations would make the two roles feel like two products.
+  const groups = isAdmin ? [...navGroups, operatorGroup] : navGroups;
 
   const sidebar = (
     <div className="flex h-full flex-col">
@@ -196,7 +228,7 @@ export function DashboardShell({
       </Link>
 
       <nav aria-label="Dashboard navigation" className="mt-5 grid min-h-0 flex-1 content-start gap-4 overflow-y-auto">
-        {navGroups.map((group) => (
+        {groups.map((group) => (
           <div key={group.label} className="grid gap-0.5">
             <p className="px-3 text-micro font-semibold uppercase tracking-[0.16em] text-ink-3">
               {group.label}
@@ -252,6 +284,11 @@ export function DashboardShell({
           <div className="min-w-0">
             <p className="truncate text-[0.82rem] font-semibold text-ink">{user.name}</p>
             <p className="truncate text-micro text-ink-3">{user.email}</p>
+            {isAdmin && (
+              <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-lav-100 px-2 py-0.5 text-micro font-semibold text-lav-800">
+                <Shield className="h-2.5 w-2.5" /> Administrator
+              </span>
+            )}
           </div>
         </div>
         <div className="mt-2.5">
