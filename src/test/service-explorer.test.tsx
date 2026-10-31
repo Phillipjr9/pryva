@@ -125,6 +125,12 @@ describe("country-first service explorer", () => {
     const messaging = filterExplorerItems(items, "verification", "", "Messaging");
     expect(messaging.some((item) => item.name === "WhatsApp")).toBe(true);
     expect(messaging.every((item) => item.category === "verification" && item.tag === "Messaging")).toBe(true);
+    const rentals = filterExplorerItems(items, "numbers", "", "Rental");
+    expect(rentals.every((item) => item.category === "numbers" && item.tag === "Rental")).toBe(true);
+    expect(rentals.some((item) => item.id === "plan-rent-ng-30")).toBe(true);
+    const singleUse = filterExplorerItems(items, "numbers", "", "Single use");
+    expect(singleUse.every((item) => item.category === "numbers" && item.tag === "Single use")).toBe(true);
+    expect(singleUse.some((item) => item.id === "plan-vn-ng")).toBe(true);
     expect(filterExplorerItems(items, "social", "no-such-service")).toEqual([]);
   });
 
