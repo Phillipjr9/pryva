@@ -23,6 +23,8 @@ export const ORDER_PROVIDERS = {
   preview: "preview",
   /** Catalog account order placed through the routing layer. */
   accounts: "accounts",
+  /** Digital gift cards and game vouchers delivered via FoxReload. */
+  foxreload: "foxreload",
   /** Hand-prepared item waiting on the admin fulfilment queue. */
   manual: "manual",
 } as const;
@@ -32,4 +34,5 @@ export type OrderProvider = (typeof ORDER_PROVIDERS)[keyof typeof ORDER_PROVIDER
 export const LIVE_OTP_PROVIDER = ORDER_PROVIDERS.liveOtp;
 export const PREVIEW_PROVIDER = ORDER_PROVIDERS.preview;
 export const ACCOUNTS_PROVIDER = ORDER_PROVIDERS.accounts;
+export const FOXRELOAD_PROVIDER = ORDER_PROVIDERS.foxreload;
 export const MANUAL_PROVIDER = ORDER_PROVIDERS.manual;
