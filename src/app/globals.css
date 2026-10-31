@@ -357,6 +357,64 @@
   .flow-progress { animation: flow-progress 1.5s ease-in-out infinite; }
   .flow-pop { animation: flow-pop 550ms cubic-bezier(.2,.8,.2,1) both; }
   .otp-arrive { animation: otp-arrive 420ms ease-out both; }
+
+  /*
+   * The 404 cartoon (src/components/not-found/NotFoundScene.tsx).
+   *
+   * Everything moves with transform or opacity only, so none of it triggers
+   * layout, and the global prefers-reduced-motion rule above stops the whole
+   * scene in place. The astronaut bobs, the stars twinkle, the eyes blink, the
+   * right arm waves, the digits drift like lost balloons and a rocket crosses
+   * the sky every eighteen seconds.
+   */
+  @keyframes nf-bob {
+    0%, 100% { transform: translateY(0) rotate(-1deg); }
+    50% { transform: translateY(-12px) rotate(1deg); }
+  }
+  @keyframes nf-twinkle {
+    0%, 100% { opacity: 0.45; transform: scale(0.85); }
+    50% { opacity: 1; transform: scale(1.15); }
+  }
+  @keyframes nf-blink {
+    0%, 92%, 100% { transform: scaleY(1); }
+    95% { transform: scaleY(0.08); }
+  }
+  @keyframes nf-wave {
+    0%, 54%, 100% { transform: rotate(0deg); }
+    66% { transform: rotate(-24deg); }
+    78% { transform: rotate(9deg); }
+    88% { transform: rotate(-13deg); }
+  }
+  @keyframes nf-drift {
+    0%, 100% { transform: translateX(-12px); }
+    50% { transform: translateX(14px); }
+  }
+  @keyframes nf-trail {
+    to { stroke-dashoffset: -72; }
+  }
+  @keyframes nf-halo {
+    0%, 100% { opacity: 0.28; transform: scale(0.92); }
+    50% { opacity: 0.6; transform: scale(1.1); }
+  }
+  @keyframes nf-rocket {
+    0% { transform: translate(-170px, 30px); opacity: 0; }
+    6% { opacity: 1; }
+    52% { transform: translate(420px, -4px); opacity: 1; }
+    64%, 100% { transform: translate(800px, -34px); opacity: 0; }
+  }
+  @keyframes nf-flame {
+    0%, 100% { transform: scaleX(0.78); opacity: 0.85; }
+    50% { transform: scaleX(1.2); opacity: 1; }
+  }
+  .nf-bob { animation: nf-bob 6s ease-in-out infinite; }
+  .nf-twinkle { animation: nf-twinkle 3.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .nf-blink { animation: nf-blink 6.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .nf-wave { animation: nf-wave 5.2s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 6%; }
+  .nf-drift { animation: nf-drift 16s ease-in-out infinite; }
+  .nf-trail { animation: nf-trail 2.6s linear infinite; }
+  .nf-halo { animation: nf-halo 4.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .nf-rocket { animation: nf-rocket 18s linear infinite 3.5s; }
+  .nf-flame { animation: nf-flame 0.4s ease-in-out infinite; transform-box: fill-box; transform-origin: right center; }
 }
 
 @media (prefers-reduced-motion: reduce) {
