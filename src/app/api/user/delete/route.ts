@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, notInArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   accountDeletions,
@@ -34,10 +34,12 @@ import {
   TOMBSTONE_NAME,
   confirmationMatches,
   deletionBlock,
+  forfeitureWarning,
   retentionSummary,
   sessionIsFresh,
   tombstoneEmail,
 } from "@/lib/account-deletion";
+import { debitWalletInTx, makeReference } from "@/lib/wallet";
 import { clientIp } from "@/lib/auth-rate-limit";
 import { hashSignal } from "@/lib/fraud";
 import { isSameOriginMutation } from "@/lib/net";
@@ -46,6 +48,9 @@ import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/li
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
+
+/** Payout states that are finished; every other value is treated as still moving. */
+const FINISHED_WITHDRAWALS: string[] = ["completed", "failed", "rejected"];
 
 /**
  * Close my account.
@@ -102,7 +107,7 @@ export async function POST(request: NextRequest) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json({ ok: false, error: "Invalid request body" }, { status: 400 });
   }
-  const fields = body as { confirm?: unknown; password?: unknown; understand?: unknown };
+  const fields = body as { confirm?: unknown; password?: unknown; forfeitAcknowledged?: unknown };
 
   try {
     const jar = await cookies();
@@ -165,18 +170,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step four: never take an account with money in it, or one whose payout is
-    // still in the air. Both are checked again inside the transaction.
+    // Step four: a payout still in the air is a live claim on a record that would
+    // be deleted with the account, so that is refused. A balance is not — it is
+    // forfeited, and only with the customer's acknowledgement of the amount.
+    // Anything that is not finished counts as live: `pending` and `processing`
+    // today, and any status this code has not heard of tomorrow.
     const [pending] = await db
       .select({ total: count() })
       .from(withdrawals)
-      .where(and(eq(withdrawals.userId, user.id), eq(withdrawals.status, "pending")));
-    const block = deletionBlock({
-      walletBalance: account.walletBalance,
-      pendingWithdrawals: Number(pending?.total ?? 0),
-    });
+      .where(and(eq(withdrawals.userId, user.id), notInArray(withdrawals.status, FINISHED_WITHDRAWALS)));
+    const block = deletionBlock({ pendingWithdrawals: Number(pending?.total ?? 0) });
     if (block) {
       return NextResponse.json({ ok: false, ...block }, { status: 409 });
+    }
+
+    const forfeiture = forfeitureWarning(account.walletBalance);
+    if (forfeiture && fields.forfeitAcknowledged !== true) {
+      // The amount is named, and the request is refused until it is acknowledged:
+      // a client that never rendered the warning cannot lose money because of it.
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "FORFEITURE_NOT_ACKNOWLEDGED",
+          error: forfeiture.message,
+          detail: { balance: forfeiture.amount },
+        },
+        { status: 409 },
+      );
     }
 
     const now = new Date();
@@ -189,7 +209,7 @@ export async function POST(request: NextRequest) {
       | { kind: "missing" }
       | { kind: "already" }
       | { kind: "blocked"; block: NonNullable<ReturnType<typeof deletionBlock>> }
-      | { kind: "done"; retained: Record<string, number> };
+      | { kind: "done"; retained: Record<string, number>; forfeited: number };
 
     const receipt = await db.transaction(async (tx): Promise<Result> => {
       // The lock is the point: a purchase that read the balance a moment ago must
@@ -201,10 +221,36 @@ export async function POST(request: NextRequest) {
         .for("update");
       if (!locked) return { kind: "missing" };
       if (locked.deletedAt) return { kind: "already" };
-      // No withdrawal can have appeared since the check above — the payout paths
-      // all take this same row lock — so only the balance is re-read.
-      const lateBlock = deletionBlock({ walletBalance: locked.walletBalance, pendingWithdrawals: 0 });
-      if (lateBlock) return { kind: "blocked", block: lateBlock };
+
+      // The balance is re-read under the lock: money that arrived after the
+      // pre-check must not be destroyed by a request that acknowledged a different
+      // figure, so it is refused rather than silently forfeited.
+      const lateForfeiture = forfeitureWarning(locked.walletBalance);
+      if (lateForfeiture && fields.forfeitAcknowledged !== true) {
+        return {
+          kind: "blocked",
+          block: {
+            code: "FORFEITURE_NOT_ACKNOWLEDGED",
+            error: lateForfeiture.message,
+            action: { label: "Go to wallet", href: "/dashboard/wallet" },
+            detail: { withdrawals: 0 },
+          },
+        };
+      }
+
+      // The forfeiture is written into the ledger, not just the receipt: a wallet
+      // that drops to zero without a row explaining why would break the invariant
+      // the nightly close checks (`previous ± amount = balance_after`).
+      const forfeited = locked.walletBalance;
+      if (forfeited > 0) {
+        await debitWalletInTx(tx, {
+          userId: user.id,
+          amount: forfeited,
+          type: "debit",
+          description: "Account closed — balance forfeited",
+          reference: makeReference("CLS"),
+        });
+      }
 
       const [orderCount] = await tx.select({ total: count() }).from(orders).where(eq(orders.userId, user.id));
       const [ledgerCount] = await tx
@@ -273,10 +319,11 @@ export async function POST(request: NextRequest) {
         deletedAt: now,
         reason: "self_service",
         retained,
+        forfeited,
         ipHash: hashSignal(clientIp(request)),
       });
 
-      return { kind: "done", retained };
+      return { kind: "done", retained, forfeited };
     });
 
     if (receipt.kind === "missing") {
@@ -291,7 +338,11 @@ export async function POST(request: NextRequest) {
 
     // The browser stops being signed in here, not at the next request.
     await destroySession();
-    logger.info("Account closed by its owner", { userId: user.id, retained: receipt.retained });
+    logger.info("Account closed by its owner", {
+      userId: user.id,
+      retained: receipt.retained,
+      forfeited: receipt.forfeited,
+    });
 
     return NextResponse.json({
       ok: true,
@@ -300,6 +351,7 @@ export async function POST(request: NextRequest) {
       // list they were shown before they confirmed.
       removed: DELETION_TERMS.removed,
       retained: receipt.retained,
+      forfeited: receipt.forfeited,
     });
   } catch (error) {
     logger.error("Account deletion failed", { userId: user.id, error });

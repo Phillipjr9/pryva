@@ -46,7 +46,12 @@ vi.mock("next/headers", () => ({ cookies: mocks.cookies }));
 vi.mock("@/lib/google", () => ({
   googleConfigured: () => true, exchangeGoogleCode: mocks.exchange, fetchGoogleUser: mocks.googleProfile,
 }));
-vi.mock("@/lib/wallet", () => ({ creditWallet: vi.fn() }));
+// The real ledger arithmetic is kept (the deletion path writes a forfeiture debit
+// through it); only the outbound credit is stubbed.
+vi.mock("@/lib/wallet", async (original) => ({
+  ...(await original<typeof import("@/lib/wallet")>()),
+  creditWallet: vi.fn(),
+}));
 vi.mock("@/lib/rate-limit", () => ({
   purchaseRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   giftCardIpRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
@@ -107,6 +112,7 @@ let withdrawalRoute: typeof import("@/app/api/wallet/withdraw/route");
 let adminWithdrawalRoute: typeof import("@/app/api/admin/withdrawals/route");
 let integrity: typeof import("@/lib/payment-integrity");
 let autoRefund: typeof import("@/lib/auto-refund");
+let retention: typeof import("@/lib/retention");
 
 function purchaseRequest(id = REQUEST_ID, origin = "https://pryva.test", type = "application/json") {
   return new NextRequest("https://pryva.test/api/accounts/purchase", {
@@ -158,6 +164,7 @@ beforeAll(async () => {
   await pg.exec(await readFile("migrations/0022_fraud.sql", "utf8"));
   await pg.exec(await readFile("migrations/0023_boost_orders.sql", "utf8"));
   await pg.exec(await readFile("migrations/0024_account_deletions.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0025_account_deletion_forfeiture.sql", "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
   [purchaseRoute, refundRoute, bankRoute, verifyBankRoute, googleRoute, contactRoute, deleteRoute, passwordRoute, sessionsRoute, autoRefund, giftPurchaseRoute, giftCheckRoute, giftRedeemRoute, topUpRoute, verifyTopUpRoute, webhookRoute, profileRoute, notificationsRoute, markReadRoute, logoutRoute, syncRoute, scheduledRoute, promoRoute, withdrawalRoute, adminWithdrawalRoute, integrity] = await Promise.all([
@@ -172,6 +179,7 @@ beforeAll(async () => {
     import("@/app/api/notifications/mark-read/route"), import("@/app/api/auth/logout/route"),
     import("@/app/api/orders/[id]/sync/route"), import("@/app/api/scheduled-orders/route"), import("@/app/api/accounts/promo/route"), import("@/app/api/wallet/withdraw/route"), import("@/app/api/admin/withdrawals/route"), import("@/lib/payment-integrity"),
   ]);
+  retention = await import("@/lib/retention");
 }, 30_000);
 
 afterAll(async () => { await pg?.close(); });
@@ -702,24 +710,67 @@ describe("Google subject binding and account protection", () => {
     expect(await database.select().from(schema.accountDeletions)).toHaveLength(1);
   });
 
-  it("will not close an account that still holds money", async () => {
+  it("closes with a balance only when the forfeiture is acknowledged, and writes it down", async () => {
     await database.insert(schema.sessions).values({ userId: USER, token: "current-token", expiresAt: new Date(Date.now() + 60_000), createdAt: new Date() });
     mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session" ? { value: "current-token" } : undefined });
 
-    const request = new NextRequest("https://pryva.test/api/user/delete", {
-      method: "POST",
-      headers: { origin: "https://pryva.test", "content-type": "application/json" },
-      body: JSON.stringify({ confirm: "buyer@example.com", password: "hash" }),
-    });
-    const response = await deleteRoute.POST(request);
-    expect(response.status).toBe(409);
-    const body = await response.json();
-    expect(body.code).toBe("BALANCE_REMAINING");
-    expect(body.error).toContain("10,000");
+    const post = (payload: unknown) => deleteRoute.POST(new NextRequest("https://pryva.test/api/user/delete", {
+      method: "POST", headers: { origin: "https://pryva.test", "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    }));
+
+    // Without the acknowledgement the request is refused, and it names the amount.
+    const refused = await post({ confirm: "buyer@example.com", password: "hash" });
+    expect(refused.status).toBe(409);
+    const refusal = await refused.json();
+    expect(refusal.code).toBe("FORFEITURE_NOT_ACKNOWLEDGED");
+    expect(refusal.error).toContain("10,000");
+    const [untouched] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+    expect(untouched.deletedAt).toBeNull();
+    expect(untouched.walletBalance).toBe(10_000);
+
+    // With it, the account closes and the balance is forfeited — in the ledger.
+    const closed = await post({ confirm: "buyer@example.com", password: "hash", forfeitAcknowledged: true });
+    expect(closed.status).toBe(200);
+    expect(await closed.json()).toMatchObject({ ok: true, deleted: true, forfeited: 10_000 });
 
     const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+    expect(user.deletedAt).not.toBeNull();
+    expect(user.walletBalance).toBe(0);
+    expect(user.email).toBe(`deleted+${USER}@deleted.pryva.invalid`);
+
+    // The money did not vanish: the ledger says where it went, and the
+    // `previous ± amount = balance_after` invariant the nightly close checks holds.
+    const [forfeiture] = await database.select().from(schema.walletTransactions);
+    expect(forfeiture).toMatchObject({
+      userId: USER,
+      type: "debit",
+      amount: 10_000,
+      balanceAfter: 0,
+      description: "Account closed — balance forfeited",
+    });
+
+    const [receipt] = await database.select().from(schema.accountDeletions);
+    expect(receipt.forfeited).toBe(10_000);
+  });
+
+  it("holds a closure while a payout is still moving", async () => {
+    await database.insert(schema.sessions).values({ userId: USER, token: "current-token", expiresAt: new Date(Date.now() + 60_000), createdAt: new Date() });
+    await database.insert(schema.withdrawals).values({
+      userId: USER, amount: 6000, bankName: "Test Bank", accountNumber: "1234567890",
+      accountName: "Test Customer", reference: "WD-pending-1", status: "processing",
+    });
+    mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session" ? { value: "current-token" } : undefined });
+    await database.update(schema.users).set({ walletBalance: 0 }).where(eq(schema.users.id, USER));
+
+    const response = await deleteRoute.POST(new NextRequest("https://pryva.test/api/user/delete", {
+      method: "POST", headers: { origin: "https://pryva.test", "content-type": "application/json" },
+      body: JSON.stringify({ confirm: "buyer@example.com", password: "hash", forfeitAcknowledged: true }),
+    }));
+    expect(response.status).toBe(409);
+    expect((await response.json()).code).toBe("WITHDRAWAL_IN_FLIGHT");
+    const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
     expect(user.deletedAt).toBeNull();
-    expect(user.walletBalance).toBe(10_000);
   });
 
   it("refuses a session that has been open too long, and a wrong password", async () => {
@@ -1235,5 +1286,67 @@ describe("order sync and scheduler safety", () => {
     expect(await (await promoRoute.POST(request("https://pryva.test"))).json()).toMatchObject({ valid: false });
     expect(mocks.getListing).not.toHaveBeenCalled();
     expect(mocks.promo).not.toHaveBeenCalled();
+  });
+});
+
+describe("the ten-year horizon for closed accounts", () => {
+  const OLD = "11111111-1111-4111-8111-111111111111";
+  const RECENT = "22222222-2222-4222-8222-222222222222";
+  const OPEN = "33333333-3333-4333-8333-333333333333";
+  const yearsAgo = (n: number) => {
+    const date = new Date();
+    date.setUTCFullYear(date.getUTCFullYear() - n);
+    return date;
+  };
+
+  async function seed() {
+    await database.insert(schema.users).values([
+      { id: OLD, name: "Deleted account", email: `deleted+${OLD}@deleted.pryva.invalid`, passwordHash: "x", deletedAt: yearsAgo(11) },
+      { id: RECENT, name: "Deleted account", email: `deleted+${RECENT}@deleted.pryva.invalid`, passwordHash: "x", deletedAt: yearsAgo(9) },
+      { id: OPEN, name: "Customer", email: "open@example.com", passwordHash: "x", walletBalance: 500 },
+    ]);
+    await database.insert(schema.orders).values({ reference: "ORDER-OLD", userId: OLD, service: "numbers", productSlug: "s", productName: "P", planLabel: "L", region: "NG", duration: "20 min", amount: 1000, provider: "fleexa" });
+  }
+
+  it("does nothing unless the sweep is armed", async () => {
+    await seed();
+    const sweep = await retention.purgeExpiredClosedAccounts({ armed: false });
+    expect(sweep).toMatchObject({ armed: false, purged: 0 });
+    expect(sweep.due).toBe(1);
+    expect(await database.select().from(schema.users)).toHaveLength(4);
+    expect(await database.select().from(schema.orders)).toHaveLength(1);
+  });
+
+  it("removes the closed account past the horizon and its records with it", async () => {
+    await seed();
+    const sweep = await retention.purgeExpiredClosedAccounts({ armed: true });
+    expect(sweep.purged).toBe(1);
+
+    const remaining = (await database.select().from(schema.users)).map((row) => row.id);
+    // The nine-year-old closure and the open customer are untouched — the horizon
+    // measures a closure, not an age.
+    expect(remaining).not.toContain(OLD);
+    expect(remaining).toEqual(expect.arrayContaining([RECENT, OPEN, USER]));
+    // Cascade: the order went with the account it belonged to, which is the point
+    // of a retention limit.
+    expect(await database.select().from(schema.orders)).toHaveLength(0);
+  });
+
+  it("holds a closed account whose payout never finished", async () => {
+    await seed();
+    await database.insert(schema.withdrawals).values({
+      userId: OLD, amount: 1000, bankName: "Test Bank", accountNumber: "1234567890",
+      accountName: "Test Customer", reference: "WD-old-1", status: "processing",
+    });
+
+    const sweep = await retention.purgeExpiredClosedAccounts({ armed: true });
+    expect(sweep).toMatchObject({ purged: 0, held: 1 });
+    expect(await database.select().from(schema.users)).toHaveLength(4);
+  });
+
+  it("counts what is due without deleting anything", async () => {
+    await seed();
+    expect(await retention.countDueForPurge()).toBe(1);
+    expect(await database.select().from(schema.users)).toHaveLength(4);
   });
 });

@@ -75,6 +75,14 @@ export const accountDeletions = pgTable(
     deletedAt: timestamp("deleted_at", { withTimezone: true }).notNull().defaultNow(),
     reason: varchar("reason", { length: 40 }).notNull().default("self_service"),
     retained: jsonb("retained").notNull().default({}),
+    /**
+     * What the customer gave up by closing with money in the wallet.
+     *
+     * Written down rather than discarded, because "I had ₦4,500 in there" is a
+     * question somebody will ask, and the ledger carries the same figure as a
+     * debit so the balance arithmetic still holds on a closed account.
+     */
+    forfeited: integer("forfeited").notNull().default(0),
     ipHash: varchar("ip_hash", { length: 64 }),
   },
   (table) => [
