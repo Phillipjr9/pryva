@@ -65,6 +65,14 @@ export async function POST(request: Request) {
       return lockedResponse(lockedForMs);
     }
 
+    // A closed account is not a sign-in that failed; it is an account that no
+    // longer exists. Its password was replaced with a random hash, so the branch
+    // below would refuse it anyway -- this says why, and keeps a deleted row out of
+    // the lockout counters it has no business in.
+    if (user?.deletedAt) {
+      return Response.json({ ok: false, error: "Those details don't match an account." }, { status: 401 });
+    }
+
     if (!user || !verifyPassword(password, user.passwordHash)) {
       if (user) {
         // Count the failure against the account. A database error here must not

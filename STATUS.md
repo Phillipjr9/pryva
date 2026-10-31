@@ -1914,3 +1914,66 @@ against a leaky server by hand.
 **Not verified:** the headers of the live deployment from inside this sandbox — it
 has no network route to `pryva-two.vercel.app`. `npm run headers:check` is the one
 command that answers it from anywhere with a route.
+
+---
+
+## 44. Thirty-sixth pass — closing an account without erasing the record (31 Oct 2026)
+
+Asked: *"can you add user delete acont so user can delete there account....but the
+most important thing is that user can delete there account but i want the user data
+to still be intact for security purposes."*
+
+The two halves of that sentence are the whole design. `users` cascades to orders,
+wallet transactions, deposits, withdrawals, gift cards, payment records, support
+messages and reviews — so a cascading delete would take the only evidence that any
+money moved. The old endpoint answered `503` precisely because of it. **Closing an
+account therefore removes the person and keeps the paperwork**, and both lists are
+shown to the customer before they can press anything.
+
+**What is removed.** Name, email, password, Google subject and email verification
+are replaced inside one transaction that takes a row lock first; every session,
+passkey, TOTP enrolment, recovery code and outstanding reset/verification token is
+deleted in the same transaction. `users.deleted_at` is stamped, and that is the
+switch every auth path now reads — `sessionUser` filters on it, sign-in refuses it,
+and the password is replaced with a real hash of a random string, so a closed row can
+never authenticate even if a credential row somehow survived.
+
+**What is kept, and why.** Orders, the wallet ledger, deposits, withdrawals, gift
+cards, support conversations, reviews and fraud signals stay attached to the same
+row. A chargeback, a refund or a payout question can arrive months later, and the
+nightly reconciliation asserts the ledger invariant against `users.wallet_balance` —
+both facts die with the row. The receipt (`account_deletions`) records what was
+retained as **counts, never contents**.
+
+**Three things the endpoint refuses**, all of which protect the customer rather than
+the system: an account that still holds a **balance** (withdraw it first — a closed
+account cannot claim its own money), an account with a **withdrawal in flight** (they
+would have no way to see whether it arrived), and a **session older than fifteen
+minutes** (a tab left open on a shared laptop is not consent). Confirmation is the
+account's own address typed out, plus the password where the account has one — a
+Google-created account never had one, and asking for it would make closure
+impossible for exactly those customers.
+
+**The screen says the same thing as the code.** `DELETION_TERMS` is one definition,
+used by the confirmation panel and by the endpoint; a test reads the route and fails
+if the copy and the SQL drift apart, including that no `delete(orders)`,
+`delete(walletTransactions)`, `delete(payments)` or `delete(giftCards)` ever appears.
+`/admin/users` marks the row **Closed** and hides the privilege badge, because a
+closed account's admin rights are meaningless. The privacy page now describes the
+real behaviour instead of "currently unavailable".
+
+**Verified:** 1,479 tests / 160 files · typecheck · lint · build. New coverage:
+`financial-auth-integration.test.ts` runs the deletion against embedded PostgreSQL —
+a cross-origin attempt changes nothing, a funded account is refused with its balance
+named, a stale session and a wrong password are refused, and a successful close
+leaves the order and the ledger entry in place while scrubbing the row, destroying
+the session and writing the receipt; `account-deletion.test.ts` (11) pins the pure
+rules and that the warning matches the endpoint; `account-deletion-ui.test.tsx` (8)
+drives the screen — terms before the button, the button disabled until the address is
+typed, a refused balance rendered as a sentence with a way out, and the receipt shown
+afterwards.
+
+**Not verified:** a real closure on production, and the retention *period* — which is
+an owner decision (see `SECURITY.md` §4 and `RUNBOOK.md` §7l): nothing purges a
+closed account today, so "kept while the law or a dispute requires" is accurate only
+because nothing is deleted.

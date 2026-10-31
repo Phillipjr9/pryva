@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { toast } from "@/components/ui/Toast";
 import { ArrowRight, Download, Loader2, Shield } from "@/components/icons";
 
@@ -10,9 +9,9 @@ import { ArrowRight, Download, Loader2, Shield } from "@/components/icons";
  *
  * `/api/user/export` already produced a JSON archive of this account's activity,
  * but nothing in the product linked to it — the Settings page called itself
- * "read-only details". Self-service deletion deliberately returns 503 until
- * settlement and record retention are designed, so this panel says that plainly
- * and points at support instead of offering a button that always fails.
+ * "read-only details". Closing the account is self-service now, so this panel
+ * points at that section instead of at support: the warning that matters (what is
+ * removed, what is kept) lives there, next to the button.
  */
 export function AccountDataPanel() {
   const [busy, setBusy] = useState(false);
@@ -84,14 +83,14 @@ export function AccountDataPanel() {
         </p>
 
         <p className="text-meta leading-relaxed text-ink-2">
-          Closing your account permanently is not self-service yet: remaining balances, settled
-          payments and record retention have to be reviewed first.{" "}
-          <Link
-            href="/dashboard/support"
+          You can also close your account without asking anyone — the section at the bottom of this page lists
+          exactly what is removed and what is kept.{" "}
+          <a
+            href="#close-account"
             className="inline-flex items-center gap-1 font-semibold text-lav-700 hover:underline"
           >
-            Ask support to close it <ArrowRight className="h-3 w-3" />
-          </Link>
+            Close my account <ArrowRight className="h-3 w-3" />
+          </a>
         </p>
       </div>
     </section>

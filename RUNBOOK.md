@@ -482,6 +482,58 @@ they do.
 
 ---
 
+## 7l. "A customer closed their account — where did their data go?"
+
+Nowhere. Closing removes the **person** and keeps the **record**. There is no
+restore, and nothing to look for in a backup.
+
+What changed on the row (all in `users`):
+
+| Column | After closure |
+|---|---|
+| `name` | `Deleted account` |
+| `email` | `deleted+<user id>@deleted.pryva.invalid` (never receives mail) |
+| `deleted_email_hash` | salted SHA-256 of the address they had, so support can still match them |
+| `password_hash` | a real hash of a random password nobody knows |
+| `google_subject`, `email_verified_at` | NULL |
+| `deleted_at` | when it happened — the switch every auth path reads |
+
+Gone: `sessions`, `webauthn_credentials`, `user_two_factor`,
+`two_factor_recovery_codes`, `two_factor_challenges`, `password_reset_tokens`,
+`email_verification_tokens`.
+Kept: `orders`, `wallet_transactions`, `payment_topups`, `withdrawals`,
+`gift_cards`, `support_tickets` / `support_messages`, `product_reviews`,
+`account_signals`, `fraud_events` — all still pointing at the same id.
+
+**Answering a "I closed my account but…" message.** You cannot search by email any
+more. Ask for an order reference or a payout reference; `/admin/users` lists the row
+as **Closed <date>** and the retained counts are on the `account_deletions` row:
+
+```sql
+select user_id, deleted_at, retained, ip_hash from account_deletions order by deleted_at desc limit 20;
+```
+
+**Why the record stays.** Chargebacks, refunds and payout disputes read these rows
+months later, and the nightly reconciliation asserts the ledger invariant against
+`users.wallet_balance` — deleting the user would take both away.
+
+**What a closing customer cannot do, and why they are told before confirming:**
+
+| Refusal | Means | What to tell them |
+|---|---|---|
+| `BALANCE_REMAINING` (409) | the wallet still holds money | withdraw first; a closed account cannot claim it |
+| `WITHDRAWAL_IN_FLIGHT` (409) | a payout is still processing | wait for it to settle, then close |
+| `SESSION_TOO_OLD` (403) | the session is older than 15 minutes | sign in again on the settings page |
+| `CONFIRMATION_MISMATCH` (400) | the typed address is not the account's | type the address exactly |
+| `PASSWORD_MISMATCH` (401) | wrong password | for Google-only accounts there is no password to type |
+
+**They can come back.** The address is freed, not blocked: registering it again
+creates a new account with no history. The old records stay on the old id, and the
+fraud signals on it stay visible in the queue. If you ever want closure to be a ban,
+that is a product decision, not a deletion one.
+
+---
+
 ## 7k. "Is the site still announcing what it runs?"
 
 One command, after a deploy:

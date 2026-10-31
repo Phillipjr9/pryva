@@ -75,6 +75,20 @@ host), HSTS with preload, `nosniff`, `Referrer-Policy: origin-when-cross-origin`
 `Permissions-Policy` denying camera/microphone/geolocation, and a policy that a
 test compares against `next.config.ts` so the two cannot drift.
 
+**Account closure** — `src/lib/account-deletion.ts`, `src/app/api/user/delete/route.ts`, `migrations/0024_account_deletions.sql`
+Closing an account scrubs identity (name, email, password, Google subject, email
+verification) and destroys every credential and session — passkeys, TOTP enrolment,
+recovery codes, reset and verification tokens — inside one transaction that takes a
+row lock first. The `users` row itself is not deleted: orders, the wallet ledger,
+deposits, withdrawals, gift cards, support messages, reviews and fraud signals
+cascade from it, and those records have to outlive the account for chargebacks,
+refunds and payout questions. `deleted_at` is the switch every auth path reads, so a
+closed account cannot be signed into even if a session row survived. The endpoint
+refuses an account holding a balance or with a withdrawal in flight, requires a
+session created in the last 15 minutes, the account's own address typed out, and the
+password where the account has one. `account_deletions` records what was retained
+(counts, never contents).
+
 **No banner, no version** — `src/lib/server-banner.ts`, `next.config.ts`, `scripts/check-headers.mjs`
 `poweredByHeader: false` stops Next advertising itself, the proxy removes
 `X-Powered-By`, `X-Matched-Path`, `X-Generator` and the other names in
@@ -226,6 +240,16 @@ a detector may **observe** and may **throttle**, but may not decide.
 - **Preview deployments may share the production database** (see
   `migrations/README.md`). Until they are isolated, a preview has production
   data behind it.
+- **Retention after closure is a policy, not a deadline.** A closed account keeps
+  its financial record indefinitely — there is no scheduled purge, because the
+  events that need it (chargebacks, disputes, tax) have no fixed horizon here. If a
+  retention period is chosen, it needs a job and an owner; until then "kept for as
+  long as the law or a dispute requires" is what the privacy page says, and it is
+  accurate only because nothing is deleted.
+- **The tombstone email is freed, not blocked.** Someone can register the same
+  address again and gets a new, unrelated account; the retained record stays tied to
+  the old id. That is deliberate (closure is not a ban) and the fraud signals on the
+  old row remain visible to the queue.
 
 ## 5. The operator checklist (code cannot do these)
 

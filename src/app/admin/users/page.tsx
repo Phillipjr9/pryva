@@ -78,6 +78,10 @@ export default async function AdminUsersPage({
       // a second, unaudited way to undo a security control.
       lockedUntil: users.lockedUntil,
       failedLoginAttempts: users.failedLoginAttempts,
+      // A closed account keeps its row (orders, ledger and payout records point at
+      // it) so it must stay visible here; the badge is the only difference between
+      // "customer" and "customer who left and whose records we must still answer for".
+      deletedAt: users.deletedAt,
     })
     .from(users)
     .where(query ? or(ilike(users.name, term), ilike(users.email, term)) : undefined)
@@ -175,9 +179,22 @@ export default async function AdminUsersPage({
               return (
                 <tr key={row.id} className="border-t border-line/70">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-ink">{row.name}</p>
+                    <p className="font-medium text-ink">
+                      {row.name}
+                      {row.deletedAt ? (
+                        <span
+                          className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-micro font-semibold text-slate-600"
+                          title="Closed by its owner. Identity scrubbed; financial records retained."
+                        >
+                          Closed {formatDate(row.deletedAt)}
+                        </span>
+                      ) : null}
+                    </p>
                     <p className="text-meta text-ink-3">{row.email}</p>
-                    <AccessLevel email={row.email} emailVerifiedAt={row.emailVerifiedAt} />
+                    {/* Privilege is meaningless on a closed account: it can never sign in. */}
+                    {row.deletedAt ? null : (
+                      <AccessLevel email={row.email} emailVerifiedAt={row.emailVerifiedAt} />
+                    )}
                   </td>
                   <td className="px-4 py-3 font-medium">{formatNaira(row.walletBalance)}</td>
                   <td className="px-4 py-3">{stats?.orders ?? 0}</td>
