@@ -43,6 +43,7 @@ const SOCIAL_TAGS = [
   "Reactions",
 ];
 const NUMBER_TAGS = ["Single use", "Rental", "Bundle"];
+const DATA_TAGS = ["MTN", "Airtel", "Glo", "9mobile"];
 
 const CATEGORY_ICONS: Record<string, string> = {
   verification: "💬",
@@ -159,6 +160,8 @@ export function ServiceExplorer({ initialCountry, initialCategory, rejectedCount
     ? SOCIAL_TAGS
     : category === "numbers"
     ? NUMBER_TAGS
+    : category === "data"
+    ? DATA_TAGS
     : [];
 
   // Live listings: boosts are purchasable, the others are read-only until their ordering is wired.

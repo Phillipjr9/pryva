@@ -131,6 +131,9 @@ describe("country-first service explorer", () => {
     const singleUse = filterExplorerItems(items, "numbers", "", "Single use");
     expect(singleUse.every((item) => item.category === "numbers" && item.tag === "Single use")).toBe(true);
     expect(singleUse.some((item) => item.id === "plan-vn-ng")).toBe(true);
+    const mtnData = filterExplorerItems(items, "data", "", "MTN");
+    expect(mtnData).toHaveLength(8);
+    expect(mtnData.every((item) => item.category === "data" && item.tag === "MTN")).toBe(true);
     expect(filterExplorerItems(items, "social", "no-such-service")).toEqual([]);
   });
 

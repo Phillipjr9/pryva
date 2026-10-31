@@ -293,6 +293,13 @@ function exampleItems(): ExplorerItem[] {
   return [...verification, ...social];
 }
 
+const PROVIDER_LABELS: Record<AirtimeProvider, string> = {
+  mtn: "MTN",
+  airtel: "Airtel",
+  glo: "Glo",
+  "9mobile": "9mobile",
+};
+
 function additionalItems(country: ExplorerCountry): ExplorerItem[] {
   const digitalBrands: Record<string, BrandSlug | "disney-plus"> = {
     netflix: "netflix", spotify: "spotify", youtube: "youtube", disney: "disney-plus", chatgpt: "chatgpt", canva: "canva",
@@ -324,7 +331,7 @@ function additionalItems(country: ExplorerCountry): ExplorerItem[] {
         category: "data",
         name: plan.name,
         description: `${plan.size} · ${plan.duration}`,
-        tag: "Mobile data",
+        tag: PROVIDER_LABELS[plan.provider] ?? "Mobile data",
         artwork: { kind: "network", name: plan.provider },
         source: "catalog",
         coverage: "catalog-country",
