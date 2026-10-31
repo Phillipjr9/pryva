@@ -7,18 +7,23 @@ import type { PublicUser } from "@/lib/auth";
 
 interface BulkOrdersFormProps {
   user: PublicUser;
+  /** Plans the server will actually buy; anything else is refused at checkout. */
+  sellableSlugs: string[];
+  /** The per-checkout ceiling, shared with the route. */
+  maxUnits: number;
 }
 
-export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
+export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersFormProps) {
   const [items, setItems] = useState<BulkOrderItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const allPlans = plans.filter((p) => ["numbers", "esim", "proxies", "email-otp"].includes(p.service));
+  const sellable = new Set(sellableSlugs);
+  const allPlans = plans.filter((p) => sellable.has(p.slug));
 
   function addItem(productSlug: string) {
-    if (totalQuantity >= 200) { setError("A basket can contain at most 200 items."); return; }
+    if (totalQuantity >= maxUnits) { setError(`A basket can contain at most ${maxUnits} items.`); return; }
     setError(null);
     setSuccessMessage(null);
     const existing = items.find((item) => item.productSlug === productSlug);
@@ -33,7 +38,7 @@ export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
 
   function updateQuantity(productSlug: string, quantity: number) {
     const current = items.find((item) => item.productSlug === productSlug)?.quantity ?? 0;
-    if (totalQuantity - current + quantity > 200) { setError("A basket can contain at most 200 items."); return; }
+    if (totalQuantity - current + quantity > maxUnits) { setError(`A basket can contain at most ${maxUnits} items.`); return; }
     setError(null);
     setSuccessMessage(null);
     if (quantity <= 0) {
@@ -71,7 +76,7 @@ export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
         return;
       }
 
-      setSuccessMessage(`Bulk order completed successfully (${data.count} items). Reference: ${data.reference}`);
+      setSuccessMessage(`Bulk order placed: ${data.count} ${data.count === 1 ? "item" : "items"}. Codes appear in your orders as they arrive. Reference: ${data.reference}`);
       setItems([]);
     } catch {
       setError("An unexpected error occurred. Please try again.");
@@ -93,7 +98,7 @@ export function BulkOrdersForm({ user }: BulkOrdersFormProps) {
           Select Products
         </label>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {allPlans.slice(0, 12).map((plan) => (
+          {allPlans.map((plan) => (
             <div
               key={plan.slug}
               className="rounded-xl border border-line bg-white p-4"

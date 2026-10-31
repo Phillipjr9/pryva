@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { isPreviewDatabase } from "@/lib/demo-policy";
-import { db, mutatePreviewDatabase } from "@/db";
+import { db } from "@/db";
 import { scheduledOrders, orders, users } from "@/db/schema";
 import { eq, and, lte, ne } from "drizzle-orm";
 import { findPlan } from "./catalog";
+import { cancelUpstream, fulfillPlan, fulfilmentIntent } from "./fulfillment";
 import { makeReference, debitWalletInTx } from "./wallet";
 
 export type Frequency = "daily" | "weekly" | "biweekly" | "monthly";
@@ -19,6 +19,12 @@ export async function createScheduledOrder(params: {
   const plan = findPlan(productSlug);
   if (!plan || plan.service !== service) {
     throw new Error("Invalid product or service");
+  }
+  // A schedule that can only ever fail is not a product. Only plans with a
+  // supplier path may recur, so a run can always be delivered and charged in
+  // that order.
+  if (!fulfilmentIntent(productSlug)) {
+    throw new Error("That plan cannot be delivered automatically, so it cannot be scheduled.");
   }
   if (!["daily", "weekly", "biweekly", "monthly"].includes(frequency)) {
     throw new Error("Invalid frequency");
@@ -78,101 +84,130 @@ export async function getUserScheduledOrders(userId: string) {
   });
 }
 
-/** Atomically execute one due run. */
+/**
+ * Atomically execute one due run.
+ *
+ * The old version debited the wallet, wrote an order marked `delivered` with
+ * provider `scheduled`, and never called a supplier: the customer paid for
+ * nothing, and the order said it had arrived. This one buys first — the same
+ * `fulfillPlan` a manual purchase uses — and only then records and charges. A
+ * refused or unreachable supplier leaves the money where it was and the run is
+ * skipped, so the next scheduled time can try again.
+ */
 export async function processScheduledOrder(scheduled: typeof scheduledOrders.$inferSelect): Promise<boolean> {
   const now = new Date();
-  if (isPreviewDatabase()) {
-    return mutatePreviewDatabase((draft) => {
-      const current = draft.scheduledOrders.find((row) => row.id === scheduled.id && row.userId === scheduled.userId);
-      if (!current || current.status !== "active") return false;
-      const due = new Date(current.nextRunAt as Date | string).getTime();
-      if (!Number.isFinite(due)) throw new Error("Invalid scheduled run time");
-      if (due > now.getTime()) return false;
-      const plan = typeof current.productSlug === "string" ? findPlan(current.productSlug) : undefined;
-      if (!plan || current.service !== plan.service) throw new Error("Invalid scheduled product");
-      const nextRunAt = calculateNextRun(current.frequency as Frequency, now);
-      const account = draft.users.find((row) => row.id === current.userId);
-      if (!account || !Number.isSafeInteger(account.walletBalance) || (account.walletBalance as number) < plan.price) return false;
-      const newBalance = (account.walletBalance as number) - plan.price;
-      const reference = makeReference("SCH");
-      const orderId = randomUUID();
-      draft.orders.push({
-        id: orderId, reference, userId: current.userId, service: current.service,
-        productSlug: current.productSlug, productName: plan.name, planLabel: plan.planLabel,
-        region: plan.region, duration: plan.duration, amount: plan.price,
-        status: "delivered", provider: "scheduled", createdAt: now,
-      });
-      draft.walletTransactions.push({
-        id: randomUUID(), userId: current.userId, orderId, type: "debit", amount: plan.price,
-        balanceAfter: newBalance, description: `Scheduled purchase: ${plan.name}`, reference, createdAt: now,
-      });
-      account.walletBalance = newBalance;
-      current.lastRunAt = now;
-      current.lastOrderId = orderId;
-      current.nextRunAt = nextRunAt;
-      return true;
-    });
-  }
-
   const plan = typeof scheduled.productSlug === "string" ? findPlan(scheduled.productSlug) : undefined;
   if (!plan || scheduled.service !== plan.service) throw new Error("Invalid scheduled product");
-  const nextRunAt = calculateNextRun(scheduled.frequency as Frequency, now);
+  if (!fulfilmentIntent(plan.slug)) {
+    console.error("Scheduled run skipped: plan has no supplier path", { scheduledOrderId: scheduled.id, slug: plan.slug });
+    return false;
+  }
+
+  // Re-read before spending anything: the cron can hand over a row that another
+  // instance has already run or that the customer has paused.
+  const [current] = await db
+    .select()
+    .from(scheduledOrders)
+    .where(and(eq(scheduledOrders.id, scheduled.id), eq(scheduledOrders.userId, scheduled.userId), eq(scheduledOrders.status, "active")))
+    .limit(1);
+  if (!current) return false;
+  const due = new Date(current.nextRunAt as Date | string).getTime();
+  if (!Number.isFinite(due) || due > now.getTime()) return false;
+
+  const [account] = await db
+    .select({ walletBalance: users.walletBalance })
+    .from(users)
+    .where(eq(users.id, current.userId))
+    .limit(1);
+  if (!account || !Number.isSafeInteger(account.walletBalance) || account.walletBalance < plan.price) return false;
+
+  let fulfilled;
+  try {
+    fulfilled = await fulfillPlan(plan);
+  } catch (error) {
+    // Nothing bought, nothing charged. Leaving the row active lets the next run
+    // try again once the supplier is back.
+    console.error("Scheduled fulfilment unavailable; run skipped", {
+      scheduledOrderId: current.id,
+      slug: plan.slug,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+
+  const nextRunAt = calculateNextRun(current.frequency as Frequency, now);
   const reference = makeReference("SCH");
   const orderId = randomUUID();
 
-  return await db.transaction(async (tx: any) => {
-    const [current] = await tx
-      .select()
-      .from(scheduledOrders)
-      .where(and(eq(scheduledOrders.id, scheduled.id), eq(scheduledOrders.status, "active")))
-      .limit(1);
-    if (!current) return false;
-    const due = new Date(current.nextRunAt as Date | string).getTime();
-    if (!Number.isFinite(due) || due > now.getTime()) return false;
+  try {
+    return await db.transaction(async (tx: any): Promise<boolean> => {
+      const [fresh] = await tx
+        .select()
+        .from(scheduledOrders)
+        .where(and(eq(scheduledOrders.id, current.id), eq(scheduledOrders.status, "active")))
+        .limit(1);
+      if (!fresh || new Date(fresh.nextRunAt as Date | string).getTime() > now.getTime()) return false;
 
-    const [account] = await tx
-      .select({ walletBalance: users.walletBalance })
-      .from(users)
-      .where(eq(users.id, current.userId))
-      .limit(1);
-    if (!account || !Number.isSafeInteger(account.walletBalance) || account.walletBalance < plan.price) return false;
+      const [wallet] = await tx
+        .select({ walletBalance: users.walletBalance })
+        .from(users)
+        .where(eq(users.id, current.userId))
+        .limit(1);
+      if (!wallet || wallet.walletBalance < plan.price) return false;
 
-    await tx.insert(orders).values({
-      id: orderId,
-      reference,
-      userId: current.userId,
-      service: current.service,
-      productSlug: current.productSlug,
-      productName: plan.name,
-      planLabel: plan.planLabel,
-      region: plan.region,
-      duration: plan.duration,
-      amount: plan.price,
-      status: "delivered",
-      provider: "scheduled",
-      createdAt: now,
+      await tx.insert(orders).values({
+        id: orderId,
+        reference,
+        userId: current.userId,
+        service: current.service,
+        productSlug: current.productSlug,
+        productName: plan.name,
+        planLabel: plan.planLabel,
+        region: plan.region,
+        duration: plan.duration,
+        amount: plan.price,
+        // A code may still be on its way, exactly as for a manual purchase.
+        status: "active",
+        provider: fulfilled.provider,
+        providerCostNgn: fulfilled.providerCostNgn,
+        providerRequestId: fulfilled.providerRequestId,
+        referenceCode: fulfilled.referenceCode,
+        otpCode: fulfilled.otpCode,
+        expiresAt: fulfilled.expiresAt,
+        createdAt: now,
+      });
+
+      await debitWalletInTx(tx, {
+        userId: current.userId,
+        amount: plan.price,
+        type: "debit",
+        description: `Scheduled purchase: ${plan.name}`,
+        orderId,
+        reference,
+      });
+
+      await tx
+        .update(scheduledOrders)
+        .set({ lastRunAt: now, lastOrderId: orderId, nextRunAt })
+        .where(eq(scheduledOrders.id, current.id));
+
+      return true;
     });
-
-    await debitWalletInTx(tx, {
-      userId: current.userId,
-      amount: plan.price,
-      type: "debit",
-      description: `Scheduled purchase: ${plan.name}`,
-      orderId,
-      reference,
-    });
-
-    await tx
-      .update(scheduledOrders)
-      .set({
-        lastRunAt: now,
-        lastOrderId: orderId,
-        nextRunAt,
-      })
-      .where(eq(scheduledOrders.id, current.id));
-
-    return true;
-  });
+  } catch (error) {
+    // The purchase was made but never recorded or charged: release it rather
+    // than holding a paid-for number nobody can see.
+    try {
+      await cancelUpstream({
+        provider: fulfilled.provider,
+        providerRequestId: fulfilled.providerRequestId,
+        service: plan.service,
+        duration: plan.duration,
+      });
+    } catch (cancelError) {
+      console.error("Scheduled upstream cancel failed", cancelError);
+    }
+    throw error;
+  }
 }
 
 export async function processScheduledOrders(): Promise<number> {

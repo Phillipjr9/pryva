@@ -2246,3 +2246,43 @@ new classes, and the compiled CSS contains the `min-width: 400px` rule. New
 coverage in `service-grid-density.test.tsx` asserts that both grids start
 single-column, that the phone row keeps a 44 px action with an accessible name,
 and that each service renders exactly one heading and one control.
+
+---
+
+## Service completeness, honest checkout, and selection order (31 Oct 2026)
+
+Full detail in `SERVICE-AUDIT.md`. Three findings, two fixes.
+
+**Bulk orders charged without delivering.** `POST /api/orders/bulk` debited the
+wallet and inserted one order per unit as `delivered`/`manual` without calling a
+supplier, and the hand-fulfilment queue never saw them because it only lists
+`processing`/`review`. It now buys every unit through `fulfillPlan` first,
+refuses plans outside the fulfilment allowlist before spending, caps a basket at
+20 units, releases everything it bought if any unit is refused or the write
+fails, and then records `active` orders and one wallet debit. The page lists only
+deliverable plans.
+
+**Scheduled orders did the same on a timer.** `processScheduledOrder` debited and
+wrote `delivered` without fulfilment while the API and cron were live. It now
+re-reads the row, fulfils, then records and charges in one transaction; a
+supplier failure costs nothing and leaves the row active. Creation refuses plans
+with no supplier path. The feature still has no management screen and remains
+unlaunched.
+
+**Selection order described nothing.** `src/lib/service-readiness.ts` derives one
+verdict per family from the same configuration the checkout reads — ready to buy,
+catalogue only, free tool, ordering paused, not connected — and
+`src/lib/service-states.ts` holds the client-safe wording. The hub's category
+chips and the dashboard's service tiles are sorted by that verdict with a dot and
+an accessible label, the hub states the tally, and a category that cannot be
+ordered explains why with an **Ask about it** link that drafts the support
+question (`?ask=`, capped, never auto-sent). `EXPLORER_CATEGORIES` is unchanged,
+so every existing link still resolves.
+
+**Still blocked on suppliers, not code:** eSIM (price semantics), app
+verification (per-app mapping), paid email OTP (no durations), proxies, mobile
+data, subscriptions.
+
+**Verified:** 1,580 tests / 169 files · typecheck · lint · build · hub and
+overview render `200` with the ordered chips, state dots and the request link in
+a running instance · API probes unchanged in preview.

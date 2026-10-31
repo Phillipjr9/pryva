@@ -49,6 +49,24 @@ type Reply = {
 
 const BUBBLE_BASE = "w-full max-w-[46rem] rounded-2xl px-4 py-3";
 
+/**
+ * A question carried in the URL fragment, e.g. `/dashboard/support#ask=…`.
+ *
+ * The fragment deliberately is not a query parameter: the support page reads
+ * the customer's tickets from the session, and a query parameter on that page
+ * is how a crafted link ends up selecting somebody else's data. A fragment is
+ * never sent to the server, so the worst it can do is prefill this composer —
+ * nothing leaves the browser until the customer presses send.
+ */
+export function draftFromHash(hash: string): string {
+  if (!hash.startsWith("#ask=")) return "";
+  try {
+    return decodeURIComponent(hash.slice(5)).trim().slice(0, 200);
+  } catch {
+    return "";
+  }
+}
+
 function localMessage(role: ChatRole, body: string): ChatMessage {
   return {
     id: `local-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -144,6 +162,14 @@ export function SupportChat({
   const [escalated, setEscalated] = useState(initiallyEscalated);
   const [escalating, setEscalating] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const question = draftFromHash(window.location.hash);
+    // Reading a browser-only value once after mount is what an effect is for;
+    // reading it during render would make the server and client disagree.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (question) setDraft((current) => current || question);
+  }, []);
 
   useEffect(() => {
     // Scroll once the transcript grows, and only inside this card — never the page.
