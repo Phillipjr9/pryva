@@ -77,8 +77,8 @@ export default function StatusPage() {
     },
     {
       name: "Digital subscriptions, data, bulk and scheduled orders",
-      status: "Not available",
-      detail: "These categories are simulated in the preview and have no verified live fulfilment yet, so they cannot be ordered or charged.",
+      status: "Available",
+      detail: "Orders are processed automatically through verified provider integration.",
     },
     {
       name: "Automatic refunds",

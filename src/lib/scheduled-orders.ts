@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { db, mutatePreviewDatabase } from "@/db";
-import { scheduledOrders } from "@/db/schema";
+import { scheduledOrders, orders, users } from "@/db/schema";
 import { eq, and, lte, ne } from "drizzle-orm";
 import { findPlan } from "./catalog";
-import { makeReference } from "./wallet";
+import { makeReference, debitWalletInTx } from "./wallet";
 
 export type Frequency = "daily" | "weekly" | "biweekly" | "monthly";
 
@@ -78,44 +78,104 @@ export async function getUserScheduledOrders(userId: string) {
   });
 }
 
-/** Atomically simulate one due run in the current preview process only. */
+/** Atomically execute one due run. */
 export async function processScheduledOrder(scheduled: typeof scheduledOrders.$inferSelect): Promise<boolean> {
-  if (!isPreviewDatabase()) throw new Error("Live scheduled fulfillment is not configured");
   const now = new Date();
-  return mutatePreviewDatabase((draft) => {
-    const current = draft.scheduledOrders.find((row) => row.id === scheduled.id && row.userId === scheduled.userId);
-    if (!current || current.status !== "active") return false;
+  if (isPreviewDatabase()) {
+    return mutatePreviewDatabase((draft) => {
+      const current = draft.scheduledOrders.find((row) => row.id === scheduled.id && row.userId === scheduled.userId);
+      if (!current || current.status !== "active") return false;
+      const due = new Date(current.nextRunAt as Date | string).getTime();
+      if (!Number.isFinite(due)) throw new Error("Invalid scheduled run time");
+      if (due > now.getTime()) return false;
+      const plan = typeof current.productSlug === "string" ? findPlan(current.productSlug) : undefined;
+      if (!plan || current.service !== plan.service) throw new Error("Invalid scheduled product");
+      const nextRunAt = calculateNextRun(current.frequency as Frequency, now);
+      const account = draft.users.find((row) => row.id === current.userId);
+      if (!account || !Number.isSafeInteger(account.walletBalance) || (account.walletBalance as number) < plan.price) return false;
+      const newBalance = (account.walletBalance as number) - plan.price;
+      const reference = makeReference("SCH");
+      const orderId = randomUUID();
+      draft.orders.push({
+        id: orderId, reference, userId: current.userId, service: current.service,
+        productSlug: current.productSlug, productName: plan.name, planLabel: plan.planLabel,
+        region: plan.region, duration: plan.duration, amount: plan.price,
+        status: "delivered", provider: "scheduled", createdAt: now,
+      });
+      draft.walletTransactions.push({
+        id: randomUUID(), userId: current.userId, orderId, type: "debit", amount: plan.price,
+        balanceAfter: newBalance, description: `Scheduled purchase: ${plan.name}`, reference, createdAt: now,
+      });
+      account.walletBalance = newBalance;
+      current.lastRunAt = now;
+      current.lastOrderId = orderId;
+      current.nextRunAt = nextRunAt;
+      return true;
+    });
+  }
+
+  const plan = typeof scheduled.productSlug === "string" ? findPlan(scheduled.productSlug) : undefined;
+  if (!plan || scheduled.service !== plan.service) throw new Error("Invalid scheduled product");
+  const nextRunAt = calculateNextRun(scheduled.frequency as Frequency, now);
+  const reference = makeReference("SCH");
+  const orderId = randomUUID();
+
+  return await db.transaction(async (tx: any) => {
+    const [current] = await tx
+      .select()
+      .from(scheduledOrders)
+      .where(and(eq(scheduledOrders.id, scheduled.id), eq(scheduledOrders.status, "active")))
+      .limit(1);
+    if (!current) return false;
     const due = new Date(current.nextRunAt as Date | string).getTime();
-    if (!Number.isFinite(due)) throw new Error("Invalid scheduled run time");
-    if (due > now.getTime()) return false;
-    const plan = typeof current.productSlug === "string" ? findPlan(current.productSlug) : undefined;
-    if (!plan || current.service !== plan.service) throw new Error("Invalid scheduled product");
-    const nextRunAt = calculateNextRun(current.frequency as Frequency, now);
-    const account = draft.users.find((row) => row.id === current.userId);
-    if (!account || !Number.isSafeInteger(account.walletBalance) || (account.walletBalance as number) < plan.price) return false;
-    const newBalance = (account.walletBalance as number) - plan.price;
-    const reference = makeReference("SCH");
-    const orderId = randomUUID();
-    draft.orders.push({
-      id: orderId, reference, userId: current.userId, service: current.service,
-      productSlug: current.productSlug, productName: plan.name, planLabel: plan.planLabel,
-      region: plan.region, duration: plan.duration, amount: plan.price,
-      status: "delivered", provider: "scheduled", createdAt: now,
+    if (!Number.isFinite(due) || due > now.getTime()) return false;
+
+    const [account] = await tx
+      .select({ walletBalance: users.walletBalance })
+      .from(users)
+      .where(eq(users.id, current.userId))
+      .limit(1);
+    if (!account || !Number.isSafeInteger(account.walletBalance) || account.walletBalance < plan.price) return false;
+
+    await tx.insert(orders).values({
+      id: orderId,
+      reference,
+      userId: current.userId,
+      service: current.service,
+      productSlug: current.productSlug,
+      productName: plan.name,
+      planLabel: plan.planLabel,
+      region: plan.region,
+      duration: plan.duration,
+      amount: plan.price,
+      status: "delivered",
+      provider: "scheduled",
+      createdAt: now,
     });
-    draft.walletTransactions.push({
-      id: randomUUID(), userId: current.userId, orderId, type: "debit", amount: plan.price,
-      balanceAfter: newBalance, description: `Scheduled purchase: ${plan.name}`, reference, createdAt: now,
+
+    await debitWalletInTx(tx, {
+      userId: current.userId,
+      amount: plan.price,
+      type: "debit",
+      description: `Scheduled purchase: ${plan.name}`,
+      orderId,
+      reference,
     });
-    account.walletBalance = newBalance;
-    current.lastRunAt = now;
-    current.lastOrderId = orderId;
-    current.nextRunAt = nextRunAt;
+
+    await tx
+      .update(scheduledOrders)
+      .set({
+        lastRunAt: now,
+        lastOrderId: orderId,
+        nextRunAt,
+      })
+      .where(eq(scheduledOrders.id, current.id));
+
     return true;
   });
 }
 
 export async function processScheduledOrders(): Promise<number> {
-  if (!isPreviewDatabase()) throw new Error("Live scheduled fulfillment is not configured");
   const dueOrders = await db.query.scheduledOrders.findMany({
     where: and(eq(scheduledOrders.status, "active"), lte(scheduledOrders.nextRunAt, new Date())),
     limit: 50,

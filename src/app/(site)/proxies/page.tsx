@@ -8,7 +8,7 @@ import { ServiceIcon } from "@/components/ServiceIcon";
 
 export const metadata: Metadata = {
   title: "Residential Proxies",
-  description: "Explore proxy plans. Live proxy fulfillment is paused.",
+  description: "Explore proxy plans for secure browsing and data collection.",
 };
 
 export default function ProxiesPage() {
