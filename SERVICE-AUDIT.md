@@ -24,6 +24,7 @@ integration at all.
 | **Scheduled orders** | API + cron; page says not launched | `/api/scheduled-orders`, cron | **Broken: each run debited the wallet and wrote a `delivered` order without fulfilment** | **Fulfils before charging; refuses plans with no supplier path; skipped runs cost nothing** |
 | **eSIM** | hub → `/dashboard/esim/[id]` | Live supplier catalogue, wallet checkout, activation code on the order | Catalogue only | **Ready to buy with an eSIM key: live plans, naira prices, profile delivered and recoverable** |
 | App verification | hub | Both number suppliers, read-only listing | Catalogue only | Catalogue only — labelled |
+| Supplier status | `/api/admin/suppliers` (admin GET) | Read-only catalogue probe, no buy call | No such check | **Reports per supplier per country: configured, listed, priced, in stock, cheapest naira cost, and an error code when the catalogue cannot be read** |
 | Email OTP (paid) | hub, inbox | Fleexa email products | Catalogue only | Catalogue only — labelled |
 | Proxies | hub + `/proxies` | none | No path | No path — labelled |
 | Mobile data | `/dashboard/data` | `/api/airtime/plans` reads; `POST /api/airtime/purchase` always `503`; no supplier client | No path | No path — labelled |
