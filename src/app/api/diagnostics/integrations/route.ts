@@ -9,6 +9,8 @@ import {
   listFleexaRentAreas,
 } from "@/lib/fleexa";
 import { isBitcallConfigured, getBitcallBalance } from "@/lib/bitcall";
+import { esimItemsForCountry, readEsimCatalog } from "@/lib/esim-catalog";
+import { explorerCountry } from "@/lib/service-explorer";
 import { isSmmPanelConfigured } from "@/lib/smm-panel";
 import { resendConfigured } from "@/lib/resend-config";
 import { isPaystackConfigured, paystackKeyMode, getBanks } from "@/lib/paystack";
@@ -104,11 +106,27 @@ export async function GET(request: NextRequest) {
       })()
     : { configured: false as const };
 
+  // The eSIM catalogue is the one feed whose *size* is a support question: a
+  // destination can look empty because the supplier never published a plan, or
+  // because we could not price it, or because its coverage was unreadable, and
+  // all three render the same on the page. This reports which one it is, and
+  // ?country=NG answers "how many are actually listed for here".
+  const esimCountry = explorerCountry(request.nextUrl.searchParams.get("country"));
   const gateway = gatewayConfigured
     ? {
         configured: true as const,
         keyTail: keyTail("BITCALL_KEY_ID"),
         balance: await probe("bitcall-balance", getBitcallBalance),
+        esim: await probe("esim-catalog", async () => {
+          const catalog = await readEsimCatalog();
+          return {
+            ...catalog.stats,
+            partial: catalog.partial,
+            ...(esimCountry
+              ? { country: esimCountry.code, listedForCountry: esimItemsForCountry(catalog.offers, esimCountry.code).length }
+              : {}),
+          };
+        }),
       }
     : { configured: false as const };
 

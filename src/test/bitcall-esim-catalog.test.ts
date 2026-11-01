@@ -195,6 +195,27 @@ describe("eSIM coverage", () => {
   });
 });
 
+describe("eSIM catalogue counters", () => {
+  it("says why the catalogue came out the size it did", async () => {
+    const { offers } = await catalog([
+      plan({ planId: "pln_a", countries: ["Nigeria"], price: 4, currency: "USD" }),
+      plan({ planId: "pln_b", name: "Euro plan", countries: ["Germany"], price: 6, currency: "EUR" }),
+      plan({ planId: "pln_c", name: "No price", countries: ["Ghana"], price: null }),
+      plan({ planId: "pln_d", name: "Global", region: "Worldwide", countries: [] , price: 9 }),
+    ]);
+    const { stats } = await (await import("@/lib/esim-catalog")).readEsimCatalog();
+    expect(stats.returned).toBe(4);
+    expect(stats.priced).toBe(offers.length);
+    expect(stats.skippedCurrency).toBe(1);
+    expect(stats.skippedNoPrice).toBe(1);
+    // Only the priced plans can carry coverage into a listing: the euro plan and
+    // the unpriced one were dropped before they could be shown anywhere.
+    expect(stats.withCoverage).toBe(1);
+    expect(stats.global).toBe(1);
+    expect(stats.purchasable).toBeLessThanOrEqual(offers.length);
+  });
+});
+
 describe("eSIM catalogue reads", () => {
   it("fails closed when the provider is not configured", async () => {
     const { readEsimCatalog } = await import("@/lib/esim-catalog");

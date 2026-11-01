@@ -216,6 +216,28 @@ curl -s -H "Authorization: Bearer $DIAGNOSTICS_SECRET" \
   https://<your-domain>/api/diagnostics/integrations
 ```
 
+**"The eSIM list is too short."** Ask the diagnostics endpoint, which now counts
+the reasons rather than leaving you to guess:
+
+```sh
+curl -s -H "Authorization: Bearer $DIAGNOSTICS_SECRET" \
+  "https://<your-domain>/api/diagnostics/integrations?country=NG" | jq .gateway.esim
+```
+
+`returned` is what the supplier published; `priced` is what became an offer;
+`skippedCurrency` / `skippedNoPrice` / `skippedNoPlanId` say what was dropped and
+why; `withCoverage` counts offers that name a destination and `global` counts the
+ones listed everywhere; `listedForCountry` is the number the catalogue will show
+for `?country=`. A destination whose plans name their country in a scalar field
+(`country`, `countryCode`, comma-separated `coverage`) is read correctly since
+`0ca7328`'s follow-up — before that, those plans parsed to no coverage and
+appeared under no destination, which is the usual cause of an empty-looking list.
+
+Also worth remembering when counting a page rather than a catalogue: the service
+explorer renders twelve listings at a time and appends the rest behind **Show
+more**, across every category, so a country with 40 eSIM plans still shows a few
+of them first.
+
 The probe is rate-limited by the suppliers, so do not put it on a tight schedule.
 Watch for: an empty catalog with a funded balance (mapping problem), repeated
 `429`s (shared supplier budget), and an outbox that is not draining (scheduler
