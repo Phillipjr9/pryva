@@ -14,12 +14,15 @@ import { Check, Refresh } from "@/components/icons";
  */
 export function EsimProfile({
   orderId,
+  qrDataUrl,
   activationCode,
   installUrl,
   iccid,
   pending,
 }: {
   orderId: string;
+  /** The activation string drawn as a QR server-side, so nothing extra is fetched. */
+  qrDataUrl?: string | null;
   activationCode: string | null;
   installUrl: string | null;
   iccid: string | null;
@@ -91,6 +94,23 @@ export function EsimProfile({
 
   return (
     <div className="grid gap-4">
+      {qrDataUrl ? (
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-line bg-white p-4 sm:flex-row sm:items-start sm:gap-4">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a data URL has no optimiser path */}
+          <img
+            src={qrDataUrl}
+            alt="eSIM installation QR code"
+            width={176}
+            height={176}
+            className="h-[176px] w-[176px] rounded-lg"
+          />
+          <p className="text-[0.86rem] leading-relaxed text-ink-2">
+            Point your phone&apos;s camera at this code and follow the prompt — that is the whole
+            install. If the camera will not read it, paste the activation code instead.
+          </p>
+        </div>
+      ) : null}
+
       <div>
         <p className="text-micro font-semibold uppercase tracking-[0.14em] text-ink-3">Activation code</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -109,8 +129,8 @@ export function EsimProfile({
       </div>
 
       <ol className="grid list-decimal gap-1.5 pl-5 text-[0.9rem] leading-relaxed text-ink-2">
-        <li>Open Settings → Mobile data on the device and choose “Add eSIM”.</li>
-        <li>Pick “Enter details manually” and paste the code above.</li>
+        <li>Scan the QR above, or open Settings → Mobile data and choose “Add eSIM”.</li>
+        <li>Without a scanner, pick “Enter details manually” and paste the code above.</li>
         <li>Label the line eSIM and turn on data roaming while you travel.</li>
       </ol>
 

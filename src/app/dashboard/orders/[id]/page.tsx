@@ -15,6 +15,7 @@ import { OrderActions } from "@/components/dashboard/OrderActions";
 import { pollsForCode } from "@/lib/order-providers";
 import { canResendNumberCode } from "@/lib/otp-resend";
 import { syncBoostOrderStatus, type BoostSyncResult } from "@/lib/boost-status";
+import { esimQrDataUrl } from "@/lib/esim-qr";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -115,6 +116,11 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                 <CardContent>
                   <EsimProfile
                     orderId={order.id}
+                    qrDataUrl={
+                      order.esimActivationCode && status !== "processing"
+                        ? await esimQrDataUrl(order.esimActivationCode)
+                        : null
+                    }
                     activationCode={order.esimActivationCode}
                     installUrl={order.esimInstallUrl}
                     iccid={order.esimIccid}

@@ -6,6 +6,7 @@ import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
 import { validateEmail } from "@/lib/validation";
+import { sendGiftCardDelivery } from "@/lib/gift-card-delivery";
 
 export const dynamic = "force-dynamic";
 
@@ -46,11 +47,21 @@ export async function POST(request: NextRequest) {
     if (message != null && (typeof message !== "string" || message.length > 1000)) {
       return NextResponse.json({ error: "Message must be at most 1,000 characters." }, { status: 400 });
     }
-    const result = await createGiftCard({
-      userId: user.id, amount,
-      recipientEmail: typeof recipientEmail === "string" ? recipientEmail.trim().toLowerCase() : undefined,
-      message: typeof message === "string" ? message.trim() : undefined,
-    });
+    const recipient = typeof recipientEmail === "string" ? recipientEmail.trim().toLowerCase() : undefined;
+    const note = typeof message === "string" ? message.trim() : undefined;
+    const result = await createGiftCard({ userId: user.id, amount, recipientEmail: recipient, message: note });
+
+    // The card exists and the wallet is debited; mail is a courtesy on top, so it
+    // can never turn this into a failure the customer would retry (and pay twice).
+    if (recipient) {
+      await sendGiftCardDelivery({
+        to: recipient,
+        code: result.code,
+        amount: result.amount,
+        senderName: user.name ?? "A friend",
+        message: note,
+      }).catch(() => undefined);
+    }
     return NextResponse.json({ ok: true, code: result.code, amount: result.amount, expiresAt: result.expiresAt.toISOString() }, {
       headers: { "Cache-Control": "private, no-store" },
     });

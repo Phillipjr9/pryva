@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { db } from "@/db";
 import { scheduledOrders, orders, users } from "@/db/schema";
 import { eq, and, lte, ne } from "drizzle-orm";
+import { logger } from "@/lib/logger";
 import { findPlan } from "./catalog";
 import { cancelUpstream, fulfillPlan, fulfilmentIntent } from "./fulfillment";
 import { makeReference, debitWalletInTx } from "./wallet";
@@ -210,20 +211,56 @@ export async function processScheduledOrder(scheduled: typeof scheduledOrders.$i
   }
 }
 
-export async function processScheduledOrders(): Promise<number> {
+export type ScheduledRunCounts = { processed: number; skipped: number; failed: number; deferred: number };
+
+/** A run has to finish inside the cron request, so it stops buying before that. */
+const DEFAULT_RUN_LIMIT = 20;
+const DEFAULT_RUN_BUDGET_MS = 40_000;
+
+/**
+ * Run every due schedule, once.
+ *
+ * The nightly job calls this; `/api/cron/scheduled-orders` does too, for a manual
+ * run. Both get the same counts, because "processed 0" and "there was nothing to
+ * do" are different answers and only one of them means the wiring works.
+ */
+export async function runScheduledOrders(
+  options: { limit?: number; budgetMs?: number } = {},
+): Promise<ScheduledRunCounts> {
+  const limit = options.limit ?? DEFAULT_RUN_LIMIT;
+  const budgetMs = options.budgetMs ?? DEFAULT_RUN_BUDGET_MS;
+  const startedAt = Date.now();
   const dueOrders = await db.query.scheduledOrders.findMany({
     where: and(eq(scheduledOrders.status, "active"), lte(scheduledOrders.nextRunAt, new Date())),
-    limit: 50,
+    limit,
   });
-  let processed = 0;
-  for (const scheduled of dueOrders) {
+  const counts: ScheduledRunCounts = { processed: 0, skipped: 0, failed: 0, deferred: 0 };
+  for (const [index, scheduled] of dueOrders.entries()) {
+    // Each run buys from a supplier before charging, so one slow supplier can eat
+    // the whole cron window. Anything not reached stays due and is picked up
+    // tomorrow -- it was never charged, so deferring costs the customer nothing.
+    if (Date.now() - startedAt > budgetMs) {
+      counts.deferred = dueOrders.length - index;
+      logger.warn("Scheduled run out of budget", { deferred: counts.deferred, budgetMs });
+      break;
+    }
     try {
-      if (await processScheduledOrder(scheduled)) processed++;
+      if (await processScheduledOrder(scheduled)) counts.processed++;
+      else counts.skipped++;
     } catch (error) {
-      console.error(`Failed to process scheduled order ${scheduled.id}:`, error);
+      counts.failed++;
+      logger.error("Failed to process scheduled order", {
+        scheduledOrderId: scheduled.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
-  return processed;
+  return counts;
+}
+
+/** The processed count, for callers that only want the headline number. */
+export async function processScheduledOrders(): Promise<number> {
+  return (await runScheduledOrders()).processed;
 }
 
 export function calculateNextRun(frequency: Frequency, from = new Date()): Date {

@@ -31,10 +31,10 @@ disagreement is named.
 | 5 | Accounts marketplace | Yes | Supplier key + admin manual lane | Uncertain outcomes parked in `review`, reviewed by hand | **Complete** |
 | 6 | Social boosts | Yes, when the SMM panel is configured | SMM panel | Debit reversed automatically, order marked `refunded` | **Complete** |
 | 7 | Gift cards (supplier stock) | Yes | FoxReload | Wallet refund on any upstream failure | **Complete** |
-| 8 | Gift cards (Pryva-issued) | Yes | Generated locally | Not applicable — nothing upstream to fail | **Complete**, no delivery email |
+| 8 | Gift cards (Pryva-issued) | Yes | Generated locally and emailed to the recipient | Not applicable — nothing upstream to fail | **Complete** |
 | 9 | Wallet, top-ups, withdrawals | Yes | Paystack | Approvals, name checks, reconciliation queue | **Complete** |
 | 10 | Temporary email inbox | Free, not a purchase | Local + database | Paused with an explicit reason on preview DBs | **Complete** |
-| 11 | Scheduled / recurring orders | No UI, API live | Nothing — no job runs it | n/a | **Dormant** (see G1) |
+| 11 | Scheduled / recurring orders | Yes, from `/dashboard/scheduled` | Nightly job → `runScheduledOrders()` | Nothing charged unless the plan was bought | **Complete** |
 | 12 | App verification codes, extended inbox plans | No | No supplier for either | n/a | **Not sellable, correctly** |
 | 13 | Residential proxies | No | No supplier | n/a | **Not sellable, correctly** |
 | 14 | Mobile data & airtime | No | No supplier | n/a | **Not sellable, correctly** |
@@ -102,8 +102,13 @@ Tests: `bulk-orders`, `bulk-orders-extended`, `bulk-orders-route`.
 - Recovery: nothing is charged when the profile cannot be issued.
 - Tests: `esim-purchase-route`, `esim-delivery-email`, `bitcall-esim-catalog`.
 
-**Gaps:** no failover — Bitcall is the only eSIM supplier (G3); the order page
-never renders a QR, only the activation string (G3b).
+The order page draws the QR from the activation string server-side
+(`esimQrDataUrl`) and inlines it as a data URL, so the page carries no extra
+request and the scan is step one of the install — the email had been telling
+customers to "open your order page to view the QR code" when the page showed only
+the string.
+
+**Gap:** no failover — Bitcall is the only eSIM supplier (G3).
 
 ## 5. Accounts marketplace — complete
 
@@ -139,10 +144,14 @@ refunds to the wallet and writes a `reconciliationNote`. The voucher code lands 
 `referenceCode` and is shown to the buyer.
 Tests: `gift-cards`, `gift-cards-extended`, `gift-card-security`.
 
-**Gap:** if the refund itself fails, the route only `console.error`s — the money
-is then neither delivered nor returned until someone notices (G2).
+A refund that cannot commit is now parked rather than announced: the order moves
+to `review` with `reconciliationNote: "…; automatic refund failed — debit still
+stands"`, which is the queue `/admin/reconciliation` shows, and the customer is
+told the money will be refunded by support instead of being told it already was.
+Previously the same "Your wallet has been refunded." sentence was returned whether
+or not the credit committed.
 
-## 8. Gift cards (Pryva-issued) — complete, no email
+## 8. Gift cards (Pryva-issued) — complete
 
 `/api/gift-cards/purchase` debits the wallet and mints a `PRYVA-XXXX-XXXX-XXXX`
 code; `/api/gift-cards/redeem` credits it, with per-IP and per-user budgets, one
@@ -150,8 +159,11 @@ redemption per card, a 12-month validity and a ₦500,000 cap
 (`gift-card-rules.ts`, `gift-card-requests.ts`).
 Tests: `gift-card-requests`, `brand-gift-cards`, `gift-card-page`.
 
-**Gap:** `giftCardEmail()` exists in `src/lib/email-templates.ts` but nothing calls
-it — the recipient is only reached if the buyer copies the code by hand (G6).
+`sendGiftCardDelivery()` (`src/lib/gift-card-delivery.ts`) now mails the code to the
+address the buyer typed, through the template that had existed uncalled since the
+launch. The send is best effort and escapes the sender's name and message: the
+card exists and the wallet is debited before the mail is attempted, so a mail
+failure must never turn a completed purchase into an error the customer retries.
 
 ## 9. Wallet, top-ups, withdrawals — complete
 
@@ -170,22 +182,28 @@ Tests: `withdrawal-security`, `bank-account-onboarding`, `wallet-*`,
 preview database instead of failing silently; `/dashboard/inbox` explains the pause.
 Tests: `inbox-route`, `disposable-inbox`, `inbox-diagnostics`, `inbox-responsive`.
 
-## 11. Scheduled / recurring orders — dormant
+## 11. Scheduled / recurring orders — complete
 
-The schema, API (`/api/scheduled-orders`, GET/POST/pause/resume/cancel) and
-processor (`/api/cron/scheduled-orders` → `processScheduledOrders`) all exist, and
-`createScheduledOrder` refuses any plan without `fulfilmentIntent`. But:
+The processor was already written to buy first and charge only what it bought; the
+missing half was that nothing called it. `vercel.json` schedules only
+`/api/cron/nightly`, and the dedicated route exported `POST` while Vercel Cron
+sends `GET` — a job registered there would have been answered 405 forever.
 
-- `vercel.json` schedules **only** `/api/cron/nightly`, and `cron-schedule.test.ts`
-  documents why `scheduled-orders` is excluded — that route exports `POST` only,
-  Vercel Cron sends `GET`, and the Hobby plan allows two jobs. So nothing ever
-  runs a schedule on Vercel.
-- `/dashboard/scheduled` says recurring orders are unavailable; no UI creates one.
+- `runScheduledOrders()` is now a step inside the nightly job, placed **after** the
+  refund sweep so an order it creates is never examined by the same run. It is
+  skipped on a preview database, reports all three counts (processed, skipped,
+  failed) in the run summary, and a failure in it cannot stop the other steps.
+- `/api/cron/scheduled-orders` answers `GET` as well as `POST`, for a manual run.
+- `/dashboard/scheduled` is a real screen: create from the plans that have a
+  supplier path, at a stated cadence, then pause, resume or cancel. It says the
+  runner wakes once a night, that `daily` therefore means "every night", and that
+  a balance below one run means no charge — the schedule simply stays due.
+- A schedule that is due because its last attempt did not go through says so, by
+  comparing `nextRunAt` to now rather than showing a date that has already passed.
 
-Net effect: a caller hitting the API directly can store a schedule that will never
-execute. It cannot be charged (no run means no debit), so this is wasted intent
-rather than a money leak — but it is the one service where the backend and frontend
-disagree (G1).
+Tests: `scheduled-wiring` (the route answers GET, refuses a wrong secret, and the
+nightly job calls it) and `scheduled-manager-ui` (the body sent, the honest copy,
+pause/resume/cancel).
 
 ## 12. App verification codes, extended inbox plans — not sellable, correctly
 
@@ -212,16 +230,16 @@ proxies under "Case by case" alongside eSIM and offered a refund route for airti
 
 ## Gaps, worst first
 
-| # | Gap | Severity | Evidence | Suggested action |
-|---|---|---|---|---|
-| G1 | Scheduled orders can be created but never run | Medium — no money loss, but a dead promise | `vercel.json`, `cron-schedule.test.ts`, `src/lib/scheduled-orders.ts` | Either retire the API until a job slot exists, or convert `/api/cron/scheduled-orders` to `GET` + fold it into `nightly` and ship the UI |
-| G2 | A failed gift-card refund is only logged | Medium — unpriced money | `src/app/api/gift-cards/order/route.ts` critical-refund path | Fall back to a reconciliation row the admin queue can claim |
-| G3 | eSIM has one supplier, no failover | Medium | `src/lib/esim-fulfilment.ts` (Bitcall only) | Add a second eSIM supplier behind the same interface the numbers lane uses |
-| G3b | The eSIM order page shows no QR | Low | `src/components/dashboard/EsimProfile.tsx` | Render the activation QR from the same string the email uses |
-| G4 | Resend is Bitcall-only | Low | `src/lib/otp-resend.ts` | Route resends through whichever supplier issued the number |
-| G5 | Boost completion is never emailed | Low | `wallet-email-outbox.ts` event kinds | Add a `boost_complete` event |
-| G6 | Pryva gift cards are not emailed to the recipient | Low | `giftCardEmail()` unused | Wire it into the purchase route |
-| G7 | Copy drift on `/faq`, `/refund-policy`, `/proxies` | Fixed in this pass | see below | — |
+| # | Gap | Severity | Status |
+|---|---|---|---|
+| G1 | Scheduled orders could be created but never ran | Medium — no money loss, but a dead promise | **Fixed**: nightly step + GET route + management screen |
+| G2 | A failed gift-card refund was only logged | Medium — unpriced money | **Fixed**: order moves to `review` with a note in the reconciliation queue, and the customer is not told a refund happened |
+| G3 | eSIM has one supplier, no failover | Medium | **Open**: needs a second eSIM credential. Fleexa has no eSIM endpoint, so there is nothing to fail over *to*; adding a fake second path would be worse than the single one |
+| G3b | The eSIM order page showed no QR | Low | **Fixed**: `esimQrDataUrl()` inline in the page |
+| G4 | Resend is Bitcall-only | Low | **Open**: route resends through wherever the number was bought |
+| G5 | Boost completion is never emailed | Low | **Open**: needs a `boost_complete` outbox event |
+| G6 | Pryva gift cards were not emailed to the recipient | Low | **Fixed**: `sendGiftCardDelivery()`, best effort, HTML-escaped |
+| G7 | Copy drift on `/faq`, `/refund-policy`, `/proxies` | Low | **Fixed**: see below |
 
 ## What production must configure before each "gated" service opens
 
@@ -229,6 +247,7 @@ proxies under "Case by case" alongside eSIM and offered a refund route for airti
 |---|---|---|
 | Numbers, rentals, bulk | `FLEEXA_API_KEY`, `BITCALL_KEY_ID`/`BITCALL_API_SECRET` | Plans render; checkout refuses with a truthful message |
 | eSIM | Bitcall credentials | `/esim` shows the six sample cards; no ordering |
+| Scheduled purchases | `CRON_SECRET` (the nightly job runs them) | Schedules can be created; nothing would run them |
 | Boosts | SMM panel URL + key | Boost page 404s; `/admin/boosting` shows readiness steps |
 | Accounts | Supplier credential | Only the admin manual lane is offered |
 | Gift cards | FoxReload base URL + key | Order route refuses before debiting |
@@ -253,10 +272,21 @@ proxies under "Case by case" alongside eSIM and offered a refund route for airti
   proxy plan is ever in the fulfilment allowlist — if one is added, the test fails
   and points at the copy that must change with it.
 
+## Fixed after the audit
+
+- **G1 scheduled orders** — wired into the nightly job, route answers GET, and
+  `/dashboard/scheduled` is a management screen.
+- **G2 gift-card refund failure** — the order goes where an operator will see it,
+  and the customer is told the truth.
+- **G3b eSIM QR** — the order page draws the code the email already told customers
+  to open the page for.
+- **G6 gift-card delivery email** — the recipient is mailed the code.
+
 ## How to re-run this audit
 
 ```
 npm run typecheck && npm run lint && npm test
-npx vitest run src/test/public-availability-copy.test.tsx
+npx vitest run src/test/public-availability-copy.test.tsx src/test/scheduled-wiring.test.ts \
+  src/test/scheduled-manager-ui.test.tsx src/test/gift-card-delivery.test.ts src/test/esim-qr-page.test.tsx
 npm run pricing:audit -- --check
 ```

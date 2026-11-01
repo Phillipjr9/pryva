@@ -6,6 +6,7 @@ import { sweepPendingNumberCodes } from "@/lib/number-code-sync";
 import { dispatchWalletEmails, walletEmailConfigured } from "@/lib/wallet-email-outbox";
 import { sweepBoostDeliveries } from "@/lib/boost-status";
 import { expireFinishedRentals } from "@/lib/rental-expiry";
+import { runScheduledOrders } from "@/lib/scheduled-orders";
 import { sweepPendingEsimOrders } from "@/lib/esim-fulfilment";
 import { settleReferralRewards } from "@/lib/referrals";
 import { purgeExpiredClosedAccounts } from "@/lib/retention";
@@ -40,7 +41,11 @@ export const maxDuration = 60;
  *      as live even if its owner never opens the page. It runs after the refund
  *      sweep on purpose: a single-use number whose window closed unfulfilled must
  *      reach the refund step while it still says `active`;
- *   6. **ask about payouts the provider has not reported**, because a customer's
+ *   6. **run the schedules that are due**, after the refund sweep so an order it
+ *      creates is never examined by the sweep in the same run. Recurring orders
+ *      exist as an API and a processor but no job ever called them, which made a
+ *      stored schedule a promise nothing kept; this is the caller;
+ *   7. **ask about payouts the provider has not reported**, because a customer's
  *      money must not depend on a webhook arriving.
  *
  * Each step is isolated: a failure in one is reported and the next still runs,
@@ -133,6 +138,17 @@ async function handler(request: NextRequest) {
     return { ok: true, detail: `completed ${result.completed}, pending ${result.pending}, failed ${result.failed}` };
   });
 
+  // Recurring orders: the processor buys first and charges only what it bought,
+  // so a skipped run costs nothing and stays due for the next night.
+  const scheduled = await runStep("scheduled-orders", async () => {
+    if (isPreviewDatabase()) return { ok: true, detail: "skipped: preview database" };
+    const counts = await runScheduledOrders();
+    return {
+      ok: true,
+      detail: `processed ${counts.processed}, skipped ${counts.skipped}, failed ${counts.failed}, deferred ${counts.deferred}`,
+    };
+  });
+
   const rentals = await runStep("rental-expiry", async () => {
     const result = await expireFinishedRentals();
     return { ok: true, detail: `expired ${result.expired}` };
@@ -186,7 +202,7 @@ async function handler(request: NextRequest) {
     };
   });
 
-  const allOk = close.ok && emails.ok && boosts.ok && numberCodes.ok && refunds.ok && esim.ok && rentals.ok && referrals.ok && payouts.ok && webhookLog.ok && retention.ok;
+  const allOk = close.ok && emails.ok && boosts.ok && numberCodes.ok && refunds.ok && esim.ok && scheduled.ok && rentals.ok && referrals.ok && payouts.ok && webhookLog.ok && retention.ok;
   logger.info("Nightly run finished", {
     day,
     allOk,
@@ -196,13 +212,14 @@ async function handler(request: NextRequest) {
     numberCodes: numberCodes.detail,
     refunds: refunds.detail,
     esim: esim.detail,
+    scheduled: scheduled.detail,
     rentals: rentals.detail,
     referrals: referrals.detail,
     retention: retention.detail,
   });
 
   return NextResponse.json(
-    { ok: allOk, day, steps: { close, emails, boosts, numberCodes, refunds, esim, rentals, referrals, retention } },
+    { ok: allOk, day, steps: { close, emails, boosts, numberCodes, refunds, esim, scheduled, rentals, referrals, retention } },
     { status: allOk ? 200 : 207, headers: { "Cache-Control": "no-store" } },
   );
 }
