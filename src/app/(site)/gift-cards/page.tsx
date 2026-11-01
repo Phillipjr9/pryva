@@ -72,7 +72,7 @@ const steps = [
   },
   {
     title: "Share the code",
-    body: "The code looks like PRYVA-XXXX-XXXX-XXXX. Copy it, or note the recipient's email on the card for your own records. We store that address; we do not send anything to it.",
+    body: "The code looks like PRYVA-XXXX-XXXX-XXXX. Name a recipient and we email them the code and your message; leave the address out and it stays on your screen for you to share yourself.",
   },
   {
     title: "They redeem it",

@@ -11,6 +11,7 @@ import * as orders from "@/app/api/admin/orders/route";
 import * as refunds from "@/app/api/admin/refunds/route";
 import * as metrics from "@/app/api/admin/security/metrics/route";
 import * as stats from "@/app/api/admin/stats/route";
+import * as suppliers from "@/app/api/admin/suppliers/route";
 import * as userDetails from "@/app/api/admin/users/[id]/route";
 import * as users from "@/app/api/admin/users/route";
 import * as withdrawals from "@/app/api/admin/withdrawals/route";
@@ -42,6 +43,7 @@ const handlers: Array<{ path: string; method: string; handler: Handler }> = [
   { path: "refunds", method: "POST", handler: refunds.POST },
   { path: "security/metrics", method: "GET", handler: metrics.GET },
   { path: "stats", method: "GET", handler: stats.GET },
+  { path: "suppliers", method: "GET", handler: suppliers.GET },
   { path: "users", method: "GET", handler: users.GET },
   { path: "users/test-id", method: "GET", handler: userDetails.GET },
   { path: "users/test-id", method: "PUT", handler: userDetails.PUT },

@@ -86,7 +86,7 @@ export default function ESIMPage() {
                 are charged when the profile is issued, and it installs from an activation code on the order.
               </p>
               <Link
-                href="/dashboard/services?category=esim"
+                href="/dashboard/esim"
                 className="mt-4 inline-flex items-center gap-2 rounded-xl bg-lav-600 px-5 py-2.5 text-[0.9rem] font-semibold text-white hover:bg-lav-700"
               >
                 See live eSIM plans <ArrowRight className="h-4 w-4" />

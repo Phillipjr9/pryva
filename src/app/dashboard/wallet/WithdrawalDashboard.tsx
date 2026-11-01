@@ -29,6 +29,8 @@ interface BankAccount {
   accountNumber: string;
   accountName: string;
   isDefault: boolean;
+  /** Set when the payout name rule will refuse this account, so the list can say so up front. */
+  payoutWarning?: string | null;
 }
 
 interface Withdrawal {
@@ -100,6 +102,15 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
   const [pendingIntents, setPendingIntents] = useState<WithdrawalIntent[]>([]);
   const [review, setReview] = useState<WithdrawalReview | null>(null);
   const [recoveryState, setRecoveryState] = useState<"loading" | "ready" | "unavailable">("loading");
+  /**
+   * The payout route's email-verification refusal.
+   *
+   * "Review requests or retry" is the right advice for an unknown outcome, but it
+   * is useless here: retrying changes nothing until the address is verified, and
+   * the customer has just been told no money moved. This keeps the reason on the
+   * page next to the link that fixes it, instead of a toast that disappears.
+   */
+  const [emailVerificationNotice, setEmailVerificationNotice] = useState<string | null>(null);
   const intentKey = `pryva.withdrawal.pending.v1.${userId}`;
   const sending = useRef(false);
   const [banks, setBanks] = useState<Bank[]>([]);
@@ -241,7 +252,14 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
       const data = await response.json();
 
       if (response.ok && data.ok) {
-        addToast({ type: "success", message: "Bank account added" });
+        // Saved but unpairable is a real outcome: say so now, and let the list
+        // keep saying it rather than flashing past in a toast.
+        const warning = typeof data.payoutWarning === "string" && data.payoutWarning.trim() ? data.payoutWarning : null;
+        addToast({
+          type: warning ? "warning" : "success",
+          message: warning ?? "Bank account added",
+          duration: warning ? 9_000 : undefined,
+        });
         setBankCode("");
         setAccountNumber("");
         setAccountName("");
@@ -283,6 +301,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
     if (sending.current) return { ok: false, message: "A request is already being checked. Review Requests before trying again." };
     sending.current = true;
     setLoading(true);
+    setEmailVerificationNotice(null);
     const abort = new AbortController();
     const timeout = window.setTimeout(() => abort.abort(), 20_000);
     try {
@@ -325,6 +344,14 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
       // key even for a 4xx until the request is reviewed or reconciled.
       const error = data && typeof data === "object" && !Array.isArray(data) && typeof (data as { error?: unknown }).error === "string"
         ? (data as { error: string }).error.slice(0, 240) : "The request response could not be confirmed.";
+
+      // Nothing was written and nothing was debited, so there is no request to
+      // review: the answer is "verify your email", said once, where it can be acted on.
+      if (data && typeof data === "object" && !Array.isArray(data) && (data as { code?: unknown }).code === "EMAIL_UNVERIFIED") {
+        setEmailVerificationNotice(error);
+        addToast({ type: "error", message: error });
+        return { ok: false, message: error };
+      }
       const message = `${error} Review requests or retry the original request before starting another.`;
       setActiveTab("history");
       void fetchWithdrawalHistory();
@@ -402,6 +429,21 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
     }
   }
 
+  /**
+   * The CTA for a customer with no accounts.
+   *
+   * It used to be a link to `#bank-accounts`, but that panel is only rendered
+   * while the Bank accounts tab is active — so on the Withdraw tab the link had
+   * no target and pressing "Add a bank account" did nothing at all. Switch the
+   * tab first, then bring the panel into view on the next frame.
+   */
+  function openAccountsTab() {
+    setActiveTab("accounts");
+    window.requestAnimationFrame(() => {
+      document.getElementById("bank-accounts")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   const maxPayout = maxWithdrawalForBalance(balance);
   const enteredAmount = Number(amount);
   const validEnteredAmount = Number.isSafeInteger(enteredAmount) && enteredAmount >= MIN_WITHDRAWAL && enteredAmount <= MAX_WITHDRAWAL;
@@ -429,6 +471,15 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
         </span>
       </div>
 
+      {emailVerificationNotice ? (
+        <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[0.82rem] leading-relaxed text-amber-900">
+          {emailVerificationNotice}{" "}
+          <a href="/verify-email" className="font-semibold underline">
+            Verify your email
+          </a>
+        </div>
+      ) : null}
+
       <div className="flex gap-1.5 overflow-x-auto">
         {tabs.map((tab) => (
           <button
@@ -454,7 +505,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
               icon={Card}
               title="Add a bank account first"
               body="Add a Nigerian bank account and check the resolved account name carefully before requesting a payout."
-              action={{ label: "Add a bank account", href: "#bank-accounts" }}
+              action={{ label: "Add a bank account", onClick: openAccountsTab }}
               className="!border-0 !bg-transparent !py-6"
             />
           ) : (
@@ -525,6 +576,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                   {bankAccounts.map((account) => (
                     <option key={account.id} value={account.id}>
                       {account.bankName} · {account.accountNumber} ({account.accountName})
+                      {account.payoutWarning ? " — payouts blocked" : ""}
                     </option>
                   ))}
                 </select>
@@ -718,7 +770,9 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                 <span>
                   Withdrawals are paid only to a bank account in the same name as the one that
                   funded your wallet. Money is never sent to a third-party account, so an account
-                  in somebody else&apos;s name cannot be used.
+                  in somebody else&apos;s name cannot be used — but you can still save it, and if the
+                  names look different we will say so here rather than after you have filled in a
+                  withdrawal. Support can review a name that is spelled differently by the bank.
                 </span>
               </p>
 
@@ -767,6 +821,12 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                       </p>
                       <p className="truncate text-meta text-ink-2">{account.accountNumber}</p>
                       <p className="truncate text-meta text-ink-3">{account.accountName}</p>
+                      {account.payoutWarning && (
+                        <p className="mt-1.5 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-micro leading-relaxed text-amber-900">
+                          <AlertCircle className="mt-px h-3 w-3 shrink-0" />
+                          <span>{account.payoutWarning}</span>
+                        </p>
+                      )}
                     </div>
                     <button
                       type="button"

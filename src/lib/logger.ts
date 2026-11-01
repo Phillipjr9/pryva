@@ -71,6 +71,13 @@ class Logger {
       context,
     };
     console.error(this.formatEntry(entry));
+    // Platform logs are only read after somebody notices. This is what makes an
+    // error noticed -- fire-and-forget, throttled, never awaited, never throwing.
+    if (typeof window === "undefined" && process.env.ALERT_WEBHOOK_URL?.trim()) {
+      void import("@/lib/alerts")
+        .then(({ sendAlert }) => sendAlert(message, context))
+        .catch(() => undefined);
+    }
   }
 }
 

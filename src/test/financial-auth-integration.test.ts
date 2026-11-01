@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   verifyTransfer: vi.fn(),
   checkSms: vi.fn(),
   rentalSms: vi.fn(),
+  otpActivation: vi.fn(),
   destroySession: vi.fn(),
   googleProfile: vi.fn(),
   exchange: vi.fn(),
@@ -71,6 +72,11 @@ vi.mock("@/lib/accszone", async (original) => {
 vi.mock("@/lib/fleexa", async (original) => {
   const actual = await original<typeof import("@/lib/fleexa")>();
   return { ...actual, checkFleexaSms: mocks.checkSms, getFleexaRentalSms: mocks.rentalSms };
+});
+// A number can come from either supplier; the poll must ask the one that sold it.
+vi.mock("@/lib/bitcall", async (original) => {
+  const actual = await original<typeof import("@/lib/bitcall")>();
+  return { ...actual, getBitcallOtpActivation: mocks.otpActivation };
 });
 vi.mock("@/lib/marketplace-pricing", () => ({
   priceMarketplaceListing: mocks.price,
@@ -169,6 +175,9 @@ beforeAll(async () => {
   await pg.exec(await readFile("migrations/0025_account_deletion_forfeiture.sql", "utf8"));
   await pg.exec(await readFile("migrations/0026_webhook_events.sql", "utf8"));
   await pg.exec(await readFile("migrations/0027_esim_credentials.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0028_esim_delivery_email.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0029_notification_gaps.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0030_payout_name_approvals.sql", "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
   [purchaseRoute, refundRoute, bankRoute, verifyBankRoute, googleRoute, contactRoute, deleteRoute, passwordRoute, sessionsRoute, autoRefund, giftPurchaseRoute, giftCheckRoute, giftRedeemRoute, topUpRoute, verifyTopUpRoute, webhookRoute, profileRoute, notificationsRoute, markReadRoute, logoutRoute, syncRoute, scheduledRoute, promoRoute, withdrawalRoute, adminWithdrawalRoute, integrity] = await Promise.all([
@@ -203,6 +212,7 @@ beforeEach(async () => {
   }));
   mocks.checkSms.mockReset();
   mocks.rentalSms.mockReset();
+  mocks.otpActivation.mockReset();
   vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db");
   vi.stubEnv("MARKETPLACE_LIVE_PURCHASES", "true");
   vi.stubEnv("PAYSTACK_SECRET_KEY", "test-secret");
@@ -1562,6 +1572,38 @@ describe("order sync and scheduler safety", () => {
     const [saved] = await database.select().from(schema.orders).where(eq(schema.orders.id, order.id));
     expect(saved.status).toBe("refunded");
     expect(saved.otpCode).toBeNull();
+  });
+
+  it("polls the supplier that actually sold the number for its code", async () => {
+    const [order] = await database.insert(schema.orders).values({
+      reference: "GATEWAY-ORDER", userId: USER, service: "numbers", productSlug: "vn-ng", productName: "Number",
+      planLabel: "Nigeria number · WhatsApp", region: "NG", duration: "Single verification · 20 min window",
+      amount: 1000, status: "active", provider: "bitcall", providerRequestId: "act-1",
+      expiresAt: new Date(Date.now() + 60_000),
+    }).returning();
+    const context = { params: Promise.resolve({ id: order.id }) };
+    const url = `https://pryva.test/api/orders/${order.id}/sync`;
+
+    // No code yet: the order stays open rather than being closed on a guess.
+    mocks.otpActivation.mockResolvedValueOnce({
+      activationId: "act-1", phoneNumber: "+2348111111111", code: null, price: 0.01,
+      currency: "USD", status: "pending", serviceId: "pool-1",
+      actions: { canResend: false, canReactivate: false },
+    });
+    expect(await (await syncRoute.GET(new Request(url), context)).json())
+      .toMatchObject({ otpCode: null, status: "active" });
+    expect(mocks.checkSms).not.toHaveBeenCalled();
+
+    // The provider never says "delivered": only "received" means a code exists.
+    mocks.otpActivation.mockResolvedValueOnce({
+      activationId: "act-1", phoneNumber: "+2348111111111", code: "654321", price: 0.01,
+      currency: "USD", status: "received", serviceId: "pool-1",
+      actions: { canResend: false, canReactivate: true },
+    });
+    expect(await (await syncRoute.GET(new Request(url), context)).json())
+      .toMatchObject({ otpCode: "654321", status: "delivered" });
+    const [saved] = await database.select().from(schema.orders).where(eq(schema.orders.id, order.id));
+    expect(saved).toMatchObject({ otpCode: "654321", status: "delivered" });
   });
 
   it("keeps a rental active after a code so a later message can still be synced", async () => {

@@ -19,3 +19,31 @@ export function resendConfigured(): boolean {
   const from = process.env.RESEND_FROM_EMAIL?.trim();
   return Boolean(key && from && from.length <= 255 && !/[\r\n]/.test(from));
 }
+
+/**
+ * The one place a payout asks "is this account's address real?".
+ *
+ * Email verification has always been advisory: a link is mailed at signup, a
+ * banner appears until it is clicked, and nothing else cares. That is tolerable
+ * for browsing and buying -- the goods appear on the order page whether or not
+ * mail works -- but not for money leaving. A payout to an account whose address
+ * nobody has proven they control is an account we cannot reach, cannot warn and
+ * cannot recover if a session is stolen, and the address was never checked.
+ *
+ * Two conditions, both deliberate:
+ *
+ *  • only when mail is configured, because a gate nobody can satisfy is a lockout
+ *    -- if Resend is unset the link cannot be sent, so it cannot be required;
+ *  • only on the way out, not on deposits or purchases, so the rule costs a
+ *    customer nothing until they ask us to send money to a bank.
+ */
+export const UNVERIFIED_EMAIL_PAYOUT_MESSAGE =
+  "Verify your email before withdrawing. We can only send money out of an account whose address we can reach — open the link we emailed you, or request a new one from Security. Nothing was deducted.";
+
+export function unverifiedEmailBlocksPayout(user: {
+  emailVerifiedAt: Date | string | null;
+}): string | null {
+  if (!resendConfigured()) return null;
+  if (user.emailVerifiedAt) return null;
+  return UNVERIFIED_EMAIL_PAYOUT_MESSAGE;
+}

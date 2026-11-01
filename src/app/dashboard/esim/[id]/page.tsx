@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
  * 404s instead of quoting a price that no longer exists.
  */
 export default async function EsimPlanPage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await requireUser("/dashboard/services?category=esim");
+  const user = await requireUser("/dashboard/esim");
   const { id } = await params;
 
   const offer = await findEsimOffer(id).catch(() => null);
@@ -29,7 +29,7 @@ export default async function EsimPlanPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="grid gap-5">
-      <Link href="/dashboard/services?category=esim" className="w-fit text-meta font-semibold text-lav-700 hover:underline">
+      <Link href="/dashboard/esim" className="w-fit text-meta font-semibold text-lav-700 hover:underline">
         ← Back to eSIM plans
       </Link>
 

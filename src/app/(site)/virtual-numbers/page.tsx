@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { serviceMap, plansFor, formatNaira } from "@/lib/catalog";
 import { isPlanFulfillable } from "@/lib/fulfillment";
+import { orderNumberPlansByCheapestCost } from "@/lib/number-plan-order";
 import { getCurrentUser } from "@/lib/auth";
 import { PlanPurchase } from "@/components/purchase/PlanPurchase";
 import { Check, ArrowRight } from "@/components/icons";
@@ -20,7 +21,12 @@ export default async function VirtualNumbersPage() {
   const service = serviceMap.numbers;
   // Only plans the fulfilment layer can actually deliver are shown or sold.
   const deliverable = plansFor("numbers").filter((plan) => isPlanFulfillable(plan.slug));
-  const plans = deliverable.filter((plan) => !plan.slug.startsWith("rent-"));
+  // Cheapest destination to serve first: the selling price is fixed per plan, so
+  // the least we pay is the most margin, and the customer sees the best value at
+  // the top of the list. Only the order changes — no cost is ever rendered.
+  const plans = await orderNumberPlansByCheapestCost(
+    deliverable.filter((plan) => !plan.slug.startsWith("rent-")),
+  );
   const rentals = deliverable.filter((plan) => plan.slug.startsWith("rent-"));
   const user = await getCurrentUser().catch(() => null);
 

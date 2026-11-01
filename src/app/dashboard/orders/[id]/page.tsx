@@ -12,8 +12,10 @@ import { ArrowLeft } from "@/components/icons";
 import { CredentialList } from "./CredentialList";
 import { EsimProfile } from "./EsimProfile";
 import { OrderActions } from "@/components/dashboard/OrderActions";
-import { LIVE_OTP_PROVIDER } from "@/lib/order-providers";
+import { pollsForCode } from "@/lib/order-providers";
+import { canResendNumberCode } from "@/lib/otp-resend";
 import { syncBoostOrderStatus, type BoostSyncResult } from "@/lib/boost-status";
+import { esimQrDataUrl } from "@/lib/esim-qr";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -114,6 +116,11 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                 <CardContent>
                   <EsimProfile
                     orderId={order.id}
+                    qrDataUrl={
+                      order.esimActivationCode && status !== "processing"
+                        ? await esimQrDataUrl(order.esimActivationCode)
+                        : null
+                    }
                     activationCode={order.esimActivationCode}
                     installUrl={order.esimInstallUrl}
                     iccid={order.esimIccid}
@@ -183,6 +190,12 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                     </Badge>
                   </div>
                 </div>
+                <p className="mt-3 text-meta">
+                  {/* The order page is a live screen; a receipt is a document. */}
+                  <Link href={`/dashboard/orders/${order.id}/receipt`} className="font-semibold text-lav-700 hover:underline">
+                    View or print receipt
+                  </Link>
+                </p>
               </CardContent>
             </Card>
 
@@ -242,7 +255,9 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
               referenceCode={order.referenceCode ?? null}
               otpCode={order.otpCode ?? null}
               service={order.service}
-              refreshableCode={order.provider === LIVE_OTP_PROVIDER}
+              refreshableCode={pollsForCode(order)}
+              // Decided on the server: the browser gets a boolean, never a name.
+              canResendCode={canResendNumberCode(order)}
               initialNow={now}
             />
             <Card>

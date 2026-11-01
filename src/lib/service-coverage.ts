@@ -1,4 +1,5 @@
 import "server-only";
+import { NUMBER_PROVIDERS } from "@/lib/order-providers";
 
 /**
  * Can a customer actually receive what this shop sells?
@@ -46,7 +47,10 @@ export const SERVICE_LANES: LaneSpec[] = [
   {
     id: "numbers",
     label: "Virtual numbers & rentals",
-    providers: ["fleexa"],
+    // Every supplier that can sell a number: an order delivered from the second
+    // one is still this lane's responsibility, and leaving it out would let it
+    // go stale with no page saying so.
+    providers: [...NUMBER_PROVIDERS],
     staleHours: 2,
     delivery: "The number is issued at purchase and the code is polled onto the order page.",
     recovery: "A number that never delivers is refunded by the nightly sweep and released upstream.",

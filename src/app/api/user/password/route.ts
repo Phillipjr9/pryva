@@ -8,6 +8,7 @@ import { isSameOriginMutation } from "@/lib/net";
 import { passwordChangeRateLimiter } from "@/lib/rate-limit";
 import { validatePassword } from "@/lib/validation";
 import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { sendSecurityNotice } from "@/lib/security-notice";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,16 @@ export async function POST(request: NextRequest) {
       return true;
     });
     if (!changed) return NextResponse.json({ error: "Password changed elsewhere; sign in again." }, { status: 409 });
+
+    // The account holder is the only one who can tell us this was not an
+    // attacker who already had the old password. Best effort by design: the
+    // change has committed, and a mail outage must not report it as failed.
+    try {
+      await sendSecurityNotice({ to: userProfile.email, name: userProfile.name, event: "password_changed" });
+    } catch {
+      // The password has already changed; a mail failure must not report otherwise.
+    }
+
     return NextResponse.json({ ok: true, message: "Password changed; other sessions were signed out." });
   } catch {
     return NextResponse.json({ error: "Failed to change password" }, { status: 500 });
