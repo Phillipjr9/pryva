@@ -92,8 +92,11 @@ Tests: `bulk-orders`, `bulk-orders-extended`, `bulk-orders-route`.
 
 - Catalogue: `/esim` lists six written sample cards when live ordering is off; once
   `isEsimOrderingAvailable()` (i.e. Bitcall configured) they disappear and the page
-  points at the dashboard catalogue, which lists Bitcall's live plans. No path
-  sells a plan that does not exist upstream.
+  points at `/dashboard/esim`, which lists **every** priced plan cheapest first
+  (search, region filter, paging, and plans the margin guard refuses shown but not
+  sellable). The per-destination view in the service explorer still answers "what
+  can I buy for Nigeria"; the catalogue page answers "what is there". No path sells
+  a plan that does not exist upstream.
 - Purchase: `/api/esim/purchase` — debits, creates the order, asks Bitcall for the
   profile; `pending → processing → /api/esim/orders/[id]/complete`. The profile is
   issued before the charge stands, and a nightly sweep retires stale rows.
