@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
 import { authorizeAdminApi } from "@/lib/admin-auth";
-import { bitcallKeyEnvironment, isBitcallConfigured } from "@/lib/bitcall";
+import { bitcallKeyEnvironment, getBitcallBalance, isBitcallConfigured } from "@/lib/bitcall";
 import { getUsdToNgnRate } from "@/lib/exchange-rate";
 import { fulfilablePlans } from "@/lib/fulfillment";
 import { checkMargin } from "@/lib/margin-guard";
 import { otpSupplierConfigured, otpSupplierOrder, otpSupplierProbe } from "@/lib/otp-suppliers";
+import { supplierAmountToNgn } from "@/lib/supplier-currency";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,19 @@ export async function GET(request: NextRequest) {
   const configured = Object.fromEntries(order.map((supplier) => [supplier, otpSupplierConfigured(supplier)]));
 
   const rate = Object.values(configured).some(Boolean) ? await getUsdToNgnRate() : null;
+
+  // A working key with an empty balance sells nothing, and the failure looks the
+  // same as any other refusal. Reading it here means "why did that order fail"
+  // has an answer that does not involve opening the supplier's dashboard.
+  const balance = await (async () => {
+    if (!isBitcallConfigured()) return null;
+    try {
+      const { balance: amount, currency } = await getBitcallBalance();
+      return { amount, currency, amountNgn: await supplierAmountToNgn(amount, currency) };
+    } catch {
+      return { amount: null, currency: null, amountNgn: null };
+    }
+  })();
 
   const reports = await Promise.all(
     wanted.map(async ([code, name]) => {
@@ -112,7 +126,7 @@ export async function GET(request: NextRequest) {
       routing: { order, configured },
       // Which environment the credential is for. A test key in production is
       // otherwise invisible until someone compares prices or balances.
-      gateway: { keyEnvironment: bitcallKeyEnvironment() },
+      gateway: { keyEnvironment: bitcallKeyEnvironment(), balance },
       esim: { orderable: isBitcallConfigured() },
       // The rate every dollar price is converted at; null when nothing is
       // configured, because nothing would be converted.

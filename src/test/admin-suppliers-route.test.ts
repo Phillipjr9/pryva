@@ -25,6 +25,7 @@ vi.mock("@/lib/bitcall", async (importOriginal) => {
     ...actual,
     isBitcallConfigured: () => true,
     bitcallKeyEnvironment: () => "live" as const,
+    getBitcallBalance: async () => ({ balance: 12.5, currency: "USD" }),
     listBitcallOtpServices: gate.list,
     buyBitcallOtpActivation: gate.buy,
     cancelBitcallOtpActivation: gate.cancel,
@@ -83,7 +84,7 @@ describe("supplier status endpoint", () => {
     expect(body).toMatchObject({
       ok: true,
       routing: { order: ["fleexa", "bitcall"], configured: { fleexa: true, bitcall: true } },
-      gateway: { keyEnvironment: "live" },
+      gateway: { keyEnvironment: "live", balance: { amount: 12.5, currency: "USD", amountNgn: 18750 } },
       usdToNgn: { rate: 1500, source: "override" },
     });
     expect(body.destinations).toHaveLength(1);

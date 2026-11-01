@@ -329,6 +329,16 @@ export async function cancelUpstream(order: {
   if (!order.providerRequestId) return false;
 
   if (order.provider === "bitcall") {
+    // The same gateway also sells eSIM profiles, which store the same provider
+    // value. An eSIM order must never be sent to the OTP cancel endpoint, so the
+    // service is checked before the request is shaped.
+    if (order.service !== "numbers") {
+      console.error("Refusing to cancel a non-number order against the OTP gateway", {
+        service: order.service,
+        providerRequestId: order.providerRequestId,
+      });
+      return false;
+    }
     // A rental is never bought from this supplier, so anything marked as one did
     // not come from here and must not be cancelled blind.
     if (order.duration?.startsWith("Rent")) {
