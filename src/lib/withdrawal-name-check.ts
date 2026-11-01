@@ -1,6 +1,6 @@
-import { and, asc, eq, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { paymentTopups } from "@/db/schema";
+import { paymentTopups, payoutNameApprovals } from "@/db/schema";
 
 /**
  * Payouts may only go to the person who deposited the money.
@@ -129,6 +129,49 @@ export async function depositorNameFor(userId: string): Promise<string | null> {
   return row?.payerName ?? null;
 }
 
+/**
+ * A payout name an administrator has reviewed and approved for this account.
+ *
+ * Stored beside the frozen depositor name rather than replacing it: the record of
+ * what was on the account when the money arrived is evidence, and a decision made
+ * later must not erase it. Revoking the approval restores the original rule.
+ */
+export async function payoutApprovalFor(userId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ approvedName: payoutNameApprovals.approvedName })
+    .from(payoutNameApprovals)
+    .where(and(eq(payoutNameApprovals.userId, userId), isNull(payoutNameApprovals.revokedAt)))
+    .orderBy(desc(payoutNameApprovals.createdAt))
+    .limit(1);
+  return row?.approvedName ?? null;
+}
+
+export type PayoutDestinationCheck =
+  | { ok: true; matched: "depositor" | "approval" }
+  | { ok: false; reason: PayoutNameReason };
+
+/**
+ * Whether this account may be paid, in either of the two ways it can qualify.
+ *
+ * Either the destination matches the name frozen on the funding deposit, or it
+ * matches a name an administrator reviewed and approved for this account. The
+ * frozen name is checked first because it needs no human in the loop; the
+ * approval exists for the case that rule cannot answer — the same person whose
+ * bank record is fuller than the signup form.
+ */
+export async function checkPayoutDestination(userId: string, accountName: string): Promise<PayoutDestinationCheck> {
+  const depositorName = await depositorNameFor(userId);
+  const depositorCheck = comparePayoutNames(depositorName, accountName);
+  if (depositorCheck.ok) return { ok: true, matched: "depositor" };
+
+  const approvedName = await payoutApprovalFor(userId);
+  if (approvedName && comparePayoutNames(approvedName, accountName).ok) {
+    return { ok: true, matched: "approval" };
+  }
+
+  return { ok: false, reason: depositorCheck.reason };
+}
+
 export type PayoutNameReason = Extract<PayoutNameCheck, { ok: false }>["reason"];
 
 /** Wording shared by every surface that refuses a payout, so they agree. */
@@ -138,5 +181,5 @@ export const PAYOUT_NAME_MESSAGES: Record<PayoutNameReason, string> = {
   "no-name":
     "That bank account has no name on record, so it cannot be paid. Verify it again before saving.",
   mismatch:
-    "Withdrawals can only be paid to a bank account in the same name as the one that funded this wallet. This account's name does not match, so it cannot be used. Contact support if your bank records your name differently.",
+    "Withdrawals can only be paid to a bank account in the same name as the one that funded this wallet. This account's name does not match, so it cannot be used. If your bank spells your name differently — a fuller name, or surname first — contact support and ask for a payout-name review; a bank statement or an account screenshot showing the name is usually enough.",
 };

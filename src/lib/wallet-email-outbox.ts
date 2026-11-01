@@ -8,6 +8,9 @@ import { logger } from "@/lib/logger";
 import { readJsonWithLimit } from "@/lib/request-body";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { resendConfigured } from "@/lib/resend-config";
+import { makeEsimDeliveryEmail } from "@/lib/esim-email-template";
+import { makeNumberCodeEmail } from "@/lib/number-email-template";
+import { esimQrAttachment } from "@/lib/esim-qr";
 import { makeWalletEmail, type ResendPayload, type WalletEmailEvent } from "@/lib/wallet-email-template";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
@@ -29,13 +32,34 @@ export function walletEmailConfigured(): boolean {
   return resendConfigured();
 }
 
+/**
+ * Base64 payloads are bounded: two attachments of at most ~1.5 MB is already far
+ * more than a QR needs, and an unbounded field is a way to fill the table.
+ */
+const MAX_ATTACHMENTS = 2;
+const MAX_ATTACHMENT_CHARS = 2_000_000;
+
+function validAttachments(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_ATTACHMENTS) return false;
+  return value.every((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
+    const a = entry as { filename?: unknown; content?: unknown; content_id?: unknown };
+    return typeof a.filename === "string" && a.filename.length > 0 && a.filename.length <= 100 &&
+      !/[\\/\r\n]/.test(a.filename) &&
+      typeof a.content === "string" && a.content.length > 0 && a.content.length <= MAX_ATTACHMENT_CHARS &&
+      /^[A-Za-z0-9+/=]+$/.test(a.content) &&
+      (a.content_id === undefined || (typeof a.content_id === "string" && a.content_id.length > 0 && a.content_id.length <= 60));
+  });
+}
+
 function validPayload(value: unknown): value is ResendPayload {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const p = value as Partial<ResendPayload>;
   return typeof p.from === "string" && p.from.length > 0 && p.from.length <= 255 && !/[\r\n]/.test(p.from) &&
     Array.isArray(p.to) && p.to.length === 1 && typeof p.to[0] === "string" && p.to[0].length <= 200 &&
     typeof p.subject === "string" && p.subject.length <= 200 && typeof p.text === "string" && p.text.length <= 10_000 &&
-    typeof p.html === "string" && p.html.length <= 20_000;
+    typeof p.html === "string" && p.html.length <= 20_000 && validAttachments(p.attachments);
 }
 
 /**
@@ -88,6 +112,7 @@ async function mark(job: Claimed, status: "sent" | "pending" | "review", error: 
 
 async function payloadFor(job: Claimed): Promise<ResendPayload> {
   const [row] = await db.select({
+    orderId: walletEmailOutbox.orderId,
     recipient: walletEmailOutbox.recipient,
     eventKind: walletEmailOutbox.eventKind,
     payload: walletEmailOutbox.payload,
@@ -101,6 +126,17 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
     withdrawalReference: withdrawals.reference,
     orderAmount: orders.amount,
     orderReference: orders.reference,
+    orderService: orders.service,
+    orderProductName: orders.productName,
+    orderPlanLabel: orders.planLabel,
+    orderRegion: orders.region,
+    orderDuration: orders.duration,
+    orderActivationCode: orders.esimActivationCode,
+    orderInstallUrl: orders.esimInstallUrl,
+    orderIccid: orders.esimIccid,
+    orderOtpCode: orders.otpCode,
+    orderPhoneNumber: orders.referenceCode,
+    orderExpiresAt: orders.expiresAt,
   }).from(walletEmailOutbox)
     .leftJoin(walletTransactions, eq(walletEmailOutbox.walletTransactionId, walletTransactions.id))
     .leftJoin(withdrawals, eq(walletEmailOutbox.withdrawalId, withdrawals.id))
@@ -113,6 +149,71 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
     try { saved = JSON.parse(row.payload); } catch { throw new InvalidNotificationData(); }
     if (!validPayload(saved)) throw new InvalidNotificationData();
     return saved;
+  }
+
+  // The eSIM handover is built from the order itself, and carries the QR as an
+  // attachment: the image is generated here rather than fetched from a URL that
+  // could be rotated out from under an old email.
+  if (row.eventKind === "esim_delivery") {
+    if (!row.orderId || !row.orderActivationCode || !row.orderReference) throw new InvalidNotificationData();
+    const sender = process.env.RESEND_FROM_EMAIL?.trim();
+    if (!sender) throw new InvalidNotificationData();
+    const siteUrl = (process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://pryva.ng").replace(/\/$/, "");
+    let delivery: ResendPayload;
+    try {
+      delivery = makeEsimDeliveryEmail({
+        recipient: row.recipient,
+        sender,
+        orderReference: row.orderReference,
+        productName: row.orderProductName ?? "eSIM plan",
+        planLabel: row.orderPlanLabel ?? "",
+        region: row.orderRegion ?? "",
+        duration: row.orderDuration ?? "",
+        activationCode: row.orderActivationCode,
+        installUrl: row.orderInstallUrl ?? null,
+        iccid: row.orderIccid ?? null,
+        orderUrl: `${siteUrl}/dashboard/orders/${row.orderId}`,
+        attachment: await esimQrAttachment(row.orderActivationCode),
+      });
+    } catch {
+      throw new InvalidNotificationData();
+    }
+    const [savedEsim] = await db.update(walletEmailOutbox).set({ payload: JSON.stringify(delivery) })
+      .where(and(eq(walletEmailOutbox.id, job.id), eq(walletEmailOutbox.status, "sending"), eq(walletEmailOutbox.lockToken, job.lock_token)))
+      .returning({ id: walletEmailOutbox.id });
+    if (!savedEsim) throw new Error("Notification lease expired");
+    return delivery;
+  }
+
+  // A verification code is the delivery for a number, and the page is not
+  // always open. Same rule as the eSIM: built from the order, never guessed.
+  if (row.eventKind === "number_code") {
+    if (!row.orderId || !row.orderOtpCode || !row.orderReference) throw new InvalidNotificationData();
+    const sender = process.env.RESEND_FROM_EMAIL?.trim();
+    if (!sender) throw new InvalidNotificationData();
+    const siteUrl = (process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://pryva.ng").replace(/\/$/, "");
+    let notice: ResendPayload;
+    try {
+      notice = makeNumberCodeEmail({
+        recipient: row.recipient,
+        sender,
+        orderReference: row.orderReference,
+        productName: row.orderProductName ?? "Verification number",
+        planLabel: row.orderPlanLabel ?? "",
+        region: row.orderRegion ?? "",
+        phoneNumber: row.orderPhoneNumber ?? null,
+        code: row.orderOtpCode,
+        expiresAt: row.orderExpiresAt ? new Date(row.orderExpiresAt) : null,
+        orderUrl: `${siteUrl}/dashboard/orders/${row.orderId}`,
+      });
+    } catch {
+      throw new InvalidNotificationData();
+    }
+    const [savedCode] = await db.update(walletEmailOutbox).set({ payload: JSON.stringify(notice) })
+      .where(and(eq(walletEmailOutbox.id, job.id), eq(walletEmailOutbox.status, "sending"), eq(walletEmailOutbox.lockToken, job.lock_token)))
+      .returning({ id: walletEmailOutbox.id });
+    if (!savedCode) throw new Error("Notification lease expired");
+    return notice;
   }
 
   let event: WalletEmailEvent;

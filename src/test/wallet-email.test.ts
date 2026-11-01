@@ -19,7 +19,7 @@ let database: ReturnType<typeof drizzle<typeof schema>>;
 
 beforeAll(async () => {
   pg = new PGlite();
-  for (const file of ["0000_base_schema.sql", "0001_google_subject.sql", "0002_shared_rate_limits.sql", "0003_withdrawal_idempotency.sql", "0004_paystack_transfer_reference.sql", "0005_wallet_email_outbox.sql", "0006_order_idempotency.sql", "0007_order_reconciliation_note.sql", "0008_order_provider_cost.sql", "0009_password_reset_tokens.sql", "0010_order_provider_no_default.sql", "0011_email_verification.sql", "0012_topup_payer_name.sql", "0013_disposable_inboxes.sql", "0014_admin_audit_log.sql", "0015_two_factor.sql", "0016_product_reviews.sql", "0017_login_lockout.sql", "0018_reconciliation_runs.sql", "0019_support_tickets.sql", "0020_webauthn.sql", "0021_referrals.sql", "0022_fraud.sql", "0023_boost_orders.sql", "0024_account_deletions.sql", "0025_account_deletion_forfeiture.sql", "0026_webhook_events.sql", "0027_esim_credentials.sql"]) {
+  for (const file of ["0000_base_schema.sql", "0001_google_subject.sql", "0002_shared_rate_limits.sql", "0003_withdrawal_idempotency.sql", "0004_paystack_transfer_reference.sql", "0005_wallet_email_outbox.sql", "0006_order_idempotency.sql", "0007_order_reconciliation_note.sql", "0008_order_provider_cost.sql", "0009_password_reset_tokens.sql", "0010_order_provider_no_default.sql", "0011_email_verification.sql", "0012_topup_payer_name.sql", "0013_disposable_inboxes.sql", "0014_admin_audit_log.sql", "0015_two_factor.sql", "0016_product_reviews.sql", "0017_login_lockout.sql", "0018_reconciliation_runs.sql", "0019_support_tickets.sql", "0020_webauthn.sql", "0021_referrals.sql", "0022_fraud.sql", "0023_boost_orders.sql", "0024_account_deletions.sql", "0025_account_deletion_forfeiture.sql", "0026_webhook_events.sql", "0027_esim_credentials.sql", "0028_esim_delivery_email.sql", "0029_notification_gaps.sql", "0030_payout_name_approvals.sql"]) {
     await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   }
   database = drizzle(pg, { schema });
@@ -177,7 +177,11 @@ describe("wallet email outbox on embedded PostgreSQL", () => {
       planLabel: "One", region: "US", duration: "20 minutes", amount: 2500, status: "active", provider: "fleexa",
     }).returning();
     await database.update(schema.orders).set({ status: "delivered", otpCode: "123456" }).where(eq(schema.orders.id, order.id));
-    expect(await database.select().from(schema.walletEmailOutbox)).toHaveLength(0);
+    // No purchase-completion email, because this provider's receipt is not
+    // verified. The code email is a different event with its own trigger, and a
+    // single number that received a code is exactly what it is for.
+    const jobs = await database.select().from(schema.walletEmailOutbox);
+    expect(jobs.map((job) => job.eventKind)).toEqual(["number_code"]);
   });
 
   it("queues truthful withdrawal status updates once per transition", async () => {

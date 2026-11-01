@@ -29,9 +29,11 @@ vi.mock("@/lib/fleexa", async (importOriginal) => {
 });
 
 const { cancelUpstream, fulfillPlan, isPlanFulfillable } = await import("@/lib/fulfillment");
+const { clearOtpCatalogueCache } = await import("@/lib/otp-suppliers");
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearOtpCatalogueCache();
   provider.configured = true;
 });
 afterEach(() => { vi.restoreAllMocks(); });
@@ -48,12 +50,14 @@ const SMS_SERVICES = ["ng", "us", "gb", "ca", "de", "gh"].map((country) => ({
 
 /** Plans we can deliver, and the exact provider arguments each one implies. */
 const DELIVERABLE: Array<[slug: string, args: unknown]> = [
-  ["vn-ng", { country: "ng" }],
-  ["vn-us", { country: "us" }],
-  ["vn-uk", { country: "gb" }],
-  ["vn-ca", { country: "ca" }],
-  ["vn-de", { country: "de" }],
-  ["vn-gh", { country: "gh" }],
+  // The app is passed too: a catalogue row names one, and buying it by country
+  // alone could rent a pool that cannot receive the customer's code.
+  ["vn-ng", { app: "NG", country: "ng" }],
+  ["vn-us", { app: "US", country: "us" }],
+  ["vn-uk", { app: "GB", country: "gb" }],
+  ["vn-ca", { app: "CA", country: "ca" }],
+  ["vn-de", { app: "DE", country: "de" }],
+  ["vn-gh", { app: "GH", country: "gh" }],
 ];
 
 /**
@@ -106,6 +110,9 @@ describe("fulfilment", () => {
       country: null, priceNgn: null, expiresAt: null, raw: {} };
     /** Quote a cost for the destination we are about to buy. */
     function quote(priceNgn: number | null) {
+      // Catalogues are cached briefly in production; a re-quote here has to be
+      // seen, so the cache is cleared with it.
+      clearOtpCatalogueCache();
       provider.listServices.mockResolvedValue([{ id: "svc-ng", country: "ng", priceNgn, stock: 10 }]);
     }
 

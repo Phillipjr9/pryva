@@ -6,6 +6,7 @@ import { resendConfigured } from "@/lib/resend-config";
 import { SettingsForm } from "./SettingsForm";
 import { SecuritySection } from "./SecuritySection";
 import { DangerZone } from "./DangerZone";
+import { EmailChangeCard } from "@/components/dashboard/EmailChangeCard";
 
 // The dashboard layout already provides the shell — nesting it here rendered a
 // second sidebar inside the content column.
@@ -40,6 +41,8 @@ export default async function SettingsPage({
           Manage your account, and how it is protected.
         </p>
       </div>
+
+      <EmailChangeCard currentEmail={user.email} />
 
       {needsSecondFactor && (
         <div

@@ -9,17 +9,14 @@ import { isPreviewDatabase } from "@/lib/demo-policy";
 import { logger } from "@/lib/logger";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
-import {
-  comparePayoutNames,
-  depositorNameFor,
-  PAYOUT_NAME_MESSAGES,
-} from "@/lib/withdrawal-name-check";
+import { checkPayoutDestination, PAYOUT_NAME_MESSAGES } from "@/lib/withdrawal-name-check";
 import { MAX_WITHDRAWAL, MIN_WITHDRAWAL, withdrawalFee } from "@/lib/withdrawal";
 import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 import { assessWithdrawal, recordFraudEvent, type RiskAssessment } from "@/lib/fraud";
 import { isPaystackConfigured } from "@/lib/paystack";
 import { paystackTransferReference } from "@/lib/paystack-transfer-reference";
 import { sendPayout } from "@/lib/payouts";
+import { unverifiedEmailBlocksPayout } from "@/lib/resend-config";
 
 export const dynamic = "force-dynamic";
 
@@ -94,6 +91,17 @@ export async function POST(request: NextRequest) {
     if (limit.unavailable) return NextResponse.json({ error: "Withdrawals are temporarily unavailable." }, { status: 503 });
     if (!limit.allowed) return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
 
+    // Money out needs a reachable owner. This runs before anything is written, so
+    // a refused payout leaves the balance exactly where it was.
+    const unverified = unverifiedEmailBlocksPayout(user);
+    if (unverified) {
+      logger.warn("Withdrawal refused: email not verified", { userId: user.id });
+      return NextResponse.json(
+        { error: unverified, code: "EMAIL_UNVERIFIED" },
+        { status: 403, headers: { "Cache-Control": "private, no-store" } },
+      );
+    }
+
     let body: unknown;
     try {
       body = await readJsonWithLimit(request, 2_048);
@@ -132,7 +140,7 @@ export async function POST(request: NextRequest) {
     // runs after the balance has moved would need a rollback to be worth
     // anything. The reference is the name frozen on the first settled deposit,
     // not `users.name`, which the profile endpoint can change at any time.
-    const nameCheck = comparePayoutNames(await depositorNameFor(user.id), bankAccount.accountName);
+    const nameCheck = await checkPayoutDestination(user.id, bankAccount.accountName);
     if (!nameCheck.ok) {
       // Reason and identifiers only: bank account names are not logged.
       logger.warn("Withdrawal refused: destination name does not match the depositor", {

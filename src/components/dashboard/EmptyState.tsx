@@ -18,7 +18,12 @@ export function EmptyState({
   icon: (props: { className?: string }) => ReactNode;
   title: string;
   body: string;
-  action?: { label: string; href: string };
+  /**
+   * Either a link or an in-page action. A dead-end CTA is worse than none: the
+   * withdrawal screen used to point at `#bank-accounts` before that panel existed
+   * in the DOM, so "Add a bank account" did nothing for a brand-new customer.
+   */
+  action?: { label: string; href?: string; onClick?: () => void };
   secondary?: { label: string; href: string };
   className?: string;
 }) {
@@ -33,15 +38,24 @@ export function EmptyState({
       <p className="mx-auto mt-1.5 max-w-sm text-[0.82rem] leading-relaxed text-ink-2">{body}</p>
       {(action || secondary) && (
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-          {action && (
+          {action && (action.onClick ? (
+            <button
+              type="button"
+              onClick={action.onClick}
+              className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.78rem]"
+            >
+              {action.label}
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          ) : (
             <Link
-              href={action.href}
+              href={action.href ?? "#"}
               className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.78rem]"
             >
               {action.label}
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
-          )}
+          ))}
           {secondary && (
             <Link
               href={secondary.href}

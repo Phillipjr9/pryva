@@ -14,6 +14,7 @@ import {
 } from "@/lib/foxreload";
 import { FOXRELOAD_PROVIDER } from "@/lib/order-providers";
 import { creditWallet, debitWalletInTx, makeReference } from "@/lib/wallet";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
@@ -188,6 +189,10 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "Failed to process gift card purchase." }, { status: 500 });
   }
 
+  // The debit committed with its own transaction, so `debitWallet`'s usual nudge
+  // never ran here. Without this the receipt waits for the nightly backstop.
+  scheduleWalletEmails();
+
   // Step 2: Execute real FoxReload API purchase
   let voucherCode = "";
   let providerOrderId = "";
@@ -248,6 +253,7 @@ export async function POST(request: Request) {
         ? err.message
         : "Fulfillment provider unavailable";
 
+    let refunded = false;
     try {
       await creditWallet({
         userId: user.id,
@@ -267,14 +273,34 @@ export async function POST(request: Request) {
           reconciliationNote: `Fulfillment failed: ${errorMessage}`,
         })
         .where(eq(orders.id, orderId));
+      refunded = true;
     } catch (refundErr) {
+      // The debit stands and no card exists. This used to be a console line while
+      // the customer was told the wallet had been refunded -- a false statement
+      // about money, with no record anybody would look at. `review` puts the row
+      // in front of an operator on /admin/reconciliation, which is where a refund
+      // that no code could complete belongs.
       console.error("Critical: Failed to auto-refund gift card order", refundErr);
+      try {
+        await db
+          .update(orders)
+          .set({
+            status: "review",
+            providerRequestId: providerOrderId || null,
+            reconciliationNote: `Fulfillment failed: ${errorMessage}; automatic refund failed — debit still stands`.slice(0, 480),
+          })
+          .where(eq(orders.id, orderId));
+      } catch (noteError) {
+        console.error("Critical: could not flag gift card order for review", noteError);
+      }
     }
 
     return Response.json(
       {
         ok: false,
-        error: `Gift card fulfillment failed: ${errorMessage}. Your wallet has been refunded.`,
+        error: refunded
+          ? `Gift card fulfillment failed: ${errorMessage}. Your wallet has been refunded.`
+          : `Gift card delivery failed: ${errorMessage}. We could not return the money to your wallet automatically, so support has been flagged and will refund it. Quote reference ${reference}.`,
       },
       { status: err instanceof FoxreloadError && err.status >= 400 && err.status < 600 ? err.status : 502 },
     );

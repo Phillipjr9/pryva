@@ -38,6 +38,19 @@ describe("hydration-safe order countdowns", () => {
     expect(server).not.toContain("Window closed");
   });
 
+  it("offers a resend only when the server says this order can take one", () => {
+    const base = { orderId: "order-3", status: "active", expiresAt, amount: 500, referenceCode: "ref", otpCode: null, service: "numbers", initialNow };
+
+    // The capability is decided on the server; the button is not the decision.
+    expect(renderToStaticMarkup(<OrderActions {...base} />)).not.toContain("Resend code");
+    expect(renderToStaticMarkup(<OrderActions {...base} canResendCode />)).toContain("Resend code");
+
+    // A settled order has nothing to resend, even where the capability is set.
+    const past = new Date(initialNow - 60_000).toISOString();
+    const closed = renderToStaticMarkup(<OrderActions {...base} expiresAt={past} canResendCode />);
+    expect(closed).not.toContain("Resend code");
+  });
+
   it("does not call an order without an expiry window closed", () => {
     const html = renderToStaticMarkup(<OrderActions orderId="order-2" status="active" expiresAt={null} amount={500} referenceCode="ref" otpCode={null} service="numbers" initialNow={initialNow} />);
     expect(html).not.toContain("Window closed");

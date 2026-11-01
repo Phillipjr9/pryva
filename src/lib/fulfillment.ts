@@ -1,24 +1,42 @@
+import { cancelBitcallOtpActivation } from "@/lib/bitcall";
 import { plans, type Plan } from "@/lib/catalog";
 import {
   buyFleexaRental,
-  buyFleexaSmsNumber,
   cancelFleexaSms,
   FleexaError,
   isFleexaConfigured,
   listFleexaRentAreas,
-  listFleexaSmsServices,
 } from "@/lib/fleexa";
+import {
+  buyOtpNumber,
+  isAmbiguousOtpPurchase,
+  matchesCountry,
+  otpOffersFor,
+  otpSupplierConfigured,
+  otpSupplierOrder,
+} from "@/lib/otp-suppliers";
 import { checkMargin, MARGIN_BLOCKED_MESSAGE } from "@/lib/margin-guard";
 import { SERVICE_TIMEOUTS } from "@/lib/service-timeouts";
 
 export type FulfilledOrder = {
-  provider: "fleexa";
+  /**
+   * Which supplier actually delivered it. A number can come from either, so the
+   * caller must record this rather than assume: it is also what decides which
+   * supplier a later cancel has to ask.
+   */
+  provider: "fleexa" | "bitcall";
   /** Charged cost where the provider reports one, else the pre-spend quote. */
   providerCostNgn: number | null;
   providerRequestId: string | null;
   referenceCode: string | null;
   otpCode: string | null;
   expiresAt: Date;
+  /**
+   * The app this number was bought for, when the supplier named one. A fallback
+   * supplier sells app-specific pools, and a customer who receives a WhatsApp
+   * number when the plan said "a number" needs to be told which it is.
+   */
+  serviceLabel?: string | null;
 };
 
 /**
@@ -90,14 +108,8 @@ export function fulfilablePlans(): Array<{ plan: Plan; intent: PlanIntent }> {
  * to our ISO code (and to the plan's human region name) is deliberate: we send
  * back an identifier the provider itself published, never one we invented.
  */
-export function matchesCountry(value: string | null, code: string, regionName: string): boolean {
-  const candidate = value?.trim().toLowerCase();
-  if (!candidate) return false;
-  if (candidate === code || candidate === regionName.trim().toLowerCase()) return true;
-  if (code === "gb") return candidate === "uk" || candidate === "united kingdom";
-  if (code === "us") return candidate === "usa" || candidate === "united states";
-  return false;
-}
+/** Re-exported so existing callers keep one import; the rule lives with routing. */
+export { matchesCountry };
 
 /** Trust a provider expiry only when it parses and is still in the future. */
 function providerExpiry(value: string | null, fallbackMs: number): Date {
@@ -138,10 +150,6 @@ function guardMargin(plan: Plan, costNgn: number | null): void {
 }
 
 export async function fulfillPlan(plan: Plan): Promise<FulfilledOrder> {
-  if (!isFleexaConfigured()) {
-    throw new FleexaError("Live fulfilment is not configured", 503, "NO_API_KEY");
-  }
-
   const intent = FULFILMENT_MAP[plan.slug];
   if (!intent) {
     throw new FleexaError(
@@ -151,49 +159,126 @@ export async function fulfillPlan(plan: Plan): Promise<FulfilledOrder> {
     );
   }
 
-  if (intent.kind === "sms") {
-    // Resolve the destination before buying: the buy call spends real balance and
-    // only reports its price afterwards. Quoting from the catalog first means an
-    // unpriced or loss-making service is refused while nothing has been spent.
-    const services = await listFleexaSmsServices();
-    const service = services.find(
-      (entry) => entry.id && matchesCountry(entry.country, intent.country, plan.region),
-    );
-    if (!service?.id) {
-      throw new FleexaError(
-        "No number coverage is confirmed for that destination",
-        503,
-        "SERVICE_UNAVAILABLE",
-      );
-    }
-    if (typeof service.stock === "number" && service.stock <= 0) {
-      throw new FleexaError("That destination is out of stock", 503, "SERVICE_UNAVAILABLE");
-    }
-    guardMargin(plan, service.priceNgn);
+  return intent.kind === "sms" ? fulfillNumber(plan, intent) : fulfillRental(plan, intent);
+}
 
-    const order = await buyFleexaSmsNumber({ country: intent.country });
-    if (typeof order.priceNgn === "number" && order.priceNgn > (service.priceNgn ?? 0)) {
-      // The quote is the best pre-spend signal available. If the provider charged
-      // more, the sale may have landed below the floor; it cannot be undone, so
-      // it is logged loudly instead of being silently absorbed.
-      console.error("Provider charged more than the quoted cost", {
-        slug: plan.slug,
-        quotedNgn: service.priceNgn,
-        chargedNgn: order.priceNgn,
-      });
+/**
+ * A verification number, from whichever configured supplier can serve it.
+ *
+ * Both suppliers are asked to describe the country before either is asked to buy
+ * anything, so switching suppliers on a missing key, a missing country, sold-out
+ * stock or an unprofitable price costs nothing. Once a buy has been attempted the
+ * search stops at the first ambiguous answer: neither supplier takes an
+ * idempotency key, so a failover there would rent a second number for one order.
+ */
+async function fulfillNumber(plan: Plan, intent: SmsIntent): Promise<FulfilledOrder> {
+  if (!otpSupplierOrder().some(otpSupplierConfigured)) {
+    throw new FleexaError("Live fulfilment is not configured", 503, "NO_API_KEY");
+  }
+
+  // Every configured supplier is asked for a price, because the cheapest one is
+  // the one we buy from: the selling price is fixed by the catalogue, so paying
+  // less is the whole margin. Catalogue reads are bounded and briefly cached, so
+  // comparing never holds a purchase hostage to a supplier that stopped answering.
+  const offers = await otpOffersFor(intent.country, plan.region);
+
+  if (offers.length === 0) {
+    throw new FleexaError(
+      "No number coverage is confirmed for that destination",
+      503,
+      "SERVICE_UNAVAILABLE",
+    );
+  }
+
+  // "We do not know what it costs" is not the same as "it is sold out", and both
+  // differ from "nobody serves that country" -- each is counted so the refusal
+  // below can say which one happened.
+  const priced = offers.filter((offer) => offer.costNgn !== null);
+  if (priced.length === 0) {
+    throw new FleexaError("That destination has no usable price", 503, "COST_UNKNOWN");
+  }
+
+  const sellable = priced.filter((offer) => offer.stock === null || offer.stock > 0);
+  if (sellable.length === 0) {
+    console.error("Every number offer for that destination is out of stock", {
+      slug: plan.slug,
+      country: intent.country,
+      listed: offers.length,
+    });
+    throw new FleexaError("That destination is out of stock", 503, "SERVICE_UNAVAILABLE");
+  }
+
+  let lastError: unknown = null;
+  for (const offer of sellable) {
+    if (offer.costNgn === null) continue;
+
+    // The floor is what makes "cheapest" also mean "still profitable": offers
+    // are walked cheapest first, and the first one that clears the floor is the
+    // cheapest sale that leaves a margin. An offer below the floor is skipped,
+    // never sold at a loss.
+    try {
+      guardMargin(plan, offer.costNgn);
+    } catch (error) {
+      lastError = error;
+      continue;
     }
-    return {
-      provider: "fleexa",
-      // Prefer what was actually charged over the quote: the quote is an
-      // estimate, and the gap between the two is exactly what margin analysis
-      // needs to see.
-      providerCostNgn: typeof order.priceNgn === "number" ? order.priceNgn : (service.priceNgn ?? null),
-      providerRequestId: order.requestId,
-      referenceCode: order.number,
-      // The code arrives later; the order page polls for it.
-      otpCode: null,
-      expiresAt: providerExpiry(order.expiresAt, SERVICE_TIMEOUTS.numbers.delivery),
-    };
+
+    try {
+      const bought = await buyOtpNumber(offer);
+      if (
+        typeof bought.providerCostNgn === "number" &&
+        bought.providerCostNgn > (offer.costNgn ?? 0)
+      ) {
+        // The quote is the best pre-spend signal available. If the supplier
+        // charged more, the sale may have landed below the floor; it cannot be
+        // undone, so it is logged loudly instead of being silently absorbed.
+        console.error("Provider charged more than the quoted cost", {
+          slug: plan.slug,
+          provider: bought.supplier,
+          quotedNgn: offer.costNgn,
+          chargedNgn: bought.providerCostNgn,
+        });
+      }
+      return {
+        provider: bought.supplier,
+        providerCostNgn: bought.providerCostNgn ?? offer.costNgn,
+        providerRequestId: bought.providerRequestId,
+        referenceCode: bought.number,
+        // The code arrives later; the order page polls for it.
+        otpCode: null,
+        expiresAt: providerExpiry(bought.expiresAt, SERVICE_TIMEOUTS.numbers.delivery),
+        serviceLabel: bought.app,
+      };
+    } catch (error) {
+      if (isAmbiguousOtpPurchase(error)) {
+        // The number may exist. Retrying, or failing over, would buy a second one.
+        console.error("Number purchase outcome unknown; not retrying", {
+          slug: plan.slug,
+          provider: offer.supplier,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error instanceof FleexaError
+          ? error
+          : new FleexaError("The provider did not confirm that purchase", 502, "AMBIGUOUS_PURCHASE");
+      }
+      console.error("Supplier could not sell that number; trying the next", {
+        slug: plan.slug,
+        provider: offer.supplier,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof FleexaError
+    ? lastError
+    : new FleexaError("No provider could deliver that number right now", 503, "SERVICE_UNAVAILABLE");
+}
+
+/** Rentals have one supplier, and the rental path is unchanged. */
+async function fulfillRental(plan: Plan, intent: RentalIntent): Promise<FulfilledOrder> {
+  if (!isFleexaConfigured()) {
+    throw new FleexaError("Live fulfilment is not configured", 503, "NO_API_KEY");
   }
 
   const areas = await listFleexaRentAreas();
@@ -241,7 +326,32 @@ export async function cancelUpstream(order: {
   service: string;
   duration?: string;
 }): Promise<boolean> {
-  if (order.provider !== "fleexa" || !order.providerRequestId) return false;
+  if (!order.providerRequestId) return false;
+
+  if (order.provider === "bitcall") {
+    // The same gateway also sells eSIM profiles, which store the same provider
+    // value. An eSIM order must never be sent to the OTP cancel endpoint, so the
+    // service is checked before the request is shaped.
+    if (order.service !== "numbers") {
+      console.error("Refusing to cancel a non-number order against the OTP gateway", {
+        service: order.service,
+        providerRequestId: order.providerRequestId,
+      });
+      return false;
+    }
+    // A rental is never bought from this supplier, so anything marked as one did
+    // not come from here and must not be cancelled blind.
+    if (order.duration?.startsWith("Rent")) {
+      console.error("Refusing to cancel a rental against the wrong supplier", {
+        providerRequestId: order.providerRequestId,
+      });
+      return false;
+    }
+    await cancelBitcallOtpActivation(order.providerRequestId);
+    return true;
+  }
+
+  if (order.provider !== "fleexa") return false;
 
   if (order.duration?.startsWith("Rent")) {
     console.error(

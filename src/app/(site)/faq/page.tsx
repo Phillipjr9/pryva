@@ -51,7 +51,7 @@ const faqCategories = [
     questions: [
       {
         q: "How do I activate my eSIM?",
-        a: "eSIM plans are not available for purchase yet. They are listed for reference and marked unavailable, so you cannot be charged for one.",
+        a: "Buy one from your dashboard: Services → eSIM lists the plans the network is offering right now, with coverage, data allowance, validity and the naira price. You are charged only when the profile is issued, and it installs from an activation code — the same code and QR we email you. If no plans are listed, the network is not connected yet and nothing can be charged for one.",
       },
       {
         q: "Which phones support eSIM?",
@@ -59,7 +59,7 @@ const faqCategories = [
       },
       {
         q: "Can I keep my WhatsApp number when using an eSIM?",
-        a: "Your existing account can generally remain associated with its original number, but check your device, carrier and app settings. eSIM plans are not available for purchase yet.",
+        a: "Your existing account can generally remain associated with its original number, but check your device, carrier and app settings. An eSIM is data-only: it does not move your number, it adds a second data connection while your usual line keeps handling calls and messages.",
       },
     ],
   },

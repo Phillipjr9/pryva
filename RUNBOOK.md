@@ -216,10 +216,54 @@ curl -s -H "Authorization: Bearer $DIAGNOSTICS_SECRET" \
   https://<your-domain>/api/diagnostics/integrations
 ```
 
+**"The eSIM list is too short."** Ask the diagnostics endpoint, which now counts
+the reasons rather than leaving you to guess:
+
+```sh
+curl -s -H "Authorization: Bearer $DIAGNOSTICS_SECRET" \
+  "https://<your-domain>/api/diagnostics/integrations?country=NG" | jq .gateway.esim
+```
+
+`returned` is what the supplier published; `priced` is what became an offer;
+`skippedCurrency` / `skippedNoPrice` / `skippedNoPlanId` say what was dropped and
+why; `withCoverage` counts offers that name a destination and `global` counts the
+ones listed everywhere; `listedForCountry` is the number the catalogue will show
+for `?country=`. A destination whose plans name their country in a scalar field
+(`country`, `countryCode`, comma-separated `coverage`) is read correctly since
+`0ca7328`'s follow-up — before that, those plans parsed to no coverage and
+appeared under no destination, which is the usual cause of an empty-looking list.
+
+Also worth remembering when counting a page rather than a catalogue: the service
+explorer renders twelve listings at a time and appends the rest behind **Show
+more**, across every category, so a country with 40 eSIM plans still shows a few
+of them first. `/dashboard/esim` is the exception and the place to check a
+catalogue question: it lists **every** priced plan, cheapest first, with the
+region counts and a filter, and it is where the storefront's "See live eSIM plans"
+button now leads.
+
 The probe is rate-limited by the suppliers, so do not put it on a tight schedule.
 Watch for: an empty catalog with a funded balance (mapping problem), repeated
 `429`s (shared supplier budget), and an outbox that is not draining (scheduler
 problem). The README documents the per-supplier request budgets.
+
+### Alerts
+
+Set `ALERT_WEBHOOK_URL` to a Slack or Discord incoming webhook and every
+`logger.error()` posts there: `{ "text": "🚨 Pryva: <message>\n<context>" }`. That
+includes every nightly step that fails, every route that catches, and every refund
+that cannot commit. It is deliberately dumb so it needs no vendor account:
+
+- one alert per identical message per five minutes, so a failing loop cannot flood
+  the channel;
+- values under keys matching password/secret/token/authorization/key/card/OTP/
+  account number/BVN/NIN are replaced with `[redacted]` before they leave the
+  process, and long strings are truncated;
+- never retried, never awaited, never throwing — an alert channel that fails inside
+  an error handler would hide the error it was reporting.
+
+Unset, errors stay in the platform log only. Check it with: trigger a known error
+(or call `sendAlert("test")` from a route during a deploy) and confirm the message
+lands. A webhook that is configured and silent looks exactly like a healthy system.
 
 Admin surfaces that answer "what happened": `/admin/orders?status=review`,
 `/admin/refunds`, `/admin/withdrawals`, `/admin/fulfilment`, `/admin/messages`,

@@ -408,6 +408,39 @@ function stringList(value: unknown): string[] {
   return value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0).slice(0, 300);
 }
 
+/**
+ * Coverage, however the catalog chooses to state it.
+ *
+ * Plans used to read coverage from array fields only (`countries`, `coverage`,
+ * `countryList`). A single-destination plan very often names its one country in a
+ * scalar field instead, which parsed to no coverage at all — and a plan with no
+ * coverage is shown under no destination. The effect is the one the owner asked
+ * about: a catalogue of hundreds of plans renders as a handful of listings, and
+ * only for destinations that happened to be written as an array or a global plan.
+ *
+ * Accepting the scalar forms is not guessing coverage: every value here is a
+ * country the catalog itself named. Anything it does not name still counts as no
+ * coverage, and is listed for no destination.
+ */
+function coverageList(row: Record<string, unknown>): string[] {
+  for (const value of [row.countries, row.coveredCountries, row.countryList, row.coverage, row.destinations]) {
+    if (Array.isArray(value)) return stringList(value);
+  }
+  const parts: string[] = [];
+  for (const key of [
+    "country", "countryCode", "country_code", "destination", "destinations",
+    "coverage", "countries", "coveredCountries", "countryList",
+  ]) {
+    const value = row[key];
+    if (typeof value !== "string") continue;
+    for (const piece of value.split(/[,|;/]/)) {
+      const trimmed = piece.trim();
+      if (trimmed) parts.push(trimmed);
+    }
+  }
+  return [...new Set(parts)].slice(0, 300);
+}
+
 export async function listBitcallEsimPlans(filter: { region?: string; country?: string } = {}): Promise<BitcallEsimPlan[]> {
   const payload = await gatewayFetch("GET", "/v1/esim/plans", { query: { region: filter.region, country: filter.country } });
   const plans: BitcallEsimPlan[] = [];
@@ -421,7 +454,7 @@ export async function listBitcallEsimPlans(filter: { region?: string; country?: 
       planId,
       name: pickString(row, ["name", "title", "planName"]),
       region: pickString(row, ["region", "regionName"]),
-      countries: stringList(row.countries ?? row.coverage ?? row.countryList),
+      countries: coverageList(row),
       allowance: nonNegative(pickNumber(row, ["allowance", "data", "dataAllowance", "allowanceValue"])),
       allowanceUnit: pickString(row, ["allowanceUnit", "dataUnit", "unit"]),
       validity: nonNegative(pickNumber(row, ["validity", "validityDays", "days", "duration"])),

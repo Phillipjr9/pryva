@@ -21,10 +21,16 @@ const rows = [
     detail: "Email OTP inboxes are not available for purchase yet, so no charge can be raised for one.",
   },
   {
-    product: "eSIM data & residential proxies",
+    product: "eSIM data",
     refund: "Case by case",
     detail:
-      "Contact support to review delivery and provider status. Issued or consumed goods are not automatically refundable.",
+      "The profile is issued before you are charged, so a plan that never arrived costs nothing. Once a profile is issued and installed it is not automatically refundable; contact support with your reference and we will review the network's status.",
+  },
+  {
+    product: "Residential proxies",
+    refund: "Not available",
+    detail:
+      "Proxies are not available yet, so these plans cannot be ordered and no charge can be raised for one.",
   },
   {
     product: "Digital accounts (marketplace)",
@@ -34,9 +40,9 @@ const rows = [
   },
   {
     product: "Airtime & data bundles",
-    refund: "Failed delivery only",
+    refund: "Not available",
     detail:
-      "Failed deliveries are refunded automatically to your wallet balance.",
+      "Airtime and data bundles are not available yet, so they cannot be ordered and no charge can be raised. When they open, a failed delivery will be refunded automatically to your wallet balance.",
   },
   {
     product: "Gift cards",

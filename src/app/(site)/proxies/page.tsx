@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { serviceMap, plansFor, formatNaira } from "@/lib/catalog";
+import { isPlanFulfillable } from "@/lib/fulfillment";
 import { ArrowRight } from "@/components/icons";
 import { CountryFlag } from "@/components/CountryFlag";
 import { hasCountryFlag } from "@/lib/countries";
@@ -26,8 +27,12 @@ export default function ProxiesPage() {
             <span className="inline-block rounded-full bg-lav-100 px-4 py-1.5 text-meta font-semibold text-lav-700 mb-4">{service.eyebrow}</span>
             <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3.5rem]">{service.tagline}</h1>
             <p className="mt-6 text-[1.1rem] text-ink-2 leading-relaxed">{service.description}</p>
+            {/* No "Get Started" here: there is no way to deliver a proxy, so there
+                is nothing a new account could buy. The same rule the pricing page
+                follows — a card may state a price, but the promise to sell is
+                withdrawn until a delivery path exists. */}
             <div className="mt-8 flex flex-wrap gap-3 sm:gap-4">
-              <Link href="/signup" className="inline-flex items-center gap-2 rounded-xl bg-lav-600 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-700">Get Started <ArrowRight className="h-4 w-4" /></Link>
+              <Link href="/status" className="inline-flex items-center gap-2 rounded-xl bg-lav-600 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-700">Check availability <ArrowRight className="h-4 w-4" /></Link>
               <Link href="/pricing" className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-6 py-3 text-[0.95rem] font-semibold text-ink hover:bg-cream">View Pricing</Link>
             </div>
           </div>
@@ -49,7 +54,11 @@ export default function ProxiesPage() {
 
       <section className="pb-16">
         <div className="shell">
-          <h2 className="text-[1.75rem] font-semibold text-ink mb-8">Pricing</h2>
+          <h2 className="text-[1.75rem] font-semibold text-ink mb-3">Pricing</h2>
+          <p className="mb-8 max-w-2xl text-[0.92rem] leading-relaxed text-ink-2">
+            Proxy plans are not available yet, so they cannot be ordered or charged. They stay
+            listed with their prices so you can see what is planned and what it costs.
+          </p>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {plans.slice(0, 6).map((plan) => (
               <div key={plan.slug} className={`rounded-2xl border p-6 ${plan.popular ? "border-lav-600 bg-white shadow-[var(--shadow-card)]" : "border-line bg-white"}`}>
@@ -59,7 +68,13 @@ export default function ProxiesPage() {
                 </h3>
                 <p className="text-[0.86rem] text-ink-2 mb-4">{plan.planLabel}</p>
                 <div className="mb-4"><span className="text-[2rem] font-bold text-ink">{formatNaira(plan.price)}</span></div>
-                <Link href={`/signup?plan=${plan.slug}`} className="block w-full rounded-xl bg-lav-600 px-4 py-3 text-center text-[0.9rem] font-semibold text-white hover:bg-lav-700">Get Started</Link>
+                {isPlanFulfillable(plan.slug) ? (
+                  <Link href={`/signup?plan=${plan.slug}`} className="block w-full rounded-xl bg-lav-600 px-4 py-3 text-center text-[0.9rem] font-semibold text-white hover:bg-lav-700">Get Started</Link>
+                ) : (
+                  <p className="block w-full rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-center text-meta font-semibold leading-relaxed text-amber-900">
+                    This plan cannot be delivered yet, so it cannot be ordered or charged.
+                  </p>
+                )}
               </div>
             ))}
           </div>

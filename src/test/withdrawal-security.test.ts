@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
-import { bankAccounts, paymentTopups, users, withdrawals, walletTransactions , } from "@/db/schema";
+import { bankAccounts, paymentTopups, payoutNameApprovals, users, withdrawals, walletTransactions , } from "@/db/schema";
 import { POST } from "@/app/api/wallet/withdraw/route";
 
 const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), select: vi.fn(), transaction: vi.fn() }));
@@ -43,6 +43,8 @@ function fakeDatabase() {
     // The name frozen when this wallet was funded. Payouts are only allowed to a
     // bank account whose resolved name matches it.
     topups: [{ userId: "user-id", payerName: "Test User" }] as Array<{ userId: string; payerName: string | null }>,
+    // A payout name an administrator reviewed. Empty unless a spec adds one.
+    approvals: [] as Array<{ userId: string; approvedName: string }>,
   };
   mocks.select.mockImplementation(() => ({
     from: (table: unknown) => ({
@@ -56,6 +58,10 @@ function fakeDatabase() {
           if (table === paymentTopups) return state.topups
             .filter((row) => row.userId === params[0] && row.payerName !== null)
             .map((row) => ({ payerName: row.payerName }));
+          // payoutApprovalFor() reads the live approval for this account.
+          if (table === payoutNameApprovals) return state.approvals
+            .filter((row) => row.userId === params[0])
+            .map((row) => ({ approvedName: row.approvedName }));
           return [];
         };
         // The payout-name lookup orders by paid_at; the others do not.
@@ -138,6 +144,57 @@ beforeEach(() => {
 });
 
 afterEach(() => vi.unstubAllEnvs());
+
+/**
+ * Money out needs a reachable owner.
+ *
+ * Verification was advisory everywhere: a link at signup, a banner until it was
+ * clicked, nothing else. Browsing and buying can live with that (the goods are on
+ * the order page whether or not mail works), but a payout to an address nobody has
+ * proven they control cannot be warned, cannot be recovered, and belongs to an
+ * account we cannot reach at all. The gate is deliberately narrow -- it fires only
+ * when mail is configured, because a requirement nobody can satisfy is a lockout,
+ * and it sits before anything is written, so a refusal costs nothing.
+ */
+describe("email verification before money leaves", () => {
+  function configureMail() {
+    vi.stubEnv("RESEND_API_KEY", "re_test_secret");
+    vi.stubEnv("RESEND_FROM_EMAIL", "Pryva <hello@pryva.ng>");
+  }
+
+  it("refuses an unverified address before any row or debit exists", async () => {
+    configureMail();
+    const state = fakeDatabase();
+    mocks.currentUser.mockResolvedValue({ id: "user-id", email: "user@example.com", emailVerifiedAt: null });
+
+    const response = await POST(request(2_000));
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.code).toBe("EMAIL_UNVERIFIED");
+    expect(body.error).toContain("Verify your email before withdrawing");
+    expect(state.withdrawals).toHaveLength(0);
+    expect(state.ledger).toHaveLength(0);
+    expect(state.balance).toBe(7_000);
+  });
+
+  it("lets a verified account withdraw", async () => {
+    configureMail();
+    fakeDatabase();
+    mocks.currentUser.mockResolvedValue({ id: "user-id", email: "user@example.com", emailVerifiedAt: new Date() });
+
+    const response = await POST(request(2_000));
+    expect(response.status).toBe(200);
+  });
+
+  it("cannot lock anybody out when mail is not configured, because no link could be sent", async () => {
+    const state = fakeDatabase();
+    mocks.currentUser.mockResolvedValue({ id: "user-id", email: "user@example.com", emailVerifiedAt: null });
+
+    const response = await POST(request(2_000));
+    expect(response.status).toBe(200);
+    expect(state.withdrawals).toHaveLength(1);
+  });
+});
 
 describe("withdrawal requests", () => {
   it("refuses to withdraw simulated preview funds", async () => {
@@ -225,6 +282,47 @@ describe("withdrawal requests", () => {
     expect(state.balance).toBe(7000);
     expect(state.withdrawals).toHaveLength(0);
     expect(state.ledger).toHaveLength(0);
+  });
+
+  /**
+   * The one case the frozen name cannot answer.
+   *
+   * "Emeka" at signup against "EMEKA CHUKWUEMEKA OKAFOR" on the bank record is one
+   * person, and no string rule can prove it. An administrator can, and this is the
+   * only way that decision reaches the payout route: a reviewed name stored
+   * beside the deposit, never in place of it.
+   */
+  it("pays a name an administrator reviewed and approved", async () => {
+    const state = fakeDatabase();
+    state.topups = [{ userId: "user-id", payerName: "Emeka" }];
+    state.bank.accountName = "EMEKA CHUKWUEMEKA OKAFOR";
+    state.approvals = [{ userId: "user-id", approvedName: "EMEKA CHUKWUEMEKA OKAFOR" }];
+
+    const response = await POST(request(6000));
+
+    expect(response.status).toBe(200);
+    expect(state.balance).toBe(940);
+    expect(state.withdrawals).toHaveLength(1);
+  });
+
+  it("does not let an approval admit a different person's name", async () => {
+    const state = fakeDatabase();
+    state.topups = [{ userId: "user-id", payerName: "Emeka" }];
+    state.bank.accountName = "BOLA ADEYEMI";
+    state.approvals = [{ userId: "user-id", approvedName: "EMEKA CHUKWUEMEKA OKAFOR" }];
+
+    expect((await POST(request(6000))).status).toBe(403);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(state.balance).toBe(7000);
+  });
+
+  it("ignores an approval belonging to somebody else", async () => {
+    const state = fakeDatabase();
+    state.topups = [{ userId: "user-id", payerName: "Emeka" }];
+    state.bank.accountName = "EMEKA CHUKWUEMEKA OKAFOR";
+    state.approvals = [{ userId: "another-user", approvedName: "EMEKA CHUKWUEMEKA OKAFOR" }];
+
+    expect((await POST(request(6000))).status).toBe(403);
   });
 
   it("does not treat one shared surname as the same person", async () => {
