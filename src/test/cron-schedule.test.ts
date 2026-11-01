@@ -8,8 +8,11 @@ import { describe, expect, it } from "vitest";
  * Two failure modes here are invisible in every other test and in the build:
  * a schedule that Vercel's Hobby plan will not accept, and a path whose route
  * only exports POST -- Vercel Cron issues GET, so such a job is registered,
- * appears configured, and is answered with 405 forever. `scheduled-orders` is
- * exactly that route, which is why it is deliberately not listed.
+ * appears configured, and is answered with 405 forever. `scheduled-orders` used
+ * to be exactly that route, and is why it is not listed here: it now answers GET
+ * as well, but it still runs *inside* `/api/cron/nightly` rather than as its own
+ * entry, because two entries are all the plan allows and the app needs three
+ * tasks. `scheduled-wiring.test.ts` pins that it is actually called.
  */
 
 const root = process.cwd();

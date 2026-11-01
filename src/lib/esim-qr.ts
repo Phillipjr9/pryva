@@ -18,6 +18,30 @@ export type EmailAttachment = ResendAttachment;
 /** Anything longer than this is not a profile payload, it is a bug. */
 const MAX_PAYLOAD = 1_200;
 
+/**
+ * The same QR, as a data URL for the order page.
+ *
+ * The email template already told customers to "open your order page to view the
+ * QR code", and the page only ever rendered the activation string — so the one
+ * instruction that avoids typing a 60-character credential pointed at nothing.
+ * Drawn server-side and inlined as a data URL: no signed URL to rotate, no extra
+ * request from the customer's phone on the page that carries the credential.
+ */
+export async function esimQrDataUrl(payload: string): Promise<string | null> {
+  const text = payload.trim();
+  if (!text || text.length > MAX_PAYLOAD) return null;
+  try {
+    return await QRCode.toDataURL(text, {
+      width: 320,
+      margin: 1,
+      errorCorrectionLevel: "M",
+      color: { dark: "#241b3a", light: "#ffffff" },
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function esimQrAttachment(payload: string): Promise<EmailAttachment | null> {
   const text = payload.trim();
   if (!text || text.length > MAX_PAYLOAD) return null;
