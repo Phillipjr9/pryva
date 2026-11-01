@@ -155,6 +155,23 @@ describe("the saved accounts list", () => {
     expect(byName["OKAFOR EMEKA"]).toBeNull();
   });
 
+  it("stops warning once support has reviewed the name", async () => {
+    await settleDeposit("Emeka");
+    await database.insert(schema.payoutNameApprovals).values({
+      userId: ADA,
+      approvedName: "EMEKA CHUKWUEMEKA OKAFOR",
+      depositorName: "Emeka",
+      reason: "Bank statement supplied in ticket 412",
+      approvedByEmail: "admin@pryva.ng",
+    });
+    await database.insert(bankAccounts).values({
+      userId: ADA, bankName: "Access Bank", bankCode: "044", accountNumber: "0123456789", accountName: "EMEKA CHUKWUEMEKA OKAFOR", recipientCode: "RCP-1", isDefault: 1,
+    });
+
+    const body = await (await route.GET()).json();
+    expect(body.bankAccounts[0].payoutWarning).toBeNull();
+  });
+
   it("warns about nothing when there is no recorded depositor to compare against", async () => {
     await database.insert(bankAccounts).values({
       userId: ADA, bankName: "Access Bank", bankCode: "044", accountNumber: "0123456789", accountName: "ANY NAME AT ALL", recipientCode: "RCP-1", isDefault: 1,

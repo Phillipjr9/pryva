@@ -9,11 +9,7 @@ import { isPreviewDatabase } from "@/lib/demo-policy";
 import { logger } from "@/lib/logger";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
-import {
-  comparePayoutNames,
-  depositorNameFor,
-  PAYOUT_NAME_MESSAGES,
-} from "@/lib/withdrawal-name-check";
+import { checkPayoutDestination, PAYOUT_NAME_MESSAGES } from "@/lib/withdrawal-name-check";
 import { MAX_WITHDRAWAL, MIN_WITHDRAWAL, withdrawalFee } from "@/lib/withdrawal";
 import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 import { assessWithdrawal, recordFraudEvent, type RiskAssessment } from "@/lib/fraud";
@@ -132,7 +128,7 @@ export async function POST(request: NextRequest) {
     // runs after the balance has moved would need a rollback to be worth
     // anything. The reference is the name frozen on the first settled deposit,
     // not `users.name`, which the profile endpoint can change at any time.
-    const nameCheck = comparePayoutNames(await depositorNameFor(user.id), bankAccount.accountName);
+    const nameCheck = await checkPayoutDestination(user.id, bankAccount.accountName);
     if (!nameCheck.ok) {
       // Reason and identifiers only: bank account names are not logged.
       logger.warn("Withdrawal refused: destination name does not match the depositor", {

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
-import { bankAccounts, paymentTopups, users, withdrawals, walletTransactions , } from "@/db/schema";
+import { bankAccounts, paymentTopups, payoutNameApprovals, users, withdrawals, walletTransactions , } from "@/db/schema";
 import { POST } from "@/app/api/wallet/withdraw/route";
 
 const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), select: vi.fn(), transaction: vi.fn() }));
@@ -43,6 +43,8 @@ function fakeDatabase() {
     // The name frozen when this wallet was funded. Payouts are only allowed to a
     // bank account whose resolved name matches it.
     topups: [{ userId: "user-id", payerName: "Test User" }] as Array<{ userId: string; payerName: string | null }>,
+    // A payout name an administrator reviewed. Empty unless a spec adds one.
+    approvals: [] as Array<{ userId: string; approvedName: string }>,
   };
   mocks.select.mockImplementation(() => ({
     from: (table: unknown) => ({
@@ -56,6 +58,10 @@ function fakeDatabase() {
           if (table === paymentTopups) return state.topups
             .filter((row) => row.userId === params[0] && row.payerName !== null)
             .map((row) => ({ payerName: row.payerName }));
+          // payoutApprovalFor() reads the live approval for this account.
+          if (table === payoutNameApprovals) return state.approvals
+            .filter((row) => row.userId === params[0])
+            .map((row) => ({ approvedName: row.approvedName }));
           return [];
         };
         // The payout-name lookup orders by paid_at; the others do not.
@@ -225,6 +231,47 @@ describe("withdrawal requests", () => {
     expect(state.balance).toBe(7000);
     expect(state.withdrawals).toHaveLength(0);
     expect(state.ledger).toHaveLength(0);
+  });
+
+  /**
+   * The one case the frozen name cannot answer.
+   *
+   * "Emeka" at signup against "EMEKA CHUKWUEMEKA OKAFOR" on the bank record is one
+   * person, and no string rule can prove it. An administrator can, and this is the
+   * only way that decision reaches the payout route: a reviewed name stored
+   * beside the deposit, never in place of it.
+   */
+  it("pays a name an administrator reviewed and approved", async () => {
+    const state = fakeDatabase();
+    state.topups = [{ userId: "user-id", payerName: "Emeka" }];
+    state.bank.accountName = "EMEKA CHUKWUEMEKA OKAFOR";
+    state.approvals = [{ userId: "user-id", approvedName: "EMEKA CHUKWUEMEKA OKAFOR" }];
+
+    const response = await POST(request(6000));
+
+    expect(response.status).toBe(200);
+    expect(state.balance).toBe(940);
+    expect(state.withdrawals).toHaveLength(1);
+  });
+
+  it("does not let an approval admit a different person's name", async () => {
+    const state = fakeDatabase();
+    state.topups = [{ userId: "user-id", payerName: "Emeka" }];
+    state.bank.accountName = "BOLA ADEYEMI";
+    state.approvals = [{ userId: "user-id", approvedName: "EMEKA CHUKWUEMEKA OKAFOR" }];
+
+    expect((await POST(request(6000))).status).toBe(403);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(state.balance).toBe(7000);
+  });
+
+  it("ignores an approval belonging to somebody else", async () => {
+    const state = fakeDatabase();
+    state.topups = [{ userId: "user-id", payerName: "Emeka" }];
+    state.bank.accountName = "EMEKA CHUKWUEMEKA OKAFOR";
+    state.approvals = [{ userId: "another-user", approvedName: "EMEKA CHUKWUEMEKA OKAFOR" }];
+
+    expect((await POST(request(6000))).status).toBe(403);
   });
 
   it("does not treat one shared surname as the same person", async () => {

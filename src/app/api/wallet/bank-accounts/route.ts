@@ -11,8 +11,9 @@ import { logger } from "@/lib/logger";
 import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
 import {
-  comparePayoutNames,
+  checkPayoutDestination,
   depositorNameFor,
+  payoutApprovalFor,
   PAYOUT_NAME_MESSAGES,
 } from "@/lib/withdrawal-name-check";
 
@@ -27,16 +28,13 @@ export async function GET() {
     // A saved account that the payout rule will refuse is worth saying out loud
     // on the list, not only when a withdrawal fails: otherwise the customer
     // picks it, fills in an amount, and finds out at the last step.
-    const depositorName = accounts.length ? await depositorNameFor(user.id) : null;
-    return NextResponse.json({
-      ok: true,
-      bankAccounts: accounts.map((acc) => ({
-        id: acc.id, bankName: acc.bankName, bankCode: acc.bankCode,
-        accountNumber: acc.accountNumber, accountName: acc.accountName,
-        isDefault: acc.isDefault === 1, createdAt: acc.createdAt,
-        payoutWarning: payoutWarningFor(depositorName, acc.accountName),
-      })),
-    });
+    const bankAccountsWithWarnings = await Promise.all(accounts.map(async (acc) => ({
+      id: acc.id, bankName: acc.bankName, bankCode: acc.bankCode,
+      accountNumber: acc.accountNumber, accountName: acc.accountName,
+      isDefault: acc.isDefault === 1, createdAt: acc.createdAt,
+      payoutWarning: await payoutWarningFor(user.id, acc.accountName),
+    })));
+    return NextResponse.json({ ok: true, bankAccounts: bankAccountsWithWarnings });
   } catch {
     logger.error("Failed to fetch bank accounts");
     return NextResponse.json({ error: "Failed to fetch bank accounts" }, { status: 500 });
@@ -115,7 +113,7 @@ export async function POST(request: NextRequest) {
     // Only the frozen deposit name is used, never `users.name`: the profile field
     // is editable, so it proves nothing about who sent the money.
     const depositorName = await depositorNameFor(user.id);
-    const nameCheck = depositorName ? comparePayoutNames(depositorName, accountName) : null;
+    const nameCheck = depositorName ? await checkPayoutDestination(user.id, accountName) : null;
     const payoutWarning = nameCheck && !nameCheck.ok ? PAYOUT_NAME_MESSAGES[nameCheck.reason] : null;
     if (nameCheck && !nameCheck.ok) {
       // Reason and identifiers only: bank account names are not logged.
@@ -182,12 +180,15 @@ export async function DELETE(request: NextRequest) {
 /**
  * What to tell a customer about an account the payout rule will refuse.
  *
- * Returns null when the account can be paid -- including when no deposit has
- * been recorded yet, because then there is nothing to compare and the withdrawal
- * route is the place that decides.
+ * Returns null when the account can be paid, and also when there is nothing on
+ * record to compare against yet: no settled deposit and no reviewed name. Warning
+ * "no completed deposit has recorded one yet" on the first account a customer
+ * saves would read as a failure on a form that just worked, so that case is left
+ * to the withdrawal route, which is where it actually matters. A reviewed name
+ * clears the warning, because then the account can be paid.
  */
-function payoutWarningFor(depositorName: string | null, accountName: string): string | null {
-  if (!depositorName) return null;
-  const check = comparePayoutNames(depositorName, accountName);
+async function payoutWarningFor(userId: string, accountName: string): Promise<string | null> {
+  if (!(await depositorNameFor(userId)) && !(await payoutApprovalFor(userId))) return null;
+  const check = await checkPayoutDestination(userId, accountName);
   return check.ok ? null : PAYOUT_NAME_MESSAGES[check.reason];
 }

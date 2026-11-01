@@ -18,6 +18,7 @@ const LINKS = [
   { href: "/admin/support", label: "Support" },
   { href: "/admin/messages", label: "Contact form" },
   { href: "/admin/withdrawals", label: "Withdrawals" },
+  { href: "/admin/payout-names", label: "Payout names" },
   { href: "/admin/reconciliation", label: "Reconciliation" },
   { href: "/admin/reviews", label: "Reviews" },
   { href: "/admin/audit", label: "Audit" },
