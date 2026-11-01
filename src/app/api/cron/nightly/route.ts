@@ -5,6 +5,7 @@ import { processAutoRefunds } from "@/lib/auto-refund";
 import { dispatchWalletEmails, walletEmailConfigured } from "@/lib/wallet-email-outbox";
 import { sweepBoostDeliveries } from "@/lib/boost-status";
 import { expireFinishedRentals } from "@/lib/rental-expiry";
+import { sweepPendingEsimOrders } from "@/lib/esim-fulfilment";
 import { settleReferralRewards } from "@/lib/referrals";
 import { purgeExpiredClosedAccounts } from "@/lib/retention";
 import { reconcileInFlightPayouts } from "@/lib/payouts";
@@ -106,6 +107,14 @@ async function handler(request: NextRequest) {
     return { ok: true, detail: `refunded ${refunded}, released ${cancelled}` };
   });
 
+  // An eSIM bought while the supplier was still provisioning is recorded
+  // uncharged until its profile can be read. This sweep finishes those, and
+  // charges only what it can actually hand over.
+  const esim = await runStep("esim-orders", async () => {
+    const result = await sweepPendingEsimOrders();
+    return { ok: true, detail: `completed ${result.completed}, pending ${result.pending}, failed ${result.failed}` };
+  });
+
   const rentals = await runStep("rental-expiry", async () => {
     const result = await expireFinishedRentals();
     return { ok: true, detail: `expired ${result.expired}` };
@@ -159,7 +168,7 @@ async function handler(request: NextRequest) {
     };
   });
 
-  const allOk = close.ok && emails.ok && boosts.ok && refunds.ok && rentals.ok && referrals.ok && payouts.ok && webhookLog.ok && retention.ok;
+  const allOk = close.ok && emails.ok && boosts.ok && refunds.ok && esim.ok && rentals.ok && referrals.ok && payouts.ok && webhookLog.ok && retention.ok;
   logger.info("Nightly run finished", {
     day,
     allOk,
@@ -167,13 +176,14 @@ async function handler(request: NextRequest) {
     emails: emails.detail,
     boosts: boosts.detail,
     refunds: refunds.detail,
+    esim: esim.detail,
     rentals: rentals.detail,
     referrals: referrals.detail,
     retention: retention.detail,
   });
 
   return NextResponse.json(
-    { ok: allOk, day, steps: { close, emails, boosts, refunds, rentals, referrals, retention } },
+    { ok: allOk, day, steps: { close, emails, boosts, refunds, esim, rentals, referrals, retention } },
     { status: allOk ? 200 : 207, headers: { "Cache-Control": "no-store" } },
   );
 }

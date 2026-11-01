@@ -25,7 +25,7 @@ vi.mock("@/lib/fleexa", () => ({ isFleexaConfigured: () => state.fleexaConfigure
 vi.mock("@/lib/smm-panel", () => ({ isSmmPanelConfigured: () => state.boostConfigured }));
 vi.mock("@/lib/smm-catalog", () => ({ readBoostSnapshot: state.boostSnapshot, boostItems: state.boostItems }));
 vi.mock("@/lib/bitcall", () => ({ isBitcallConfigured: () => state.bitcallConfigured }));
-vi.mock("@/lib/bitcall-esim-catalog", () => ({ readEsimSnapshot: state.esimSnapshot, esimItemsForCountry: state.esimItems }));
+vi.mock("@/lib/esim-catalog", () => ({ readEsimCatalog: state.esimSnapshot, esimItemsForCountry: state.esimItems }));
 
 import { GET } from "@/app/api/services/catalog/route";
 
@@ -44,7 +44,7 @@ beforeEach(() => {
   state.items.mockReturnValue([SIGNAL]);
   state.boostSnapshot.mockResolvedValue({ partial: false, fetchedAt: "2026-01-02T00:00:00Z", currency: "USD", balance: 12.5 });
   state.boostItems.mockReturnValue([BOOST]);
-  state.esimSnapshot.mockResolvedValue({ partial: false, fetchedAt: "2026-01-03T00:00:00Z", countries: ["Nigeria"] });
+  state.esimSnapshot.mockResolvedValue({ partial: false, fetchedAt: "2026-01-03T00:00:00Z", offers: [] });
   state.esimItems.mockReturnValue([ESIM]);
 });
 

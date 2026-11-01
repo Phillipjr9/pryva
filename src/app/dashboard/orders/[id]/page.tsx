@@ -10,6 +10,7 @@ import { formatNaira } from "@/lib/catalog";
 import Link from "next/link";
 import { ArrowLeft } from "@/components/icons";
 import { CredentialList } from "./CredentialList";
+import { EsimProfile } from "./EsimProfile";
 import { OrderActions } from "@/components/dashboard/OrderActions";
 import { LIVE_OTP_PROVIDER } from "@/lib/order-providers";
 import { syncBoostOrderStatus, type BoostSyncResult } from "@/lib/boost-status";
@@ -105,6 +106,22 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="order-2 space-y-6 lg:order-1 lg:col-span-2">
+            {order.service === "esim" ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Your eSIM</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <EsimProfile
+                    orderId={order.id}
+                    activationCode={order.esimActivationCode}
+                    installUrl={order.esimInstallUrl}
+                    iccid={order.esimIccid}
+                    pending={status === "processing"}
+                  />
+                </CardContent>
+              </Card>
+            ) : null}
             <Card>
               <CardHeader>
                 <CardTitle>Order Information</CardTitle>

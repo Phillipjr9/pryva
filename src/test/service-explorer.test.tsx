@@ -47,7 +47,13 @@ describe("country-first service explorer", () => {
     expect(ids).toEqual(["verification", "social", "numbers", "esim", "proxies", "email", "accounts", "subscriptions", "data", "tools"]);
     const items = buildServiceExplorer("ng");
     expect(new Set(items.map((item) => item.id)).size).toBe(items.length);
-    for (const category of ids) expect(items.some((item) => item.category === category), category).toBe(true);
+    // eSIM is the exception: its plans come from the live supplier catalogue and
+    // are listed from there, so the static builder has no eSIM rows to offer.
+    // `esim-catalog.test.ts` covers what that category lists instead.
+    for (const category of ids.filter((id) => id !== "esim")) {
+      expect(items.some((item) => item.category === category), category).toBe(true);
+    }
+    expect(items.some((item) => item.category === "esim")).toBe(false);
 
     // Gift cards are wallet credit Pryva issues itself, not a service family:
     // no chip, no card. The page itself is /dashboard/gift-cards.
@@ -78,7 +84,7 @@ describe("country-first service explorer", () => {
     expect(nigeria.some((item) => item.id === "plan-vn-us")).toBe(false);
     expect(us.some((item) => item.id === "plan-vn-us")).toBe(true);
     expect(us.some((item) => item.id === "plan-vn-ng")).toBe(false);
-    const regional = us.find((item) => item.id === "plan-esim-europe");
+    const regional = us.find((item) => item.id === "plan-proxy-eu-10");
     expect(regional).toMatchObject({ coverage: "unconfirmed", action: null });
     // Email is no longer a set of catalogue plans, so nothing here matches a
     // country -- and nothing needs to. The free inbox is a tool item that shows

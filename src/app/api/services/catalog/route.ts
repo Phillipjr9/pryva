@@ -6,7 +6,7 @@ import { readSupplierSnapshot, supplierItemsForCountry } from "@/lib/fleexa-cata
 import { isSmmPanelConfigured } from "@/lib/smm-panel";
 import { boostItems, readBoostSnapshot } from "@/lib/smm-catalog";
 import { isBitcallConfigured } from "@/lib/bitcall";
-import { esimItemsForCountry, readEsimSnapshot } from "@/lib/bitcall-esim-catalog";
+import { esimItemsForCountry, readEsimCatalog } from "@/lib/esim-catalog";
 import { explorerCountry } from "@/lib/service-explorer";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
 
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
   const [supplier, boost, esim] = await Promise.all([
     attempt(isFleexaConfigured(), () => readSupplierSnapshot(refresh)),
     attempt(isSmmPanelConfigured(), () => readBoostSnapshot(refresh)),
-    attempt(isBitcallConfigured(), () => readEsimSnapshot(refresh)),
+    attempt(isBitcallConfigured(), () => readEsimCatalog(refresh)),
   ]);
   const sources = [supplier, boost, esim];
   if (sources.every((source) => !source.snapshot)) {
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
 
   const items = [
     ...(supplier.snapshot ? supplierItemsForCountry(supplier.snapshot, country.code) : []),
-    ...(esim.snapshot ? esimItemsForCountry(esim.snapshot, country.code) : []),
+    ...(esim.snapshot ? esimItemsForCountry(esim.snapshot.offers, country.code) : []),
     ...(boost.snapshot ? boostItems(boost.snapshot) : []),
   ];
   // Partial means "this may be incomplete": a configured source that failed, or
