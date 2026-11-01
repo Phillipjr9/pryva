@@ -332,6 +332,35 @@ export const paymentTopups = pgTable(
 
 // Inserted by PostgreSQL triggers alongside wallet ledger/status changes. The
 // Resend worker claims rows with a lease; provider calls happen after commit.
+/**
+ * An administrator's reviewed payout name for one account.
+ *
+ * The depositor name frozen on the first deposit is never edited — it is the
+ * evidence of what was recorded when the money arrived. An approval beside it
+ * widens the set of bank-account names that may be paid, for one user, until it
+ * is revoked. See src/lib/withdrawal-name-check.ts.
+ */
+export const payoutNameApprovals = pgTable(
+  "payout_name_approvals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    approvedName: varchar("approved_name", { length: 200 }).notNull(),
+    depositorName: varchar("depositor_name", { length: 200 }),
+    reason: varchar("reason", { length: 500 }).notNull(),
+    approvedByEmail: varchar("approved_by_email", { length: 320 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokedByEmail: varchar("revoked_by_email", { length: 320 }),
+  },
+  (table) => [
+    index("payout_name_approvals_user_idx").on(table.userId),
+    uniqueIndex("payout_name_approvals_live_idx").on(table.userId).where(sql`revoked_at IS NULL`),
+  ],
+);
+
 export const walletEmailOutbox = pgTable("wallet_email_outbox", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
