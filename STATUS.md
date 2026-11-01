@@ -2286,3 +2286,45 @@ data, subscriptions.
 **Verified:** 1,580 tests / 169 files · typecheck · lint · build · hub and
 overview render `200` with the ordered chips, state dots and the request link in
 a running instance · API probes unchanged in preview.
+
+
+---
+
+## eSIM goes on sale (1 Nov 2026)
+
+eSIM was six written plans with prices and no supplier behind them, a live
+catalogue that returned plans with `price: null`, and an ordering client nothing
+called. It is now a product.
+
+**Catalogue** — `src/lib/esim-catalog.ts` reads the supplier's plans, converts the
+per-plan price to naira (USD at the shared cached rate, NGN as-is), applies
+`priceFromCost` (30–50% band, rounded up) and the same `checkMargin` floor every
+other live purchase clears. A plan in a currency this deployment cannot convert,
+or without a price, is left out rather than guessed at; a plan the margin guard
+would block is listed with coverage and no buy button. Plan references stay
+hashed, so no supplier id reaches a page.
+
+**Checkout** — `/dashboard/esim/[id]` shows one live plan and buys it from the
+wallet via `POST /api/esim/purchase`. Money moves only once the activation code is
+in hand: delivered → order `active`, profile stored, one debit; still
+provisioning → order `processing`, **charged nothing**, finished by the order
+page's "Check delivery" button or the nightly sweep; refused → nothing bought,
+nothing charged; outcome unknown → parked on `review` uncharged and never
+retried, because a resend would be a second purchase.
+
+**Delivery** — `orders.esim_iccid`, `esim_activation_code` and `esim_install_url`
+(migration `0027`). The order page renders the `LPA:` code with a copy action, the
+one-tap install link and the install steps, and nothing else in the app ever
+renders it. `GET` the ICCID back from the supplier later is the documented
+recovery path when a customer loses the code.
+
+**Also corrected:** the six written eSIM plans are no longer listed for sale in
+the hub (the live catalogue replaces them), and `/esim` withdraws its sample
+prices and says live pricing when a key is configured — it used to claim
+"cannot be delivered yet" regardless of state.
+
+**Verified:** 1,599 tests / 171 files · typecheck · lint · build · hub renders the
+eSIM category with no written plans and the honest "needs the eSIM network key"
+line in preview. **Not verified:** a live purchase — no key here. The pricing
+assumption (their figure is cost) and the whole provisioning path need one cheap
+real purchase; see `.env.example`.
