@@ -1,6 +1,6 @@
 # What is still missing
 
-Written 1 November 2026, at `66d08ea`. This is the backlog that
+Written 1 November 2026, updated 3 November 2026. This is the backlog that
 `SERVICES-COMPLETENESS.md` points at: that file says what each service can do
 today, this one says what is absent, why it matters, and what unblocks it.
 
@@ -10,17 +10,18 @@ undeliverable plans on `/proxies`, eSIM QR) are fixed. These are the absences.
 
 ## P0 — exposure before the next naira of volume
 
-### 1. No identity verification and no tiered limits
-Anybody with a working email can hold a balance, receive transfers from other
-users and withdraw to a bank account. There is no BVN/NIN check, no date-of-birth
-or address step, no tier (verified/unverified) and no per-tier ceiling. The only
-friction is the debit-card name rule on withdrawal, which is an anti-fraud control,
-not an identity one.
-*Evidence:* `src/app/api/auth/signup/route.ts` (name, email, password only);
-`src/app/api/wallet/withdraw/route.ts` (₦1,000–₦5,000,000, no identity state);
-no `kyc|bvn|nin` table in `src/db/schema.ts`.
-*Unblocks:* a decision on which provider (Prembly/Dojah/etc.) and which tier
-limits. Then schema + a step in signup + a gate in withdraw.
+### 1. Identity verification — **declined by the owner, 3 November 2026**
+Not wanted: no BVN/NIN step, no date-of-birth or address step, no verified/
+unverified tier and no per-tier ceiling. Recorded here only so it is not proposed
+again, and so the decision has a date on it.
+
+What does hold the line instead, and is already live: the payout name rule (money
+may only leave in the name it arrived in, frozen from the first settled deposit,
+with an admin-reviewed override), fraud scoring on every withdrawal request, the
+email-verification gate on payouts added in `a52b13e`, the per-request risk level
+in the operator queue, and the reconciliation sweep for anything whose outcome is
+unknown. That is a fraud-and-reachability posture, not an identity one — accounts
+can still be opened with an address nobody has proven they own.
 
 ### 2. Nothing reports an error in production — **closed, with one step left**
 `logger.error()` now posts to a webhook (`ALERT_WEBHOOK_URL`, Slack or Discord
@@ -59,10 +60,9 @@ with a migration. Deploying the code without them fails at runtime, not at build
 `migrations/README.md`'s checks.
 
 ### What is left in P0
-Items 1 (identity verification), 3 (CI billing) and 5 (migrations) need a provider
-contract, a billing change or a deploy — none of them is code I can write alone.
-Item 2 is closed in code and needs one secret set; item 4 is closed at the boundary
-where it matters.
+Item 1 is declined. Items 3 (CI billing) and 5 (migrations) need a billing change
+and a deploy, which are not code. Item 2 is closed in code and needs one secret
+set (`ALERT_WEBHOOK_URL`); item 4 is closed at the boundary where it matters.
 
 ## P1 — the gaps a customer will meet
 
@@ -83,14 +83,22 @@ code never arrives gets an honest refusal instead of a retry.
 *Unblocks:* nothing but code — the Fleexa client has no resend call, so this needs
 a decision (buy a replacement number at our cost, or keep refusing).
 
-### 9. No statement or receipt a customer can keep
-The wallet page lists transactions; there is no CSV/PDF statement, no per-order
-receipt download, and no yearly summary. Admin can export (`/admin/export`), the
-customer cannot. For a payments product this is the first support request you will
-get at tax time.
-*Evidence:* `src/app/dashboard/wallet/` renders a list only; `src/lib/email-templates.ts`
-has `orderConfirmationEmail` / `refundEmail` / `walletTopupEmail` templates that no
-code calls.
+### 9. Statements and receipts — **closed, and the list was wrong about half of it**
+The wallet ledger was already exportable: `ExportTransactionsButton` on
+`/dashboard/wallet` calls `/api/wallet/transactions/export`, which returns every
+row as CSV or JSON. What genuinely did not exist was a document for a **single
+order** — the order page is a live screen that polls, changes status and holds the
+code or eSIM activation credential, so it is the wrong thing to hand to a bank.
+
+`/dashboard/orders/[id]/receipt` now renders a printable receipt (browser print →
+PDF): reference, date, product, plan, region, validity, how it was paid, status in
+words, the amount, and the refund date when there is one. It deliberately never
+reads `provider`, `otpCode`, `referenceCode`, `accounts` or the eSIM fields, and a
+test enforces that, so a receipt can be forwarded without leaking a supplier or a
+credential. The order page links to it.
+
+Still missing in this area: a date range on the wallet export (it is all-or-nothing)
+and any yearly summary.
 
 ### 10. No dispute or chargeback handling
 `dispute` appears in the privacy and refund copy and nowhere in code. A Paystack
@@ -121,7 +129,7 @@ fact, if they are looking.
 | 17 | Subscriptions / digital products | No supplier. |
 | 18 | Per-app verification codes | `vn-otp-5` is listed with no app mapping; not sellable. |
 | 19 | Search across orders and services | Dashboards filter; nothing searches. Grows painful past a few hundred orders. |
-| 20 | Dead templates | `welcomeEmail`, `orderConfirmationEmail`, `refundEmail`, `walletTopupEmail` render nothing anywhere — delete or wire, don't leave them to imply coverage. |
+| 20 | Dead templates | `welcomeEmail`, `orderConfirmationEmail`, `refundEmail`, `walletTopupEmail` render nothing anywhere — delete or wire, don't leave them to imply coverage. Receipts are now a page, not an email, so the second is the one worth deleting outright. |
 | 21 | Accessibility sweep | Contrast and focus states are partly tested (`mobile-layout.test.tsx`); no screen-reader pass. |
 | 22 | `npm audit`: 20 moderate | Production dependencies are clean (`npm audit --omit=dev` → 0); the moderates are dev-only, in the lint/test chain. |
 | 23 | GitHub Actions | See P0.3 — the same billing block means no scheduled dependency audit either. |
