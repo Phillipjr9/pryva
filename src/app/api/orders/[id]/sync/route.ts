@@ -10,6 +10,7 @@ import {
   getFleexaRentalSms,
   FleexaError,
 } from "@/lib/fleexa";
+import { getBitcallOtpActivation } from "@/lib/bitcall";
 
 export const dynamic = "force-dynamic";
 const orderSyncLimiter = createRateLimiter({ windowMs: 20_000, maxRequests: 1 });
@@ -34,7 +35,7 @@ export async function GET(
     .limit(1);
 
   if (!order) return Response.json({ ok: false, error: "Order not found" }, { status: 404 });
-  if (order.provider !== "fleexa" || !order.providerRequestId) {
+  if (!order.providerRequestId || (order.provider !== "fleexa" && order.provider !== "bitcall")) {
     return Response.json({ ok: true, otpCode: order.otpCode, status: order.status, synced: false });
   }
   if (order.status !== "active") {
@@ -49,7 +50,20 @@ export async function GET(
     let upstreamStatus = "pending";
     let lastMessage: string | null = null;
 
-    if (order.service === "email-otp") {
+    if (order.provider === "bitcall") {
+      // App-specific pools deliver one code; the activation reports it once the
+      // message lands, and the same poll answers "cancelled" or "expired".
+      const activation = await getBitcallOtpActivation(order.providerRequestId);
+      code = activation.code;
+      upstreamStatus =
+        activation.status === "received" || activation.status === "completed"
+          ? "delivered"
+          : activation.status === "cancelled" || activation.status === "refunded"
+            ? "cancelled"
+            : activation.status === "expired"
+              ? "expired"
+              : "pending";
+    } else if (order.service === "email-otp") {
       const result = await checkFleexaEmail(order.providerRequestId);
       code = result.code;
       lastMessage = result.messages[0]?.body ?? null;
