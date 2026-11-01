@@ -7,6 +7,11 @@ client and a running instance (`~/dashboard`, `/dashboard/services`,
 Every claim below is from code or from a probe, not from copy on a marketing
 page.
 
+> **Deep dive:** `SERVICES-COMPLETENESS.md` walks the same services one by one
+> through catalogue → gate → purchase → delivery → recovery → visibility, with
+> the verdict for each and the gaps found (including scheduled orders, which can be
+> created through the API but are never run by any job).
+
 ## 1. What each service can actually do
 
 `Ready` means a customer can pay and receive the thing. `Catalogue` means the
