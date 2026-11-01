@@ -282,6 +282,12 @@ proxies under "Case by case" alongside eSIM and offered a refund route for airti
   to open the page for.
 - **G6 gift-card delivery email** — the recipient is mailed the code.
 
+## What is still missing
+
+`GAPS.md` carries the backlog this audit produced: identity verification, error
+reporting, CI, the single-supplier services, statements, disputes and the smaller
+polish, each with the evidence and what unblocks it.
+
 ## How to re-run this audit
 
 ```
