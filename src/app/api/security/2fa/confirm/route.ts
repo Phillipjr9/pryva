@@ -3,6 +3,7 @@ import { requireAuthApi } from "@/lib/auth";
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { logger } from "@/lib/logger";
+import { sendSecurityNotice } from "@/lib/security-notice";
 import { confirmEnrolment, twoFactorAvailable } from "@/lib/two-factor";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +57,13 @@ export async function POST(request: NextRequest) {
       );
     }
     logger.info("Two-factor authentication enabled", { userId: user.id });
+    // Best effort, never throws: the customer should hear about this from a
+    // device they trust, and a mail outage must not undo the enrolment.
+    try {
+      await sendSecurityNotice({ to: user.email, name: user.name, event: "two_factor_enabled" });
+    } catch {
+      // Changing the setting has already committed; the notice is best effort.
+    }
     return NextResponse.json({ ok: true, recoveryCodes: confirmed.recoveryCodes });
   } catch (error) {
     logger.error("Failed to confirm two-factor enrolment", { userId: user.id, error });

@@ -6,6 +6,7 @@ import { requireAuthApi, verifyPassword } from "@/lib/auth";
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { logger } from "@/lib/logger";
+import { sendSecurityNotice } from "@/lib/security-notice";
 import { disableTwoFactor, twoFactorAvailable, verifySecondFactor } from "@/lib/two-factor";
 
 export const dynamic = "force-dynamic";
@@ -73,6 +74,13 @@ export async function POST(request: NextRequest) {
 
     await disableTwoFactor(user.id);
     logger.info("Two-factor authentication disabled", { userId: user.id, method: second.method });
+    // The most important notice of the four: losing the second factor lowers the
+    // account to a password alone, and the owner should learn that from us.
+    try {
+      await sendSecurityNotice({ to: user.email, name: user.name, event: "two_factor_disabled" });
+    } catch {
+      // Changing the setting has already committed; the notice is best effort.
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     logger.error("Failed to disable two-factor authentication", { userId: user.id, error });
