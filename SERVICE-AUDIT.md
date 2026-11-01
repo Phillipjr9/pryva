@@ -25,6 +25,7 @@ integration at all.
 | **eSIM** | hub → `/dashboard/esim/[id]` | Live supplier catalogue, wallet checkout, activation code on the order | Catalogue only | **Ready to buy with an eSIM key: live plans, naira prices, profile delivered and recoverable** |
 | App verification | hub | Both number suppliers, read-only listing | Catalogue only | Catalogue only — labelled |
 | eSIM delivery email | inbox + order page | `wallet_email_outbox` (migration `0028`), Resend, QR attached as PNG | The profile existed only behind a login | **A delivered eSIM emails its instructions, activation code and QR; one email per order, queued in the same transaction as the profile** |
+| Add a bank account (new customer) | `/dashboard/wallet` → Withdraw → Bank accounts | `POST /api/wallet/bank-accounts`, Paystack resolve + recipient | **Two dead ends: the only CTA on the empty Withdraw tab was a link to `#bank-accounts`, a panel not in the DOM until that tab was open, so it did nothing; and saving was refused outright when the verified bank name differed from the name typed at signup ("Emeka" vs "EMEKA CHUKWUEMEKA OKAFOR")** | **The CTA opens the panel; a verified account always saves, and is flagged "payouts blocked" in the list and the payout picker when the depositor-name rule would refuse it — the rule itself still refuses the payout, unchanged** |
 | Verification code email | inbox | `wallet_email_outbox` (migration `0029`), Resend, 3D code tile | A code existed only on the order page — close the tab and it was gone | **A code arriving on a number emails itself to the account, with the number, the plan and when it stops receiving; single numbers only, one email per code** |
 | Change sign-in email | `/dashboard/settings` → `/confirm-email` | `POST /api/user/email`, `POST /api/auth/confirm-email-change`, `email_change_requests` | **Missing: the address could not be changed at all** | **A new address takes over only after the link sent to it is opened; 2h, single-use, hash-only, one live request per account, refused outright if mail is down** |
 | Security notices | inbox | `src/lib/security-notice.ts` wired into password change, 2FA on/off and email change | **Missing: the three things an attacker does first happened silently** | **Password changed, 2FA on, 2FA off, and the old address is told when the sign-in email moves; best effort, never fails the action** |
@@ -130,7 +131,7 @@ derived.
 
 ## 5. Verification
 
-- `npm test` — 1,702 tests / 182 files, including new coverage for the bulk
+- `npm test` — 1,714 tests / 184 files, including new coverage for the bulk
   checkout's order of operations (fulfil → record → charge, release on failure),
   the scheduled run's refusal to charge without delivery, and the hub's
   readiness ordering and request link.
