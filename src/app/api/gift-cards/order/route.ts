@@ -14,6 +14,7 @@ import {
 } from "@/lib/foxreload";
 import { FOXRELOAD_PROVIDER } from "@/lib/order-providers";
 import { creditWallet, debitWalletInTx, makeReference } from "@/lib/wallet";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
@@ -187,6 +188,10 @@ export async function POST(request: Request) {
     console.error("Failed to commit gift card order debit", error);
     return Response.json({ ok: false, error: "Failed to process gift card purchase." }, { status: 500 });
   }
+
+  // The debit committed with its own transaction, so `debitWallet`'s usual nudge
+  // never ran here. Without this the receipt waits for the nightly backstop.
+  scheduleWalletEmails();
 
   // Step 2: Execute real FoxReload API purchase
   let voucherCode = "";

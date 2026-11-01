@@ -15,6 +15,8 @@ type Props = {
   service: string;
   /** Server-computed: this order's code can be re-read while the window is open. */
   refreshableCode?: boolean;
+  /** Server-computed: this order's supplier can send the code to the number again. */
+  canResendCode?: boolean;
   initialNow: number;
 };
 
@@ -46,6 +48,7 @@ export function OrderActions({
   otpCode,
   service,
   refreshableCode = false,
+  canResendCode = false,
   initialNow,
 }: Props) {
   const [copied, setCopied] = useState<string | null>(null);
@@ -59,6 +62,8 @@ export function OrderActions({
   const [liveOtp, setLiveOtp] = useState<string | null>(otpCode);
   const [synced, setSynced] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(service === "numbers" || service === "email-otp");
 
   const isLiveProvider = refreshableCode;
@@ -120,6 +125,29 @@ export function OrderActions({
       setRefundError("The refund didn't go through. Please contact support.");
     } finally {
       setRefunding(false);
+    }
+  }
+
+  async function requestResend() {
+    if (resending) return;
+    setResending(true);
+    setResendNotice(null);
+    try {
+      const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}/resend`, {
+        method: "POST",
+      });
+      const data = (await response.json()) as { ok?: boolean; error?: string };
+      if (response.ok && data.ok) {
+        setResendNotice("Sent again. It can take up to a minute to arrive.");
+        return;
+      }
+      // A cooldown and a number that can no longer receive codes are different
+      // problems, so the server's wording is shown rather than a guess.
+      setResendNotice(data.error ?? "The code couldn't be sent again just now.");
+    } catch {
+      setResendNotice("The code couldn't be sent again just now.");
+    } finally {
+      setResending(false);
     }
   }
 
@@ -228,6 +256,24 @@ export function OrderActions({
               ))}
             </button>
             {!revealed && <p className="mt-2 text-meta text-ink-3">Tap the code to reveal it.</p>}
+          </div>
+        )}
+
+        {canResendCode && active && !expired && (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={requestResend}
+              disabled={resending}
+              className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-micro font-semibold text-ink-2 hover:border-lav-300 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {resending ? "Asking for a new code…" : "Resend code"}
+            </button>
+            {resendNotice && (
+              <p role="status" aria-live="polite" className="mt-2 text-meta text-ink-2">
+                {resendNotice}
+              </p>
+            )}
           </div>
         )}
 

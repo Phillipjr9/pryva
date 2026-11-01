@@ -13,6 +13,7 @@ import { CredentialList } from "./CredentialList";
 import { EsimProfile } from "./EsimProfile";
 import { OrderActions } from "@/components/dashboard/OrderActions";
 import { pollsForCode } from "@/lib/order-providers";
+import { canResendNumberCode } from "@/lib/otp-resend";
 import { syncBoostOrderStatus, type BoostSyncResult } from "@/lib/boost-status";
 
 export const dynamic = "force-dynamic";
@@ -243,6 +244,8 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
               otpCode={order.otpCode ?? null}
               service={order.service}
               refreshableCode={pollsForCode(order)}
+              // Decided on the server: the browser gets a boolean, never a name.
+              canResendCode={canResendNumberCode(order)}
               initialNow={now}
             />
             <Card>
