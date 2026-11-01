@@ -24,6 +24,7 @@ integration at all.
 | **Scheduled orders** | API + cron; page says not launched | `/api/scheduled-orders`, cron | **Broken: each run debited the wallet and wrote a `delivered` order without fulfilment** | **Fulfils before charging; refuses plans with no supplier path; skipped runs cost nothing** |
 | **eSIM** | hub → `/dashboard/esim/[id]` | Live supplier catalogue, wallet checkout, activation code on the order | Catalogue only | **Ready to buy with an eSIM key: live plans, naira prices, profile delivered and recoverable** |
 | App verification | hub | Both number suppliers, read-only listing | Catalogue only | Catalogue only — labelled |
+| Number code sweep | nightly cron (`number-codes`) | Supplier read per open single-number order | Code arrived only while the order page was open | **Delivers codes for orders nobody is watching, before the refund sweep runs** |
 | Supplier status | `/api/admin/suppliers` (admin GET) | Read-only catalogue probe, no buy call | No such check | **Per supplier per country: configured, listed, priced, in stock, cheapest naira cost, error code; plus per plan: our price, cheapest cost in naira, profit and margin against the floor** |
 | Email OTP (paid) | hub, inbox | Fleexa email products | Catalogue only | Catalogue only — labelled |
 | Proxies | hub + `/proxies` | none | No path | No path — labelled |

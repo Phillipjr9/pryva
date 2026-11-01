@@ -10,7 +10,7 @@ import {
   getFleexaRentalSms,
   FleexaError,
 } from "@/lib/fleexa";
-import { getBitcallOtpActivation } from "@/lib/bitcall";
+import { readNumberCode } from "@/lib/number-code-sync";
 
 export const dynamic = "force-dynamic";
 const orderSyncLimiter = createRateLimiter({ windowMs: 20_000, maxRequests: 1 });
@@ -35,7 +35,13 @@ export async function GET(
     .limit(1);
 
   if (!order) return Response.json({ ok: false, error: "Order not found" }, { status: 404 });
-  if (!order.providerRequestId || (order.provider !== "fleexa" && order.provider !== "bitcall")) {
+  // Only the products whose provider returns something on demand are syncable.
+  // An eSIM is bought through the same gateway as numbers, so the service is
+  // checked too: without it, an eSIM order would be sent to the number endpoint.
+  const syncable =
+    (order.service === "numbers" && (order.provider === "fleexa" || order.provider === "bitcall")) ||
+    (order.service === "email-otp" && order.provider === "fleexa");
+  if (!order.providerRequestId || !syncable) {
     return Response.json({ ok: true, otpCode: order.otpCode, status: order.status, synced: false });
   }
   if (order.status !== "active") {
@@ -50,27 +56,20 @@ export async function GET(
     let upstreamStatus = "pending";
     let lastMessage: string | null = null;
 
-    if (order.provider === "bitcall") {
-      // App-specific pools deliver one code; the activation reports it once the
-      // message lands, and the same poll answers "cancelled" or "expired".
-      const activation = await getBitcallOtpActivation(order.providerRequestId);
-      code = activation.code;
-      upstreamStatus =
-        activation.status === "received" || activation.status === "completed"
-          ? "delivered"
-          : activation.status === "cancelled" || activation.status === "refunded"
-            ? "cancelled"
-            : activation.status === "expired"
-              ? "expired"
-              : "pending";
+    if (order.service === "numbers" && !order.duration.startsWith("Rent")) {
+      // One read per supplier, shared with the nightly sweep, so the page and the
+      // sweep can never disagree about whether a code arrived.
+      const read = await readNumberCode(order);
+      code = read.code;
+      lastMessage = read.message;
+      upstreamStatus = read.status;
     } else if (order.service === "email-otp") {
       const result = await checkFleexaEmail(order.providerRequestId);
       code = result.code;
       lastMessage = result.messages[0]?.body ?? null;
       upstreamStatus = code ? "delivered" : "pending";
-    } else if (order.duration.startsWith("Rent")) {
+    } else {
       const result = await getFleexaRentalSms(order.providerRequestId);
-      // Do not guess the order of multiple untimestamped messages.
       const dated = result.messages
         .map((message) => ({ message, time: message.at ? Date.parse(message.at) : NaN }))
         .filter((entry) => Number.isFinite(entry.time))
@@ -79,11 +78,6 @@ export async function GET(
       code = latest?.code ?? null;
       lastMessage = latest?.body ?? null;
       upstreamStatus = code ? "delivered" : "pending";
-    } else {
-      const result = await checkFleexaSms(order.providerRequestId);
-      code = result.code;
-      lastMessage = result.message;
-      upstreamStatus = result.status;
     }
 
     const updates: Partial<typeof orders.$inferSelect> = {};
