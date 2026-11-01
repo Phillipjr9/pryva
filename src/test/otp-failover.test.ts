@@ -247,6 +247,23 @@ describe("cancelling upstream", () => {
     expect(bitcall.cancel).toHaveBeenCalledWith("act-1");
   });
 
+  it("refuses to send an eSIM order to the number cancellation endpoint", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    // eSIM is bought through the same gateway and stores the same provider value.
+    const released = await cancelUpstream({
+      provider: "bitcall",
+      providerRequestId: "esim-order-1",
+      service: "esim",
+      duration: "30 days",
+    });
+
+    expect(released).toBe(false);
+    expect(bitcall.cancel).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
   it("refuses when a rental order is somehow marked with the wrong supplier", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
 

@@ -6,6 +6,7 @@ import {
   summariseLane,
   type OrderTally,
 } from "@/lib/service-coverage";
+import { isNumberProvider, pollsForCode } from "@/lib/order-providers";
 
 /**
  * The coverage verdict.
@@ -17,6 +18,33 @@ import {
  */
 
 const numbers = SERVICE_LANES.find((lane) => lane.id === "numbers")!;
+
+/**
+ * A number can be sold by either supplier now, so every test that used to be an
+ * equality check has to be a membership one -- otherwise the second supplier's
+ * orders are invisible to the health page and never polled for their code.
+ */
+describe("number orders from either supplier", () => {
+  it("counts both suppliers as this lane's responsibility", () => {
+    expect(numbers.providers).toContain("fleexa");
+    expect(numbers.providers).toContain("bitcall");
+    expect(new Set(numbers.providers).size).toBe(numbers.providers.length);
+  });
+
+  it("treats either supplier as a live number, and nothing else", () => {
+    for (const provider of numbers.providers) expect(isNumberProvider(provider)).toBe(true);
+    for (const provider of ["manual", "preview", "accounts", "smm", null]) {
+      expect(isNumberProvider(provider)).toBe(false);
+    }
+  });
+
+  it("polls for the code on numbers only -- eSIM shares the gateway but has none", () => {
+    expect(pollsForCode({ service: "numbers", provider: "fleexa" })).toBe(true);
+    expect(pollsForCode({ service: "numbers", provider: "bitcall" })).toBe(true);
+    expect(pollsForCode({ service: "esim", provider: "bitcall" })).toBe(false);
+    expect(pollsForCode({ service: "accounts", provider: "accounts" })).toBe(false);
+  });
+});
 
 const DAY = 86_400_000;
 const now = new Date("2026-10-31T12:00:00Z");

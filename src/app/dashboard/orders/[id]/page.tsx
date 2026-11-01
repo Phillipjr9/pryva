@@ -12,7 +12,7 @@ import { ArrowLeft } from "@/components/icons";
 import { CredentialList } from "./CredentialList";
 import { EsimProfile } from "./EsimProfile";
 import { OrderActions } from "@/components/dashboard/OrderActions";
-import { LIVE_OTP_PROVIDER } from "@/lib/order-providers";
+import { pollsForCode } from "@/lib/order-providers";
 import { syncBoostOrderStatus, type BoostSyncResult } from "@/lib/boost-status";
 
 export const dynamic = "force-dynamic";
@@ -242,7 +242,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
               referenceCode={order.referenceCode ?? null}
               otpCode={order.otpCode ?? null}
               service={order.service}
-              refreshableCode={order.provider === LIVE_OTP_PROVIDER}
+              refreshableCode={pollsForCode(order)}
               initialNow={now}
             />
             <Card>
