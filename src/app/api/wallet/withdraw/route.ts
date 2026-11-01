@@ -16,6 +16,7 @@ import { assessWithdrawal, recordFraudEvent, type RiskAssessment } from "@/lib/f
 import { isPaystackConfigured } from "@/lib/paystack";
 import { paystackTransferReference } from "@/lib/paystack-transfer-reference";
 import { sendPayout } from "@/lib/payouts";
+import { unverifiedEmailBlocksPayout } from "@/lib/resend-config";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +90,17 @@ export async function POST(request: NextRequest) {
     const limit = await purchaseRateLimiter(`withdrawal:${user.id}`);
     if (limit.unavailable) return NextResponse.json({ error: "Withdrawals are temporarily unavailable." }, { status: 503 });
     if (!limit.allowed) return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
+
+    // Money out needs a reachable owner. This runs before anything is written, so
+    // a refused payout leaves the balance exactly where it was.
+    const unverified = unverifiedEmailBlocksPayout(user);
+    if (unverified) {
+      logger.warn("Withdrawal refused: email not verified", { userId: user.id });
+      return NextResponse.json(
+        { error: unverified, code: "EMAIL_UNVERIFIED" },
+        { status: 403, headers: { "Cache-Control": "private, no-store" } },
+      );
+    }
 
     let body: unknown;
     try {

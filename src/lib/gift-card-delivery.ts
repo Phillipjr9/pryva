@@ -1,6 +1,7 @@
 import "server-only";
 
 import { giftCardEmail } from "@/lib/email-templates";
+import { resendConfigured } from "@/lib/resend-config";
 
 /**
  * Mail a Pryva gift card to the address the buyer typed.
@@ -38,13 +39,13 @@ export interface GiftCardDelivery {
 }
 
 export function giftCardDeliveryConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY?.trim() && process.env.RESEND_FROM_EMAIL?.trim());
+  return resendConfigured();
 }
 
 export async function sendGiftCardDelivery(gift: GiftCardDelivery): Promise<boolean> {
   const key = process.env.RESEND_API_KEY?.trim();
   const from = process.env.RESEND_FROM_EMAIL?.trim();
-  if (!key || !from) {
+  if (!resendConfigured() || !key || !from) {
     // Not an error: the buyer still has the code on screen.
     console.info("[gift-cards] delivery email skipped: Resend is not configured");
     return false;

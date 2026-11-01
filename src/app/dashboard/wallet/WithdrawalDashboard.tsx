@@ -102,6 +102,15 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
   const [pendingIntents, setPendingIntents] = useState<WithdrawalIntent[]>([]);
   const [review, setReview] = useState<WithdrawalReview | null>(null);
   const [recoveryState, setRecoveryState] = useState<"loading" | "ready" | "unavailable">("loading");
+  /**
+   * The payout route's email-verification refusal.
+   *
+   * "Review requests or retry" is the right advice for an unknown outcome, but it
+   * is useless here: retrying changes nothing until the address is verified, and
+   * the customer has just been told no money moved. This keeps the reason on the
+   * page next to the link that fixes it, instead of a toast that disappears.
+   */
+  const [emailVerificationNotice, setEmailVerificationNotice] = useState<string | null>(null);
   const intentKey = `pryva.withdrawal.pending.v1.${userId}`;
   const sending = useRef(false);
   const [banks, setBanks] = useState<Bank[]>([]);
@@ -292,6 +301,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
     if (sending.current) return { ok: false, message: "A request is already being checked. Review Requests before trying again." };
     sending.current = true;
     setLoading(true);
+    setEmailVerificationNotice(null);
     const abort = new AbortController();
     const timeout = window.setTimeout(() => abort.abort(), 20_000);
     try {
@@ -334,6 +344,14 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
       // key even for a 4xx until the request is reviewed or reconciled.
       const error = data && typeof data === "object" && !Array.isArray(data) && typeof (data as { error?: unknown }).error === "string"
         ? (data as { error: string }).error.slice(0, 240) : "The request response could not be confirmed.";
+
+      // Nothing was written and nothing was debited, so there is no request to
+      // review: the answer is "verify your email", said once, where it can be acted on.
+      if (data && typeof data === "object" && !Array.isArray(data) && (data as { code?: unknown }).code === "EMAIL_UNVERIFIED") {
+        setEmailVerificationNotice(error);
+        addToast({ type: "error", message: error });
+        return { ok: false, message: error };
+      }
       const message = `${error} Review requests or retry the original request before starting another.`;
       setActiveTab("history");
       void fetchWithdrawalHistory();
@@ -452,6 +470,15 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
           <Wallet className="h-3 w-3 text-lav-600" /> {formatNaira(balance)} available
         </span>
       </div>
+
+      {emailVerificationNotice ? (
+        <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[0.82rem] leading-relaxed text-amber-900">
+          {emailVerificationNotice}{" "}
+          <a href="/verify-email" className="font-semibold underline">
+            Verify your email
+          </a>
+        </div>
+      ) : null}
 
       <div className="flex gap-1.5 overflow-x-auto">
         {tabs.map((tab) => (

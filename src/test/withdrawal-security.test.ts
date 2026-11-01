@@ -145,6 +145,57 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllEnvs());
 
+/**
+ * Money out needs a reachable owner.
+ *
+ * Verification was advisory everywhere: a link at signup, a banner until it was
+ * clicked, nothing else. Browsing and buying can live with that (the goods are on
+ * the order page whether or not mail works), but a payout to an address nobody has
+ * proven they control cannot be warned, cannot be recovered, and belongs to an
+ * account we cannot reach at all. The gate is deliberately narrow -- it fires only
+ * when mail is configured, because a requirement nobody can satisfy is a lockout,
+ * and it sits before anything is written, so a refusal costs nothing.
+ */
+describe("email verification before money leaves", () => {
+  function configureMail() {
+    vi.stubEnv("RESEND_API_KEY", "re_test_secret");
+    vi.stubEnv("RESEND_FROM_EMAIL", "Pryva <hello@pryva.ng>");
+  }
+
+  it("refuses an unverified address before any row or debit exists", async () => {
+    configureMail();
+    const state = fakeDatabase();
+    mocks.currentUser.mockResolvedValue({ id: "user-id", email: "user@example.com", emailVerifiedAt: null });
+
+    const response = await POST(request(2_000));
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.code).toBe("EMAIL_UNVERIFIED");
+    expect(body.error).toContain("Verify your email before withdrawing");
+    expect(state.withdrawals).toHaveLength(0);
+    expect(state.ledger).toHaveLength(0);
+    expect(state.balance).toBe(7_000);
+  });
+
+  it("lets a verified account withdraw", async () => {
+    configureMail();
+    fakeDatabase();
+    mocks.currentUser.mockResolvedValue({ id: "user-id", email: "user@example.com", emailVerifiedAt: new Date() });
+
+    const response = await POST(request(2_000));
+    expect(response.status).toBe(200);
+  });
+
+  it("cannot lock anybody out when mail is not configured, because no link could be sent", async () => {
+    const state = fakeDatabase();
+    mocks.currentUser.mockResolvedValue({ id: "user-id", email: "user@example.com", emailVerifiedAt: null });
+
+    const response = await POST(request(2_000));
+    expect(response.status).toBe(200);
+    expect(state.withdrawals).toHaveLength(1);
+  });
+});
+
 describe("withdrawal requests", () => {
   it("refuses to withdraw simulated preview funds", async () => {
     vi.stubEnv("DATABASE_URL", "");
