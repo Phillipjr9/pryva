@@ -22,7 +22,7 @@ integration at all.
 | Temporary inbox | `/dashboard/inbox` | `/api/inbox` | Works on a persistent database; `reason: "preview"` otherwise | Unchanged, now labelled |
 | **Bulk orders** | `/dashboard/bulk-orders` | `POST /api/orders/bulk` | **Broken: charged the wallet, wrote each unit as `delivered`, never bought it** | **Ready with a Fleexa key: buys every unit first, then records and charges** |
 | **Scheduled orders** | API + cron; page says not launched | `/api/scheduled-orders`, cron | **Broken: each run debited the wallet and wrote a `delivered` order without fulfilment** | **Fulfils before charging; refuses plans with no supplier path; skipped runs cost nothing** |
-| eSIM | hub | Bitcall catalog (`listBitcallEsimPlans`); `buyBitcallEsimPlan` exists but is unused | Catalogue only | Catalogue only — labelled |
+| **eSIM** | hub → `/dashboard/esim/[id]` | Live supplier catalogue, wallet checkout, activation code on the order | Catalogue only | **Ready to buy with an eSIM key: live plans, naira prices, profile delivered and recoverable** |
 | App verification | hub | Fleexa SMS listings, read-only | Catalogue only | Catalogue only — labelled |
 | Email OTP (paid) | hub, inbox | Fleexa email products | Catalogue only | Catalogue only — labelled |
 | Proxies | hub + `/proxies` | none | No path | No path — labelled |
@@ -81,7 +81,7 @@ each one actually needs:
 
 | Service | Blocker | Who can clear it |
 | --- | --- | --- |
-| eSIM | The catalog returns a price, but its documentation does not say whether that figure is our cost or a suggested retail price. Markup on a retail price overcharges; selling at cost loses money. | Owner: confirm which, then set a price mode and add a checkout route. `buyBitcallEsimPlan` is already written. |
+| eSIM | Nothing — pricing is now decided (their figure is cost, marked up in band, USD at `USD_NGN_RATE`) and checkout is wired. What remains is a live key and one small purchase to confirm the pricing assumption. | Owner: set `BITCALL_KEY_ID`/`BITCALL_API_SECRET`, buy one cheap plan, compare what the balance fell by. |
 | App verification | The supplier publishes service codes (WhatsApp, Telegram, …) and the shop sells country plans. A per-app mapping has not been verified. | Owner + one staging purchase. |
 | Email OTP (paid) | Supplier email products expose no duration, so a 24-hour inbox and a 30-day inbox are indistinguishable at purchase time. | Owner: pick products with a stated duration. |
 | Proxies | No supplier client in the repository. | Owner: choose a supplier. |
@@ -123,11 +123,14 @@ derived.
 
 ## 5. Verification
 
-- `npm test` — 1,580 tests / 169 files, including new coverage for the bulk
+- `npm test` — 1,599 tests / 171 files, including new coverage for the bulk
   checkout's order of operations (fulfil → record → charge, release on failure),
   the scheduled run's refusal to charge without delivery, and the hub's
   readiness ordering and request link.
 - `npm run typecheck`, `npm run lint`, `npm run build`.
+- eSIM: `esim-catalog.test.ts` (pricing band, unsupported currency, coverage,
+  hidden plan references) and `esim-purchase-route.test.ts` (replay, refusal,
+  provisioning, delivery, unknown outcome).
 - Probes against a running instance: `/api/airtime/plans` `200`,
   `/api/accounts/listings` `200` (`configured:false`),
   `/api/gift-cards/catalog` `200`, `POST /api/airtime/purchase` `503`,

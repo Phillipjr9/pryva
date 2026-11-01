@@ -210,6 +210,19 @@ export const orders = pgTable(
     /** JSON array of delivered credential strings (marketplace accounts only). */
     accounts: text("accounts"),
     /**
+     * eSIM only: the profile's ICCID, its `LPA:` activation credential and the
+     * supplier's one-tap install link.
+     *
+     * The activation code is a bearer credential — anyone holding it installs
+     * the plan — so it is only ever read back onto the owner's order page, never
+     * listed in an order index, never logged and never emailed. The ICCID is the
+     * durable half: the supplier documents a lost credential as recoverable by
+     * re-reading the profile, and that read is addressed by ICCID.
+     */
+    esimIccid: varchar("esim_iccid", { length: 40 }),
+    esimActivationCode: text("esim_activation_code"),
+    esimInstallUrl: text("esim_install_url"),
+    /**
      * Boosting orders only: the profile/post the customer asked us to grow, and
      * how many units they bought. Null on every other service. The link is kept
      * because it is what was ordered and the only way to settle a delivery

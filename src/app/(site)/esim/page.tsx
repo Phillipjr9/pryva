@@ -5,6 +5,12 @@ import { Check, ArrowRight } from "@/components/icons";
 import { CountryFlag, CountryChips } from "@/components/CountryFlag";
 import { hasCountryFlag } from "@/lib/countries";
 import { ServiceIcon } from "@/components/ServiceIcon";
+import { isEsimOrderingAvailable } from "@/lib/esim-availability";
+
+// The catalogue below is a written sample. Which of it is live depends on the
+// supplier key, which Vercel snapshots at build time — reading it per request is
+// the difference between "available" and a page that goes stale in one direction.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "eSIM",
@@ -13,7 +19,11 @@ export const metadata: Metadata = {
 
 export default function ESIMPage() {
   const service = serviceMap.esim;
-  const plans = plansFor("esim");
+  const live = isEsimOrderingAvailable();
+  // With a supplier connected the sample cards are withdrawn: the real plans are
+  // listed in the dashboard with live coverage and naira prices, and showing six
+  // written ones next to them would read as a second, cheaper catalogue.
+  const plans = live ? [] : plansFor("esim");
 
   if (!service) return <div>Service not found</div>;
 
@@ -25,7 +35,11 @@ export default function ESIMPage() {
             <ServiceIcon service="esim" size="lg" className="mb-5" />
             <span className="inline-block rounded-full bg-lav-100 px-4 py-1.5 text-meta font-semibold text-lav-700 mb-4">{service.eyebrow}</span>
             <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3.5rem]">{service.tagline}</h1>
-            <p className="mt-6 text-[1.1rem] text-ink-2 leading-relaxed">{service.description}</p>
+            <p className="mt-6 text-[1.1rem] text-ink-2 leading-relaxed">
+              {live
+                ? "Live eSIM data plans, priced in naira and issued as an activation code the moment you buy."
+                : service.description}
+            </p>
             <div className="mt-8 flex flex-wrap gap-3 sm:gap-4">
               <Link href="/signup" className="inline-flex items-center gap-2 rounded-xl bg-lav-600 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-700">Get Started <ArrowRight className="h-4 w-4" /></Link>
               <Link href="/pricing" className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-6 py-3 text-[0.95rem] font-semibold text-ink hover:bg-cream">View Pricing</Link>
@@ -64,7 +78,21 @@ export default function ESIMPage() {
 
       <section className="pb-16">
         <div className="shell">
-          <h2 className="text-[1.75rem] font-semibold text-ink mb-8">Pricing</h2>
+          <h2 className="text-[1.75rem] font-semibold text-ink mb-8">{live ? "Live pricing" : "Pricing"}</h2>
+          {live ? (
+            <div className="mb-6 rounded-2xl border border-line bg-white p-6">
+              <p className="text-[0.95rem] leading-relaxed text-ink-2">
+                Plans are read live: coverage, data allowance, validity and the naira price for your destination. You
+                are charged when the profile is issued, and it installs from an activation code on the order.
+              </p>
+              <Link
+                href="/dashboard/services?category=esim"
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-lav-600 px-5 py-2.5 text-[0.9rem] font-semibold text-white hover:bg-lav-700"
+              >
+                See live eSIM plans <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          ) : null}
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {plans.map((plan) => (
               <div

@@ -231,6 +231,10 @@ function planItems(country: ExplorerCountry): ExplorerItem[] {
   return plans.flatMap((plan): ExplorerItem[] => {
     const category = planCategories[plan.service];
     if (!category) return [];
+    // eSIM plans come from the supplier catalogue and are sold from there. The
+    // six in `catalog.ts` are written samples with no deliverable behind them,
+    // so they are not listed for sale next to the real ones.
+    if (plan.service === "esim") return [];
     const matches = planMatchesCountry(plan, country.code);
     const ambiguous = ambiguousPlanRegions.has(plan.region);
     if (!matches && !ambiguous) return [];

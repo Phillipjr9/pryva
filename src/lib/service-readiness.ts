@@ -1,6 +1,7 @@
 import "server-only";
 
 import { isPreviewDatabase } from "@/lib/demo-policy";
+import { isBitcallConfigured } from "@/lib/bitcall";
 import { isFleexaConfigured } from "@/lib/fleexa";
 import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
 import { isSmmPanelConfigured } from "@/lib/smm-panel";
@@ -24,6 +25,7 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
   const fleexa = isFleexaConfigured();
   const boosting = isSmmPanelConfigured();
   const accounts = isMarketplaceCheckoutConfigured();
+  const esim = isBitcallConfigured();
 
   const entries: ServiceReadinessEntry[] = [
     {
@@ -53,8 +55,10 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
     {
       id: "esim",
       label: "eSIM",
-      state: "preview",
-      detail: "Travel plans are listed for browsing. Checkout is closed until supplier pricing is confirmed.",
+      state: esim ? "buy" : "paused",
+      detail: esim
+        ? "Travel data plans are read live from the network, priced in naira and issued as an activation code."
+        : "Live travel plans need the eSIM network key; nothing can be ordered until it is set.",
     },
     {
       id: "proxies",

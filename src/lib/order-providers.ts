@@ -27,6 +27,8 @@ export const ORDER_PROVIDERS = {
   foxreload: "foxreload",
   /** Hand-prepared item waiting on the admin fulfilment queue. */
   manual: "manual",
+  /** eSIM profile bought through the gateway and installed from a QR code. */
+  bitcall: "bitcall",
 } as const;
 
 export type OrderProvider = (typeof ORDER_PROVIDERS)[keyof typeof ORDER_PROVIDERS];
@@ -36,3 +38,4 @@ export const PREVIEW_PROVIDER = ORDER_PROVIDERS.preview;
 export const ACCOUNTS_PROVIDER = ORDER_PROVIDERS.accounts;
 export const FOXRELOAD_PROVIDER = ORDER_PROVIDERS.foxreload;
 export const MANUAL_PROVIDER = ORDER_PROVIDERS.manual;
+export const ESIM_PROVIDER = ORDER_PROVIDERS.bitcall;
