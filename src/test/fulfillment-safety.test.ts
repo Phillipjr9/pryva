@@ -48,12 +48,14 @@ const SMS_SERVICES = ["ng", "us", "gb", "ca", "de", "gh"].map((country) => ({
 
 /** Plans we can deliver, and the exact provider arguments each one implies. */
 const DELIVERABLE: Array<[slug: string, args: unknown]> = [
-  ["vn-ng", { country: "ng" }],
-  ["vn-us", { country: "us" }],
-  ["vn-uk", { country: "gb" }],
-  ["vn-ca", { country: "ca" }],
-  ["vn-de", { country: "de" }],
-  ["vn-gh", { country: "gh" }],
+  // The app is passed too: a catalogue row names one, and buying it by country
+  // alone could rent a pool that cannot receive the customer's code.
+  ["vn-ng", { app: "NG", country: "ng" }],
+  ["vn-us", { app: "US", country: "us" }],
+  ["vn-uk", { app: "GB", country: "gb" }],
+  ["vn-ca", { app: "CA", country: "ca" }],
+  ["vn-de", { app: "DE", country: "de" }],
+  ["vn-gh", { app: "GH", country: "gh" }],
 ];
 
 /**

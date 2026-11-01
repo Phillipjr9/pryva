@@ -15,7 +15,7 @@ integration at all.
 
 | Service | Where it is | Route / supplier | Before this pass | Now |
 | --- | --- | --- | --- | --- |
-| Number plans | hub → plan page → checkout | `POST /api/orders`, Fleexa, fulfilment allowlist | Ready with a Fleexa key | Ready (unchanged) |
+| Number plans | hub → plan page → checkout | `POST /api/orders`, fulfilment allowlist, **two suppliers with failover** (`src/lib/otp-suppliers.ts`) | Ready with a Fleexa key | Ready with either key: a number is bought from whichever configured supplier can serve it, cheapest in-band first |
 | Social promotion | hub → boost page | `POST /api/boosts/order`, boosting panel | Ready with a panel key | Ready (unchanged) |
 | Digital accounts | `/dashboard/accounts` | `/api/accounts/*`, accounts marketplace, manual lane | Ready with a marketplace key | Ready (unchanged) |
 | Gift cards | `/dashboard/gift-cards` | `/api/gift-cards/order` (supplier) and `/api/gift-cards/purchase` (wallet credit) | Ready | Ready (unchanged) |
@@ -23,7 +23,7 @@ integration at all.
 | **Bulk orders** | `/dashboard/bulk-orders` | `POST /api/orders/bulk` | **Broken: charged the wallet, wrote each unit as `delivered`, never bought it** | **Ready with a Fleexa key: buys every unit first, then records and charges** |
 | **Scheduled orders** | API + cron; page says not launched | `/api/scheduled-orders`, cron | **Broken: each run debited the wallet and wrote a `delivered` order without fulfilment** | **Fulfils before charging; refuses plans with no supplier path; skipped runs cost nothing** |
 | **eSIM** | hub → `/dashboard/esim/[id]` | Live supplier catalogue, wallet checkout, activation code on the order | Catalogue only | **Ready to buy with an eSIM key: live plans, naira prices, profile delivered and recoverable** |
-| App verification | hub | Fleexa SMS listings, read-only | Catalogue only | Catalogue only — labelled |
+| App verification | hub | Both number suppliers, read-only listing | Catalogue only | Catalogue only — labelled |
 | Email OTP (paid) | hub, inbox | Fleexa email products | Catalogue only | Catalogue only — labelled |
 | Proxies | hub + `/proxies` | none | No path | No path — labelled |
 | Mobile data | `/dashboard/data` | `/api/airtime/plans` reads; `POST /api/airtime/purchase` always `503`; no supplier client | No path | No path — labelled |

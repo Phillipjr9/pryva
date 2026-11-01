@@ -224,7 +224,12 @@ export async function POST(request: Request) {
           service: plan.service,
           productSlug: plan.slug,
           productName: plan.name,
-          planLabel: plan.planLabel,
+          // A fallback supplier sells app-specific pools. When that happens the
+          // order says which app the number was bought for, because "a number"
+          // that only works for one service is a different promise.
+          planLabel: fulfilled.serviceLabel
+            ? `${plan.planLabel} · ${fulfilled.serviceLabel}`.slice(0, 120)
+            : plan.planLabel,
           region: plan.region,
           duration: plan.duration,
           amount: plan.price,
