@@ -43,7 +43,7 @@ vi.mock("@/lib/bitcall", async (importOriginal) => {
 });
 
 const { cancelUpstream, fulfillPlan } = await import("@/lib/fulfillment");
-const { otpSupplierOrder } = await import("@/lib/otp-suppliers");
+const { otpSupplierOrder, otpSupplierProbe } = await import("@/lib/otp-suppliers");
 const { FleexaError } = await import("@/lib/fleexa");
 
 const RATE = 1500;
@@ -108,6 +108,50 @@ describe("supplier order", () => {
     const fresh = await import("@/lib/otp-suppliers");
     expect(fresh.otpSupplierOrder()).toEqual(["bitcall", "fleexa"]);
     vi.resetModules();
+  });
+});
+
+describe("cost of a standing fallback", () => {
+  it("never asks the second supplier when the first can already sell", async () => {
+    fleexa.list.mockResolvedValue(fleexaQuote(100));
+    fleexa.buy.mockResolvedValue(receipt);
+
+    await expect(fulfillPlan(plan)).resolves.toMatchObject({ provider: "fleexa" });
+    // A configured fallback must not tax every sale: no gateway round trip, no
+    // shared rate budget, nothing that can slow a purchase that was already fine.
+    expect(bitcall.list).not.toHaveBeenCalled();
+    expect(bitcall.buy).not.toHaveBeenCalled();
+  });
+
+  it("asks the next supplier only once the first has nothing sellable", async () => {
+    fleexa.list.mockResolvedValue(fleexaQuote(100, "WhatsApp"));
+    // Its only row is out of stock, so the purchase has to look further.
+    fleexa.list.mockResolvedValue([{ id: "svc-ng", country: "ng", name: "WhatsApp", priceNgn: 100, stock: 0 }]);
+    bitcall.list.mockResolvedValue(bitcallQuote());
+
+    await expect(fulfillPlan(plan)).resolves.toMatchObject({ provider: "bitcall" });
+    expect(bitcall.list).toHaveBeenCalledOnce();
+  });
+});
+
+describe("operator probe", () => {
+  it("reports a supplier failure as a code, never as an upstream message", async () => {
+    fleexa.list.mockRejectedValue(new FleexaError("declined sk-live-should-not-leak", 502, "INVALID_RESPONSE"));
+
+    const probe = await otpSupplierProbe("fleexa", "ng", "Nigeria");
+
+    expect(probe.offers).toEqual([]);
+    expect(probe.errorCode).toBe("INVALID_RESPONSE");
+    expect(JSON.stringify(probe)).not.toContain("sk-live-should-not-leak");
+  });
+
+  it("says which offers a working supplier currently has", async () => {
+    bitcall.list.mockResolvedValue(bitcallQuote({ availableCount: 4 }));
+
+    const probe = await otpSupplierProbe("bitcall", "ng", "Nigeria");
+
+    expect(probe.errorCode).toBeNull();
+    expect(probe.offers).toMatchObject([{ supplier: "bitcall", app: "WhatsApp", costNgn: 15, stock: 4 }]);
   });
 });
 

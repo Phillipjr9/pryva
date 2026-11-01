@@ -99,68 +99,71 @@ function readableApp(value: string | null): string | null {
   return cleaned;
 }
 
+/**
+ * Within one supplier: in-stock first, then cheapest. A supplier's own rows are
+ * interchangeable, so this is pure value ordering — the cross-supplier order is
+ * a policy decision and lives in `otpSupplierOrder()`.
+ */
+function rankWithinSupplier(offers: OtpOffer[]): OtpOffer[] {
+  const stocked = (offer: OtpOffer) => (offer.stock === null ? 1 : offer.stock > 0 ? 0 : 2);
+  return [...offers].sort(
+    (a, b) =>
+      stocked(a) - stocked(b) ||
+      (a.costNgn ?? Number.MAX_SAFE_INTEGER) - (b.costNgn ?? Number.MAX_SAFE_INTEGER),
+  );
+}
+
+/** Reads one supplier's catalogue. Throws when it cannot be read. */
+async function fetchOffers(supplier: OtpSupplierId, country: string, regionName: string): Promise<OtpOffer[]> {
+  return supplier === "fleexa" ? fleexaOffers(country, regionName) : bitcallOffers(country);
+}
+
 async function fleexaOffers(country: string, regionName: string): Promise<OtpOffer[]> {
   if (!isFleexaConfigured()) return [];
-  try {
-    const services = await listFleexaSmsServices();
-    const offers: OtpOffer[] = [];
-    const seen = new Set<string>();
-    for (const service of services) {
-      if (!matchesCountry(service.country, country, regionName)) continue;
-      const app = readableApp(service.name);
-      // A row with no app still works: the buyer passes only the country, so
-      // the country itself is the dedupe key for it.
-      const key = app ?? country;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      offers.push({
-        supplier: "fleexa",
-        ref: country,
-        country,
-        app,
-        costNgn: service.priceNgn,
-        stock: service.stock,
-      });
-    }
-    return offers;
-  } catch (error) {
-    // A supplier whose catalogue cannot be read is skipped, not fatal: the other
-    // one may still serve the same country.
-    logger.warn("Fleexa number catalogue unavailable", {
-      error: error instanceof Error ? error.message : String(error),
+  const services = await listFleexaSmsServices();
+  const offers: OtpOffer[] = [];
+  const seen = new Set<string>();
+  for (const service of services) {
+    if (!matchesCountry(service.country, country, regionName)) continue;
+    const app = readableApp(service.name);
+    // A row with no app still works: the buyer passes only the country, so
+    // the country itself is the dedupe key for it.
+    const key = app ?? country;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    offers.push({
+      supplier: "fleexa",
+      ref: country,
+      country,
+      app,
+      costNgn: service.priceNgn,
+      stock: service.stock,
     });
-    return [];
   }
+  return offers;
 }
 
 async function bitcallOffers(country: string): Promise<OtpOffer[]> {
   if (!isBitcallConfigured()) return [];
-  try {
-    const services = await listBitcallOtpServices({ countryCode: country.toUpperCase() });
-    const offers: OtpOffer[] = [];
-    const seen = new Set<string>();
-    for (const service of services) {
-      const app = readableApp(service.name);
-      for (const entry of service.offers) {
-        if (!entry.serviceId || seen.has(entry.serviceId)) continue;
-        seen.add(entry.serviceId);
-        offers.push({
-          supplier: "bitcall",
-          ref: entry.serviceId,
-          country,
-          app,
-          costNgn: await supplierAmountToNgn(entry.price, entry.currency),
-          stock: entry.availableCount,
-        });
-      }
+  const services = await listBitcallOtpServices({ countryCode: country.toUpperCase() });
+  const offers: OtpOffer[] = [];
+  const seen = new Set<string>();
+  for (const service of services) {
+    const app = readableApp(service.name);
+    for (const entry of service.offers) {
+      if (!entry.serviceId || seen.has(entry.serviceId)) continue;
+      seen.add(entry.serviceId);
+      offers.push({
+        supplier: "bitcall",
+        ref: entry.serviceId,
+        country,
+        app,
+        costNgn: await supplierAmountToNgn(entry.price, entry.currency),
+        stock: entry.availableCount,
+      });
     }
-    return offers;
-  } catch (error) {
-    logger.warn("OTP gateway catalogue unavailable", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return [];
   }
+  return offers;
 }
 
 /**
@@ -172,18 +175,70 @@ async function bitcallOffers(country: string): Promise<OtpOffer[]> {
  * rather than implying nobody serves it.
  */
 export async function otpOffersFor(country: string, regionName: string, app?: string | null): Promise<OtpOffer[]> {
-  const [fleexa, bitcall] = await Promise.all([fleexaOffers(country, regionName), bitcallOffers(country)]);
-  const wanted = app?.trim().toLowerCase() || null;
-  const all = [...fleexa, ...bitcall].filter((offer) => !wanted || offer.app?.toLowerCase() === wanted);
-  const rank = (offer: OtpOffer) => configuredOrder.indexOf(offer.supplier);
-  const stocked = (offer: OtpOffer) => (offer.stock === null ? 1 : offer.stock > 0 ? 0 : 2);
-
-  return all.sort(
-    (a, b) =>
-      rank(a) - rank(b) ||
-      stocked(a) - stocked(b) ||
-      (a.costNgn ?? Number.MAX_SAFE_INTEGER) - (b.costNgn ?? Number.MAX_SAFE_INTEGER),
+  const all = await Promise.all(
+    OTP_SUPPLIERS.map((supplier) => otpOffersForSupplier(supplier, country, regionName)),
   );
+  const wanted = app?.trim().toLowerCase() || null;
+  const rank = (offer: OtpOffer) => configuredOrder.indexOf(offer.supplier);
+
+  return all
+    .flat()
+    .filter((offer) => !wanted || offer.app?.toLowerCase() === wanted)
+    .sort((a, b) => rank(a) - rank(b));
+}
+
+/**
+ * One supplier's offers for a country, best first.
+ *
+ * Fetching per supplier rather than always both is what keeps the second one
+ * free of consequences: a purchase only asks the next supplier once the current
+ * one has nothing it can sell, so a slow or limited gateway never delays a
+ * purchase the first supplier could already serve.
+ */
+export async function otpOffersForSupplier(
+  supplier: OtpSupplierId,
+  country: string,
+  regionName: string,
+): Promise<OtpOffer[]> {
+  if (!otpSupplierConfigured(supplier)) return [];
+  try {
+    return rankWithinSupplier(await fetchOffers(supplier, country, regionName));
+  } catch (error) {
+    // A catalogue that cannot be read is skipped, not fatal: the other supplier
+    // may still serve the same country.
+    logger.warn("Number catalogue unavailable", {
+      supplier,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return [];
+  }
+}
+
+/**
+ * Why a supplier has nothing, for the operator dashboard. Read-only: it makes no
+ * buy call. Only the error's *code* is reported — never its message, which can
+ * carry an upstream body, and never the credential.
+ */
+export async function otpSupplierProbe(
+  supplier: OtpSupplierId,
+  country: string,
+  regionName: string,
+): Promise<{ offers: OtpOffer[]; errorCode: string | null }> {
+  if (!otpSupplierConfigured(supplier)) return { offers: [], errorCode: "NOT_CONFIGURED" };
+  try {
+    return { offers: rankWithinSupplier(await fetchOffers(supplier, country, regionName)), errorCode: null };
+  } catch (error) {
+    return { offers: [], errorCode: errorCodeOf(error) };
+  }
+}
+
+function errorCodeOf(error: unknown): string {
+  if (error instanceof FleexaError) return error.code ?? "UPSTREAM_ERROR";
+  const name = error instanceof Error ? error.name : "";
+  // A type name is not a message and cannot carry a response body, so it is the
+  // most specific safe thing to report. A plain `Error` says nothing at all.
+  if (!name || name === "Error") return "UNKNOWN_ERROR";
+  return `${name.replace(/Error$/, "").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase()}_ERROR`;
 }
 
 /** Buy one offer. Every call here spends real supplier balance. */
