@@ -190,6 +190,12 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                     </Badge>
                   </div>
                 </div>
+                <p className="mt-3 text-meta">
+                  {/* The order page is a live screen; a receipt is a document. */}
+                  <Link href={`/dashboard/orders/${order.id}/receipt`} className="font-semibold text-lav-700 hover:underline">
+                    View or print receipt
+                  </Link>
+                </p>
               </CardContent>
             </Card>
 
