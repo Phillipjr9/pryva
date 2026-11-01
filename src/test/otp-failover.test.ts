@@ -43,7 +43,7 @@ vi.mock("@/lib/bitcall", async (importOriginal) => {
 });
 
 const { cancelUpstream, fulfillPlan } = await import("@/lib/fulfillment");
-const { otpSupplierOrder, otpSupplierProbe } = await import("@/lib/otp-suppliers");
+const { otpSupplierOrder, otpSupplierProbe, clearOtpCatalogueCache } = await import("@/lib/otp-suppliers");
 const { FleexaError } = await import("@/lib/fleexa");
 
 const RATE = 1500;
@@ -83,6 +83,9 @@ const activation = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Catalogues are cached briefly so a purchase does not re-read them; a test
+  // that changes what a supplier sells has to start from a cold cache.
+  clearOtpCatalogueCache();
   fleexa.configured = true;
   bitcall.configured = true;
   vi.stubEnv("USD_NGN_RATE", String(RATE));
@@ -111,26 +114,31 @@ describe("supplier order", () => {
   });
 });
 
-describe("cost of a standing fallback", () => {
-  it("never asks the second supplier when the first can already sell", async () => {
-    fleexa.list.mockResolvedValue(fleexaQuote(100));
+describe("paying the least", () => {
+  it("buys from the cheaper supplier even when it is second in the order", async () => {
+    fleexa.list.mockResolvedValue(fleexaQuote(900));
     fleexa.buy.mockResolvedValue(receipt);
+    bitcall.list.mockResolvedValue(bitcallQuote({ price: 0.05 })); // 75 naira
 
-    await expect(fulfillPlan(plan)).resolves.toMatchObject({ provider: "fleexa" });
-    // A configured fallback must not tax every sale: no gateway round trip, no
-    // shared rate budget, nothing that can slow a purchase that was already fine.
-    expect(bitcall.list).not.toHaveBeenCalled();
-    expect(bitcall.buy).not.toHaveBeenCalled();
+    await expect(fulfillPlan(plan)).resolves.toMatchObject({ provider: "bitcall" });
+    // The plan price is fixed, so the cheaper purchase is the whole margin.
+    expect(fleexa.buy).not.toHaveBeenCalled();
+    expect(bitcall.buy).toHaveBeenCalledOnce();
   });
 
-  it("asks the next supplier only once the first has nothing sellable", async () => {
-    fleexa.list.mockResolvedValue(fleexaQuote(100, "WhatsApp"));
-    // Its only row is out of stock, so the purchase has to look further.
-    fleexa.list.mockResolvedValue([{ id: "svc-ng", country: "ng", name: "WhatsApp", priceNgn: 100, stock: 0 }]);
+  it("prefers the configured supplier only when the price is the same", async () => {
+    fleexa.list.mockResolvedValue(fleexaQuote(75));
+    fleexa.buy.mockResolvedValue(receipt);
+    bitcall.list.mockResolvedValue(bitcallQuote({ price: 0.05 })); // also 75 naira
+
+    await expect(fulfillPlan(plan)).resolves.toMatchObject({ provider: "fleexa" });
+  });
+
+  it("skips a supplier that cannot be priced and buys the one that can", async () => {
+    fleexa.list.mockResolvedValue(fleexaQuote(null));
     bitcall.list.mockResolvedValue(bitcallQuote());
 
     await expect(fulfillPlan(plan)).resolves.toMatchObject({ provider: "bitcall" });
-    expect(bitcall.list).toHaveBeenCalledOnce();
   });
 });
 
@@ -197,9 +205,11 @@ describe("failing over", () => {
   });
 
   it("never fails over after a purchase that may have happened", async () => {
+    // Fleexa is the cheaper of the two here, so it is the one that gets bought --
+    // and its ambiguous failure must not send the order to the other supplier.
     fleexa.list.mockResolvedValue(fleexaQuote(100));
     fleexa.buy.mockRejectedValue(new FleexaError("Incomplete receipt", 502, "INCOMPLETE_RECEIPT"));
-    bitcall.list.mockResolvedValue(bitcallQuote());
+    bitcall.list.mockResolvedValue(bitcallQuote({ price: 0.5 }));
     vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "INCOMPLETE_RECEIPT" });

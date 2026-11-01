@@ -3,6 +3,7 @@ import { authorizeAdminApi } from "@/lib/admin-auth";
 import { bitcallKeyEnvironment, isBitcallConfigured } from "@/lib/bitcall";
 import { getUsdToNgnRate } from "@/lib/exchange-rate";
 import { fulfilablePlans } from "@/lib/fulfillment";
+import { checkMargin } from "@/lib/margin-guard";
 import { otpSupplierConfigured, otpSupplierOrder, otpSupplierProbe } from "@/lib/otp-suppliers";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +76,36 @@ export async function GET(request: NextRequest) {
     }),
   );
 
+  // What each sellable plan actually earns if it is bought from the cheapest
+  // supplier that can serve it. This is the owner's question — "am I still
+  // making money at the cheapest price" — answered in the same units the
+  // purchase guard uses, rather than a second opinion computed differently.
+  const byCountry = new Map(reports.map((report) => [report.country, report]));
+  const plans = fulfilablePlans()
+    .filter(({ intent }) => intent.kind === "sms")
+    .map(({ plan, intent }) => {
+      const country = intent.kind === "sms" ? intent.country : "";
+      const offers = byCountry.get(country)?.suppliers ?? [];
+      const cheapest = offers
+        .filter((entry) => entry.cheapestNgn !== null)
+        .sort((a, b) => (a.cheapestNgn as number) - (b.cheapestNgn as number))[0] ?? null;
+      const margin = cheapest ? checkMargin(plan.price, cheapest.cheapestNgn) : null;
+
+      return {
+        slug: plan.slug,
+        name: plan.name,
+        country,
+        ourPriceNgn: plan.price,
+        cheapest: cheapest
+          ? { supplier: cheapest.supplier, costNgn: cheapest.cheapestNgn }
+          : null,
+        profitNgn: margin?.marginNgn ?? null,
+        marginPct: margin?.ok ? Math.round(margin.marginRatio * 1000) / 10 : null,
+        clearsFloor: margin?.ok ?? false,
+        blockedBy: margin && !margin.ok ? margin.code : null,
+      };
+    });
+
   return Response.json(
     {
       ok: true,
@@ -86,6 +117,7 @@ export async function GET(request: NextRequest) {
       // The rate every dollar price is converted at; null when nothing is
       // configured, because nothing would be converted.
       usdToNgn: rate ? { rate: rate.rate, source: rate.source } : null,
+      plans,
       destinations: reports,
     },
     { headers: { "cache-control": "no-store" } },
