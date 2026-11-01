@@ -221,6 +221,25 @@ Watch for: an empty catalog with a funded balance (mapping problem), repeated
 `429`s (shared supplier budget), and an outbox that is not draining (scheduler
 problem). The README documents the per-supplier request budgets.
 
+### Alerts
+
+Set `ALERT_WEBHOOK_URL` to a Slack or Discord incoming webhook and every
+`logger.error()` posts there: `{ "text": "🚨 Pryva: <message>\n<context>" }`. That
+includes every nightly step that fails, every route that catches, and every refund
+that cannot commit. It is deliberately dumb so it needs no vendor account:
+
+- one alert per identical message per five minutes, so a failing loop cannot flood
+  the channel;
+- values under keys matching password/secret/token/authorization/key/card/OTP/
+  account number/BVN/NIN are replaced with `[redacted]` before they leave the
+  process, and long strings are truncated;
+- never retried, never awaited, never throwing — an alert channel that fails inside
+  an error handler would hide the error it was reporting.
+
+Unset, errors stay in the platform log only. Check it with: trigger a known error
+(or call `sendAlert("test")` from a route during a deploy) and confirm the message
+lands. A webhook that is configured and silent looks exactly like a healthy system.
+
 Admin surfaces that answer "what happened": `/admin/orders?status=review`,
 `/admin/refunds`, `/admin/withdrawals`, `/admin/fulfilment`, `/admin/messages`,
 `/admin/margin`, `/admin/security`, and `/admin/audit`.

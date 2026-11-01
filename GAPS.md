@@ -22,14 +22,16 @@ no `kyc|bvn|nin` table in `src/db/schema.ts`.
 *Unblocks:* a decision on which provider (Prembly/Dojah/etc.) and which tier
 limits. Then schema + a step in signup + a gate in withdraw.
 
-### 2. Nothing reports an error in production
-There is no error tracker and no alert channel. A 500 is a line in the platform
-log that nobody reads until a customer writes in; the nightly cron's own failure
-report is only visible if somebody opens the endpoint. `logger` is structured and
-good, but nothing aggregates it.
-*Evidence:* no `@sentry/*`, `posthog`, `datadog` in `package.json`; `src/lib/logger.ts`
-writes to console only.
-*Unblocks:* a DSN (Sentry free tier is enough) and an alert address. Half a day.
+### 2. Nothing reports an error in production — **closed, with one step left**
+`logger.error()` now posts to a webhook (`ALERT_WEBHOOK_URL`, Slack or Discord
+shape) as well as to the log: throttled to one message per five minutes, values
+under credential-shaped keys redacted, never retried, never thrown. That covers
+every nightly step failure, every caught route error and every refund that cannot
+commit.
+*Still needed:* **set the webhook URL in production.** Until it is set, this is
+inert by design, and `RUNBOOK.md` §7 says how to prove it works. A full error
+tracker with stack traces (Sentry) is still worth having for the browser, but it
+is no longer the difference between noticing and not.
 
 ### 3. CI cannot run
 `.github/workflows/ci.yml` exists but Actions is billing-locked, so every gate in
@@ -37,20 +39,30 @@ this repo is run by hand. The suite is strong (1,775 tests) and worthless if a r
 build can be merged.
 *Unblocks:* billing on the GitHub account, or a second runner. Nothing in the code.
 
-### 4. Email ownership is never required
-Password signup sends a verification link, and the app works whether or not it is
-clicked. A purchase, a wallet top-up and a withdrawal all proceed unverified, so an
-address nobody controls can hold money and receive order email.
-*Evidence:* `src/app/dashboard/layout.tsx:37` shows a banner when
-`emailVerifiedAt` is null; `src/app/api/orders/route.ts` does not read it.
-*Unblocks:* a decision — block at first top-up (my suggestion) or at withdrawal.
-Blocking everywhere would break the shared demo and existing accounts.
+### 4. Email ownership is never required — **closed at the payout boundary**
+Money out now requires a verified address: `/api/wallet/withdraw` refuses with
+`403 { code: "EMAIL_UNVERIFIED" }` before it writes a row or debits anything, and
+the wallet screen keeps the reason on the page next to the link that fixes it,
+instead of the "review or retry" advice that cannot help.
+
+Two deliberate limits: the gate fires **only when mail is configured** (a
+requirement nobody can satisfy is a lockout), and it applies **only to money
+leaving** — deposits and purchases still work unverified, because the goods appear
+on the order page whether or not email delivers. If you would rather require
+verification at first top-up as well, that is a one-line change in the same helper
+(`unverifiedEmailBlocksPayout`, `src/lib/resend-config.ts`).
 
 ### 5. Migrations 0028, 0029 and 0030 must be applied
 The eSIM delivery email, number-code email and payout-name approvals each shipped
 with a migration. Deploying the code without them fails at runtime, not at build.
 *Run:* `npm run db:migrate` against production, then verify with
 `migrations/README.md`'s checks.
+
+### What is left in P0
+Items 1 (identity verification), 3 (CI billing) and 5 (migrations) need a provider
+contract, a billing change or a deploy — none of them is code I can write alone.
+Item 2 is closed in code and needs one secret set; item 4 is closed at the boundary
+where it matters.
 
 ## P1 — the gaps a customer will meet
 
