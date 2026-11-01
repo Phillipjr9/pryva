@@ -2,7 +2,21 @@ export type WalletEmailEvent =
   | { kind: "wallet"; type: string; amount: number; reference: string; description: string; createdAt: Date }
   | { kind: "withdrawal_processing" | "withdrawal_completed" | "withdrawal_rejected" | "purchase_completed"; amount: number; reference: string; createdAt: Date };
 
-export type ResendPayload = { from: string; to: string[]; subject: string; text: string; html: string };
+/**
+ * Resend takes attachments as base64. A `content_id` makes the image available
+ * inline as `cid:<id>` as well as downloadable, which is how the eSIM QR reaches
+ * a mail client that blocks remote images.
+ */
+export type ResendAttachment = { filename: string; content: string; content_id?: string };
+
+export type ResendPayload = {
+  from: string;
+  to: string[];
+  subject: string;
+  text: string;
+  html: string;
+  attachments?: ResendAttachment[];
+};
 
 function htmlEscape(value: string): string {
   return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
