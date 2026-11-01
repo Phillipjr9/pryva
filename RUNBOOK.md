@@ -236,7 +236,10 @@ appeared under no destination, which is the usual cause of an empty-looking list
 Also worth remembering when counting a page rather than a catalogue: the service
 explorer renders twelve listings at a time and appends the rest behind **Show
 more**, across every category, so a country with 40 eSIM plans still shows a few
-of them first.
+of them first. `/dashboard/esim` is the exception and the place to check a
+catalogue question: it lists **every** priced plan, cheapest first, with the
+region counts and a filter, and it is where the storefront's "See live eSIM plans"
+button now leads.
 
 The probe is rate-limited by the suppliers, so do not put it on a tight schedule.
 Watch for: an empty catalog with a funded balance (mapping problem), repeated

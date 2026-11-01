@@ -294,6 +294,43 @@ function coversCountry(plan: EsimOffer, code: string, name: string): boolean {
 }
 
 /**
+ * The whole catalogue, in the shape a browser may see.
+ *
+ * `planId` is the provider reference and `costNgn` is what we pay: neither is part
+ * of a customer's view of a plan, and this mapper is the only thing that stands
+ * between the two, so it is a pure function a test can hold to that.
+ */
+export type EsimCatalogueItem = {
+  id: string;
+  name: string;
+  region: string;
+  dataLabel: string;
+  validityLabel: string;
+  /** How many destinations the plan names. Zero only for a global plan. */
+  destinations: number;
+  global: boolean;
+  priceNgn: number;
+  purchasable: boolean;
+};
+
+/** A page cannot render ten thousand cards, and a price-sorted slice is the honest cut. */
+export const ESIM_CATALOGUE_LIMIT = 1_000;
+
+export function catalogueItems(offers: EsimOffer[], limit = ESIM_CATALOGUE_LIMIT): EsimCatalogueItem[] {
+  return offers.slice(0, limit).map((offer) => ({
+    id: offer.id,
+    name: offer.name,
+    region: offer.region,
+    dataLabel: offer.dataLabel,
+    validityLabel: offer.validityLabel,
+    destinations: offer.countries.length,
+    global: offer.coverage === "not-country-specific",
+    priceNgn: offer.priceNgn,
+    purchasable: offer.purchasable,
+  }));
+}
+
+/**
  * Listings for one destination.
  *
  * A regional plan is never shown against a country it does not name: guessing
