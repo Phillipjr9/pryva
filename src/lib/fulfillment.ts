@@ -11,7 +11,7 @@ import {
   buyOtpNumber,
   isAmbiguousOtpPurchase,
   matchesCountry,
-  otpOffersForSupplier,
+  otpOffersFor,
   otpSupplierConfigured,
   otpSupplierOrder,
 } from "@/lib/otp-suppliers";
@@ -172,112 +172,102 @@ export async function fulfillPlan(plan: Plan): Promise<FulfilledOrder> {
  * idempotency key, so a failover there would rent a second number for one order.
  */
 async function fulfillNumber(plan: Plan, intent: SmsIntent): Promise<FulfilledOrder> {
-  const order = otpSupplierOrder();
-  if (!order.some(otpSupplierConfigured)) {
+  if (!otpSupplierOrder().some(otpSupplierConfigured)) {
     throw new FleexaError("Live fulfilment is not configured", 503, "NO_API_KEY");
   }
 
-  let lastError: unknown = null;
-  let listed = 0;
-  let pricedCount = 0;
-  let sellableCount = 0;
+  // Every configured supplier is asked for a price, because the cheapest one is
+  // the one we buy from: the selling price is fixed by the catalogue, so paying
+  // less is the whole margin. Catalogue reads are bounded and briefly cached, so
+  // comparing never holds a purchase hostage to a supplier that stopped answering.
+  const offers = await otpOffersFor(intent.country, plan.region);
 
-  // Suppliers are asked one at a time, in order, and the next one is only asked
-  // once the current one has nothing it can actually sell. That keeps the second
-  // supplier free of consequences for a purchase the first could already serve:
-  // no extra round trip on the checkout path, and no shared rate budget spent on
-  // catalogue reads nobody needed.
-  for (const supplier of order) {
-    if (!otpSupplierConfigured(supplier)) continue;
-
-    const offers = await otpOffersForSupplier(supplier, intent.country, plan.region);
-    listed += offers.length;
-
-    // "We do not know what it costs" is not the same as "it is sold out", and
-    // both differ from "nobody serves that country" -- each is counted so the
-    // refusal below can say which one happened.
-    const priced = offers.filter((offer) => offer.costNgn !== null);
-    pricedCount += priced.length;
-    const sellable = priced.filter((offer) => offer.stock === null || offer.stock > 0);
-    sellableCount += sellable.length;
-
-    for (const offer of sellable) {
-      if (offer.costNgn === null) continue;
-
-      // The margin check runs per supplier: one may be inside the band while the
-      // other is not, and the cheaper one is not always the one first in order.
-      try {
-        guardMargin(plan, offer.costNgn);
-      } catch (error) {
-        lastError = error;
-        continue;
-      }
-
-      try {
-        const bought = await buyOtpNumber(offer);
-        if (
-          typeof bought.providerCostNgn === "number" &&
-          bought.providerCostNgn > (offer.costNgn ?? 0)
-        ) {
-          // The quote is the best pre-spend signal available. If the supplier
-          // charged more, the sale may have landed below the floor; it cannot be
-          // undone, so it is logged loudly instead of being silently absorbed.
-          console.error("Provider charged more than the quoted cost", {
-            slug: plan.slug,
-            provider: bought.supplier,
-            quotedNgn: offer.costNgn,
-            chargedNgn: bought.providerCostNgn,
-          });
-        }
-        return {
-          provider: bought.supplier,
-          providerCostNgn: bought.providerCostNgn ?? offer.costNgn,
-          providerRequestId: bought.providerRequestId,
-          referenceCode: bought.number,
-          // The code arrives later; the order page polls for it.
-          otpCode: null,
-          expiresAt: providerExpiry(bought.expiresAt, SERVICE_TIMEOUTS.numbers.delivery),
-          serviceLabel: bought.app,
-        };
-      } catch (error) {
-        if (isAmbiguousOtpPurchase(error)) {
-          // The number may exist. Retrying, or failing over, would buy a second one.
-          console.error("Number purchase outcome unknown; not retrying", {
-            slug: plan.slug,
-            provider: offer.supplier,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          throw error instanceof FleexaError
-            ? error
-            : new FleexaError("The provider did not confirm that purchase", 502, "AMBIGUOUS_PURCHASE");
-        }
-        console.error("Supplier could not sell that number; trying the next", {
-          slug: plan.slug,
-          provider: offer.supplier,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        lastError = error;
-      }
-    }
-  }
-
-  if (listed === 0) {
+  if (offers.length === 0) {
     throw new FleexaError(
       "No number coverage is confirmed for that destination",
       503,
       "SERVICE_UNAVAILABLE",
     );
   }
-  if (pricedCount === 0) {
+
+  // "We do not know what it costs" is not the same as "it is sold out", and both
+  // differ from "nobody serves that country" -- each is counted so the refusal
+  // below can say which one happened.
+  const priced = offers.filter((offer) => offer.costNgn !== null);
+  if (priced.length === 0) {
     throw new FleexaError("That destination has no usable price", 503, "COST_UNKNOWN");
   }
-  if (sellableCount === 0) {
+
+  const sellable = priced.filter((offer) => offer.stock === null || offer.stock > 0);
+  if (sellable.length === 0) {
     console.error("Every number offer for that destination is out of stock", {
       slug: plan.slug,
       country: intent.country,
-      listed,
+      listed: offers.length,
     });
     throw new FleexaError("That destination is out of stock", 503, "SERVICE_UNAVAILABLE");
+  }
+
+  let lastError: unknown = null;
+  for (const offer of sellable) {
+    if (offer.costNgn === null) continue;
+
+    // The floor is what makes "cheapest" also mean "still profitable": offers
+    // are walked cheapest first, and the first one that clears the floor is the
+    // cheapest sale that leaves a margin. An offer below the floor is skipped,
+    // never sold at a loss.
+    try {
+      guardMargin(plan, offer.costNgn);
+    } catch (error) {
+      lastError = error;
+      continue;
+    }
+
+    try {
+      const bought = await buyOtpNumber(offer);
+      if (
+        typeof bought.providerCostNgn === "number" &&
+        bought.providerCostNgn > (offer.costNgn ?? 0)
+      ) {
+        // The quote is the best pre-spend signal available. If the supplier
+        // charged more, the sale may have landed below the floor; it cannot be
+        // undone, so it is logged loudly instead of being silently absorbed.
+        console.error("Provider charged more than the quoted cost", {
+          slug: plan.slug,
+          provider: bought.supplier,
+          quotedNgn: offer.costNgn,
+          chargedNgn: bought.providerCostNgn,
+        });
+      }
+      return {
+        provider: bought.supplier,
+        providerCostNgn: bought.providerCostNgn ?? offer.costNgn,
+        providerRequestId: bought.providerRequestId,
+        referenceCode: bought.number,
+        // The code arrives later; the order page polls for it.
+        otpCode: null,
+        expiresAt: providerExpiry(bought.expiresAt, SERVICE_TIMEOUTS.numbers.delivery),
+        serviceLabel: bought.app,
+      };
+    } catch (error) {
+      if (isAmbiguousOtpPurchase(error)) {
+        // The number may exist. Retrying, or failing over, would buy a second one.
+        console.error("Number purchase outcome unknown; not retrying", {
+          slug: plan.slug,
+          provider: offer.supplier,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error instanceof FleexaError
+          ? error
+          : new FleexaError("The provider did not confirm that purchase", 502, "AMBIGUOUS_PURCHASE");
+      }
+      console.error("Supplier could not sell that number; trying the next", {
+        slug: plan.slug,
+        provider: offer.supplier,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      lastError = error;
+    }
   }
 
   throw lastError instanceof FleexaError

@@ -59,6 +59,22 @@ export type BoughtNumber = {
   expiresAt: string | null;
 };
 
+/**
+ * How long a catalogue read may take before it is treated as "nothing on offer".
+ *
+ * Comparing suppliers is only useful if both answer quickly: the checkout path
+ * waits on these reads, and a gateway that hangs must not hold a purchase the
+ * other supplier could already serve. Bitcall's own client allows 20s, which is
+ * right for a purchase it is making and far too long to wait for a price quote.
+ */
+const CATALOGUE_BUDGET_MS = 4_000;
+
+/** Catalogues are read-only, so a stale answer is safe for a short while. */
+const CATALOGUE_TTL_MS = 60_000;
+
+type CacheEntry = { at: number; offers: OtpOffer[]; };
+const catalogueCache = new Map<string, CacheEntry>();
+
 /** Read once so a typo in the environment cannot change routing mid-order. */
 const configuredOrder: OtpSupplierId[] = (() => {
   const raw = process.env.OTP_PROVIDER_ORDER?.trim();
@@ -111,6 +127,36 @@ function rankWithinSupplier(offers: OtpOffer[]): OtpOffer[] {
       stocked(a) - stocked(b) ||
       (a.costNgn ?? Number.MAX_SAFE_INTEGER) - (b.costNgn ?? Number.MAX_SAFE_INTEGER),
   );
+}
+
+/**
+ * Cheapest first, across suppliers. This is the ordering the storefront shows
+ * and the order a purchase walks, so the plan a customer sees first is the one
+ * that costs Pryva the least — which is also the one with the most margin on it.
+ *
+ * Ties go to the configured supplier order (a deliberate preference, not an
+ * accident), and an offer whose cost is unknown sorts last because it cannot be
+ * sold — it is listed, never bought.
+ */
+function rankByCost(offers: OtpOffer[]): OtpOffer[] {
+  const stocked = (offer: OtpOffer) => (offer.stock === null ? 1 : offer.stock > 0 ? 0 : 2);
+  return [...offers].sort(
+    (a, b) =>
+      (a.costNgn ?? Number.MAX_SAFE_INTEGER) - (b.costNgn ?? Number.MAX_SAFE_INTEGER) ||
+      configuredOrder.indexOf(a.supplier) - configuredOrder.indexOf(b.supplier) ||
+      stocked(a) - stocked(b),
+  );
+}
+
+/** Reject after `ms`, so a slow supplier cannot hold a purchase or a page. */
+function withBudget<T>(work: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`catalogue read exceeded ${ms}ms`)), ms);
+    work.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
+  });
 }
 
 /** Reads one supplier's catalogue. Throws when it cannot be read. */
@@ -169,22 +215,30 @@ async function bitcallOffers(country: string): Promise<OtpOffer[]> {
 /**
  * Every way this deployment can deliver a number for one country, best first.
  *
- * Order: the configured supplier order, then in-stock before unknown, then
- * cheapest. An offer whose cost is unknown sorts last because it cannot be sold
- * — it is kept so a diagnostic can say the country is covered but unpriced,
- * rather than implying nobody serves it.
+ * Order: cheapest first, ties to the configured supplier order. An offer whose
+ * cost is unknown sorts last because it cannot be sold — it is kept so a
+ * diagnostic can say the country is covered but unpriced, rather than implying
+ * nobody serves it.
  */
-export async function otpOffersFor(country: string, regionName: string, app?: string | null): Promise<OtpOffer[]> {
-  const all = await Promise.all(
-    OTP_SUPPLIERS.map((supplier) => otpOffersForSupplier(supplier, country, regionName)),
-  );
-  const wanted = app?.trim().toLowerCase() || null;
-  const rank = (offer: OtpOffer) => configuredOrder.indexOf(offer.supplier);
+export async function otpOffersFor(
+  country: string,
+  regionName: string,
+  options: { app?: string | null; budgetMs?: number } = {},
+): Promise<OtpOffer[]> {
+  const [all, wanted] = [
+    await Promise.all(
+      OTP_SUPPLIERS.map((supplier) =>
+        otpOffersForSupplier(supplier, country, regionName, options.budgetMs ?? CATALOGUE_BUDGET_MS)),
+    ),
+    options.app?.trim().toLowerCase() || null,
+  ] as const;
 
-  return all
-    .flat()
-    .filter((offer) => !wanted || offer.app?.toLowerCase() === wanted)
-    .sort((a, b) => rank(a) - rank(b));
+  return rankByCost(all.flat().filter((offer) => !wanted || offer.app?.toLowerCase() === wanted));
+}
+
+/** Forget cached catalogues. Exported so a test can prove a fresh read happens. */
+export function clearOtpCatalogueCache(): void {
+  catalogueCache.clear();
 }
 
 /**
@@ -199,10 +253,18 @@ export async function otpOffersForSupplier(
   supplier: OtpSupplierId,
   country: string,
   regionName: string,
+  budgetMs: number = CATALOGUE_BUDGET_MS,
 ): Promise<OtpOffer[]> {
   if (!otpSupplierConfigured(supplier)) return [];
+
+  const key = `${supplier}:${country}`;
+  const cached = catalogueCache.get(key);
+  if (cached && Date.now() - cached.at < CATALOGUE_TTL_MS) return cached.offers;
+
   try {
-    return rankWithinSupplier(await fetchOffers(supplier, country, regionName));
+    const offers = rankWithinSupplier(await withBudget(fetchOffers(supplier, country, regionName), budgetMs));
+    catalogueCache.set(key, { at: Date.now(), offers });
+    return offers;
   } catch (error) {
     // A catalogue that cannot be read is skipped, not fatal: the other supplier
     // may still serve the same country.

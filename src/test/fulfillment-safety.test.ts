@@ -29,9 +29,11 @@ vi.mock("@/lib/fleexa", async (importOriginal) => {
 });
 
 const { cancelUpstream, fulfillPlan, isPlanFulfillable } = await import("@/lib/fulfillment");
+const { clearOtpCatalogueCache } = await import("@/lib/otp-suppliers");
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearOtpCatalogueCache();
   provider.configured = true;
 });
 afterEach(() => { vi.restoreAllMocks(); });
@@ -108,6 +110,9 @@ describe("fulfilment", () => {
       country: null, priceNgn: null, expiresAt: null, raw: {} };
     /** Quote a cost for the destination we are about to buy. */
     function quote(priceNgn: number | null) {
+      // Catalogues are cached briefly in production; a re-quote here has to be
+      // seen, so the cache is cleared with it.
+      clearOtpCatalogueCache();
       provider.listServices.mockResolvedValue([{ id: "svc-ng", country: "ng", priceNgn, stock: 10 }]);
     }
 

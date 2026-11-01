@@ -47,6 +47,7 @@ vi.mock("@/lib/exchange-rate", () => ({
 
 const { GET } = await import("@/app/api/admin/suppliers/route");
 const { FleexaError } = await import("@/lib/fleexa");
+const { clearOtpCatalogueCache } = await import("@/lib/otp-suppliers");
 
 function report(query = "") {
   return GET(new NextRequest(`https://pryva.test/api/admin/suppliers${query}`));
@@ -54,6 +55,7 @@ function report(query = "") {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearOtpCatalogueCache();
   gate.allow = true;
   fleexa.configured = true;
   fleexa.list.mockResolvedValue([{ id: "svc-ng", country: "ng", name: "WhatsApp", priceNgn: 900, stock: 5 }]);
@@ -99,6 +101,36 @@ describe("supplier status endpoint", () => {
     expect(gate.buy).not.toHaveBeenCalled();
     expect(fleexa.buy).not.toHaveBeenCalled();
     expect(gate.cancel).not.toHaveBeenCalled();
+  });
+
+  it("shows the profit each plan still makes at the cheapest supplier", async () => {
+    const body = await (await report("?country=ng")).json();
+    const nigeria = body.plans.find((plan: { slug: string }) => plan.slug === "vn-ng");
+
+    // 0.40 USD at 1,500 = 600 naira cost against a 1,340 naira plan price.
+    expect(nigeria).toMatchObject({
+      slug: "vn-ng",
+      country: "ng",
+      ourPriceNgn: 1340,
+      cheapest: { supplier: "bitcall", costNgn: 600 },
+      profitNgn: 740,
+      marginPct: 55.2,
+      clearsFloor: true,
+      blockedBy: null,
+    });
+  });
+
+  it("says a plan does not clear the floor when the cheapest cost is too high", async () => {
+    gate.list.mockResolvedValue([
+      { name: "WhatsApp", offers: [{ serviceId: "pool-ng", price: 1.2, currency: "USD", availableCount: 7 }] },
+    ]);
+
+    const body = await (await report("?country=ng")).json();
+    const nigeria = body.plans.find((plan: { slug: string }) => plan.slug === "vn-ng");
+
+    // 1,800 naira cost against 1,340 charged: refused, and the reason is named.
+    expect(nigeria).toMatchObject({ cheapest: { costNgn: 1800 }, clearsFloor: false, blockedBy: "UNPROFITABLE" });
+    expect(nigeria.profitNgn).toBe(-460);
   });
 
   it("reports a supplier failure as a code, never as an upstream message", async () => {
