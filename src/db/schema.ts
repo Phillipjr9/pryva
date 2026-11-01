@@ -158,6 +158,30 @@ export const passwordResetTokens = pgTable(
   ],
 );
 
+/**
+ * A pending change of the account's email address.
+ *
+ * The token is proven against the *new* address before anything moves — proving
+ * the old one would let a stolen session redirect every future password reset.
+ * Only the hash is stored, and one request may be live per account so a second
+ * attempt replaces the first link rather than leaving two valid.
+ */
+export const emailChangeRequests = pgTable(
+  "email_change_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    newEmail: varchar("new_email", { length: 320 }).notNull(),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("email_change_requests_user_idx").on(table.userId)],
+);
+
 export const emailVerificationTokens = pgTable(
   "email_verification_tokens",
   {

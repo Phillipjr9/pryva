@@ -9,6 +9,7 @@ import { readJsonWithLimit } from "@/lib/request-body";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { resendConfigured } from "@/lib/resend-config";
 import { makeEsimDeliveryEmail } from "@/lib/esim-email-template";
+import { makeNumberCodeEmail } from "@/lib/number-email-template";
 import { esimQrAttachment } from "@/lib/esim-qr";
 import { makeWalletEmail, type ResendPayload, type WalletEmailEvent } from "@/lib/wallet-email-template";
 
@@ -133,6 +134,9 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
     orderActivationCode: orders.esimActivationCode,
     orderInstallUrl: orders.esimInstallUrl,
     orderIccid: orders.esimIccid,
+    orderOtpCode: orders.otpCode,
+    orderPhoneNumber: orders.referenceCode,
+    orderExpiresAt: orders.expiresAt,
   }).from(walletEmailOutbox)
     .leftJoin(walletTransactions, eq(walletEmailOutbox.walletTransactionId, walletTransactions.id))
     .leftJoin(withdrawals, eq(walletEmailOutbox.withdrawalId, withdrawals.id))
@@ -179,6 +183,37 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
       .returning({ id: walletEmailOutbox.id });
     if (!savedEsim) throw new Error("Notification lease expired");
     return delivery;
+  }
+
+  // A verification code is the delivery for a number, and the page is not
+  // always open. Same rule as the eSIM: built from the order, never guessed.
+  if (row.eventKind === "number_code") {
+    if (!row.orderId || !row.orderOtpCode || !row.orderReference) throw new InvalidNotificationData();
+    const sender = process.env.RESEND_FROM_EMAIL?.trim();
+    if (!sender) throw new InvalidNotificationData();
+    const siteUrl = (process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://pryva.ng").replace(/\/$/, "");
+    let notice: ResendPayload;
+    try {
+      notice = makeNumberCodeEmail({
+        recipient: row.recipient,
+        sender,
+        orderReference: row.orderReference,
+        productName: row.orderProductName ?? "Verification number",
+        planLabel: row.orderPlanLabel ?? "",
+        region: row.orderRegion ?? "",
+        phoneNumber: row.orderPhoneNumber ?? null,
+        code: row.orderOtpCode,
+        expiresAt: row.orderExpiresAt ? new Date(row.orderExpiresAt) : null,
+        orderUrl: `${siteUrl}/dashboard/orders/${row.orderId}`,
+      });
+    } catch {
+      throw new InvalidNotificationData();
+    }
+    const [savedCode] = await db.update(walletEmailOutbox).set({ payload: JSON.stringify(notice) })
+      .where(and(eq(walletEmailOutbox.id, job.id), eq(walletEmailOutbox.status, "sending"), eq(walletEmailOutbox.lockToken, job.lock_token)))
+      .returning({ id: walletEmailOutbox.id });
+    if (!savedCode) throw new Error("Notification lease expired");
+    return notice;
   }
 
   let event: WalletEmailEvent;

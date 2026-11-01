@@ -25,6 +25,9 @@ integration at all.
 | **eSIM** | hub → `/dashboard/esim/[id]` | Live supplier catalogue, wallet checkout, activation code on the order | Catalogue only | **Ready to buy with an eSIM key: live plans, naira prices, profile delivered and recoverable** |
 | App verification | hub | Both number suppliers, read-only listing | Catalogue only | Catalogue only — labelled |
 | eSIM delivery email | inbox + order page | `wallet_email_outbox` (migration `0028`), Resend, QR attached as PNG | The profile existed only behind a login | **A delivered eSIM emails its instructions, activation code and QR; one email per order, queued in the same transaction as the profile** |
+| Verification code email | inbox | `wallet_email_outbox` (migration `0029`), Resend, 3D code tile | A code existed only on the order page — close the tab and it was gone | **A code arriving on a number emails itself to the account, with the number, the plan and when it stops receiving; single numbers only, one email per code** |
+| Change sign-in email | `/dashboard/settings` → `/confirm-email` | `POST /api/user/email`, `POST /api/auth/confirm-email-change`, `email_change_requests` | **Missing: the address could not be changed at all** | **A new address takes over only after the link sent to it is opened; 2h, single-use, hash-only, one live request per account, refused outright if mail is down** |
+| Security notices | inbox | `src/lib/security-notice.ts` wired into password change, 2FA on/off and email change | **Missing: the three things an attacker does first happened silently** | **Password changed, 2FA on, 2FA off, and the old address is told when the sign-in email moves; best effort, never fails the action** |
 | Resend a code | order page → "Resend code" | `POST /api/orders/[id]/resend`, supplier resend, 2/min per order | No way to ask again: a code that never arrived ended in a refund | **One click re-delivers from the same rental; a supplier cooldown is reported as "wait a minute", never as success** |
 | Number code sweep | nightly cron (`number-codes`) | Supplier read per open single-number order | Code arrived only while the order page was open | **Delivers codes for orders nobody is watching, before the refund sweep runs** |
 | Supplier status | `/api/admin/suppliers` (admin GET) | Read-only catalogue probe, no buy call | No such check | **Per supplier per country: configured, listed, priced, in stock, cheapest naira cost, error code; plus per plan: our price, cheapest cost in naira, profit and margin against the floor** |
@@ -127,7 +130,7 @@ derived.
 
 ## 5. Verification
 
-- `npm test` — 1,599 tests / 171 files, including new coverage for the bulk
+- `npm test` — 1,702 tests / 182 files, including new coverage for the bulk
   checkout's order of operations (fulfil → record → charge, release on failure),
   the scheduled run's refusal to charge without delivery, and the hub's
   readiness ordering and request link.
