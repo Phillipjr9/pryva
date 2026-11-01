@@ -244,6 +244,38 @@ describe("eSIM catalog", () => {
     expect(await listBitcallEsimPlans()).toHaveLength(1);
   });
 
+  it("reads coverage from a scalar country field, which is how most single-destination plans state it", async () => {
+    // The bug this closes: coverage was read from array fields only, so a plan
+    // that names one country in `country` (or `countryCode`, or a comma-separated
+    // `coverage`) parsed to no coverage at all -- and a plan with no coverage is
+    // listed under no destination. The catalogue looked short for every country.
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
+      data: [
+        { planId: "pln_single", name: "Nigeria 1GB", country: "NG", price: 4, currency: "USD" },
+        { planId: "pln_code", name: "Ghana 2GB", countryCode: "GH", price: 5, currency: "USD" },
+        { planId: "pln_list", name: "West Africa", coverage: "NG, GH | SN", price: 9, currency: "USD" },
+        { planId: "pln_array", name: "Two countries", countries: ["Kenya", "Tanzania"], price: 7, currency: "USD" },
+        { planId: "pln_none", name: "Global-ish", price: 12, currency: "USD" },
+      ],
+    })));
+    const plans = await listBitcallEsimPlans();
+    const byId = new Map(plans.map((plan) => [plan.planId, plan.countries]));
+    expect(byId.get("pln_single")).toEqual(["NG"]);
+    expect(byId.get("pln_code")).toEqual(["GH"]);
+    expect(byId.get("pln_list")).toEqual(["NG", "GH", "SN"]);
+    expect(byId.get("pln_array")).toEqual(["Kenya", "Tanzania"]);
+    // Nothing is invented for a plan that names no country.
+    expect(byId.get("pln_none")).toEqual([]);
+  });
+
+  it("prefers the array when the catalog sends both shapes", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
+      data: [{ planId: "pln_both", name: "Both", countries: ["Nigeria"], country: "GH", price: 4, currency: "USD" }],
+    })));
+    const [plan] = await listBitcallEsimPlans();
+    expect(plan.countries).toEqual(["Nigeria"]);
+  });
+
   it("passes a region filter through as a query parameter", async () => {
     const fetchMock = vi.fn().mockImplementation(() => json({ data: [] }));
     vi.stubGlobal("fetch", fetchMock);
