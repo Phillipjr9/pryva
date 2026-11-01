@@ -24,12 +24,17 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const accounts = await db.select().from(bankAccounts)
       .where(eq(bankAccounts.userId, user.id)).orderBy(desc(bankAccounts.isDefault));
+    // A saved account that the payout rule will refuse is worth saying out loud
+    // on the list, not only when a withdrawal fails: otherwise the customer
+    // picks it, fills in an amount, and finds out at the last step.
+    const depositorName = accounts.length ? await depositorNameFor(user.id) : null;
     return NextResponse.json({
       ok: true,
       bankAccounts: accounts.map((acc) => ({
         id: acc.id, bankName: acc.bankName, bankCode: acc.bankCode,
         accountNumber: acc.accountNumber, accountName: acc.accountName,
         isDefault: acc.isDefault === 1, createdAt: acc.createdAt,
+        payoutWarning: payoutWarningFor(depositorName, acc.accountName),
       })),
     });
   } catch {
@@ -95,34 +100,29 @@ export async function POST(request: NextRequest) {
     if (typeof expectedAccountName === "string" && accountName !== expectedAccountName.trim()) {
       return NextResponse.json({ error: "The resolved account name changed. Verify it again before saving." }, { status: 409 });
     }
-    // Refuse to save an account that could never be paid out to, so the customer
-    // learns that here rather than after filling in a withdrawal. This is early
-    // feedback and not the authoritative control: the withdrawal route re-checks
-    // against the name frozen on the first settled deposit, because a profile
-    // name can be edited after this row is saved. Where a deposit has already
-    // settled its frozen name is the reference here too, so the two agree.
+    // The payout rule is reported here but *not* enforced here, and that is a
+    // deliberate change. Saving used to be refused outright when the verified
+    // bank name did not match the name frozen on the first settled deposit, which
+    // left a brand-new customer with no account at all and no way forward: the
+    // frozen name is the profile name typed at signup, and "Emeka" against
+    // "EMEKA CHUKWUEMEKA OKAFOR" is a mismatch by this rule even though it is
+    // plainly the same person. The rule still decides whether money moves, in
+    // the withdrawal route, which re-checks at the moment of payment. Saving
+    // only stores a provider recipient and verifies the account; nothing is sent.
     //
-    // It also runs *before* createTransferRecipient, which registers a payee with
-    // the payment provider -- a side effect that should not happen for an account
-    // we are going to refuse.
-    // Only the frozen deposit name is used here, never `users.name`. The profile
-    // field is self-typed and editable, so refusing on it would lock out genuine
-    // customers whose bank record spells, orders or abbreviates their name
-    // differently -- and would give a false sense of enforcement, since it proves
-    // nothing about who sent the money. With no recorded deposit yet there is
-    // nothing authoritative to compare against, so saving is allowed and the
-    // withdrawal route makes the decision that actually moves money.
+    // With no recorded deposit there is nothing to compare against at all, so the
+    // account is saved with no warning and the withdrawal route answers later.
+    // Only the frozen deposit name is used, never `users.name`: the profile field
+    // is editable, so it proves nothing about who sent the money.
     const depositorName = await depositorNameFor(user.id);
-    if (depositorName) {
-      const nameCheck = comparePayoutNames(depositorName, accountName);
-      if (!nameCheck.ok) {
-        // Reason and identifiers only: bank account names are not logged.
-        logger.warn("Bank account refused: resolved name does not match the depositor", {
-          userId: user.id,
-          reason: nameCheck.reason,
-        });
-        return NextResponse.json({ error: PAYOUT_NAME_MESSAGES[nameCheck.reason] }, { status: 403 });
-      }
+    const nameCheck = depositorName ? comparePayoutNames(depositorName, accountName) : null;
+    const payoutWarning = nameCheck && !nameCheck.ok ? PAYOUT_NAME_MESSAGES[nameCheck.reason] : null;
+    if (nameCheck && !nameCheck.ok) {
+      // Reason and identifiers only: bank account names are not logged.
+      logger.warn("Bank account saved with payouts blocked: name does not match the depositor", {
+        userId: user.id,
+        reason: nameCheck.reason,
+      });
     }
 
     const recipient = await createTransferRecipient({ name: accountName, accountNumber, bankCode });
@@ -150,7 +150,8 @@ export async function POST(request: NextRequest) {
         accountNumber: newAccount.accountNumber, accountName: newAccount.accountName,
         isDefault: newAccount.isDefault === 1,
       },
-      message: "Bank account added successfully",
+      message: payoutWarning ? "Bank account saved, but payouts to it are blocked." : "Bank account added successfully",
+      payoutWarning,
     });
   } catch {
     // Provider responses may contain bank account information; don't log them.
@@ -176,4 +177,17 @@ export async function DELETE(request: NextRequest) {
     logger.error("Failed to delete bank account");
     return NextResponse.json({ error: "Failed to delete bank account" }, { status: 500 });
   }
+}
+
+/**
+ * What to tell a customer about an account the payout rule will refuse.
+ *
+ * Returns null when the account can be paid -- including when no deposit has
+ * been recorded yet, because then there is nothing to compare and the withdrawal
+ * route is the place that decides.
+ */
+function payoutWarningFor(depositorName: string | null, accountName: string): string | null {
+  if (!depositorName) return null;
+  const check = comparePayoutNames(depositorName, accountName);
+  return check.ok ? null : PAYOUT_NAME_MESSAGES[check.reason];
 }
