@@ -32,7 +32,7 @@ export default function ProxiesPage() {
                 follows — a card may state a price, but the promise to sell is
                 withdrawn until a delivery path exists. */}
             <div className="mt-8 flex flex-wrap gap-3 sm:gap-4">
-              <Link href="/status" className="inline-flex items-center gap-2 rounded-xl bg-lav-600 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-700">Check availability <ArrowRight className="h-4 w-4" /></Link>
+              <Link href="/status" className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-800">Check availability <ArrowRight className="h-4 w-4" /></Link>
               <Link href="/pricing" className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-6 py-3 text-[0.95rem] font-semibold text-ink hover:bg-cream">View Pricing</Link>
             </div>
           </div>
@@ -69,7 +69,7 @@ export default function ProxiesPage() {
                 <p className="text-[0.86rem] text-ink-2 mb-4">{plan.planLabel}</p>
                 <div className="mb-4"><span className="text-[2rem] font-bold text-ink">{formatNaira(plan.price)}</span></div>
                 {isPlanFulfillable(plan.slug) ? (
-                  <Link href={`/signup?plan=${plan.slug}`} className="block w-full rounded-xl bg-lav-600 px-4 py-3 text-center text-[0.9rem] font-semibold text-white hover:bg-lav-700">Get Started</Link>
+                  <Link href={`/signup?plan=${plan.slug}`} className="block w-full rounded-xl bg-lav-700 px-4 py-3 text-center text-[0.9rem] font-semibold text-white hover:bg-lav-800">Get Started</Link>
                 ) : (
                   <p className="block w-full rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-center text-meta font-semibold leading-relaxed text-amber-900">
                     This plan cannot be delivered yet, so it cannot be ordered or charged.

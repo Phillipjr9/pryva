@@ -117,7 +117,7 @@ export default async function OrdersPage({
                   key={filter.key}
                   href={hrefFor(filter.key)}
                   aria-current={active ? "page" : undefined}
-                  className={`rounded-full border px-3 py-1.5 text-meta font-semibold transition-colors ${
+                  className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-meta font-semibold transition-colors ${
                     active
                       ? "border-ink bg-ink text-white"
                       : "border-line bg-white/70 text-ink-2 hover:border-lav-200"
@@ -165,7 +165,7 @@ export default async function OrdersPage({
                 {group.label}
               </h2>
               <div className="overflow-hidden rounded-[1.5rem] border border-line bg-[#fffdfa]">
-                <div className="hidden grid-cols-[1.6fr_0.9fr_0.7fr_0.6fr_0.3fr] gap-3 border-b border-line px-5 py-3 text-micro font-semibold uppercase tracking-[0.14em] text-ink-3 md:grid">
+                <div className="hidden grid-cols-[1.45fr_0.9fr_0.7fr_0.75fr_0.25fr] gap-3 border-b border-line px-5 py-3 text-micro font-semibold uppercase tracking-[0.14em] text-ink-3 md:grid">
                   <span>Order</span>
                   <span>Placed</span>
                   <span>Amount</span>
@@ -180,7 +180,7 @@ export default async function OrdersPage({
                       <Link
                         key={order.id}
                         href={`/dashboard/orders/${order.id}`}
-                        className="grid gap-1.5 px-4 py-3.5 transition-colors hover:bg-lav-50/40 md:grid-cols-[1.6fr_0.9fr_0.7fr_0.6fr_0.3fr] md:items-center md:gap-3 md:px-5"
+                        className="grid gap-1.5 px-4 py-3.5 transition-colors hover:bg-lav-50/40 md:grid-cols-[1.45fr_0.9fr_0.7fr_0.75fr_0.25fr] md:items-center md:gap-3 md:px-5"
                       >
                         <div className="min-w-0">
                           <p className="truncate text-[0.87rem] font-semibold text-ink">
@@ -199,14 +199,14 @@ export default async function OrdersPage({
                         <p className="hidden text-[0.82rem] font-semibold text-ink md:block">
                           {formatNaira(order.amount)}
                         </p>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span
-                            className={`inline-flex w-fit items-center rounded-full px-2.5 py-1 text-micro font-semibold capitalize ${statusStyle(order.status)}`}
+                            className={`inline-flex w-fit items-center whitespace-nowrap rounded-full px-2.5 py-1 text-micro font-semibold capitalize ${statusStyle(order.status)}`}
                           >
                             {order.status}
                           </span>
                           {live && order.otpCode && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-lav-50 px-2 py-1 text-micro font-semibold text-lav-700">
+                            <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-lav-50 px-2 py-1 text-micro font-semibold text-lav-700">
                               <Clock className="h-2.5 w-2.5" /> Code live
                             </span>
                           )}

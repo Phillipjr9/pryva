@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CommandPalette, CommandPaletteTrigger } from "@/components/command/CommandPalette";
-import { ArrowRight, Bell, Close, Logout, Menu, Plus, Shield, Wallet } from "@/components/icons";
+import { ArrowRight, Bell, Close, Logout, Menu, Shield, Wallet } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { NavIcon, type NavArt } from "@/components/dashboard/NavIcon";
 import { ProfileAvatar } from "@/components/dashboard/ProfileAvatar";
@@ -213,21 +213,14 @@ export function DashboardShell({
         <BrandLockup size="sm" />
       </div>
 
-      <Link
-        href="/dashboard/wallet"
-        onClick={() => setOpen(false)}
-        className="mt-5 block rounded-2xl bg-gradient-to-br from-ink to-[#3b2f56] p-4 text-white"
-      >
-        <p className="text-micro uppercase tracking-[0.16em] text-white/55">Wallet balance</p>
-        <p className="mt-1.5 text-[1.35rem] font-semibold leading-none">
-          {formatNaira(user.walletBalance)}
-        </p>
-        <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-micro font-semibold">
-          <Plus className="h-2.5 w-2.5" /> Top up wallet
-        </span>
-      </Link>
-
-      <nav aria-label="Dashboard navigation" className="mt-5 grid min-h-0 flex-1 content-start gap-4 overflow-y-auto">
+      {/*
+        The balance card used to sit here, above the nav. It showed the same
+        number as the chip in the top bar (every width, every page) and, on the
+        wallet page, a third time inside that page's own hero — and it cost
+        ~110px of a fixed-height column that already had to hold 27 links. The
+        chip is the single source in the shell.
+      */}
+      <nav aria-label="Dashboard navigation" className="nav-scroll mt-5 grid min-h-0 flex-1 content-start gap-4 overflow-y-auto">
         {groups.map((group) => (
           <div key={group.label} className="grid gap-0.5">
             <p className="px-3 text-micro font-semibold uppercase tracking-[0.16em] text-ink-3">
@@ -263,7 +256,7 @@ export function DashboardShell({
                   )}
                   {item.label}
                   {badge ? (
-                    <span className="ml-auto rounded-full bg-lav-600 px-1.5 py-0.5 text-micro font-bold text-white">
+                    <span className="ml-auto rounded-full bg-lav-700 px-1.5 py-0.5 text-micro font-bold text-white">
                       {badge}
                     </span>
                   ) : (
@@ -353,7 +346,7 @@ export function DashboardShell({
               >
                 <Bell className="h-4 w-4" />
                 {unreadNotifications > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-lav-600 px-1 text-micro font-bold text-white">
+                  <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-lav-700 px-1 text-micro font-bold text-white">
                     {unreadNotifications}
                   </span>
                 )}

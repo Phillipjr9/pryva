@@ -116,7 +116,7 @@ export function EsimCatalogue({ items, truncated }: { items: EsimCatalogueItem[]
                 {item.purchasable ? (
                   <Link
                     href={`/dashboard/esim/${encodeURIComponent(item.id)}`}
-                    className="rounded-lg bg-lav-600 px-3 py-2 text-meta font-semibold text-white hover:bg-lav-700"
+                    className="rounded-lg bg-lav-700 px-3 py-2 text-meta font-semibold text-white hover:bg-lav-800"
                   >
                     Buy eSIM
                   </Link>
