@@ -558,9 +558,18 @@ There is no approval queue any more. A customer confirming a withdrawal debits t
 wallet and sends the transfer in the same request, so **you are not the gate**. The
 controls that replace the gate are all automatic and all before money moves: the
 destination name must match the name that funded the wallet, the amount must be
-inside the ₦1,000–₦5,000,000 band, a risk score is recorded (advisory, never
+inside the ₦1,000–₦5,000,000 band, an account may make **3 requests and
+₦1,000,000 per rolling 24 hours** (adjustable with `WITHDRAWAL_DAILY_COUNT_LIMIT`
+and `WITHDRAWAL_DAILY_AMOUNT_LIMIT`; a rejected or failed request does not count,
+because the money came back), a risk score is recorded (advisory, never
 blocking), and a request with no Paystack key is refused outright rather than
 accepted and stranded.
+
+The daily ceiling is the one control aimed at a stolen session: the floor and the
+ceiling are per request, so without it an attacker with a valid session could make
+five maximum payouts in a minute and every one of them would be a legal single
+request. A customer who hits it sees the reason and the time the oldest request
+ages out, not a generic failure.
 
 **Your job is the exceptions, not the queue.** `/admin/withdrawals` now reads
 "Payouts". A row sitting in `processing` for more than an hour is an exception:

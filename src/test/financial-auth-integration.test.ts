@@ -379,6 +379,56 @@ describe("withdrawal request idempotency on embedded PostgreSQL", () => {
     expect(stored).toMatchObject({ status: "processing", paystackReference: `wd-${legacy.id.replace(/-/g, "")}`, transferReference: "TRF-auto" });
   });
 
+  it("refuses a fourth payout request in a day, and says when the next one can go", async () => {
+    vi.stubEnv("WITHDRAWAL_DAILY_COUNT_LIMIT", "2");
+    await addBank();
+
+    expect((await withdrawalRoute.POST(withdrawalRequest(REQUEST_ID, 2000))).status).toBe(200);
+    expect((await withdrawalRoute.POST(withdrawalRequest(OTHER_REQUEST_ID, 2000))).status).toBe(200);
+
+    const third = await withdrawalRoute.POST(withdrawalRequest(
+      "0f6f2b8e-6a52-4a41-9c4e-6d1f8a2b7c31", 2000,
+    ));
+    expect(third.status).toBe(429);
+    const body = await third.json();
+    expect(body).toMatchObject({ code: "WITHDRAWAL_VELOCITY", reason: "count", used: { count: 2 } });
+    expect(body.error).toContain("2 withdrawal requests in 24 hours");
+    expect(body.retryAt).toEqual(expect.any(String));
+
+    // Nothing was written and nothing was debited for the refused request.
+    expect(await database.select().from(schema.withdrawals)).toHaveLength(2);
+    const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+    expect(user.walletBalance).toBe(6000);
+  });
+
+  it("caps the day's payout value even when each request is small enough on its own", async () => {
+    vi.stubEnv("WITHDRAWAL_DAILY_AMOUNT_LIMIT", "2500");
+    await addBank();
+
+    expect((await withdrawalRoute.POST(withdrawalRequest(REQUEST_ID, 2000))).status).toBe(200);
+    const second = await withdrawalRoute.POST(withdrawalRequest(OTHER_REQUEST_ID, 2000));
+
+    expect(second.status).toBe(429);
+    const body = await second.json();
+    expect(body).toMatchObject({ code: "WITHDRAWAL_VELOCITY", reason: "amount", used: { amount: 2000 } });
+    expect(body.error).toContain("₦500 more right now");
+    expect(await database.select().from(schema.withdrawals)).toHaveLength(1);
+  });
+
+  it("does not count a rejected request against the day's allowance", async () => {
+    vi.stubEnv("WITHDRAWAL_DAILY_COUNT_LIMIT", "1");
+    await addBank();
+    // A rejected request never sent money; punishing it would lock a customer out
+    // of their own wallet for a day because they mistyped a bank account.
+    await database.insert(schema.withdrawals).values({
+      userId: USER, requestId: "9a2c4d61-8b53-4a8f-9d21-3c5e7f0a1b42", bankAccountId: BANK_ID,
+      amount: 2000, fee: 0, bankName: "Test Bank", accountNumber: "1234567890", accountName: "Test Customer",
+      status: "rejected", reference: "WD-rejected-one",
+    });
+
+    expect((await withdrawalRoute.POST(withdrawalRequest(REQUEST_ID, 2000))).status).toBe(200);
+  });
+
   it("enforces unique Paystack transfer references in the migrated database", async () => {
     await addBank();
     const { withdrawal: first } = await (await withdrawalRoute.POST(withdrawalRequest())).json();

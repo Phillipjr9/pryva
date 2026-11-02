@@ -131,11 +131,30 @@ outcomes; `grep -ri dispute src` matches only marketing pages.
 address that hard-bounces is retried forever by the outbox, which burns sender
 reputation — the one asset that decides whether receipts arrive at all.
 
-### 12. Withdrawal has a floor and a ceiling but no velocity
-₦1,000 minimum, ₦5,000,000 maximum, one bank-name rule, and no per-day, per-account
-or new-account hold. A compromised session can attempt a large payout immediately.
-`/admin/reconciliation` shows pending payouts, so a human can catch it — after the
-fact, if they are looking.
+### 12. Withdrawal velocity — **closed**
+₦1,000 minimum and ₦5,000,000 maximum are *per request*, which is not a rate: an
+account whose session had been stolen could make several valid maximum payouts in
+a minute, and each one left before anyone looked at reconciliation.
+
+`src/lib/withdrawal-velocity.ts` now caps the account, not the request: **3
+requests and ₦1,000,000 per rolling 24 hours**, before any write and before the
+payout is asked for. The numbers are the owner's (approved 2 November 2026),
+deliberately far above a real customer's day, and both are adjustable with
+`WITHDRAWAL_DAILY_COUNT_LIMIT` / `WITHDRAWAL_DAILY_AMOUNT_LIMIT` — where an
+unreadable value falls back to the default rather than to unlimited, because a
+typo must not be the thing that removes a control.
+
+Three deliberate details: a **rejected or failed** request does not count (the
+money came back, and otherwise a mistyped bank account would lock someone out of
+their own wallet for a day), the logged amount is the payout and not the payout
+plus fee, and a refusal names the limit and the Lagos time the oldest request ages
+out instead of a generic "try again later". The customer's wallet shows that
+sentence alone — the usual "review requests or retry" advice would push them into
+the same wall. If the recent-request query cannot be read the request is refused
+(503) rather than sent, the same posture as every other payout gate.
+
+What remains here is only the bank-name rule, which is a correctness control and
+not a velocity one.
 
 ## P2 — completeness and polish
 

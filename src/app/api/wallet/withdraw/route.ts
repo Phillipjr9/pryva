@@ -11,6 +11,7 @@ import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/li
 import { purchaseRateLimiter } from "@/lib/rate-limit";
 import { checkPayoutDestination, PAYOUT_NAME_MESSAGES } from "@/lib/withdrawal-name-check";
 import { MAX_WITHDRAWAL, MIN_WITHDRAWAL, withdrawalFee } from "@/lib/withdrawal";
+import { VELOCITY_WINDOW_MS, assessVelocity, velocityLimits } from "@/lib/withdrawal-velocity";
 import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 import { assessWithdrawal, recordFraudEvent, type RiskAssessment } from "@/lib/fraud";
 import { isPaystackConfigured } from "@/lib/paystack";
@@ -124,6 +125,41 @@ export async function POST(request: NextRequest) {
     // since the original request was committed.
     const [existing] = await db.select().from(withdrawals).where(requestCondition).limit(1);
     if (existing) return receipt(existing, amount, bankAccountId, true);
+
+    // A floor and a ceiling are per-request limits; neither is a rate. An account
+    // whose session was stolen can make several valid maximum requests in a
+    // minute, and each one is a separate payout that has already left by the time
+    // anyone looks at reconciliation. This runs after the replay lookup (a retry
+    // must return its receipt, never a refusal) and before any write.
+    const limits = velocityLimits();
+    let velocity;
+    try {
+      const recent = await db
+        .select({ amount: withdrawals.amount, status: withdrawals.status, createdAt: withdrawals.createdAt })
+        .from(withdrawals)
+        .where(and(eq(withdrawals.userId, user.id), gte(withdrawals.createdAt, new Date(Date.now() - VELOCITY_WINDOW_MS))))
+        // Bounded on purpose: the answer is "allowed" or "refused", and it is
+        // refused as soon as the count passes a single-digit limit, so reading a
+        // thousandth row would never change the verdict.
+        .limit(100);
+      velocity = assessVelocity(recent, amount, limits, new Date());
+    } catch (error) {
+      // Fail closed, like every other payout gate: if the count cannot be read,
+      // this is not the moment to send money.
+      logger.error("Withdrawal refused: velocity could not be checked", { userId: user.id, error: error instanceof Error ? error.message : "unknown" });
+      return NextResponse.json({ error: "Withdrawals are temporarily unavailable. Nothing was deducted." }, { status: 503 });
+    }
+    if (!velocity.allowed) {
+      logger.warn("Withdrawal refused: daily velocity", { userId: user.id, reason: velocity.reason, usedCount: velocity.usedCount, usedAmount: velocity.usedAmount });
+      return NextResponse.json({
+        error: velocity.message,
+        code: "WITHDRAWAL_VELOCITY",
+        reason: velocity.reason,
+        retryAt: velocity.retryAt?.toISOString() ?? null,
+        limits,
+        used: { count: velocity.usedCount, amount: velocity.usedAmount },
+      }, { status: 429, headers: { "Cache-Control": "private, no-store" } });
+    }
 
     const [bankAccount] = await db.select().from(bankAccounts)
       .where(and(eq(bankAccounts.id, bankAccountId), eq(bankAccounts.userId, user.id))).limit(1);

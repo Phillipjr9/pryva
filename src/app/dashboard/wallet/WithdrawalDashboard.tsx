@@ -352,6 +352,15 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
         addToast({ type: "error", message: error });
         return { ok: false, message: error };
       }
+      // A daily-limit refusal is a fact about the whole account, not a lost
+      // request: there is nothing to review, and telling the customer to retry
+      // would push them into the same wall. Say the limit and when it lifts.
+      if (data && typeof data === "object" && !Array.isArray(data) && (data as { code?: unknown }).code === "WITHDRAWAL_VELOCITY") {
+        setActiveTab("history");
+        void fetchWithdrawalHistory();
+        addToast({ type: "error", message: error });
+        return { ok: false, message: error };
+      }
       const message = `${error} Review requests or retry the original request before starting another.`;
       setActiveTab("history");
       void fetchWithdrawalHistory();

@@ -51,7 +51,13 @@ function fakeDatabase() {
       where: (condition: SQL) => {
         const limit = async () => {
           const params = dialect.sqlToQuery(condition).params;
-          if (table === withdrawals) return state.withdrawals.filter((row) => row.userId === params[0] && row.requestId === params[1]);
+          if (table === withdrawals) {
+            // Two shapes reach this table: the replay lookup (user + request id)
+            // and the velocity count (user + a cut-off date, which the route
+            // bounds with LIMIT).
+            if (params[1] instanceof Date) return state.withdrawals.filter((row) => row.userId === params[0]);
+            return state.withdrawals.filter((row) => row.userId === params[0] && row.requestId === params[1]);
+          }
           if (table === bankAccounts) return params[0] === state.bank.id && params[1] === state.bank.userId ? [{ ...state.bank }] : [];
           // depositorNameFor() reads the frozen payer name, oldest deposit first.
           if (table === users) return params[0] === "user-id" ? [{ balance: state.balance }] : [];
