@@ -6,7 +6,7 @@ import Link from "next/link";
 const field =
   "w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink outline-none transition-colors focus:border-lav-400";
 const submitClass =
-  "w-full rounded-xl bg-lav-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-lav-700 disabled:cursor-not-allowed disabled:opacity-60";
+  "w-full rounded-xl bg-lav-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-lav-800 disabled:cursor-not-allowed disabled:opacity-60";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");

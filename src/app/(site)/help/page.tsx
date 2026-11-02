@@ -61,7 +61,7 @@ export default function HelpPage() {
         <div className="shell"><div className="rounded-2xl border border-line bg-white p-8 text-center">
           <h2 className="mb-3 text-[1.5rem] font-semibold text-ink">Still need help?</h2>
           <p className="mx-auto mb-6 max-w-md text-[0.95rem] text-ink-2">Contact support with your order or wallet reference.</p>
-          <Link href="/contact" className="inline-flex items-center gap-2 rounded-xl bg-lav-600 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-700">Contact support <ArrowRight className="h-4 w-4" /></Link>
+          <Link href="/contact" className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-800">Contact support <ArrowRight className="h-4 w-4" /></Link>
         </div></div>
       </section>
     </div>

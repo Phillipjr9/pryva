@@ -66,7 +66,7 @@ export function EmailChangeCard({ currentEmail }: { currentEmail: string }) {
         <button
           type="submit"
           disabled={busy || email.trim().length === 0}
-          className="rounded-xl bg-lav-600 px-4 py-2 text-[0.85rem] font-semibold text-white hover:bg-lav-700 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-xl bg-lav-700 px-4 py-2 text-[0.85rem] font-semibold text-white hover:bg-lav-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy ? "Sending…" : "Send confirmation"}
         </button>

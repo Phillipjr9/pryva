@@ -21,7 +21,7 @@ export default function PrivacyPage() {
             </Link>
             <Link
               href="/signup"
-              className="rounded-xl bg-lav-600 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-700"
+              className="rounded-xl bg-lav-700 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-800"
             >
               Get Started
             </Link>

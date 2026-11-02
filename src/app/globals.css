@@ -56,7 +56,16 @@
     background-color: var(--color-cream);
     color: var(--color-ink);
     font-family: var(--font-sans);
-    overflow-wrap: anywhere;
+    /*
+     * `break-word`, not `anywhere`. Both let a long reference number or email
+     * split rather than push the page sideways; `anywhere` additionally lets
+     * that break count towards intrinsic min-content sizing, so a grid column
+     * that holds the word "active" is happy to be one letter wide. Status
+     * pills were rendering "Acti/ve" for exactly this reason. Anything that
+     * genuinely wants a shrink-to-nothing label opts in with `overflow-wrap`
+     * (see `.btn`).
+     */
+    overflow-wrap: break-word;
   }
 
   /* Flex/grid min-content sizing must not let addresses, references or wide
@@ -170,13 +179,20 @@
     transform: translateY(-1px);
   }
 
+  /*
+   * A solid token colour, not a gradient. The previous 3-stop gradient ran from
+   * #8b6fd1 to #c0a8ee, and white text on its lightest stop measures 2.2:1 —
+   * below the 4.5:1 WCAG AA floor for body-size button labels. `lav-700` gives
+   * 6.3:1 and keeps the highlight in the box-shadow instead of the fill.
+   */
   .btn-primary {
-    background: linear-gradient(120deg, #8b6fd1 0%, #a98ce0 55%, #c0a8ee 100%);
+    background: var(--color-lav-700);
     color: #fff;
     box-shadow: 0 14px 30px -16px rgba(107, 79, 174, 0.8);
   }
 
   .btn-primary:hover {
+    background: var(--color-lav-800);
     box-shadow: 0 20px 38px -18px rgba(107, 79, 174, 0.9);
   }
 
@@ -297,6 +313,32 @@
 
   .no-scrollbar {
     scrollbar-width: none;
+  }
+
+  /*
+   * The dashboard nav is the one block in the sidebar that can outgrow it — 27
+   * links against a fixed `calc(100vh - 2.5rem)` column — so it scrolls itself
+   * and needs to look like it. A thin, always-visible thumb is the honest cue;
+   * a bottom fade would keep promising more after the list had ended.
+   * `contain` stops a flick from chaining to the page behind the mobile drawer.
+   */
+  .nav-scroll {
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-lav-300) transparent;
+  }
+
+  .nav-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .nav-scroll::-webkit-scrollbar-thumb {
+    background: var(--color-lav-300);
+    border-radius: 999px;
+  }
+
+  .nav-scroll::-webkit-scrollbar-track {
+    background: transparent;
   }
 
   .marquee-track {

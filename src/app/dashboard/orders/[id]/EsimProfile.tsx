@@ -138,7 +138,7 @@ export function EsimProfile({
         <a
           href={installUrl}
           rel="noreferrer noopener"
-          className="inline-flex w-fit items-center gap-2 rounded-xl bg-lav-600 px-4 py-2.5 text-meta font-semibold text-white hover:bg-lav-700"
+          className="inline-flex w-fit items-center gap-2 rounded-xl bg-lav-700 px-4 py-2.5 text-meta font-semibold text-white hover:bg-lav-800"
         >
           One-tap install
         </a>
