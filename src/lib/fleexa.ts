@@ -9,6 +9,8 @@
  *   • Rentals     — GET /rent/sms4/areas, POST /rent/sms4/buy,
  *                   GET /rent/sms4/numbers, GET /rent/sms4/sms
  *   • Account     — GET /profile, GET /balance
+ *   • Proxies     — GET /proxy/products, POST /proxy/buy, GET /proxy/check/:id,
+ *                   POST /proxy/cancel  (unverified — see PROXIES.md)
  *
  * Auth: `Authorization: Bearer flx_live_...` or X-API-Key.
  * Envelope: `{ success, message, error_code, details, http_code }`.
@@ -543,4 +545,150 @@ export async function getFleexaStatus(): Promise<FleexaStatus> {
       error: error instanceof FleexaError ? error.message : "Unreachable",
     };
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Proxies                                                             */
+/*                                                                     */
+/* Endpoint shapes are NOT verified. They follow the same convention   */
+/* as the SMS, email and rental paths above (`/sms4/buy`,             */
+/* `/email/buy`, `/rent/sms4/buy`), which is evidence of a house      */
+/* style and nothing more. Product ids are deployment data, not code, */
+/* so a plan is only mapped to a supplier product through             */
+/* `FLEEXA_PROXY_PRODUCTS`, and nothing is sellable until that map is */
+/* present and `FLEEXA_PROXY_ENABLED=1`. See PROXIES.md for the       */
+/* verification step before any of this touches money.                */
+/* ------------------------------------------------------------------ */
+
+/** Endpoint prefix. One place to change if Fleexa documents a different path. */
+const PROXY_PATH = "/proxy";
+
+export type FleexaProxyProduct = {
+  productId: string;
+  name: string | null;
+  gigabytes: number | null;
+  days: number | null;
+  region: string | null;
+  /** What this costs us. Never rendered to a customer. */
+  priceNgn: number | null;
+};
+
+export type FleexaProxyAccess = {
+  accessId: string;
+  host: string | null;
+  port: number | null;
+  username: string | null;
+  password: string | null;
+  protocol: "http" | "https" | "socks5";
+  expiresAt: Date | null;
+  limitGb: number | null;
+  usedGb: number | null;
+};
+
+export type ProxyPlanMap = Record<string, string>;
+
+/**
+ * The deployment's plan→product map.
+ *
+ * Absent or malformed means "no proxy products", which is the safe direction: a
+ * plan with no product id cannot be bought, and a typo cannot silently point two
+ * plans at one product.
+ */
+export function fleexaProxyPlanMap(): ProxyPlanMap {
+  const raw = process.env.FLEEXA_PROXY_PRODUCTS?.trim();
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const map: ProxyPlanMap = {};
+    for (const [slug, productId] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof slug === "string" && typeof productId === "string" && productId.trim()) {
+        map[slug] = productId.trim();
+      }
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+export async function listFleexaProxyProducts(): Promise<FleexaProxyProduct[]> {
+  const payload = await fleexaFetch(`${PROXY_PATH}/products`);
+  return listFrom(payload).slice(0, 500).flatMap((row) => {
+    const productId = pickString(row, [["product_id"], ["productId"], ["id"], ["plan_id"]]);
+    if (!productId) return [];
+    return [{
+      productId,
+      name: pickString(row, [["name"], ["title"], ["plan"]]),
+      gigabytes: pickNumber(row, [["gigabytes"], ["gb"], ["bandwidth_gb"], ["data_gb"]]),
+      days: pickNumber(row, [["days"], ["duration_days"], ["validity_days"], ["validity"]]),
+      region: pickString(row, [["region"], ["country"], ["country_code"], ["location"]]),
+      priceNgn: pickNumber(row, [["price_ngn"], ["price"], ["amount_ngn"], ["amount"]]),
+    }];
+  });
+}
+
+function protocolOf(value: string | null): FleexaProxyAccess["protocol"] {
+  const normalised = (value ?? "").toLowerCase();
+  if (normalised.includes("socks5") || normalised === "socks") return "socks5";
+  if (normalised.includes("https")) return "https";
+  return "http";
+}
+
+function accessFrom(row: UnknownRecord): FleexaProxyAccess | null {
+  const accessId = pickString(row, [["access_id"], ["accessId"], ["order_id"], ["orderId"], ["id"]]);
+  if (!accessId) return null;
+  const expires = pickString(row, [["expires_at"], ["expiresAt"], ["expiry"], ["valid_until"]]);
+  const parsedExpiry = expires ? new Date(expires) : null;
+  return {
+    accessId,
+    host: pickString(row, [["host"], ["proxy_host"], ["gateway"], ["server"]]),
+    port: pickNumber(row, [["port"], ["proxy_port"]]),
+    username: pickString(row, [["username"], ["user"], ["login"]]),
+    password: pickString(row, [["password"], ["pass"]]),
+    protocol: protocolOf(pickString(row, [["protocol"], ["type"]])),
+    expiresAt: parsedExpiry && Number.isFinite(parsedExpiry.getTime()) ? parsedExpiry : null,
+    limitGb: pickNumber(row, [["limit_gb"], ["bandwidth_gb"], ["gigabytes"], ["quota_gb"]]),
+    usedGb: pickNumber(row, [["used_gb"], ["usage_gb"], ["traffic_used_gb"], ["used"]]),
+  };
+}
+
+/**
+ * Buy one proxy allowance.
+ *
+ * `reference` is sent as our own idempotency key where the supplier accepts one:
+ * a retried request must not open a second sub-user, because the second one is
+ * billable bandwidth nobody ordered.
+ */
+export async function buyFleexaProxy(input: {
+  productId: string;
+  reference: string;
+  gigabytes: number;
+  days: number;
+}): Promise<FleexaProxyAccess> {
+  const payload = await fleexaFetch(`${PROXY_PATH}/buy`, {
+    method: "POST",
+    body: {
+      product_id: input.productId,
+      reference: input.reference,
+      gigabytes: input.gigabytes,
+      days: input.days,
+    },
+  });
+  const row = listFrom(payload)[0] ?? asRecord(payload.data ?? payload);
+  const access = accessFrom(row);
+  if (!access) throw new FleexaError("Unexpected provider response", 502, "INVALID_PROXY_ACCESS");
+  return access;
+}
+
+/** Read back one allowance — the quota check and the usage figure. */
+export async function checkFleexaProxy(accessId: string): Promise<FleexaProxyAccess | null> {
+  const payload = await fleexaFetch(`${PROXY_PATH}/check/${encodeURIComponent(accessId)}`);
+  const row = listFrom(payload)[0] ?? asRecord(payload.data ?? payload);
+  return accessFrom(row);
+}
+
+/** Release an allowance we bought but could not hand over. */
+export async function cancelFleexaProxy(accessId: string): Promise<void> {
+  await fleexaFetch(`${PROXY_PATH}/cancel`, { method: "POST", body: { access_id: accessId } });
 }

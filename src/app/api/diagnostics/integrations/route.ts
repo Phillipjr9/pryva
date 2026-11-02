@@ -9,6 +9,8 @@ import {
   listFleexaRentAreas,
 } from "@/lib/fleexa";
 import { isBitcallConfigured, getBitcallBalance } from "@/lib/bitcall";
+import { fleexaProxyPlanMap, listFleexaProxyProducts } from "@/lib/fleexa";
+import { isProxyOrderingAvailable, PROXY_PLAN_QUOTAS } from "@/lib/proxy-plans";
 import { esimItemsForCountry, readEsimCatalog } from "@/lib/esim-catalog";
 import { explorerCountry } from "@/lib/service-explorer";
 import { isSmmPanelConfigured } from "@/lib/smm-panel";
@@ -106,6 +108,19 @@ export async function GET(request: NextRequest) {
       })()
     : { configured: false as const };
 
+  // Proxies have no purchase path yet; this probe is how the owner confirms the
+  // supplier's product list and the endpoint shape before anything is switched on.
+  // It reads products only -- it cannot open an allowance or spend bandwidth.
+  const proxies = numbersConfigured
+    ? {
+        configured: true as const,
+        orderingEnabled: isProxyOrderingAvailable(),
+        mappedPlans: Object.keys(fleexaProxyPlanMap()).length,
+        plansWithoutQuota: Object.keys(fleexaProxyPlanMap()).filter((slug) => !(slug in PROXY_PLAN_QUOTAS)),
+        products: await probe("fleexa-proxy-products", async () => summarize(await listFleexaProxyProducts())),
+      }
+    : { configured: false as const };
+
   // The eSIM catalogue is the one feed whose *size* is a support question: a
   // destination can look empty because the supplier never published a plan, or
   // because we could not price it, or because its coverage was unreadable, and
@@ -151,6 +166,7 @@ export async function GET(request: NextRequest) {
       },
       fallbackAccounts: { configured: isAccsZoneConfigured() },
       numbers,
+      proxies,
       gateway,
       boosting: { configured: isSmmPanelConfigured() },
       payments: isPaystackConfigured()
