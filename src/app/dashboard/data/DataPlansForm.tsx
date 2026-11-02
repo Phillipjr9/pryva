@@ -103,7 +103,7 @@ export function DataPlansForm({ user, initialPlanId }: DataPlansFormProps) {
       <button
         type="button"
         disabled
-        className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full rounded-xl bg-lav-700 px-6 py-4 text-[1rem] font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Data plans are not available yet
       </button>

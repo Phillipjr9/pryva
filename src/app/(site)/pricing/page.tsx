@@ -113,7 +113,7 @@ export default function PricingPage() {
                         href={`/signup?plan=${plan.slug}`}
                         className={`block w-full rounded-lg px-3 py-2 text-center text-meta font-semibold transition-colors sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.9rem] ${
                           plan.popular
-                            ? "bg-lav-600 text-white hover:bg-lav-700"
+                            ? "bg-lav-700 text-white hover:bg-lav-800"
                             : "border border-line bg-white text-ink hover:bg-cream"
                         }`}
                       >

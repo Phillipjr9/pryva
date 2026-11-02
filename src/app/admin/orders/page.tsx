@@ -145,7 +145,7 @@ export default async function AdminOrdersPage({
             href={buildHref({ status: filter.value, page: 1 })}
             className={
               filter.value === status
-                ? "rounded-full border border-lav-600 bg-lav-600 px-3.5 py-1.5 text-[0.8rem] font-medium text-white"
+                ? "rounded-full border border-lav-600 bg-lav-700 px-3.5 py-1.5 text-[0.8rem] font-medium text-white"
                 : "rounded-full border border-line bg-white px-3.5 py-1.5 text-[0.8rem] font-medium text-ink-2 hover:border-lav-300"
             }
           >

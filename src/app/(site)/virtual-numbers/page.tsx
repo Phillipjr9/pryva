@@ -53,7 +53,7 @@ export default async function VirtualNumbersPage() {
             <div className="mt-8 flex flex-wrap gap-3 sm:gap-4">
               <Link
                 href="/signup"
-                className="inline-flex items-center gap-2 rounded-xl bg-lav-600 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-700"
+                className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-800"
               >
                 Get Started
                 <ArrowRight className="h-4 w-4" />
@@ -162,7 +162,7 @@ export default async function VirtualNumbersPage() {
                   href={`/signup?plan=${plan.slug}`}
                   className={`block w-full rounded-xl px-4 py-3 text-center text-[0.9rem] font-semibold transition-colors ${
                     plan.popular
-                      ? "bg-lav-600 text-white hover:bg-lav-700"
+                      ? "bg-lav-700 text-white hover:bg-lav-800"
                       : "border border-line bg-white text-ink hover:bg-cream"
                   }`}
                 >

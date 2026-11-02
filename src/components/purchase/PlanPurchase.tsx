@@ -212,7 +212,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
                     <span
                       className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border transition-colors ${
                         isSelected
-                          ? "border-lav-500 bg-lav-500 text-white"
+                          ? "border-lav-700 bg-lav-700 text-white"
                           : "border-line text-transparent"
                       }`}
                     >
