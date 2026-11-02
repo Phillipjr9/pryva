@@ -293,8 +293,11 @@ a detector may **observe** and may **throttle**, but may not decide.
 
 ## 6. Reporting a vulnerability
 
-Email or message through <https://pryva.ng/contact> with as much detail as you
-can, and **do not** test against a live account that is not yours, run automated
-scanners against the site, or attempt to extract other customers' data. A report
-that stops at "this looks wrong, here is how to reproduce" is worth more than one
-that proved it on someone's wallet. `/.well-known/security.txt` points here.
+Use the Contact page (`/contact`) on the deployment you are reporting about, with
+as much detail as you can, and **do not** test against a live account that is not
+yours, run automated scanners against the site, or attempt to extract other
+customers' data. A report that stops at "this looks wrong, here is how to
+reproduce" is worth more than one that proved it on someone's wallet.
+`/.well-known/security.txt` publishes the absolute contact for whichever origin
+is serving the site; it is generated from `canonicalSiteUrl()` rather than a
+static file, so it never points at an unattached domain.

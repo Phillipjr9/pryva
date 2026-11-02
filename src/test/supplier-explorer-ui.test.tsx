@@ -47,6 +47,24 @@ describe("service explorer live listings", () => {
     expect(within(card).getByText(/from ₦1,600/)).toBeTruthy();
   });
 
+  it("offers every listing at once instead of hiding the catalogue behind pagination", async () => {
+    // 199 Nigerian listings were reachable only twelve at a time: it looked
+    // like services were missing, when they were merely behind "Show more".
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, country: "ng", items: [] }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="ng" initialCategory="all" />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    expect(document.body.textContent).toContain("Showing 12 of");
+    const before = document.querySelectorAll("article").length;
+    expect(before).toBe(12);
+
+    fireEvent.click(screen.getByRole("button", { name: /Show all/ }));
+    expect(document.querySelectorAll("article").length).toBeGreaterThan(before);
+    expect(screen.queryByRole("button", { name: /Show all/ })).toBeNull();
+    expect(document.body.textContent).toContain("Not tracked");
+    expect(document.body.textContent).toContain("Orders page");
+  });
+
   it("requests the live catalog and never a demo endpoint", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, country: "us", items: [] }) });
     vi.stubGlobal("fetch", fetchMock);

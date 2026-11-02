@@ -403,7 +403,9 @@ export function ServiceExplorer({
               <div>
                 <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Sparkle className="h-3.5 w-3.5" /> Step 03</p>
                 <h2 id="services-title" className="mt-1 text-[1.05rem] font-semibold text-ink">{selectedCategory ? `Explore ${selectedCategory.label}` : "Explore services"}</h2>
-                <p aria-live="polite" className="mt-1 text-meta text-ink-3">{filtered.length} {`listing${filtered.length === 1 ? "" : "s"} and examples`} · {selectedCountry.name} selected</p>
+                <p aria-live="polite" className="mt-1 text-meta text-ink-3">
+                  Showing {Math.min(visible, filtered.length)} of {filtered.length} {`listing${filtered.length === 1 ? "" : "s"} and examples`} · {selectedCountry.name} selected
+                </p>
                 {liveState?.country === country && liveState.fetchedAt && <p className="mt-1 text-micro text-ink-3">Stock checked: <time dateTime={liveState.fetchedAt}>{new Date(liveState.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
               </div>
               <div className="relative w-full sm:max-w-[260px]">
@@ -431,11 +433,17 @@ export function ServiceExplorer({
               </div>
             )}
             {visible < filtered.length && (
-              <div className="mt-5 text-center">
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
                 <button type="button" onClick={() => setVisible((current) => current + PAGE_SIZE)} className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2.5 text-meta font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-lav-700">Show more <span className="text-ink-3">({filtered.length - visible} remaining)</span></button>
+                <button type="button" onClick={() => setVisible(filtered.length)} className="inline-flex items-center gap-2 rounded-full border border-lav-200 bg-lav-50 px-4 py-2.5 text-meta font-semibold text-lav-800 transition-colors hover:border-lav-400">Show all {filtered.length}</button>
               </div>
             )}
-            <p className="mt-5 border-t border-line pt-4 text-micro leading-relaxed text-ink-3">Stock means available inventory. My units means your remaining purchased units. Unknown and not tracked are not the same as zero. Examples do not imply platform support or verified coverage.</p>
+            <p className="mt-5 border-t border-line pt-4 text-micro leading-relaxed text-ink-3">
+              Stock means available inventory. My units means your remaining purchased units; this catalog does not track
+              them yet, so <strong className="font-semibold">Not tracked</strong> means unknown, not zero — your bought
+              units are on the <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">Orders page</Link>.
+              Examples do not imply platform support or verified coverage.
+            </p>
           </section>
         </>
       )}

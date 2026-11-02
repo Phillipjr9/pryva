@@ -107,6 +107,8 @@ describe("/esim does not contradict itself", () => {
     expect(markup).toContain("See live eSIM plans");
     expect(markup).toContain("Activation code on your order");
     expect(markup).toContain("Yes. Live plans are listed");
+    expect(markup).toContain("Coverage is read live from the network");
+    expect(markup).not.toContain("The catalog lists plans for these regions");
     expect(markup).not.toContain("Not available yet");
     expect(markup).not.toContain("eSIM plans cannot be delivered yet");
     expect(markup).not.toContain("eSIM plans are not available for purchase yet");
@@ -121,6 +123,8 @@ describe("/esim does not contradict itself", () => {
     const markup = renderToStaticMarkup(<ESIMPage />);
     expect(markup).toContain("Not available yet");
     expect(markup).toContain("eSIM plans cannot be delivered yet");
+    expect(markup).toContain("The catalog lists plans for these regions");
     expect(markup).not.toContain("See live eSIM plans");
+    expect(markup).not.toContain("Coverage is read live from the network");
   });
 });

@@ -85,7 +85,9 @@ export default function ESIMPage() {
         <div className="shell">
           <h2 className="mb-3 text-[1.75rem] font-semibold text-ink">Destinations</h2>
           <p className="mb-6 max-w-2xl text-[0.95rem] text-ink-2">
-            The catalog lists plans for these regions with high-speed global and local data coverage.
+            {live
+              ? "Coverage is read live from the network before you buy, so check the dashboard for the destinations on sale right now. These are examples of commonly covered regions."
+              : "The catalog lists plans for these regions with high-speed global and local data coverage."}
           </p>
           <CountryChips
             codes={[

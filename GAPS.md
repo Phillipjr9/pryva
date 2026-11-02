@@ -47,7 +47,7 @@ so whether the URL is set remains an operator check.
 The API shows 127 runs; the last 100 are all `failure`, each finishing in about two
 seconds with **zero steps**. The job annotation is explicit: *"The job was not
 started because your account is locked due to a billing issue."* The suite is
-strong (**1,843 tests / 197 files**) and worthless if a red build can be merged.
+strong (**1,845 tests / 197 files**) and worthless if a red build can be merged.
 *Unblocks:* billing on the GitHub account, or a second runner. Nothing in the code.
 
 ### 4. Email ownership is never required — **closed at the payout boundary**
@@ -92,7 +92,8 @@ production/deployment host → a local-only fallback. Placeholder values such as
 blank instead of shipping a placeholder, and documents `RESTORE_DATABASE_URL`.
 *Still needs the owner:* attach `pryva.ng` (or set `NEXT_PUBLIC_SITE_URL` to the
 domain actually serving the site) so crawlers see the canonical brand domain.
-Also still hardcoded: `public/.well-known/security.txt`.
+`public/.well-known/security.txt` also hardcoded that dead domain; section D
+below records its move to the shared resolver.
 
 ### B. Public pages promised what checkout refuses — **fixed in code**
 `/status` said "Digital subscriptions, data, bulk and scheduled orders —
@@ -134,6 +135,25 @@ has to add real product IDs and complete a staging purchase — see
 `SUPPLIER-PRODUCTS.md`. Per-app verification codes remain read-only because paid
 Fleexa purchases are still deliberately off until app/country mapping and
 reconciliation are verified.
+
+### D. Hidden listings, untracked units and a dead security contact — **fixed**
+The service hub built 199 listings for Nigeria but rendered only 12 at a time,
+so whole families looked absent. It now says *"Showing X of Y listings"* and has
+a **Show all** control beside *Show more*, and the units footer says plainly that
+"Not tracked" means unknown (not zero) and points at the Orders page for bought
+units. `security.txt` was a static file whose `Contact` and `Canonical` pointed
+at the unattached `https://pryva.ng`, giving a researcher nowhere to report a
+problem; it is now served from `src/app/.well-known/security.txt/route.ts` using
+`canonicalSiteUrl()`, and `security-posture.test.ts` asserts it follows a live
+host. `/esim`'s destination paragraph is now live-aware too.
+
+Three suspected gaps were checked and are **not** gaps: `/status` has exactly one
+"Temporary email inboxes" row (the catalogue has no `email-otp` plans, so the
+label map never produces a second row — the extra HTML hits are React's flight
+payload); `/esim`'s `service.description` was already switched by the live gate;
+and `service.intro` is not rendered on any page. Gift cards being absent from the
+hub and eSIM having no static hub rows are deliberate, with guards in
+`service-explorer.test.tsx` and `dashboard-nav-coverage.test.tsx`.
 
 ## P1 — the gaps a customer will meet
 
@@ -208,7 +228,7 @@ it — after the fact, if they are looking.
 | 22 | `npm audit`: 20 moderate | Re-verified 2 November: production dependencies clean (`npm audit --omit=dev` → 0); all 20 moderates are dev-only, in the lint/test chain. |
 | 23 | GitHub Actions | See P0.3 — the same billing block means no scheduled dependency audit either. |
 | 24 | Browser error tracking and error boundaries | No `error.tsx`, `global-error.tsx` or `ErrorBoundary` anywhere; only `not-found.tsx`. Unhandled render errors fall through to Next's default page, and nothing reports a browser exception. |
-| 25 | End-to-end and live-stack tests | 1,843 tests on jsdom + in-process PGlite with mocked providers. No Playwright/Cypress, no separate PostgreSQL server, no multi-instance or live supplier-sandbox pass. |
+| 25 | End-to-end and live-stack tests | 1,845 tests on jsdom + in-process PGlite with mocked providers. No Playwright/Cypress, no separate PostgreSQL server, no multi-instance or live supplier-sandbox pass. |
 | 26 | Documentation drift | 12 docs / ~6,350 lines with no single current-state index. `AUDIT.md` O4 still said "no `.github/workflows`"; `migrations/README.md`'s prose stopped at `0020` while `0030` exists; `STATUS.md` (31 Oct) says scheduled orders have no management screen while `SERVICES-COMPLETENESS.md` (1 Nov) says it is fixed. The three concrete contradictions are annotated now, but the older review files are historical. |
 | 27 | Three stale open PRs | #34 (docs-only correction), #17 (CI gate, effectively already on `main`), #8 (payment UI, 16 files). Merge or close so the queue means something. |
 | 28 | Repo hygiene | No LICENSE, CONTRIBUTING, CHANGELOG, CODEOWNERS, `.nvmrc`/`engines`, dependabot or PR/issue templates. One ESLint warning remains (`InboxManager.tsx:131`, missing `useEffect` dependency). |
@@ -239,7 +259,7 @@ whether the Paystack/Resend/supplier webhooks are registered.
 
 ## Verified in this pass (2 November 2026)
 
-`npm ci` clean · `typecheck` 0 errors · `lint` 0 errors / 1 warning · **1,843
+`npm ci` clean · `typecheck` 0 errors · `lint` 0 errors / 1 warning · **1,845
 tests / 197 files pass** · `pricing:audit -- --check` (37 plans, all inside the
 30–50% band) · production `build` succeeds · `npm audit --omit=dev` → 0
 vulnerabilities. All internal `href`s resolve to a real page; no TODO/FIXME
