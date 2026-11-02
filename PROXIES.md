@@ -65,15 +65,23 @@ The block is a supplier-side answer, not our code. In preference order:
 
 ## A second thing worth knowing: price
 
-The supplier's public starting price for residential proxies is **₦500/GB**
-(`llms.txt`: "Residential Proxies | ₦500/GB"). Our cost sheet assumes **₦2,690/GB**
-for the smallest Nigeria plan and ₦2,000/GB at the 25GB tier. If ₦500/GB is real
-for the product we would resell, our quoted cost sits above the supplier's own
-retail, and every proxy margin in `PRICING.md` is fiction.
+The supplier's own proxy page states **₦500 per GB** (≈$0.31/GB) as its starting
+price, with HTTP, HTTPS and SOCKS5 and instant delivery to the dashboard — and it
+publishes a comparison table against Bright Data and Geonode on that basis.
 
-Selling prices are the owner's call and are unchanged. But the *cost* column needs
-a real quote before any proxy plan is sold, or the profit figure shown on the
-comparison page is a number we invented.
+Our cost sheet assumes **₦2,690/GB** for the smallest Nigeria plan, falling to
+₦2,000/GB at the 25GB tier. So the quoted cost is about **5× the supplier's own
+retail**, and the selling prices (₦3,650–₦67,500, i.e. ₦3,650–₦2,700/GB) sit at
+roughly **7×** what a customer could pay the supplier directly.
+
+That is not a margin problem, it is a positioning problem: the supplier is a
+public Nigerian site, a customer may well find it, and anyone who does will not
+pay seven times the list price for the same bandwidth. Selling prices remain the
+owner's call and are unchanged here — but two things need a decision before a
+proxy plan goes on sale:
+
+1. Replace the cost column with a real, written quote.
+2. Revisit the price ladder, or be able to explain the premium.
 
 ## If the family turns out to be open
 
@@ -125,3 +133,18 @@ Costs already modelled (see `PRICING.md`): ₦2,690/GB Nigeria down to ₦2,000/
 the 25GB tier, priced at ₦3,650–₦67,500. Those are assumptions, and the
 supplier's own ₦500/GB starting price suggests they are too high — so a written
 quote is needed alongside the endpoint answer, not after it.
+
+## Message to send the supplier
+
+Short, one question, no account details:
+
+> Hello — I buy numbers, rentals and email OTP from you through the /developer
+> API and it works well. Do you also expose **residential proxy** purchases
+> through that API? If so, which endpoints should I call to list proxy plans,
+> buy one, read its usage and cancel it? If proxies are dashboard-only for now,
+> is API access planned, and would you share a written per-GB price for API
+> customers?
+
+Send to `t.me/fleexasupport` or `hello@fleexa.com.ng`. The answer decides which
+of the three paths above applies, and if it is "yes", the change is confined to
+`PROXY_PATH` and the field aliases in `src/lib/fleexa.ts`.
