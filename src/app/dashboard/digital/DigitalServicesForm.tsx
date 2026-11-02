@@ -5,21 +5,25 @@ import { type DigitalService } from "@/lib/digital-services";
 import { formatNaira } from "@/lib/catalog";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import type { PublicUser } from "@/lib/auth";
+import { MappedProductBuyButton } from "@/components/purchase/MappedProductBuyButton";
 
 interface DigitalServicesFormProps {
   user: PublicUser;
   service: DigitalService;
   countryCode?: string;
   backHref?: string;
+  /** Server-computed: our own plan IDs mapped to a verified supplier product. */
+  mappedPlanIds?: string[];
+  enabled?: boolean;
 }
 
-export function DigitalServicesForm({ user, service, countryCode, backHref = "/dashboard/digital" }: DigitalServicesFormProps) {
+export function DigitalServicesForm({ user, service, countryCode, backHref = "/dashboard/digital", mappedPlanIds = [], enabled = false }: DigitalServicesFormProps) {
   const [selection, setSelection] = useState<{ service: string; country: string | undefined; plan: string } | null>(null);
   const selectedPlan = selection?.service === service.slug && selection.country === countryCode ? selection.plan : null;
   const selectedPlanData = service.plans.find((p) => p.id === selectedPlan);
 
-  // Digital subscriptions have no supplier path, so this form is browse-only:
-  // there is deliberately no submit and nothing can be ordered or charged.
+  // Without a mapped supplier product this form stays browse-only: no submit,
+  // and nothing can be ordered or charged.
 
   return (
     <>
@@ -32,7 +36,11 @@ export function DigitalServicesForm({ user, service, countryCode, backHref = "/d
           <ServiceIcon service={service.slug as any} size="lg" />
           <div>
             <h2 className="text-xl font-bold text-ink">{service.name}</h2>
-            <p className="text-sm text-ink-3">Digital subscriptions are not available for purchase yet.</p>
+            <p className="text-sm text-ink-3">
+              {enabled
+                ? "Choose a verified plan to buy from your wallet. Delivery codes appear on the order."
+                : "Digital subscriptions are not available for purchase yet."}
+            </p>
           </div>
         </div>
       </div>
@@ -101,13 +109,25 @@ export function DigitalServicesForm({ user, service, countryCode, backHref = "/d
       </div>
 
       {/* Purchase Button */}
-      <button
-        type="button"
-        disabled
-        className="btn btn-primary w-full text-lg py-4 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        Digital subscriptions are not available yet
-      </button>
+      {enabled && selectedPlanData && mappedPlanIds.includes(selectedPlanData.id) ? (
+        <MappedProductBuyButton
+          family="subscriptions"
+          planId={selectedPlanData.id}
+          name={`${service.name} ${selectedPlanData.name}`}
+          price={selectedPlanData.price}
+          walletBalance={user.walletBalance}
+        />
+      ) : (
+        <button
+          type="button"
+          disabled
+          className="btn btn-primary w-full text-lg py-4 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {enabled
+            ? selectedPlanData ? "This plan isn't available for delivery yet" : "Select a plan"
+            : "Digital subscriptions are not available yet"}
+        </button>
+      )}
     </div>
     </>
   );

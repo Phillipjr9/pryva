@@ -40,6 +40,17 @@ disagreement is named.
 | 14 | Mobile data & airtime | No | No supplier | n/a | **Not sellable, correctly** |
 | 15 | Subscriptions / digital products | No | No supplier | n/a | **Not sellable, correctly** |
 
+> **Update, 2 November 2026.** Rows 12, 13, 14 and 15 are still accurate about
+> *today*: the mapping file ships empty and nothing in those families is
+> sellable. But the code behind 13–15 is no longer "no purchase route": data,
+> subscriptions and proxies now share a fail-closed FoxReload-backed path
+> (`src/lib/mapped-purchase.ts`) gated by the server-side
+> `PRODUCT_MAPPINGS_JSON` value (the committed `data/product-mappings.json` is
+> only an empty template). The verdict flips to "sellable" only after an operator adds verified product IDs
+> and completes a staging purchase. Row 12 (per-app verification) is unchanged:
+> paid Fleexa purchases remain deliberately off. See `SUPPLIER-PRODUCTS.md` and
+> `GAPS.md` section C.
+
 ---
 
 ## 1. Virtual numbers for SMS verification — complete

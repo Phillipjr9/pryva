@@ -1,23 +1,18 @@
-import { NextResponse } from "next/server";
-import { requireAuthApi } from "@/lib/auth";
+import { purchaseMappedProduct } from "@/lib/mapped-purchase";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /**
  * POST /api/airtime/purchase
  *
- * Mobile data has no fulfilment path, so this fails closed in every environment:
- * nothing is reserved and no wallet is debited. The endpoint stays mounted so
- * callers receive an actionable 503 instead of a 404, and so enabling data means
- * adding real fulfilment here rather than removing a gate.
+ * Mobile data used to be a permanent 503 with no supplier behind it. It now
+ * shares the FoxReload-backed purchase path with subscriptions and proxies: a
+ * plan is sellable only when an operator has mapped it to a real, code-delivering
+ * supplier product and the supplier key is configured. With an empty mapping
+ * file this still refuses every request, but the 503 now names exactly what is
+ * missing instead of saying only "not available yet".
  */
-export async function POST() {
-  const user = await requireAuthApi();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  return NextResponse.json(
-    { error: "Data purchases are not available yet." },
-    { status: 503 },
-  );
+export async function POST(request: Request) {
+  return purchaseMappedProduct(request, "data");
 }

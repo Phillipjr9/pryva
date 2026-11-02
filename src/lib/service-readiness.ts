@@ -6,6 +6,7 @@ import { isFleexaConfigured } from "@/lib/fleexa";
 import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
 import { isSmmPanelConfigured } from "@/lib/smm-panel";
 import { EXPLORER_CATEGORIES } from "@/lib/service-explorer";
+import { mappedPlanIds, mappedPurchasesEnabled } from "@/lib/product-mappings";
 import { orderByReadiness, type ServiceReadinessEntry } from "@/lib/service-states";
 
 /**
@@ -26,6 +27,12 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
   const boosting = isSmmPanelConfigured();
   const accounts = isMarketplaceCheckoutConfigured();
   const esim = isBitcallConfigured();
+  // The three catalogue-only families share one FoxReload-backed gate. Ask it
+  // here rather than hard-coding "unavailable": once an operator maps a verified
+  // product, the hub, /status and checkout must agree on the same answer.
+  const mappedProxies = mappedPurchasesEnabled("proxies");
+  const mappedSubscriptions = mappedPurchasesEnabled("subscriptions");
+  const mappedData = mappedPurchasesEnabled("data");
 
   const entries: ServiceReadinessEntry[] = [
     {
@@ -63,8 +70,10 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
     {
       id: "proxies",
       label: "Proxies",
-      state: "unavailable",
-      detail: "No proxy supplier is connected, so no proxy plan can be ordered or charged.",
+      state: mappedProxies ? "buy" : "unavailable",
+      detail: mappedProxies
+        ? `${mappedPlanIds("proxies").length} verified proxy product${mappedPlanIds("proxies").length === 1 ? "" : "s"} can be bought from your wallet and delivered as a code.`
+        : "No proxy supplier is connected, so no proxy plan can be ordered or charged.",
     },
     {
       id: "email",
@@ -85,14 +94,18 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
     {
       id: "subscriptions",
       label: "Subscriptions",
-      state: "unavailable",
-      detail: "No subscription supplier is connected. Prices here are examples, not offers.",
+      state: mappedSubscriptions ? "buy" : "unavailable",
+      detail: mappedSubscriptions
+        ? `${mappedPlanIds("subscriptions").length} verified subscription product${mappedPlanIds("subscriptions").length === 1 ? "" : "s"} can be bought from your wallet and delivered as a code.`
+        : "No subscription supplier is connected. Prices here are examples, not offers.",
     },
     {
       id: "data",
       label: "Mobile data",
-      state: "unavailable",
-      detail: "Data plans are catalogued, but no supplier is connected to deliver them.",
+      state: mappedData ? "buy" : "unavailable",
+      detail: mappedData
+        ? `${mappedPlanIds("data").length} verified data product${mappedPlanIds("data").length === 1 ? "" : "s"} can be bought from your wallet and delivered as a code.`
+        : "Data plans are catalogued, but no supplier is connected to deliver them.",
     },
     {
       id: "tools",

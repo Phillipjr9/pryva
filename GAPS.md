@@ -47,7 +47,7 @@ so whether the URL is set remains an operator check.
 The API shows 127 runs; the last 100 are all `failure`, each finishing in about two
 seconds with **zero steps**. The job annotation is explicit: *"The job was not
 started because your account is locked due to a billing issue."* The suite is
-strong (**1,823 tests / 195 files**) and worthless if a red build can be merged.
+strong (**1,843 tests / 197 files**) and worthless if a red build can be merged.
 *Unblocks:* billing on the GitHub account, or a second runner. Nothing in the code.
 
 ### 4. Email ownership is never required — **closed at the payout boundary**
@@ -109,6 +109,31 @@ gate, and the stale "Scheduled ordering is not launched yet" verdict in
 since 1 November. `content-integrity.test.tsx`,
 `public-availability-copy.test.tsx` and `site-url.test.ts` now fail if any of this
 drifts back.
+
+### C. Three catalogue families had no supplier path — **wired, still disabled**
+Data, subscriptions and proxies had written prices and no way to deliver anything:
+two purchase routes were permanent 503s and proxies had no route at all. On the
+owner's decision to use the already-integrated FoxReload account,
+`src/lib/product-mappings.ts` and `src/lib/mapped-purchase.ts` now provide one
+fail-closed path shared by `/api/airtime/purchase`, `/api/digital/purchase` and
+`/api/proxies/purchase`. Real product IDs go in the server-side
+`PRODUCT_MAPPINGS_JSON` variable, **not** the committed template
+`data/product-mappings.json` — this repository is public, and the owner rule
+against revealing sourcing is enforced by `supplier-secrecy.test.ts` in every
+user-facing file and client bundle. Customer-facing 503s are therefore neutral;
+`GET /api/diagnostics/product-mappings` gives the operator the exact list.
+`readServiceReadiness()` asks the same gate, so the hub and `/status` flip to
+"Available" only when a family has a verified product. The purchase sequence
+reuses the gift-card route's FoxReload order/pay/poll flow and its debit-then-
+refund compensation, adds a live pre-flight check that the product delivers a
+**code** (direct top-ups are refused), converts the supplier price to naira and
+applies `checkMargin()` before any wallet debit. `GET
+/api/diagnostics/product-mappings` reports exactly what is missing.
+**The mapping file ships empty, so nothing became sellable.** An operator still
+has to add real product IDs and complete a staging purchase — see
+`SUPPLIER-PRODUCTS.md`. Per-app verification codes remain read-only because paid
+Fleexa purchases are still deliberately off until app/country mapping and
+reconciliation are verified.
 
 ## P1 — the gaps a customer will meet
 
@@ -173,9 +198,9 @@ it — after the fact, if they are looking.
 |---|---|---|
 | 13 | Notification preferences | Notifications exist (`/api/notifications`); no way to opt out of email. |
 | 14 | A welcome email | `welcomeEmail()` exists, uncalled. Signup sends verification instead. |
-| 15 | Residential proxies | No supplier. Catalogue only, and the copy now says so. |
-| 16 | Mobile data & airtime | No supplier; both routes fail closed with an actionable 503. |
-| 17 | Subscriptions / digital products | No supplier. |
+| 15 | Residential proxies — **code wired, not enabled** | A FoxReload-backed `/api/proxies/purchase` now exists. Still no verified product in `data/product-mappings.json`, so every plan stays unpurchasable. See section C. |
+| 16 | Mobile data & airtime — **code wired, not enabled** | `/api/airtime/purchase` now maps verified code-delivering FoxReload products. Direct top-ups are deliberately refused (no recipient contract). No mapping yet. |
+| 17 | Subscriptions / digital products — **code wired, not enabled** | `/api/digital/purchase` uses the same mapped path; no verified product yet. |
 | 18 | Per-app verification codes | `vn-otp-5` is listed with no app mapping; not sellable. |
 | 19 | Search across orders and services — **closed** | Was "nothing searches". `GET /api/search` plus the ⌘K/Ctrl+K command palette search the visitor's orders, wallet transactions and gift cards; `ServiceExplorer` searches services. This row was stale, not a gap. |
 | 20 | Dead templates | `welcomeEmail`, `orderConfirmationEmail`, `refundEmail`, `walletTopupEmail` render nothing anywhere — only `logo-removal.test.tsx` imports them. Delete or wire, don't leave them to imply coverage. |
@@ -183,7 +208,7 @@ it — after the fact, if they are looking.
 | 22 | `npm audit`: 20 moderate | Re-verified 2 November: production dependencies clean (`npm audit --omit=dev` → 0); all 20 moderates are dev-only, in the lint/test chain. |
 | 23 | GitHub Actions | See P0.3 — the same billing block means no scheduled dependency audit either. |
 | 24 | Browser error tracking and error boundaries | No `error.tsx`, `global-error.tsx` or `ErrorBoundary` anywhere; only `not-found.tsx`. Unhandled render errors fall through to Next's default page, and nothing reports a browser exception. |
-| 25 | End-to-end and live-stack tests | 1,823 tests on jsdom + in-process PGlite with mocked providers. No Playwright/Cypress, no separate PostgreSQL server, no multi-instance or live supplier-sandbox pass. |
+| 25 | End-to-end and live-stack tests | 1,843 tests on jsdom + in-process PGlite with mocked providers. No Playwright/Cypress, no separate PostgreSQL server, no multi-instance or live supplier-sandbox pass. |
 | 26 | Documentation drift | 12 docs / ~6,350 lines with no single current-state index. `AUDIT.md` O4 still said "no `.github/workflows`"; `migrations/README.md`'s prose stopped at `0020` while `0030` exists; `STATUS.md` (31 Oct) says scheduled orders have no management screen while `SERVICES-COMPLETENESS.md` (1 Nov) says it is fixed. The three concrete contradictions are annotated now, but the older review files are historical. |
 | 27 | Three stale open PRs | #34 (docs-only correction), #17 (CI gate, effectively already on `main`), #8 (payment UI, 16 files). Merge or close so the queue means something. |
 | 28 | Repo hygiene | No LICENSE, CONTRIBUTING, CHANGELOG, CODEOWNERS, `.nvmrc`/`engines`, dependabot or PR/issue templates. One ESLint warning remains (`InboxManager.tsx:131`, missing `useEffect` dependency). |
@@ -214,8 +239,8 @@ whether the Paystack/Resend/supplier webhooks are registered.
 
 ## Verified in this pass (2 November 2026)
 
-`npm ci` clean · `typecheck` 0 errors · `lint` 0 errors / 1 warning · **1,823
-tests / 195 files pass** · `pricing:audit -- --check` (37 plans, all inside the
+`npm ci` clean · `typecheck` 0 errors · `lint` 0 errors / 1 warning · **1,843
+tests / 197 files pass** · `pricing:audit -- --check` (37 plans, all inside the
 30–50% band) · production `build` succeeds · `npm audit --omit=dev` → 0
 vulnerabilities. All internal `href`s resolve to a real page; no TODO/FIXME
 stubs; every key in `.env.example` is read by code.

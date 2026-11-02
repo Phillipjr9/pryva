@@ -5,16 +5,21 @@ import { dataPlans, findDataPlan, type AirtimeProvider } from "@/lib/airtime";
 import { formatNaira } from "@/lib/catalog";
 import type { PublicUser } from "@/lib/auth";
 import { NetworkBadge } from "@/components/NetworkBadge";
+import { MappedProductBuyButton } from "@/components/purchase/MappedProductBuyButton";
 
 interface DataPlansFormProps {
   user: PublicUser;
   initialPlanId?: string;
+  /** Server-computed: our own plan IDs mapped to a verified supplier product. */
+  mappedPlanIds?: string[];
+  enabled?: boolean;
 }
 
-export function DataPlansForm({ user, initialPlanId }: DataPlansFormProps) {
+export function DataPlansForm({ user, initialPlanId, mappedPlanIds = [], enabled = false }: DataPlansFormProps) {
   const initialPlan = initialPlanId ? findDataPlan(initialPlanId) : undefined;
   const [selectedProvider, setSelectedProvider] = useState<AirtimeProvider>(initialPlan?.provider ?? "mtn");
   const [selectedPlan, setSelectedPlan] = useState<string | null>(initialPlan?.id ?? null);
+  const selected = selectedPlan ? findDataPlan(selectedPlan) : undefined;
 
   const providers: { id: AirtimeProvider; name: string }[] = [
     { id: "mtn", name: "MTN" },
@@ -87,9 +92,11 @@ export function DataPlansForm({ user, initialPlanId }: DataPlansFormProps) {
         </div>
       </div>
 
-      <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-meta text-amber-900">
-        Data plans cannot be delivered yet, so nothing on this page can be ordered or charged.
-      </p>
+      {!enabled && (
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-meta text-amber-900">
+          Data plans cannot be delivered yet, so nothing on this page can be ordered or charged.
+        </p>
+      )}
 
       {/* Wallet Balance */}
       <div className="rounded-xl border border-line bg-cream p-4">
@@ -100,13 +107,25 @@ export function DataPlansForm({ user, initialPlanId }: DataPlansFormProps) {
       </div>
 
       {/* Purchase Button */}
-      <button
-        type="button"
-        disabled
-        className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        Data plans are not available yet
-      </button>
+      {enabled && selected && mappedPlanIds.includes(selected.id) ? (
+        <MappedProductBuyButton
+          family="data"
+          planId={selected.id}
+          name={selected.name}
+          price={selected.price}
+          walletBalance={user.walletBalance}
+        />
+      ) : (
+        <button
+          type="button"
+          disabled
+          className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {enabled
+            ? selected ? "This plan isn't available for delivery yet" : "Select a data plan"
+            : "Data plans are not available yet"}
+        </button>
+      )}
     </div>
   );
 }

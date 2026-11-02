@@ -1,0 +1,5 @@
+{
+  "schema": 1,
+  "readme": "Template only. Maps a Pryva catalogue plan to one verified, code-delivering product ID. Empty by default: nothing in the data, subscriptions or proxies families can be ordered or charged until a real ID is supplied at deploy time. Each entry needs family (data|subscriptions|proxies), planId (an id that already exists in the Pryva catalogue) and productId (the id from the configured fulfilment catalogue). Only products whose live deliveryType is 'code' are sellable. The repository is public: real IDs belong in the PRODUCT_MAPPINGS_JSON environment variable, never in a committed file. See SUPPLIER-PRODUCTS.md.",
+  "products": []
+}

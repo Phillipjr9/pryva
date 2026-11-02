@@ -7,6 +7,8 @@ import { isPlanFulfillable } from "@/lib/fulfillment";
 import { canPreviewPlan, explorerCountry } from "@/lib/service-explorer";
 import { CountryFlag } from "@/components/CountryFlag";
 import { PlanPurchase } from "@/components/purchase/PlanPurchase";
+import { MappedProductBuyButton } from "@/components/purchase/MappedProductBuyButton";
+import { mappedPlanIds, mappedPurchasesEnabled } from "@/lib/product-mappings";
 
 export const metadata: Metadata = { title: "Plan details" };
 export const dynamic = "force-dynamic";
@@ -33,6 +35,11 @@ export default async function DashboardPlanPage({
    * it — the same rule `/api/orders` enforces server-side.
    */
   const fulfillable = isPlanFulfillable(plan.slug);
+  // Proxies use the mapped FoxReload path, not /api/orders. A plan is only
+  // buyable here when an operator has verified a real supplier product for it.
+  const proxyBuyable = plan.service === "proxies"
+    && mappedPurchasesEnabled("proxies")
+    && mappedPlanIds("proxies").includes(plan.slug);
 
   return (
     <div className="grid gap-5">
@@ -56,6 +63,20 @@ export default async function DashboardPlanPage({
             signedIn
             walletBalance={user.walletBalance}
             nextPath={back}
+          />
+        </>
+      ) : proxyBuyable ? (
+        <>
+          <div role="note" className="rounded-2xl border border-line bg-white p-4 text-meta leading-relaxed text-ink-2">
+            Delivered as a code once payment is taken from your wallet.
+            The code appears on the order as soon as it arrives.
+          </div>
+          <MappedProductBuyButton
+            family="proxies"
+            planId={plan.slug}
+            name={plan.name}
+            price={plan.price}
+            walletBalance={user.walletBalance}
           />
         </>
       ) : (

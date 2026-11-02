@@ -1,23 +1,15 @@
-import { NextResponse } from "next/server";
-import { requireAuthApi } from "@/lib/auth";
+import { purchaseMappedProduct } from "@/lib/mapped-purchase";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /**
  * POST /api/digital/purchase
  *
- * No account provider is connected for digital subscriptions, so this fails
- * closed in every environment. A placeholder delivery must never debit a real
- * wallet; the endpoint stays mounted so callers get an actionable 503 rather
- * than a 404.
+ * Digital subscriptions used to be a permanent 503 with no supplier behind it.
+ * See /api/airtime/purchase: both now use the same mapped, fail-closed FoxReload
+ * path, and an unmapped plan still cannot be ordered or charged.
  */
-export async function POST() {
-  const user = await requireAuthApi();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  return NextResponse.json(
-    { error: "Digital purchases are not available yet." },
-    { status: 503 },
-  );
+export async function POST(request: Request) {
+  return purchaseMappedProduct(request, "subscriptions");
 }

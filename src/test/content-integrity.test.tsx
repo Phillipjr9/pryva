@@ -57,7 +57,9 @@ describe("public content integrity", () => {
     // The old row said "Digital subscriptions, data, bulk and scheduled orders
     // — Available — processed automatically through verified provider
     // integration" while /api/digital/purchase and /api/airtime/purchase were
-    // permanent 503s. Those two rows must come from the readiness verdicts.
+    // permanent 503s. Those routes now share a fail-closed, mapped supplier
+    // path, but the shipping mapping is empty, so the verdict must still be
+    // driven by readServiceReadiness() rather than a hard-coded "Available".
     expect(html).not.toContain("Digital subscriptions, data, bulk and scheduled orders");
     expect(html).not.toContain("processed automatically through verified provider integration");
 

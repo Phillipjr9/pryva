@@ -8,6 +8,7 @@ import { DigitalServicesForm } from "./DigitalServicesForm";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { ArrowRight, Shield } from "@/components/icons";
 import { explorerCountry } from "@/lib/service-explorer";
+import { mappedPlanIds, mappedPurchasesEnabled } from "@/lib/product-mappings";
 
 export const metadata: Metadata = { title: "Subscriptions" };
 export const dynamic = "force-dynamic";
@@ -27,6 +28,8 @@ export default async function DigitalServicesPage({
   // A bad deep link must not silently render or purchase a different service.
   if ((query.service !== undefined && !selectedService) || (query.country !== undefined && !country)) notFound();
   const allSubscriptions = country ? `/dashboard/digital?country=${country.code}` : "/dashboard/digital";
+  const enabled = mappedPurchasesEnabled("subscriptions");
+  const buyablePlanIds = enabled ? mappedPlanIds("subscriptions") : [];
 
   return (
     <div className="grid gap-4">
@@ -37,9 +40,11 @@ export default async function DigitalServicesPage({
             {selectedService ? selectedService.name : "Premium subscriptions"}
           </h1>
           <p className="mt-1 max-w-xl text-[0.86rem] text-ink-2">
-            {selectedService
-              ? "Compare catalog plans. Digital subscriptions cannot be delivered yet."
-              : "Explore subscription examples. Digital subscriptions cannot be delivered yet."}
+            {enabled
+              ? "Buy a verified plan from your wallet. Delivery codes appear on the order."
+              : selectedService
+                ? "Compare catalog plans. Digital subscriptions cannot be delivered yet."
+                : "Explore subscription examples. Digital subscriptions cannot be delivered yet."}
           </p>
           {country && <p className="mt-1 text-meta text-ink-3">Browsing for {country.name}. This selection does not confirm real coverage.</p>}
         </div>
@@ -58,7 +63,15 @@ export default async function DigitalServicesPage({
       </div>
 
       {selectedService ? (
-        <DigitalServicesForm key={`${selectedService.slug}:${country?.code ?? ""}`} user={user} service={selectedService} countryCode={country?.code} backHref={allSubscriptions} />
+        <DigitalServicesForm
+          key={`${selectedService.slug}:${country?.code ?? ""}`}
+          user={user}
+          service={selectedService}
+          countryCode={country?.code}
+          backHref={allSubscriptions}
+          mappedPlanIds={buyablePlanIds}
+          enabled={enabled}
+        />
       ) : (
         <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
           {digitalServices.map((service) => (
@@ -77,7 +90,9 @@ export default async function DigitalServicesPage({
                 </div>
               </div>
               <p className="mt-3 text-[0.8rem] leading-relaxed text-ink-2">
-                Not available for purchase yet.
+                {enabled
+                  ? `${service.plans.filter((plan) => buyablePlanIds.includes(plan.id)).length} of ${service.plans.length} plans verified for delivery.`
+                  : "Not available for purchase yet."}
               </p>
               <div className="mt-auto flex items-end justify-between gap-2 pt-3.5">
                 <div>
