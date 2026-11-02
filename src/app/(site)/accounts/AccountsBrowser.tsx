@@ -383,7 +383,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
             className={cn(
               "rounded-full border px-3.5 py-1.5 text-[0.8rem] font-medium transition-colors",
               activeCategory === null
-                ? "border-lav-600 bg-lav-600 text-white"
+                ? "border-lav-600 bg-lav-700 text-white"
                 : "border-line bg-white text-ink-2 hover:border-lav-300",
             )}
           >
@@ -397,7 +397,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
               className={cn(
                 "rounded-full border px-3.5 py-1.5 text-[0.8rem] font-medium transition-colors",
                 activeCategory === category.id
-                  ? "border-lav-600 bg-lav-600 text-white"
+                  ? "border-lav-600 bg-lav-700 text-white"
                   : "border-line bg-white text-ink-2 hover:border-lav-300",
               )}
             >

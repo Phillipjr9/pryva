@@ -322,7 +322,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
                       }`}
                     >
                       {denom.popular && (
-                        <span className="absolute -top-2.5 right-3 rounded-full bg-lav-600 px-2 py-0.5 text-micro font-bold uppercase tracking-wider text-white">
+                        <span className="absolute -top-2.5 right-3 rounded-full bg-lav-700 px-2 py-0.5 text-micro font-bold uppercase tracking-wider text-white">
                           Popular
                         </span>
                       )}
@@ -404,7 +404,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
                     type="button"
                     onClick={handleBrandOrder}
                     disabled={brandOrderLoading || user.walletBalance < selectedDenom.priceNgn}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-lav-700 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                   >
                     <ShoppingCart className="h-5 w-5" />
                     {brandOrderLoading
@@ -541,7 +541,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
               <button
                 onClick={handleCreate}
                 disabled={loading || amount < 1000 || amount > 500000}
-                className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full rounded-xl bg-lav-700 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-800 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? "Creating..." : `Create Gift Card for ${formatNaira(amount)}`}
               </button>
@@ -593,7 +593,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
               <button
                 onClick={handleRedeem}
                 disabled={redeemLoading || !redeemCode}
-                className="w-full rounded-xl bg-lav-600 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full rounded-xl bg-lav-700 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-800 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {redeemLoading ? "Redeeming..." : "Redeem Gift Card"}
               </button>

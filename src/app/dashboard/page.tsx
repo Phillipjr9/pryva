@@ -171,8 +171,11 @@ export default async function DashboardOverviewPage() {
             below more than a screen of scrolling. On phones this is now a compact
             three-up tile grid (four-up from 400px); the note and arrow return at
             `sm`, where each tile has room to be a full row again.
+            From `lg` the panel is the narrow right-hand column of the overview
+            grid — about 330px — so two tiles per row leaves "Residential
+            proxies" rendering as "Resid…". One tile per row again there.
           */}
-          <div className="mt-3 grid grid-cols-3 gap-1.5 min-[400px]:grid-cols-4 sm:grid-cols-2 sm:gap-2">
+          <div className="mt-3 grid grid-cols-3 gap-1.5 min-[400px]:grid-cols-4 sm:grid-cols-2 sm:gap-2 lg:grid-cols-1">
             {serviceTiles.map((item) => (
               <Link
                 key={item.label}
