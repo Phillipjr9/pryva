@@ -53,9 +53,10 @@ on the order page whether or not email delivers. If you would rather require
 verification at first top-up as well, that is a one-line change in the same helper
 (`unverifiedEmailBlocksPayout`, `src/lib/resend-config.ts`).
 
-### 5. Migrations 0028, 0029 and 0030 must be applied
-The eSIM delivery email, number-code email and payout-name approvals each shipped
-with a migration. Deploying the code without them fails at runtime, not at build.
+### 5. Migrations 0028, 0029, 0030 and 0031 must be applied
+The eSIM delivery email, number-code email, payout-name approvals and the boost
+completion email each shipped with a migration. Deploying the code without them
+fails at runtime, not at build.
 *Run:* `npm run db:migrate` against production, then verify with
 `migrations/README.md`'s checks.
 
@@ -71,11 +72,19 @@ Fleexa has no eSIM endpoint; Bitcall is the only path. Your standing rule is tha
 every product fails over. Today an eSIM outage is an eSIM outage.
 *Unblocks:* a second eSIM credential with an activation-code API.
 
-### 7. Boosts have one panel, and a completed boost is never emailed
-`isSmmPanelConfigured()` gates the whole service; there is no second panel. And
-`wallet-email-outbox.ts` has no `boost_complete` event, so delivery is only visible
-on the order page.
-*Unblocks:* a second panel (rare for SMM) and a small outbox event.
+### 7. Boosts have one panel — **the email half is closed**
+A completed boost now emails the customer: migration `0031` adds a `boost_complete`
+outbox event, written by a trigger on `orders` whenever an `smm` row reaches
+`delivered`, and `src/lib/boost-email-template.ts` builds the message. It is built
+from the order — product, units, the link the customer supplied, the reference —
+and names no panel, no supplier and no supplier order id; a test enforces that.
+The trigger is the right place because the state change arrives from two paths
+(`syncBoostOrderStatus` on a page view, `sweepBoostDeliveries` nightly) and would
+arrive from a third if an operator marked one delivered by hand.
+
+What remains is the failover: `isSmmPanelConfigured()` still gates the whole
+service, and there is no second panel.
+*Unblocks:* a second SMM panel credential (rare — most panels are single-account).
 
 ### 8. Resend only works for Bitcall-issued numbers
 `src/lib/otp-resend.ts` asks Bitcall and refuses otherwise, so a Fleexa order whose

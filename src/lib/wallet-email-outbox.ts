@@ -10,6 +10,7 @@ import { createRateLimiter } from "@/lib/rate-limit";
 import { resendConfigured } from "@/lib/resend-config";
 import { makeEsimDeliveryEmail } from "@/lib/esim-email-template";
 import { makeNumberCodeEmail } from "@/lib/number-email-template";
+import { makeBoostCompleteEmail } from "@/lib/boost-email-template";
 import { esimQrAttachment } from "@/lib/esim-qr";
 import { makeWalletEmail, type ResendPayload, type WalletEmailEvent } from "@/lib/wallet-email-template";
 
@@ -137,6 +138,8 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
     orderOtpCode: orders.otpCode,
     orderPhoneNumber: orders.referenceCode,
     orderExpiresAt: orders.expiresAt,
+    orderQuantity: orders.quantity,
+    orderTargetLink: orders.targetLink,
   }).from(walletEmailOutbox)
     .leftJoin(walletTransactions, eq(walletEmailOutbox.walletTransactionId, walletTransactions.id))
     .leftJoin(withdrawals, eq(walletEmailOutbox.withdrawalId, withdrawals.id))
@@ -213,6 +216,36 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
       .where(and(eq(walletEmailOutbox.id, job.id), eq(walletEmailOutbox.status, "sending"), eq(walletEmailOutbox.lockToken, job.lock_token)))
       .returning({ id: walletEmailOutbox.id });
     if (!savedCode) throw new Error("Notification lease expired");
+    return notice;
+  }
+
+  // A boost runs for hours or days, so the moment it finishes is the moment the
+  // customer is least likely to be looking. Same rule as the other two: the body
+  // is built from the order, never guessed, and the supplier is never named.
+  if (row.eventKind === "boost_complete") {
+    if (!row.orderId || !row.orderReference) throw new InvalidNotificationData();
+    const sender = process.env.RESEND_FROM_EMAIL?.trim();
+    if (!sender) throw new InvalidNotificationData();
+    const siteUrl = (process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://pryva.ng").replace(/\/$/, "");
+    let notice: ResendPayload;
+    try {
+      notice = makeBoostCompleteEmail({
+        recipient: row.recipient,
+        sender,
+        orderReference: row.orderReference,
+        productName: row.orderProductName ?? "Boost",
+        planLabel: row.orderPlanLabel ?? "",
+        quantity: row.orderQuantity ?? null,
+        targetLink: row.orderTargetLink ?? null,
+        orderUrl: `${siteUrl}/dashboard/orders/${row.orderId}`,
+      });
+    } catch {
+      throw new InvalidNotificationData();
+    }
+    const [savedBoost] = await db.update(walletEmailOutbox).set({ payload: JSON.stringify(notice) })
+      .where(and(eq(walletEmailOutbox.id, job.id), eq(walletEmailOutbox.status, "sending"), eq(walletEmailOutbox.lockToken, job.lock_token)))
+      .returning({ id: walletEmailOutbox.id });
+    if (!savedBoost) throw new Error("Notification lease expired");
     return notice;
   }
 

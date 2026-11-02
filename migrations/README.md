@@ -39,6 +39,10 @@ sign-in, the shared rate-limit table, withdrawal request idempotency keys, a dur
 enrolment and recovery codes (`0015`), verified-purchase reviews (`0016`), login
 lockout (`0017`), reconciliation runs (`0018`), support threads (`0019`) and
 WebAuthn credentials and challenges (`0020`).
+`0028`–`0031` add the eSIM delivery email, the number-code email and the boost
+completion email (each an outbox event kind plus its trigger), and the payout-name
+approval table. They are additive: no existing row changes, and a database without
+them still serves every page until a customer's delivery needs one of the emails.
 Back up existing databases before applying migrations and verify the schema before routing traffic.
 
 ## Existing databases

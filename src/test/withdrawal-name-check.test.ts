@@ -92,6 +92,7 @@ describe("migration fixtures", () => {
     "src/test/order-idempotency.test.ts",
     "src/test/purchase-pricing-e2e.test.ts",
     "src/test/wallet-email.test.ts",
+    "src/test/boost-complete-email.test.ts",
   ];
 
   it("finds the migration files", () => {
