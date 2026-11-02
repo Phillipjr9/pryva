@@ -1,15 +1,16 @@
 # Proxies — what exists, and the one thing needed before they can be sold
 
-Written 3 November 2026. Fleexa carries residential proxies, which matters because
+Written 2 November 2026. Fleexa carries residential proxies, which matters because
 Fleexa is already the supplier behind numbers, rentals and the temporary inbox — the
-same key, the same rate-limit budget, the same envelope. So the proxy family does not
-need a new provider relationship; it needs a verified endpoint shape.
+same key, the same rate-limit budget, the same envelope. So the proxy family needs no
+new provider relationship. It needs an endpoint, and as of today there isn't one:
+the supplier sells proxies in its dashboard and publishes no API for them.
 
 ## What is already built
 
 | Piece | File | State |
 |---|---|---|
-| Supplier client (products, buy, usage, cancel) | `src/lib/fleexa.ts` (`Proxy` section) | Written; **endpoint shapes unverified** |
+| Supplier client (products, buy, usage, cancel) | `src/lib/fleexa.ts` (`Proxy` section) | Written; **family absent from the published API** |
 | Plan → gigabytes/days/region | `src/lib/proxy-plans.ts` | Done, and pinned against the catalogue by test |
 | Plan → supplier product id | `FLEEXA_PROXY_PRODUCTS` (JSON, deployment data) | You map it; no ids are guessed in code |
 | On/off switch | `FLEEXA_PROXY_ENABLED=1` + key + map | Off unless all three are present |
@@ -19,16 +20,62 @@ need a new provider relationship; it needs a verified endpoint shape.
 
 ## Why there is no checkout yet
 
-The proxy endpoints follow Fleexa's own naming convention (`/sms4/buy`,
-`/email/buy`, `/rent/sms4/buy` → `/proxy/products`, `/proxy/buy`,
+Two findings, the second of which matters more than the first.
+
+**1. The endpoints are a guess.** They follow the supplier's own naming convention
+(`/sms4/buy`, `/email/buy`, `/rent/sms4/buy` → `/proxy/products`, `/proxy/buy`,
 `/proxy/check/:id`, `/proxy/cancel`). That is evidence of a house style, not a
-contract. Debit-then-call against an unverified endpoint is exactly the failure this
-codebase is built to refuse: the customer is charged, the call 404s, and somebody
-reconciles it by hand.
+contract.
 
-So the money path waits for one piece of evidence: **a real response**.
+**2. The supplier's published API does not include proxies at all.** Checked on
+2 November 2026 against `fleexa.com.ng/api`, `fleexa.com.ng/docs` and
+`fleexa.com.ng/llms.txt`. The endpoint list is complete and explicit:
 
-## The verification step
+```
+SMS OTP    /sms4/*, /sms5/*, /sms6/*
+Email OTP  /email/*
+Rentals    /rent/*
+eSIM       /esim/*
+Account    /profile, /balance
+```
+
+No `/proxy/*`. The docs page describes "four core services"; the marketing
+homepage does list proxies under "REST API", and the proxies landing page points
+developers at API docs that never mention them. The honest reading: **proxies are
+sold in the supplier's dashboard and are not exposed to API customers.** A smoke
+test would most likely return 404 — not because the key or the path is wrong, but
+because the family is not open.
+
+That is why nothing is wired to money. Debit-then-404 is exactly the failure this
+codebase refuses.
+
+## What that leaves
+
+The block is a supplier-side answer, not our code. In preference order:
+
+1. **Ask whether proxy ordering is available over the API** — `t.me/fleexasupport`
+   or `hello@fleexa.com.ng`. One question: *"Do you expose residential proxy
+   purchases through the /developer API, and if so what are the endpoints?"* If
+   yes, `src/lib/fleexa.ts` is already shaped to receive it.
+2. **Manual fulfilment** — sell the plan, then have an operator buy and hand over
+   the credentials through `/admin/fulfilment`. Works today with no API; not
+   instant; no current copy promises instant proxy delivery, so it stays truthful.
+3. **A proxy-native provider** — then the map in `src/lib/proxy-plans.ts` changes,
+   not the design.
+
+## A second thing worth knowing: price
+
+The supplier's public starting price for residential proxies is **₦500/GB**
+(`llms.txt`: "Residential Proxies | ₦500/GB"). Our cost sheet assumes **₦2,690/GB**
+for the smallest Nigeria plan and ₦2,000/GB at the 25GB tier. If ₦500/GB is real
+for the product we would resell, our quoted cost sits above the supplier's own
+retail, and every proxy margin in `PRICING.md` is fiction.
+
+Selling prices are the owner's call and are unchanged. But the *cost* column needs
+a real quote before any proxy plan is sold, or the profit figure shown on the
+comparison page is a number we invented.
+
+## If the family turns out to be open
 
 With `FLEEXA_API_KEY` set (nothing else):
 
@@ -37,19 +84,12 @@ curl -s -H "Authorization: Bearer $DIAGNOSTICS_SECRET" \
   "https://<your-domain>/api/diagnostics/integrations" | jq .proxies
 ```
 
-- `products.count` above zero: the product path and the key are right. The
-  `sample` shows the field names so the mapping can be read straight off it.
-- `products.ok: false` with `UPSTREAM_ERROR`/404: the path is wrong for this
-  deployment. One constant to change (`PROXY_PATH` in `src/lib/fleexa.ts`).
-- `mappedPlans` counts what `FLEEXA_PROXY_PRODUCTS` currently maps, and
-  `plansWithoutQuota` catches a product mapped to a slug that has no quota.
-
-Then set the mapping, using the ids the probe showed:
-
-```sh
-FLEEXA_PROXY_ENABLED=1
-FLEEXA_PROXY_PRODUCTS='{"proxy-ng-1":"<id>","proxy-ng-5":"<id>","proxy-us-5":"<id>","proxy-eu-10":"<id>","proxy-ng-25":"<id>"}'
-```
+- `products.count` above zero: the family exists and the `sample` shows its field
+  names.
+- `products.ok: false` with 404: consistent with the published list above — stop
+  and take path 1 or 2.
+- `mappedPlans` counts what `FLEEXA_PROXY_PRODUCTS` currently maps;
+  `plansWithoutQuota` catches a product mapped to a slug with no quota.
 
 ## The rules the integration must obey
 
@@ -81,6 +121,7 @@ FLEEXA_PROXY_PRODUCTS='{"proxy-ng-1":"<id>","proxy-ng-5":"<id>","proxy-us-5":"<i
    delivered yet" sentence, and `public-availability-copy.test.tsx` — which asserts no
    proxy plan can be sold — fails first and points at the copy that must change.
 
-Costs already modelled (see `PRICING.md`): ₦2,690/GB Nigeria up to ₦2,000/GB on the
-25GB tier, priced at ₦3,650–₦67,500. These are assumptions until a real quote, and a
-supplier quote is the second thing to fetch after the product list.
+Costs already modelled (see `PRICING.md`): ₦2,690/GB Nigeria down to ₦2,000/GB on
+the 25GB tier, priced at ₦3,650–₦67,500. Those are assumptions, and the
+supplier's own ₦500/GB starting price suggests they are too high — so a written
+quote is needed alongside the endpoint answer, not after it.

@@ -10,7 +10,14 @@
  *                   GET /rent/sms4/numbers, GET /rent/sms4/sms
  *   • Account     — GET /profile, GET /balance
  *   • Proxies     — GET /proxy/products, POST /proxy/buy, GET /proxy/check/:id,
- *                   POST /proxy/cancel  (unverified — see PROXIES.md)
+ *                   POST /proxy/cancel  (NOT PUBLISHED — see PROXIES.md)
+ *
+ * Published API surface, checked 2 Nov 2026 against /api and /llms.txt: numbers
+ * (`/sms4`, `/sms5`, `/sms6`), email (`/email`), rentals (`/rent`), eSIM
+ * (`/esim`), account (`/profile`, `/balance`). Proxies are sold in the supplier's
+ * dashboard but appear in none of those lists, so the `/proxy/*` block below is a
+ * probe, not an integration. Do not build a checkout on it until a supplier
+ * response — not a smoke test that would 404 — proves the family exists.
  *
  * Auth: `Authorization: Bearer flx_live_...` or X-API-Key.
  * Envelope: `{ success, message, error_code, details, http_code }`.
@@ -550,14 +557,16 @@ export async function getFleexaStatus(): Promise<FleexaStatus> {
 /* ------------------------------------------------------------------ */
 /* Proxies                                                             */
 /*                                                                     */
-/* Endpoint shapes are NOT verified. They follow the same convention   */
+/* Endpoint shapes are NOT published. They follow the same convention  */
 /* as the SMS, email and rental paths above (`/sms4/buy`,             */
-/* `/email/buy`, `/rent/sms4/buy`), which is evidence of a house      */
-/* style and nothing more. Product ids are deployment data, not code, */
-/* so a plan is only mapped to a supplier product through             */
-/* `FLEEXA_PROXY_PRODUCTS`, and nothing is sellable until that map is */
-/* present and `FLEEXA_PROXY_ENABLED=1`. See PROXIES.md for the       */
-/* verification step before any of this touches money.                */
+/* `/email/buy`, `/rent/sms4/buy`), which is evidence of a house style */
+/* and nothing more — and the supplier's own endpoint list omits the   */
+/* proxy family entirely, so the prior is now negative rather than     */
+/* merely unknown. Product ids are deployment data, not code, so a     */
+/* plan is only mapped to a supplier product through                   */
+/* `FLEEXA_PROXY_PRODUCTS`, and nothing is sellable until that map is  */
+/* present and `FLEEXA_PROXY_ENABLED=1`. See PROXIES.md for what to do */
+/* before any of this touches money.                                   */
 /* ------------------------------------------------------------------ */
 
 /** Endpoint prefix. One place to change if Fleexa documents a different path. */
