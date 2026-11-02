@@ -38,9 +38,24 @@ describe("actual CSV export endpoints", () => {
     expect(csv).not.toContain('"\'-7"');
   });
 
+  it("exports only the period asked for, and names the file after it", async () => {
+    const response = await walletExport.GET(new NextRequest(
+      "https://pryva.test/api/wallet/transactions/export?format=csv&startDate=2026-01-01&endDate=2026-01-31",
+    ));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-disposition")).toContain("2026-01-01_to_2026-01-31.csv");
+
+    // No period still means the whole ledger, with the filename it always had.
+    const everything = await walletExport.GET(new NextRequest("https://pryva.test/api/wallet/transactions/export?format=json"));
+    expect(everything.status).toBe(200);
+    expect(everything.headers.get("content-disposition")).not.toContain("_to_");
+  });
+
   it("rejects unsupported formats and malformed date ranges", async () => {
     expect((await adminExport.GET(new NextRequest("https://pryva.test/api/admin/export?format=xml"))).status).toBe(400);
     expect((await adminExport.GET(new NextRequest("https://pryva.test/api/admin/export?startDate=not-a-date"))).status).toBe(400);
     expect((await walletExport.GET(new NextRequest("https://pryva.test/api/wallet/transactions/export?format=xml"))).status).toBe(400);
+    expect((await walletExport.GET(new NextRequest("https://pryva.test/api/wallet/transactions/export?format=csv&startDate=2026-02-30"))).status).toBe(400);
+    expect((await walletExport.GET(new NextRequest("https://pryva.test/api/wallet/transactions/export?format=csv&startDate=2026-05-02&endDate=2026-05-01"))).status).toBe(400);
   });
 });

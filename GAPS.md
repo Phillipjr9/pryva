@@ -106,8 +106,18 @@ reads `provider`, `otpCode`, `referenceCode`, `accounts` or the eSIM fields, and
 test enforces that, so a receipt can be forwarded without leaking a supplier or a
 credential. The order page links to it.
 
-Still missing in this area: a date range on the wallet export (it is all-or-nothing)
-and any yearly summary.
+**Closed since:** the wallet export took a period. `GET
+/api/wallet/transactions/export?format=csv&startDate=2026-01-01&endDate=2026-01-31`
+filters by `created_at`, both bounds are whole **Lagos** days (UTC+1, no DST) and
+inclusive, and the downloaded filename carries the period so two months do not
+land in the same folder under the same name. Either bound alone works; neither
+means the whole ledger, exactly as before. The wallet's Export panel has the two
+date fields, refuses a backwards period before making a request, and the server
+refuses it too — a malformed or impossible date (`2026-02-30`) is a 400 with a
+sentence a customer can act on, not a silently empty file.
+
+Still missing in this area: a yearly summary (totals in and out per calendar
+year).
 
 ### 10. No dispute or chargeback handling
 `dispute` appears in the privacy and refund copy and nowhere in code. A Paystack
