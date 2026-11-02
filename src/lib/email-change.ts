@@ -1,4 +1,5 @@
 import "server-only";
+import { appLinkOrigin } from "@/lib/site-url";
 
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt, isNull, ne, sql } from "drizzle-orm";
@@ -35,7 +36,7 @@ export function normaliseEmail(raw: string): string {
 }
 
 function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://pryva.ng").replace(/\/$/, "");
+  return appLinkOrigin();
 }
 
 function escapeHtml(value: string): string {

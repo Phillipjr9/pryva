@@ -3,6 +3,8 @@ import Link from "next/link";
 import { plans } from "@/lib/catalog";
 import { isPlanFulfillable } from "@/lib/fulfillment";
 import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
+import { readServiceReadiness } from "@/lib/service-readiness";
+import type { ServiceReadinessEntry } from "@/lib/service-states";
 
 export const metadata: Metadata = {
   title: "Service Status",
@@ -11,14 +13,24 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * Availability is derived from the fulfilment allowlist rather than written by
- * hand. A status page that disagrees with what checkout will actually do is
- * worse than no status page, so each row is computed from the same map that
- * decides whether an order can be placed at all.
+ * Availability is derived, never written by hand. A status page that disagrees
+ * with what checkout will actually do is worse than no status page.
+ *
+ * Two sources, both read at request time:
+ *   • the fulfilment allowlist (`isPlanFulfillable`) for written catalogue plans;
+ *   • `readServiceReadiness()` — the same verdicts the service hub and the
+ *     dashboard tiles use — for everything whose plans are not in the written
+ *     catalogue (live eSIM, subscriptions, data, free inbox, order tools).
+ *
+ * This replaced a hardcoded row that claimed "Digital subscriptions, data, bulk
+ * and scheduled orders — Available — processed automatically through verified
+ * provider integration" while `/api/digital/purchase` and
+ * `/api/airtime/purchase` were permanent 503s. It also replaced an eSIM row that
+ * counted six withdrawn written plans and said "Not available" even when the
+ * live catalogue was on sale.
  */
 const SERVICE_LABELS: Record<string, string> = {
   numbers: "Virtual numbers (SMS verification & rentals)",
-  esim: "eSIM data plans",
   proxies: "Residential proxies",
   "email-otp": "Temporary email inboxes",
 };
@@ -26,6 +38,11 @@ const SERVICE_LABELS: Record<string, string> = {
 function catalogAvailability() {
   const grouped = new Map<string, { total: number; deliverable: number }>();
   for (const plan of plans) {
+    // eSIM's written plans are deliberately withdrawn from sale when a network
+    // key is configured; the live catalogue is read from the supplier instead.
+    // Counting those six here is how /status said "Not available" while the
+    // dashboard was selling eSIMs, so the eSIM row comes from readiness below.
+    if (plan.service === "esim") continue;
     const entry = grouped.get(plan.service) ?? { total: 0, deliverable: 0 };
     entry.total += 1;
     if (isPlanFulfillable(plan.slug)) entry.deliverable += 1;
@@ -39,10 +56,21 @@ function catalogAvailability() {
   }));
 }
 
+/** Only "buy" and "free" are promises a customer can act on today. */
+function readinessRow(name: string, entry: ServiceReadinessEntry | undefined) {
+  const available = entry?.state === "buy" || entry?.state === "free";
+  return {
+    name,
+    status: available ? "Available" : "Not available",
+    detail: entry?.detail ?? "This service is not connected, so nothing here can be ordered or charged.",
+  };
+}
+
 export default function StatusPage() {
   const marketplaceEnabled = isMarketplaceCheckoutConfigured();
   const paystackEnabled = Boolean(process.env.PAYSTACK_SECRET_KEY?.trim());
   const catalog = catalogAvailability();
+  const readiness = new Map(readServiceReadiness().map((entry) => [entry.id, entry]));
 
   const rows = [
     ...catalog.map((entry) => ({
@@ -52,6 +80,8 @@ export default function StatusPage() {
         ? `${entry.deliverable} of ${entry.total} plans in this category can be ordered and delivered automatically.`
         : `None of the ${entry.total} plans in this category can be delivered yet, so they cannot be ordered or charged.`,
     })),
+    readinessRow("eSIM data plans", readiness.get("esim")),
+    readinessRow("Temporary email inboxes", readiness.get("email")),
     {
       name: "Account marketplace checkout",
       status: marketplaceEnabled ? "Available" : "Not available",
@@ -75,11 +105,9 @@ export default function StatusPage() {
       status: "Available",
       detail: "Gift cards are issued by Pryva from your wallet balance the moment you buy one, so they do not depend on a third-party catalogue.",
     },
-    {
-      name: "Digital subscriptions, data, bulk and scheduled orders",
-      status: "Available",
-      detail: "Orders are processed automatically through verified provider integration.",
-    },
+    readinessRow("Digital subscriptions", readiness.get("subscriptions")),
+    readinessRow("Mobile data and airtime", readiness.get("data")),
+    readinessRow("Bulk and scheduled purchases", readiness.get("tools")),
     {
       name: "Automatic refunds",
       status: "Reviewed by support",

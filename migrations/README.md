@@ -39,6 +39,13 @@ sign-in, the shared rate-limit table, withdrawal request idempotency keys, a dur
 enrolment and recovery codes (`0015`), verified-purchase reviews (`0016`), login
 lockout (`0017`), reconciliation runs (`0018`), support threads (`0019`) and
 WebAuthn credentials and challenges (`0020`).
+
+That prose list deliberately stops at `0020`: it has twice been the stale list
+that left a database missing tables. Migrations `0021`–`0030` exist (referrals,
+fraud, boost orders, account deletions, webhook events, eSIM credentials and
+delivery, notification gaps and payout-name approvals, among others), and the
+glob/runner above is the authority on what gets applied — not this paragraph.
+Read the SQL files themselves for their contents.
 Back up existing databases before applying migrations and verify the schema before routing traffic.
 
 ## Existing databases

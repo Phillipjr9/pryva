@@ -98,8 +98,12 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
       id: "tools",
       label: "Order tools",
       state: fleexa ? "buy" : "paused",
+      // This used to say "Scheduled ordering is not launched yet". That was
+      // true on 31 October, but /dashboard/scheduled now has a create form, the
+      // POST route and the nightly processor, so saying it again on the hub and
+      // on /status would be a second stale "no" after the answer became "yes".
       detail: fleexa
-        ? "Bulk orders buy and deliver the same units as a single order. Scheduled ordering is not launched yet."
+        ? "Bulk orders buy and deliver the same units as a single order. Scheduled purchases are created in the dashboard and run on the nightly job."
         : "Bulk and scheduled tools need deliverable plans before they can place anything.",
     },
   ];

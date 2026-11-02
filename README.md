@@ -24,11 +24,13 @@ npm run lint
 npm run build
 ```
 
-The same commands run on every pull request and push to `main` in
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml), together with
+The same commands are wired into [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+for every pull request and push to `main`, together with
 `npm run pricing:audit -- --check`, which fails when a generated price has drifted
 outside the 30–50% band. They need no secrets: providers are mocked and PostgreSQL
-runs in-process.
+runs in-process. **As of 2 November 2026 the workflow is not actually running**:
+GitHub Actions is billing-locked on this account, so every run fails before its
+first step. Run the gates locally until billing is resolved — see `GAPS.md` P0.3.
 
 Security tests include embedded PostgreSQL/WASM SQL and transaction checks plus mocked providers and authentication. They do not replace tests against a separate PostgreSQL server, multiple application instances, or live payment/supplier sandboxes.
 
@@ -63,7 +65,9 @@ The following are server-side environment variables unless otherwise noted. Stor
 - `DATABASE_URL`: PostgreSQL connection string. Back up existing data and apply the ordered migrations in [`migrations/README.md`](migrations/README.md) before deploying.
 - `ADMIN_EMAILS`: comma-separated, explicitly authorized email addresses. There is **no default administrator**; the demo identity can never be an admin. The allowlist is a privilege boundary, not proof of identity. See provisioning below before setting it on an existing deployment.
 - `PAYSTACK_SECRET_KEY`: server-only Paystack secret used to initialize checkout and verify webhook signatures. Configure it through the hosting provider's secret settings; never put it in client code, URLs, source control, or chat. Use separate test and live credentials.
-- `NEXT_PUBLIC_APP_URL`: the external HTTPS **origin** used for the Paystack return URL, e.g. `https://app.example.com` (no path, query, fragment or credentials). Public return URLs must use HTTPS; only local development permits HTTP localhost. `NEXT_PUBLIC_SITE_URL` can also pin the external origin for OAuth behind a proxy.
+- `NEXT_PUBLIC_SITE_URL`: the canonical public **origin** for sitemaps, `robots.txt`, metadata, structured data and absolute links in email. Set it to a domain actually attached to the deployment; `https://pryva.ng` is not attached yet. Leave it unset rather than copying a placeholder: [`src/lib/site-url.ts`](src/lib/site-url.ts) then uses Vercel's injected production host, which always resolves. It also pins the origin used for CSRF checks behind a proxy.
+- `NEXT_PUBLIC_APP_URL`: the external HTTPS **origin** used for the Paystack return URL, e.g. `https://app.example.com` (no path, query, fragment or credentials). Public return URLs must use HTTPS; only local development permits HTTP localhost. For links in email it takes precedence over `NEXT_PUBLIC_SITE_URL`; for the canonical sitemap origin the reverse is true.
+- `RESTORE_DATABASE_URL`: the throwaway database a backup is restored into by `npm run db:restore`. This is deliberately not `DATABASE_URL` — the restore script refuses to overwrite the live database. `--target <connection string>` works for a one-off drill.
 - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`: optional Google sign-in credentials. Configure the provider's callback URL for `/api/auth/google/callback`. Google accounts must have a verified email and are bound by their Google subject, not email alone. Existing unlinked accounts need secure recovery; see the migration guide.
 - `TWO_FACTOR_KEY`: server-only passphrase, at least 16 characters, that encrypts every stored TOTP secret. Without it two-factor authentication is **unavailable rather than optional**: enrolment is refused, and an account that already has it enabled is refused at sign-in with HTTP 503 and no session — never silently let in on the password alone. Rotating the value makes existing enrolments unreadable, so plan the recovery in [`RUNBOOK.md`](RUNBOOK.md) before you change it.
 - `BULKACC_API_KEY`: optional server-only key for the primary account-marketplace catalog and orders. **Setting this key on a persistent database turns live purchasing on for that path** — there is no second switch to forget, so set it only once the account is funded and the reconciliation process is understood. `BULKACC_API_URL` optionally overrides the API base for staging. The key travels as a query parameter, so request URLs are never logged. Top the account up first: an order is refused when the balance is short, and the refusal is reported as such rather than as a delivery failure.

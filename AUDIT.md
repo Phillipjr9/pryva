@@ -118,6 +118,16 @@ ratings**, **coupons** (marketplace promos are supplier-side only), **support ti
 | O9 | **Correction to an earlier note in this audit:** security headers were already shipping from `src/proxy.ts` (HSTS, nosniff, Referrer-Policy, Permissions-Policy, preview-aware X-Frame-Options). Only CSP is still open. |
 | O8 | Base database migration | **Fixed in this pass** — see §5 |
 
+> **Update, 2 November 2026 (this audit is otherwise a historical snapshot):**
+> O4 is superseded in part. `.github/workflows/ci.yml` now exists and runs
+> typecheck, lint, the pricing band, the full suite and a production build, but
+> GitHub Actions is billing-locked on this account, so every run fails before its
+> first step and the gates still only pass when someone runs them by hand. See
+> `GAPS.md` P0.3 for the annotation and the unblock. O5 (Dockerfile / deploy
+> config) is also no longer accurate as written: `vercel.json` and the build
+> command documented in `RUNBOOK.md` are the deployment config, though no
+> Dockerfile exists.
+
 ### 3.6 UX / design
 
 | # | Missing |

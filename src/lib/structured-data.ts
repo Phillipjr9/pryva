@@ -14,8 +14,10 @@
  * same lie as a seeded testimonial, in a format crawlers believe.
  */
 
+import { canonicalSiteUrl } from "@/lib/site-url";
+
 /** The canonical origin. `metadataBase` in `layout.tsx` uses the same value. */
-export const SITE_URL = "https://pryva.ng";
+export const SITE_URL = canonicalSiteUrl();
 
 export type StructuredDataNode = Record<string, unknown>;
 

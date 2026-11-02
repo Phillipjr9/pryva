@@ -7,6 +7,7 @@ import {
   siteStructuredData,
   websiteSchema,
 } from "@/lib/structured-data";
+import { canonicalSiteUrl } from "@/lib/site-url";
 
 const layout = readFileSync("src/app/layout.tsx", "utf8");
 const globals = readFileSync("src/app/globals.css", "utf8");
@@ -49,8 +50,17 @@ describe("sitewide structured data", () => {
   });
 
   it("uses the canonical origin the rest of the app uses", () => {
-    expect(SITE_URL).toBe("https://pryva.ng");
-    expect(layout).toContain(`new URL("${SITE_URL}")`);
+    // The origin is resolved once, in @/lib/site-url. It used to be a literal
+    // https://pryva.ng in four places, which published a sitemap on a domain
+    // that was never attached to the deployment. A hardcoded origin can drift
+    // from the host actually serving the page; a shared resolver cannot.
+    expect(SITE_URL).toBe(canonicalSiteUrl());
+    expect(layout).toContain("new URL(SITE_URL)");
+    const structured = readFileSync("src/lib/structured-data.ts", "utf8");
+    expect(structured).toContain("canonicalSiteUrl()");
+    for (const source of [layout, structured]) {
+      expect(source).not.toMatch(/["'`]https:\/\/pryva\.ng/);
+    }
     expect(globals).toContain("--font-sans");
     expect(globals).toContain("--font-display");
   });

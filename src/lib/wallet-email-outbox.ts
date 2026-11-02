@@ -1,4 +1,5 @@
 import "server-only";
+import { appLinkOrigin } from "@/lib/site-url";
 import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -158,7 +159,7 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
     if (!row.orderId || !row.orderActivationCode || !row.orderReference) throw new InvalidNotificationData();
     const sender = process.env.RESEND_FROM_EMAIL?.trim();
     if (!sender) throw new InvalidNotificationData();
-    const siteUrl = (process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://pryva.ng").replace(/\/$/, "");
+    const siteUrl = appLinkOrigin();
     let delivery: ResendPayload;
     try {
       delivery = makeEsimDeliveryEmail({
@@ -191,7 +192,7 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
     if (!row.orderId || !row.orderOtpCode || !row.orderReference) throw new InvalidNotificationData();
     const sender = process.env.RESEND_FROM_EMAIL?.trim();
     if (!sender) throw new InvalidNotificationData();
-    const siteUrl = (process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://pryva.ng").replace(/\/$/, "");
+    const siteUrl = appLinkOrigin();
     let notice: ResendPayload;
     try {
       notice = makeNumberCodeEmail({

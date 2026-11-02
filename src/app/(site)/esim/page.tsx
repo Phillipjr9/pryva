@@ -7,6 +7,24 @@ import { hasCountryFlag } from "@/lib/countries";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { isEsimOrderingAvailable } from "@/lib/esim-availability";
 
+/**
+ * Copy for when the live catalogue is on sale. `catalog.ts` deliberately says
+ * "not available yet" in its description, highlights and FAQ — that is the
+ * honest answer when no network key is configured, but it contradicted the
+ * hero ("issued the moment you buy") on the very same page once eSIM went live.
+ * Switching the whole set, rather than one sentence, keeps both states honest.
+ */
+const LIVE_HIGHLIGHTS = [
+  { title: "Check your device", body: "Confirm eSIM compatibility and carrier unlock requirements with your device and carrier." },
+  { title: "Review coverage", body: "Coverage, data allowance and validity are read live from the network before you buy." },
+  { title: "Activation code on your order", body: "A live plan is issued as an LPA activation code on the order page, with a one-tap install link." },
+];
+
+const LIVE_FAQS = [
+  { q: "Does my phone support eSIM?", a: "Compatibility depends on the model, region and carrier. Check your device and carrier documentation." },
+  { q: "Can I activate an eSIM now?", a: "Yes. Live plans are listed under Services → eSIM in your dashboard; the activation code appears on the order once the profile is issued." },
+];
+
 // The catalogue below is a written sample. Which of it is live depends on the
 // supplier key, which Vercel snapshots at build time — reading it per request is
 // the difference between "available" and a page that goes stale in one direction.
@@ -26,6 +44,8 @@ export default function ESIMPage() {
   const plans = live ? [] : plansFor("esim");
 
   if (!service) return <div>Service not found</div>;
+  const highlights = live ? LIVE_HIGHLIGHTS : service.highlights;
+  const faqs = live ? LIVE_FAQS : service.faqs;
 
   return (
     <div className="min-h-screen bg-cream">
@@ -51,7 +71,7 @@ export default function ESIMPage() {
       <section className="pb-16">
         <div className="shell">
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {service.highlights.map((highlight, index) => (
+            {highlights.map((highlight, index) => (
               <div key={index} className="rounded-2xl border border-line bg-white p-6">
                 <h3 className="text-[1.1rem] font-semibold text-ink mb-3">{highlight.title}</h3>
                 <p className="text-[0.9rem] text-ink-2 leading-relaxed">{highlight.body}</p>
@@ -164,7 +184,7 @@ export default function ESIMPage() {
         <div className="shell max-w-3xl">
           <h2 className="text-[1.75rem] font-semibold text-ink mb-8">FAQ</h2>
           <div className="space-y-4">
-            {service.faqs.map((faq, index) => (
+            {faqs.map((faq, index) => (
               <div key={index} className="rounded-2xl border border-line bg-white p-6">
                 <h3 className="text-[1rem] font-semibold text-ink mb-3">{faq.q}</h3>
                 <p className="text-[0.9rem] text-ink-2 leading-relaxed">{faq.a}</p>

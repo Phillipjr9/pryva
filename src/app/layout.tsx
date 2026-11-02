@@ -20,10 +20,10 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { BUILD_ID } from "@/lib/build-id";
 import { BuildGuard } from "@/components/system/BuildGuard";
 import { ServiceWorkerRegistration } from "@/components/system/ServiceWorkerRegistration";
-import { serializeStructuredData, siteStructuredData } from "@/lib/structured-data";
+import { SITE_URL, serializeStructuredData, siteStructuredData } from "@/lib/structured-data";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://pryva.ng"),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "Pryva — Virtual numbers, eSIMs and proxies for Nigeria",
     template: "%s · Pryva",

@@ -1,4 +1,5 @@
 import "server-only";
+import { appLinkOrigin } from "@/lib/site-url";
 
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
@@ -56,11 +57,7 @@ async function sendResetEmail(to: string, name: string, token: string): Promise<
   // invented in this file and appears nowhere else, so nobody could have known to
   // set it from .env.example -- and an unset base would silently send every reset
   // link to a domain that may not be the one serving the site.
-  const base = (
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    "https://pryva.ng"
-  ).replace(/\/$/, "");
+  const base = appLinkOrigin();
   const link = `${base}/reset-password?token=${encodeURIComponent(token)}`;
   // The shared branded template, which already existed and was never called.
   const template = passwordResetEmail(name, link);

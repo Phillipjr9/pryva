@@ -1,4 +1,5 @@
 import "server-only";
+import { appLinkOrigin } from "@/lib/site-url";
 
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
@@ -73,11 +74,7 @@ async function sendVerificationEmail(to: string, name: string, token: string): P
     console.error("[auth] verification email not sent: Resend is not configured");
     return { delivered: false, detail: "email delivery is not configured on this server" };
   }
-  const base = (
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    "https://pryva.ng"
-  ).replace(/\/$/, "");
+  const base = appLinkOrigin();
   const link = `${base}/verify-email?token=${encodeURIComponent(token)}`;
   // The shared branded template: gradient header bar, hero image, brand mark,
   // DM Sans/Manrope, a plain-text fallback. This route was sending three bare

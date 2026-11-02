@@ -1,3 +1,4 @@
+import { appLinkOrigin } from "@/lib/site-url";
 export interface EmailTemplate {
   subject: string;
   html: string;
@@ -18,14 +19,11 @@ const config = {
   infoBackground: "#f8f5ee",
   infoBorder: "#eae5da",
   accentColor: "#8266C9",
-  // Was hardcoded to https://pryva.ng, a domain that is not attached to the
-  // deployment. Hero images and the brand mark are absolute URLs built from this,
-  // so every image in every email would have 404d on the live host.
-  siteUrl: (
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    "https://pryva.ng"
-  ).replace(/\/$/, ""),
+  // Hero images and the brand mark are absolute URLs built from this. It used to
+  // be hardcoded to a domain that was never attached to the deployment, so every
+  // image in every email 404d. The shared resolver keeps one live origin for
+  // mail, sitemaps, robots.txt and structured data.
+  siteUrl: appLinkOrigin(),
 };
 
 function emailWrapper(content: string, preheader: string = ""): string {

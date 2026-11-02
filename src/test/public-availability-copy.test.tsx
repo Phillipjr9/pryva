@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import ProxiesPage from "@/app/(site)/proxies/page";
+import ESIMPage from "@/app/(site)/esim/page";
 import FaqPage from "@/app/(site)/faq/page";
 import RefundPolicyPage from "@/app/(site)/refund-policy/page";
 import { plans, plansFor } from "@/lib/catalog";
@@ -88,5 +89,38 @@ describe("the catalogue itself", () => {
     // wrong ones and this fails first, pointing at them.
     const sellableProxies = plans.filter((plan) => plan.service === "proxies" && isPlanFulfillable(plan.slug));
     expect(sellableProxies).toEqual([]);
+  });
+});
+
+describe("/esim does not contradict itself", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("stops saying 'not available' when the live catalogue is on sale", () => {
+    // The hero already said "issued the moment you buy" and the pricing block
+    // offered live plans; the highlights and FAQ were static catalogue copy
+    // that still answered "No. eSIM plans are not available for purchase yet."
+    vi.stubEnv("BITCALL_KEY_ID", "ak_test_key");
+    vi.stubEnv("BITCALL_API_SECRET", "test-secret");
+
+    const markup = renderToStaticMarkup(<ESIMPage />);
+    expect(markup).toContain("Live pricing");
+    expect(markup).toContain("See live eSIM plans");
+    expect(markup).toContain("Activation code on your order");
+    expect(markup).toContain("Yes. Live plans are listed");
+    expect(markup).not.toContain("Not available yet");
+    expect(markup).not.toContain("eSIM plans cannot be delivered yet");
+    expect(markup).not.toContain("eSIM plans are not available for purchase yet");
+    // The six written sample prices are withdrawn when live plans exist.
+    expect(markup).not.toContain("/signup?plan=esim-");
+  });
+
+  it("still says why nothing can be ordered when the network key is absent", () => {
+    vi.stubEnv("BITCALL_KEY_ID", "");
+    vi.stubEnv("BITCALL_API_SECRET", "");
+
+    const markup = renderToStaticMarkup(<ESIMPage />);
+    expect(markup).toContain("Not available yet");
+    expect(markup).toContain("eSIM plans cannot be delivered yet");
+    expect(markup).not.toContain("See live eSIM plans");
   });
 });
