@@ -1,12 +1,12 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { orders, productReviews, users } from "@/db/schema";
+import { orders, productReviews, users, isFulfilledOrder } from "@/db/schema";
 import { recordAdminAction } from "@/lib/admin-audit";
 import type { PublicUser } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 
 /**
- * Reviews, and the three things they must never become.
+ * Reviews, and the four things they must never become.
  *
  * ## Not invented
  *
@@ -26,19 +26,22 @@ import { logger } from "@/lib/logger";
  * Every review starts `pending`. Publishing or rejecting is an admin action with
  * an audit row, and the update is conditional on the review still being pending,
  * so two operators cannot both decide it and have the last write silently win.
+ *
+ * ## Not on a purchase the customer never had
+ *
+ * The gate is the app's one definition of a purchase that happened —
+ * `FULFILLED_ORDER_STATUSES` (`active`, `delivered`, `expired`), with a refund
+ * overriding the letter of the status. This used to keep its own
+ * `["delivered", "completed"]`. Nothing in the app writes `completed` on an
+ * order, while eSIM, boosting, account batches and scheduled purchases all
+ * settle on `active`: the funnel was shut for four of the product lines, and a
+ * row the ledger had already paid back stayed writable.
  */
 
 export const REVIEW_BODY_MIN = 20;
 export const REVIEW_BODY_MAX = 1200;
 export const REVIEW_HEADLINE_MAX = 80;
 export const REVIEW_RATINGS = [1, 2, 3, 4, 5] as const;
-
-/**
- * Delivered and completed only. A refunded, cancelled, processing or failed
- * order is not a purchase the customer received, so it cannot be reviewed —
- * otherwise a refund would still leave a one-star record attached to the order.
- */
-export const REVIEWABLE_STATUSES = ["delivered", "completed"] as const;
 
 export type NormalizedReview =
   | { ok: true; rating: number; headline: string | null; body: string }
@@ -90,6 +93,7 @@ export async function createReview(params: {
       id: orders.id,
       userId: orders.userId,
       status: orders.status,
+      refundedAt: orders.refundedAt,
       service: orders.service,
       productName: orders.productName,
     })
@@ -98,7 +102,7 @@ export async function createReview(params: {
     .limit(1);
 
   if (!order) return { ok: false, reason: "not-your-order" };
-  if (!(REVIEWABLE_STATUSES as readonly string[]).includes(order.status)) {
+  if (!isFulfilledOrder(order)) {
     return { ok: false, reason: "not-delivered" };
   }
 
@@ -185,6 +189,7 @@ export async function listReviewableOrders(userId: string) {
       productName: orders.productName,
       planLabel: orders.planLabel,
       status: orders.status,
+      refundedAt: orders.refundedAt,
       createdAt: orders.createdAt,
     })
     .from(orders)
@@ -197,11 +202,7 @@ export async function listReviewableOrders(userId: string) {
     .where(eq(productReviews.userId, userId));
   const reviewedIds = new Set(reviewed.map((row) => row.orderId));
 
-  return ownOrders.filter(
-    (order) =>
-      (REVIEWABLE_STATUSES as readonly string[]).includes(order.status) &&
-      !reviewedIds.has(order.id),
-  );
+  return ownOrders.filter((order) => isFulfilledOrder(order) && !reviewedIds.has(order.id));
 }
 
 export type ModerationDecision = "publish" | "reject";

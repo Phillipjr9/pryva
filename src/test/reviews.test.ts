@@ -49,12 +49,14 @@ async function seedOrder(params: {
   userId?: string;
   status?: string;
   productName?: string;
+  service?: string;
+  refundedAt?: Date | null;
 }) {
   await db.insert(orders).values({
     id: params.id,
     reference: `PV-${params.id.slice(-6).toUpperCase()}`,
     userId: params.userId ?? buyer,
-    service: "numbers",
+    service: params.service ?? "numbers",
     productSlug: "us-number",
     productName: params.productName ?? "US virtual number",
     planLabel: "Single verification",
@@ -62,6 +64,7 @@ async function seedOrder(params: {
     duration: "15 minutes",
     amount: 1500,
     status: params.status ?? "delivered",
+    refundedAt: params.refundedAt ?? null,
     provider: "preview",
   });
 }
@@ -136,7 +139,7 @@ describe("who may review what", () => {
   });
 
   it("refuses an order that was not delivered", async () => {
-    for (const status of ["processing", "active", "refunded", "cancelled", "review"]) {
+    for (const status of ["processing", "refunded", "cancelled", "review", "failed"]) {
       const id = orderId();
       await seedOrder({ id, status });
       const result = await createReview({
@@ -148,6 +151,67 @@ describe("who may review what", () => {
       });
       expect(result, status).toEqual({ ok: false, reason: "not-delivered" });
     }
+  });
+
+  it("opens the funnel to the services that deliver as `active`", async () => {
+    // Four of the product lines settle on `active` rather than `delivered`
+    // (eSIM, boosting, account batches, scheduled purchases), and `expired` is a
+    // rental that ran out after the customer had it. The list this function used
+    // to keep named `delivered` and `completed`, and no writer in the app has
+    // ever put `completed` on an order — so those four lines answered every
+    // customer with "not delivered" and the review funnel was shut for them.
+    const delivered = [
+      { service: "esim", status: "active", productName: "Nigeria eSIM 1GB" },
+      { service: "social", status: "active", productName: "Instagram followers" },
+      { service: "accounts", status: "active", productName: "Aged Gmail accounts" },
+      { service: "scheduled", status: "active", productName: "Scheduled Nigeria number" },
+      { service: "numbers", status: "expired", productName: "Nigeria 7-day rental" },
+    ];
+
+    for (const order of delivered) {
+      const id = orderId();
+      await seedOrder({ id, ...order });
+      const result = await createReview({
+        userId: buyer,
+        orderId: id,
+        rating: 5,
+        headline: "Worked",
+        body: "The plan arrived as described and I used all of it.",
+      });
+      expect(result, `${order.service}/${order.status}`).toMatchObject({ ok: true });
+    }
+  });
+
+  it("closes the funnel again once the money is back, whatever the status says", async () => {
+    // A refund is a second write: `refundedAt` is stamped and the status usually
+    // follows. Where it does not — a row that still reads `delivered` while the
+    // ledger paid it back — the docblock's own reason for gating on delivery ("a
+    // refund would still leave a one-star record attached to the order") says the
+    // money wins.
+    const id = orderId();
+    await seedOrder({ id, refundedAt: new Date() });
+    expect(
+      await createReview({
+        userId: buyer,
+        orderId: id,
+        rating: 1,
+        headline: null,
+        body: "Refunded afterwards, so this should never have been writable.",
+      }),
+    ).toEqual({ ok: false, reason: "not-delivered" });
+
+    const remaining = await listReviewableOrders(buyer);
+    expect(remaining.map((order) => order.id)).not.toContain(id);
+  });
+
+  it("offers a paid-for order to the customer on the reviews page", async () => {
+    const active = orderId();
+    await seedOrder({ id: active, service: "esim", status: "active", productName: "Nigeria eSIM 1GB" });
+
+    const remaining = await listReviewableOrders(buyer);
+    const listed = remaining.find((order) => order.id === active);
+    expect(listed?.status).toBe("active");
+    expect(listed?.productName).toBe("Nigeria eSIM 1GB");
   });
 
   it("accepts one review per delivered order and stores the purchase snapshot", async () => {
