@@ -501,6 +501,22 @@ export async function activateInbox(userId: string, inboxId: string): Promise<In
   return viewOf(activated);
 }
 
+/**
+ * What a failed cancellation actually tells us.
+ *
+ * The same split `mayHaveSpentMoney` makes about buying, applied to giving the
+ * inbox back: an answer from the feed means nothing was released, and a lost
+ * answer means the opposite may be true. Refusals are retryable and leave the
+ * row alone; a timeout is not evidence of anything, and a row that still claims
+ * the customer can receive codes on a mailbox that is probably gone is the one
+ * outcome this module's ordering exists to avoid.
+ */
+const REFUSED_CANCELLATION = ["NO_API_KEY", "RATE_LIMITED", "RATE_LIMIT_UNAVAILABLE", "UPSTREAM_ERROR"];
+
+function cancellationRefused(error: unknown): boolean {
+  return error instanceof FleexaError && REFUSED_CANCELLATION.includes(error.code ?? "");
+}
+
 export async function discardInbox(userId: string, inboxId: string): Promise<InboxView> {
   const row = await ownInbox(userId, inboxId);
   if (row.status === "discarded") return viewOf(row);
@@ -517,6 +533,13 @@ export async function discardInbox(userId: string, inboxId: string): Promise<Inb
       provider: row.provider,
       reason: cancelError instanceof Error ? cancelError.message : String(cancelError),
     });
+    if (cancellationRefused(cancelError)) {
+      throw new InboxError(
+        "PROVIDER_FAILED",
+        502,
+        "That inbox is still open. The supplier refused to close it, so nothing was discarded — try again.",
+      );
+    }
   }
 
   const [updated] = await db

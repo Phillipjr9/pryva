@@ -375,6 +375,77 @@ describe("discarding an inbox", () => {
     expect(view.status).toBe("discarded");
     expect(mocks.cancel).not.toHaveBeenCalled();
   });
+
+  /**
+   * A cancellation that fails. Logged through the same list the happy path uses,
+   * so "was the supplier asked, and was the row then written" stays one
+   * comparison instead of two counters that cannot be related.
+   */
+  function failingCancellation(error: Error, once = false) {
+    const impl = async () => {
+      mocks.state.calls.push("cancel");
+      throw error;
+    };
+    if (once) mocks.cancel.mockImplementationOnce(impl);
+    else mocks.cancel.mockImplementation(impl);
+  }
+
+  /**
+   * Buying a free inbox spends real money at the feed, and cancelling is how it
+   * is given back -- the same compensation `createFreeInbox` performs when its
+   * own index says no. A refusal gives back nothing, so a row that says
+   * "discarded" after one describes a mailbox that is still open and still
+   * held, behind a status that stops every later read of it.
+   */
+  it("does not record a discard the supplier refused", async () => {
+    failingCancellation(new FleexaError("Provider request failed", 502, "UPSTREAM_ERROR"));
+
+    await expect(discardInbox(USER, "inbox-1")).rejects.toMatchObject({
+      code: "PROVIDER_FAILED",
+      status: 502,
+    });
+    // Only the cancellation was attempted; the row keeps the state the supplier
+    // actually left it in.
+    expect(mocks.state.calls).toEqual(["cancel"]);
+  });
+
+  it.each([
+    ["UPSTREAM_ERROR", 502],
+    ["RATE_LIMITED", 429],
+    ["NO_API_KEY", 503],
+    ["RATE_LIMIT_UNAVAILABLE", 503],
+  ])("treats a %s answer as retryable rather than as a closed inbox", async (code, status) => {
+    failingCancellation(new FleexaError("Provider request failed", status, code));
+
+    await expect(discardInbox(USER, "inbox-1")).rejects.toMatchObject({ code: "PROVIDER_FAILED" });
+    expect(mocks.state.calls).toEqual(["cancel"]);
+  });
+
+  it("closes the inbox on a retry after a refusal", async () => {
+    failingCancellation(new FleexaError("Provider request failed", 502, "UPSTREAM_ERROR"), true);
+    await expect(discardInbox(USER, "inbox-1")).rejects.toMatchObject({ code: "PROVIDER_FAILED" });
+
+    const view = await discardInbox(USER, "inbox-1");
+
+    // The first attempt cost the customer nothing they cannot get back.
+    expect(view.status).toBe("discarded");
+    expect(mocks.cancel).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * The other half, and the reason the refusal cannot simply be a blanket error:
+   * a lost answer is not a refusal. The request went out, the mailbox is probably
+   * gone, and leaving a row that says the customer can still receive codes on a
+   * dead mailbox is the outcome this module's ordering exists to avoid.
+   */
+  it.each(["UPSTREAM_UNREACHABLE", "INVALID_RESPONSE"])("records a discard whose %s answer proves nothing", async (code) => {
+    failingCancellation(new FleexaError("Fleexa took too long to respond", 502, code));
+
+    const view = await discardInbox(USER, "inbox-1");
+
+    expect(view.status).toBe("discarded");
+    expect(mocks.state.calls).toEqual(["cancel", "update:disposable_inboxes"]);
+  });
 });
 
 describe("listing inboxes", () => {
