@@ -249,17 +249,22 @@ export default async function HomePage() {
               <div className="relative mx-auto w-full max-w-[21rem] sm:max-w-[26rem] lg:max-w-[30rem]">
                 <div className="absolute inset-x-5 top-6 bottom-20 rounded-[2.5rem] bg-gradient-to-br from-lav-300/60 via-white/30 to-peach/50 blur-sm" />
 
-                <div className="relative overflow-hidden rounded-[1.75rem] border border-white shadow-[var(--shadow-float)] sm:rounded-[2.1rem]">
+                {/* `contain`, not `cover`, on a white card: the studio's white
+                    ground merges with the card, so the photograph reads as a
+                    cut-out without being one, and the subject is shown whole.
+                    The dark bottom gradient that faded a full-bleed photo into
+                    the card went with it -- over white it only dirtied the floor
+                    she stands on. */}
+                <div className="relative overflow-hidden rounded-[1.75rem] border border-white bg-white shadow-[var(--shadow-float)] sm:rounded-[2.1rem]">
                   <Image
                     src={PHOTOS.hero.url}
                     alt={PHOTOS.hero.alt}
                     width={1080}
-                    height={1260}
+                    height={1620}
                     priority
                     sizes="(max-width: 640px) 88vw, (max-width: 1024px) 26rem, 30rem"
-                    className="aspect-[4/4.3] w-full object-cover sm:aspect-[4/4.25] lg:aspect-[4/4.6]"
+                    className="aspect-[4/4.3] w-full object-contain sm:aspect-[4/4.25] lg:aspect-[4/4.6]"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-ink/35 via-transparent to-transparent" />
                 </div>
               </div>
             </Reveal>

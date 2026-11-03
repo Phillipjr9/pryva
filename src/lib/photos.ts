@@ -3,9 +3,16 @@ const px = (id: number, width: number, height: number, ext: "jpeg" | "png" = "jp
 
 export const PHOTOS = {
   hero: {
-    url: px(7971558, 1080, 1260),
-    alt: "Young woman smiling while using her smartphone outside a modern building",
-    credit: "Photo by Darlene Alderson on Pexels",
+    // A studio shot on a white background, and that is the point: the card it
+    // sits in is white too and the image is drawn with `object-contain`, so the
+    // photograph's own background disappears into the card and the subject is
+    // shown whole. Nothing is cropped -- the requested 2:3 matches the original
+    // frame, so the CDN has nothing to cut -- and there is no cut-out file to
+    // keep in sync with the layout. A coloured or textured background would show
+    // as a rectangle here, which is exactly what this choice avoids.
+    url: px(9422865, 1080, 1620),
+    alt: "Woman smiling while holding up her smartphone",
+    credit: "Photo by Guto Macedo on Pexels",
   },
   socialProof: [
     { url: px(6497114, 96, 96), alt: "Smiling woman with braided hair in a green top" },
