@@ -59,7 +59,7 @@ export default async function AdminDashboardPage() {
     },
     {
       label: "Total Revenue",
-      value: `₦${(revenueStats?.sum || 0).toLocaleString()}`,
+      value: `₦${Number(revenueStats?.sum || 0).toLocaleString()}`,
       icon: DollarSign,
       color: "mint",
       href: "/admin/analytics",

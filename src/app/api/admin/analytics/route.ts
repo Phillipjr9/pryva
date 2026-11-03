@@ -1,7 +1,14 @@
 import { authorizeAdminApi } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, orders, walletTransactions, giftCards } from "@/db/schema";
+import {
+  fulfilledOrderRevenue,
+  fulfilledOrderWhere,
+  giftCards,
+  orders,
+  users,
+  walletTransactions,
+} from "@/db/schema";
 import { sql, gte, and, eq } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 
@@ -27,14 +34,21 @@ export async function GET(request: NextRequest) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    // Revenue analytics
+    // Revenue analytics.
+    //
+    // Priced from the one definition of a fulfilled order the rest of the admin
+    // surface uses. Read on its own this column is a list of amounts, and every
+    // status in it is a number: `processing` and `review` are money the shop has
+    // taken and not yet delivered, and `refunded` is money it handed back. The
+    // `orders` and `average` beside this total are the same set, so the three
+    // relate to each other; `orders.byStatus` below is where all seven rows show.
     const revenueResult = await db
       .select({
-        total: sql<number>`COALESCE(SUM(${orders.amount}), 0)`,
+        total: fulfilledOrderRevenue(),
         count: sql<number>`COUNT(*)`,
       })
       .from(orders)
-      .where(gte(orders.createdAt, startDate));
+      .where(and(fulfilledOrderWhere(), gte(orders.createdAt, startDate)));
 
     const revenue = {
       total: Number(revenueResult[0]?.total || 0),
@@ -63,21 +77,21 @@ export async function GET(request: NextRequest) {
       .select({
         service: orders.service,
         count: sql<number>`COUNT(*)`,
-        revenue: sql<number>`COALESCE(SUM(${orders.amount}), 0)`,
+        revenue: fulfilledOrderRevenue(),
       })
       .from(orders)
-      .where(gte(orders.createdAt, startDate))
+      .where(and(fulfilledOrderWhere(), gte(orders.createdAt, startDate)))
       .groupBy(orders.service);
 
     // Daily revenue trend (last 30 days)
     const dailyTrend = await db
       .select({
         date: sql<string>`DATE(${orders.createdAt})`,
-        revenue: sql<number>`COALESCE(SUM(${orders.amount}), 0)`,
+        revenue: fulfilledOrderRevenue(),
         orders: sql<number>`COUNT(*)`,
       })
       .from(orders)
-      .where(gte(orders.createdAt, startDate))
+      .where(and(fulfilledOrderWhere(), gte(orders.createdAt, startDate)))
       .groupBy(sql`DATE(${orders.createdAt})`)
       .orderBy(sql`DATE(${orders.createdAt})`);
 
@@ -86,10 +100,10 @@ export async function GET(request: NextRequest) {
       .select({
         productName: orders.productName,
         count: sql<number>`COUNT(*)`,
-        revenue: sql<number>`COALESCE(SUM(${orders.amount}), 0)`,
+        revenue: fulfilledOrderRevenue(),
       })
       .from(orders)
-      .where(gte(orders.createdAt, startDate))
+      .where(and(fulfilledOrderWhere(), gte(orders.createdAt, startDate)))
       .groupBy(orders.productName)
       .orderBy(sql`COUNT(*) DESC`)
       .limit(10);

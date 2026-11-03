@@ -56,12 +56,12 @@ export async function GET(request: NextRequest) {
         total: {
           users: totalUsers?.count || 0,
           orders: totalOrders?.count || 0,
-          revenue: totalRevenue?.sum || 0,
+          revenue: Number(totalRevenue?.sum || 0),
         },
         last24h: {
           users: users24h?.count || 0,
           orders: orders24h?.count || 0,
-          revenue: revenue24h?.sum || 0,
+          revenue: Number(revenue24h?.sum || 0),
         },
         last7d: {
           orders: orders7d?.count || 0,

@@ -324,11 +324,15 @@ export function fulfilledOrderWhere() {
  *
  * `sum` over an integer column is a bigint, and the driver answers that with a
  * string, so a tile that formats it gets no thousands separators — `₦1234567` on
- * the screen next to `₦1,234,567` everywhere else. The cast back to int4 is what
- * makes the driver hand over a number.
+ * the screen next to `₦1,234,567` everywhere else. Casting to `::int` would hand
+ * over a number and quietly break the surface that grows past ₦2,147,483,647:
+ * individual amounts fit an int4, their total does not, and Postgres answers an
+ * overflow with `integer_out_of_range` rather than a clamp. So the sum stays a
+ * bigint, and the readers that put it in a payload convert with `Number()` —
+ * exactly what every sibling aggregate in those routes already does.
  */
 export function fulfilledOrderRevenue() {
-  return sql<number>`coalesce(sum(${orders.amount}), 0)::int`;
+  return sql<number>`coalesce(sum(${orders.amount}), 0)::bigint`;
 }
 
 export const walletTransactions = pgTable(
