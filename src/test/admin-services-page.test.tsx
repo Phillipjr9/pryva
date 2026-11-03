@@ -81,6 +81,22 @@ describe("the service coverage page", () => {
     expect(screen.getAllByText(/refuse to take money/i).length).toBeGreaterThanOrEqual(1);
   });
 
+  it("does not report on a lane whose orders it cannot see", async () => {
+    // `isPreviewDatabase` is mocked false above, so this is a production-shaped
+    // process: the nightly sweep really does run there, and skips only on the
+    // preview shim (`api/cron/nightly/route.ts:144`). The scheduled lane used to
+    // answer "Not for sale — the gates refuse to take money" in exactly that
+    // process, and could never have answered with evidence, because a recurring
+    // purchase copies the supplier's name onto the order it buys.
+    state.results = [[], [], [], [], []];
+    render(await AdminServicesPage());
+    expect(screen.queryByText("Scheduled purchases")).toBeNull();
+    expect(screen.getAllByText("Not for sale").length).toBeLessThanOrEqual(1);
+    expect(screen.getByText("Virtual numbers & rentals")).toBeTruthy();
+    expect(screen.getByText("Accounts marketplace")).toBeTruthy();
+    expect(screen.getByText("Social boosting")).toBeTruthy();
+  });
+
   it("lists what the shop deliberately does not sell, so it is not mistaken for broken", async () => {
     state.results = [[], [], [], [], []];
     render(await AdminServicesPage());

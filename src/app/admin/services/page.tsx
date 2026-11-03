@@ -8,7 +8,6 @@ import { isFleexaConfigured } from "@/lib/fleexa";
 import { isSmmPanelConfigured } from "@/lib/smm-panel";
 import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
 import { isManualFulfilmentReachable } from "@/lib/manual-fulfilment";
-import { isPreviewDatabase } from "@/lib/demo-policy";
 import {
   NOT_FOR_SALE,
   SERVICE_LANES,
@@ -36,10 +35,6 @@ export const dynamic = "force-dynamic";
 
 function configuredFor(id: LaneId): boolean {
   switch (id) {
-    // The one that is not an env var: purchases are refused outright on the
-    // preview database, so the lane is genuinely closed there.
-    case "scheduled":
-      return isPreviewDatabase();
     case "numbers":
       return isFleexaConfigured();
     case "boosts":

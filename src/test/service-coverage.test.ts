@@ -6,7 +6,7 @@ import {
   summariseLane,
   type OrderTally,
 } from "@/lib/service-coverage";
-import { isNumberProvider, pollsForCode } from "@/lib/order-providers";
+import { ORDER_PROVIDERS, isNumberProvider, pollsForCode } from "@/lib/order-providers";
 
 /**
  * The coverage verdict.
@@ -43,6 +43,39 @@ describe("number orders from either supplier", () => {
     expect(pollsForCode({ service: "numbers", provider: "bitcall" })).toBe(true);
     expect(pollsForCode({ service: "esim", provider: "bitcall" })).toBe(false);
     expect(pollsForCode({ service: "accounts", provider: "accounts" })).toBe(false);
+  });
+});
+
+/**
+ * A lane is only worth showing if the page can see its orders.
+ *
+ * `summariseLane` scores a lane by matching `orders.provider` against
+ * `spec.providers`, so a name no writer ever puts on an order is not an unproven
+ * lane — it is an invisible one, frozen at "nothing has ever been bought" however
+ * many it sold. The scheduled lane was that case: a recurring purchase copies the
+ * supplier's own name onto the row it buys (`lib/scheduled-orders.ts:172`), so
+ * `provider: "scheduled"` could never match anything.
+ *
+ * `ORDER_PROVIDERS` is the vocabulary the writers use, so the invariant is stated
+ * against it rather than against a list copied into this file.
+ */
+describe("a lane must name a provider that orders actually carry", () => {
+  it("claims no provider the writers never produce", () => {
+    const written = new Set<string>(Object.values(ORDER_PROVIDERS));
+    for (const lane of SERVICE_LANES) {
+      expect([...lane.providers].filter((provider) => !written.has(provider)), lane.id).toEqual([]);
+    }
+  });
+
+  it("has no scheduled lane, because no order is marked as one", () => {
+    expect(SERVICE_LANES.map((lane) => lane.id)).not.toContain("scheduled");
+  });
+
+  it("names the boosting panel in the shared vocabulary", () => {
+    // `lib/boost-orders.ts:126` writes it, so a module that presents itself as
+    // "the values stored in orders.provider" has to carry it or the invariant
+    // above is a lie in the other direction.
+    expect(Object.values(ORDER_PROVIDERS)).toContain("smm");
   });
 });
 

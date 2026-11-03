@@ -1,5 +1,5 @@
 import "server-only";
-import { NUMBER_PROVIDERS } from "@/lib/order-providers";
+import { NUMBER_PROVIDERS, ORDER_PROVIDERS } from "@/lib/order-providers";
 
 /**
  * Can a customer actually receive what this shop sells?
@@ -21,10 +21,19 @@ import { NUMBER_PROVIDERS } from "@/lib/order-providers";
  * history would report "untested" forever, and a page that cries wolf is worse
  * than no page.
  *
+ * Scheduled purchases are not a lane either, for a blunter reason: the page has no
+ * way to see them. A lane is scored by matching `orders.provider`, and a recurring
+ * purchase copies the supplier's own name onto the order it buys
+ * (`lib/scheduled-orders.ts:172`), so the `provider: "scheduled"` this lane used
+ * to ask for matched nothing — it reported "not for sale" in production, where the
+ * nightly sweep is actually running and charging wallets, and could only have
+ * reported "untested" no matter how many it bought. The schedules themselves are
+ * visible in `scheduled_orders` and on the customer's own dashboard.
+ *
  * The summarising is pure so it can be pinned by tests without a database.
  */
 
-export type LaneId = "numbers" | "accounts" | "boosts" | "scheduled";
+export type LaneId = "numbers" | "accounts" | "boosts";
 
 export type LaneSpec = {
   id: LaneId;
@@ -58,7 +67,7 @@ export const SERVICE_LANES: LaneSpec[] = [
   {
     id: "accounts",
     label: "Accounts marketplace",
-    providers: ["accounts", "manual"],
+    providers: [ORDER_PROVIDERS.accounts, ORDER_PROVIDERS.manual],
     staleHours: 48,
     delivery: "Credentials are written onto the order page the moment the supplier returns them.",
     recovery: "An ambiguous supplier call parks the order for review instead of charging twice; a refusal is refunded.",
@@ -66,18 +75,10 @@ export const SERVICE_LANES: LaneSpec[] = [
   {
     id: "boosts",
     label: "Social boosting",
-    providers: ["smm"],
+    providers: [ORDER_PROVIDERS.boosting],
     staleHours: 168,
     delivery: "Opening the order reads the panel's status back; progress is shown on the order page.",
     recovery: "A partial or cancelled boost goes to review for a manual refund — never an automatic one.",
-  },
-  {
-    id: "scheduled",
-    label: "Scheduled purchases",
-    providers: ["scheduled"],
-    staleHours: 48,
-    delivery: "The schedule buys the same plan when it runs.",
-    recovery: "Disabled outside the preview database; nothing is charged while it is off.",
   },
 ];
 

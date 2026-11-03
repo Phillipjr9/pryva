@@ -23,6 +23,12 @@ export const ORDER_PROVIDERS = {
   preview: "preview",
   /** Catalog account order placed through the routing layer. */
   accounts: "accounts",
+  /**
+   * Social boost bought from the SMM panel. `lib/boost-orders.ts:126` writes it;
+   * it lived only there, which is how the coverage page came to be the only
+   * reader that could not name it.
+   */
+  boosting: "smm",
   /** Digital gift cards and game vouchers delivered via FoxReload. */
   foxreload: "foxreload",
   /** Hand-prepared item waiting on the admin fulfilment queue. */
