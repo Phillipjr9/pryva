@@ -187,12 +187,12 @@ export async function runDailyReconciliation(day: string = lagosDay()): Promise<
   const inWindow = (column: AnyColumn) => and(gte(column, start), lt(column, end));
 
   const topupsPaid = await db
-    .select({ count: sql<number>`count(*)::int`, amount: sql<number>`coalesce(sum(${paymentTopups.amount}), 0)::int` })
+    .select({ count: sql<number>`count(*)::int`, amount: sql<number>`coalesce(sum(${paymentTopups.amount}), 0)::bigint` })
     .from(paymentTopups)
     .where(and(eq(paymentTopups.status, "paid"), inWindow(paymentTopups.paidAt)));
 
   const topupsPending = await db
-    .select({ count: sql<number>`count(*)::int`, amount: sql<number>`coalesce(sum(${paymentTopups.amount}), 0)::int` })
+    .select({ count: sql<number>`count(*)::int`, amount: sql<number>`coalesce(sum(${paymentTopups.amount}), 0)::bigint` })
     .from(paymentTopups)
     .where(and(eq(paymentTopups.status, "pending"), inWindow(paymentTopups.createdAt)));
 
@@ -200,7 +200,7 @@ export async function runDailyReconciliation(day: string = lagosDay()): Promise<
     .select({
       type: walletTransactions.type,
       count: sql<number>`count(*)::int`,
-      amount: sql<number>`coalesce(sum(${walletTransactions.amount}), 0)::int`,
+      amount: sql<number>`coalesce(sum(${walletTransactions.amount}), 0)::bigint`,
     })
     .from(walletTransactions)
     .where(inWindow(walletTransactions.createdAt))
@@ -212,22 +212,22 @@ export async function runDailyReconciliation(day: string = lagosDay()): Promise<
   const refunds = byType.get("refund");
 
   const ordersPlaced = await db
-    .select({ count: sql<number>`count(*)::int`, amount: sql<number>`coalesce(sum(${orders.amount}), 0)::int` })
+    .select({ count: sql<number>`count(*)::int`, amount: sql<number>`coalesce(sum(${orders.amount}), 0)::bigint` })
     .from(orders)
     .where(inWindow(orders.createdAt));
 
   const giftsIssued = await db
-    .select({ count: sql<number>`count(*)::int`, amount: sql<number>`coalesce(sum(${giftCards.initialAmount}), 0)::int` })
+    .select({ count: sql<number>`count(*)::int`, amount: sql<number>`coalesce(sum(${giftCards.initialAmount}), 0)::bigint` })
     .from(giftCards)
     .where(inWindow(giftCards.createdAt));
 
   const withdrawalsCompleted = await db
-    .select({ count: sql<number>`count(*)::int`, amount: sql<number>`coalesce(sum(${withdrawals.amount}), 0)::int` })
+    .select({ count: sql<number>`count(*)::int`, amount: sql<number>`coalesce(sum(${withdrawals.amount}), 0)::bigint` })
     .from(withdrawals)
     .where(and(eq(withdrawals.status, "completed"), inWindow(withdrawals.completedAt)));
 
   const withdrawalsPending = await db
-    .select({ count: sql<number>`count(*)::int`, amount: sql<number>`coalesce(sum(${withdrawals.amount}), 0)::int` })
+    .select({ count: sql<number>`count(*)::int`, amount: sql<number>`coalesce(sum(${withdrawals.amount}), 0)::bigint` })
     .from(withdrawals)
     .where(eq(withdrawals.status, "pending"));
 
