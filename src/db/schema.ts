@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { and, inArray, isNull, sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -283,6 +283,53 @@ export const orders = pgTable(
     uniqueIndex("orders_user_request_idx").on(table.userId, table.requestId),
   ],
 );
+
+/**
+ * The orders whose customer received something, and kept it.
+ *
+ * `status` is a free varchar with no CHECK constraint, so every reader had to
+ * decide for itself what "this purchase went through" means, and the readers
+ * drifted apart. This is the answer implied by the writers:
+ *
+ *   • `active` — the unit is in the customer's hands: an installed eSIM, a boost
+ *     the panel accepted, a rented number, a fulfilled bulk batch, a scheduled
+ *     purchase. Most services never write anything else.
+ *   • `delivered` — a one-shot delivery completed: a code arrived, a gift-card key
+ *     was sent, an admin handed over an account batch.
+ *   • `expired` — they had it and the term ran out. Paid for, used, nothing to
+ *     hand back. A rental must not stop being a sale because it finished.
+ *
+ * Left out deliberately: `processing` and `review`, where the delivery is still
+ * unsettled and somebody owes a decision, and `refunded`, whose money is gone.
+ * `refundedAt` is tested alongside the status because refunding is a second write
+ * and the ledger outranks the letter: a row the ledger says was paid back is not a
+ * fulfilled order whatever its status claims.
+ */
+export const FULFILLED_ORDER_STATUSES = ["active", "delivered", "expired"] as const;
+
+export type FulfilledOrderStatus = (typeof FULFILLED_ORDER_STATUSES)[number];
+
+/** The same test for a row already in memory. */
+export function isFulfilledOrder(order: Pick<Order, "status" | "refundedAt">): boolean {
+  return (FULFILLED_ORDER_STATUSES as readonly string[]).includes(order.status) && !order.refundedAt;
+}
+
+/** The same test as SQL, for the readers that aggregate over the whole table. */
+export function fulfilledOrderWhere() {
+  return and(inArray(orders.status, [...FULFILLED_ORDER_STATUSES]), isNull(orders.refundedAt));
+}
+
+/**
+ * What the fulfilled orders are worth, as a number.
+ *
+ * `sum` over an integer column is a bigint, and the driver answers that with a
+ * string, so a tile that formats it gets no thousands separators — `₦1234567` on
+ * the screen next to `₦1,234,567` everywhere else. The cast back to int4 is what
+ * makes the driver hand over a number.
+ */
+export function fulfilledOrderRevenue() {
+  return sql<number>`coalesce(sum(${orders.amount}), 0)::int`;
+}
 
 export const walletTransactions = pgTable(
   "wallet_transactions",

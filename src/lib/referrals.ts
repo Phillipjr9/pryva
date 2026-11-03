@@ -1,7 +1,7 @@
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { orders, referralCodes, referrals, users } from "@/db/schema";
+import { orders, referralCodes, referrals, users, fulfilledOrderWhere } from "@/db/schema";
 import { logger } from "@/lib/logger";
 import { creditWalletInTx } from "@/lib/wallet";
 import { recordFraudEvent, sameNetwork } from "@/lib/fraud";
@@ -31,9 +31,10 @@ export { normalizeReferralCode, makeReferralCode, readReferralCodeFrom, readCook
  *   2. **One payout per referral.** Settlement claims the row with a conditional
  *      update (`… WHERE status = 'pending'`) and writes a UNIQUE ledger
  *      reference, so two workers racing over the same row credit once.
- *   3. **The rewarded order is a delivered one.** A pending, refunded or failed
- *      order does not qualify, and a refund after delivery is visible on the row
- *      that no longer matches.
+ *   3. **The rewarded order is a fulfilled one.** What a completed purchase looks
+ *      like is decided in one place — `FULFILLED_ORDER_STATUSES` in the schema —
+ *      and it is the same answer the revenue tiles give, so an order cannot be
+ *      counted as a sale while still being refused its reward.
  *   4. **No self-referral.** Checked here *and* by a CHECK constraint, because a
  *      free wallet credit by inviting yourself is the obvious way to abuse this.
  *
@@ -44,9 +45,6 @@ export { normalizeReferralCode, makeReferralCode, readReferralCodeFrom, readCook
 
 export const DEFAULT_REWARD_PERCENT = 5;
 export const DEFAULT_REWARD_CAP_NGN = 2_000;
-
-/** A delivered order is one the customer actually received something for. */
-const QUALIFYING_ORDER_STATUSES = ["active", "delivered"] as const;
 
 export type ReferralRewardConfig = { percent: number; capNgn: number };
 
@@ -214,13 +212,7 @@ export async function settleReferralRewards(options: { refereeId?: string } = {}
         const [order] = await tx
           .select({ id: orders.id, amount: orders.amount })
           .from(orders)
-          .where(
-            and(
-              eq(orders.userId, row.refereeId),
-              inArray(orders.status, [...QUALIFYING_ORDER_STATUSES]),
-              isNull(orders.refundedAt),
-            ),
-          )
+          .where(and(eq(orders.userId, row.refereeId), fulfilledOrderWhere()))
           .orderBy(asc(orders.createdAt))
           .limit(1);
         if (!order) return 0;

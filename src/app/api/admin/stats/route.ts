@@ -1,8 +1,8 @@
 import { authorizeAdminApi } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, orders, walletTransactions } from "@/db/schema";
-import { and, count, sum, eq, gte } from "drizzle-orm";
+import { users, orders, fulfilledOrderWhere, fulfilledOrderRevenue } from "@/db/schema";
+import { and, count, gte } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -20,9 +20,9 @@ export async function GET(request: NextRequest) {
     const [totalUsers] = await db.select({ count: count() }).from(users);
     const [totalOrders] = await db.select({ count: count() }).from(orders);
     const [totalRevenue] = await db
-      .select({ sum: sum(orders.amount) })
+      .select({ sum: fulfilledOrderRevenue() })
       .from(orders)
-      .where(eq(orders.status, "delivered"));
+      .where(fulfilledOrderWhere());
 
     // Last 24h stats
     const [users24h] = await db
@@ -34,9 +34,9 @@ export async function GET(request: NextRequest) {
       .from(orders)
       .where(gte(orders.createdAt, last24h));
     const [revenue24h] = await db
-      .select({ sum: sum(orders.amount) })
+      .select({ sum: fulfilledOrderRevenue() })
       .from(orders)
-      .where(and(eq(orders.status, "delivered"), gte(orders.createdAt, last24h)));
+      .where(and(fulfilledOrderWhere(), gte(orders.createdAt, last24h)));
 
     // Last 7d stats
     const [orders7d] = await db

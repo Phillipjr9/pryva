@@ -1,7 +1,14 @@
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/db";
-import { users, orders, contactMessages, supportTickets } from "@/db/schema";
-import { count, sum, desc, eq } from "drizzle-orm";
+import {
+  users,
+  orders,
+  contactMessages,
+  supportTickets,
+  fulfilledOrderWhere,
+  fulfilledOrderRevenue,
+} from "@/db/schema";
+import { count, desc, eq } from "drizzle-orm";
 import Link from "next/link";
 import { Users, ShoppingCart, DollarSign, MessageCircle } from "@/components/icons";
 
@@ -12,9 +19,9 @@ export default async function AdminDashboardPage() {
   const [userStats] = await db.select({ count: count() }).from(users);
   const [orderStats] = await db.select({ count: count() }).from(orders);
   const [revenueStats] = await db
-    .select({ sum: sum(orders.amount) })
+    .select({ sum: fulfilledOrderRevenue() })
     .from(orders)
-    .where(eq(orders.status, "delivered"));
+    .where(fulfilledOrderWhere());
 
   const [openMessages] = await db
     .select({ count: count() })

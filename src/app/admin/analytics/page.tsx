@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/db";
-import { orders, users, walletTransactions } from "@/db/schema";
-import { count, sum, eq } from "drizzle-orm";
+import { orders, users, fulfilledOrderWhere, fulfilledOrderRevenue } from "@/db/schema";
+import { count } from "drizzle-orm";
 import { AnalyticsDashboard } from "./AnalyticsDashboard";
 
 export default async function AdminAnalyticsPage() {
@@ -10,14 +10,14 @@ export default async function AdminAnalyticsPage() {
   const totalUsers = await db.select({ count: count() }).from(users);
   const totalOrders = await db.select({ count: count() }).from(orders);
   const totalRevenue = await db
-    .select({ sum: sum(orders.amount) })
+    .select({ sum: fulfilledOrderRevenue() })
     .from(orders)
-    .where(eq(orders.status, "delivered"));
+    .where(fulfilledOrderWhere());
 
   const stats = {
     totalUsers: totalUsers[0]?.count || 0,
     totalOrders: totalOrders[0]?.count || 0,
-    totalRevenue: Number(totalRevenue[0]?.sum || 0),
+    totalRevenue: totalRevenue[0]?.sum ?? 0,
   };
 
   return (

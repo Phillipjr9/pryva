@@ -234,6 +234,19 @@ describe("paying the reward", () => {
     expect(await balanceOf(REFERRER)).toBe(0);
   });
 
+  it("pays for a rental whose term has run out", async () => {
+    // Settlement is best effort at purchase and then nightly. A friend who bought
+    // a 30-day rental and never came back has the sweep find the order already
+    // moved to `expired` — the reward was earned, and the invitation would stay
+    // pending forever on a word list that only knew two of the three.
+    const code = await lib.codeForUser(REFERRER);
+    await lib.attributeReferral({ refereeId: REFEREE, code });
+    await seedOrder(REFEREE, 10_000, "expired");
+
+    expect(await lib.settleReferralRewards()).toMatchObject({ credited: 1, pending: 0 });
+    expect(await balanceOf(REFERRER)).toBe(500);
+  });
+
   it("applies the cap", async () => {
     const code = await lib.codeForUser(REFERRER);
     await lib.attributeReferral({ refereeId: REFEREE, code });

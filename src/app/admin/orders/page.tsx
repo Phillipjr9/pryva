@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/db";
-import { orders, users } from "@/db/schema";
+import { orders, users, isFulfilledOrder } from "@/db/schema";
 import { and, count, desc, eq, ilike, inArray, or } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -106,9 +106,7 @@ export default async function AdminOrdersPage({
   }
 
   const totalPages = Math.max(1, Math.ceil(Number(total) / PAGE_SIZE));
-  const revenueOnPage = rows
-    .filter((row) => row.status === "delivered" || row.status === "active")
-    .reduce((sum, row) => sum + row.amount, 0);
+  const revenueOnPage = rows.filter(isFulfilledOrder).reduce((sum, row) => sum + row.amount, 0);
 
   const buildHref = (next: { status?: string; page?: number }) => {
     const search = new URLSearchParams();
