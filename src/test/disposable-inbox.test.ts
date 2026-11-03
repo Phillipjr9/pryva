@@ -330,6 +330,33 @@ describe("reading an inbox", () => {
     expect(mocks.state.insertedMessages[0]).toMatchObject({ inboxId: "inbox-1", userId: USER });
   });
 
+  /**
+   * The fallback is the point of these two: a failed provider read answers from
+   * what is already stored, which for a free inbox is nothing. Without a flag on
+   * the result the caller cannot tell "the mailbox is empty" from "the mailbox
+   * did not answer", and the screen says the first while meaning the second.
+   */
+  it("says the supplier did not answer, instead of returning an empty inbox", async () => {
+    mocks.state.selectRows = [ACTIVE_ROW];
+    mocks.state.messageRows = [];
+    mocks.check.mockRejectedValue(new Error("upstream unreachable"));
+
+    const result = await pollInbox(USER, "inbox-1");
+
+    expect(result.unreadable).toBe(true);
+    expect(result.messages).toEqual([]);
+    expect(result.stored).toBe(true);
+  });
+
+  it("does not report an inbox as unreadable when the supplier answered", async () => {
+    mocks.state.selectRows = [ACTIVE_ROW];
+    mocks.check.mockResolvedValue({ messages: [], code: null, raw: {} });
+
+    const result = await pollInbox(USER, "inbox-1");
+
+    expect(result.unreadable).toBe(false);
+  });
+
   it("does not call the supplier again for an inbox that has already ended", async () => {
     mocks.state.selectRows = [{ ...ACTIVE_ROW, status: "discarded" }];
     mocks.state.messageRows = [];
@@ -337,6 +364,7 @@ describe("reading an inbox", () => {
     const result = await pollInbox(USER, "inbox-1");
 
     expect(result.stored).toBe(true);
+    expect(result.unreadable).toBe(false);
     expect(mocks.check).not.toHaveBeenCalled();
   });
 });

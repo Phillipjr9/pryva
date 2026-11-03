@@ -53,6 +53,7 @@ export function InboxManager() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const [unreadable, setUnreadable] = useState(false);
   const inFlight = useRef(false);
 
   const active = inboxes.find((inbox) => inbox.status === "active") ?? null;
@@ -103,7 +104,12 @@ export function InboxManager() {
         }
         setMessages(Array.isArray(data.messages) ? data.messages : []);
         setCode(typeof data.code === "string" ? data.code : null);
-        setLastChecked(new Date());
+        // A read that could not reach the supplier hands back whatever it already
+        // had. Showing it is fine; dating it as a fresh check is not, because the
+        // customer would read "Checked at 14:03" as "nothing arrived by 14:03".
+        const couldNotRead = data.unreadable === true;
+        setUnreadable(couldNotRead);
+        if (!couldNotRead) setLastChecked(new Date());
         setError(null);
       } catch {
         if (!silent) setError("Could not reach the inbox. Try again.");
@@ -148,6 +154,7 @@ export function InboxManager() {
       setMessages([]);
       setCode(null);
       setLastChecked(null);
+      setUnreadable(false);
 
       const newInbox = data.inbox as InboxView;
       setInboxes((current) => [
@@ -190,6 +197,7 @@ export function InboxManager() {
       setMessages([]);
       setCode(null);
       setLastChecked(null);
+      setUnreadable(false);
       void checkForMail(inboxId);
     } catch {
       setError("Could not switch inboxes. Try again.");
@@ -226,6 +234,7 @@ export function InboxManager() {
           setMessages([]);
           setCode(null);
           setLastChecked(null);
+          setUnreadable(false);
         }
       }
     } catch {
@@ -391,6 +400,18 @@ export function InboxManager() {
               )}
             </div>
 
+            {/* Unreadable banner */}
+            {unreadable && (
+              <p
+                role="status"
+                className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[0.8rem] leading-relaxed text-amber-800"
+              >
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                We could not reach the inbox, so this list may be missing newer
+                messages. It will be read again automatically.
+              </p>
+            )}
+
             {/* OTP Banner */}
             {code && (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
@@ -405,10 +426,14 @@ export function InboxManager() {
 
             {/* Messages List */}
             {messages.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-[0.8rem] text-ink-3">
-                Nothing has arrived yet. Send an email to the address above and it will appear here
-                automatically.
-              </p>
+              // A failed read is not evidence that the inbox is empty, and the
+              // banner above has already said what is actually true.
+              !unreadable && (
+                <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-[0.8rem] text-ink-3">
+                  Nothing has arrived yet. Send an email to the address above and it will appear here
+                  automatically.
+                </p>
+              )
             ) : (
               <div className="space-y-2">
                 <p className="text-meta font-medium uppercase tracking-wide text-ink-3">

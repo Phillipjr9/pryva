@@ -375,6 +375,12 @@ export type PollResult = {
   code: string | null;
   /** Whether the messages came from storage rather than a live provider read. */
   stored: boolean;
+  /**
+   * Whether this read failed to reach the supplier. `stored` alone cannot say:
+   * a paid inbox reads storage even on a successful poll, so the only field that
+   * distinguishes "nothing has arrived" from "we could not look" is this one.
+   */
+  unreadable: boolean;
 };
 
 /**
@@ -392,7 +398,7 @@ export async function pollInbox(userId: string, inboxId: string): Promise<PollRe
     // A discarded or expired inbox can still have retained messages worth
     // showing, but there is nothing left to poll at the provider.
     const stored = await storedMessages(row.id);
-    return { inbox: viewOf(row), messages: stored, code: stored.find((m) => m.code)?.code ?? null, stored: true };
+    return { inbox: viewOf(row), messages: stored, code: stored.find((m) => m.code)?.code ?? null, stored: true, unreadable: false };
   }
 
   let checked: { messages: (FleexaEmailMessage | TempMailMessage)[]; code: string | null };
@@ -413,6 +419,7 @@ export async function pollInbox(userId: string, inboxId: string): Promise<PollRe
       messages: stored,
       code: stored.find((m) => m.code)?.code ?? null,
       stored: true,
+      unreadable: true,
     };
   }
 
@@ -434,7 +441,7 @@ export async function pollInbox(userId: string, inboxId: string): Promise<PollRe
       // The whole point: a repeated poll inserts nothing new.
       .onConflictDoNothing();
     const stored = await storedMessages(row.id);
-    return { inbox: viewOf(row), messages: stored, code: checked.code ?? stored.find((m) => m.code)?.code ?? null, stored: true };
+    return { inbox: viewOf(row), messages: stored, code: checked.code ?? stored.find((m) => m.code)?.code ?? null, stored: true, unreadable: false };
   }
 
   const messages: InboxMessageView[] = checked.messages.map((message) => ({
@@ -444,7 +451,7 @@ export async function pollInbox(userId: string, inboxId: string): Promise<PollRe
     code: message.code,
     receivedAt: message.receivedAt,
   }));
-  return { inbox: viewOf(row), messages, code: checked.code ?? messages.find((m) => m.code)?.code ?? null, stored: false };
+  return { inbox: viewOf(row), messages, code: checked.code ?? messages.find((m) => m.code)?.code ?? null, stored: false, unreadable: false };
 }
 
 async function storedMessages(inboxId: string): Promise<InboxMessageView[]> {
