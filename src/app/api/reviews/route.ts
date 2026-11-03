@@ -15,9 +15,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  *
  * The eligibility rules live in `src/lib/reviews.ts`, not here, so the dashboard,
  * this route and the tests all consult one implementation: ownership, a
- * delivered/completed status, no existing review, and a 1–5 rating with a body
- * between 20 and 1,200 characters. Every new review is pending until an operator
- * publishes it.
+ * fulfilled order, no existing review, and a 1–5 rating with a body between 20
+ * and 1,200 characters. Every new review is pending until an operator publishes
+ * it.
  */
 export async function POST(request: NextRequest) {
   const user = await requireAuthApi();
