@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { securityViolations } from "@/db/schema";
 import { desc, eq, sql } from "drizzle-orm";
+import { SECURITY_VIOLATION_TYPES } from "@/lib/security-violation-types";
 
 export const dynamic = "force-dynamic";
 
@@ -21,36 +22,17 @@ export async function GET(request: NextRequest) {
       .from(securityViolations);
     const totalViolations = Number(totalResult[0]?.count || 0);
 
-    // Get violations by type
-    const devToolsResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(securityViolations)
-      .where(eq(securityViolations.type, "devtools"));
-    const devToolsDetections = Number(devToolsResult[0]?.count || 0);
-
-    const debuggerResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(securityViolations)
-      .where(eq(securityViolations.type, "debugger"));
-    const debuggerDetections = Number(debuggerResult[0]?.count || 0);
-
-    const injectionResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(securityViolations)
-      .where(eq(securityViolations.type, "injection"));
-    const injectionAttempts = Number(injectionResult[0]?.count || 0);
-
-    const scrapingResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(securityViolations)
-      .where(eq(securityViolations.type, "scraping"));
-    const scrapingAttempts = Number(scrapingResult[0]?.count || 0);
-
-    const iframeResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(securityViolations)
-      .where(eq(securityViolations.type, "iframe"));
-    const iframeDetections = Number(iframeResult[0]?.count || 0);
+    // One number per type the writer can store, walked from its list rather than
+    // typed out again here. One query per type, not a `groupBy`: the in-memory
+    // preview database has no `groupBy`, and this route has to answer there too.
+    const byType: Record<string, number> = {};
+    for (const spec of SECURITY_VIOLATION_TYPES) {
+      const result = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(securityViolations)
+        .where(eq(securityViolations.type, spec.type));
+      byType[spec.type] = Number(result[0]?.count || 0);
+    }
 
     // Get recent violations (last 50)
     const recentViolations = await db
@@ -62,11 +44,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       metrics: {
         totalViolations,
-        devToolsDetections,
-        debuggerDetections,
-        injectionAttempts,
-        scrapingAttempts,
-        iframeDetections,
+        byType,
       },
       violations: recentViolations.map((v) => ({
         id: v.id,

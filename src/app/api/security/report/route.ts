@@ -7,16 +7,9 @@ import { isSameOriginMutation, publicOrigin } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { db } from "@/db";
 import { securityViolations } from "@/db/schema";
+import { violationTypeFor } from "@/lib/security-violation-types";
 
 export const dynamic = "force-dynamic";
-
-const knownReports: Record<string, string> = {
-  "DevTools detected": "devtools",
-  "Debugger attached": "debugger",
-  "Code injection detected": "injection",
-  "Running in iframe": "iframe",
-  "Modified environment detected": "modified_environment",
-};
 
 /** Client reports are untrusted telemetry, not proof of an attack. */
 export async function POST(request: NextRequest) {
@@ -47,7 +40,7 @@ export async function POST(request: NextRequest) {
     if (typeof value !== "string" || value.length > 240 || /[\x00-\x1f\x7f]/.test(value)) {
       return NextResponse.json({ error: "Invalid report" }, { status: 400 });
     }
-    const type = knownReports[value] ?? (value.startsWith("Scraping detected: ") ? "scraping" : null);
+    const type = violationTypeFor(value);
     if (!type) return NextResponse.json({ error: "Invalid report" }, { status: 400 });
     reports.push({ type, details: value });
   }

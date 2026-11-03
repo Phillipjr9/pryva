@@ -2,15 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { Shield, AlertTriangle, Activity, Eye, Lock, Code } from "@/components/icons";
+import { SECURITY_VIOLATION_TYPES } from "@/lib/security-violation-types";
 
 interface SecurityMetrics {
   totalViolations: number;
-  devToolsDetections: number;
-  debuggerDetections: number;
-  injectionAttempts: number;
-  scrapingAttempts: number;
-  iframeDetections: number;
+  byType: Record<string, number>;
 }
+
+/** Cycled across the tile list, so a type added to the vocabulary gets a tile without an edit here. */
+const TILE_ICONS = [Eye, Code, Lock, Activity, AlertTriangle, Shield];
 
 interface ViolationLog {
   id: string;
@@ -27,19 +27,26 @@ export function SecurityDashboard() {
   const [metrics, setMetrics] = useState<SecurityMetrics | null>(null);
   const [violations, setViolations] = useState<ViolationLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/admin/security/metrics", { signal: controller.signal })
       .then(async (response) => response.ok ? response.json() : null)
       .then((data) => {
-        if (data && !controller.signal.aborted) {
+        if (controller.signal.aborted) return;
+        if (data) {
           setMetrics(data.metrics);
           setViolations(data.violations);
+        } else {
+          setUnavailable(true);
         }
       })
       .catch((error) => {
-        if (!controller.signal.aborted) console.error("Failed to fetch security data:", error);
+        if (!controller.signal.aborted) {
+          console.error("Failed to fetch security data:", error);
+          setUnavailable(true);
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -60,8 +67,14 @@ export function SecurityDashboard() {
     return (
       <div className="card p-8 text-center">
         <Shield className="h-16 w-16 text-ink-3 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-ink mb-2">No Security Data</h2>
-        <p className="text-ink-2">No security violations have been reported yet.</p>
+        <h2 className="text-xl font-semibold text-ink mb-2">
+          {unavailable ? "Security data could not be loaded" : "No security violations recorded"}
+        </h2>
+        <p className="text-ink-2">
+          {unavailable
+            ? "This is a failed request, not an empty table: the counts are unknown, not zero."
+            : "Nothing has been written to the violations table yet."}
+        </p>
       </div>
     );
   }
@@ -77,48 +90,29 @@ export function SecurityDashboard() {
           color="text-red-600"
           bgColor="bg-red-50"
         />
-        <MetricCard
-          icon={<Eye className="h-6 w-6" />}
-          label="DevTools Detections"
-          value={metrics.devToolsDetections}
-          color="text-orange-600"
-          bgColor="bg-orange-50"
-        />
-        <MetricCard
-          icon={<Code className="h-6 w-6" />}
-          label="Debugger Detections"
-          value={metrics.debuggerDetections}
-          color="text-purple-600"
-          bgColor="bg-purple-50"
-        />
-        <MetricCard
-          icon={<Lock className="h-6 w-6" />}
-          label="Injection Attempts"
-          value={metrics.injectionAttempts}
-          color="text-red-600"
-          bgColor="bg-red-50"
-        />
-        <MetricCard
-          icon={<Activity className="h-6 w-6" />}
-          label="Scraping Attempts"
-          value={metrics.scrapingAttempts}
-          color="text-yellow-600"
-          bgColor="bg-yellow-50"
-        />
-        <MetricCard
-          icon={<Shield className="h-6 w-6" />}
-          label="Iframe Detections"
-          value={metrics.iframeDetections}
-          color="text-blue-600"
-          bgColor="bg-blue-50"
-        />
+        {SECURITY_VIOLATION_TYPES.map((spec, index) => {
+          const Icon = TILE_ICONS[index % TILE_ICONS.length];
+          return (
+            <MetricCard
+              key={spec.type}
+              icon={<Icon className="h-6 w-6" />}
+              label={spec.label}
+              value={metrics.byType[spec.type] ?? 0}
+              color="text-orange-600"
+              bgColor="bg-orange-50"
+            />
+          );
+        })}
       </div>
 
       {/* Recent Violations */}
       <div className="card p-6">
         <h2 className="text-lg font-semibold text-ink mb-4">Recent Violations</h2>
         {violations.length === 0 ? (
-          <p className="text-ink-2 text-center py-8">No recent violations</p>
+          <p className="text-ink-2 text-center py-8">
+            No recent violations. Only a browser running the client detector can add a row here, and
+            no page installs that detector today — the controls below say which ones that is.
+          </p>
         ) : (
           <div className="space-y-3">
             {violations.slice(0, 10).map((violation) => (
@@ -153,52 +147,6 @@ export function SecurityDashboard() {
         )}
       </div>
 
-      {/* Protection Status */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold text-ink mb-4">Active Protections</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <ProtectionStatus
-            name="DevTools Detection"
-            enabled={true}
-            description="Detects when browser DevTools are open"
-          />
-          <ProtectionStatus
-            name="Debugger Detection"
-            enabled={true}
-            description="Detects attached debuggers"
-          />
-          <ProtectionStatus
-            name="Code Injection Detection"
-            enabled={true}
-            description="Detects code tampering attempts"
-          />
-          <ProtectionStatus
-            name="Iframe Detection"
-            enabled={true}
-            description="Protects against clickjacking"
-          />
-          <ProtectionStatus
-            name="Scraping Detection"
-            enabled={true}
-            description="Detects automated scraping"
-          />
-          <ProtectionStatus
-            name="Honeypot Traps"
-            enabled={true}
-            description="Detects code analysis attempts"
-          />
-          <ProtectionStatus
-            name="Browser Fingerprinting"
-            enabled={true}
-            description="Tracks unique browser signatures"
-          />
-          <ProtectionStatus
-            name="Rate Limiting"
-            enabled={true}
-            description="Prevents abuse and DoS attacks"
-          />
-        </div>
-      </div>
     </div>
   );
 }
@@ -223,37 +171,6 @@ function MetricCard({
       </div>
       <p className="text-sm text-ink-2 mb-1">{label}</p>
       <p className="text-3xl font-bold text-ink">{value}</p>
-    </div>
-  );
-}
-
-function ProtectionStatus({
-  name,
-  enabled,
-  description,
-}: {
-  name: string;
-  enabled: boolean;
-  description: string;
-}) {
-  return (
-    <div className="flex items-start gap-3 p-4 rounded-lg bg-cream border border-line">
-      <div
-        className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
-          enabled ? "bg-green-500" : "bg-gray-300"
-        }`}
-      />
-      <div className="flex-1">
-        <p className="font-medium text-ink">{name}</p>
-        <p className="text-sm text-ink-2">{description}</p>
-      </div>
-      <span
-        className={`text-xs font-medium px-2 py-1 rounded ${
-          enabled ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-        }`}
-      >
-        {enabled ? "Active" : "Disabled"}
-      </span>
     </div>
   );
 }
