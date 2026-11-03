@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authorizeAdminApi } from "@/lib/admin-auth";
+import { authorizeAdminApi, authorizeAdminRead } from "@/lib/admin-auth";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { listReviewsForModeration, moderateReview } from "@/lib/reviews";
 import { logger } from "@/lib/logger";
@@ -11,7 +11,7 @@ const STATUSES = new Set(["pending", "published", "rejected", "all"]);
 
 /** The moderation queue. Pending by default, because that is the job. */
 export async function GET(request: NextRequest) {
-  const access = await authorizeAdminApi(request);
+  const access = await authorizeAdminRead(request);
   if (access.response) return access.response;
 
   const requested = request.nextUrl.searchParams.get("status") ?? "pending";

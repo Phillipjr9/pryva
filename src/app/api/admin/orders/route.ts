@@ -1,4 +1,4 @@
-import { authorizeAdminApi } from "@/lib/admin-auth";
+import { authorizeAdminApi, authorizeAdminRead } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const access = await authorizeAdminApi(request);
+    const access = await authorizeAdminRead(request);
     if (access.response) return access.response;
 
     const limit = parseInt(request.nextUrl.searchParams.get("limit") || "50");

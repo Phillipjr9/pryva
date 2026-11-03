@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { authorizeAdminApi } from "@/lib/admin-auth";
+import { authorizeAdminApi, authorizeAdminRead } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 // GET /api/admin/refunds - List orders eligible for refund or with pending refunds
 export async function GET(request: NextRequest) {
   try {
-    const access = await authorizeAdminApi(request);
+    const access = await authorizeAdminRead(request);
     if (access.response) return access.response;
 
     const { searchParams } = request.nextUrl;

@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
-import { authorizeAdminApi } from "@/lib/admin-auth";
+import { authorizeAdminApi, authorizeAdminRead } from "@/lib/admin-auth";
+import { redactPayoutCoordinates } from "@/lib/operator-redaction";
 import { db } from "@/db";
 import { withdrawals, users, walletTransactions } from "@/db/schema";
 import { initiateTransfer, isPaystackConfigured } from "@/lib/paystack";
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const access = await authorizeAdminApi(request);
+    const access = await authorizeAdminRead(request);
     if (access.response) return access.response;
 
     const status = request.nextUrl.searchParams.get("status");
@@ -50,7 +51,10 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(withdrawals.createdAt))
       .limit(200);
 
-    return NextResponse.json({ ok: true, withdrawals: allWithdrawals, count: allWithdrawals.length });
+    // A session shows the operator the account the money is going to. A read token
+    // gets the last four and no recipient code -- see src/lib/operator-redaction.ts.
+    const rows = access.user === null ? allWithdrawals.map(redactPayoutCoordinates) : allWithdrawals;
+    return NextResponse.json({ ok: true, withdrawals: rows, count: rows.length });
   } catch (error) {
     logger.error("Failed to fetch withdrawals", { error });
     return NextResponse.json({ error: "Failed to fetch withdrawals" }, { status: 500 });

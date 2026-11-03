@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { authorizeAdminApi } from "@/lib/admin-auth";
+import { authorizeAdminApi, authorizeAdminRead } from "@/lib/admin-auth";
 import { bitcallKeyEnvironment, getBitcallBalance, isBitcallConfigured } from "@/lib/bitcall";
 import { getUsdToNgnRate } from "@/lib/exchange-rate";
 import { fulfilablePlans } from "@/lib/fulfillment";
@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
  * can carry a response body) and never any part of a credential.
  */
 export async function GET(request: NextRequest) {
-  const access = await authorizeAdminApi(request);
+  const access = await authorizeAdminRead(request);
   if (access.response) return access.response;
 
   const requested = new URL(request.url).searchParams.get("country")?.trim().toLowerCase() || null;

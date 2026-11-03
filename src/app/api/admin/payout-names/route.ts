@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, isNull } from "drizzle-orm";
-import { authorizeAdminApi } from "@/lib/admin-auth";
+import { authorizeAdminApi, authorizeAdminRead } from "@/lib/admin-auth";
 import { recordAdminAction } from "@/lib/admin-audit";
 import { db } from "@/db";
 import { bankAccounts, payoutNameApprovals, users } from "@/db/schema";
@@ -30,7 +30,7 @@ const SCAN_LIMIT = 500;
  */
 export async function GET(request: NextRequest) {
   try {
-    const access = await authorizeAdminApi(request);
+    const access = await authorizeAdminRead(request);
     if (access.response) return access.response;
 
     const rows = await db

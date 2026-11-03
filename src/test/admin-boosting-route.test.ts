@@ -16,7 +16,11 @@ const mocks = vi.hoisted(() => ({
   services: vi.fn(),
 }));
 
-vi.mock("@/lib/admin-auth", () => ({ authorizeAdminApi: mocks.admin }));
+vi.mock("@/lib/admin-auth", () => ({
+  authorizeAdminApi: mocks.admin,
+  // These tests never present a bearer, so the read door is the session door.
+  authorizeAdminRead: mocks.admin,
+}));
 vi.mock("@/lib/smm-panel", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/smm-panel")>();
   return {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authorizeAdminApi } from "@/lib/admin-auth";
+import { authorizeAdminApi, authorizeAdminRead } from "@/lib/admin-auth";
 import { logger } from "@/lib/logger";
 import {
   getSmmBalance,
@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
  * identity is not something to expose anywhere a customer could reach.
  */
 export async function GET(request: NextRequest) {
-  const access = await authorizeAdminApi(request);
+  const access = await authorizeAdminRead(request);
   if (access.response) return access.response;
 
   const configured = isSmmPanelConfigured();

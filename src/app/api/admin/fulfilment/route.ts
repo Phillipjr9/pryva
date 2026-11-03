@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users } from "@/db/schema";
-import { authorizeAdminApi } from "@/lib/admin-auth";
+import { authorizeAdminApi, authorizeAdminRead } from "@/lib/admin-auth";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { manualWarrantyDays } from "@/lib/manual-catalog";
 import { MANUAL_PROVIDER, MAX_QUEUE_ITEMS, QUEUE_STATUSES, quantityFromPlanLabel } from "@/lib/fulfilment-queue";
@@ -40,7 +40,7 @@ function isUsableCredential(value: unknown): value is string {
 
 export async function GET(request: NextRequest) {
   try {
-    const access = await authorizeAdminApi(request);
+    const access = await authorizeAdminRead(request);
     if (access.response) return access.response;
 
     const rows = await db.select({

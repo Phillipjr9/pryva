@@ -11,7 +11,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth", () => ({ requireAuthApi: mocks.user }));
-vi.mock("@/lib/admin-auth", () => ({ authorizeAdminApi: mocks.admin }));
+vi.mock("@/lib/admin-auth", () => ({
+  authorizeAdminApi: mocks.admin,
+  // These tests never present a bearer, so the read door is the session door.
+  authorizeAdminRead: mocks.admin,
+}));
 vi.mock("@/lib/rate-limit", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/rate-limit")>();
   return { ...actual, reviewRateLimiter: mocks.limit };

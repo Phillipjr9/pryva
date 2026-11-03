@@ -12,12 +12,17 @@ import { NextRequest } from "next/server";
 const gate = vi.hoisted(() => ({ allow: true, list: vi.fn(), buy: vi.fn(), cancel: vi.fn() }));
 const fleexa = vi.hoisted(() => ({ configured: true, list: vi.fn(), buy: vi.fn() }));
 
-vi.mock("@/lib/admin-auth", () => ({
-  authorizeAdminApi: async () =>
+vi.mock("@/lib/admin-auth", () => {
+  const sessionDoor = async () =>
     gate.allow
       ? { user: { id: "admin" }, response: null }
-      : { user: null, response: Response.json({ ok: false, error: "Unauthorized" }, { status: 401 }) },
-}));
+      : { user: null, response: Response.json({ ok: false, error: "Unauthorized" }, { status: 401 }) };
+  return {
+    authorizeAdminApi: sessionDoor,
+    // These tests never present a bearer, so the read door is the session door.
+    authorizeAdminRead: sessionDoor,
+  };
+});
 
 vi.mock("@/lib/bitcall", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/bitcall")>();

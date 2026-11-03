@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { authorizeAdminApi } from "@/lib/admin-auth";
+import { authorizeAdminApi, authorizeAdminRead } from "@/lib/admin-auth";
 import { recordAdminAction } from "@/lib/admin-audit";
 import { listFraudEvents, markFraudEventReviewed } from "@/lib/fraud";
 import { logger } from "@/lib/logger";
@@ -17,7 +17,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
  * Read-only — these rows are advisory, and nothing here moves money.
  */
 export async function GET(request: NextRequest) {
-  const access = await authorizeAdminApi(request);
+  const access = await authorizeAdminRead(request);
   if (access.response) return access.response;
 
   try {

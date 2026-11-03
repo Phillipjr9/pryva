@@ -1,4 +1,4 @@
-import { authorizeAdminApi } from "@/lib/admin-auth";
+import { authorizeAdminApi, authorizeAdminRead } from "@/lib/admin-auth";
 import { recordAdminAction } from "@/lib/admin-audit";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 // GET /api/admin/messages - List all contact messages
 export async function GET(request: NextRequest) {
   try {
-    const access = await authorizeAdminApi(request);
+    const access = await authorizeAdminRead(request);
     if (access.response) return access.response;
 
     const { searchParams } = request.nextUrl;

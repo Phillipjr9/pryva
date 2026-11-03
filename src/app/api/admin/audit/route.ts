@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, count, desc, eq, ilike, or } from "drizzle-orm";
 import { db } from "@/db";
 import { adminAuditLog } from "@/db/schema";
-import { authorizeAdminApi } from "@/lib/admin-auth";
+import { authorizeAdminApi, authorizeAdminRead } from "@/lib/admin-auth";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ const MAX_LIMIT = 200;
  */
 export async function GET(request: NextRequest) {
   try {
-    const access = await authorizeAdminApi(request);
+    const access = await authorizeAdminRead(request);
     if (access.response) return access.response;
 
     const params = request.nextUrl.searchParams;

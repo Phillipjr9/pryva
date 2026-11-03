@@ -31,12 +31,17 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
 vi.mock("@/lib/logger", () => ({ logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/net", () => ({ isSameOriginMutation: () => mocks.sameOrigin }));
-vi.mock("@/lib/admin-auth", () => ({
-  authorizeAdminApi: async () =>
+vi.mock("@/lib/admin-auth", () => {
+  const sessionDoor = async () =>
     mocks.admin
       ? { user: mocks.admin, response: null }
-      : { user: null, response: Response.json({ ok: false, error: "Administrator access required" }, { status: 403 }) },
-}));
+      : { user: null, response: Response.json({ ok: false, error: "Administrator access required" }, { status: 403 }) };
+  return {
+    authorizeAdminApi: sessionDoor,
+    // These tests never present a bearer, so the read door is the session door.
+    authorizeAdminRead: sessionDoor,
+  };
+});
 
 const EMeka = "3f1c6a2b-9d4e-4a7c-8b1f-2e5d6c7b8a90";
 const OTHER = "7a2b3c4d-5e6f-4a8b-9c0d-1e2f3a4b5c6d";
