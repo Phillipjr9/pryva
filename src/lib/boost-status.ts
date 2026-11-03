@@ -28,7 +28,8 @@ import { getSmmOrderStatus, isSmmPanelConfigured, type SmmOrderState } from "@/l
  *
  * Once a row says `delivered`, `review` or `refunded`, a stale panel answer must
  * not overwrite it. `refunded` in particular means money moved, and a status read
- * is not allowed to contradict the ledger.
+ * is not allowed to contradict the ledger — so the test runs again inside the
+ * UPDATE, against the row, and not only against the copy this call was handed.
  */
 
 export const BOOST_PROVIDER = "smm";
@@ -150,10 +151,16 @@ export async function syncBoostOrderStatus(
           ? `Supplier reports the boost cancelled (${report.orderId}); no automatic refund was issued.`
           : `Supplier reports a partial delivery (${report.remains === null ? "unknown" : report.remains} units remaining); review before refunding.`;
     try {
-      await db
+      // The eligibility test above read the row *before* the panel was asked, and
+      // that call can take seconds. An admin refund that lands in between is money
+      // already moved, so the open-status test is repeated inside the UPDATE: a
+      // status read may report on a settled row, it may not reopen it.
+      const [saved] = await db
         .update(orders)
         .set(note ? { status: next, reconciliationNote: note } : { status: next })
-        .where(eq(orders.id, order.id));
+        .where(and(eq(orders.id, order.id), inArray(orders.status, [...OPEN_STATUSES])))
+        .returning({ id: orders.id });
+      if (!saved) return { ...result, status: null };
     } catch (error) {
       // The read still happened and is still worth showing; the write can be
       // repeated by the next viewer.

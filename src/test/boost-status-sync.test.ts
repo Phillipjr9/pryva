@@ -17,7 +17,9 @@ vi.mock("@/db", () => ({
     update: () => ({
       set: (values: Record<string, unknown>) => {
         writes.push(values);
-        return { where: () => Promise.resolve() };
+        // A guarded UPDATE answers with the row it matched, which is how the
+        // module learns the write was declined.
+        return { where: () => ({ returning: () => Promise.resolve([{ id: "order-1" }]) }) };
       },
     }),
   },
