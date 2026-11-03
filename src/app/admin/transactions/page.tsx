@@ -103,9 +103,9 @@ export default async function AdminTransactionsPage({
 
   const [{ credits, debits, refunds } = { credits: 0, debits: 0, refunds: 0 }] = await db
     .select({
-      credits: sql<number>`coalesce(sum(CASE WHEN ${walletTransactions.type} = 'credit' THEN ${walletTransactions.amount} ELSE 0 END), 0)::int`,
-      debits: sql<number>`coalesce(sum(CASE WHEN ${walletTransactions.type} = 'debit' THEN ${walletTransactions.amount} ELSE 0 END), 0)::int`,
-      refunds: sql<number>`coalesce(sum(CASE WHEN ${walletTransactions.type} = 'refund' THEN ${walletTransactions.amount} ELSE 0 END), 0)::int`,
+      credits: sql<number>`coalesce(sum(CASE WHEN ${walletTransactions.type} = 'credit' THEN ${walletTransactions.amount} ELSE 0 END), 0)::bigint`,
+      debits: sql<number>`coalesce(sum(CASE WHEN ${walletTransactions.type} = 'debit' THEN ${walletTransactions.amount} ELSE 0 END), 0)::bigint`,
+      refunds: sql<number>`coalesce(sum(CASE WHEN ${walletTransactions.type} = 'refund' THEN ${walletTransactions.amount} ELSE 0 END), 0)::bigint`,
     })
     .from(walletTransactions)
     .innerJoin(users, eq(users.id, walletTransactions.userId))
@@ -133,9 +133,11 @@ export default async function AdminTransactionsPage({
 
       <div className="grid gap-3 sm:grid-cols-3">
         {[
-          { label: "Credits in the filter", value: credits, tone: "text-emerald-700" },
-          { label: "Debits in the filter", value: debits, tone: "text-ink" },
-          { label: "Refunds in the filter", value: refunds, tone: "text-amber-700" },
+          // int8 arrives from the driver as a string, and `sql<number>` is only an
+          // assertion, so these totals are converted on purpose rather than by luck.
+          { label: "Credits in the filter", value: Number(credits), tone: "text-emerald-700" },
+          { label: "Debits in the filter", value: Number(debits), tone: "text-ink" },
+          { label: "Refunds in the filter", value: Number(refunds), tone: "text-amber-700" },
         ].map((card) => (
           <div key={card.label} className="rounded-2xl border border-line bg-white p-4">
             <p className="text-meta uppercase tracking-wide text-ink-3">{card.label}</p>
