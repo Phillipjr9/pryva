@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { disposableInboxes, inboxMessages } from "@/db/schema";
 import {
@@ -80,7 +80,8 @@ export type InboxErrorCode =
   | "ALREADY_ACTIVE"
   | "NOT_FOUND"
   | "PROVIDER_FAILED"
-  | "RECONCILE_FAILED";
+  | "RECONCILE_FAILED"
+  | "INBOX_CLOSED";
 
 export class InboxError extends Error {
   constructor(
@@ -477,28 +478,51 @@ async function storedMessages(inboxId: string): Promise<InboxMessageView[]> {
 /**
  * Activate a saved inbox, setting it as the user's active inbox and marking any
  * previously active inbox as 'saved'.
+ *
+ * A discarded inbox is refused rather than reopened: discarding asked the supplier
+ * to give the mailbox back, and nothing here can take it again.
  */
 export async function activateInbox(userId: string, inboxId: string): Promise<InboxView> {
   const row = await ownInbox(userId, inboxId);
 
-  // Transition any currently active inbox for this user to 'saved'
-  await db
-    .update(disposableInboxes)
-    .set({ status: "saved" })
-    .where(and(eq(disposableInboxes.userId, userId), eq(disposableInboxes.status, "active")));
-
-  // Activate the selected inbox
-  const [activated] = await db
-    .update(disposableInboxes)
-    .set({ status: "active", discardedAt: null })
-    .where(and(eq(disposableInboxes.id, row.id), eq(disposableInboxes.userId, userId)))
-    .returning();
-
-  if (!activated) {
-    throw new InboxError("NOT_FOUND", 404, "Could not activate that inbox.");
+  if (row.status === "discarded") {
+    throw new InboxError(
+      "INBOX_CLOSED",
+      409,
+      "That inbox was discarded and its mailbox is closed. Create a new one.",
+    );
   }
 
-  return viewOf(activated);
+  // Both writes commit together. Parked first and activated second is the only
+  // order the "one active free inbox per user" index allows, so done as two
+  // separate transactions a refusal between them would leave every inbox saved
+  // and none active -- the customer looking at no inbox at all.
+  return db.transaction(async (tx) => {
+    await tx
+      .update(disposableInboxes)
+      .set({ status: "saved" })
+      .where(and(eq(disposableInboxes.userId, userId), eq(disposableInboxes.status, "active")));
+
+    const [activated] = await tx
+      .update(disposableInboxes)
+      .set({ status: "active", discardedAt: null })
+      .where(
+        and(
+          eq(disposableInboxes.id, row.id),
+          eq(disposableInboxes.userId, userId),
+          // The discard does not wait for this to finish, so the reopen only
+          // claims the row while it is still something the customer can read.
+          ne(disposableInboxes.status, "discarded"),
+        ),
+      )
+      .returning();
+
+    if (!activated) {
+      throw new InboxError("RECONCILE_FAILED", 409, "That inbox changed while it was being reopened. Try again.");
+    }
+
+    return viewOf(activated);
+  });
 }
 
 export async function discardInbox(userId: string, inboxId: string): Promise<InboxView> {

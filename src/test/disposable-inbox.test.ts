@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  activateInbox,
   createFreeInbox,
   dailyKeyFor,
   discardInbox,
@@ -98,16 +99,31 @@ vi.mock("@/db", async () => {
     }),
     update: (table: unknown) => ({
       set: (values: Record<string, unknown>) => ({
-        where: () => ({
-          returning: async () => {
+        where: () => {
+          const written = async () => {
             mocks.state.calls.push(`update:${nameOf(table)}`);
             return mocks.state.updateResult.map((row) => ({ ...row, ...values }));
-          },
-        }),
+          };
+          // Some updates are awaited without .returning(), so the where clause
+          // itself has to resolve -- otherwise a write the code really issued
+          // goes unrecorded and an ordering assertion proves nothing.
+          return { then: (resolve: (rows: Record<string, unknown>[]) => unknown) => written().then(resolve), returning: written };
+        },
       }),
     }),
   };
-  return { db };
+
+  // The stub holds no rows between calls, so it cannot roll anything back: what
+  // this records is that a transaction was asked for and which writes were
+  // issued inside it.
+  const stub = {
+    ...db,
+    transaction: async (callback: (tx: typeof db) => Promise<unknown>) => {
+      mocks.state.calls.push("transaction");
+      return await callback(db);
+    },
+  };
+  return { db: stub };
 });
 
 const USER = "user-1";
@@ -374,6 +390,64 @@ describe("discarding an inbox", () => {
 
     expect(view.status).toBe("discarded");
     expect(mocks.cancel).not.toHaveBeenCalled();
+  });
+});
+
+describe("switching back to a saved inbox", () => {
+  const SAVED = { ...ACTIVE_ROW, id: "inbox-2", status: "saved" };
+
+  /**
+   * A discarded inbox has no mailbox behind it: discardInbox asked the supplier to
+   * give it back, and nothing here can un-cancel it. Reopening one leaves the
+   * customer looking at an empty inbox that will never fill -- polling a closed
+   * mailbox swallows the provider error, and a free inbox stores no messages, so
+   * "nothing has arrived yet" and "nothing can arrive" look identical.
+   */
+  it("refuses to reopen an inbox the supplier already closed", async () => {
+    mocks.state.selectRows = [{ ...SAVED, status: "discarded" }];
+    mocks.state.updateResult = [SAVED];
+
+    await expect(activateInbox(USER, "inbox-2")).rejects.toMatchObject({
+      code: "INBOX_CLOSED",
+      status: 409,
+    });
+    // Nothing was written, so the inbox the customer is using stayed usable.
+    expect(mocks.state.calls).toEqual([]);
+  });
+
+  it("activates a saved inbox and parks the current one in one unit", async () => {
+    mocks.state.selectRows = [SAVED];
+    mocks.state.updateResult = [SAVED];
+
+    const view = await activateInbox(USER, "inbox-2");
+
+    expect(view.status).toBe("active");
+    // The parking and the activating commit together. Done as two separate
+    // writes, a failure between them leaves every inbox saved and none active.
+    expect(mocks.state.calls).toEqual(["transaction", "update:disposable_inboxes", "update:disposable_inboxes"]);
+  });
+
+  /**
+   * The discard does not wait for a reopen to finish: it lands whenever the
+   * supplier answers. So the reopen has to notice the row it is about to write
+   * has moved, rather than setting a closed mailbox back to active.
+   */
+  it("gives up when the inbox is discarded while the reopen is running", async () => {
+    mocks.state.selectRows = [SAVED];
+    mocks.state.updateResult = []; // the guarded update matched nothing
+
+    await expect(activateInbox(USER, "inbox-2")).rejects.toMatchObject({
+      code: "RECONCILE_FAILED",
+      status: 409,
+    });
+    expect(mocks.state.calls).toEqual(["transaction", "update:disposable_inboxes", "update:disposable_inboxes"]);
+  });
+
+  it.each(["active", "saved"])("still accepts an inbox in state %s", async (status) => {
+    mocks.state.selectRows = [{ ...SAVED, status }];
+    mocks.state.updateResult = [{ ...SAVED, status }];
+
+    await expect(activateInbox(USER, "inbox-2")).resolves.toMatchObject({ status: "active" });
   });
 });
 

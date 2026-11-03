@@ -67,7 +67,12 @@ vi.mock("@/db", async () => {
       }),
     }),
   };
-  return { db };
+
+  const stub = {
+    ...db,
+    transaction: async (callback: (tx: typeof db) => Promise<unknown>) => await callback(db),
+  };
+  return { db: stub };
 });
 
 describe("extractVerificationCode", () => {
