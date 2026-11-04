@@ -104,10 +104,36 @@ describe("the relying party", () => {
   };
 
   it("is pinned by configuration when the deployment names its origin", () => {
-    const env = { NEXT_PUBLIC_SITE_URL: "https://pryva.ng" } as unknown as NodeJS.ProcessEnv;
-    expect(passkeys.relyingPartyFor(request("https://preview.example.com/"), env)).toEqual({
-      rpID: "pryva.ng",
-      origin: "https://pryva.ng",
+    // A preview host is rewritten to the canonical origin, so a passkey enrolled
+    // on the preview is still usable on the real site.
+    const env = { NEXT_PUBLIC_SITE_URL: "https://example.test" } as unknown as NodeJS.ProcessEnv;
+    expect(passkeys.relyingPartyFor(request("https://pryva-abc123.vercel.app/"), env)).toEqual({
+      rpID: "example.test",
+      origin: "https://example.test",
+    });
+  });
+
+  it("lets the canonical host sign for itself instead of an old pinned domain", () => {
+    // The pin exists to correct deployment hosts. On the site's own domain it
+    // must describe the request: a stale pin would sign every ceremony for a
+    // domain the deployment no longer serves, and the browser would reject it.
+    const env = { NEXT_PUBLIC_SITE_URL: "https://example.test" } as unknown as NodeJS.ProcessEnv;
+    expect(passkeys.relyingPartyFor(request("https://example.test/"), env)).toEqual({
+      rpID: "example.test",
+      origin: "https://example.test",
+    });
+  });
+
+  it("still lets an explicit passkey origin override everything", () => {
+    // `WEBAUTHN_ORIGIN` is the escape hatch for a deployment that terminates
+    // WebAuthn somewhere the request headers cannot describe.
+    const env = {
+      WEBAUTHN_ORIGIN: "https://keys.example.test",
+      NEXT_PUBLIC_SITE_URL: "https://example.test",
+    } as unknown as NodeJS.ProcessEnv;
+    expect(passkeys.relyingPartyFor(request("https://pryva-abc123.vercel.app/"), env)).toEqual({
+      rpID: "keys.example.test",
+      origin: "https://keys.example.test",
     });
   });
 

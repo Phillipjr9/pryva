@@ -69,8 +69,13 @@ export type RelyingParty = { rpID: string; origin: string };
  * always fails.
  */
 export function relyingPartyFor(request: Request, env: NodeJS.ProcessEnv = process.env): RelyingParty | null {
-  const pinnedOrigin = (env.WEBAUTHN_ORIGIN?.trim() || env.NEXT_PUBLIC_SITE_URL?.trim() || "").replace(/\/+$/, "");
-  const origin = pinnedOrigin || publicOrigin(request);
+  const explicitOrigin = env.WEBAUTHN_ORIGIN?.trim().replace(/\/+$/, "") || "";
+  // A pinned *passkey* origin is authoritative and must match what the browser
+  // reports. The general site URL is not: it is used here as a canonical
+  // fallback, so it goes through `publicOrigin` below and steps aside when the
+  // request already arrived on the canonical host. Reading it directly meant a
+  // site moved to its own domain still signed passkeys for the old one.
+  const origin = explicitOrigin || publicOrigin(request, env);
 
   let parsed: URL;
   try {

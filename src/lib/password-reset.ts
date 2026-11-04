@@ -8,6 +8,7 @@ import { hashPassword, isValidEmail, normalizeEmail } from "@/lib/auth";
 import { passwordResetEmail } from "@/lib/email-templates";
 import { authRateLimiter } from "@/lib/rate-limit";
 import { validatePassword } from "@/lib/validation";
+import { canonicalSiteUrl } from "@/lib/net";
 
 /** A reset link stays usable for 30 minutes. */
 export const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
@@ -56,11 +57,7 @@ async function sendResetEmail(to: string, name: string, token: string): Promise<
   // invented in this file and appears nowhere else, so nobody could have known to
   // set it from .env.example -- and an unset base would silently send every reset
   // link to a domain that may not be the one serving the site.
-  const base = (
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    "https://pryva.ng"
-  ).replace(/\/$/, "");
+  const base = canonicalSiteUrl();
   const link = `${base}/reset-password?token=${encodeURIComponent(token)}`;
   // The shared branded template, which already existed and was never called.
   const template = passwordResetEmail(name, link);
