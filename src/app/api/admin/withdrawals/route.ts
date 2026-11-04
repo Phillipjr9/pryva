@@ -129,9 +129,13 @@ export async function PUT(request: NextRequest) {
             : !["pending", "processing", "queued", "success"].includes(providerStatus)
               ? "Paystack transfer status is unconfirmed. Reconcile it before retrying or refunding."
               : null;
+        // The row may have moved while Paystack was answering: a signed
+        // transfer.success or transfer.reversed event is applied by the webhook
+        // whenever it arrives, and what it wrote is newer than this response.
+        // Same guard as `lib/payouts.ts:176`, which does this write properly.
         await db.update(withdrawals)
           .set({ transferReference: transferCode, failureReason: note })
-          .where(eq(withdrawals.id, id));
+          .where(and(eq(withdrawals.id, id), eq(withdrawals.status, "processing")));
         logger.info("Withdrawal transfer initiated", { withdrawalId: id, adminId: admin.id, providerStatus });
         await recordAdminAction({
           actor: admin,

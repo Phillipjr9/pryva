@@ -100,6 +100,44 @@ function place(overrides: Partial<Parameters<typeof boost.placeBoostOrder>[0]> =
   });
 }
 
+/**
+ * A database whose first `update(orders)` call is refused.
+ *
+ * The refund used to be two commits — the credit in a transaction of its own,
+ * the order status written after it. So "the money moved and then the write
+ * failed" was a state a real outage could reach, and this is that failure
+ * injected. Everything else passes through, including the transaction wrapper,
+ * so the refusal lands wherever the code happens to write rather than where the
+ * test happens to expect it.
+ */
+function flakyDatabase(state: { fired: boolean }) {
+  const facade = (client: any): any => ({
+    select: (...args: unknown[]) => client.select(...args),
+    insert: (...args: unknown[]) => client.insert(...args),
+    execute: (...args: unknown[]) => client.execute(...args),
+    update: (table: unknown) => {
+      if (table === orders && !state.fired) {
+        state.fired = true;
+        throw new Error("database write failed");
+      }
+      return client.update(table);
+    },
+    transaction: (callback: (tx: any) => unknown) =>
+      client.transaction((tx: any) => callback(facade(tx))),
+  });
+  return facade(database);
+}
+
+async function refundState() {
+  const [order] = await database.select().from(orders).where(eq(orders.userId, USER));
+  const entries = await database.select().from(walletTransactions).where(eq(walletTransactions.userId, USER));
+  return {
+    order,
+    moneyIsBack: entries.some((entry) => entry.type === "refund"),
+    balance: await balance(),
+  };
+}
+
 describe("placing a boost", () => {
   it("charges the server's price and tells the supplier once", async () => {
     const result = await place();
@@ -169,6 +207,11 @@ describe("placing a boost", () => {
     // The ledger tells the whole story: a debit and its reversal.
     const entries = await database.select().from(walletTransactions).where(eq(walletTransactions.userId, USER));
     expect(entries.map((entry) => entry.type).sort()).toEqual(["debit", "refund"]);
+
+    // The receipt nudge used to ride along with the standalone credit. Once the
+    // refund commits inside a transaction, somebody has to call it on purpose.
+    const { scheduleWalletEmails } = await import("@/lib/schedule-wallet-emails");
+    expect(vi.mocked(scheduleWalletEmails)).toHaveBeenCalledTimes(1);
   });
 
   it("never trusts a price the browser sends", async () => {
@@ -203,6 +246,32 @@ describe("placing a boost", () => {
     const result = await place();
     expect(result.kind).toBe("invalid");
     expect(mocks.add).not.toHaveBeenCalled();
+  });
+
+  describe("when the refund cannot be recorded", () => {
+    it("keeps the money and the order record as one event", async () => {
+      const state = { fired: false };
+      mocks.db = flakyDatabase(state);
+      mocks.add.mockRejectedValue(new Error("panel said no"));
+      try {
+        const result = await place();
+        expect(result.kind).toBe("unavailable");
+
+        const { order, moneyIsBack, balance: wallet } = await refundState();
+        // Either the customer has the money and the order says so, or nothing
+        // moved and the row still reads `processing` for an operator to settle.
+        // The state this rejects is the one the split left reachable: wallet
+        // refunded, order insisting the refund failed, and nothing to tell the
+        // next reader — or the admin refund screen — that it already happened.
+        expect(moneyIsBack).toBe(order.refundedAt !== null);
+        expect(order.status).toBe(moneyIsBack ? "refunded" : "processing");
+        expect(wallet).toBe(moneyIsBack ? 25_000 : 23_500);
+        expect(order.reconciliationNote).toContain("automatic refund failed");
+        expect(state.fired).toBe(true);
+      } finally {
+        mocks.db = database;
+      }
+    });
   });
 
   it("refuses an unpriced listing rather than guessing", async () => {
