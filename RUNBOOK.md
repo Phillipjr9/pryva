@@ -108,6 +108,71 @@ orders still processing. A tile reading **"unread"** means the count itself
 failed to load — that is different from a count of zero, which means the queue is
 clear. Do not read an unread tile as "nothing to do".
 
+## 2b. The domain: pryvalogs.com
+
+The site is served from `pryvalogs.com`, registered through **Wix**. Wix is the
+registrar *and* the DNS host, so every DNS change is made in the Wix dashboard —
+there is no separate nameserver to log into.
+
+### Moving DNS from Wix to Vercel
+
+Until this is done the domain resolves to Wix's parking page ("This domain isn't
+connected to a site"), not to the app.
+
+1. **Vercel → Project `pryva` → Settings → Domains → Add.** Add `pryvalogs.com`
+   and `www.pryvalogs.com`. Vercel will show the exact records it wants.
+2. **Wix → Domains → pryvalogs.com → DNS records.** Replace the Wix pointing
+   records with Vercel's:
+   - `pryvalogs.com` → `A` record to `76.76.21.21`
+   - `www` → `CNAME` to `cname.vercel-dns.com`
+   Delete the existing `A` records (currently `185.230.63.x`) and the
+   `www` CNAME to `initial.wixdns.net`, or the two sets will fight.
+3. Wait for Vercel to show **Valid Configuration** on both names. Propagation is
+   usually minutes, occasionally a few hours.
+4. **Pick one name.** Add a redirect from the other in Vercel → Domains, so
+   `www` and the apex are one origin rather than two. Look at which one you
+   configured in `NEXT_PUBLIC_SITE_URL` and redirect *towards* it.
+
+⚠ **Do not connect the domain to Wix as a site.** The registrar and the website
+host are separate concerns here; leaving the domain "connected to a Wix site"
+will serve Wix's page instead of the app.
+
+### After DNS is live
+
+- Set `NEXT_PUBLIC_SITE_URL=https://pryvalogs.com` in Vercel for **production**
+  (and preview, if you want preview links to name the real domain). Redeploy:
+  the value is read at build time for metadata.
+- **Google OAuth** — add `https://pryvalogs.com/api/auth/google/callback` to the
+  authorized redirect URIs in Google Cloud Console. Without it, Google sign-in
+  fails with `redirect_uri_mismatch` on the new domain and nowhere else.
+- **Paystack** — the callback URL is built from `NEXT_PUBLIC_APP_URL` or the
+  request origin, so no dashboard change is strictly needed, but confirm a
+  top-up completes end to end. A half-finished payment on a new origin is worth
+  one test transaction.
+- **Passkeys** — these are bound to the domain they were enrolled on. Every
+  passkey created before the move stops working, on every account, with no error
+  message that says so. Warn people, or keep `WEBAUTHN_ORIGIN` on the old origin
+  only as long as the old origin still serves.
+- **Email** — verification, password reset and receipt links are absolute and
+  will now point at the new domain. Old links in already-sent mail are governed
+  by `RESEND_FROM_EMAIL`, not by this.
+- **Sessions** — a session cookie is now written for the registrable domain so
+  the apex and `www` share it. Cookies issued on the old host do not follow;
+  everyone signs in once more after the move.
+
+### Checking it took
+
+```sh
+node scripts/check-headers.mjs https://pryvalogs.com
+curl -s https://pryvalogs.com/robots.txt | grep -o 'Sitemap:.*'
+curl -s https://pryvalogs.com/sitemap.xml | grep -o '<loc>[^<]*' | head -3
+```
+
+All three should name `pryvalogs.com`. If `robots.txt` still names another host,
+the deployment is running an older build — the origin is compiled in.
+
+---
+
 ## 3. Deploying and migrating
 
 The build command in Vercel is:
@@ -627,7 +692,7 @@ question with an answer rather than an inference:
 
 ```bash
 curl -s -H "Authorization: Bearer $DIAGNOSTICS_SECRET" \
-  "https://pryva-two.vercel.app/api/diagnostics/webhooks" | jq '{verdict, explanation, counts, lastDeliveryAt, refusedSignatures}'
+  "https://pryvalogs.com/api/diagnostics/webhooks" | jq '{verdict, explanation, counts, lastDeliveryAt, refusedSignatures}'
 ```
 
 | `verdict` | What it means | The fix |
@@ -705,7 +770,7 @@ Paystack and our record, and a person has to read it.
 
 **Check the webhook subscribes to transfer events.** In Paystack → Settings →
 API Keys & Webhooks, the endpoint URL must be
-`https://pryva-two.vercel.app/api/webhooks/payment` with `charge.success`,
+`https://pryvalogs.com/api/webhooks/payment` with `charge.success`,
 `transfer.success`, `transfer.failed` and `transfer.reversed` enabled. If transfer
 events are filtered out in the dashboard, this code is inert and every payout goes
 back to the manual queue.
@@ -752,7 +817,7 @@ H`. Either way it:
 
 ```bash
 curl -s -H "Authorization: Bearer $DIAGNOSTICS_SECRET" \
-  "https://pryva-two.vercel.app/api/diagnostics/retention" | jq '{verdict, retentionYears, closedAccounts, dueForPurge, armed}'
+  "https://pryvalogs.com/api/diagnostics/retention" | jq '{verdict, retentionYears, closedAccounts, dueForPurge, armed}'
 ```
 
 Read-only by construction — it cannot purge, whatever it is asked.
@@ -816,7 +881,7 @@ that is a product decision, not a deletion one.
 One command, after a deploy:
 
 ```bash
-npm run headers:check -- https://pryva-two.vercel.app
+npm run headers:check -- https://pryvalogs.com
 # or against a local production build
 npm run headers:check -- http://localhost:3111
 ```
@@ -882,7 +947,7 @@ One request answers it. The endpoint is read-only and cannot buy anything:
 
 ```bash
 curl -s -H "Authorization: Bearer $DIAGNOSTICS_SECRET" \
-  "https://pryva-two.vercel.app/api/diagnostics/inbox" | jq '{verdict, explanation, products}'
+  "https://pryvalogs.com/api/diagnostics/inbox" | jq '{verdict, explanation, products}'
 ```
 
 | Verdict | What it means | Fix |
@@ -949,7 +1014,7 @@ Curl, if you would rather see the JSON:
 
 ```bash
 curl -s -H "Authorization: Bearer $DIAGNOSTICS_SECRET" \
-  "https://pryva-two.vercel.app/api/diagnostics/stock" | jq '.lanes[] | {lane, headline}'
+  "https://pryvalogs.com/api/diagnostics/stock" | jq '.lanes[] | {lane, headline}'
 ```
 
 `?refresh=1` skips the 30 s read cache.

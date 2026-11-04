@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { emailChangeRequests, users } from "@/db/schema";
 import { logger } from "@/lib/logger";
 import { resendConfigured } from "@/lib/resend-config";
+import { canonicalSiteUrl } from "@/lib/net";
 
 /**
  * Changing the sign-in address, with proof of control of the new one.
@@ -35,7 +36,7 @@ export function normaliseEmail(raw: string): string {
 }
 
 function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://pryva.ng").replace(/\/$/, "");
+  return canonicalSiteUrl();
 }
 
 function escapeHtml(value: string): string {

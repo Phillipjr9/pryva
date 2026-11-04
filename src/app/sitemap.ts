@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { blogPosts } from "@/lib/blog";
+import { canonicalSiteUrl } from "@/lib/net";
 
 const routes = [
   "",
@@ -32,7 +33,7 @@ const routes = [
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = "https://pryva.ng";
+  const base = canonicalSiteUrl();
   const staticRoutes = routes.map((route) => ({
     url: `${base}${route}`,
     lastModified: new Date(),

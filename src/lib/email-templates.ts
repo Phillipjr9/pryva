@@ -1,3 +1,4 @@
+import { canonicalSiteUrl } from "@/lib/net";
 export interface EmailTemplate {
   subject: string;
   html: string;
@@ -18,14 +19,12 @@ const config = {
   infoBackground: "#f8f5ee",
   infoBorder: "#eae5da",
   accentColor: "#8266C9",
-  // Was hardcoded to https://pryva.ng, a domain that is not attached to the
-  // deployment. Hero images and the brand mark are absolute URLs built from this,
-  // so every image in every email would have 404d on the live host.
-  siteUrl: (
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    "https://pryva.ng"
-  ).replace(/\/$/, ""),
+  // Hero images and the brand mark are absolute URLs built from this, so a wrong
+  // value 404s every image in every email. It used to be a hardcoded domain no
+  // deployment has ever served; it now comes from the shared resolver, which
+  // prefers the configured canonical site and falls back to the project's own
+  // production host rather than a guess.
+  siteUrl: canonicalSiteUrl(),
 };
 
 function emailWrapper(content: string, preheader: string = ""): string {

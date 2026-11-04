@@ -58,7 +58,9 @@ describe("gift-card explainer", () => {
 
   it("is published: listed in the sitemap and linked from the footer", () => {
     const urls = sitemap().map((entry) => entry.url);
-    expect(urls).toContain("https://pryva.ng/gift-cards");
+    // The host comes from `canonicalSiteUrl` and moves with the deployment; what
+    // this guards is that the page is in the sitemap at all.
+    expect(urls.some((url) => url.endsWith("/gift-cards"))).toBe(true);
 
     const footer = readFileSync("src/components/site/SiteFooter.tsx", "utf8");
     expect(footer).toContain('href: "/gift-cards"');

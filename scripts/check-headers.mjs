@@ -6,7 +6,7 @@
  * non-zero if a response names the framework or a version — so it can be run
  * after every deploy, or pasted into a monitoring check.
  *
- *   node scripts/check-headers.mjs                      # https://pryva-two.vercel.app
+ *   node scripts/check-headers.mjs                      # https://pryvalogs.com
  *   node scripts/check-headers.mjs http://localhost:3111
  *   node scripts/check-headers.mjs https://pryva.example /api/health /login
  *
@@ -16,7 +16,7 @@
  */
 import { inspectBanners, revealsVersion } from "../src/lib/server-banner.ts";
 
-const base = (process.argv[2] ?? "https://pryva-two.vercel.app").replace(/\/$/, "");
+const base = (process.argv[2] ?? "https://pryvalogs.com").replace(/\/$/, "");
 const paths = process.argv.slice(3);
 const targets = paths.length > 0 ? paths : ["/", "/login", "/api/health", "/dashboard/support"];
 

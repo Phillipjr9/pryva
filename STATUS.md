@@ -1912,7 +1912,7 @@ classes and the script's wiring; the live check was run against `next start` and
 against a leaky server by hand.
 
 **Not verified:** the headers of the live deployment from inside this sandbox — it
-has no network route to `pryva-two.vercel.app`. `npm run headers:check` is the one
+has no network route to `pryvalogs.com`. `npm run headers:check` is the one
 command that answers it from anywhere with a route.
 
 ---
