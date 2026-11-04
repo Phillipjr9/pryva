@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { paymentTopups, users, walletTransactions } from "@/db/schema";
+import { paymentTopups, TOPUP_STATUS, users, walletTransactions } from "@/db/schema";
 import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 
 export type TopUpOutcome = "credited" | "duplicate" | "mismatch";
@@ -38,7 +38,7 @@ export async function completeTopUp(input: {
     const [topup] = await tx
       .update(paymentTopups)
       .set({
-        status: "completed",
+        status: TOPUP_STATUS.completed,
         paidAt: new Date(),
         payerName: accountHolder?.name.trim() || null,
       })
@@ -47,7 +47,7 @@ export async function completeTopUp(input: {
           eq(paymentTopups.reference, reference),
           eq(paymentTopups.userId, userId),
           eq(paymentTopups.amount, amount),
-          eq(paymentTopups.status, "pending"),
+          eq(paymentTopups.status, TOPUP_STATUS.pending),
         ),
       )
       .returning();
@@ -59,7 +59,7 @@ export async function completeTopUp(input: {
         .where(eq(paymentTopups.reference, reference))
         .limit(1);
 
-      if (previous?.status === "completed" && previous.userId === userId && previous.amount === amount) {
+      if (previous?.status === TOPUP_STATUS.completed && previous.userId === userId && previous.amount === amount) {
         return "duplicate" as const;
       }
 
