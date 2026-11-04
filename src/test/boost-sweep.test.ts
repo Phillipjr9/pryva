@@ -34,7 +34,7 @@ vi.mock("@/db", () => ({
     update: () => ({
       set: (values: Record<string, unknown>) => {
         state.writes.push(values);
-        return { where: () => Promise.resolve() };
+        return { where: () => ({ returning: () => Promise.resolve([{ id: "boost-1" }]) }) };
       },
     }),
   },
