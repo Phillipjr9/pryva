@@ -61,7 +61,15 @@ for (const path of targets) {
 console.log(`Checked ${checked.length} response(s) from ${base}\n`);
 for (const entry of checked) console.log(`  ${String(entry.status).padEnd(4)} ${entry.url}`);
 
-if (leaks.length === 0) {
+// "No leaks" and "nothing was examined" are different answers, and only one of
+// them is good news. A host that could not be reached — egress-blocked sandbox,
+// DNS typo, a deployment protection wall — used to fall through to the green
+// line below and read as a passing check with zero evidence behind it. The exit
+// code was already 2, but the sentence a human reads said the opposite.
+if (checked.length === 0) {
+  console.log(`\n✗ Nothing was checked: no response from ${base}. This is not a pass.`);
+  process.exitCode = 2;
+} else if (leaks.length === 0) {
   console.log("\n✓ No framework banner and no version in any response header.");
 } else {
   console.log("\n✗ These responses disclose the stack:");
