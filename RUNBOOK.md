@@ -119,19 +119,31 @@ there is no separate nameserver to log into.
 Until this is done the domain resolves to Wix's parking page ("This domain isn't
 connected to a site"), not to the app.
 
-1. **Vercel → Project `pryva` → Settings → Domains → Add.** Add `pryvalogs.com`
-   and `www.pryvalogs.com`. Vercel will show the exact records it wants.
-2. **Wix → Domains → pryvalogs.com → DNS records.** Replace the Wix pointing
-   records with Vercel's:
-   - `pryvalogs.com` → `A` record to `76.76.21.21`
-   - `www` → `CNAME` to `cname.vercel-dns.com`
-   Delete the existing `A` records (currently `185.230.63.x`) and the
-   `www` CNAME to `initial.wixdns.net`, or the two sets will fight.
-3. Wait for Vercel to show **Valid Configuration** on both names. Propagation is
-   usually minutes, occasionally a few hours.
-4. **Pick one name.** Add a redirect from the other in Vercel → Domains, so
-   `www` and the apex are one origin rather than two. Look at which one you
-   configured in `NEXT_PUBLIC_SITE_URL` and redirect *towards* it.
+**Already done in Vercel:** both names are attached to the project and
+`www.pryvalogs.com` permanently redirects (308) to `pryvalogs.com`, so the two
+are one origin. `NEXT_PUBLIC_SITE_URL` and `NEXT_PUBLIC_APP_URL` are set to
+`https://pryvalogs.com` for all three environments.
+
+**What remains is DNS, and it can only be done in Wix.** The nameservers are
+`ns0/ns1.wixdns.net` and Vercel currently reports both names as
+`misconfigured`. In **Wix → Domains → pryvalogs.com → DNS records**, replace the
+Wix pointing records with Vercel's:
+
+| Record | Name | Value |
+|---|---|---|
+| `A` | `@` | `216.198.79.1` |
+| `A` | `@` | `64.29.17.1` |
+| `CNAME` | `www` | `5fd9d5d1f427b86f.vercel-dns-017.com` |
+
+Delete the existing `A` records (`185.230.63.107/171/186`) and the `www` CNAME to
+`cdn3.wixdns.net`, or the two sets will fight and the domain will keep resolving
+to Wix. Vercel also accepts the older pair `76.76.21.21` (apex) and
+`cname.vercel-dns.com` (`www`); either set works, but use one set, not a mix.
+
+Then wait for Vercel to show **Valid Configuration** on both names. Propagation
+is usually minutes, occasionally a few hours. Until it does, the domain serves
+Wix's "This domain isn't connected to a site" page and nothing in this repo can
+change that.
 
 ⚠ **Do not connect the domain to Wix as a site.** The registrar and the website
 host are separate concerns here; leaving the domain "connected to a Wix site"
