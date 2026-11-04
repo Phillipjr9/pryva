@@ -44,6 +44,7 @@
 import "server-only";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { readJsonWithLimit } from "@/lib/request-body";
+import { logger } from "@/lib/logger";
 
 const API_HOST = "api.bitcall.io";
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -445,10 +446,23 @@ export async function listBitcallEsimPlans(filter: { region?: string; country?: 
   const payload = await gatewayFetch("GET", "/v1/esim/plans", { query: { region: filter.region, country: filter.country } });
   const plans: BitcallEsimPlan[] = [];
   const seen = new Set<string>();
-  for (const row of rowsFrom(payload).slice(0, 2000)) {
+  const rows = rowsFrom(payload);
+  // A plan id that does not look like ours is dropped, because a plan we cannot
+  // name cannot be bought. Dropping it *silently* is what turns a supplier's
+  // schema change into an empty storefront with a green health check: the read
+  // succeeds, every row is discarded, and the page renders no plans and no
+  // error. Count them and say so — the ids are not logged, only how many of the
+  // rows survived.
+  let unreadableIds = 0;
+  let sampleKeys: string[] | null = null;
+  for (const row of rows.slice(0, 2000)) {
     const planId = pickString(row, ["planId", "plan_id", "id"]);
     // Without a `pln_` reference the plan cannot be bought, so it cannot be listed.
-    if (!planId || !planId.startsWith("pln_") || seen.has(planId)) continue;
+    if (!planId || !planId.startsWith("pln_") || seen.has(planId)) {
+      unreadableIds += 1;
+      if (!sampleKeys) sampleKeys = Object.keys(row).slice(0, 12);
+      continue;
+    }
     seen.add(planId);
     plans.push({
       planId,
@@ -462,6 +476,15 @@ export async function listBitcallEsimPlans(filter: { region?: string; country?: 
       price: nonNegative(pickNumber(row, ["price", "amount", "retailPrice", "sellingPrice"])),
       currency: currencyCode(pickString(row, ["currency"])),
     });
+  }
+  if (rows.length > 0 && plans.length === 0) {
+    // Every row was unusable: not a quiet catalogue, a contract that moved.
+    logger.error("eSIM catalog returned rows but none were readable", {
+      rows: rows.length,
+      sampleKeys,
+    });
+  } else if (unreadableIds > 0) {
+    logger.warn("eSIM catalog rows skipped", { rows: rows.length, skipped: unreadableIds, sampleKeys });
   }
   return plans;
 }
