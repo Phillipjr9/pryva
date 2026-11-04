@@ -322,7 +322,7 @@ export default async function AdminReconciliationPage() {
               )}
               {dailyRuns.map((run) => {
                 const totals = (run.totals ?? {}) as {
-                  topupsPaid?: { amount?: number };
+                  topupsCompleted?: { amount?: number };
                   ordersPlaced?: { amount?: number };
                   refunds?: { amount?: number };
                   withdrawalsCompleted?: { amount?: number };
@@ -346,7 +346,7 @@ export default async function AdminReconciliationPage() {
                         {run.discrepancies > 0 ? ` · ${run.discrepancies}` : ""}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3">{formatNaira(totals.topupsPaid?.amount ?? 0)}</td>
+                    <td className="whitespace-nowrap px-4 py-3">{formatNaira(totals.topupsCompleted?.amount ?? 0)}</td>
                     <td className="whitespace-nowrap px-4 py-3">{formatNaira(totals.ordersPlaced?.amount ?? 0)}</td>
                     <td className="whitespace-nowrap px-4 py-3">{formatNaira(totals.refunds?.amount ?? 0)}</td>
                     <td className="whitespace-nowrap px-4 py-3">{formatNaira(totals.withdrawalsCompleted?.amount ?? 0)}</td>

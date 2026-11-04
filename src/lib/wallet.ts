@@ -1,7 +1,13 @@
 import { randomBytes, randomInt } from "node:crypto";
 import { and, eq, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { users, walletTransactions } from "@/db/schema";
+import {
+  users,
+  WALLET_CREDIT_TYPES,
+  WALLET_DEBIT_TYPES,
+  walletTransactions,
+  type WalletEntryType,
+} from "@/db/schema";
 import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 
 export function makeReference(prefix = "PRY"): string {
@@ -18,7 +24,7 @@ export type WalletEntryInput = {
   userId: string;
   amount: number;
   description: string;
-  type: "credit" | "debit" | "refund";
+  type: WalletEntryType;
   orderId?: string | null;
   reference?: string;
 };
@@ -36,7 +42,8 @@ function validateWalletEntry(input: WalletEntryInput, direction: "credit" | "deb
   if (!Number.isSafeInteger(input.amount) || input.amount <= 0 || input.amount > MAX_DATABASE_INTEGER) {
     throw new Error("Wallet amount must be a positive whole-naira value");
   }
-  if (direction === "credit" ? !["credit", "refund"].includes(input.type) : input.type !== "debit") {
+  const allowed: readonly WalletEntryType[] = direction === "credit" ? WALLET_CREDIT_TYPES : WALLET_DEBIT_TYPES;
+  if (!allowed.includes(input.type)) {
     throw new Error("Wallet transaction type does not match its direction");
   }
 }

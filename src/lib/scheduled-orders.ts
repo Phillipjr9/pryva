@@ -86,6 +86,19 @@ export async function getUserScheduledOrders(userId: string) {
 }
 
 /**
+ * This run is not ours to make: the row moved under us, or the money did.
+ *
+ * Thrown rather than returned so the transaction rolls back and one `catch`
+ * decides what a declined run owes the supplier.
+ */
+class RunDeclinedError extends Error {
+  constructor() {
+    super("Scheduled run declined");
+    this.name = "RunDeclinedError";
+  }
+}
+
+/**
  * Atomically execute one due run.
  *
  * The old version debited the wallet, wrote an order marked `delivered` with
@@ -94,6 +107,11 @@ export async function getUserScheduledOrders(userId: string) {
  * `fulfillPlan` a manual purchase uses — and only then records and charges. A
  * refused or unreachable supplier leaves the money where it was and the run is
  * skipped, so the next scheduled time can try again.
+ *
+ * Buying before claiming is what makes the release path matter: if the row turns
+ * out not to be ours to run — paused, already run by the sweep that overlapped
+ * this one, balance moved under us — the number has already been bought and has
+ * to go back, or the business pays a supplier for a number nobody holds.
  */
 export async function processScheduledOrder(scheduled: typeof scheduledOrders.$inferSelect): Promise<boolean> {
   const now = new Date();
@@ -140,21 +158,44 @@ export async function processScheduledOrder(scheduled: typeof scheduledOrders.$i
   const reference = makeReference("SCH");
   const orderId = randomUUID();
 
+  // One release path for both ways this run can back out: the transaction
+  // declining, and the transaction failing. `cancelUpstream` is the only thing
+  // standing between a bought number and nobody holding it.
+  const release = () =>
+    cancelUpstream({
+      provider: fulfilled.provider,
+      providerRequestId: fulfilled.providerRequestId,
+      service: plan.service,
+      duration: plan.duration,
+    }).catch((cancelError) => {
+      console.error("Scheduled upstream cancel failed", cancelError);
+    });
+
   try {
     return await db.transaction(async (tx: any): Promise<boolean> => {
+      // `FOR UPDATE`, on the row this run is about to spend: two sweeps that both
+      // picked this schedule out of the due list used to read the same past
+      // `nextRunAt`, both see it as still due, and both buy and both charge. The
+      // nightly job and `/api/cron/scheduled-orders` are separate requests, and
+      // Vercel can overlap two invocations of either. Blocking here makes the
+      // loser re-read the row as the winner left it — next run advanced — decline,
+      // and give the number back.
       const [fresh] = await tx
         .select()
         .from(scheduledOrders)
         .where(and(eq(scheduledOrders.id, current.id), eq(scheduledOrders.status, "active")))
+        .for("update")
         .limit(1);
-      if (!fresh || new Date(fresh.nextRunAt as Date | string).getTime() > now.getTime()) return false;
+      if (!fresh || new Date(fresh.nextRunAt as Date | string).getTime() > now.getTime()) {
+        throw new RunDeclinedError();
+      }
 
       const [wallet] = await tx
         .select({ walletBalance: users.walletBalance })
         .from(users)
         .where(eq(users.id, current.userId))
         .limit(1);
-      if (!wallet || wallet.walletBalance < plan.price) return false;
+      if (!wallet || wallet.walletBalance < plan.price) throw new RunDeclinedError();
 
       await tx.insert(orders).values({
         id: orderId,
@@ -195,18 +236,8 @@ export async function processScheduledOrder(scheduled: typeof scheduledOrders.$i
       return true;
     });
   } catch (error) {
-    // The purchase was made but never recorded or charged: release it rather
-    // than holding a paid-for number nobody can see.
-    try {
-      await cancelUpstream({
-        provider: fulfilled.provider,
-        providerRequestId: fulfilled.providerRequestId,
-        service: plan.service,
-        duration: plan.duration,
-      });
-    } catch (cancelError) {
-      console.error("Scheduled upstream cancel failed", cancelError);
-    }
+    await release();
+    if (error instanceof RunDeclinedError) return false;
     throw error;
   }
 }

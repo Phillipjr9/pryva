@@ -284,6 +284,22 @@ export const orders = pgTable(
   ],
 );
 
+/**
+ * Which `wallet_transactions.type` values move the balance which way.
+ *
+ * The column is a free varchar and `amount` is always positive, so the type is
+ * the only thing that gives a row its direction: a credit's amount is added to
+ * the previous balance, a debit's is subtracted. A reader that hard-codes one
+ * word for "money out" gets the arithmetic backwards for every row outside it —
+ * which is how the nightly ledger check came to report every payout as a break,
+ * because a withdrawal is written as `withdrawal`, not `debit`.
+ */
+export const WALLET_DEBIT_TYPES = ["debit", "withdrawal"] as const;
+export const WALLET_CREDIT_TYPES = ["credit", "refund"] as const;
+
+/** Every value the ledger's `type` column is allowed to hold. */
+export type WalletEntryType = (typeof WALLET_DEBIT_TYPES)[number] | (typeof WALLET_CREDIT_TYPES)[number];
+
 export const walletTransactions = pgTable(
   "wallet_transactions",
   {
@@ -301,6 +317,17 @@ export const walletTransactions = pgTable(
   },
   (table) => [index("wallet_user_idx").on(table.userId)],
 );
+
+/**
+ * The whole vocabulary `payment_topups.status` ever holds.
+ *
+ * A row is created `pending` by the top-up route and moved to `completed` by
+ * `completeTopUp` — nothing else writes it. The word for "the money arrived" is
+ * *not* `paid`: that belongs to the withdrawals table, where it describes a
+ * payout leaving, not a deposit landing. Readers that invented their own word
+ * silently counted nothing.
+ */
+export const TOPUP_STATUS = { pending: "pending", completed: "completed" } as const;
 
 // A server-created top-up is required before a signed Paystack event can
 // credit a wallet. The reference is unique, so retries are idempotent.

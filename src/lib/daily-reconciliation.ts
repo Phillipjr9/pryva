@@ -7,7 +7,11 @@ import {
   orders,
   paymentTopups,
   reconciliationRuns,
+  TOPUP_STATUS,
   walletTransactions,
+  WALLET_CREDIT_TYPES,
+  WALLET_DEBIT_TYPES,
+  type WalletEntryType,
   withdrawals,
 } from "@/db/schema";
 
@@ -46,22 +50,30 @@ export const LAGOS_OFFSET_MS = 60 * 60 * 1000;
 export type Money = { count: number; amount: number };
 
 export type ReconciliationTotals = {
-  topupsPaid: Money;
+  /** Deposits the provider confirmed — i.e. `payment_topups.status = completed`. */
+  topupsCompleted: Money;
   topupsPending: Money;
   walletCredits: Money;
   walletDebits: Money;
   refunds: Money;
+  /**
+   * Ledger rows for payouts, counted separately from `walletDebits` because the
+   * withdraw route writes its own type. Without it, the four columns above do
+   * not tie out to `netWalletMovement` on a day with a payout in it, and an
+   * operator reading this row by hand cannot reproduce the figure.
+   */
+  walletWithdrawals: Money;
   ordersPlaced: Money;
   giftCardsIssued: Money;
   withdrawalsCompleted: Money;
   withdrawalsPending: Money;
-  /** Credit minus debit, as the ledger recorded it. */
+  /** Credit-direction minus debit-direction, as the ledger recorded it. */
   netWalletMovement: number;
 };
 
 export type LedgerBreak = {
   userId: string;
-  kind: "balance_after" | "final_balance";
+  kind: "balance_after" | "final_balance" | "unknown_type";
   detail: string;
 };
 
@@ -117,6 +129,14 @@ async function checkLedger(): Promise<{ accountsChecked: number; breaks: LedgerB
 
   const breaks: LedgerBreak[] = [];
 
+  // The vocabulary comes from the schema, not from a string literal in this file.
+  // `type` is a free varchar, so a hand-written rule here drifted: it treated
+  // everything that is not `'debit'` as money coming in, which read the payout
+  // rows the withdraw route writes (`'withdrawal'`, also a positive amount that
+  // moves the balance down) as credits.
+  const inList = (types: readonly string[]) =>
+    sql`(${sql.join(types.map((type) => sql`${type}`), sql`, `)})`;
+
   const outOfSequence = await db.execute<{ user_id: string; occurrences: number }>(sql`
     WITH ordered AS (
       SELECT user_id, type, balance_after, amount,
@@ -127,10 +147,10 @@ async function checkLedger(): Promise<{ accountsChecked: number; breaks: LedgerB
       FROM ordered
      WHERE previous IS NOT NULL
        AND (
-         -- Debits are stored as a positive amount that moves the balance down,
-         -- so the arithmetic depends on the direction, not on the sign.
-         (type = 'debit' AND previous - amount <> balance_after)
-         OR (type <> 'debit' AND previous + amount <> balance_after)
+         -- Amounts are stored positive in both directions, so the arithmetic
+         -- depends on the direction the type belongs to, never on its sign.
+         (type IN ${inList(WALLET_DEBIT_TYPES)} AND previous - amount <> balance_after)
+         OR (type IN ${inList(WALLET_CREDIT_TYPES)} AND previous + amount <> balance_after)
        )
      GROUP BY user_id
   `);
@@ -139,6 +159,23 @@ async function checkLedger(): Promise<{ accountsChecked: number; breaks: LedgerB
       userId: row.user_id,
       kind: "balance_after",
       detail: `${row.occurrences} transaction(s) whose balance does not follow from the previous one`,
+    });
+  }
+
+  // A type in neither list has no direction, so the two checks above silently
+  // skip it. That is not the same as it being clean: a row this file cannot read
+  // is a row the books cannot read either, so it is reported instead of ignored.
+  const unknownTypes = await db.execute<{ user_id: string; type: string; occurrences: number }>(sql`
+    SELECT user_id, type, count(*)::int AS occurrences
+      FROM wallet_transactions
+     WHERE type NOT IN ${inList([...WALLET_DEBIT_TYPES, ...WALLET_CREDIT_TYPES])}
+     GROUP BY user_id, type
+  `);
+  for (const row of unknownTypes.rows) {
+    breaks.push({
+      userId: row.user_id,
+      kind: "unknown_type",
+      detail: `${row.occurrences} transaction(s) of type '${row.type}' are in no known direction and were not checked`,
     });
   }
 
@@ -186,15 +223,15 @@ export async function runDailyReconciliation(day: string = lagosDay()): Promise<
   // nullability, and the predicate is the same for all of them.
   const inWindow = (column: AnyColumn) => and(gte(column, start), lt(column, end));
 
-  const topupsPaid = await db
+  const topupsCompleted = await db
     .select({ count: sql<number>`count(*)::int`, amount: sql<number>`coalesce(sum(${paymentTopups.amount}), 0)::bigint` })
     .from(paymentTopups)
-    .where(and(eq(paymentTopups.status, "paid"), inWindow(paymentTopups.paidAt)));
+    .where(and(eq(paymentTopups.status, TOPUP_STATUS.completed), inWindow(paymentTopups.paidAt)));
 
   const topupsPending = await db
     .select({ count: sql<number>`count(*)::int`, amount: sql<number>`coalesce(sum(${paymentTopups.amount}), 0)::bigint` })
     .from(paymentTopups)
-    .where(and(eq(paymentTopups.status, "pending"), inWindow(paymentTopups.createdAt)));
+    .where(and(eq(paymentTopups.status, TOPUP_STATUS.pending), inWindow(paymentTopups.createdAt)));
 
   const ledgerByType = await db
     .select({
@@ -207,9 +244,16 @@ export async function runDailyReconciliation(day: string = lagosDay()): Promise<
     .groupBy(walletTransactions.type);
 
   const byType = new Map(ledgerByType.map((row) => [row.type, row]));
-  const credits = byType.get("credit");
-  const debits = byType.get("debit");
-  const refunds = byType.get("refund");
+  // Typed as the vocabulary, so a name that is not in `WALLET_*_TYPES` stops
+  // compiling instead of silently reading `undefined` and reporting zero.
+  const rowFor = (type: WalletEntryType) => byType.get(type);
+  const credits = rowFor("credit");
+  const refunds = rowFor("refund");
+  const debits = rowFor("debit");
+  const payoutRows = rowFor("withdrawal");
+
+  const amountFor = (types: readonly WalletEntryType[]) =>
+    types.reduce((sum, type) => sum + Number(byType.get(type)?.amount ?? 0), 0);
 
   const ordersPlaced = await db
     .select({ count: sql<number>`count(*)::int`, amount: sql<number>`coalesce(sum(${orders.amount}), 0)::bigint` })
@@ -232,19 +276,20 @@ export async function runDailyReconciliation(day: string = lagosDay()): Promise<
     .where(eq(withdrawals.status, "pending"));
 
   const totals: ReconciliationTotals = {
-    topupsPaid: money(topupsPaid[0]?.count, topupsPaid[0]?.amount),
+    topupsCompleted: money(topupsCompleted[0]?.count, topupsCompleted[0]?.amount),
     topupsPending: money(topupsPending[0]?.count, topupsPending[0]?.amount),
     walletCredits: money(credits?.count, credits?.amount),
     walletDebits: money(debits?.count, debits?.amount),
     refunds: money(refunds?.count, refunds?.amount),
+    walletWithdrawals: money(payoutRows?.count, payoutRows?.amount),
     ordersPlaced: money(ordersPlaced[0]?.count, ordersPlaced[0]?.amount),
     giftCardsIssued: money(giftsIssued[0]?.count, giftsIssued[0]?.amount),
     withdrawalsCompleted: money(withdrawalsCompleted[0]?.count, withdrawalsCompleted[0]?.amount),
     withdrawalsPending: money(withdrawalsPending[0]?.count, withdrawalsPending[0]?.amount),
-    // Refunds are credits to the customer, so they count on the same side as a
-    // top-up credit: the ledger's own arithmetic, not the operator's view of it.
-    netWalletMovement:
-      Number(credits?.amount ?? 0) + Number(refunds?.amount ?? 0) - Number(debits?.amount ?? 0),
+    // Every type the ledger knows, on the side its direction list puts it on —
+    // derived from the vocabulary rather than from a hand-written list of names,
+    // which is what left payout rows out of this number before.
+    netWalletMovement: amountFor(WALLET_CREDIT_TYPES) - amountFor(WALLET_DEBIT_TYPES),
   };
 
   const { accountsChecked, breaks } = await checkLedger();
@@ -262,6 +307,14 @@ export async function runDailyReconciliation(day: string = lagosDay()): Promise<
   const externalNote =
     "External side not compared: check the day's settled deposits against the payment provider's dashboard.";
 
+  // The run page lists the accounts whose final balance disagrees, and nothing
+  // else, so the kinds that do not look like that — a transaction that does not
+  // follow from the one before, a type with no direction — have to be legible in
+  // the row itself or an operator is sent to a table with nothing in it.
+  const byKind = new Map<string, number>();
+  for (const entry of breaks) byKind.set(entry.kind, (byKind.get(entry.kind) ?? 0) + 1);
+  const breakKinds = [...byKind].map(([kind, count]) => `${count} ${kind}`).join(", ");
+
   await db
     .update(reconciliationRuns)
     .set({
@@ -271,7 +324,7 @@ export async function runDailyReconciliation(day: string = lagosDay()): Promise<
       discrepancies: breaks.length,
       totals: totals as unknown as Record<string, unknown>,
       notes: breaks.length
-        ? `${breaks.length} ledger break(s); see /admin/reconciliation. ${externalNote}`
+        ? `${breaks.length} ledger break(s) (${breakKinds}); see /admin/reconciliation. ${externalNote}`
         : externalNote,
     })
     .where(eq(reconciliationRuns.day, day));
