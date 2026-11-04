@@ -6,7 +6,7 @@ import { Check } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { CountryFlag } from "@/components/CountryFlag";
 import { hasCountryFlag } from "@/lib/countries";
-import { catalogEsimSampleIsSellable, isEsimOrderingAvailable } from "@/lib/esim-availability";
+import { isEsimOrderingAvailable } from "@/lib/esim-availability";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -59,12 +59,14 @@ export default function PricingPage() {
                   // that could never be delivered. Plans stay listed with their
                   // price and details -- what is withdrawn is the promise to sell,
                   // using the same wording the plan page already uses.
-                  // eSIM sample cards are placeholders for a live catalogue: once
-                  // one exists, these are not what a customer buys, and printing
-                  // "cannot be delivered yet" on them says the product is broken.
-                  const deliverable = plan.service === "esim"
-                    ? catalogEsimSampleIsSellable()
-                    : isPlanFulfillable(plan.slug);
+                  const deliverable = isPlanFulfillable(plan.slug);
+                  // These written cards are not what a customer buys once a live
+                  // catalogue exists. They are still not deliverable -- there is
+                  // no provider reference to order -- so the note stays, but
+                  // "cannot be delivered yet" would read as "the product is
+                  // broken" while the dashboard is selling plans. Point at the
+                  // ones that can be bought instead.
+                  const liveEsim = plan.service === "esim" && isEsimOrderingAvailable();
                   return (
                   <div
                     key={plan.slug}
@@ -124,6 +126,13 @@ export default function PricingPage() {
                         }`}
                       >
                         Get Started
+                      </Link>
+                    ) : liveEsim ? (
+                      <Link
+                        href="/esim"
+                        className="block w-full rounded-lg border border-lav-200 bg-lav-50 px-3 py-2 text-center text-meta font-semibold leading-relaxed text-lav-800 transition-colors hover:bg-lav-100 sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.9rem]"
+                      >
+                        Live eSIM plans are priced per destination — see them
                       </Link>
                     ) : (
                       <p className="block w-full rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-center text-meta font-semibold leading-relaxed text-amber-900 sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.78rem]">

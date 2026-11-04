@@ -168,32 +168,42 @@ describe("the public eSIM page agrees with itself", () => {
 });
 
 describe("no public page says eSIM cannot be bought while it is being bought", () => {
-  it("withdraws the sample cards' 'undeliverable' claim once a live catalogue exists", async () => {
-    const { catalogEsimSampleIsSellable } = await import("@/lib/esim-availability");
+  it("reports the category as orderable once a live catalogue exists", async () => {
     vi.resetModules();
     vi.stubEnv("BITCALL_KEY_ID", "ak_live_abc");
     vi.stubEnv("BITCALL_API_SECRET", "a".repeat(128));
-    expect(catalogEsimSampleIsSellable()).toBe(false);
+    const { esimCategoryOrderable } = await import("@/lib/esim-availability");
+    expect(esimCategoryOrderable()).toBe(true);
 
+    vi.resetModules();
     vi.stubEnv("BITCALL_KEY_ID", "");
     vi.stubEnv("BITCALL_API_SECRET", "");
-    expect(catalogEsimSampleIsSellable()).toBe(true);
+    const off = await import("@/lib/esim-availability");
+    expect(off.esimCategoryOrderable()).toBe(false);
     vi.unstubAllEnvs();
   });
 
-  it("is asked by the three surfaces that used to contradict the storefront", () => {
-    // /pricing and /status printed "cannot be delivered yet" on every eSIM card,
-    // and the plan page refused to sell them, all while /esim said plans were
-    // live and issued on purchase.
-    for (const page of [
-      "app/(site)/pricing/page.tsx",
-      "app/(site)/status/page.tsx",
-      "app/dashboard/services/plan/[slug]/page.tsx",
-    ]) {
-      const source = read(page);
-      expect(source, `${page} must not fall through to isPlanFulfillable for eSIM`).toMatch(
-        /catalogEsimSampleIsSellable|isEsimOrderingAvailable/,
-      );
-    }
+  it("is not a licence to sell a sample card", () => {
+    // The six written cards have no provider reference: `FULFILMENT_MAP` omits
+    // them, /api/orders refuses them, and no page may offer one. Availability is a
+    // report about a category, never a permission for a plan -- an earlier
+    // revision of this change made /pricing link a signup funnel for all six and
+    // the plan page render a purchase button that the API would reject.
+    const pricing = read("app/(site)/pricing/page.tsx");
+    expect(pricing).toContain("const deliverable = isPlanFulfillable(plan.slug);");
+    expect(pricing).not.toContain("catalogEsimSampleIsSellable(plan.slug)");
+
+    const planPage = read("app/dashboard/services/plan/[slug]/page.tsx");
+    expect(planPage).toContain("const fulfillable = isPlanFulfillable(plan.slug);");
+    expect(planPage).not.toContain("esimCategoryOrderable");
+  });
+
+  it("sends a visitor from a dead sample card to the plans that are live", () => {
+    // The card keeps its note -- it genuinely cannot be ordered -- but "cannot be
+    // delivered yet" alone reads as a broken product while the dashboard sells
+    // eSIM, so it points at the live catalogue.
+    const pricing = read("app/(site)/pricing/page.tsx");
+    expect(pricing).toContain("liveEsim");
+    expect(pricing).toContain('href="/esim"');
   });
 });

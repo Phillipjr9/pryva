@@ -3,7 +3,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import PricingPage from "@/app/(site)/pricing/page";
 import { formatNaira, plans } from "@/lib/catalog";
 import { isPlanFulfillable } from "@/lib/fulfillment";
-import { isEsimOrderingAvailable } from "@/lib/esim-availability";
 
 /**
  * /pricing is the one surface that advertised plans the app cannot deliver.
@@ -21,29 +20,23 @@ import { isEsimOrderingAvailable } from "@/lib/esim-availability";
  * existing words.
  */
 const NOTE = "This plan cannot be delivered yet, so it cannot be ordered or charged.";
+/**
+ * With a live catalogue, eSIM sample cards replace the note with a pointer to
+ * `/esim`. They are still not sellable -- the link is a signpost, not a sale --
+ * so the "one action or one note per card" rule below still holds; only the
+ * wording of the eSIM dead end changes.
+ */
+const LIVE_ESIM_NOTE = "Live eSIM plans are priced per destination";
 // email-otp is absent: a temporary inbox is free, so it has no plans to price
 // and no group on this page. Pinned explicitly below.
 const PRICED_SERVICES = ["numbers", "esim", "proxies"];
 
 const priced = plans.filter((plan) => PRICED_SERVICES.includes(plan.service));
 
-/**
- * What the page should promise for one plan.
- *
- * The page has two kinds of plan in the eSIM group: written sample cards with no
- * provider reference, and the live catalogue those cards stand in for. While a
- * supplier key is configured, the sample cards are not what a customer buys, so
- * they are not marked undeliverable -- that note would tell a visitor the
- * product is broken while the dashboard sells it.
- */
-function isSellable(plan: (typeof plans)[number]): boolean {
-  return plan.service === "esim" ? !isEsimOrderingAvailable() : isPlanFulfillable(plan.slug);
-}
-
 // The suite runs with no supplier key, which is how a fresh checkout behaves.
 const markup = renderToStaticMarkup(<PricingPage />);
-const deliverable = priced.filter((plan) => isSellable(plan) && isPlanFulfillable(plan.slug));
-const undeliverable = priced.filter((plan) => !isSellable(plan));
+const deliverable = priced.filter((plan) => isPlanFulfillable(plan.slug));
+const undeliverable = priced.filter((plan) => !isPlanFulfillable(plan.slug));
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -51,22 +44,19 @@ function count(needle: string): number {
   return markup.split(needle).length - 1;
 }
 
+/**
+ * Dead sample cards gain a third element when a live eSIM catalogue exists: a
+ * pointer to `/esim`. The card still carries its honest note -- it genuinely has
+ * no provider reference and cannot be ordered -- so the one-link-or-one-note
+ * invariant below is unaffected.
+ */
+const LIVE_ESIM_LINK = "/esim";
+
 describe("/pricing only offers to sell what can be delivered", () => {
   it("covers both kinds of plan, so the assertions below are not vacuous", () => {
-    // email-otp is excluded by PRICED_SERVICES, so this is every priced card.
-    expect(priced.length).toBeGreaterThan(0);
-    // A split only exists while some plan is sellable and some is not. Asserting
-    // the split rather than a bare total keeps this meaningful whichever way
-    // eSIM ordering is configured: with a supplier key the eSIM notes go away and
-    // only the proxies remain marked.
-    expect(deliverable.length).toBeGreaterThan(0);
-    expect(undeliverable.length).toBeGreaterThan(0);
-    // Deliberately *not* `toBe(priced.length)`: while a live eSIM catalogue
-    // exists its sample cards are placeholders for the pages above, and
-    // `markup` cannot see them, so the two lists do not have to partition the
-    // full set. What must hold is that no plan is counted both ways.
-    expect(deliverable.length + undeliverable.length).toBeLessThanOrEqual(priced.length);
-    expect(deliverable.filter((plan) => undeliverable.includes(plan))).toHaveLength(0);
+    expect(priced.length).toBe(23);
+    expect(deliverable.length).toBe(10);
+    expect(undeliverable.length).toBe(13);
   });
 
   it("links a signup funnel only for plans that can be delivered", () => {
@@ -79,18 +69,16 @@ describe("/pricing only offers to sell what can be delivered", () => {
   });
 
   it("says so in the same words the plan page already uses", () => {
-    expect(count(NOTE)).toBe(undeliverable.length);
+    const esimDead = undeliverable.filter((plan) => plan.service === "esim").length;
+    expect(count(NOTE) + count(LIVE_ESIM_NOTE)).toBe(undeliverable.length);
+    // A sample card may point at the live catalogue, but never at a sale.
+    if (esimDead > 0) expect(count("/signup?plan=esim-")).toBe(0);
   });
 
   it("still lists every plan it prices, deliverable or not", () => {
-    // Every card carries exactly one outcome: a call to action, or an honest note
-    // that it cannot be bought. Gating the link must not silently drop a listing,
-    // and a card with neither would be a new state. eSIM sample cards are neither
-    // while a live catalogue exists -- they are placeholders, and the live plans
-    // are the ones for sale -- so they are excluded from the tally rather than
-    // counted as broken.
-    const placeholderCards = priced.filter((plan) => plan.service === "esim" && !isSellable(plan)).length;
-    expect(count(NOTE) + count("/signup?plan=")).toBe(priced.length - placeholderCards);
+    // One call to action or one honest note per card: gating the link must not
+    // silently drop a listing, and a card with neither would be a new state.
+    expect(count(NOTE) + count("/signup?plan=")).toBe(priced.length);
     for (const plan of priced) {
       expect(markup, `${plan.slug} should still be listed`).toContain(plan.planLabel);
     }
