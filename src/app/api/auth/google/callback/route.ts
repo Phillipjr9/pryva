@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { createSession, hashPassword } from "@/lib/auth";
 import { exchangeGoogleCode, fetchGoogleUser, googleConfigured } from "@/lib/google";
+import { stateAccepted } from "@/lib/google-state";
 import { relativeRedirect } from "@/lib/net";
 import { creditWallet } from "@/lib/wallet";
 import { safeRedirectPath } from "@/lib/safe-redirect";
@@ -45,7 +46,10 @@ export async function GET(request: Request) {
 
   if (error) return clearCookies(goToLogin("google-canceled"));
   if (!googleConfigured()) return clearCookies(goToLogin("google-not-configured"));
-  if (!code || !state || !expectedState || state !== expectedState) {
+  // The cookie is preferred when present, but its absence is not proof of an
+  // attack: a cross-site redirect may withhold a SameSite=Lax cookie. In that
+  // case a correctly signed and unexpired state carries the request.
+  if (!code || !stateAccepted(state, expectedState)) {
     return clearCookies(goToLogin("google-state"));
   }
 

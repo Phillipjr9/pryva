@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { googleAuthorizeUrl, googleConfigured, makeState } from "@/lib/google";
+import { signState } from "@/lib/google-state";
 import { safeRedirectPath } from "@/lib/safe-redirect";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,10 @@ export async function GET(request: Request) {
     redirect("/login?error=google-not-configured");
   }
 
-  const state = makeState();
+  const nonce = makeState();
+  // Signed so the callback can authenticate it without the cookie: Google's
+  // cross-site return is not guaranteed to carry a SameSite=Lax cookie.
+  const state = signState(nonce) ?? nonce;
   const authorizeUrl = googleAuthorizeUrl(request, state);
 
   const proto = request.headers.get("x-forwarded-proto");
