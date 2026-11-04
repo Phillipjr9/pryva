@@ -299,6 +299,78 @@ describe("the daily close", () => {
   });
 });
 
+/**
+ * `amount` is an `integer` column, so `sum(amount)` comes back as a bigint and
+ * `::int` asks Postgres to squeeze it back into int4. The ceiling is
+ * 2,147,483,647 kobo -- ₦21,474,836.47 in a single Lagos day, and for the pending
+ * withdrawal figure, across the whole backlog. Past it the nightly close does not
+ * report a wrong number; it throws, and the day is left with no `reconciliation_runs`
+ * row at all, which is the one thing an operator cannot tell apart from a quiet day.
+ */
+describe("a day too big for int4", () => {
+  /** Fits in int4 on its own. Two of them do not. */
+  const BIG = 2_000_000_000;
+
+  it("closes a day whose deposits are bigger than the cast can hold", async () => {
+    await database.insert(users).values({
+      id: USER,
+      name: "Big Day",
+      email: "big@example.com",
+      passwordHash: "x",
+      walletBalance: BIG,
+    });
+    await database.insert(paymentTopups).values([
+      { reference: "TOP-BIG-1", userId: USER, amount: BIG, status: "completed", paidAt: NOON, createdAt: NOON },
+      { reference: "TOP-BIG-2", userId: USER, amount: BIG, status: "completed", paidAt: NOON, createdAt: NOON },
+    ]);
+
+    const result = await reconciliation.runDailyReconciliation(DAY);
+
+    // int8 arrives from the driver as a string and `sql<number>` is only an
+    // assertion, so this equality is also the check that the close converted it.
+    expect(result.totals.topupsCompleted).toEqual({ count: 2, amount: 4_000_000_000 });
+
+    const [run] = await database.select().from(reconciliationRuns);
+    expect((run.totals as { topupsCompleted: { amount: number } }).topupsCompleted.amount).toBe(4_000_000_000);
+  });
+
+  it("adds up a day of ledger credits grouped by type without the ceiling", async () => {
+    // Two accounts, one deposit each. A single account cannot hold more than an
+    // int4 balance, so the only way a day crosses the ceiling is by being busy
+    // -- which is exactly the figure this query exists to produce.
+    const SECOND = "1c9e7a5b-3d4f-4a6b-8c9d-2e1f2a3b4c7a";
+    await database.insert(users).values([
+      { id: USER, name: "Big Ledger", email: "bigledger@example.com", passwordHash: "x", walletBalance: BIG },
+      { id: SECOND, name: "Big Ledger 2", email: "bigledger2@example.com", passwordHash: "x", walletBalance: BIG },
+    ]);
+    await database.insert(walletTransactions).values([
+      {
+        userId: USER,
+        type: "credit",
+        amount: BIG,
+        balanceAfter: BIG,
+        description: "Deposit 1",
+        reference: "B-1",
+        createdAt: NOON,
+      },
+      {
+        userId: SECOND,
+        type: "credit",
+        amount: BIG,
+        balanceAfter: BIG,
+        description: "Deposit 2",
+        reference: "B-2",
+        createdAt: new Date(NOON.getTime() + 60_000),
+      },
+    ]);
+
+    const result = await reconciliation.runDailyReconciliation(DAY);
+
+    expect(result.totals.walletCredits).toEqual({ count: 2, amount: 4_000_000_000 });
+    expect(result.status).toBe("clean");
+  });
+});
+
 describe("the nightly job", () => {
   const route = readFileSync("src/app/api/cron/nightly/route.ts", "utf8");
   const vercel = JSON.parse(readFileSync("vercel.json", "utf8")) as {

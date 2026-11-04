@@ -126,11 +126,17 @@ export default async function AdminTransactionsPage({
   // One filtered sum per type the vocabulary knows, instead of three hard-coded
   // CASE columns: a payout was money that left and appeared nowhere, and the type
   // it left under is read from the schema rather than spelled out here again.
+  //
+  // `::bigint`, not `::int`: `amount` is an integer column, so Postgres sums it
+  // into an int8 and a cast back to int4 raises `integer out of range` once the
+  // filtered total passes 2,147,483,647 kobo (N21,474,836.47). The filter is
+  // optional, so with no `day` these are lifetime totals and the page would stop
+  // answering for good. int8 reaches the driver as a string, hence the Number().
   const tiles = await Promise.all(
     LEDGER_TYPES.map(async (entry) => {
       const [row] = await db
         .select({
-          value: sql<number>`coalesce(sum(${walletTransactions.amount}), 0)::int`,
+          value: sql<number>`coalesce(sum(${walletTransactions.amount}), 0)::bigint`,
         })
         .from(walletTransactions)
         .innerJoin(users, eq(users.id, walletTransactions.userId))
