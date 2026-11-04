@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { isFleexaConfigured } from "@/lib/fleexa";
 import { isSmmPanelConfigured } from "@/lib/smm-panel";
+import { isBitcallConfigured } from "@/lib/bitcall";
 import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
 import { isManualFulfilmentReachable } from "@/lib/manual-fulfilment";
 import { isPreviewDatabase } from "@/lib/demo-policy";
@@ -44,6 +45,11 @@ function configuredFor(id: LaneId): boolean {
       return isFleexaConfigured();
     case "boosts":
       return isSmmPanelConfigured();
+    case "esim":
+      // Same gateway as numbers, but a different product with its own order
+      // path; "configured" is genuinely the key, because the catalogue is read
+      // from the supplier on every request.
+      return isBitcallConfigured();
     case "accounts":
       return isMarketplaceCheckoutConfigured();
     default:
@@ -73,16 +79,18 @@ export default async function AdminServicesPage() {
   const tallyRows = await db
     .select({
       provider: orders.provider,
+      service: orders.service,
       status: orders.status,
       total: count(),
       withCode: sql<number>`count(${orders.referenceCode})`,
       latest: sql<Date>`max(${orders.createdAt})`,
     })
     .from(orders)
-    .groupBy(orders.provider, orders.status);
+    .groupBy(orders.provider, orders.service, orders.status);
 
   const tallies: OrderTally[] = tallyRows.map((row) => ({
     provider: row.provider,
+    service: row.service,
     status: row.status,
     total: Number(row.total),
     withCode: Number(row.withCode ?? 0),
@@ -100,6 +108,7 @@ export default async function AdminServicesPage() {
         .where(
           and(
             inArray(orders.provider, lane.providers),
+            lane.services ? inArray(orders.service, lane.services) : sql`true`,
             inArray(orders.status, open),
             lt(orders.createdAt, cutoff),
           ),
