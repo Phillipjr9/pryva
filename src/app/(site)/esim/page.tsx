@@ -25,6 +25,32 @@ export default function ESIMPage() {
   // written ones next to them would read as a second, cheaper catalogue.
   const plans = live ? [] : plansFor("esim");
 
+  /*
+   * The written highlights and FAQ describe the pre-launch product ("cannot be
+   * delivered yet", "not available for purchase yet"). They were rendered on the
+   * same page as a hero that reads "Live eSIM data plans … issued as an
+   * activation code the moment you buy", so a visitor with a supplier key
+   * configured was told twice, in bold, that nothing could be bought.
+   *
+   * They swap with the supplier key, like `plans` above: they are accurate when
+   * ordering is off and lie when it is on.
+   */
+  const faqs = live
+    ? service.faqs.map((faq) =>
+        faq.q === "Can I activate an eSIM now?"
+          ? { q: faq.q, a: "Yes. Choose a plan for your destination, pay from your wallet, and the activation code appears on the order the moment the profile is issued." }
+          : faq,
+      )
+    : service.faqs;
+
+  const highlights = live
+    ? [
+        { title: "Check your device", body: "Confirm eSIM compatibility and carrier unlock requirements with your device and carrier." },
+        { title: "Buy and install", body: "Pick a plan for your destination, pay from your wallet, and install from the activation code on the order." },
+        { title: "Available now", body: "Live plans are listed with their data allowance, validity and naira price. You are charged when the profile is issued." },
+      ]
+    : service.highlights;
+
   if (!service) return <div>Service not found</div>;
 
   return (
@@ -51,7 +77,7 @@ export default function ESIMPage() {
       <section className="pb-16">
         <div className="shell">
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {service.highlights.map((highlight, index) => (
+            {highlights.map((highlight, index) => (
               <div key={index} className="rounded-2xl border border-line bg-white p-6">
                 <h3 className="text-[1.1rem] font-semibold text-ink mb-3">{highlight.title}</h3>
                 <p className="text-[0.9rem] text-ink-2 leading-relaxed">{highlight.body}</p>
@@ -164,7 +190,7 @@ export default function ESIMPage() {
         <div className="shell max-w-3xl">
           <h2 className="text-[1.75rem] font-semibold text-ink mb-8">FAQ</h2>
           <div className="space-y-4">
-            {service.faqs.map((faq, index) => (
+            {faqs.map((faq, index) => (
               <div key={index} className="rounded-2xl border border-line bg-white p-6">
                 <h3 className="text-[1rem] font-semibold text-ink mb-3">{faq.q}</h3>
                 <p className="text-[0.9rem] text-ink-2 leading-relaxed">{faq.a}</p>

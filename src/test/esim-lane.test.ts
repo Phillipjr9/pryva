@@ -150,3 +150,19 @@ describe("an unreadable supplier schema is loud, not empty", () => {
     expect(client).not.toMatch(/logger\.(warn|error)\("eSIM[^"]*",\s*\{\s*planId/);
   });
 });
+
+describe("the public eSIM page agrees with itself", () => {
+  it("does not advertise 'live plans' and 'not available yet' at once", () => {
+    // The hero and the sample cards already swap with the supplier key; the
+    // written highlights and FAQ did not. With the key set, the page read
+    // "Live eSIM data plans … the moment you buy" and then, in bold, "eSIM plans
+    // cannot be delivered yet, so nothing here can be ordered or charged" —
+    // which is exactly how an owner concludes eSIM is switched off.
+    const page = read("app/(site)/esim/page.tsx");
+    expect(page).toContain("const highlights = live");
+    expect(page).toContain("const faqs = live");
+    expect(page).toContain("Available now");
+    // The pre-launch strings must survive for the no-supplier case.
+    expect(read("lib/catalog.ts")).toContain("not available for purchase yet");
+  });
+});
