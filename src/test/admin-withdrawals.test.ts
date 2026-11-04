@@ -164,6 +164,47 @@ describe("admin withdrawal processing", () => {
     expect(state.balance).toBe(2000);
   });
 
+  /**
+   * Paystack sends signed transfer events whenever it likes, including while the
+   * admin's own initiation call is still open. The row that event writes is newer
+   * than anything the initiation response can say about it, so the post-response
+   * update must only land on a row still in flight.
+   */
+  it("does not overwrite a provider outcome that arrived during the initiation call", async () => {
+    const state = fakeDatabase();
+    let finishTransfer!: (value: unknown) => void;
+    mocks.initiateTransfer.mockReturnValueOnce(new Promise((resolve) => { finishTransfer = resolve; }));
+
+    const first = PUT(request("approve"));
+    await vi.waitFor(() => expect(mocks.initiateTransfer).toHaveBeenCalledTimes(1));
+
+    // A `transfer.reversed` event lands mid-call: failed, with the bank's reason.
+    Object.assign(state.withdrawal, { status: "failed", failureReason: "Reversed by the beneficiary bank." });
+
+    finishTransfer({ status: true, data: { transfer_code: "TRF-test", reference: providerReference, amount: 1000000, currency: "NGN", status: "pending" } });
+    expect((await first).status).toBe(200);
+    expect(state.withdrawal.status).toBe("failed");
+    expect(state.withdrawal.failureReason).toBe("Reversed by the beneficiary bank.");
+  });
+
+  it("does not mark a settled payout as needing authorization because of its own response", async () => {
+    const state = fakeDatabase();
+    let finishTransfer!: (value: unknown) => void;
+    mocks.initiateTransfer.mockReturnValueOnce(new Promise((resolve) => { finishTransfer = resolve; }));
+
+    const first = PUT(request("approve"));
+    await vi.waitFor(() => expect(mocks.initiateTransfer).toHaveBeenCalledTimes(1));
+
+    // A `transfer.success` event lands mid-call: instant rails paid the payout
+    // before this request could record its own verdict.
+    Object.assign(state.withdrawal, { status: "completed", failureReason: null, completedAt: new Date() });
+
+    finishTransfer({ status: true, data: { transfer_code: "TRF-test", reference: providerReference, amount: 1000000, currency: "NGN", status: "otp" } });
+    expect((await first).status).toBe(200);
+    expect(state.withdrawal.status).toBe("completed");
+    expect(state.withdrawal.failureReason).toBeNull();
+  });
+
   it("keeps an unconfirmed transfer for reconciliation instead of immediately refunding", async () => {
     const state = fakeDatabase();
     mocks.initiateTransfer.mockRejectedValueOnce(new Error("network timeout"));
