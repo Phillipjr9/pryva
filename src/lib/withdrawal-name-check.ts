@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { paymentTopups, payoutNameApprovals } from "@/db/schema";
+import { paymentTopups, payoutNameApprovals, TOPUP_STATUS } from "@/db/schema";
 
 /**
  * Payouts may only go to the person who deposited the money.
@@ -120,7 +120,7 @@ export async function depositorNameFor(userId: string): Promise<string | null> {
     .where(
       and(
         eq(paymentTopups.userId, userId),
-        eq(paymentTopups.status, "completed"),
+        eq(paymentTopups.status, TOPUP_STATUS.completed),
         isNotNull(paymentTopups.payerName),
       ),
     )
