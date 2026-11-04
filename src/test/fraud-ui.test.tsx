@@ -4,18 +4,18 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { FraudQueue } from "@/app/admin/security/FraudQueue";
+import { FraudQueue } from "@/app/admin/(console)/security/FraudQueue";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
 }));
 
 const read = (path: string) => readFileSync(path, "utf8");
-const securityPage = read("src/app/admin/security/page.tsx");
-const queue = read("src/app/admin/security/FraudQueue.tsx");
+const securityPage = read("src/app/admin/(console)/security/page.tsx");
+const queue = read("src/app/admin/(console)/security/FraudQueue.tsx");
 const fraudApi = read("src/app/api/admin/security/fraud/route.ts");
 const withdrawalsApi = read("src/app/api/admin/withdrawals/route.ts");
-const withdrawalsUi = read("src/app/admin/withdrawals/WithdrawalsManager.tsx");
+const withdrawalsUi = read("src/app/admin/(console)/withdrawals/WithdrawalsManager.tsx");
 const withdrawRoute = read("src/app/api/wallet/withdraw/route.ts");
 const ordersRoute = read("src/app/api/orders/route.ts");
 const redeemRoute = read("src/app/api/gift-cards/redeem/route.ts");

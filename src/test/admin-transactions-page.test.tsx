@@ -30,7 +30,7 @@ const MINUS = "−";
 const naira = (amount: number) => `₦${amount.toLocaleString("en-NG")}`;
 
 async function render(searchParams: Record<string, string> = {}) {
-  const { default: TransactionsPage } = await import("@/app/admin/transactions/page");
+  const { default: TransactionsPage } = await import("@/app/admin/(console)/transactions/page");
   return renderToStaticMarkup(
     await TransactionsPage({ searchParams: Promise.resolve(searchParams) } as never),
   );

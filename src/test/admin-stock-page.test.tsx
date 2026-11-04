@@ -16,7 +16,7 @@ const state = vi.hoisted(() => ({ report: null as unknown }));
 vi.mock("@/lib/auth", () => ({ requireAdmin: vi.fn().mockResolvedValue({ id: "admin-1" }) }));
 vi.mock("@/lib/stock-live", () => ({ buildStockReport: async () => state.report }));
 
-import AdminStockPage from "@/app/admin/stock/page";
+import AdminStockPage from "@/app/admin/(console)/stock/page";
 
 function report(overrides: Record<string, unknown> = {}) {
   return {

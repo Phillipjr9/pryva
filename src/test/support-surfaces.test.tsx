@@ -85,8 +85,8 @@ describe("support surfaces are scoped to the account", () => {
   });
 
   it("the admin side is behind the admin gate and the audit log", () => {
-    expect(read("src/app/admin/support/page.tsx")).toContain('await requireAdmin("/admin/support")');
-    const detail = read("src/app/admin/support/[id]/page.tsx");
+    expect(read("src/app/admin/(console)/support/page.tsx")).toContain('await requireAdmin("/admin/support")');
+    const detail = read("src/app/admin/(console)/support/[id]/page.tsx");
     expect(detail).toContain('await requireAdmin("/admin/support")');
     // The operator can read the reasoning; that is the point of escalating.
     expect(detail).toContain("How it decided this");

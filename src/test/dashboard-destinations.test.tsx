@@ -17,7 +17,7 @@ const { planDestination } = await import("@/lib/plan-destination");
 const { ServiceExplorer } = await import("@/components/dashboard/ServiceExplorer");
 const { CommandPalette, CommandPaletteTrigger } = await import("@/components/command/CommandPalette");
 const { AccountDataPanel } = await import("@/app/dashboard/settings/AccountDataPanel");
-const { MessageStatusControl } = await import("@/app/admin/messages/MessageStatusControl");
+const { MessageStatusControl } = await import("@/app/admin/(console)/messages/MessageStatusControl");
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const read = (relative: string) => readFileSync(join(root, relative), "utf8");
@@ -138,21 +138,21 @@ describe("features that had an endpoint but no screen", () => {
   });
 
   it("gives support messages an admin inbox", () => {
-    const nav = read("app/admin/AdminNav.tsx");
+    const nav = read("app/admin/(console)/OperatorNav.tsx");
     expect(nav).toContain('{ href: "/admin/support", label: "Support" }');
     expect(nav).toContain('{ href: "/admin/messages", label: "Contact form" }');
-    const page = read("app/admin/messages/page.tsx");
+    const page = read("app/admin/(console)/messages/page.tsx");
     expect(page).toContain('await requireAdmin("/admin/messages")');
     expect(page).toContain("contactMessages");
     expect(page).toContain("<MessageStatusControl");
-    const control = read("app/admin/messages/MessageStatusControl.tsx");
+    const control = read("app/admin/(console)/messages/MessageStatusControl.tsx");
     expect(control).toContain('method: "PATCH"');
     expect(control).toContain("/api/admin/messages");
     expect(renderToStaticMarkup(<MessageStatusControl id="abc" status="open" />)).toContain("In progress");
   });
 
   it("replaces the invented growth metric with a count somebody has to act on", () => {
-    const source = read("app/admin/dashboard/page.tsx");
+    const source = read("app/admin/(console)/dashboard/page.tsx");
     expect(source).not.toContain('value: "+12%"');
     // Tickets the assistant could not settle, not form submissions nobody has
     // touched: the number on the dashboard is the work, not the inbox depth.

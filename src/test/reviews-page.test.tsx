@@ -27,7 +27,7 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 import ReviewsPage from "@/app/(site)/reviews/page";
-import AdminReviewsPage from "@/app/admin/reviews/page";
+import AdminReviewsPage from "@/app/admin/(console)/reviews/page";
 
 const buyer = "66666666-6666-4666-8666-666666666666";
 const PENDING_BODY = "This one is still waiting for a decision and must not be public.";

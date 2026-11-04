@@ -50,6 +50,64 @@ targets is an operator decision that changes how the owner tests.
 
 ---
 
+## 2a. Signing in as an operator
+
+The console is its own surface, not a tab inside the customer dashboard. There are
+two doors and they lead to the same place.
+
+**The front door.** `/admin/login` is the operator door. It carries its own copy,
+is marked `noindex`, and is the only page under `/admin` that a signed-out visitor
+can see; every other console page redirects here. Bookmark this one.
+
+**The shared door.** `/login` is the customer door, but it sorts people by who
+they are: an `ADMIN_EMAILS` account lands on `/admin`, a customer lands on
+`/dashboard`. You can sign in from either page — the address decides where you
+end up, not the URL you started from.
+
+**A refusal is not a bug.** A customer who tries `/admin/login` is sent back with
+`?denied=1` and an explanation, because signing out their customer session to
+"switch" would be worse. A customer who tries `/admin` directly is sent to
+`/dashboard?error=admin-required`. Neither path leaks whether a given address is
+an administrator.
+
+### What "administrator" actually requires
+
+All three, or the door stays shut:
+
+1. the address is in `ADMIN_EMAILS`, and
+2. the account's email is **verified** (an `ADMIN_EMAILS` match alone is not
+   enough — an unverified address proves nothing about who is holding it), and
+3. if `ADMIN_2FA_REQUIRED` is on, a second factor is enrolled.
+
+A missing second factor does not bounce you to the storefront. It sends you to
+`/admin/account?require=2fa`, which is where you arm it, then back to what you
+asked for.
+
+### Ordering matters the first time
+
+Set `ADMIN_EMAILS` **after** the account exists and is verified:
+
+1. leave `ADMIN_EMAILS` empty,
+2. sign up normally and click the verification link,
+3. add the address to `ADMIN_EMAILS` and redeploy,
+4. sign in at `/admin/login`.
+
+Adding the address first means signup refuses it (the allowlist is also a
+signup guard, so an operator address cannot be claimed by a stranger) and you
+have no account to verify.
+
+⚠ Setting `ADMIN_2FA_REQUIRED` on an environment whose only operator has not yet
+enrolled a factor locks that operator out of the console. Enrol at
+`/admin/account` first, then turn the requirement on.
+
+### When the console is empty
+
+`/admin` is a queue of things that need a person: pending withdrawals, payout
+names needing clearance, escalated support tickets, open contact messages, and
+orders still processing. A tile reading **"unread"** means the count itself
+failed to load — that is different from a count of zero, which means the queue is
+clear. Do not read an unread tile as "nothing to do".
+
 ## 3. Deploying and migrating
 
 The build command in Vercel is:

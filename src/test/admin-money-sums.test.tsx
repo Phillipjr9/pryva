@@ -77,7 +77,7 @@ function row(type: "credit" | "debit" | "refund", reference: string) {
 }
 
 async function renderLedger() {
-  const { default: Page } = await import("@/app/admin/transactions/page");
+  const { default: Page } = await import("@/app/admin/(console)/transactions/page");
   return renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }));
 }
 
