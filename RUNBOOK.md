@@ -86,6 +86,7 @@ build. Never hand-edit `schema_migrations`.
 | `PAYSTACK_SECRET_KEY` | checkout init, verification, transfers, webhook HMAC | rotate in Paystack, then the host; webhook signatures fail closed without it |
 | `CRON_SECRET` | bearer for the cron routes | rotate in the host and in whatever calls the jobs |
 | `DIAGNOSTICS_SECRET` | bearer for the read-only integration probe | rotate independently; `CRON_SECRET` is still accepted as a fallback |
+| `OPERATOR_READ_TOKEN` | bearer for the hosted operations console; opens `GET`s only | rotate independently of `CRON_SECRET` and `DIAGNOSTICS_SECRET` — this is the one safe to hand a dashboard. Unset means every console read is a 401. Rotating it cuts the console off until the new value is given to both sides |
 | `TWO_FACTOR_KEY` | encrypts every stored TOTP secret (AES-256-GCM, scrypt-derived; at least 16 characters) | **rotating it locks out every account with 2FA enabled** — they still hold the factor, the server can no longer read it. Clear the affected enrolments deliberately, one at a time, after verifying identity (see the playbook) |
 | `ADMIN_EMAILS` | the only source of administrator identity | edit deliberately; a match still requires a **verified** email |
 | Supplier keys (`BULKACC_API_KEY`, `FLEEXA_API_KEY`, `ACCSZONE_API_KEY`, `BITCALL_*`) | catalog and fulfilment | rotate at the supplier, then the host |
@@ -245,6 +246,47 @@ The probe is rate-limited by the suppliers, so do not put it on a tight schedule
 Watch for: an empty catalog with a funded balance (mapping problem), repeated
 `429`s (shared supplier budget), and an outbox that is not draining (scheduler
 problem). The README documents the per-supplier request budgets.
+
+**"The console says unauthorized."** The hosted console reads over
+`OPERATOR_READ_TOKEN`, which `authorizeAdminRead` in `src/lib/admin-auth.ts`
+enforces. If that guard is not deployed yet, this variable does nothing and the
+console has no way in — set it early if you like, since a variable nothing reads
+cannot widen access.
+
+Once the guard is live, a bearer request is answered by the bearer alone and
+never falls back to a cookie, so this is the read credential itself and not
+whoever happens to be signed in on the browser. Three things to check, in order:
+
+```sh
+# 1. Is the token set at all? An unset value matches nothing, so every read is 401.
+#    (Blank or absent is the safe default, not a broken deploy.)
+vercel env ls --environment=production | grep OPERATOR_READ_TOKEN
+
+# 2. Does it open a read? Expect 200 and real rows.
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -H "Authorization: Bearer $OPERATOR_READ_TOKEN" \
+  https://<your-domain>/api/admin/stats
+
+# 3. Does it still refuse to change anything? Expect 401, not 200.
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  -H "Authorization: Bearer $OPERATOR_READ_TOKEN" \
+  https://<your-domain>/api/admin/refunds
+```
+
+A `401` on step 2 means the token is wrong, stale or unset — rotate it on both
+sides rather than pasting the old value around.
+
+Step 3 refusing with `401` is correct and expected, and knowing *why* matters
+when reading a log: a mutation route is guarded by `authorizeAdminApi`, which
+only knows a session, so a bearer is simply "not authenticated" there. The
+credential's own refusal is `403 The read credential cannot change anything`,
+which is what `authorizeAdminRead` returns if a route ever hands it a `POST`.
+Either way the write never happens and the database is never touched — the
+PR's tests assert both that the status is `401` and that no `update` or
+`transaction` ran.
+
+If step 3 ever returns `200`, treat it as an incident: the token is doing more
+than it was issued for. Rotate it immediately, and check what wrote.
 
 ### Alerts
 
