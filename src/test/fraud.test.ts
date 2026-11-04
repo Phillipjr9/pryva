@@ -13,6 +13,7 @@ import {
   orders,
   paymentTopups,
   referrals,
+  TOPUP_STATUS,
   users,
   withdrawals,
 } from "@/db/schema";
@@ -154,7 +155,7 @@ describe("withdrawal assessment", () => {
       reference: "TOP-1",
       userId: USER,
       amount: 100_000,
-      status: "paid",
+      status: TOPUP_STATUS.completed,
     });
     await database.insert(withdrawals).values({
       userId: USER,
@@ -184,7 +185,7 @@ describe("withdrawal assessment", () => {
   it("flags a withdrawal that is almost everything the account ever deposited", async () => {
     await seedUser(USER, "ada@example.com", new Date(Date.now() - 60 * DAY));
     const bankAccountId = await seedBankAccount(USER, new Date(Date.now() - 60 * DAY));
-    await database.insert(paymentTopups).values({ reference: "TOP-2", userId: USER, amount: 50_000, status: "paid" });
+    await database.insert(paymentTopups).values({ reference: "TOP-2", userId: USER, amount: 50_000, status: TOPUP_STATUS.completed });
     await database.insert(withdrawals).values({
       userId: USER,
       amount: 5_000,
