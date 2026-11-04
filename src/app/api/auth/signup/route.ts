@@ -10,6 +10,7 @@ import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { attributeReferral, readReferralCodeFrom } from "@/lib/referrals";
 import { recordSignupSignal } from "@/lib/fraud";
+import { previewOperatorBootstrapEnabled } from "@/lib/preview-operator";
 
 export async function POST(request: Request) {
   if (!isSameOriginMutation(request)) return Response.json({ ok: false, error: "Invalid origin." }, { status: 403 });
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
     if (isDisposableEmailAddress(email)) {
       return Response.json({ ok: false, error: DISPOSABLE_EMAIL_ERROR }, { status: 400 });
     }
-    if (isConfiguredAdminEmail(email)) {
+    if (isConfiguredAdminEmail(email) && !previewOperatorBootstrapEnabled()) {
       return Response.json({ ok: false, error: "This account cannot be created through public signup." }, { status: 403 });
     }
     if (password.length < 8 || password.length > 128) {
@@ -57,8 +58,21 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, error: "An account with this email already exists. Try signing in." }, { status: 409 });
     }
 
+    // Preview operator bootstrap: this address is in ADMIN_EMAILS, so it cannot
+    // be created above unless both preview locks are on -- and once created it
+    // has no mailbox to verify from. Marking it verified here is what lets the
+    // operator actually reach /admin on a preview. `isAdminUser` still demands
+    // the address be in ADMIN_EMAILS, so this grants nothing to anyone else.
+    const operatorBootstrap = isConfiguredAdminEmail(email) && previewOperatorBootstrapEnabled();
+
     const [created] = await db.insert(users)
-      .values({ name, email, passwordHash: hashPassword(password), walletBalance: 0 })
+      .values({
+        name,
+        email,
+        passwordHash: hashPassword(password),
+        walletBalance: 0,
+        ...(operatorBootstrap ? { emailVerifiedAt: new Date() } : {}),
+      })
       .returning({ id: users.id });
     if (!created) return Response.json({ ok: false, error: "Could not create that account." }, { status: 500 });
 
@@ -82,7 +96,7 @@ export async function POST(request: Request) {
     // link can be re-requested from /verify-email. Signup must not fail because
     // Resend is down.
     // `created` returns only the id; `email` is the normalized address in scope.
-    await issueEmailVerification(created.id, email, name).catch((error) => {
+    if (!operatorBootstrap) await issueEmailVerification(created.id, email, name).catch((error) => {
       console.error("[auth] signup verification email failed", error);
     });
     return Response.json({ ok: true });

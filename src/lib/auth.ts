@@ -223,8 +223,15 @@ export async function requireUser(nextPath = "/dashboard"): Promise<PublicUser> 
   return requireAuth(nextPath);
 }
 
-export async function requireAdmin(nextPath = "/admin/dashboard"): Promise<PublicUser> {
-  const user = await requireAuth(nextPath);
+export async function requireAdmin(nextPath = "/admin"): Promise<PublicUser> {
+  // Signed out. The console has its own door, so an operator who follows a console
+  // link lands on the operator sign-in rather than on the storefront's. Both end at
+  // the same session; this only decides which page asks for it.
+  const signedOut = await getCurrentUser();
+  if (!signedOut) {
+    redirect(`/admin/login?next=${encodeURIComponent(nextPath)}`);
+  }
+  const user = signedOut;
 
   if (!isAdminUser(user)) {
     redirect(`/dashboard?error=admin-required`);
@@ -233,9 +240,11 @@ export async function requireAdmin(nextPath = "/admin/dashboard"): Promise<Publi
   // An administrator can approve withdrawals and issue refunds, so the account
   // that does it carries a second factor. Instead of an error, the redirect sends
   // them to the page that fixes it — with where they were going, so the return
-  // trip is one click.
+  // trip is one click. That page lives inside the console, because sending an
+  // operator into the customer dashboard to arm the console contradicts the whole
+  // point of having two.
   if (await adminBlockedForMissingSecondFactor(user.id)) {
-    redirect(`/dashboard/settings?require=2fa&next=${encodeURIComponent(nextPath)}#security`);
+    redirect(`/admin/account?require=2fa&next=${encodeURIComponent(nextPath)}`);
   }
 
   return user;

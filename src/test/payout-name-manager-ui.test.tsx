@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { PayoutNameManager } from "@/app/admin/payout-names/PayoutNameManager";
+import { PayoutNameManager } from "@/app/admin/(console)/payout-names/PayoutNameManager";
 
 /**
  * The operator's side of a refused payout.

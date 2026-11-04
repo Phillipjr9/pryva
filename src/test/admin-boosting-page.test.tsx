@@ -13,7 +13,7 @@ vi.mock("@/lib/smm-panel", async (importOriginal) => {
   return { ...actual, isSmmPanelConfigured: vi.fn(), smmPanelApiKey: vi.fn(), panelEndpoint: vi.fn() };
 });
 
-import AdminBoostingPage from "@/app/admin/boosting/page";
+import AdminBoostingPage from "@/app/admin/(console)/boosting/page";
 import { isSmmPanelConfigured, panelEndpoint, smmPanelApiKey, SmmPanelError } from "@/lib/smm-panel";
 
 beforeEach(() => {

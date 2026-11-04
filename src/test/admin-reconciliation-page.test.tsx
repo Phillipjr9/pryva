@@ -88,7 +88,7 @@ describe("admin reconciliation page", () => {
       createdAt: hoursAgo(3),
     });
 
-    const { default: ReconciliationPage } = await import("@/app/admin/reconciliation/page");
+    const { default: ReconciliationPage } = await import("@/app/admin/(console)/reconciliation/page");
     const html = renderToStaticMarkup(await ReconciliationPage());
 
     // Every class is present, by reference.

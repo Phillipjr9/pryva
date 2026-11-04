@@ -10,12 +10,47 @@ function navHrefs(): string[] {
   return [...shell.matchAll(/href: "([^"]+)"/g)].map((match) => match[1]);
 }
 
-function pageExists(href: string) {
-  const relative = href.replace(/^\//, "");
-  return (
-    existsSync(join(root, "app", relative, "page.tsx")) ||
-    existsSync(join(root, "app", "(site)", relative, "page.tsx"))
-  );
+/**
+ * Does a URL resolve to a real `page.tsx`, route groups included?
+ *
+ * A directory in parentheses — `(console)`, `(site)` — is an organisational folder
+ * that appears in the file path but **not** in the URL. So `/admin/dashboard` may
+ * be served from `app/admin/dashboard/page.tsx` or `app/admin/(console)/dashboard/page.tsx`,
+ * and which one is a filing decision nobody should have to encode in a test.
+ *
+ * This walks the URL segment by segment, following every branch at each level, and
+ * treats each parenthetical directory as transparent — it can be entered or skipped
+ * wherever it occurs, including around the final segment. Then the last step
+ * accepts `page.tsx` either directly or behind one more group.
+ */
+function pageExists(href: string): boolean {
+  const segments = href.replace(/^\//, "").split("/");
+
+  const groupDirsIn = (dir: string): string[] => {
+    if (!existsSync(dir) || !statSync(dir).isDirectory()) return [];
+    return readdirSync(dir)
+      .filter((entry) => entry.startsWith("(") && statSync(join(dir, entry)).isDirectory())
+      .map((entry) => join(dir, entry));
+  };
+
+  let dirs = [join(root, "app")];
+  for (const segment of segments) {
+    const next = new Set<string>();
+    for (const dir of dirs) {
+      next.add(join(dir, segment));
+      for (const group of groupDirsIn(dir)) next.add(join(group, segment));
+    }
+    dirs = [...next].filter((dir) => existsSync(dir) && statSync(dir).isDirectory());
+    if (dirs.length === 0) return false;
+  }
+
+  for (const dir of dirs) {
+    if (existsSync(join(dir, "page.tsx"))) return true;
+    for (const group of groupDirsIn(dir)) {
+      if (existsSync(join(group, "page.tsx"))) return true;
+    }
+  }
+  return false;
 }
 
 describe("dashboard navigation", () => {

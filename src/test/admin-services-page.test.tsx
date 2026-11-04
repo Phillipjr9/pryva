@@ -35,7 +35,7 @@ vi.mock("@/lib/marketplace-policy", () => ({ isMarketplaceCheckoutConfigured: vi
 vi.mock("@/lib/manual-fulfilment", () => ({ isManualFulfilmentReachable: vi.fn(() => true) }));
 vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: vi.fn(() => false) }));
 
-import AdminServicesPage from "@/app/admin/services/page";
+import AdminServicesPage from "@/app/admin/(console)/services/page";
 
 const recent = new Date(Date.now() - 3_600_000);
 

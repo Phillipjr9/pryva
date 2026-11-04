@@ -61,10 +61,12 @@ describe("security lives inside settings", () => {
     expect(existsSync("src/app/dashboard/settings/SessionsCard.tsx")).toBe(true);
   });
 
-  it("sends the admin bounce to the section, not to a missing page", () => {
-    expect(auth).toContain("/dashboard/settings?require=2fa");
-    expect(auth).toContain("#security");
+  it("sends the admin bounce to the operator's own page, not to a missing one", () => {
+    // Administrators arm the console inside the console now; the customer
+    // security section is still where a customer turns 2FA on for their account.
+    expect(auth).toContain("/admin/account?require=2fa");
     expect(auth).not.toContain('redirect(`/dashboard/security');
+    expect(auth).not.toContain("/dashboard/settings?require=2fa");
   });
 
   it("keeps the command palette shortcut, pointed at the section", () => {

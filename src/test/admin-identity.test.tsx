@@ -1,18 +1,27 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 
 /**
- * An administrator must be recognisable from inside the product.
+ * The operator's identity must not leak into the customer storefront.
  *
- * Administrator access is derived (`ADMIN_EMAILS` + a verified email), not stored
- * on the user row, so the customer dashboard had no idea the account had the
- * privilege: no console link, no marker, and the operator concluded the setting
- * had not taken effect. These assertions are about the rendered sidebar.
+ * This file used to assert the opposite: that an administrator saw an "Admin
+ * console" link and an "Administrator" badge inside the customer dashboard. That
+ * was right while the console was a tab bolted onto the storefront. Now that the
+ * two are separate products -- `/dashboard` redirects an operator to `/admin`
+ * -- the same affordance became a way to see a wallet, a cart and a spend
+ * history while holding the account that approves withdrawals.
  *
- * The negative case matters as much as the positive one: the console link must
- * not appear for a customer, or the gate would be advertised to everyone who
- * signs in.
+ * So the assertions inverted. What must hold now:
+ *
+ *   1. the customer shell never renders operator chrome, for anyone; and
+ *   2. the dashboard layout turns an administrator away before the shell runs.
+ *
+ * Point 2 is the load-bearing one; point 1 keeps a future edit from quietly
+ * reintroducing the badge while point 2 still happens to pass.
  */
 
 vi.mock("next/navigation", () => ({
@@ -21,38 +30,50 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
 }));
 
-const render = (isAdmin: boolean) =>
+const root = fileURLToPath(new URL("..", import.meta.url));
+const read = (path: string) => readFileSync(join(root, path), "utf8");
+
+const render = () =>
   renderToStaticMarkup(
     <DashboardShell
       buildId="test"
-      isAdmin={isAdmin}
       user={{ name: "Ada", email: "ada@example.test", walletBalance: 0 }}
     >
       <p>content</p>
     </DashboardShell>,
   );
 
-describe("administrator identity in the dashboard", () => {
-  it("gives an administrator a way into the console", () => {
-    const html = render(true);
-    expect(html).toContain('href="/admin/dashboard"');
-    expect(html).toContain("Admin console");
-    expect(html).toContain("Administrator");
-  });
-
-  it("leaves a customer's dashboard exactly as it was", () => {
-    const html = render(false);
-    expect(html).not.toContain("/admin/dashboard");
+describe("operator identity stays out of the customer dashboard", () => {
+  it("renders no console link and no administrator badge", () => {
+    const html = render();
+    expect(html).not.toContain("/admin");
     expect(html).not.toContain("Admin console");
     expect(html).not.toContain("Administrator");
   });
 
-  it("keeps the customer dashboard intact for an administrator too", () => {
-    // The console is appended, not swapped in: an operator still buys, tops up and
-    // reads orders from the same dashboard, so the customer destinations survive.
-    const html = render(true);
+  it("has no way to be told that an account is an administrator", () => {
+    // The prop is gone, not merely defaulted to false. A `isAdmin` prop that
+    // nothing passes is an invitation to pass it again.
+    const shell = read("components/dashboard/DashboardShell.tsx");
+    expect(shell).not.toContain("isAdmin");
+    expect(shell).not.toContain("operatorGroup");
+  });
+
+  it("keeps the customer destinations intact", () => {
+    const html = render();
     expect(html).toContain('href="/dashboard/wallet"');
     expect(html).toContain('href="/dashboard/orders"');
     expect(html).toContain('href="/dashboard/settings"');
+  });
+
+  it("turns an administrator away before the customer shell renders", () => {
+    const layout = read("app/dashboard/layout.tsx");
+    // The redirect has to sit after `requireUser` (so `user` is a real row, not
+    // a null that `isAdminUser` would read as "customer") and before the JSX.
+    const guard = layout.indexOf('if (isAdminUser(user)) redirect("/admin")');
+    expect(guard).toBeGreaterThan(layout.indexOf("await requireUser()"));
+    expect(guard).toBeLessThan(layout.indexOf("<DashboardShell"));
+    // And it must stop the request, not render a banner on top of the page.
+    expect(layout).toContain('import { redirect } from "next/navigation"');
   });
 });
