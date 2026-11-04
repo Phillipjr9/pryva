@@ -121,3 +121,82 @@ describe("the payout-name review queue", () => {
     expect(await screen.findByText(/Nothing is blocked/i)).toBeTruthy();
   });
 });
+
+/**
+ * The queue grew a filter, a search and a visible read error. Each is a claim the
+ * page makes to an operator, so each gets a guard: a queue that is only searchable
+ * in the happy path, or that reports a failed read as an empty one, would send
+ * support looking for a customer who is not there.
+ */
+describe("working a long queue", () => {
+  const second = {
+    userId: "9b2e7c4d-1a3f-4e8b-9c6d-7f0a1b2c3d4e",
+    userName: "Ngozi Adeyemi",
+    userEmail: "ngozi@example.com",
+    depositorName: "Ngozi Adeyemi",
+    approvedName: null as string | null,
+    accounts: [{ id: "acc-2", bankName: "GTBank", accountName: "NGOZI ADEYEMI", accountNumberLast4: "1111" }],
+  };
+
+  function twoRows() {
+    return vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url) === "/api/admin/payout-names" && !init?.method) {
+        return json({ ok: true, users: [blockedUser, { ...second, approvedName: "NGOZI ADEYEMI" }], count: 2 });
+      }
+      return json({ ok: true });
+    });
+  }
+
+  it("counts what is waiting apart from what is approved", async () => {
+    vi.stubGlobal("fetch", twoRows());
+    render(<PayoutNameManager />);
+    await screen.findByText("ngozi@example.com");
+
+    const waiting = screen.getByRole("button", { name: /^Waiting/ });
+    const approved = screen.getByRole("button", { name: /^Approved/ });
+    expect(waiting.textContent).toContain("1");
+    expect(approved.textContent).toContain("1");
+  });
+
+  it("narrows the list to the filter that was picked", async () => {
+    vi.stubGlobal("fetch", twoRows());
+    render(<PayoutNameManager />);
+    await screen.findByText("ngozi@example.com");
+
+    fireEvent.click(screen.getByRole("button", { name: /^Waiting/ }));
+    expect(screen.getByText("emeka@example.com")).toBeTruthy();
+    expect(screen.queryByText("ngozi@example.com")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Approved/ }));
+    expect(screen.getByText("ngozi@example.com")).toBeTruthy();
+    expect(screen.queryByText("emeka@example.com")).toBeNull();
+  });
+
+  it("finds a customer by bank or account name, not only by email", async () => {
+    vi.stubGlobal("fetch", twoRows());
+    render(<PayoutNameManager />);
+    await screen.findByText("ngozi@example.com");
+
+    fireEvent.change(screen.getByLabelText(/Search blocked payouts/i), { target: { value: "gtbank" } });
+    expect(screen.getByText("ngozi@example.com")).toBeTruthy();
+    expect(screen.queryByText("emeka@example.com")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/Search blocked payouts/i), { target: { value: "nobody-here" } });
+    expect(await screen.findByText(/Nothing matches this search/i)).toBeTruthy();
+  });
+
+  it("does not let a failed read look like an empty queue", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => json({ ok: false, error: "the queue is unavailable" }, 500)),
+    );
+    render(<PayoutNameManager />);
+
+    // The alert is in the page, not only in a toast that has already gone.
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("The queue could not be read.");
+    expect(alert.textContent).toContain("the queue is unavailable");
+    // It must not claim the reassuring thing.
+    expect(screen.queryByText(/Nothing is blocked/i)).toBeNull();
+  });
+});
