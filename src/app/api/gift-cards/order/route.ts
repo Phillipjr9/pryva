@@ -13,7 +13,7 @@ import {
   FoxreloadError,
 } from "@/lib/foxreload";
 import { FOXRELOAD_PROVIDER } from "@/lib/order-providers";
-import { creditWallet, debitWalletInTx, makeReference } from "@/lib/wallet";
+import { creditWalletInTx, debitWalletInTx, makeReference } from "@/lib/wallet";
 import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
@@ -255,31 +255,38 @@ export async function POST(request: Request) {
 
     let refunded = false;
     try {
-      await creditWallet({
-        userId: user.id,
-        amount: denomination.priceNgn,
-        type: "refund",
-        description: `Refund · ${card.name} ($${denomination.amountUsd})`,
-        orderId,
-        reference: makeReference("RFB"),
-      });
+      // One transaction, like the debit above: money moving back and the order
+      // saying it moved are one event. Crediting first and writing the status
+      // after left a refund the wallet had and the order did not, and the
+      // "debit still stands" note below was then the opposite of the truth.
+      await db.transaction(async (tx) => {
+        await creditWalletInTx(tx, {
+          userId: user.id,
+          amount: denomination.priceNgn,
+          type: "refund",
+          description: `Refund · ${card.name} ($${denomination.amountUsd})`,
+          orderId,
+          reference: makeReference("RFB"),
+        });
 
-      await db
-        .update(orders)
-        .set({
-          status: "refunded",
-          refundedAt: new Date(),
-          providerRequestId: providerOrderId || null,
-          reconciliationNote: `Fulfillment failed: ${errorMessage}`,
-        })
-        .where(eq(orders.id, orderId));
+        await tx
+          .update(orders)
+          .set({
+            status: "refunded",
+            refundedAt: new Date(),
+            providerRequestId: providerOrderId || null,
+            reconciliationNote: `Fulfillment failed: ${errorMessage}`,
+          })
+          .where(eq(orders.id, orderId));
+      });
+      // The refund committed inside the transaction above, so `creditWallet`'s
+      // usual nudge never ran. Without this the receipt waits for the nightly backstop.
+      scheduleWalletEmails();
       refunded = true;
     } catch (refundErr) {
-      // The debit stands and no card exists. This used to be a console line while
-      // the customer was told the wallet had been refunded -- a false statement
-      // about money, with no record anybody would look at. `review` puts the row
-      // in front of an operator on /admin/reconciliation, which is where a refund
-      // that no code could complete belongs.
+      // The debit stands and no card exists. `review` puts the row in front of an
+      // operator on /admin/reconciliation, which is where a refund that no code
+      // could complete belongs.
       console.error("Critical: Failed to auto-refund gift card order", refundErr);
       try {
         await db

@@ -9,6 +9,7 @@ import {
   giftCards,
   orders,
   paymentTopups,
+  TOPUP_STATUS,
   users,
   withdrawals,
 } from "@/db/schema";
@@ -159,7 +160,7 @@ export async function assessWithdrawal(input: {
   const [deposits] = await db
     .select({ total: sql<number>`coalesce(sum(${paymentTopups.amount}), 0)` })
     .from(paymentTopups)
-    .where(and(eq(paymentTopups.userId, input.userId), inArray(paymentTopups.status, ["paid", "completed"])));
+    .where(and(eq(paymentTopups.userId, input.userId), eq(paymentTopups.status, TOPUP_STATUS.completed)));
 
   const reasons: string[] = [];
   const accountAgeMs = account ? Date.now() - account.createdAt.getTime() : 0;

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import type { Frequency } from "@/lib/scheduled-orders";
 
 /**
@@ -13,6 +14,14 @@ import type { Frequency } from "@/lib/scheduled-orders";
 const state = vi.hoisted(() => ({
   balance: 20000,
   schedule: null as any,
+  /**
+   * What the locked re-read inside the transaction sees. Defaults to `schedule`,
+   * and a test sets it to the row as the *other* sweep left it — next run already
+   * advanced — which is what the loser of an overlapping run reads once it stops
+   * waiting on the lock.
+   */
+  scheduleUnderLock: null as any,
+  scheduleReads: 0,
   insertRows: [] as any[],
   debits: [] as any[],
   updates: [] as any[],
@@ -24,12 +33,18 @@ const state = vi.hoisted(() => ({
 
 vi.mock("@/db", async () => {
   const schema = await import("@/db/schema");
-  const rowsFor = (table: unknown) =>
-    table === schema.users ? [{ walletBalance: state.balance }] : state.schedule ? [state.schedule] : [];
+  const rowsFor = (table: unknown) => {
+    if (table === schema.users) return [{ walletBalance: state.balance }];
+    if (!state.schedule) return [];
+    state.scheduleReads += 1;
+    // Read 1 is the pre-flight check, read 2 the locked one that decides the run.
+    return state.scheduleReads === 2 && state.scheduleUnderLock ? [state.scheduleUnderLock] : [state.schedule];
+  };
   const chain = (rows: unknown[]) => {
     const api: Record<string, unknown> = {
       from: (table: unknown) => chain(rowsFor(table)),
       where: () => api,
+      for: () => api,
       limit: () => Promise.resolve(rows),
       values: (value: unknown) => {
         state.insertRows.push(value);
@@ -115,6 +130,8 @@ function dueRow(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   state.balance = 20000;
   state.schedule = dueRow();
+  state.scheduleUnderLock = null;
+  state.scheduleReads = 0;
   state.insertRows = [];
   state.debits = [];
   state.updates = [];
@@ -213,6 +230,29 @@ describe("Scheduled Orders", () => {
       expect(state.released).toHaveLength(1);
       expect(state.debits).toHaveLength(0);
       expect(state.insertRows).toHaveLength(0);
+    });
+
+    it("releases the number a run that declines cannot keep", async () => {
+      // The sweep that overlapped this one got here first and advanced the row.
+      // This run had already bought a number by then, so the number has to go
+      // back: it is the business's money, and keeping it means paying a supplier
+      // for a number nobody holds and nobody is charged for.
+      state.scheduleUnderLock = dueRow({ nextRunAt: new Date(Date.now() + 86_400_000) });
+
+      expect(await processScheduledOrder(dueRow() as any)).toBe(false);
+      expect(state.released).toHaveLength(1);
+      expect(state.debits).toHaveLength(0);
+      expect(state.insertRows).toHaveLength(0);
+      expect(state.balance).toBe(20000);
+    });
+
+    it("locks the schedule before spending anything on it", () => {
+      // PGlite holds one connection, so two transactions genuinely overlapping
+      // cannot be produced from a test. The lock is asserted where it is written.
+      // Without it the loser of an overlapping sweep reads the same past
+      // `nextRunAt` as the winner, both buy, and the customer is charged twice.
+      const source = readFileSync("src/lib/scheduled-orders.ts", "utf8");
+      expect(source).toMatch(/from\(scheduledOrders\)[^;]*?\.for\("update"\)/);
     });
   });
 });

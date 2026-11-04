@@ -5,7 +5,15 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle, type PgliteDatabase } from "drizzle-orm/pglite";
 import { eq, sql } from "drizzle-orm";
 import * as schema from "@/db/schema";
-import { orders, paymentTopups, reconciliationRuns, users, walletTransactions } from "@/db/schema";
+import {
+  orders,
+  paymentTopups,
+  reconciliationRuns,
+  TOPUP_STATUS,
+  users,
+  walletTransactions,
+} from "@/db/schema";
+import { completeTopUp } from "@/lib/topups";
 
 const mocks = vi.hoisted(() => ({ db: undefined as unknown }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
@@ -13,6 +21,7 @@ vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
 // exercise the real SQL against PGlite.
 vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => false }));
 vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
+vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
 
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
@@ -52,7 +61,7 @@ async function seedDay() {
     reference: "TOP-1",
     userId: USER,
     amount: 5000,
-    status: "paid",
+    status: TOPUP_STATUS.completed,
     paidAt: NOON,
     createdAt: NOON,
   });
@@ -115,7 +124,7 @@ describe("the daily close", () => {
     const result = await reconciliation.runDailyReconciliation(DAY);
 
     expect(result.status).toBe("clean");
-    expect(result.totals.topupsPaid).toEqual({ count: 1, amount: 5000 });
+    expect(result.totals.topupsCompleted).toEqual({ count: 1, amount: 5000 });
     expect(result.totals.walletCredits).toEqual({ count: 1, amount: 5000 });
     expect(result.totals.walletDebits).toEqual({ count: 1, amount: 1000 });
     expect(result.totals.ordersPlaced).toEqual({ count: 1, amount: 1000 });
@@ -140,7 +149,7 @@ describe("the daily close", () => {
     expect(runs[0].day).toBe(DAY);
     expect(runs[0].status).toBe("clean");
     expect(runs[0].finishedAt).toBeInstanceOf(Date);
-    expect((runs[0].totals as { topupsPaid: { amount: number } }).topupsPaid.amount).toBe(5000);
+    expect((runs[0].totals as { topupsCompleted: { amount: number } }).topupsCompleted.amount).toBe(5000);
   });
 
   it("re-running a day corrects its row instead of adding a second one", async () => {
@@ -180,7 +189,7 @@ describe("the daily close", () => {
     const result = await reconciliation.runDailyReconciliation(DAY);
     expect(result.status).toBe("clean");
     expect(result.accountsChecked).toBe(0);
-    expect(result.totals.topupsPaid).toEqual({ count: 0, amount: 0 });
+    expect(result.totals.topupsCompleted).toEqual({ count: 0, amount: 0 });
   });
 
   it("excludes money that belongs to the next Lagos day", async () => {
@@ -189,16 +198,96 @@ describe("the daily close", () => {
       reference: "TOP-2",
       userId: USER,
       amount: 700,
-      status: "paid",
+      status: TOPUP_STATUS.completed,
       // 23:30 UTC on the 30th is 00:30 on the 31st in Lagos.
       paidAt: new Date("2026-10-30T23:30:00.000Z"),
       createdAt: new Date("2026-10-30T23:30:00.000Z"),
     });
     const result = await reconciliation.runDailyReconciliation(DAY);
-    expect(result.totals.topupsPaid).toEqual({ count: 1, amount: 5000 });
+    expect(result.totals.topupsCompleted).toEqual({ count: 1, amount: 5000 });
 
     const nextDay = await reconciliation.runDailyReconciliation("2026-10-31");
-    expect(nextDay.totals.topupsPaid).toEqual({ count: 1, amount: 700 });
+    expect(nextDay.totals.topupsCompleted).toEqual({ count: 1, amount: 700 });
+  });
+
+  it("counts a deposit that was credited by the app, not by the test", async () => {
+    // Seeded the way the app seeds it — a pending row, then `completeTopUp`, the
+    // only writer this column ever has — and the close runs on that day. A test
+    // that inserts the word it later searches for proves nothing: this case sat
+    // green for as long as the close looked for a status no code ever wrote.
+    await database.insert(users).values({
+      id: USER,
+      name: "Recon Test",
+      email: "recon@example.com",
+      passwordHash: "x",
+      walletBalance: 0,
+    });
+    await database.insert(paymentTopups).values({
+      reference: "TOP-live",
+      userId: USER,
+      amount: 5000,
+      status: TOPUP_STATUS.pending,
+      createdAt: new Date(),
+    });
+    expect(await completeTopUp({ reference: "TOP-live", userId: USER, amount: 5000 })).toBe("credited");
+
+    const result = await reconciliation.runDailyReconciliation(reconciliation.lagosDay());
+    expect(result.totals.topupsCompleted).toEqual({ count: 1, amount: 5000 });
+    expect(result.status).toBe("clean");
+  });
+
+  it("reads a payout row as money leaving, not as a break", async () => {
+    await seedDay();
+    // The withdraw route reserves its own fee and writes `withdrawal`. The close
+    // classified anything that was not `debit` as a credit, so the balance going
+    // down on a payout looked like broken arithmetic: every account that had ever
+    // withdrawn money was reported as a ledger break, forever.
+    await database.insert(walletTransactions).values({
+      userId: USER,
+      type: "withdrawal",
+      amount: 1000,
+      balanceAfter: 3000,
+      description: "Payout WD-1",
+      reference: "WD-1",
+      createdAt: new Date(NOON.getTime() + 120_000),
+    });
+    await database.update(users).set({ walletBalance: 3000 }).where(eq(users.id, USER));
+
+    const result = await reconciliation.runDailyReconciliation(DAY);
+    expect(result.status).toBe("clean");
+    expect(result.totals.walletWithdrawals).toEqual({ count: 1, amount: 1000 });
+    // 5000 in, 1000 spent, 1000 paid out. The payout used to be missing from
+    // this figure entirely, so it did not tie out to the day's ledger.
+    expect(result.totals.netWalletMovement).toBe(3000);
+  });
+
+  it("flags a ledger type it cannot read instead of passing it", async () => {
+    await seedDay();
+    // A type in neither direction list has no arithmetic to check, so both
+    // queries skip it. Reporting the account as clean would be the wrong kind of
+    // quiet: it is a row the books cannot read, and the close has to say so.
+    await database.insert(walletTransactions).values({
+      userId: USER,
+      type: "gift_redeem",
+      amount: 500,
+      balanceAfter: 4000,
+      description: "Redeemed gift card",
+      reference: "GFT-1",
+      createdAt: new Date(NOON.getTime() + 120_000),
+    });
+
+    const result = await reconciliation.runDailyReconciliation(DAY);
+    expect(result.status).toBe("attention");
+    expect(result.breaks.map((row) => row.kind)).toEqual(["unknown_type"]);
+    expect(result.breaks[0].detail).toContain("gift_redeem");
+
+    // The run page lists final-balance breaks only, so the kind has to survive
+    // into the row: "attention · 1" with an empty table is a dead end.
+    const [run] = await database
+      .select()
+      .from(reconciliationRuns)
+      .where(eq(reconciliationRuns.day, DAY));
+    expect(run.notes).toContain("unknown_type");
   });
 
   it("lists the accounts behind a break, with their email", async () => {
@@ -207,6 +296,78 @@ describe("the daily close", () => {
     const rows = await reconciliation.ledgerBreaks();
     expect(rows).toHaveLength(1);
     expect(rows[0].email).toBe("recon@example.com");
+  });
+});
+
+/**
+ * `amount` is an `integer` column, so `sum(amount)` comes back as a bigint and
+ * `::int` asks Postgres to squeeze it back into int4. The ceiling is
+ * 2,147,483,647 kobo -- ₦21,474,836.47 in a single Lagos day, and for the pending
+ * withdrawal figure, across the whole backlog. Past it the nightly close does not
+ * report a wrong number; it throws, and the day is left with no `reconciliation_runs`
+ * row at all, which is the one thing an operator cannot tell apart from a quiet day.
+ */
+describe("a day too big for int4", () => {
+  /** Fits in int4 on its own. Two of them do not. */
+  const BIG = 2_000_000_000;
+
+  it("closes a day whose deposits are bigger than the cast can hold", async () => {
+    await database.insert(users).values({
+      id: USER,
+      name: "Big Day",
+      email: "big@example.com",
+      passwordHash: "x",
+      walletBalance: BIG,
+    });
+    await database.insert(paymentTopups).values([
+      { reference: "TOP-BIG-1", userId: USER, amount: BIG, status: "completed", paidAt: NOON, createdAt: NOON },
+      { reference: "TOP-BIG-2", userId: USER, amount: BIG, status: "completed", paidAt: NOON, createdAt: NOON },
+    ]);
+
+    const result = await reconciliation.runDailyReconciliation(DAY);
+
+    // int8 arrives from the driver as a string and `sql<number>` is only an
+    // assertion, so this equality is also the check that the close converted it.
+    expect(result.totals.topupsCompleted).toEqual({ count: 2, amount: 4_000_000_000 });
+
+    const [run] = await database.select().from(reconciliationRuns);
+    expect((run.totals as { topupsCompleted: { amount: number } }).topupsCompleted.amount).toBe(4_000_000_000);
+  });
+
+  it("adds up a day of ledger credits grouped by type without the ceiling", async () => {
+    // Two accounts, one deposit each. A single account cannot hold more than an
+    // int4 balance, so the only way a day crosses the ceiling is by being busy
+    // -- which is exactly the figure this query exists to produce.
+    const SECOND = "1c9e7a5b-3d4f-4a6b-8c9d-2e1f2a3b4c7a";
+    await database.insert(users).values([
+      { id: USER, name: "Big Ledger", email: "bigledger@example.com", passwordHash: "x", walletBalance: BIG },
+      { id: SECOND, name: "Big Ledger 2", email: "bigledger2@example.com", passwordHash: "x", walletBalance: BIG },
+    ]);
+    await database.insert(walletTransactions).values([
+      {
+        userId: USER,
+        type: "credit",
+        amount: BIG,
+        balanceAfter: BIG,
+        description: "Deposit 1",
+        reference: "B-1",
+        createdAt: NOON,
+      },
+      {
+        userId: SECOND,
+        type: "credit",
+        amount: BIG,
+        balanceAfter: BIG,
+        description: "Deposit 2",
+        reference: "B-2",
+        createdAt: new Date(NOON.getTime() + 60_000),
+      },
+    ]);
+
+    const result = await reconciliation.runDailyReconciliation(DAY);
+
+    expect(result.totals.walletCredits).toEqual({ count: 2, amount: 4_000_000_000 });
+    expect(result.status).toBe("clean");
   });
 });
 

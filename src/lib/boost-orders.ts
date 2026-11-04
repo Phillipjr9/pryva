@@ -1,14 +1,15 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
 import { orders, type Order } from "@/db/schema";
 import { findBoostListing } from "@/lib/smm-catalog";
 import { addSmmOrder, isSmmPanelConfigured, SmmPanelError } from "@/lib/smm-panel";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 import { totalForQuantity } from "@/lib/smm-pricing";
-import { creditWallet, debitWalletInTx, InsufficientFundsError, makeReference } from "@/lib/wallet";
+import { creditWalletInTx, debitWalletInTx, InsufficientFundsError, makeReference } from "@/lib/wallet";
 
 /**
  * Buying a boost.
@@ -175,21 +176,39 @@ export async function placeBoostOrder(input: {
         ? `Supplier refused the order (${error.code ?? error.status})`
         : "Supplier call failed";
     try {
-      await creditWallet({
-        userId: input.userId,
-        amount: total,
-        type: "refund",
-        description: `Refund · ${listing.name} · ${planLabel}`,
-        orderId,
-        reference: makeReference("RFB"),
+      // One transaction, the same way the purchase above commits its charge and
+      // its row: the money going back and the order saying it went back are one
+      // event. Written separately, the credit could commit and the status write
+      // then fail, leaving a wallet the customer had been refunded into and an
+      // order — plus a note below — insisting the refund had not happened.
+      await db.transaction(async (tx: any) => {
+        // The claim is the first write and it repeats the guard against the row:
+        // only an order that has not already been refunded may add money to a
+        // balance. A declined claim rolls the whole thing back.
+        const [claimable] = await tx
+          .update(orders)
+          .set({ status: "refunded", refundedAt: new Date(), reconciliationNote: reason })
+          .where(and(eq(orders.id, orderId), isNull(orders.refundedAt)))
+          .returning({ id: orders.id });
+        if (!claimable) throw new Error("Boost order was already settled");
+
+        await creditWalletInTx(tx, {
+          userId: input.userId,
+          amount: total,
+          type: "refund",
+          description: `Refund · ${listing.name} · ${planLabel}`,
+          orderId,
+          reference: makeReference("RFB"),
+        });
       });
-      await db
-        .update(orders)
-        .set({ status: "refunded", refundedAt: new Date(), reconciliationNote: reason })
-        .where(eq(orders.id, orderId));
+      // `creditWallet` used to send the receipt as a side effect of its own
+      // commit. Crediting inside a transaction deliberately does not, so the
+      // nudge has to be asked for here or the customer waits for the nightly.
+      scheduleWalletEmails();
     } catch (refundError) {
-      // The debit stands and the row stays at `processing` so an operator can
-      // see it: better a visible unfulfilled order than a silent loss.
+      // Nothing moved: the credit rolled back with the status write, so the
+      // debit stands and the row stays at `processing` for an operator to see.
+      // Better a visible unfulfilled order than a silent loss.
       console.error("Boost refund failed", refundError);
       await db
         .update(orders)
