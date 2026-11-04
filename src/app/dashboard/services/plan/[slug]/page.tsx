@@ -7,6 +7,7 @@ import { isPlanFulfillable } from "@/lib/fulfillment";
 import { canPreviewPlan, explorerCountry } from "@/lib/service-explorer";
 import { CountryFlag } from "@/components/CountryFlag";
 import { PlanPurchase } from "@/components/purchase/PlanPurchase";
+import { catalogEsimSampleIsSellable } from "@/lib/esim-availability";
 
 export const metadata: Metadata = { title: "Plan details" };
 export const dynamic = "force-dynamic";
@@ -32,7 +33,12 @@ export default async function DashboardPlanPage({
    * A plan outside it has no supplier path, so this page offers no way to pay for
    * it — the same rule `/api/orders` enforces server-side.
    */
-  const fulfillable = isPlanFulfillable(plan.slug);
+  // eSIM sample cards are placeholders for the live catalogue: once a supplier
+  // key exists, the plan a customer can actually buy is the live one on
+  // /dashboard/esim, and telling them this card is undeliverable is wrong.
+  const fulfillable = plan.service === "esim"
+    ? catalogEsimSampleIsSellable()
+    : isPlanFulfillable(plan.slug);
 
   return (
     <div className="grid gap-5">

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { plans } from "@/lib/catalog";
 import { isPlanFulfillable } from "@/lib/fulfillment";
 import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
+import { isEsimOrderingAvailable } from "@/lib/esim-availability";
 
 export const metadata: Metadata = {
   title: "Service Status",
@@ -28,7 +29,12 @@ function catalogAvailability() {
   for (const plan of plans) {
     const entry = grouped.get(plan.service) ?? { total: 0, deliverable: 0 };
     entry.total += 1;
-    if (isPlanFulfillable(plan.slug)) entry.deliverable += 1;
+    // eSIM is sold from a live catalogue once a supplier key is configured; the
+    // written sample cards are not what a customer buys, and counting only them
+    // made this page say "None of the 6 plans can be delivered" while the
+    // dashboard was selling plans.
+    if (plan.service === "esim" && isEsimOrderingAvailable()) entry.deliverable += 1;
+    else if (isPlanFulfillable(plan.slug)) entry.deliverable += 1;
     grouped.set(plan.service, entry);
   }
   return [...grouped.entries()].map(([service, { total, deliverable }]) => ({
