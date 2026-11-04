@@ -66,12 +66,15 @@ migrations **before** the app is built. The command gates it on the environment:
 
     if [ "$VERCEL_ENV" = "production" ]; then npm run db:migrate; fi && npm run build
 
-That gate is load-bearing. The `PG*` and `AWS_*` variables target development,
-preview *and* production — the Vercel RDS integration sets all three by default —
-so without it **every PR preview build applied its own migrations to the
-production database**, before anyone reviewed or merged the branch carrying them.
-An additive, idempotent migration survives that by luck; a `DROP COLUMN` would
-not have.
+That gate is load-bearing, and it is now a second line of defence rather than the
+only one. The Vercel RDS integration sets the `PG*` and `AWS_*` variables to
+development, preview *and* production by default, and for a while that meant
+every PR preview both applied its migrations to production **and served the
+preview against live customer data at runtime**. The nine variables are now
+scoped to `production` only, so a preview has no database and falls back to the
+in-memory shim. The build gate stays: if the targets are ever widened again by a
+re-run of the integration, it is what still stops an unreviewed branch altering
+the schema.
 
 Two consequences when adding a migration here:
 

@@ -198,6 +198,31 @@ production before review. Keep it. Previews intentionally do not migrate, so a
 preview of a branch that needs a new table can fail until the branch merges — that
 is the intended trade-off.
 
+**Preview deployments have no database, by design.** The nine RDS variables
+(`PGHOST`, `PGDATABASE`, `PGUSER`, `PGPORT`, `PGSSLMODE`, `AWS_REGION`,
+`AWS_ROLE_ARN`, `AWS_RESOURCE_ARN`, `AWS_ACCOUNT_ID`) are scoped to `production`
+only. They arrive from the Vercel AWS Marketplace integration targeted at all
+three environments, which meant a preview both migrated production and *served
+itself from live customer data* — wallet balances, orders, sessions, password
+hashes. `ADMIN_EMAILS` also reaches preview, so a preview was a privileged view
+of production. With the targets narrowed, `awsIamConfigured()` is false in
+preview, `isPreviewDatabase()` is true, and the in-memory shim answers queries.
+
+Consequences to expect when testing a preview:
+
+- It starts empty. There is no shared demo history, and anything you create is
+  lost when the function recycles.
+- Any page that reads real data shows the demo/empty state, so a preview can
+  confirm *rendering* but not *data*. Verify data changes in production or
+  locally against a restored backup.
+- If a preview ever reports `mode: "database"` from `GET /api/health`, the
+  targets have been widened again — check that before trusting what you see.
+
+⚠ The integration owns these variables. If it is re-run or the database resource
+is re-attached, it may re-apply the three-environment targets. Re-check with
+`vercel env ls` (or the Vercel dashboard's Environment Variables page: the
+*Environments* column should read **Production** only for these nine).
+
 `npm run db:migrate` applies every `migrations/*.sql` in filename order, records
 each in `schema_migrations`, stops at the first error, and is safe to re-run.
 
