@@ -6,6 +6,7 @@ import { Check } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { CountryFlag } from "@/components/CountryFlag";
 import { hasCountryFlag } from "@/lib/countries";
+import { catalogEsimSampleIsSellable, isEsimOrderingAvailable } from "@/lib/esim-availability";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -58,7 +59,12 @@ export default function PricingPage() {
                   // that could never be delivered. Plans stay listed with their
                   // price and details -- what is withdrawn is the promise to sell,
                   // using the same wording the plan page already uses.
-                  const deliverable = isPlanFulfillable(plan.slug);
+                  // eSIM sample cards are placeholders for a live catalogue: once
+                  // one exists, these are not what a customer buys, and printing
+                  // "cannot be delivered yet" on them says the product is broken.
+                  const deliverable = plan.service === "esim"
+                    ? catalogEsimSampleIsSellable()
+                    : isPlanFulfillable(plan.slug);
                   return (
                   <div
                     key={plan.slug}

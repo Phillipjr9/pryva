@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -164,5 +164,36 @@ describe("the public eSIM page agrees with itself", () => {
     expect(page).toContain("Available now");
     // The pre-launch strings must survive for the no-supplier case.
     expect(read("lib/catalog.ts")).toContain("not available for purchase yet");
+  });
+});
+
+describe("no public page says eSIM cannot be bought while it is being bought", () => {
+  it("withdraws the sample cards' 'undeliverable' claim once a live catalogue exists", async () => {
+    const { catalogEsimSampleIsSellable } = await import("@/lib/esim-availability");
+    vi.resetModules();
+    vi.stubEnv("BITCALL_KEY_ID", "ak_live_abc");
+    vi.stubEnv("BITCALL_API_SECRET", "a".repeat(128));
+    expect(catalogEsimSampleIsSellable()).toBe(false);
+
+    vi.stubEnv("BITCALL_KEY_ID", "");
+    vi.stubEnv("BITCALL_API_SECRET", "");
+    expect(catalogEsimSampleIsSellable()).toBe(true);
+    vi.unstubAllEnvs();
+  });
+
+  it("is asked by the three surfaces that used to contradict the storefront", () => {
+    // /pricing and /status printed "cannot be delivered yet" on every eSIM card,
+    // and the plan page refused to sell them, all while /esim said plans were
+    // live and issued on purchase.
+    for (const page of [
+      "app/(site)/pricing/page.tsx",
+      "app/(site)/status/page.tsx",
+      "app/dashboard/services/plan/[slug]/page.tsx",
+    ]) {
+      const source = read(page);
+      expect(source, `${page} must not fall through to isPlanFulfillable for eSIM`).toMatch(
+        /catalogEsimSampleIsSellable|isEsimOrderingAvailable/,
+      );
+    }
   });
 });
