@@ -8,13 +8,15 @@ import { SiteFooter } from "@/components/site/SiteFooter";
 import { BrandLockup, BrandMark } from "@/components/brand/BrandLockup";
 import NotFound from "@/app/not-found";
 import {
+  customerWelcomeEmail,
   emailVerificationEmail,
+  emailVerifiedEmail,
   giftCardEmail,
   orderConfirmationEmail,
   passwordResetEmail,
   refundEmail,
   walletTopupEmail,
-  welcomeEmail,
+  fraudAlertEmail,
 } from "@/lib/email-templates";
 
 /**
@@ -111,7 +113,8 @@ describe("brand presentation", () => {
 
   it("puts the brand header in every email template", () => {
     const templates = [
-      welcomeEmail("Ada"),
+      customerWelcomeEmail("Ada"),
+      emailVerifiedEmail("Ada", "ada@example.com"),
       orderConfirmationEmail({ reference: "R1", productName: "Number", amount: 1000, service: "numbers" }),
       walletTopupEmail(1000, 1000, "T1"),
       giftCardEmail({ code: "CODE", amount: 1000, senderName: "Ada" }),
@@ -133,6 +136,12 @@ describe("brand presentation", () => {
     for (const template of [
       emailVerificationEmail("Ada", "https://pryva.ng/verify-email?token=t"),
       passwordResetEmail("Ada", "https://pryva.ng/reset"),
+      // The two onboarding emails follow the same card: same gradient bar, same
+      // hero-image treatment, same type stack. A welcome that arrived in a plainer
+      // skin than the receipt before it would read as a different sender.
+      customerWelcomeEmail("Ada"),
+      emailVerifiedEmail("Ada", "ada@example.com"),
+      fraudAlertEmail({ kind: "withdrawal_velocity", severity: "high", reasons: ["test"] }),
     ]) {
       expect(template.html).toContain("/images/email/hero-");
       expect(template.html).toContain("linear-gradient");

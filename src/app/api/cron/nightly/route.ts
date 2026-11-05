@@ -12,6 +12,7 @@ import { settleReferralRewards } from "@/lib/referrals";
 import { purgeExpiredClosedAccounts } from "@/lib/retention";
 import { reconcileInFlightPayouts } from "@/lib/payouts";
 import { pruneWebhookEvents } from "@/lib/webhook-events";
+import { backfillOnboardingEmails } from "@/lib/onboarding-emails";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { logger } from "@/lib/logger";
 
@@ -101,6 +102,21 @@ async function handler(request: NextRequest) {
     // `retry` and `review` are not failures of the run: the outbox owns them,
     // with its own lease and retry budget.
     return { ok: true, detail: `sent ${counts.sent}, retry ${counts.retry}, review ${counts.review}` };
+  });
+
+  /*
+   * Finish the onboarding sequence for accounts that verified but never got the
+   * receipt or the welcome. Everyone who confirmed an address before those two
+   * emails existed is in that state, and re-verifying is impossible -- the token
+   * is spent. Bounded to recent signups, because a "welcome aboard" months late
+   * reads as phishing.
+   */
+  const onboarding = await runStep("onboarding-emails", async () => {
+    if (isPreviewDatabase() || !walletEmailConfigured()) {
+      return { ok: true, detail: "skipped: email worker not configured" };
+    }
+    const counts = await backfillOnboardingEmails({ limit: 25, sinceDays: 30 });
+    return { ok: true, detail: `backfilled ${counts.sent} of ${counts.considered} recent account(s)` };
   });
 
   const boosts = await runStep("boost-status", async () => {
@@ -202,12 +218,13 @@ async function handler(request: NextRequest) {
     };
   });
 
-  const allOk = close.ok && emails.ok && boosts.ok && numberCodes.ok && refunds.ok && esim.ok && scheduled.ok && rentals.ok && referrals.ok && payouts.ok && webhookLog.ok && retention.ok;
+  const allOk = close.ok && emails.ok && onboarding.ok && boosts.ok && numberCodes.ok && refunds.ok && esim.ok && scheduled.ok && rentals.ok && referrals.ok && payouts.ok && webhookLog.ok && retention.ok;
   logger.info("Nightly run finished", {
     day,
     allOk,
     close: close.detail,
     emails: emails.detail,
+    onboarding: onboarding.detail,
     boosts: boosts.detail,
     numberCodes: numberCodes.detail,
     refunds: refunds.detail,
@@ -219,7 +236,7 @@ async function handler(request: NextRequest) {
   });
 
   return NextResponse.json(
-    { ok: allOk, day, steps: { close, emails, boosts, numberCodes, refunds, esim, scheduled, rentals, referrals, retention } },
+    { ok: allOk, day, steps: { close, emails, onboarding, boosts, numberCodes, refunds, esim, scheduled, rentals, referrals, retention } },
     { status: allOk ? 200 : 207, headers: { "Cache-Control": "no-store" } },
   );
 }
