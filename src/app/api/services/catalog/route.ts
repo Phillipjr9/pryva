@@ -8,7 +8,7 @@ import { boostItems, readBoostSnapshot } from "@/lib/services/boosts/smm-catalog
 import { isBitcallConfigured } from "@/lib/providers/bitcall";
 import { esimItemsForCountry, readEsimCatalog } from "@/lib/services/esim/esim-catalog";
 import { explorerCountry } from "@/lib/services/service-explorer";
-import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
+import { catalogRateLimiter } from "@/lib/platform/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -35,14 +35,32 @@ async function attempt<T>(configured: boolean, read: () => Promise<T>): Promise<
  * every configured supplier fails is the catalog unavailable.
  */
 export async function GET(request: NextRequest) {
-  if (financialActionsUnavailable()) return NextResponse.json({ error: "Live catalog unavailable" }, { status: 404 });
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Please sign in" }, { status: 401 });
   const country = explorerCountry(request.nextUrl.searchParams.get("country"));
   if (!country) return NextResponse.json({ error: "Choose a valid country" }, { status: 400 });
-  const limit = await purchaseRateLimiter(`supplier-catalog:${user.id}`);
-  if (limit.unavailable) return NextResponse.json({ error: "Catalog temporarily unavailable" }, { status: 503 });
-  if (!limit.allowed) return NextResponse.json({ error: "Please try again shortly" }, { status: 429 });
+
+  /**
+   * "This deployment does not show live availability" is not a failure.
+   *
+   * It used to be a 404, which the hub can only render as "something broke,
+   * retry" — and no retry could ever help, because the reason is the
+   * environment, not the request. It answers 200 with `live: false` and a
+   * reason, so the page can say what is actually going on and drop the button.
+   * No supplier is contacted either way.
+   */
+  if (financialActionsUnavailable()) {
+    return NextResponse.json(
+      { ok: true, country: country.code, live: false, reason: "environment", partial: false, fetchedAt: null, items: [] },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
+
+  const limit = await catalogRateLimiter(`supplier-catalog:${user.id}`);
+  if (limit.unavailable) {
+    return NextResponse.json({ error: "Catalog temporarily unavailable", reason: "unavailable" }, { status: 503 });
+  }
+  if (!limit.allowed) return NextResponse.json({ error: "Please try again shortly", reason: "throttled" }, { status: 429 });
 
   const refresh = request.nextUrl.searchParams.get("refresh") === "1";
   const [supplier, boost, esim] = await Promise.all([
@@ -51,8 +69,26 @@ export async function GET(request: NextRequest) {
     attempt(isBitcallConfigured(), () => readEsimCatalog(refresh)),
   ]);
   const sources = [supplier, boost, esim];
+
+  /**
+   * No supplier connected is the steady state of a fresh deployment, not an
+   * incident: the catalogue is still browsable and the hub should say so
+   * plainly instead of offering a Retry that will keep returning this.
+   */
+  if (!sources.some((source) => source.configured)) {
+    return NextResponse.json(
+      { ok: true, country: country.code, live: false, reason: "unconfigured", partial: false, fetchedAt: null, items: [] },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
+
+  // Configured but every read failed: this one *is* transient, and retrying is
+  // the right advice.
   if (sources.every((source) => !source.snapshot)) {
-    return NextResponse.json({ error: "The live catalog is temporarily unavailable" }, { status: 503 });
+    return NextResponse.json(
+      { error: "The live catalog is temporarily unavailable", reason: "unavailable" },
+      { status: 503 },
+    );
   }
 
   const items = [
@@ -71,7 +107,7 @@ export async function GET(request: NextRequest) {
     .pop() ?? null;
 
   return NextResponse.json(
-    { ok: true, country: country.code, partial, fetchedAt, items },
+    { ok: true, country: country.code, live: true, reason: partial ? "partial" : null, partial, fetchedAt, items },
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }

@@ -154,6 +154,15 @@ What is deliberately not unified
 - `getCurrentUser()` and `requireAuthApi()`. They are the same function; the API
   spelling exists so a route handler can never call the redirecting `requireAuth()`
   by mistake. The shared checkout gates call the API one.
+- "Live listings are off" and "live listings broke". `GET /api/services/catalog`
+  answers 200 with `live: false` and a `reason` (`environment` when the
+  deployment has live availability switched off, `unconfigured` when no supplier
+  key is set) — both are steady states, not incidents. It only answers 503 when
+  a configured supplier is unreachable (retry helps) and 429 when the customer is
+  refreshing too fast. The hub renders a neutral note for the first two and the
+  amber warning with a Retry only for the last two, because a Retry button on a
+  state that cannot change is a lie. This endpoint reads through its own limiter
+  (`catalogRateLimiter`); browsing must never spend the purchase budget.
 
 
 Known gaps
