@@ -413,7 +413,19 @@ export function ServiceExplorer({
               </span>
             </div>
             {summary ? <p className="mt-1.5 text-meta text-ink-3">{summary}</p> : null}
-            <div className="-mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:mt-4 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:pb-0" aria-label="Service categories">
+            {/*
+              `relative` is not decoration. The chips are a horizontal scroll
+              strip on a phone, and each one carries an `sr-only` status label
+              ("— Not connected") for screen readers. `sr-only` is
+              `position: absolute`, so without a positioned ancestor it escapes
+              the strip entirely and resolves against the page — where the
+              strip has been scrolled it lands *past* the right edge of the
+              viewport, at the unscrolled offset of a chip nobody can see. That
+              made the document 1403px wide on a 390px phone, and a mobile
+              browser that finds a page three times the screen width zooms out
+              to fit it. This one class keeps every label inside the strip.
+            */}
+            <div className="relative -mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:mt-4 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:pb-0" aria-label="Service categories">
               <button type="button" onClick={() => chooseCategory("all")} aria-pressed={category === "all"} className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-meta font-semibold transition-colors sm:px-3.5 sm:py-2 ${category === "all" ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}>
                 <span aria-hidden="true">⚡</span> All categories
               </button>
