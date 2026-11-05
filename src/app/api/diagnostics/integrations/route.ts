@@ -13,6 +13,7 @@ import { esimItemsForCountry, readEsimCatalog } from "@/lib/esim-catalog";
 import { explorerCountry } from "@/lib/service-explorer";
 import { isSmmPanelConfigured } from "@/lib/smm-panel";
 import { resendConfigured } from "@/lib/resend-config";
+import { recentEmailActivity } from "@/lib/email-delivery-events";
 import { isPaystackConfigured, paystackKeyMode, getBanks } from "@/lib/paystack";
 import { persistentDatabaseConfigured } from "@/lib/database-config";
 import {
@@ -165,7 +166,14 @@ export async function GET(request: NextRequest) {
             banks: await probe("paystack-banks", async () => summarize(await getBanks())),
           }
         : { configured: false as const },
-      email: { configured: resendConfigured() },
+      email: {
+        configured: resendConfigured(),
+        // Whether the provider is reporting back at all. "sent" only means Resend
+        // accepted the message, so without this an operator cannot tell a working
+        // mail path from one that bounces everything.
+        webhookConfigured: Boolean(process.env.RESEND_WEBHOOK_SECRET?.trim()),
+        delivery: await probe("email-delivery", () => recentEmailActivity()),
+      },
       manualFulfilmentReachable,
     },
     { headers: { "Cache-Control": "no-store" } },
