@@ -3,6 +3,7 @@ import "server-only";
 import type { EmailAttachment } from "@/lib/esim-qr";
 import type { ResendPayload } from "@/lib/wallet-email-template";
 import { emailBrandLockup } from "@/lib/email-brand";
+import { canonicalSiteUrl } from "@/lib/net";
 
 /**
  * The eSIM handover email.
@@ -111,7 +112,9 @@ export function makeEsimDeliveryEmail(input: EsimDeliveryInput): ResendPayload {
     `Install it:`,
     `1. Make sure the device is connected to the internet.`,
     `2. Open Settings → Mobile data (or Cellular) and choose "Add eSIM".`,
-    `3. Scan the QR code attached to this email, or choose "Enter details manually" and paste the activation code below.`,
+    hasQr
+      ? `3. Scan the QR code attached to this email, or choose "Enter details manually" and paste the activation code below.`
+      : `3. View the QR code on your order page, or choose "Enter details manually" and paste the activation code below.`,
     `4. Label the line Pryva and turn on data roaming while you travel.`,
     ``,
     `Activation code (keep it private):`,
@@ -121,6 +124,7 @@ export function makeEsimDeliveryEmail(input: EsimDeliveryInput): ResendPayload {
     ``,
     `Anyone with this code can install the plan, so please don't forward this email or post screenshots of it.`,
     `Your profile is also on your order page: ${input.orderUrl}`,
+    `Questions? Visit ${canonicalSiteUrl()}/help or contact support from your account.`,
     ``,
     `Pryva Technologies · Lagos, Nigeria`,
   ].filter((line) => line !== "").join("\n");
@@ -129,7 +133,7 @@ export function makeEsimDeliveryEmail(input: EsimDeliveryInput): ResendPayload {
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr>
         <td style="padding:10px;border-radius:22px;background:linear-gradient(150deg,#ffffff 0%,#f1ecfb 45%,#d9cdf3 100%);box-shadow:0 26px 44px -20px rgba(45,30,80,0.65),inset 0 1px 0 rgba(255,255,255,0.95),inset 0 -2px 0 rgba(120,95,175,0.25);">
           <div style="padding:10px;border-radius:16px;background:#ffffff;box-shadow:inset 0 2px 6px rgba(60,40,110,0.16);">
-            <img src="cid:esim-qr" width="220" height="220" alt="eSIM installation QR code" style="display:block;width:220px;height:220px;border:0;outline:none;border-radius:8px;">
+            <img src="cid:esim-qr" width="220" height="220" alt="eSIM installation QR code" style="display:block;width:100%;max-width:220px;height:auto;border:0;outline:none;border-radius:8px;">
           </div>
         </td>
       </tr></table>
@@ -141,18 +145,21 @@ export function makeEsimDeliveryEmail(input: EsimDeliveryInput): ResendPayload {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Manrope:wght@700;800&display=swap">
-<style>@media only screen and (max-width:620px){.shell{width:100% !important;} .pad{padding-left:18px !important;padding-right:18px !important;}}</style>
+<style>@media only screen and (max-width:620px){.shell{width:100% !important;} .pad{padding-left:8px !important;padding-right:8px !important;}}</style>
 </head>
 <body style="margin:0;padding:0;background:${C.cream};">
 <div style="display:none;max-height:0;max-width:0;opacity:0;overflow:hidden;font-size:1px;line-height:1px;color:${C.cream};">${esc(preheader)}&#847;&zwnj; &#847;&zwnj; &#847;&zwnj; &#847;&zwnj;</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#f4efe6 0%,#faf7f1 45%,#f6f2ec 100%);">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;table-layout:fixed;background:linear-gradient(180deg,#f4efe6 0%,#faf7f1 45%,#f6f2ec 100%);">
 <tr><td align="center" style="padding:34px 14px 10px;">
 
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" class="shell" style="width:600px;max-width:100%;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="shell" style="width:100%;max-width:600px;table-layout:fixed;">
   <tr><td class="pad" style="padding:0 8px 20px;">
     ${emailBrandLockup(input.orderUrl.replace(/\/dashboard.*$/, ""))}
   </td></tr>
 
+  <tr><td class="pad" style="padding:0 8px 16px;">
+    <img src="${canonicalSiteUrl()}/images/email/hero-esim-delivery.jpg" width="584" alt="An eSIM ready to install" style="display:block;width:100%;max-width:584px;height:auto;border:0;border-radius:22px;">
+  </td></tr>
   <tr><td class="pad" style="padding:0 8px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:26px;background:linear-gradient(155deg,#3a2b63 0%,#241b3a 52%,#4b3480 100%);box-shadow:0 30px 55px -24px rgba(30,20,55,0.8),inset 0 1px 0 rgba(255,255,255,0.22);">
       <tr><td style="padding:34px 30px 30px;">
@@ -209,7 +216,7 @@ export function makeEsimDeliveryEmail(input: EsimDeliveryInput): ResendPayload {
   <tr><td class="pad" style="padding:20px 8px 0;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:20px;background:#fff8e8;border:1px solid #f0e0bd;box-shadow:inset 0 1px 0 #fffdf6;">
       <tr><td style="padding:16px 18px;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;line-height:1.7;color:#7a5f22;">
-        <strong>Keep this private.</strong> Anyone with this QR or code can install the plan. Don&apos;t forward this email or share screenshots of it — if it leaks, contact support and we&apos;ll help you reissue.
+        <strong>Keep this private.</strong> Anyone with this QR or code can install the plan. Don&apos;t forward this email or share screenshots of it — if it leaks, contact support for help.
       </td></tr>
     </table>
   </td></tr>
@@ -219,7 +226,7 @@ export function makeEsimDeliveryEmail(input: EsimDeliveryInput): ResendPayload {
   </td></tr>
 
   <tr><td align="center" style="padding:30px 24px 36px;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;line-height:1.7;color:${C.ink3};">
-    Questions? Reply to this email or use the <a href="${esc(input.orderUrl.replace(/\/dashboard.*$/, ""))}/help" style="color:${C.lav};font-weight:600;text-decoration:none;">help center</a>.
+    Questions? Visit the <a href="${canonicalSiteUrl()}/help" style="color:${C.lav};font-weight:600;text-decoration:none;">help center</a> or contact support from your account.
     <br><br>Pryva Technologies · Lagos, Nigeria<br>&#169; ${new Date().getFullYear()} Pryva Technologies
   </td></tr>
 </table>

@@ -32,7 +32,7 @@ import { ARTWORK_WIDTHS } from "@/lib/service-artwork";
  * Outlook, the carriers) belong to services the customer supplies, not to the
  * Pryva product being described. Third-party products (Netflix, Canva…) use the
  * real mark from `BRAND_MARKS`. Both rules are asserted here so neither can
- * drift. `STATUS.md` §17 records the full surface-by-surface audit.
+ * drift.
  */
 
 /** Pryva's own catalogue: slug -> artwork file. */

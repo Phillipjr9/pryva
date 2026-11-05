@@ -308,6 +308,10 @@ describe("adding a passkey", () => {
     expect(stored.transports).toBe("internal");
     // base64url of [1,2,3] — no padding, no `+` or `/`.
     expect(stored.publicKey).toBe("AQID");
+    const notices = await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.userId, USER));
+    expect(notices).toMatchObject([{ eventKind: "passkey_added", recipient: "ada@example.com", passkeyRowId: stored.id }]);
+    expect(JSON.stringify(notices)).not.toContain("new-credential");
+    expect(JSON.stringify(notices)).not.toContain("AQID");
   });
 
   it("refuses a challenge that belonged to a different account", async () => {
@@ -319,6 +323,7 @@ describe("adding a passkey", () => {
     });
     expect(result).toEqual({ ok: false, reason: "no-challenge" });
     expect(mocks.verifyRegistrationResponse).not.toHaveBeenCalled();
+    expect(await database.select().from(schema.walletEmailOutbox)).toHaveLength(0);
   });
 
   it("refuses the same device twice", async () => {
@@ -345,6 +350,45 @@ describe("adding a passkey", () => {
     });
     expect(result).toEqual({ ok: false, reason: "duplicate" });
     expect(await database.select().from(webauthnCredentials)).toHaveLength(1);
+    expect(await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.userId, USER))).toHaveLength(0);
+  });
+
+  it("does not add a credential if the account closes while the device is being verified", async () => {
+    await passkeys.issueChallenge({ challenge: CHALLENGE, purpose: "register", userId: USER });
+    mocks.verifyRegistrationResponse.mockImplementationOnce(async () => {
+      await database.update(users).set({ deletedAt: new Date() }).where(eq(users.id, USER));
+      return {
+        verified: true,
+        registrationInfo: {
+          credential: { id: "late-device", publicKey: new Uint8Array([1]), counter: 0 },
+          credentialDeviceType: "singleDevice",
+          credentialBackedUp: false,
+        },
+      };
+    });
+    expect(await passkeys.finishRegistration({ userId: USER, rp: RP, response: responseFor(CHALLENGE, "late-device") as never }))
+      .toEqual({ ok: false, reason: "unavailable" });
+    expect(await database.select().from(webauthnCredentials)).toHaveLength(0);
+    expect(await database.select().from(schema.walletEmailOutbox)).toHaveLength(0);
+  });
+
+  it("rechecks capacity when a previously started ceremony finishes", async () => {
+    await passkeys.issueChallenge({ challenge: CHALLENGE, purpose: "register", userId: USER });
+    await database.insert(webauthnCredentials).values(
+      Array.from({ length: 10 }, (_, index) => ({ userId: USER, credentialId: `key-${index}`, publicKey: "AQID", counter: 0 })),
+    );
+    mocks.verifyRegistrationResponse.mockResolvedValue({
+      verified: true,
+      registrationInfo: {
+        credential: { id: "eleventh", publicKey: new Uint8Array([1]), counter: 0 },
+        credentialDeviceType: "singleDevice",
+        credentialBackedUp: false,
+      },
+    });
+    expect(await passkeys.finishRegistration({ userId: USER, rp: RP, response: responseFor(CHALLENGE, "eleventh") as never }))
+      .toEqual({ ok: false, reason: "at-capacity" });
+    expect(await database.select().from(webauthnCredentials)).toHaveLength(10);
+    expect(await database.select().from(schema.walletEmailOutbox)).toHaveLength(10);
   });
 
   it("stops at ten", async () => {
@@ -374,9 +418,13 @@ describe("removing a passkey", () => {
 
     expect(await passkeys.deleteCredential(USER, row.id)).toBe(false);
     expect(await database.select().from(webauthnCredentials)).toHaveLength(1);
+    expect(await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "passkey_removed"))).toHaveLength(0);
 
     expect(await passkeys.deleteCredential(OTHER, row.id)).toBe(true);
     expect(await database.select().from(webauthnCredentials)).toHaveLength(0);
+    expect(await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "passkey_removed"))).toMatchObject([
+      { userId: OTHER, recipient: "bola@example.com", passkeyRowId: row.id },
+    ]);
   });
 
   it("ignores a malformed id", async () => {

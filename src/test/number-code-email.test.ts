@@ -73,9 +73,15 @@ async function codeEmails() {
 describe("the verification code email", () => {
   it("puts the code where it can be read from a phone notification", () => {
     const message = makeNumberCodeEmail(base);
-    expect(message.subject).toContain("481920");
+    // Mail subjects can appear in lock-screen previews and provider dashboards.
+    expect(message.subject).not.toContain("481920");
+    expect(message.subject).toMatch(/verification code has arrived/i);
     expect(message.text).toContain("481920");
     expect(message.html).toContain("481920");
+    expect(message.html).toContain("/images/email/hero-number-code.jpg");
+    expect(message.html).toContain('alt="A message received on a phone"');
+    expect(message.html).toContain("width:100%;max-width:560px;table-layout:fixed");
+    expect(message.html).toContain("overflow-wrap:anywhere;word-break:break-all");
     expect(message.to).toEqual(["ada@example.com"]);
   });
 
@@ -90,6 +96,13 @@ describe("the verification code email", () => {
   it("says nobody will ask for the code, so a caller cannot talk it out of the customer", () => {
     expect(makeNumberCodeEmail(base).text).toMatch(/nobody at pryva will ask you for it/i);
     expect(makeNumberCodeEmail(base).html).toMatch(/nobody at pryva will ask you for it/i);
+  });
+
+  it("directs unrecognized activity to support without promising an automatic refund", () => {
+    const email = makeNumberCodeEmail(base);
+    expect(email.text).toContain("/dashboard/support");
+    expect(email.html).toContain("/dashboard/support");
+    expect(email.text + email.html).not.toMatch(/we(?:'|&apos;)ll refund|reply to this email/i);
   });
 
   it("survives a code that looks like markup", () => {

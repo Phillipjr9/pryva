@@ -1,4 +1,4 @@
-import { randomBytes, scryptSync } from "node:crypto";
+import { randomBytes, randomUUID, scryptSync } from "node:crypto";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
@@ -258,9 +258,14 @@ function matchesConditionInContext(
   if (cleaned.length > 0) clauses.push(cleaned);
 
   return clauses.every((clause) => {
-    const [leftTok, opTok, rightTok] = clause;
+    // Email-change lookups use lower(users.email) to match Postgres' case-
+    // insensitive uniqueness check. Without recognizing that function, the
+    // preview adapter treated its leading token as an unconstrained clause.
+    const lowerLeft = clause[0]?.kind === "op" && clause[0].text.toLowerCase() === "lower";
+    const [leftTok, opTok, rightTok] = lowerLeft ? clause.slice(1) : clause;
     if (!leftTok || !opTok || opTok.kind !== "op") return true;
-    const leftVal = resolveValue(leftTok, ctx, defaultTable);
+    const resolved = resolveValue(leftTok, ctx, defaultTable);
+    const leftVal = lowerLeft && typeof resolved === "string" ? resolved.toLowerCase() : resolved;
     const operator = opTok.text.trim().toLowerCase();
     // Drizzle emits IS NULL without a right-hand value. Treating a two-token
     // clause as automatically true silently ignored refund safety conditions.
@@ -402,7 +407,7 @@ export type PreviewState = Record<
   | "securityViolations" | "withdrawals" | "bankAccounts" | "adminAuditLog"
   | "userTwoFactor" | "twoFactorRecoveryCodes" | "twoFactorChallenges"
   | "productReviews" | "supportTickets" | "supportMessages"
-  | "webauthnCredentials" | "webauthnChallenges"
+  | "webauthnCredentials" | "webauthnChallenges" | "emailChangeRequests"
   | "referralCodes" | "referrals"
   | "accountSignals" | "fraudEvents",
   Array<Record<string, unknown>>
@@ -436,6 +441,7 @@ const mockState: PreviewState =
     supportMessages: [],
     webauthnCredentials: [],
     webauthnChallenges: [],
+    emailChangeRequests: [],
     referralCodes: [],
     referrals: [],
     accountSignals: [],
@@ -445,7 +451,7 @@ const mockState: PreviewState =
 // Next can load route handlers and server components in separate bundles.
 // Share the in-memory preview state across those bundles in this process.
 if (!databaseUrl) {
-  for (const key of ["users", "sessions", "orders", "walletTransactions", "paymentTopups", "contactMessages", "giftCards", "scheduledOrders", "notifications", "securityViolations", "withdrawals", "bankAccounts", "adminAuditLog", "userTwoFactor", "twoFactorRecoveryCodes", "twoFactorChallenges", "productReviews", "supportTickets", "supportMessages", "webauthnCredentials", "webauthnChallenges", "referralCodes", "referrals", "accountSignals", "fraudEvents"] as const) {
+  for (const key of ["users", "sessions", "orders", "walletTransactions", "paymentTopups", "contactMessages", "giftCards", "scheduledOrders", "notifications", "securityViolations", "withdrawals", "bankAccounts", "adminAuditLog", "userTwoFactor", "twoFactorRecoveryCodes", "twoFactorChallenges", "productReviews", "supportTickets", "supportMessages", "webauthnCredentials", "webauthnChallenges", "emailChangeRequests", "referralCodes", "referrals", "accountSignals", "fraudEvents"] as const) {
     mockState[key] ??= [];
   }
   globalForDb.__arenaPryvaMockState = mockState;
@@ -753,7 +759,7 @@ function buildQueryResult(
   }
 
   const projected = contexts.map((ctx) => projectRow(selection, ctx, defaultTable));
-  return Object.assign([...projected], {
+  const result = Object.assign([...projected], {
     orderBy() {
       const sorted = sortDescendingByCreatedAt(projected);
       return withLimit(sorted);
@@ -764,7 +770,13 @@ function buildQueryResult(
     offset(start: number) {
       return withLimit(projected.slice(start));
     },
+    // The in-memory adapter is process-local and cannot emulate PostgreSQL row
+    // locks. Preserve the query shape for preview, without implying isolation.
+    for() {
+      return result;
+    },
   });
+  return result;
 }
 
 function sortQueryRows<T extends Record<string, unknown>>(rows: T[], orderBy: unknown): T[] {
@@ -863,7 +875,9 @@ const mockDb: any = {
           provider: tableKey === "orders" ? "preview" : undefined,
           walletBalance: tableKey === "users" ? 0 : undefined,
           ...input,
-          id: input.id ?? randomBytes(16).toString("hex"),
+          // Match PostgreSQL's uuid default so links and passkey deletion accept
+          // preview-generated ids just as they do persistent rows.
+          id: input.id ?? randomUUID(),
           createdAt: input.createdAt ?? new Date(),
         }));
         rows.push(...inserted);
@@ -909,14 +923,22 @@ const mockDb: any = {
   delete(table: unknown) {
     const tableKey = tableNameFor(table) as keyof PreviewState;
     return {
-      where(condition: unknown) {
-        const rows = mockState[tableKey] ?? [];
-        const survivors = rows.filter(
-          (row) => !evaluateCondition(condition, { [tableKey]: row }, tableKey),
-        );
-        mockState[tableKey] = survivors;
-        return { rows: survivors };
-      },
+          where(condition: unknown) {
+            const rows = mockState[tableKey] ?? [];
+            const removed = rows.filter(
+              (row) => evaluateCondition(condition, { [tableKey]: row }, tableKey),
+            );
+            const survivors = rows.filter(
+              (row) => !evaluateCondition(condition, { [tableKey]: row }, tableKey),
+            );
+            mockState[tableKey] = survivors;
+            return {
+              rows: survivors,
+              returning(selection?: Record<string, unknown>) {
+                return removed.map((row) => projectRow(selection, { [tableKey]: row }, tableKey));
+              },
+            };
+          },
     };
   },
   async transaction<T>(callback: (tx: typeof mockDb) => Promise<T> | T): Promise<T> {

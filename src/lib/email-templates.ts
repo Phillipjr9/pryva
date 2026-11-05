@@ -80,13 +80,18 @@ function emailWrapper(content: string, preheader: string = ""): string {
 </html>`;
 }
 
+export type NotificationHero =
+  | "wallet" | "bank" | "withdrawal" | "order" | "password" | "refund"
+  | "support-reply" | "purchase-receipt" | "passkey-added" | "passkey-removed"
+  | "two-factor-on" | "two-factor-off" | "email-changed";
+
 /** A single email-client-friendly card for account and money notifications. */
 export function brandedNotificationEmail(input: {
   subject: string;
   eyebrow: string;
   title: string;
   intro: string;
-  hero: "wallet" | "bank" | "withdrawal" | "order" | "password" | "refund";
+  hero: NotificationHero;
   heroAlt: string;
   rows: Array<{ label: string; value: string }>;
   ctaPath: string;
@@ -109,7 +114,7 @@ export function brandedNotificationEmail(input: {
           <img src="${config.siteUrl}/images/email/hero-${input.hero}.jpg" width="600" alt="${escapeEmailText(input.heroAlt)}" style="display:block;width:100%;max-width:600px;height:auto;border:0;outline:none;text-decoration:none;">
           <div class="email-padding" style="padding:32px 36px 30px;">
             <div style="margin:0 0 12px;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${config.accentColor};">${escapeEmailText(input.eyebrow)}</div>
-            <h1 style="margin:0 0 14px;font-family:'Manrope',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:27px;line-height:1.16;font-weight:600;letter-spacing:-.6px;color:${config.darkColor};">${escapeEmailText(input.title)}</h1>
+            <h1 style="margin:0 0 14px;overflow-wrap:anywhere;word-break:break-word;font-family:'Manrope',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:27px;line-height:1.16;font-weight:600;letter-spacing:-.6px;color:${config.darkColor};">${escapeEmailText(input.title)}</h1>
             <p style="margin:0 0 14px;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.65;color:${config.textColor};">${escapeEmailText(input.intro)}</p>
             ${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;background:${config.infoBackground};border:1px solid ${config.infoBorder};border-radius:12px;"><tr><td style="padding:4px 18px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr></table>` : ""}
             <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0 0;"><tr><td bgcolor="${config.darkColor}" style="border-radius:12px;"><a href="${escapeEmailText(url)}" style="display:inline-block;padding:14px 30px;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;color:#ffffff;text-decoration:none;">${escapeEmailText(input.ctaLabel)}</a></td></tr></table>

@@ -108,6 +108,9 @@ describe("the ticket itself", () => {
     expect(after.handledBy).toBe("admin");
     expect(after.resolvedAt).toBeTruthy();
     expect(after.assignedAdminId).toBe(OTHER);
+    const notices = await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "support_reply"));
+    expect(notices).toMatchObject([{ userId: USER, recipient: "ada@example.com", supportTicketId: ticket.id }]);
+    expect(JSON.stringify(notices)).not.toContain("Fixed it for you");
   });
 
   it("counts the queue by what a person has to do", async () => {

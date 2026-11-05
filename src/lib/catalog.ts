@@ -394,7 +394,7 @@ export const plans: Plan[] = planDefinitions.map((definition) => {
  * `fromPrice` is a promise to the customer — "you can buy this from ₦X" — so it
  * is computed from real plan prices wherever plans exist. Hand-set values remain
  * only for the services priced elsewhere: accounts (live marketplace listings),
- * data plans and gift cards (sold at face value — see PRICING.md), where a
+ * data plans and gift cards (sold at face value — see pricing.ts), where a
  * 30–50% markup above face value is not a thing the market allows.
  */
 export const services: Service[] = serviceDefinitions.map((service) => {
