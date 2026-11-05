@@ -17,7 +17,12 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => state.preview }));
 vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: async () => state.user }));
-vi.mock("@/lib/platform/rate-limit", () => ({ purchaseRateLimiter: state.limit }));
+vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
+  // Keep the real module: other limiters are constructed when a route imports
+  // a money module, and a factory that omits them fails at import time.
+  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
+  return { ...actual, purchaseRateLimiter: state.limit };
+});
 vi.mock("@/lib/services/numbers/fleexa-catalog", () => ({ readSupplierSnapshot: state.snapshot, supplierItemsForCountry: state.items }));
 // Mocked so the real clients never load: each calls createRateLimiter at import
 // scope, which this file's narrow rate-limit mock does not provide.

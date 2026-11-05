@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   scheduleWalletEmails: vi.fn(),
 }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: mocks.currentUser }));
+vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: mocks.currentUser, requireAuthApi: mocks.currentUser }));
 vi.mock("@/lib/services/fulfillment", () => ({
   fulfillPlan: mocks.fulfillPlan,
   cancelUpstream: mocks.cancelUpstream,

@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   place: vi.fn(),
 }));
 
-vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: mocks.user }));
+vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: mocks.user, requireAuthApi: mocks.user }));
 vi.mock("@/lib/admin/fraud", () => ({ purchaseVelocity: mocks.velocity, recordFraudEvent: mocks.fraud }));
 vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();

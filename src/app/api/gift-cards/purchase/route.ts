@@ -1,11 +1,7 @@
-import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
+import { beginPurchase } from "@/lib/checkout/purchase";
 import { NextRequest, NextResponse } from "next/server";
 import { createGiftCard } from "@/lib/services/gift-cards/gift-cards";
 import { GIFT_CARD_MAX_AMOUNT, GIFT_CARD_MIN_AMOUNT } from "@/lib/services/gift-cards/gift-card-rules";
-import { requireAuthApi } from "@/lib/identity/auth";
-import { isSameOriginMutation } from "@/lib/platform/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
-import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
 import { validateEmail } from "@/lib/platform/validation";
 import { sendGiftCardDelivery } from "@/lib/services/gift-cards/gift-card-delivery";
 
@@ -13,21 +9,18 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAuthApi();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
-    if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
-    if (financialActionsUnavailable()) return NextResponse.json({ error: "Gift cards are unavailable in this environment." }, { status: 503 });
-    const limit = await purchaseRateLimiter(`gift-card-purchase:${user.id}`);
-    if (limit.unavailable) return NextResponse.json({ error: "Gift card service temporarily unavailable." }, { status: 503 });
-    if (!limit.allowed) return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
-
-    let body: unknown;
-    try {
-      body = await readJsonWithLimit(request, 4_096);
-    } catch (error) {
-      return NextResponse.json({ error: "Invalid request" }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
-    }
+    const begun = await beginPurchase(request, {
+      bucket: "gift-card-purchase",
+      maxBodyBytes: 4_096,
+      copy: {
+        unavailable: "Gift cards are unavailable in this environment.",
+        limiterDown: "Gift card service temporarily unavailable.",
+        rateLimited: "Too many attempts. Please try again later.",
+        invalidBody: "Invalid request",
+      },
+    });
+    if (!begun.ok) return begun.response;
+    const { user, body } = begun;
     if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     const { amount, recipientEmail, message } = body as { amount?: unknown; recipientEmail?: unknown; message?: unknown };
     if (

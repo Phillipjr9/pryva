@@ -1,9 +1,8 @@
-import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
+import { beginPurchase } from "@/lib/checkout/purchase";
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users } from "@/db/schema";
-import { getCurrentUser } from "@/lib/identity/auth";
 import { findGiftCardDenomination } from "@/lib/services/gift-cards/gift-cards-catalog";
 import {
   createFoxreloadOrder,
@@ -16,49 +15,30 @@ import {
 import { FOXRELOAD_PROVIDER } from "@/lib/services/order-providers";
 import { creditWalletInTx, debitWalletInTx, makeReference } from "@/lib/payments/wallet";
 import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
-import { isSameOriginMutation } from "@/lib/platform/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
-import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return Response.json({ ok: false, error: "Please sign in to complete this order." }, { status: 401 });
-  }
-
-  if (!isSameOriginMutation(request)) {
-    return Response.json({ ok: false, error: "Cross-origin request denied." }, { status: 403 });
-  }
-
-  if (!isJsonRequest(request)) {
-    return Response.json({ ok: false, error: "Expected JSON." }, { status: 415 });
-  }
-
-  if (financialActionsUnavailable() || process.env.FOXRELOAD_IS_MOCK === "true") {
-    return Response.json({ ok: false, error: "Gift card purchases are unavailable in this environment." }, { status: 503 });
-  }
-
-  const limit = await purchaseRateLimiter(`gift-card-order:${user.id}`);
-  if (limit.unavailable) {
-    return Response.json({ ok: false, error: "Gift card purchases are temporarily unavailable." }, { status: 503 });
-  }
-  if (!limit.allowed) {
-    return Response.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
-  }
-
-  let body: unknown;
-  try {
-    body = await readJsonWithLimit(request, 16 * 1024);
-  } catch (err) {
-    if (err instanceof RequestBodyTooLargeError) {
-      return Response.json({ ok: false, error: "Request payload too large." }, { status: 413 });
-    }
-    return Response.json({ ok: false, error: "Invalid JSON." }, { status: 400 });
-  }
+  const begun = await beginPurchase(request, {
+    bucket: "gift-card-order",
+    maxBodyBytes: 16 * 1024,
+    copy: {
+      unavailable: "Gift card purchases are unavailable in this environment.",
+      limiterDown: "Gift card purchases are temporarily unavailable.",
+      bodyTooLarge: "Request payload too large.",
+      invalidBody: "Invalid JSON.",
+    },
+    // A mock feed is a closed shop: refusing here costs no catalogue read and
+    // matches the environment rule the financial gate applies to everything else.
+    supplierGate: {
+      open: () => process.env.FOXRELOAD_IS_MOCK !== "true",
+      message: "Gift card purchases are unavailable in this environment.",
+    },
+  });
+  if (!begun.ok) return begun.response;
+  const { user, body } = begun;
 
   const { denominationId, requestId: rawRequestId } = (body && typeof body === "object" ? body : {}) as {
     denominationId?: unknown;

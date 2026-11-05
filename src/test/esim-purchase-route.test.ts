@@ -28,10 +28,15 @@ const state = vi.hoisted(() => ({
   txError: null as Error | null,
 }));
 
-vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: async () => state.user }));
+vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: async () => state.user, requireAuthApi: async () => state.user }));
 vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => state.preview }));
 vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
-vi.mock("@/lib/platform/rate-limit", () => ({ purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }) }));
+vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
+  // Keep the real module: other limiters are constructed when a route imports
+  // a money module, and a factory that omits them fails at import time.
+  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
+  return { ...actual, purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }) };
+});
 vi.mock("@/lib/admin/fraud", () => ({
   purchaseVelocity: async () => ({ allowed: true, count: 0, limit: 20 }),
   recordFraudEvent: vi.fn(),

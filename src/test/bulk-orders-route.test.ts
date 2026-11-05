@@ -26,13 +26,16 @@ const state = vi.hoisted(() => ({
   balanceAfter: 49000,
 }));
 
-vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: async () => state.user }));
+vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: async () => state.user, getCurrentUser: async () => state.user }));
 
 vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
 
-vi.mock("@/lib/platform/rate-limit", () => ({
-  purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }),
-}));
+vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
+  // Keep the real module: `createRateLimiter` runs when a money module is
+  // imported, so a factory with only one function fails at import time.
+  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
+  return { ...actual, purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }) };
+});
 
 vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
 

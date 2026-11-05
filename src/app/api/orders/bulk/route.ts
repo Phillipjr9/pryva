@@ -1,8 +1,7 @@
-import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
+import { afterPurchase, beginPurchase } from "@/lib/checkout/purchase";
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { requireAuthApi } from "@/lib/identity/auth";
 import { db } from "@/db";
 import { orders, users } from "@/db/schema";
 import { calculateBulkOrder, expandBulkOrder, MAX_BULK_UNITS, type BulkOrderItem } from "@/lib/services/bulk-orders";
@@ -10,10 +9,6 @@ import { findPlan, type Plan } from "@/lib/services/catalog";
 import { cancelUpstream, fulfillPlan, isPlanFulfillable, type FulfilledOrder } from "@/lib/services/fulfillment";
 import { FleexaError } from "@/lib/providers/fleexa";
 import { debitWalletInTx, InsufficientFundsError, makeReference } from "@/lib/payments/wallet";
-import { isSameOriginMutation } from "@/lib/platform/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
-import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
-import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -73,34 +68,16 @@ function isUnavailable(error: unknown): boolean {
  * than sold as something that cannot arrive.
  */
 export async function POST(request: NextRequest) {
-  const user = await requireAuthApi();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!isSameOriginMutation(request)) {
-    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
-  }
-
-  if (!isJsonRequest(request)) {
-    return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
-  }
-
-  if (financialActionsUnavailable()) return NextResponse.json({ error: "Purchases are unavailable in this environment." }, { status: 503 });
-
-  const limit = await purchaseRateLimiter(`bulk-create:${user.id}`);
-  if (limit.unavailable) return NextResponse.json({ error: "Bulk orders are temporarily unavailable." }, { status: 503 });
-  if (!limit.allowed) return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
-
-  let body: unknown;
-  try {
-    body = await readJsonWithLimit(request, 16_384);
-  } catch (error) {
-    return NextResponse.json(
-      { error: "Invalid request body" },
-      { status: error instanceof RequestBodyTooLargeError ? 413 : 400 },
-    );
-  }
+  const begun = await beginPurchase(request, {
+    bucket: "bulk-create",
+    maxBodyBytes: 16_384,
+    copy: {
+      limiterDown: "Bulk orders are temporarily unavailable.",
+      unauthorized: "Please sign in to complete this order.",
+    },
+  });
+  if (!begun.ok) return begun.response;
+  const { user, body } = begun;
 
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
@@ -238,7 +215,7 @@ export async function POST(request: NextRequest) {
       return { balance, count: fulfilled.length, reference: batchReference };
     });
 
-    scheduleWalletEmails();
+    void afterPurchase(user.id);
     return NextResponse.json({ ok: true, ...outcome });
   } catch (error) {
     // The units were bought and nothing was recorded, so release them rather

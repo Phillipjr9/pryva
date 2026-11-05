@@ -14,10 +14,18 @@ const mocks = vi.hoisted(() => ({
   purchase: vi.fn(),
 }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: async () => ({ id: "11111111-1111-4111-8111-111111111111", walletBalance: 50_000 }) }));
+vi.mock("@/lib/identity/auth", () => ({
+  getCurrentUser: async () => ({ id: "11111111-1111-4111-8111-111111111111", walletBalance: 50_000 }),
+  requireAuthApi: async () => ({ id: "11111111-1111-4111-8111-111111111111", walletBalance: 50_000 }),
+}));
 vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => false }));
 vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => true }));
-vi.mock("@/lib/platform/rate-limit", () => ({ purchaseRateLimiter: async () => ({ allowed: true }) }));
+vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
+  // Keep the real module: other limiters are constructed when a route imports
+  // a money module, and a factory that omits them fails at import time.
+  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
+  return { ...actual, purchaseRateLimiter: async () => ({ allowed: true }) };
+});
 vi.mock("@/lib/admin/fraud", () => ({ purchaseVelocity: async () => ({ allowed: true }), recordFraudEvent: vi.fn() }));
 vi.mock("@/lib/services/esim/esim-catalog", () => ({ findEsimOffer: async () => offer(), recheckEsimOffer: mocks.recheck, esimOfferTerms: () => "a".repeat(24) }));
 vi.mock("@/lib/services/esim/esim-fulfilment", () => ({ purchaseEsim: mocks.purchase }));

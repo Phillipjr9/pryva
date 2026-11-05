@@ -1,10 +1,5 @@
-import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
+import { afterPurchase, beginPurchase } from "@/lib/checkout/purchase";
 import { placeBoostOrder } from "@/lib/services/boosts/boost-orders";
-import { getCurrentUser } from "@/lib/identity/auth";
-import { purchaseVelocity, recordFraudEvent } from "@/lib/admin/fraud";
-import { isSameOriginMutation } from "@/lib/platform/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
-import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
 import { normalizeTargetLink } from "@/lib/providers/smm-panel";
 
 export const dynamic = "force-dynamic";
@@ -14,48 +9,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 /**
  * Buy a boost.
  *
- * Same guard rails as a catalogue purchase — signed in, same origin, JSON,
- * per-minute limiter, hourly purchase ceiling, client-supplied idempotency key —
- * because this spends wallet money exactly like an order does.
+ * The shared checkout gates cover identity, origin, content type, the financial
+ * environment, the limiter and the hourly ceiling; what is left here is the part
+ * that is about boosts.
  */
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return Response.json({ ok: false, error: "Please sign in to complete this order." }, { status: 401 });
-  }
-  if (!isSameOriginMutation(request)) {
-    return Response.json({ ok: false, error: "Cross-origin request denied." }, { status: 403 });
-  }
-  if (!isJsonRequest(request)) return Response.json({ ok: false, error: "Expected JSON." }, { status: 415 });
-  if (financialActionsUnavailable()) return Response.json({ ok: false, error: "Purchases are unavailable in this environment." }, { status: 503 });
-
-  const limit = await purchaseRateLimiter(`boost-create:${user.id}`);
-  if (limit.unavailable) return Response.json({ ok: false, error: "Purchases are temporarily unavailable." }, { status: 503 });
-  if (!limit.allowed) return Response.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
-
-  const velocity = await purchaseVelocity(user.id).catch(() => ({ allowed: true, count: 0, limit: 0 }));
-  if (!velocity.allowed) {
-    await recordFraudEvent({
-      userId: user.id,
-      kind: "purchase_velocity",
-      severity: "warn",
-      reasons: [`${velocity.count} orders in the last hour (limit ${velocity.limit})`],
-    });
-    return Response.json(
-      { ok: false, error: "That is a lot of orders in a short time. Please try again in a few minutes." },
-      { status: 429 },
-    );
-  }
-
-  let body: unknown;
-  try {
-    body = await readJsonWithLimit(request, 2_048);
-  } catch (error) {
-    return Response.json(
-      { ok: false, error: "Invalid request body." },
-      { status: error instanceof RequestBodyTooLargeError ? 413 : 400 },
-    );
-  }
+  const begun = await beginPurchase(request, { bucket: "boost-create", maxBodyBytes: 2_048 });
+  if (!begun.ok) return begun.response;
+  const { user, body } = begun;
 
   const fields = body && typeof body === "object" && !Array.isArray(body)
     ? (body as { itemId?: unknown; link?: unknown; quantity?: unknown; requestId?: unknown })
@@ -104,6 +65,9 @@ export async function POST(request: Request) {
     }
 
     const order = result.order;
+    // A created order may be this customer's first delivery, which is what a
+    // referral reward waits for. Best effort, and idempotent.
+    if (result.kind !== "replay") void afterPurchase(user.id);
     return Response.json({
       ok: true,
       replayed: result.kind === "replay",
