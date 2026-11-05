@@ -417,22 +417,24 @@ export async function pollInbox(userId: string, inboxId: string): Promise<PollRe
   }
 
   if (row.tier === "paid" || row.provider === "tempmail") {
-    await db
-      .insert(inboxMessages)
-      .values(
-        checked.messages.map((message) => ({
-          inboxId: row.id,
-          userId,
-          fingerprint: messageFingerprint(message),
-          subject: message.subject,
-          fromAddress: message.from,
-          body: message.body,
-          code: message.code,
-          receivedAt: parseExpiry(message.receivedAt),
-        })),
-      )
-      // The whole point: a repeated poll inserts nothing new.
-      .onConflictDoNothing();
+    if (checked.messages.length > 0) {
+      await db
+        .insert(inboxMessages)
+        .values(
+          checked.messages.map((message) => ({
+            inboxId: row.id,
+            userId,
+            fingerprint: messageFingerprint(message),
+            subject: message.subject,
+            fromAddress: message.from,
+            body: message.body,
+            code: message.code,
+            receivedAt: parseExpiry(message.receivedAt),
+          })),
+        )
+        // The whole point: a repeated poll inserts nothing new.
+        .onConflictDoNothing();
+    }
     const stored = await storedMessages(row.id);
     return { inbox: viewOf(row), messages: stored, code: checked.code ?? stored.find((m) => m.code)?.code ?? null, stored: true };
   }

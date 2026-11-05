@@ -81,10 +81,13 @@ vi.mock("@/db", async () => {
           return [row];
         },
         onConflictDoNothing: async () => {
+          const rows = Array.isArray(value) ? value : [value];
+          if (rows.length === 0) {
+            throw new Error("values() must be called with at least one value");
+          }
           mocks.state.calls.push(`insert:${nameOf(table)}:on-conflict`);
           // A bulk insert passes an array of rows; record the rows themselves so
           // the assertions below read as "which messages were written".
-          const rows = Array.isArray(value) ? value : [value];
           mocks.state.insertedMessages.push(...(rows as Record<string, unknown>[]));
           return [];
         },
@@ -328,6 +331,18 @@ describe("reading an inbox", () => {
     // application logic — is what stops the mailbox being duplicated.
     expect(mocks.state.calls.filter((c) => c === "insert:inbox_messages:on-conflict")).toHaveLength(2);
     expect(mocks.state.insertedMessages[0]).toMatchObject({ inboxId: "inbox-1", userId: USER });
+  });
+
+  it("ignores an empty provider reply without trying to insert zero rows", async () => {
+    mocks.state.selectRows = [{ ...ACTIVE_ROW, tier: "paid" }];
+    mocks.check.mockResolvedValue({ messages: [], code: null, raw: {} });
+
+    const result = await pollInbox(USER, "inbox-1");
+
+    expect(result.messages).toEqual([]);
+    expect(result.code).toBeNull();
+    expect(result.stored).toBe(true);
+    expect(mocks.state.insertedMessages).toEqual([]);
   });
 
   it("does not call the supplier again for an inbox that has already ended", async () => {
