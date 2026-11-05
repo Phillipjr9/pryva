@@ -7,6 +7,7 @@ import { safeRedirectPath } from "@/lib/safe-redirect";
 import { planDestination } from "@/lib/plan-destination";
 import { headers } from "next/headers";
 import { isArenaPreviewHost } from "@/lib/net";
+import { operatorHomeFor } from "@/lib/operator";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -66,7 +67,13 @@ export default async function LoginPage({
   const headerList = await headers();
   const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
 
-  if (user) redirect(safeNext);
+  if (user) {
+    // An explicit `?next=` is where the visitor asked to go, and it wins. With no
+    // destination asked for, an administrator lands in the console and a customer
+    // in the storefront -- the two are separate products and a shared front door
+    // should not drop an operator into a shop.
+    redirect(next ? safeNext : operatorHomeFor(user));
+  }
 
   return (
     <div className="mx-auto w-full max-w-md rounded-[1.75rem] border border-line bg-[#fffdfa] p-6 shadow-[var(--shadow-card)] sm:p-8">

@@ -4,8 +4,9 @@ import { NextResponse } from "next/server";
 import { requireAuthApi } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 import { isSameOriginMutation } from "@/lib/net";
-import { finishRegistration, listCredentialSummaries, relyingPartyFor } from "@/lib/passkeys";
+import { MAX_PASSKEYS_PER_ACCOUNT, finishRegistration, listCredentialSummaries, relyingPartyFor } from "@/lib/passkeys";
 import { passkeyRateLimiter } from "@/lib/rate-limit";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
@@ -55,10 +56,16 @@ export async function POST(request: Request) {
       const message =
         result.reason === "duplicate"
           ? "That device is already a passkey on an account. Use a different one, or sign in with it."
-          : "That passkey could not be confirmed. Please try again.";
-      return NextResponse.json({ error: message }, { status: result.reason === "duplicate" ? 409 : 400 });
+          : result.reason === "at-capacity"
+            ? `This account already has ${MAX_PASSKEYS_PER_ACCOUNT} passkeys. Remove one before adding another.`
+            : "That passkey could not be confirmed. Please try again.";
+      const conflict = result.reason === "duplicate" || result.reason === "at-capacity";
+      return NextResponse.json({ error: message }, { status: conflict ? 409 : 400 });
     }
 
+    // The insert and its alert committed together; delivery cannot change the
+    // successful registration response. The scheduled worker handles retries.
+    scheduleWalletEmails();
     return NextResponse.json(
       {
         ok: true,

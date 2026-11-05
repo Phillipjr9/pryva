@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger";
 import { isSameOriginMutation } from "@/lib/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { addAdminMessage, getTicket, setTicketState } from "@/lib/support-tickets";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         body: reply.trim(),
         status: nextStatus,
       });
+      // Only actual human replies enqueue a notification; status-only changes
+      // and immediate AI replies do not generate customer email.
+      scheduleWalletEmails();
     } else {
       await setTicketState({ ticketId: ticket.id, status: nextStatus, priority: nextPriority });
     }

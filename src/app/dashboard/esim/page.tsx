@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { ServiceTitle } from "@/components/ServiceTitle";
 import { formatDateNigerian } from "@/lib/date-utils";
-import { catalogueItems, ESIM_CATALOGUE_LIMIT, readEsimCatalog } from "@/lib/esim-catalog";
+import { catalogueItems, ESIM_CATALOGUE_LIMIT, readEsimCatalog, type EsimCatalogStats } from "@/lib/esim-catalog";
 import { EsimCatalogue } from "./EsimCatalogue";
 
 export const metadata: Metadata = { title: "eSIM plans" };
@@ -31,6 +32,8 @@ export default async function EsimCataloguePage() {
   let fetchedAt: string | null = null;
   let partial = false;
   let failure: string | null = null;
+  let stats: EsimCatalogStats | null = null;
+  let shown = 0;
 
   try {
     const catalog = await readEsimCatalog();
@@ -38,12 +41,16 @@ export default async function EsimCataloguePage() {
     total = catalog.offers.length;
     fetchedAt = catalog.fetchedAt;
     partial = catalog.partial;
+    stats = catalog.stats;
+    shown = items.length;
   } catch (error) {
     // "Not configured" and "the supplier is down" are different, and only one of
     // them is the owner's to fix, so they are not collapsed into one message.
-    failure = error instanceof Error && /not configured/i.test(error.message)
-      ? "eSIM ordering is not connected yet, so no plan can be bought."
-      : "The eSIM catalogue could not be read just now.";
+    failure = financialActionsUnavailable()
+      ? "eSIM ordering is unavailable in this environment."
+      : error instanceof Error && /not configured/i.test(error.message)
+        ? "eSIM ordering is not connected yet, so no plan can be bought."
+        : "The eSIM catalogue could not be read just now.";
   }
 
   return (
@@ -51,12 +58,37 @@ export default async function EsimCataloguePage() {
       <div>
         <ServiceTitle service="esim">eSIM plans</ServiceTitle>
         <p className="mt-1 text-[0.86rem] leading-relaxed text-ink-2">
-          Every plan the network is offering right now, cheapest first — data allowance, validity and the
-          naira price. You are charged when the profile is issued.
+          Browse current plans by data allowance, validity and naira price. Availability can change;
+          your wallet is charged when the profile is issued.
         </p>
       </div>
 
-      {failure ? (
+      {!failure && total === 0 ? (
+        /*
+         * An empty list used to render as the catalogue component's own
+         * "No plan matches that" screen with a "Clear filters" button: a search
+         * that was never applied. The customer could not tell an empty
+         * catalogue from a broken filter, so "the listing is empty" was the
+         * only thing they could report. Say which of the two it is.
+         */
+        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.86rem] leading-relaxed text-amber-900">
+          <p className="font-semibold">No eSIM plan is on sale right now.</p>
+          <p className="mt-1">
+            No plans are currently listed. Coverage and availability can change; you have not been charged.
+            {partial ? " The plan list was also incomplete when it was read, so this may be temporary." : ""}
+          </p>
+        </div>
+      ) : total > 0 && shown === 0 && stats && stats.priced > 0 ? (
+        /*
+         * Plans exist but none survived the price cut. "Sold out" and "we cannot
+         * price it" look identical in a list, and only one of them is worth
+         * waiting for, so the reason is stated rather than a bare empty grid.
+         */
+        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.86rem] leading-relaxed text-amber-900">
+          {stats.priced} plan{stats.priced === 1 ? " was" : "s were"} found but none can be sold at a
+          price we can stand behind. Nothing was charged.
+        </div>
+      ) : failure ? (
         <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.86rem] leading-relaxed text-amber-900">
           {failure}{" "}
           <Link href="/dashboard/services?category=esim" className="font-semibold underline">

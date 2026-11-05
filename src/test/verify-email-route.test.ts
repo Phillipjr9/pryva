@@ -16,6 +16,7 @@ const state = vi.hoisted(() => ({
   configured: true,
   delivery: { delivered: true, detail: null as string | null },
   issue: vi.fn(),
+  onboarding: vi.fn(),
   sameOrigin: true,
 }));
 
@@ -30,6 +31,11 @@ vi.mock("@/lib/email-verification", () => ({
   },
 }));
 vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/onboarding-emails", () => ({
+  scheduleOnboardingEmails: (...args: unknown[]) => {
+    state.onboarding(...args);
+  },
+}));
 
 import { POST } from "@/app/api/auth/verify-email/route";
 
@@ -47,6 +53,7 @@ beforeEach(() => {
   state.delivery = { delivered: true, detail: null };
   state.sameOrigin = true;
   state.issue.mockReset();
+  state.onboarding.mockReset();
 });
 
 describe("POST /api/auth/verify-email", () => {
@@ -66,7 +73,7 @@ describe("POST /api/auth/verify-email", () => {
     expect(response.status).toBe(502);
     expect(body.delivered).toBe(false);
     expect(body.error).toContain("403");
-    expect(body.error).toMatch(/nothing will arrive/i);
+    expect(body.error).toMatch(/check your inbox/i);
   });
 
   it("says mail is not configured before it issues anything", async () => {
@@ -82,6 +89,24 @@ describe("POST /api/auth/verify-email", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true, alreadyVerified: true });
     expect(state.issue).not.toHaveBeenCalled();
+  });
+
+  it("repairs a missing receipt and welcome for an account that is already verified", async () => {
+    // The only screen a verified customer returns to. Somebody whose onboarding
+    // emails were lost to an outage or a missing table ends up here; the reply is
+    // still "already verified", but the two missing emails are re-attempted. The
+    // unique index on (user_id, kind) makes a duplicate impossible, so this is
+    // safe to do on every press.
+    state.user.emailVerifiedAt = new Date();
+    await POST(request());
+    expect(state.onboarding).toHaveBeenCalledWith("u1");
+  });
+
+  it("does not touch onboarding emails when a fresh link is being issued", async () => {
+    // The account is not verified yet, so there is no milestone to report and no
+    // welcome to send; the link is the only thing that should go out.
+    await POST(request());
+    expect(state.onboarding).not.toHaveBeenCalled();
   });
 
   it("keeps the cross-origin and throttle refusals", async () => {

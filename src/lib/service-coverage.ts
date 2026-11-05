@@ -1,5 +1,5 @@
 import "server-only";
-import { NUMBER_PROVIDERS } from "@/lib/order-providers";
+import { ESIM_PROVIDER, NUMBER_PROVIDERS } from "@/lib/order-providers";
 
 /**
  * Can a customer actually receive what this shop sells?
@@ -24,13 +24,23 @@ import { NUMBER_PROVIDERS } from "@/lib/order-providers";
  * The summarising is pure so it can be pinned by tests without a database.
  */
 
-export type LaneId = "numbers" | "accounts" | "boosts" | "scheduled";
+export type LaneId = "numbers" | "esim" | "accounts" | "boosts" | "scheduled";
 
 export type LaneSpec = {
   id: LaneId;
   label: string;
   /** The `orders.provider` values this lane is accountable for. */
   providers: string[];
+  /**
+   * The `orders.service` values this lane owns, when a provider is shared.
+   *
+   * eSIM and virtual numbers are both delivered through the same gateway, so
+   * `orders.provider` cannot tell them apart. Without this, an eSIM order would
+   * be counted as a number and the eSIM lane would read "nothing has ever been
+   * bought" forever — the exact shape of the bug where the console said eSIM was
+   * not for sale while customers were buying it.
+   */
+  services?: string[];
   /**
    * How long an order may sit in `processing`/`active`/`review` before it is
    * stale. A number should resolve in minutes; a boost of ten thousand followers
@@ -54,6 +64,20 @@ export const SERVICE_LANES: LaneSpec[] = [
     staleHours: 2,
     delivery: "The number is issued at purchase and the code is polled onto the order page.",
     recovery: "A number that never delivers is refunded by the nightly sweep and released upstream.",
+  },
+  {
+    id: "esim",
+    label: "eSIM data",
+    // eSIM is bought through the same gateway that sells numbers, so
+    // `provider === "bitcall"` alone would attribute every eSIM order to the
+    // numbers lane and every number to this one. The provider list here is
+    // therefore filtered by `services` below: the two lanes share a provider and
+    // are told apart by what was actually bought.
+    providers: [ESIM_PROVIDER],
+    services: ["esim"],
+    staleHours: 1,
+    delivery: "The profile is issued at purchase and the activation code renders on the order page, with the QR emailed.",
+    recovery: "A purchase whose supplier call is ambiguous is parked for review rather than charged twice; a refusal is refunded.",
   },
   {
     id: "accounts",
@@ -84,12 +108,15 @@ export const SERVICE_LANES: LaneSpec[] = [
 /**
  * What the shop deliberately does not sell, and why.
  *
- * Listed here rather than left implicit because "why can't I buy an eSIM?" is a
+ * Listed here rather than left implicit because "why can't I buy airtime?" is a
  * support question, and because a lane appearing in the catalogue without a
  * delivery path is the exact defect this page exists to catch.
+ *
+ * eSIM was listed here until the purchase path and its order queries were found
+ * complete: the entry had gone stale, and it made the console contradict the
+ * storefront, which has been selling eSIM for several releases.
  */
 export const NOT_FOR_SALE: Array<{ label: string; reason: string }> = [
-  { label: "eSIM data", reason: "Catalogue only — no order path exists, and the purchase endpoint is not mounted." },
   { label: "Mobile data plans", reason: "The purchase endpoint answers 503 by design; no data supplier is contracted." },
   { label: "Residential proxies", reason: "Catalogue only — no supplier and no order path." },
   { label: "Subscriptions", reason: "The purchase endpoint answers 503 until a supplier exists." },
@@ -99,6 +126,8 @@ export const NOT_FOR_SALE: Array<{ label: string; reason: string }> = [
 
 export type OrderTally = {
   provider: string;
+  /** Which product it was, where the caller grouped by it. */
+  service?: string;
   status: string;
   total: number;
   /**
@@ -168,6 +197,7 @@ export function summariseLane(args: {
 
   for (const tally of tallies) {
     if (!spec.providers.includes(tally.provider)) continue;
+    if (spec.services && tally.service !== undefined && !spec.services.includes(tally.service)) continue;
     orders += tally.total;
     const latest = toDate(tally.latest);
     if (tally.status === "delivered") {

@@ -29,9 +29,9 @@ describe("country-first service explorer", () => {
     expect(explorerCountry("ng")?.dial).toBe("+234");
     expect(explorerCountry("bj")?.dial).toBeUndefined();
     expect(EXPLORER_COUNTRIES.filter((country) => !existsSync(`public/images/flags/${country.code}.svg`))).toEqual([]);
-    const examples = buildServiceExplorer("bj").filter((item) => item.source === "example");
-    expect(examples.length).toBeGreaterThan(0);
-    expect(examples.every((item) => item.coverage === "unconfirmed")).toBe(true);
+    const items = buildServiceExplorer("bj");
+    expect(items.every((item) => ["catalog", "tool", "live"].includes(item.source))).toBe(true);
+    expect(items.filter((item) => item.category === "verification")).toEqual([]);
   });
 
   it("validates country and category parameters rather than guessing", () => {
@@ -42,38 +42,23 @@ describe("country-first service explorer", () => {
     expect(explorerCategory("unexpected")).toBe("all");
   });
 
-  it("includes every product family and explicitly separates social promotion from app verification", () => {
+  it("keeps service categories without fabricating supplier listings", () => {
     const ids = EXPLORER_CATEGORIES.map((category) => category.id);
     expect(ids).toEqual(["verification", "social", "numbers", "esim", "proxies", "email", "accounts", "subscriptions", "data", "tools"]);
     const items = buildServiceExplorer("ng");
     expect(new Set(items.map((item) => item.id)).size).toBe(items.length);
-    // eSIM is the exception: its plans come from the live supplier catalogue and
-    // are listed from there, so the static builder has no eSIM rows to offer.
-    // `esim-catalog.test.ts` covers what that category lists instead.
-    for (const category of ids.filter((id) => id !== "esim")) {
-      expect(items.some((item) => item.category === category), category).toBe(true);
+    for (const category of ["verification", "social", "esim", "subscriptions", "data"]) {
+      expect(items.some((item) => item.category === category)).toBe(false);
     }
-    expect(items.some((item) => item.category === "esim")).toBe(false);
-
-    // Gift cards are wallet credit Pryva issues itself, not a service family:
-    // no chip, no card. The page itself is /dashboard/gift-cards.
+    // Supplier-backed entries arrive separately; a platform vocabulary is not a listing.
+    expect(items.some((item) => item.id.startsWith("verification-") || item.id.startsWith("social-"))).toBe(false);
     expect(ids).not.toContain("gift-cards");
-    expect(items.some((item) => item.id === "gift-cards")).toBe(false);
-    expect(items.some((item) => item.category === ("gift-cards" as never))).toBe(false);
-    expect(items.find((item) => item.id === "verification-instagram")?.description).toBe("SMS verification");
-    expect(items.find((item) => item.id === "social-instagram-followers")?.description).toBe("Social promotion");
-    for (const brand of ["whatsapp", "instagram", "facebook", "tiktok", "telegram", "google", "youtube", "paypal", "uber"]) {
-      expect(items.some((item) => item.id === `verification-${brand}`), brand).toBe(true);
-    }
   });
 
-  it("never converts example services into fabricated prices, stock, credits, coverage or checkout", () => {
+  it("never inserts synthetic platform records into a country catalog", () => {
     for (const country of ["ng", "us", "gb", "jp"]) {
-      const examples = buildServiceExplorer(country).filter((item) => item.source === "example");
-      expect(examples.length).toBeGreaterThan(40);
-      for (const item of examples) {
-        expect(item).toMatchObject({ coverage: "unconfirmed", stock: null, myUnits: null, price: null, action: null });
-      }
+      expect(buildServiceExplorer(country).every((item) => ["catalog", "tool", "live"].includes(item.source))).toBe(true);
+      expect(buildServiceExplorer(country).some((item) => item.id.startsWith("verification-") || item.id.startsWith("social-"))).toBe(false);
     }
   });
 
@@ -108,7 +93,7 @@ describe("country-first service explorer", () => {
     for (const slug of ["email-bundle", "email-team", "email-24", "email-30"]) {
       expect(findPlan(slug), `${slug} should no longer exist`).toBeUndefined();
     }
-    expect(planMatchesCountry(findPlan("esim-europe")!, "de")).toBe(false);
+    expect(planMatchesCountry({ ...ng, region: "Europe (38 countries)" }, "de")).toBe(false);
     for (const item of buildServiceExplorer("ng")) {
       if (!item.id.startsWith("plan-") || !item.action) continue;
       const plan = plans.find((candidate) => `plan-${candidate.slug}` === item.id)!;
@@ -117,20 +102,15 @@ describe("country-first service explorer", () => {
     }
   });
 
-  it("shows Nigerian data only for Nigeria and preserves the selected plan in the link", () => {
-    const ngData = buildServiceExplorer("ng").filter((item) => item.category === "data");
-    expect(ngData.length).toBeGreaterThan(0);
-    expect(ngData.find((item) => item.id === "data-airtel-1gb")?.action?.href).toBe("/dashboard/data?plan=airtel-1gb");
+  it("does not expose unverified mobile-data plans as offers", () => {
+    expect(buildServiceExplorer("ng").filter((item) => item.category === "data")).toEqual([]);
     expect(buildServiceExplorer("gb").filter((item) => item.category === "data")).toEqual([]);
   });
 
-  it("filters examples by category, type and search without leaking other categories", () => {
+  it("filters listings by category, type and search without leaking other categories", () => {
     const items = buildServiceExplorer("ng");
-    const followers = filterExplorerItems(items, "social", "instagram", "Followers");
-    expect(followers.map((item) => item.id)).toEqual(["social-instagram-followers"]);
-    const messaging = filterExplorerItems(items, "verification", "", "Messaging");
-    expect(messaging.some((item) => item.name === "WhatsApp")).toBe(true);
-    expect(messaging.every((item) => item.category === "verification" && item.tag === "Messaging")).toBe(true);
+    expect(filterExplorerItems(items, "social", "instagram", "Followers")).toEqual([]);
+    expect(filterExplorerItems(items, "verification", "", "Messaging")).toEqual([]);
     const rentals = filterExplorerItems(items, "numbers", "", "Rental");
     expect(rentals.every((item) => item.category === "numbers" && item.tag === "Rental")).toBe(true);
     expect(rentals.some((item) => item.id === "plan-rent-ng-30")).toBe(true);
@@ -138,17 +118,15 @@ describe("country-first service explorer", () => {
     expect(singleUse.every((item) => item.category === "numbers" && item.tag === "Single use")).toBe(true);
     expect(singleUse.some((item) => item.id === "plan-vn-ng")).toBe(true);
     const mtnData = filterExplorerItems(items, "data", "", "MTN");
-    expect(mtnData).toHaveLength(8);
-    expect(mtnData.every((item) => item.category === "data" && item.tag === "MTN")).toBe(true);
+    expect(mtnData).toEqual([]);
     expect(filterExplorerItems(items, "social", "no-such-service")).toEqual([]);
   });
 
   it("renders the selected country's categories and labels unknown quantities", () => {
-    const markup = renderToStaticMarkup(<ServiceExplorer initialCountry="ng" initialCategory="social" />);
+    const markup = renderToStaticMarkup(<ServiceExplorer initialCountry="ng" initialCategory="numbers" />);
     expect(markup).toContain("Nigeria selected");
-    expect(markup).toContain("Social promotion");
-    expect(markup).toContain("Instagram followers");
-    expect(markup).toContain("Not connected");
+    expect(markup).toContain("Number plans");
+    expect(markup).not.toContain("Instagram followers");
     expect(markup).toContain("Stock");
     expect(markup).toContain("Unknown");
     expect(markup).toContain("My units");

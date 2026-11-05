@@ -22,13 +22,11 @@ beforeEach(() => {
 });
 
 describe("service hub destination pages", () => {
-  it("opens the selected data plan and network rather than silently defaulting to MTN", () => {
+  it("does not display unverified data prices even on an old plan link", () => {
     const html = renderToStaticMarkup(<DataPlansForm user={user} initialPlanId="airtel-1gb" />);
-    expect(html).toContain("Airtel 1GB");
+    expect(html).toContain("Data plans are not available yet");
+    expect(html).not.toContain("Airtel 1GB");
     expect(html).not.toContain("MTN 1GB");
-    expect(html).toMatch(/aria-pressed="true"[^>]*>[\s\S]*?Airtel 1GB/);
-    expect(html).toContain("Data plans cannot be delivered yet");
-    expect(html).not.toContain("Demo");
   });
 
   it("keeps data and subscription purchases disabled because neither can be delivered", () => {

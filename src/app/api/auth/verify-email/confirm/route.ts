@@ -4,6 +4,7 @@ import {
   confirmEmailVerification,
   rateLimitEmailVerification,
 } from "@/lib/email-verification";
+import { scheduleOnboardingEmails } from "@/lib/onboarding-emails";
 import { isSameOriginMutation } from "@/lib/net";
 import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 
@@ -61,6 +62,23 @@ export async function POST(request: NextRequest) {
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
+
+    /*
+     * The receipt and the welcome are sent after the response, never before it.
+     *
+     * This route is a page render's fetch: the customer is watching a spinner,
+     * and a provider that takes six seconds would show them a spinner for six
+     * seconds after the work was already done. `after` runs the send once the
+     * response is on the wire, and the sender swallows its own failures, so a
+     * mail outage cannot turn a successful verification into an error the
+     * customer retries -- which would fail anyway, because the token is spent.
+     *
+     * Exactly-once is the database's job, not this call's: the unique index on
+     * `(user_id, kind)` means the resend route reaching the same moment cannot
+     * produce a second copy. See `@/lib/onboarding-emails`.
+     */
+    scheduleOnboardingEmails(result.userId);
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[auth] verification confirm failed", error);

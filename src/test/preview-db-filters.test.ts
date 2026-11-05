@@ -102,6 +102,60 @@ describe("preview database condition evaluation", () => {
     expect(rows.map((row) => row.reference)).toEqual(["FILTER-NG-PROXY"]);
   });
 
+  it("keeps passkey removal usable in the process-local preview", async () => {
+    const { deleteCredential } = await import("@/lib/passkeys");
+    const userId = randomUUID();
+    await database.db.insert(schema.users).values({
+      id: userId, name: "Preview", email: `${userId}@example.test`, passwordHash: "hash", walletBalance: 0,
+    });
+    const [credential] = await database.db.insert(schema.webauthnCredentials).values({
+      userId, credentialId: "preview-device", publicKey: "AQID", counter: 0,
+    }).returning();
+    expect(credential.id).toMatch(/^[0-9a-f]{8}-[0-9a-f-]{27}$/i);
+    expect(await deleteCredential(randomUUID(), credential.id)).toBe(false);
+    expect(await deleteCredential(userId, credential.id)).toBe(true);
+    expect(await database.db.select().from(schema.webauthnCredentials).where(eq(schema.webauthnCredentials.id, credential.id))).toHaveLength(0);
+  });
+
+  it("stores and confirms a preview email-change request without sending real mail", async () => {
+    const { requestEmailChange, confirmEmailChange, EMAIL_CHANGE_INVALID } = await import("@/lib/email-change");
+    const userId = randomUUID();
+    const occupiedId = randomUUID();
+    const originalEmail = `${userId}@example.test`;
+    const newEmail = `${randomUUID()}@example.test`;
+    const occupiedEmail = `${randomUUID()}@example.test`;
+    await database.db.insert(schema.users).values([
+      { id: userId, name: "Preview", email: originalEmail, passwordHash: "hash", walletBalance: 0 },
+      { id: occupiedId, name: "Other", email: occupiedEmail.toUpperCase(), passwordHash: "hash", walletBalance: 0 },
+    ]);
+
+    const oldKey = process.env.RESEND_API_KEY;
+    const oldSender = process.env.RESEND_FROM_EMAIL;
+    process.env.RESEND_API_KEY = "preview-test-key";
+    process.env.RESEND_FROM_EMAIL = "Pryva <hello@example.test>";
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ id: "preview-message" }), { status: 200 }),
+    );
+    try {
+      expect(await requestEmailChange({ userId, newEmail: occupiedEmail })).toMatchObject({ ok: false, status: 409 });
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(await requestEmailChange({ userId, newEmail })).toMatchObject({ ok: true });
+      const sent = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body)) as { text: string };
+      const token = sent.text.match(/token=([A-Za-z0-9_-]+)/)?.[1];
+      expect(token).toBeTruthy();
+      const pending = await database.db.select().from(schema.emailChangeRequests)
+        .where(eq(schema.emailChangeRequests.userId, userId));
+      expect(pending).toHaveLength(1);
+      expect(pending[0].tokenHash).not.toBe(token);
+      expect(await confirmEmailChange(token!)).toMatchObject({ ok: true, email: newEmail, previousEmail: originalEmail });
+      expect(await confirmEmailChange(token!)).toEqual({ ok: false, error: EMAIL_CHANGE_INVALID });
+    } finally {
+      fetchSpy.mockRestore();
+      if (oldKey === undefined) delete process.env.RESEND_API_KEY; else process.env.RESEND_API_KEY = oldKey;
+      if (oldSender === undefined) delete process.env.RESEND_FROM_EMAIL; else process.env.RESEND_FROM_EMAIL = oldSender;
+    }
+  });
+
   it("supports inArray filtering", async () => {
     const rows = await database.db
       .select()

@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 const quickBuys = [
   { label: "Number plans", note: "Single-use & rentals", href: "/dashboard/services?country=ng&category=numbers", service: "numbers" as const, category: "numbers" },
   { label: "Social boosts", note: "Followers, likes & views", href: "/dashboard/services?country=ng&category=social", service: "social-promotion" as const, category: "social" },
-  { label: "eSIM data", note: "120+ regional destinations", href: "/dashboard/services?country=ng&category=esim", service: "esim" as const, category: "esim" },
+  { label: "eSIM data", note: "Travel data plans", href: "/dashboard/services?country=ng&category=esim", service: "esim" as const, category: "esim" },
   { label: "Residential proxies", note: "Clean rotating IP pools", href: "/dashboard/services?country=ng&category=proxies", service: "proxies" as const, category: "proxies" },
   { label: "Digital accounts", note: "Streaming & AI subscriptions", href: "/dashboard/services?country=ng&category=accounts", service: "accounts" as const, category: "accounts" },
   { label: "Mobile data", note: "MTN, Airtel, Glo & 9mobile", href: "/dashboard/data", service: "data" as const, category: "data" },
@@ -144,7 +144,7 @@ export default async function DashboardOverviewPage() {
         <EmptyState
           icon={Clock}
           title="No code waiting right now"
-          body="When a verification code arrives it lands here first, with a timer. Preview codes are simulated."
+          body="When a verification code arrives it lands here first, with a timer."
           action={{ label: "Explore number plans", href: "/dashboard/services?category=numbers" }}
         />
       )}
@@ -210,7 +210,7 @@ export default async function DashboardOverviewPage() {
 
           {recentOrders.length === 0 ? (
             <p className="mt-3 rounded-xl border border-dashed border-line bg-cream/50 px-4 py-6 text-center text-[0.82rem] text-ink-3">
-              Orders and their references will appear here. Preview orders are simulated.
+              Orders and their references will appear here.
             </p>
           ) : (
             <div className="mt-2 divide-y divide-line/80">

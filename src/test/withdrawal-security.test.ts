@@ -159,7 +159,7 @@ afterEach(() => vi.unstubAllEnvs());
 describe("email verification before money leaves", () => {
   function configureMail() {
     vi.stubEnv("RESEND_API_KEY", "re_test_secret");
-    vi.stubEnv("RESEND_FROM_EMAIL", "Pryva <hello@pryva.ng>");
+    vi.stubEnv("RESEND_FROM_EMAIL", "Pryva <hello@example.test>");
   }
 
   it("refuses an unverified address before any row or debit exists", async () => {

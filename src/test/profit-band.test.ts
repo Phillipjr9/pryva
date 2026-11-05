@@ -191,14 +191,14 @@ describe("discounts may not breach the floor", () => {
     const { calculateBulkOrder } = await import("@/lib/bulk-orders");
     const { CATALOG_PRICES } = await import("@/lib/prices.generated");
 
-    // esim sits near the bottom of the band (35%), so a 10% basket discount
+    // The proxy plan sits near the bottom of the band (35%), so a 10% basket discount
     // would drop it under 30%. The basket must shrink its own discount instead.
-    const basket = calculateBulkOrder([{ productSlug: "esim-ng-1", quantity: 25 }]);
+    const basket = calculateBulkOrder([{ productSlug: "proxy-ng-1", quantity: 25 }]);
     expect(basket.discountPercent).toBeLessThanOrEqual(
-      CATALOG_PRICES["esim-ng-1"].maxDiscountPercent,
+      CATALOG_PRICES["proxy-ng-1"].maxDiscountPercent,
     );
 
-    const unitCost = sheet.catalog["esim-ng-1"].cost;
+    const unitCost = sheet.catalog["proxy-ng-1"].cost;
     const realisedMarkup = markupPercent(basket.total / basket.items[0].quantity, unitCost);
     expect(realisedMarkup).toBeGreaterThanOrEqual(30);
   });

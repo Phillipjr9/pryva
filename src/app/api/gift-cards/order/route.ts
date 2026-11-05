@@ -1,3 +1,4 @@
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -35,6 +36,10 @@ export async function POST(request: Request) {
 
   if (!isJsonRequest(request)) {
     return Response.json({ ok: false, error: "Expected JSON." }, { status: 415 });
+  }
+
+  if (financialActionsUnavailable() || process.env.FOXRELOAD_IS_MOCK === "true") {
+    return Response.json({ ok: false, error: "Gift card purchases are unavailable in this environment." }, { status: 503 });
   }
 
   const limit = await purchaseRateLimiter(`gift-card-order:${user.id}`);
@@ -204,13 +209,10 @@ export async function POST(request: Request) {
       preferredId: denomination.foxreloadProductId || denomination.id,
     });
 
-    const isMock = process.env.FOXRELOAD_IS_MOCK === "true";
-
     const upstreamOrder = await createFoxreloadOrder({
       itemId: foxreloadItemId,
       quantity: 1,
       idempotencyKey: requestId,
-      isMock,
     });
     providerOrderId = upstreamOrder.id;
 
@@ -231,6 +233,8 @@ export async function POST(request: Request) {
         referenceCode: voucherCode,
       })
       .where(eq(orders.id, orderId));
+    // Delivery can trigger the first-purchase milestone after the debit.
+    scheduleWalletEmails();
 
     return Response.json({
       ok: true,

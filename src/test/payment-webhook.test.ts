@@ -123,6 +123,17 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("Paystack webhook", () => {
+  it("rejects test-key production webhooks and all preview webhooks before recording credits", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("PAYSTACK_SECRET_KEY", "sk_test_fixture");
+    const body = JSON.stringify(payload());
+    expect((await POST(request(body, createHmac("sha512", "sk_test_fixture").update(body).digest("hex")))).status).toBe(503);
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("PAYSTACK_SECRET_KEY", "sk_live_fixture");
+    expect((await POST(request(body, createHmac("sha512", "sk_live_fixture").update(body).digest("hex")))).status).toBe(503);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
   it("fails closed when no secret or persistent database is configured", async () => {
     vi.stubEnv("PAYSTACK_SECRET_KEY", "");
     expect((await POST(request(JSON.stringify(payload())))).status).toBe(503);

@@ -69,8 +69,13 @@ export type RelyingParty = { rpID: string; origin: string };
  * always fails.
  */
 export function relyingPartyFor(request: Request, env: NodeJS.ProcessEnv = process.env): RelyingParty | null {
-  const pinnedOrigin = (env.WEBAUTHN_ORIGIN?.trim() || env.NEXT_PUBLIC_SITE_URL?.trim() || "").replace(/\/+$/, "");
-  const origin = pinnedOrigin || publicOrigin(request);
+  const explicitOrigin = env.WEBAUTHN_ORIGIN?.trim().replace(/\/+$/, "") || "";
+  // A pinned *passkey* origin is authoritative and must match what the browser
+  // reports. The general site URL is not: it is used here as a canonical
+  // fallback, so it goes through `publicOrigin` below and steps aside when the
+  // request already arrived on the canonical host. Reading it directly meant a
+  // site moved to its own domain still signed passkeys for the old one.
+  const origin = explicitOrigin || publicOrigin(request, env);
 
   let parsed: URL;
   try {
@@ -240,10 +245,18 @@ export async function credentialCount(userId: string): Promise<number> {
  */
 export async function deleteCredential(userId: string, credentialRowId: string): Promise<boolean> {
   if (!/^[0-9a-f-]{36}$/i.test(credentialRowId)) return false;
-  const [deleted] = await db
-    .delete(webauthnCredentials)
-    .where(and(eq(webauthnCredentials.id, credentialRowId), eq(webauthnCredentials.userId, userId)))
-    .returning({ id: webauthnCredentials.id });
+  const deleted = await db.transaction(async (tx) => {
+    // Lock the owner before the credential, the same order used by account
+    // closure. Otherwise a removal trigger waiting for the owner and closure
+    // waiting for the credential can deadlock each other.
+    const [owner] = await tx.select({ id: users.id }).from(users)
+      .where(and(eq(users.id, userId), isNull(users.deletedAt))).for("share");
+    if (!owner) return false;
+    const [row] = await tx.delete(webauthnCredentials)
+      .where(and(eq(webauthnCredentials.id, credentialRowId), eq(webauthnCredentials.userId, userId)))
+      .returning({ id: webauthnCredentials.id });
+    return Boolean(row);
+  });
   if (!deleted) return false;
   logger.info("Passkey removed", { userId, credentialRowId });
   return true;
@@ -291,7 +304,7 @@ export async function beginRegistration(input: {
 
 export type RegistrationFinish =
   | { ok: true; credentialId: string; deviceType: string | null; backedUp: boolean }
-  | { ok: false; reason: "no-challenge" | "verification-failed" | "duplicate" | "unavailable" };
+  | { ok: false; reason: "no-challenge" | "verification-failed" | "duplicate" | "at-capacity" | "unavailable" };
 
 export async function finishRegistration(input: {
   userId: string;
@@ -331,26 +344,37 @@ export async function finishRegistration(input: {
 
   const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
 
-  // One credential id belongs to exactly one account. A device that already
-  // registered here (the exclude list should have stopped it) is refused rather
-  // than duplicated.
-  const [existing] = await db
-    .select({ userId: webauthnCredentials.userId })
-    .from(webauthnCredentials)
-    .where(eq(webauthnCredentials.credentialId, credential.id))
-    .limit(1);
-  if (existing) return { ok: false, reason: "duplicate" };
+  const stored = await db.transaction(async (tx) => {
+    // A ceremony may finish while its account is being closed. Lock the owner
+    // first, like closure does, so a credential cannot be created afterwards.
+    // The exclusive lock also makes the per-account capacity check meaningful
+    // when several verified ceremonies complete together.
+    const [owner] = await tx.select({ id: users.id }).from(users)
+      .where(and(eq(users.id, input.userId), isNull(users.deletedAt))).for("update");
+    if (!owner) return "unavailable" as const;
 
-  await db.insert(webauthnCredentials).values({
-    userId: input.userId,
-    credentialId: credential.id,
-    publicKey: isoBase64URL.fromBuffer(credential.publicKey),
-    counter: credential.counter,
-    transports: credential.transports?.join(",") ?? null,
-    deviceType: credentialDeviceType ?? null,
-    backedUp: Boolean(credentialBackedUp),
-    label: input.label?.trim().slice(0, 80) || (credentialDeviceType === "multiDevice" ? "Synced passkey" : "This device"),
+    // One credential id belongs to exactly one account. The database's unique
+    // constraint remains authoritative if different accounts race for one key.
+    const [existing] = await tx.select({ userId: webauthnCredentials.userId })
+      .from(webauthnCredentials).where(eq(webauthnCredentials.credentialId, credential.id)).limit(1);
+    if (existing) return "duplicate" as const;
+    const current = await tx.select({ id: webauthnCredentials.id }).from(webauthnCredentials)
+      .where(eq(webauthnCredentials.userId, input.userId));
+    if (current.length >= MAX_PASSKEYS_PER_ACCOUNT) return "at-capacity" as const;
+
+    await tx.insert(webauthnCredentials).values({
+      userId: input.userId,
+      credentialId: credential.id,
+      publicKey: isoBase64URL.fromBuffer(credential.publicKey),
+      counter: credential.counter,
+      transports: credential.transports?.join(",") ?? null,
+      deviceType: credentialDeviceType ?? null,
+      backedUp: Boolean(credentialBackedUp),
+      label: input.label?.trim().slice(0, 80) || (credentialDeviceType === "multiDevice" ? "Synced passkey" : "This device"),
+    });
+    return "stored" as const;
   });
+  if (stored !== "stored") return { ok: false, reason: stored };
 
   logger.info("Passkey registered", { userId: input.userId, deviceType: credentialDeviceType });
   return {

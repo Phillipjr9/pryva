@@ -2,36 +2,6 @@
   "_readme": "Cost sheet. `cost` is the fixed amount we pay per unit, in naira. Edit a cost here, run `npm run pricing:build`, and every price follows (30-50% markup, see src/lib/pricing.ts). `label` is for humans only.",
   "_updated": "2026-10-30",
   "catalog": {
-    "esim-africa": {
-      "service": "esim",
-      "label": "3GB · 15 days",
-      "cost": 9230
-    },
-    "esim-europe": {
-      "service": "esim",
-      "label": "5GB · 30 days",
-      "cost": 14230
-    },
-    "esim-global": {
-      "service": "esim",
-      "label": "20GB · 30 days",
-      "cost": 36920
-    },
-    "esim-ng-1": {
-      "service": "esim",
-      "label": "1GB · 7 days",
-      "cost": 3460
-    },
-    "esim-ng-5": {
-      "service": "esim",
-      "label": "5GB · 30 days",
-      "cost": 11150
-    },
-    "esim-us": {
-      "service": "esim",
-      "label": "10GB · 30 days",
-      "cost": 18460
-    },
     "proxy-eu-10": {
       "service": "proxies",
       "label": "10GB · EU",

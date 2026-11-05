@@ -1,99 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { digitalServices, getDigitalService } from "@/lib/digital-services";
-import { formatNaira } from "@/lib/catalog";
-import { DigitalServicesForm } from "./DigitalServicesForm";
-import { ServiceIcon } from "@/components/ServiceIcon";
-import { ArrowRight, Shield } from "@/components/icons";
-import { explorerCountry } from "@/lib/service-explorer";
+import { ServiceTitle } from "@/components/ServiceTitle";
 
 export const metadata: Metadata = { title: "Subscriptions" };
 export const dynamic = "force-dynamic";
 
-export default async function DigitalServicesPage({
-  searchParams,
-}: {
-  // Next 16 hands searchParams over as a promise. This page used to read it
-  // synchronously, so `?service=…` never matched and the detail view was
-  // unreachable — the whole section was a dead end from the dashboard.
-  searchParams: Promise<{ service?: string | string[]; country?: string | string[] }>;
-}) {
-  const user = await requireUser("/dashboard/digital");
-  const query = await searchParams;
-  const selectedService = typeof query.service === "string" ? getDigitalService(query.service) : null;
-  const country = explorerCountry(query.country);
-  // A bad deep link must not silently render or purchase a different service.
-  if ((query.service !== undefined && !selectedService) || (query.country !== undefined && !country)) notFound();
-  const allSubscriptions = country ? `/dashboard/digital?country=${country.code}` : "/dashboard/digital";
-
+export default async function DigitalServicesPage() {
+  await requireUser("/dashboard/digital");
   return (
     <div className="grid gap-4">
-      {country && <Link href={`/dashboard/services?country=${country.code}&category=subscriptions`} className="w-fit text-meta font-semibold text-lav-700 hover:underline">← Back to subscription services</Link>}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">
-            {selectedService ? selectedService.name : "Premium subscriptions"}
-          </h1>
-          <p className="mt-1 max-w-xl text-[0.86rem] text-ink-2">
-            {selectedService
-              ? "Compare catalog plans. Digital subscriptions cannot be delivered yet."
-              : "Explore subscription examples. Digital subscriptions cannot be delivered yet."}
-          </p>
-          {country && <p className="mt-1 text-meta text-ink-3">Browsing for {country.name}. This selection does not confirm real coverage.</p>}
-        </div>
-        {selectedService ? (
-          <Link
-            href={allSubscriptions}
-            className="btn border border-line bg-white !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.76rem] text-ink hover:border-lav-200"
-          >
-            All subscriptions
-          </Link>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-micro text-ink-3">
-            <Shield className="h-3 w-3 text-lav-600" /> Wallet balance {formatNaira(user.walletBalance)}
-          </span>
-        )}
+      <div>
+        <ServiceTitle service="accounts">Digital subscriptions</ServiceTitle>
+        <p className="mt-1 max-w-xl text-[0.86rem] text-ink-2">Subscriptions are not currently available to order. No wallet charge will be made.</p>
       </div>
-
-      {selectedService ? (
-        <DigitalServicesForm key={`${selectedService.slug}:${country?.code ?? ""}`} user={user} service={selectedService} countryCode={country?.code} backHref={allSubscriptions} />
-      ) : (
-        <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-          {digitalServices.map((service) => (
-            <Link
-              key={service.slug}
-              href={`/dashboard/digital?service=${encodeURIComponent(service.slug)}${country ? `&country=${country.code}` : ""}`}
-              className="group flex flex-col rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 transition-all hover:-translate-y-0.5 hover:border-lav-200 hover:shadow-[var(--shadow-card)]"
-            >
-              <div className="flex items-start gap-3">
-                <ServiceIcon service={service.slug as never} size="md" />
-                <div className="min-w-0">
-                  <h2 className="truncate text-[0.95rem] font-semibold text-ink">{service.name}</h2>
-                  <p className="text-meta text-ink-3">
-                    {service.plans.length} plan{service.plans.length === 1 ? "" : "s"}
-                  </p>
-                </div>
-              </div>
-              <p className="mt-3 text-[0.8rem] leading-relaxed text-ink-2">
-                Not available for purchase yet.
-              </p>
-              <div className="mt-auto flex items-end justify-between gap-2 pt-3.5">
-                <div>
-                  <p className="text-micro uppercase tracking-[0.12em] text-ink-3">From</p>
-                  <p className="text-[0.95rem] font-semibold text-ink">
-                    {formatNaira(Math.min(...service.plans.map((plan) => plan.price)))}
-                  </p>
-                </div>
-                <span className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700">
-                  Choose plan <ArrowRight className="h-3 w-3" />
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
+      <div className="rounded-2xl border border-line bg-white p-6">
+        <p className="text-[0.9rem] leading-relaxed text-ink-2">When a delivery service is connected, current plans and pricing will be shown here.</p>
+        <Link href="/dashboard/accounts" className="mt-4 inline-flex font-semibold text-lav-700 underline underline-offset-2">Browse account listings</Link>
+      </div>
     </div>
   );
 }

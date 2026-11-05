@@ -108,7 +108,7 @@ export function forfeitureWarning(walletBalance: number): { amount: number; mess
  */
 export const DELETION_TERMS = {
   removed: [
-    "Your name, email address and password",
+    "Your name, email address and password from the account",
     "Sign-in with Google, passkeys and two-factor",
     "Every signed-in device, including this one",
     "Unused verification and password-reset links",
@@ -132,11 +132,13 @@ export const DELETION_TERMS = {
     },
   ],
   /**
-   * Said plainly, because it is the part people are surprised by: the *account*
-   * is gone, the *person* is gone, the financial record is not.
+   * Pseudonymising the account does not anonymise the retained records: payout
+   * details or a support conversation can still identify a person.
    */
   summary:
-    "Your account and everything that identifies you are removed. The records of what the account paid for and was paid are kept, without your name or email attached, for as long as the law and disputes require. You will not be able to sign in again, and this cannot be undone.",
+    "Your account sign-in identity and credentials are removed. Financial records, payout details, support conversations and security signals are kept as needed for legal obligations and disputes; they may still contain information that identifies you. You will not be able to sign in again, and this cannot be undone.",
+  confirmationEmail:
+    "We may make one attempt to email a closure confirmation to your verified address. Our email provider handles the message; we do not save the address in the app for retries, and delivery is not guaranteed.",
 } as const;
 
 /**

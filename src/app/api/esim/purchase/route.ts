@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { orders, users, type Order } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { findEsimOffer, type EsimOffer } from "@/lib/esim-catalog";
@@ -37,7 +38,6 @@ function receipt(order: Order, balance: number, replayed: boolean, extra: Record
       amount: order.amount,
       status: order.status,
     },
-    provider: order.provider,
   });
 }
 
@@ -85,6 +85,9 @@ function isUniqueViolation(error: unknown): boolean {
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return Response.json({ ok: false, error: "Please sign in to complete this order." }, { status: 401 });
+
+  // Never spend against the live network from an in-memory preview database.
+  if (financialActionsUnavailable()) return Response.json({ ok: false, error: "eSIM ordering is unavailable in this environment." }, { status: 503 });
 
   if (!isSameOriginMutation(request)) {
     return Response.json({ ok: false, error: "Cross-origin request denied." }, { status: 403 });
@@ -158,7 +161,7 @@ export async function POST(request: Request) {
 
     if (outcome.kind === "refused") {
       return Response.json(
-        { ok: false, error: "Our provider couldn't deliver that eSIM right now — nothing was charged. Try again in a moment." },
+        { ok: false, error: "We couldn't deliver that eSIM right now — nothing was charged. Try again in a moment." },
         { status: 502 },
       );
     }
@@ -187,8 +190,7 @@ export async function POST(request: Request) {
           pending: true,
           balance: await currentBalance(user.id),
           order: { id: orderId, reference, productName: shape.name, planLabel: shape.planLabel, service: "esim", amount: offer.priceNgn, status: "review" },
-          provider: ESIM_PROVIDER,
-          message: "We're confirming this purchase with our supplier. Nothing has been charged yet.",
+          message: "We're reviewing this purchase. Nothing has been charged yet.",
         },
         { status: 202 },
       );
@@ -218,7 +220,6 @@ export async function POST(request: Request) {
           pending: true,
           balance: await currentBalance(user.id),
           order: { id: orderId, reference, productName: shape.name, planLabel: shape.planLabel, service: "esim", amount: offer.priceNgn, status: "processing" },
-          provider: ESIM_PROVIDER,
           message: "Your eSIM is provisioning. It appears on this order as soon as it is ready, and you are only charged then.",
         },
         { status: 202 },
@@ -320,7 +321,6 @@ export async function POST(request: Request) {
         amount: offer.priceNgn,
         status: "active",
       },
-      provider: delivery.provider,
     });
   } catch {
     return Response.json({ ok: false, error: "We couldn't complete that order. Please try again." }, { status: 500 });

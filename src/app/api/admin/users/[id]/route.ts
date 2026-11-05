@@ -1,3 +1,4 @@
+import { isVercelPreview } from "@/lib/financial-environment";
 import { authorizeAdminApi } from "@/lib/admin-auth";
 import { recordAdminAction } from "@/lib/admin-audit";
 import { NextRequest, NextResponse } from "next/server";
@@ -127,6 +128,7 @@ export async function PUT(
   try {
     const access = await authorizeAdminApi(request);
     if (access.response) return access.response;
+    if (isVercelPreview()) return NextResponse.json({ error: "Wallet adjustments are unavailable in preview" }, { status: 503 });
     const admin = access.user;
 
     const { id: userId } = await params;

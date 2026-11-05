@@ -1,3 +1,4 @@
+import { isVercelPreview } from "@/lib/financial-environment";
 import { NextRequest, NextResponse } from "next/server";
 import { processAutoRefunds } from "@/lib/auto-refund";
 import { logger } from "@/lib/logger";
@@ -18,6 +19,7 @@ export async function POST(request: NextRequest) {
     logger.warn("Unauthorized auto-refund cron attempt");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (isVercelPreview()) return NextResponse.json({ error: "Scheduled jobs are unavailable in preview" }, { status: 503 });
 
   try {
     const { refunded, cancelled } = await processAutoRefunds();

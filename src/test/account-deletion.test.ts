@@ -140,7 +140,7 @@ describe("what the customer is told before they confirm", () => {
 
   it("says plainly that it cannot be undone", () => {
     expect(DELETION_TERMS.summary.toLowerCase()).toContain("cannot be undone");
-    expect(DELETION_TERMS.summary.toLowerCase()).toContain("without your name or email");
+    expect(DELETION_TERMS.summary.toLowerCase()).toContain("may still contain information that identifies you");
   });
 
   it("matches what the endpoint actually does", () => {

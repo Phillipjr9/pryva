@@ -14,7 +14,6 @@ import {
   Card,
   Check,
   Clock,
-  Copy,
   Lock,
   Phone,
   Receipt,
@@ -24,7 +23,6 @@ import {
 } from "@/components/icons";
 import { formatNaira, plansFor, serviceMap, services } from "@/lib/catalog";
 import { isPlanFulfillable } from "@/lib/fulfillment";
-import { digitalServices } from "@/lib/digital-services";
 import { CountryFlag } from "@/components/CountryFlag";
 import { hasCountryFlag } from "@/lib/countries";
 import { BrandMark } from "@/components/brand/BrandLockup";
@@ -168,11 +166,6 @@ const faqSchema = {
     acceptedAnswer: { "@type": "Answer", text: faq.a },
   })),
 };
-
-const subscriptionPlanCount = digitalServices.reduce(
-  (total, service) => total + service.plans.length,
-  0,
-);
 
 export default async function HomePage() {
   // Only used to decide whether a dashboard-only service card links straight in
@@ -391,35 +384,6 @@ export default async function HomePage() {
             })}
           </div>
 
-          {/* Subscriptions used to be invisible: priced and purchasable, linked from nowhere. */}
-          <Reveal delay={120}>
-            <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-line bg-white/60 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-              <div className="flex flex-wrap items-center gap-3">
-                <p className="text-[0.84rem] font-semibold text-ink">Also inside: subscriptions</p>
-                <div className="flex items-center gap-2">
-                  {["netflix", "spotify", "youtube", "chatgpt", "canva", "disney-plus"].map((brand) => (
-                    <BrandIcon
-                      key={brand}
-                      brand={brand as "netflix"}
-                      size={22}
-                      variant="tile"
-                      decorative
-                    />
-                  ))}
-                </div>
-                <p className="text-meta text-ink-3">
-                  {subscriptionPlanCount} plans, priced in Naira
-                </p>
-              </div>
-              <Link
-                href="/digital-services"
-                className="inline-flex items-center gap-2 text-[0.82rem] font-semibold text-lav-700 underline-offset-4 hover:underline"
-              >
-                Browse subscriptions
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-          </Reveal>
         </div>
       </section>
 
@@ -579,51 +543,23 @@ export default async function HomePage() {
                 </Reveal>
               </div>
 
-              {/* An honest product visual: real states the dashboard renders. */}
+              {/* Explain the workflow without inventing customer orders or codes. */}
               <Reveal delay={140}>
                 <div className="mx-auto w-full max-w-sm">
-                  <div className="rounded-[1.5rem] border border-line bg-white p-4 shadow-[var(--shadow-card)]">
-                    <div className="flex items-center justify-between">
-                      <p className="text-micro font-semibold uppercase tracking-[0.12em] text-ink-3">
-                        Example Order PV-2291
-                      </p>
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-micro font-semibold text-emerald-700">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                        Sample code
-                      </span>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between rounded-xl border border-line bg-cream/60 px-3 py-2.5">
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        <CountryFlag code="ng" size={22} decorative />
-                        <div className="min-w-0">
-                          <p className="truncate text-[0.82rem] font-semibold">+234 ••• ••• ••••</p>
-                          <p className="text-micro text-ink-3">Nigeria · sample number</p>
+                  <div className="rounded-[1.5rem] border border-line bg-white p-5 shadow-[var(--shadow-card)]">
+                    <p className="text-micro font-semibold uppercase tracking-[0.12em] text-lav-700">Your dashboard</p>
+                    <h3 className="mt-2 text-[1.2rem] font-semibold text-ink">Keep track in one place</h3>
+                    <div className="mt-4 space-y-3">
+                      {[
+                        { title: "Explore services", detail: "Check availability and pricing before you order.", icon: Sparkle },
+                        { title: "Follow your orders", detail: "See your references and delivery status.", icon: Receipt },
+                        { title: "Get help", detail: "Contact support when an order needs review.", icon: Shield },
+                      ].map(({ title, detail, icon: Icon }) => (
+                        <div key={title} className="flex items-start gap-3 rounded-xl border border-line bg-cream/60 p-3">
+                          <Icon className="mt-0.5 h-4 w-4 shrink-0 text-lav-700" />
+                          <div><p className="text-meta font-semibold text-ink">{title}</p><p className="mt-0.5 text-meta text-ink-3">{detail}</p></div>
                         </div>
-                      </div>
-                      <Copy className="h-3.5 w-3.5 text-ink-3" />
-                    </div>
-
-                    <div className="mt-3 flex gap-1">
-                      {["8", "1", "4", "0", "2", "7"].map((digit, index) => (
-                        <span
-                          key={index}
-                          className={`grid h-8 flex-1 place-items-center rounded-md border text-[0.85rem] font-semibold ${
-                            index === 5
-                              ? "border-lav-400 bg-white text-lav-700 shadow-sm"
-                              : "border-line bg-white/80 text-ink"
-                          }`}
-                        >
-                          {digit}
-                        </span>
                       ))}
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between text-micro text-ink-3">
-                      <span className="inline-flex items-center gap-1">
-                        <Clock className="h-3 w-3" /> Expires in 00:19
-                      </span>
-                      <span>Copy to clipboard</span>
                     </div>
                   </div>
 
@@ -644,7 +580,7 @@ export default async function HomePage() {
                       <Wallet className="h-4 w-4" />
                     </span>
                     <div>
-                      <p className="text-meta font-semibold">Wallet {formatNaira(12500)}</p>
+                      <p className="text-meta font-semibold">Wallet activity</p>
                       <p className="text-meta leading-relaxed text-ink-3">
                         Every top-up, purchase and refund lands in one ledger.
                       </p>

@@ -1,3 +1,4 @@
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { NextRequest, NextResponse } from "next/server";
 import { createGiftCard } from "@/lib/gift-cards";
 import { GIFT_CARD_MAX_AMOUNT, GIFT_CARD_MIN_AMOUNT } from "@/lib/gift-card-rules";
@@ -16,6 +17,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
     if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
+    if (financialActionsUnavailable()) return NextResponse.json({ error: "Gift cards are unavailable in this environment." }, { status: 503 });
     const limit = await purchaseRateLimiter(`gift-card-purchase:${user.id}`);
     if (limit.unavailable) return NextResponse.json({ error: "Gift card service temporarily unavailable." }, { status: 503 });
     if (!limit.allowed) return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });

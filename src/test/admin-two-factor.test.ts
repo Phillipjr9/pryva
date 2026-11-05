@@ -72,10 +72,12 @@ describe("the rule is wired into both doors", () => {
 
   it("guards the admin pages, and sends the operator to the page that fixes it", () => {
     expect(auth).toContain("adminBlockedForMissingSecondFactor(user.id)");
-    // Security is a section of Settings, so the bounce carries the anchor as
-    // well as the explanation.
-    expect(auth).toContain("/dashboard/settings?require=2fa");
-    expect(auth).toContain("#security");
+    // The fix lives inside the console rather than in the customer's settings:
+    // bouncing an operator into the storefront to arm the console is the split
+    // personality the separate console exists to remove. The anchor is gone
+    // because `/admin/account` is a page, not a section of a longer one.
+    expect(auth).toContain("/admin/account?require=2fa");
+    expect(auth).not.toContain("/dashboard/settings?require=2fa");
   });
 
   it("guards the admin API too, so the page rule is not theatre", () => {

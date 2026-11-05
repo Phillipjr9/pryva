@@ -1,4 +1,6 @@
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { randomUUID } from "node:crypto";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 import { db } from "@/db";
 import { scheduledOrders, orders, users } from "@/db/schema";
 import { eq, and, lte, ne } from "drizzle-orm";
@@ -114,6 +116,7 @@ class RunDeclinedError extends Error {
  * to go back, or the business pays a supplier for a number nobody holds.
  */
 export async function processScheduledOrder(scheduled: typeof scheduledOrders.$inferSelect): Promise<boolean> {
+  if (financialActionsUnavailable()) return false;
   const now = new Date();
   const plan = typeof scheduled.productSlug === "string" ? findPlan(scheduled.productSlug) : undefined;
   if (!plan || scheduled.service !== plan.service) throw new Error("Invalid scheduled product");
@@ -276,8 +279,10 @@ export async function runScheduledOrders(
       break;
     }
     try {
-      if (await processScheduledOrder(scheduled)) counts.processed++;
-      else counts.skipped++;
+      if (await processScheduledOrder(scheduled)) {
+        counts.processed++;
+        scheduleWalletEmails();
+      } else counts.skipped++;
     } catch (error) {
       counts.failed++;
       logger.error("Failed to process scheduled order", {

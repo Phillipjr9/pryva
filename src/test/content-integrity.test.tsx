@@ -31,13 +31,16 @@ describe("public content integrity", () => {
   it("does not invent uptime or incidents and reports derived availability", () => {
     const html = renderToStaticMarkup(<StatusPage />);
     expect(html).toContain("Live monitoring is not connected");
-    // Availability is computed from the fulfilment allowlist, so the page can
-    // only ever claim a category is orderable if checkout would actually run.
+    // With no persistent DB or configured supplier, there is no live ordering
+    // path. A mapping alone must not be advertised as proof of deliverability.
     expect(html).toContain("Virtual numbers (SMS verification &amp; rentals)");
-    expect(html).toContain("can be ordered and delivered automatically");
+    expect(html).toContain("No ordering path is currently configured");
+    expect(html).not.toContain("can be ordered and delivered automatically");
     expect(html).not.toMatch(/99\.\d+%|all systems operational|resolved incident/i);
   });
-  it("reports gift cards as available, because Pryva issues them rather than a supplier", () => {
+  it("reports gift cards separately when wallet actions are configured", () => {
+    vi.stubEnv("DATABASE_URL", "postgres://mock.invalid/db");
+    vi.stubEnv("VERCEL_ENV", "production");
     const html = renderToStaticMarkup(<StatusPage />);
     // The row used to bundle gift cards with categories that have no live
     // fulfilment, so the page said "Not available" while the dashboard sold them.

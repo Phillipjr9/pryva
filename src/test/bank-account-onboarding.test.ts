@@ -29,12 +29,14 @@ const mocks = vi.hoisted(() => ({
   resolveBank: vi.fn(),
   createRecipient: vi.fn(),
   getBanks: vi.fn(),
+  schedule: vi.fn(),
   configured: true,
 }));
 
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
 vi.mock("@/lib/auth", () => ({ requireAuthApi: async () => mocks.user }));
 vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => false }));
+vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.schedule }));
 vi.mock("@/lib/rate-limit", () => ({ purchaseRateLimiter: async () => ({ allowed: true, remaining: 5, resetTime: Date.now() }) }));
 vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/paystack", () => ({
@@ -96,6 +98,8 @@ describe("a new customer saving their first account", () => {
     expect(body.payoutWarning).toBeNull();
     expect(body.message).toBe("Bank account added successfully");
     expect(await database.select().from(bankAccounts)).toHaveLength(1);
+    expect(await database.select().from(schema.walletEmailOutbox)).toMatchObject([{ eventKind: "bank_linked", recipient: "ada@example.com", bankLastFour: "6789" }]);
+    expect(mocks.schedule).toHaveBeenCalledOnce();
   });
 
   it("saves when the signup name is a shorter version of the bank name, and says payouts are blocked", async () => {
@@ -162,7 +166,7 @@ describe("the saved accounts list", () => {
       approvedName: "EMEKA CHUKWUEMEKA OKAFOR",
       depositorName: "Emeka",
       reason: "Bank statement supplied in ticket 412",
-      approvedByEmail: "admin@pryva.ng",
+      approvedByEmail: "admin@example.test",
     });
     await database.insert(bankAccounts).values({
       userId: ADA, bankName: "Access Bank", bankCode: "044", accountNumber: "0123456789", accountName: "EMEKA CHUKWUEMEKA OKAFOR", recipientCode: "RCP-1", isDefault: 1,

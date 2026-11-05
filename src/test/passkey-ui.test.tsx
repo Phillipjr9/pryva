@@ -118,7 +118,7 @@ describe("the browser half", () => {
     const creation = encodeCreationOptions({
       challenge: "AQID",
       user: { id: "BAUG", name: "ada@example.com", displayName: "Ada" },
-      rp: { id: "pryva.ng", name: "Pryva" },
+      rp: { id: "pryvalogs.com", name: "Pryva" },
       pubKeyCredParams: [],
       excludeCredentials: [{ id: "BwgJ", type: "public-key", transports: ["internal"] }],
     } as never);

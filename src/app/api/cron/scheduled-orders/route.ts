@@ -1,3 +1,4 @@
+import { isVercelPreview } from "@/lib/financial-environment";
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { runScheduledOrders } from "@/lib/scheduled-orders";
@@ -29,6 +30,7 @@ async function handler(request: NextRequest) {
     logger.warn("Unauthorized cron attempt: scheduled-orders");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (isVercelPreview()) return NextResponse.json({ error: "Scheduled jobs are unavailable in preview" }, { status: 503 });
 
   const now = new Date();
   try {

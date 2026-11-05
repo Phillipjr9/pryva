@@ -5,11 +5,13 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { createSession, hashPassword } from "@/lib/auth";
 import { exchangeGoogleCode, fetchGoogleUser, googleConfigured } from "@/lib/google";
+import { stateAccepted } from "@/lib/google-state";
 import { relativeRedirect } from "@/lib/net";
 import { creditWallet } from "@/lib/wallet";
 import { safeRedirectPath } from "@/lib/safe-redirect";
 import { attributeReferral, readReferralCodeFrom } from "@/lib/referrals";
 import { recordSignupSignal } from "@/lib/fraud";
+import { scheduleOnboardingEmails } from "@/lib/onboarding-emails";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +47,9 @@ export async function GET(request: Request) {
 
   if (error) return clearCookies(goToLogin("google-canceled"));
   if (!googleConfigured()) return clearCookies(goToLogin("google-not-configured"));
-  if (!code || !state || !expectedState || state !== expectedState) {
+  // A signed state alone is not bound to this browser. Require the cookie too,
+  // or an attacker can attach their own Google account to someone else's login.
+  if (!code || !stateAccepted(state, expectedState)) {
     return clearCookies(goToLogin("google-state"));
   }
 
@@ -75,11 +79,26 @@ export async function GET(request: Request) {
           googleSubject: profile.sub,
           passwordHash: hashPassword(randomBytes(24).toString("hex")),
           walletBalance: 0,
+          /*
+           * Google has already proven control of this address, and the flow above
+           * refuses to continue unless `email_verified` is true. Leaving this NULL
+           * would put a "confirm your email" banner in front of a customer who has
+           * no confirmation link and no way to get one -- every resend would go to
+           * an address whose mailbox we have not asked about, for a proof we
+           * already hold. It also gates withdrawals, so the account would be
+           * locked out of payouts for no reason.
+           */
+          emailVerifiedAt: new Date(),
         })
         .returning();
       user = created;
 
       await recordSignupSignal(request, created.id);
+
+      // A Google signup completes verification at creation, so it gets the same
+      // receipt and welcome a password signup gets when it clicks the link --
+      // otherwise the fastest route into the product would be the only silent one.
+      scheduleOnboardingEmails(created.id);
 
       // A Google signup is a signup: the invite cookie set on /signup counts
       // here too, or every customer who used Google would be unattributable.

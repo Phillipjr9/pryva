@@ -1,3 +1,4 @@
+import { paystackKeyUsable } from "@/lib/paystack-policy";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { readJsonWithLimit } from "@/lib/request-body";
 
@@ -218,7 +219,7 @@ export function verifyWebhookSignature(payload: string, signature: string | null
 }
 
 export function isPaystackConfigured(): boolean {
-  return Boolean(PAYSTACK_SECRET_KEY);
+  return paystackKeyUsable(PAYSTACK_SECRET_KEY);
 }
 
 /**

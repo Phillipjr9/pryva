@@ -59,13 +59,13 @@ const validReview = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.user.mockResolvedValue({ id: "user-1", email: "buyer@pryva.ng" });
+  mocks.user.mockResolvedValue({ id: "user-1", email: "buyer@example.test" });
   mocks.limit.mockResolvedValue({ allowed: true, unavailable: false });
   mocks.create.mockResolvedValue({ ok: true, id: REVIEW });
   mocks.list.mockResolvedValue([]);
   mocks.moderate.mockResolvedValue({ ok: true });
   mocks.admin.mockResolvedValue({
-    user: { id: "admin-1", email: "owner@pryva.ng" },
+    user: { id: "admin-1", email: "owner@example.test" },
     response: null,
   });
 });
@@ -197,7 +197,7 @@ describe("admin review moderation", () => {
       reviewId: REVIEW,
       decision: "reject",
       note: "Contains personal contact details.",
-      actor: { id: "admin-1", email: "owner@pryva.ng" },
+      actor: { id: "admin-1", email: "owner@example.test" },
     });
   });
 });

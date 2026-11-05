@@ -7,7 +7,7 @@ import { withdrawals, users, walletTransactions } from "@/db/schema";
 import { initiateTransfer, isPaystackConfigured } from "@/lib/paystack";
 import { paystackTransferReference } from "@/lib/paystack-transfer-reference";
 import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable, isVercelPreview } from "@/lib/financial-environment";
 import { logger } from "@/lib/logger";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { isSameOriginMutation } from "@/lib/net";
@@ -68,6 +68,7 @@ export async function PUT(request: NextRequest) {
   try {
     const access = await authorizeAdminApi(request);
     if (access.response) return access.response;
+    if (isVercelPreview()) return NextResponse.json({ error: "Withdrawal processing is unavailable in preview" }, { status: 503 });
     const admin = access.user;
     if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
     let body: unknown;
@@ -88,7 +89,7 @@ export async function PUT(request: NextRequest) {
     if (action === "approve") {
       // Preview balances are simulated, even when a real Paystack key happens
       // to be present. Never turn them into an actual bank transfer.
-      if (isPreviewDatabase() || !isPaystackConfigured()) {
+      if (financialActionsUnavailable() || !isPaystackConfigured()) {
         return NextResponse.json({ error: "Bank transfers are unavailable in this environment" }, { status: 503 });
       }
       const [existing] = await db.select().from(withdrawals).where(eq(withdrawals.id, id)).limit(1);
