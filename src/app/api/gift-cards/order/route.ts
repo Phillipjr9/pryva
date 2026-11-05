@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users } from "@/db/schema";
-import { findGiftCardDenomination } from "@/lib/services/gift-cards/gift-cards-catalog";
+import { findGiftCardDenomination } from "@/lib/services/gift-cards/brand-catalog";
 import {
   createFoxreloadOrder,
   isFoxreloadConfigured,
@@ -17,6 +17,15 @@ import { creditWalletInTx, debitWalletInTx, makeReference } from "@/lib/payments
 import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * POST /api/gift-cards/order — buy a *brand* voucher from the supplier.
+ *
+ * Not to be confused with `/api/gift-cards/purchase`, which mints Pryva-issued
+ * wallet credit. Two products, one URL prefix: this one spends wallet money with
+ * a supplier, so it can fail at delivery and needs the refund/review path below;
+ * the credit path cannot fail that way because it issues the code itself.
+ */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

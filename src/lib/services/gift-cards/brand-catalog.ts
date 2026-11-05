@@ -1,3 +1,12 @@
+/**
+ * Brand gift cards: third-party vouchers bought from a supplier.
+ *
+ * The other gift-card product is `credit.ts`, which mints Pryva-issued wallet
+ * credit with no supplier involved. This one is a catalogue of real vouchers
+ * (`BRAND_GIFT_CARDS`) whose purchase path is `/api/gift-cards/order` and whose
+ * delivery is the supplier's code, not ours.
+ */
+
 import type { BrandSlug } from "@/lib/content/brand-marks";
 import type { WordmarkSlug } from "@/components/BrandIcon";
 

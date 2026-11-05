@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
 import { fireConfetti } from "@/components/ui/Confetti";
 import { BrandIcon } from "@/components/BrandIcon";
-import { BRAND_GIFT_CARDS, type BrandGiftCardCatalogEntry } from "@/lib/services/gift-cards/gift-cards-catalog";
+import { BRAND_GIFT_CARDS, type BrandGiftCardCatalogEntry } from "@/lib/services/gift-cards/brand-catalog";
 import type { GiftCard } from "@/db/schema";
 import type { PublicUser } from "@/lib/identity/auth";
 

@@ -2,7 +2,7 @@
  * The gift-card rules that both the checkout and the marketing page quote.
  *
  * Kept in one dependency-free module so the explainer cannot drift from the
- * enforcement. `src/lib/services/gift-cards/gift-cards.ts` validates against these values and adds
+ * enforcement. `src/lib/services/gift-cards/credit.ts` validates against these values and adds
  * the database work; the page renders them. A test compares the two.
  */
 

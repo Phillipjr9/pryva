@@ -7,7 +7,7 @@ import {
   GIFT_CARD_MAX_AMOUNT,
   GIFT_CARD_MIN_AMOUNT,
   GIFT_CARD_VALIDITY_MONTHS,
-} from "@/lib/services/gift-cards/gift-card-rules";
+} from "@/lib/services/gift-cards/credit-rules";
 
 /**
  * The explainer page for gift cards.

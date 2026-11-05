@@ -7,6 +7,16 @@ not orderable. Preview data, provider configuration and production fulfilment
 are different things. A configured provider does not by itself prove live stock
 or a successful customer delivery.
 
+Project layout
+--------------
+
+Business logic lives under src/lib, grouped by domain rather than by file type:
+platform (infrastructure), identity, payments, services (one folder per product
+family), providers (supplier adapters), checkout (the shared money gates), admin,
+content, support and email. ARCHITECTURE.txt explains which module owns each
+decision, the invariants tests enforce, and how to add a service, a supplier or a
+purchase route.
+
 Local development
 -----------------
 

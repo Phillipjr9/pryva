@@ -1,11 +1,19 @@
 import { beginPurchase } from "@/lib/checkout/purchase";
 import { NextRequest, NextResponse } from "next/server";
-import { createGiftCard } from "@/lib/services/gift-cards/gift-cards";
-import { GIFT_CARD_MAX_AMOUNT, GIFT_CARD_MIN_AMOUNT } from "@/lib/services/gift-cards/gift-card-rules";
+import { createGiftCard } from "@/lib/services/gift-cards/credit";
+import { GIFT_CARD_MAX_AMOUNT, GIFT_CARD_MIN_AMOUNT } from "@/lib/services/gift-cards/credit-rules";
 import { validateEmail } from "@/lib/platform/validation";
-import { sendGiftCardDelivery } from "@/lib/services/gift-cards/gift-card-delivery";
+import { sendGiftCardDelivery } from "@/lib/services/gift-cards/credit-delivery";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * POST /api/gift-cards/purchase — mint Pryva-issued wallet credit.
+ *
+ * The sibling `/api/gift-cards/order` buys a third-party brand voucher. This path
+ * has no supplier to be late: the code is issued by this call, so its only failure
+ * mode is the wallet itself.
+ */
 
 export async function POST(request: NextRequest) {
   try {

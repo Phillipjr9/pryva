@@ -2,6 +2,13 @@ import { CATALOG_PRICES } from "@/lib/services/prices.generated";
 import { missingPriceError } from "@/lib/services/pricing-diagnostics";
 import type { OrderServiceTag } from "@/lib/services/registry";
 
+/**
+ * The price-book vocabulary: the keys in data/cost-sheet.json and the catalogue
+ * pages, including pages that sell no plan (`email-otp`, `bulk`, `scheduled`).
+ *
+ * It is deliberately not `OrderServiceTag` from the registry. A *plan* records an
+ * order tag; a *service page* may exist without one.
+ */
 export type ServiceSlug =
   | "numbers"
   | "esim"

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkGiftCardBalance } from "@/lib/services/gift-cards/gift-cards";
+import { checkGiftCardBalance } from "@/lib/services/gift-cards/credit";
 import { requireAuthApi } from "@/lib/identity/auth";
 import { isSameOriginMutation } from "@/lib/platform/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
-import { giftCardAttemptLimit, normalizeGiftCardCode } from "@/lib/services/gift-cards/gift-card-requests";
+import { giftCardAttemptLimit, normalizeGiftCardCode } from "@/lib/services/gift-cards/credit-requests";
 
 export const dynamic = "force-dynamic";
 

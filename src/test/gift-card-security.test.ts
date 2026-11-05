@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 import { giftCards, users, walletTransactions } from "@/db/schema";
-import { createGiftCard, redeemGiftCard } from "@/lib/services/gift-cards/gift-cards";
+import { createGiftCard, redeemGiftCard } from "@/lib/services/gift-cards/credit";
 
 const mocks = vi.hoisted(() => ({ transaction: vi.fn() }));
 vi.mock("@/db", () => ({ db: { transaction: mocks.transaction } }));

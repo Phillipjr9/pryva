@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { escapeHtml, sendGiftCardDelivery } from "@/lib/services/gift-cards/gift-card-delivery";
+import { escapeHtml, sendGiftCardDelivery } from "@/lib/services/gift-cards/credit-delivery";
 
 /**
  * A gift card bought "for someone" used to reach nobody.
