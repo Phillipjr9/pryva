@@ -9,19 +9,28 @@ import { isBitcallConfigured } from "@/lib/providers/bitcall";
 import { esimItemsForCountry, readEsimCatalog } from "@/lib/services/esim/esim-catalog";
 import { explorerCountry } from "@/lib/services/service-explorer";
 import { catalogRateLimiter } from "@/lib/platform/rate-limit";
+import { isFundingFailure } from "@/lib/providers/types";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-/** A configured supplier that returned nothing, versus one that is not configured at all. */
-type Source<T> = { configured: boolean; snapshot: T | null };
+/**
+ * A configured supplier that returned nothing, versus one that is not
+ * configured at all — and, when it returned nothing, why.
+ *
+ * `failure` is the difference between "we are out of funds" (top up: retrying
+ * changes nothing) and "the feed is down" (retry). The read used to swallow
+ * both into `null`, which is how an unfunded account became an endless
+ * "couldn't load, Retry" banner.
+ */
+type Source<T> = { configured: boolean; snapshot: T | null; failure: "funding" | "outage" | null };
 
 async function attempt<T>(configured: boolean, read: () => Promise<T>): Promise<Source<T>> {
-  if (!configured) return { configured: false, snapshot: null };
+  if (!configured) return { configured: false, snapshot: null, failure: null };
   try {
-    return { configured: true, snapshot: await read() };
-  } catch {
-    return { configured: true, snapshot: null };
+    return { configured: true, snapshot: await read(), failure: null };
+  } catch (error) {
+    return { configured: true, snapshot: null, failure: isFundingFailure(error) ? "funding" : "outage" };
   }
 }
 
@@ -82,9 +91,22 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Configured but every read failed: this one *is* transient, and retrying is
-  // the right advice.
+  /**
+   * Every configured supplier is out of funds. This is not an outage and not a
+   * customer's problem: the shop is restocking, and a Retry would be a button
+   * that cannot do anything until an operator tops the account up. Answer 200
+   * with that reason so the hub can say so plainly.
+   */
+  const fundingOnly = sources.some((source) => source.configured && !source.snapshot)
+    && sources.every((source) => !source.configured || (!source.snapshot && source.failure === "funding"));
   if (sources.every((source) => !source.snapshot)) {
+    if (fundingOnly) {
+      return NextResponse.json(
+        { ok: true, country: country.code, live: false, reason: "funding", partial: false, fetchedAt: null, items: [] },
+        { headers: { "Cache-Control": "private, no-store" } },
+      );
+    }
+    // Configured but unreachable: this one *is* transient, and retrying works.
     return NextResponse.json(
       { error: "The live catalog is temporarily unavailable", reason: "unavailable" },
       { status: 503 },
@@ -99,7 +121,15 @@ export async function GET(request: NextRequest) {
   // Partial means "this may be incomplete": a configured source that failed, or
   // one that reported its own degraded read. A source that is simply not
   // configured is the steady state, not a warning.
-  const partial = sources.some((source) => source.snapshot?.partial === true || (source.configured && !source.snapshot));
+  const gaps: Array<"funding" | "outage"> = [];
+  for (const source of sources) {
+    if (!source.configured) continue;
+    if (!source.snapshot) gaps.push(source.failure ?? "outage");
+    else if (source.snapshot.partial) gaps.push(source.snapshot.degraded ?? "outage");
+  }
+  const partial = gaps.length > 0;
+  // Incomplete, and every gap is a funding gap: still not retryable.
+  const fundingGap = partial && gaps.every((gap) => gap === "funding");
   const fetchedAt = sources
     .map((source) => source.snapshot?.fetchedAt)
     .filter((value): value is string => typeof value === "string" && Number.isFinite(Date.parse(value)))
@@ -107,7 +137,7 @@ export async function GET(request: NextRequest) {
     .pop() ?? null;
 
   return NextResponse.json(
-    { ok: true, country: country.code, live: true, reason: partial ? "partial" : null, partial, fetchedAt, items },
+    { ok: true, country: country.code, live: true, reason: fundingGap ? "funding" : partial ? "partial" : null, partial, fetchedAt, items },
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }

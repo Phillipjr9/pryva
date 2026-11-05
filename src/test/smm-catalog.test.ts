@@ -24,7 +24,7 @@ function service(overrides: Partial<SmmService> = {}): SmmService {
 }
 
 function snapshot(services: SmmService[]): BoostSnapshot {
-  return { services, currency: "USD", balance: 177.69, partial: false, fetchedAt: "2026-01-01T00:00:00Z" };
+  return { services, currency: "USD", balance: 177.69, partial: false, degraded: null, balanceUnavailable: false, fetchedAt: "2026-01-01T00:00:00Z" };
 }
 
 beforeEach(() => {
@@ -240,8 +240,13 @@ describe("boosting snapshot", () => {
     panel.services.mockResolvedValue([service()]);
     panel.balance.mockRejectedValue(new Error("balance unavailable"));
     const reloaded = await import("@/lib/services/boosts/smm-catalog");
-    // Currency is unknown rather than assumed, so pricing cannot be derived.
-    expect(await reloaded.readBoostSnapshot()).toMatchObject({ partial: true, currency: null, balance: null });
+    // Currency is unknown rather than assumed, so pricing cannot be derived —
+    // but no listing is missing, so the catalogue is not "partial": a balance
+    // read is a pricing input, and reporting it as a gap told customers to
+    // retry a request that had already succeeded.
+    expect(await reloaded.readBoostSnapshot()).toMatchObject({
+      partial: false, balanceUnavailable: true, degraded: null, currency: null, balance: null,
+    });
   });
 
   it("caps the catalog, caches briefly and deduplicates concurrent reads", async () => {

@@ -111,6 +111,26 @@ describe("SMM panel transport", () => {
     expect(caught.message).not.toContain("999");
   });
 
+  it("reports an unfunded panel as funding, whatever shape the refusal takes", async () => {
+    // Panels say "not enough balance" three different ways: a 200 with an error
+    // field, a 4xx with a body, a bare 402. All three must be recognisable, and
+    // none may forward the panel's own words.
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({ error: "Insufficient balance. Current: 0" })));
+    const caught = await listSmmServices().catch((error: unknown) => error) as SmmPanelError;
+    expect(caught).toMatchObject({ status: 402, code: "INSUFFICIENT_BALANCE" });
+    expect(caught.message).not.toMatch(/Insufficient balance|Current: 0/);
+
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({ message: "Not enough funds to place this order" }, 400)));
+    await expect(listSmmServices()).rejects.toMatchObject({ status: 402, code: "INSUFFICIENT_BALANCE" });
+
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => new Response("", { status: 402 })));
+    await expect(listSmmServices()).rejects.toMatchObject({ status: 402, code: "INSUFFICIENT_BALANCE" });
+
+    // An authentication rejection is not funding, even when it mentions balance.
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({ error: "Invalid API key. Balance: 0" })));
+    await expect(listSmmServices()).rejects.toMatchObject({ status: 502, code: "PANEL_REJECTED" });
+  });
+
   it("maps transport failures onto distinct codes", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => new Response("", { status: 429 })));
     await expect(listSmmServices()).rejects.toMatchObject({ status: 429, code: "RATE_LIMITED" });

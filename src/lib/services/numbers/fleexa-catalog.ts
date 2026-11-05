@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { isFundingFailure } from "@/lib/providers/types";
 import { isFleexaConfigured, listFleexaEmailProducts, listFleexaRentAreas, listFleexaSmsServices, type FleexaEmailProduct, type FleexaRentArea, type FleexaSmsService } from "@/lib/providers/fleexa";
 import { priceFromCost, isPriceInBand } from "@/lib/services/pricing";
 import { safeUnitCount } from "@/lib/services/service-units";
@@ -10,6 +11,12 @@ export type SupplierSnapshot = {
   email: FleexaEmailProduct[];
   rentals: FleexaRentArea[];
   partial: boolean;
+  /**
+   * Why this read is incomplete, when it is: "funding" means the account cannot
+   * pay, so the gap will not close by itself; "outage" is transient. The hub
+   * shows different copy for the two, and only offers a Retry for the second.
+   */
+  degraded: "funding" | "outage" | null;
   fetchedAt: string;
 };
 
@@ -24,12 +31,19 @@ export async function readSupplierSnapshot(refresh = false): Promise<SupplierSna
   inFlight = (async () => {
     const [sms, email, rentals] = await Promise.allSettled([listFleexaSmsServices(), listFleexaEmailProducts(), listFleexaRentAreas()]);
     const results = [sms, email, rentals];
-    if (results.every((result) => result.status === "rejected")) throw new Error("Supplier catalog unavailable");
+    const failures = results.filter((result) => result.status === "rejected");
+    // An unfunded account is not an outage: preserve the refusal's own class so
+    // the hub can say "restocking" instead of offering a Retry that cannot work.
+    if (failures.length === results.length) {
+      if (failures.every((failure) => isFundingFailure(failure.reason))) throw failures[0].reason;
+      throw new Error("Supplier catalog unavailable");
+    }
     const snapshot: SupplierSnapshot = {
       sms: sms.status === "fulfilled" ? sms.value.slice(0, 2000) : [],
       email: email.status === "fulfilled" ? email.value.slice(0, 2000) : [],
       rentals: rentals.status === "fulfilled" ? rentals.value.slice(0, 2000) : [],
-      partial: results.some((result) => result.status === "rejected"),
+      partial: failures.length > 0,
+      degraded: failures.length === 0 ? null : failures.every((failure) => isFundingFailure(failure.reason)) ? "funding" : "outage",
       fetchedAt: new Date().toISOString(),
     };
     cache = { snapshot, expires: Date.now() + 30_000 };

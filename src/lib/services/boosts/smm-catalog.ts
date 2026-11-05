@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { isFundingFailure } from "@/lib/providers/types";
 import {
   getSmmBalance,
   isSmmPanelConfigured,
@@ -21,6 +22,17 @@ export type BoostSnapshot = {
   currency: string | null;
   balance: number | null;
   partial: boolean;
+  /** "funding" cannot be retried away; "outage" can. Null when the read is whole. */
+  degraded: "funding" | "outage" | null;
+  /**
+   * The balance read failed, so the panel's billing currency is unknown.
+   *
+   * Kept apart from `partial` on purpose: a missing balance does not remove a
+   * single listing, and every boost price is null by policy anyway, so reporting
+   * it as an incomplete catalogue told customers something was missing when
+   * nothing was.
+   */
+  balanceUnavailable: boolean;
   fetchedAt: string;
 };
 
@@ -35,14 +47,20 @@ export async function readBoostSnapshot(refresh = false): Promise<BoostSnapshot>
   inFlight = (async () => {
     const [services, balance] = await Promise.allSettled([listSmmServices(), getSmmBalance()]);
     // Without the service list there is nothing to display, so that failure is
-    // fatal. Balance only supplies the billing currency, so it degrades instead.
-    if (services.status === "rejected") throw new Error("Boosting catalog unavailable");
+    // fatal — but keep an unfunded-account refusal intact, because it is not an
+    // outage and the hub must not offer a Retry for it.
+    if (services.status === "rejected") {
+      if (isFundingFailure(services.reason)) throw services.reason;
+      throw new Error("Boosting catalog unavailable");
+    }
     const settled = balance.status === "fulfilled" ? balance.value : null;
     const snapshot: BoostSnapshot = {
       services: services.value.slice(0, 2000),
       currency: settled?.currency ?? null,
       balance: settled?.balance ?? null,
-      partial: balance.status === "rejected",
+      partial: false,
+      degraded: null,
+      balanceUnavailable: balance.status === "rejected",
       fetchedAt: new Date().toISOString(),
     };
     cache = { snapshot, expires: Date.now() + 30_000 };

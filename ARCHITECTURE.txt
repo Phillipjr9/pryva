@@ -155,14 +155,31 @@ What is deliberately not unified
   spelling exists so a route handler can never call the redirecting `requireAuth()`
   by mistake. The shared checkout gates call the API one.
 - "Live listings are off" and "live listings broke". `GET /api/services/catalog`
-  answers 200 with `live: false` and a `reason` (`environment` when the
-  deployment has live availability switched off, `unconfigured` when no supplier
-  key is set) — both are steady states, not incidents. It only answers 503 when
-  a configured supplier is unreachable (retry helps) and 429 when the customer is
-  refreshing too fast. The hub renders a neutral note for the first two and the
-  amber warning with a Retry only for the last two, because a Retry button on a
-  state that cannot change is a lie. This endpoint reads through its own limiter
-  (`catalogRateLimiter`); browsing must never spend the purchase budget.
+  answers 200 with `live: false` and a `reason`: `environment` (the deployment
+  has live availability switched off), `unconfigured` (no supplier key) or
+  `funding` (every configured supplier's account is out of balance). All three
+  are steady states, not incidents. It answers 503 only when a configured
+  supplier is unreachable — retry helps there — and 429 when the customer is
+  refreshing too fast. `partial: true` carries the same `reason` vocabulary for
+  an incomplete-but-served read. The hub renders a neutral note for the steady
+  states and keeps the amber warning with a Retry only where retrying can change
+  the answer, because a Retry button on a state that cannot change is a lie.
+  This endpoint reads through its own limiter (`catalogRateLimiter`); browsing
+  must never spend the purchase budget.
+- "We cannot pay" versus "they are down". `isFundingFailure()` in
+  `lib/providers/types.ts` is the only place that answer is decided, and adapters
+  raise a 402 `INSUFFICIENT_BALANCE` rather than a generic 502 when a supplier
+  refuses for want of funds. `looksLikeFundingRefusal()` reads a refusal's prose
+  to decide that — suppliers say "not enough balance" in a 200 body far more
+  often than in a status code — but the prose itself is never forwarded, and a
+  complaint that names a credential is never treated as funding. Everything that
+  swallows a supplier error (`attempt()` in the catalogue route, each
+  `read*Snapshot`) must keep this distinction; folding it into `null` is what
+  turned an empty balance into an endless "retry" banner.
+- A read that cannot change the listing is not "partial". The boosting balance
+  call only supplies a billing currency, so its failure is reported as
+  `balanceUnavailable`, not as an incomplete catalogue: the listings were all
+  there, and telling a customer otherwise invites a retry that changes nothing.
 
 
 Known gaps

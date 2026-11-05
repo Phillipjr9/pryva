@@ -32,7 +32,7 @@
 import "server-only";
 import { createRateLimiter } from "@/lib/platform/rate-limit";
 import { readJsonWithLimit } from "@/lib/platform/request-body";
-import { ProviderError } from "@/lib/providers/types";
+import { ProviderError, looksLikeFundingRefusal } from "@/lib/providers/types";
 
 const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_CATALOG_ENTRIES = 5_000;
@@ -185,6 +185,18 @@ function rowsFrom(payload: unknown, keys: string[]): UnknownRecord[] {
 /* Transport                                                            */
 /* ------------------------------------------------------------------ */
 
+/** Whatever part of a refusal might say "not enough balance"; classified, never forwarded. */
+function refusalText(payload: unknown): string {
+  if (typeof payload === "string") return payload;
+  if (!payload || typeof payload !== "object") return "";
+  const record = payload as Record<string, unknown>;
+  return [record.error, record.err, record.message, record.msg]
+    .map((value) => (typeof value === "string" ? value : value && typeof value === "object" ? JSON.stringify(value) : ""))
+    .filter(Boolean)
+    .join(" | ")
+    .slice(0, 2_000);
+}
+
 async function panelRequest(action: string, params: Record<string, string | number> = {}): Promise<unknown> {
   const key = smmPanelApiKey();
   if (!key) throw new SmmPanelError("SMM_PANEL_API_KEY is not configured", 503, "NO_API_KEY");
@@ -214,12 +226,18 @@ async function panelRequest(action: string, params: Record<string, string | numb
   }
 
   if (!response.ok) {
-    await response.body?.cancel().catch(() => {});
-    throw new SmmPanelError(
-      "Panel request failed",
-      response.status === 429 ? 429 : 502,
-      response.status === 429 ? "RATE_LIMITED" : "UPSTREAM_ERROR",
-    );
+    if (response.status === 429) {
+      await response.body?.cancel().catch(() => {});
+      throw new SmmPanelError("Panel request failed", 429, "RATE_LIMITED");
+    }
+    // An unfunded panel refuses in prose with a 4xx. Read that refusal before
+    // discarding it: "not enough balance" is answered by topping up, not by
+    // retrying, and the customer-facing copy differs accordingly.
+    const detail = await readJsonWithLimit(response, 16_384).catch(() => null);
+    if (response.status === 402 || looksLikeFundingRefusal(refusalText(detail))) {
+      throw new SmmPanelError("Panel balance is insufficient", 402, "INSUFFICIENT_BALANCE");
+    }
+    throw new SmmPanelError("Panel request failed", 502, "UPSTREAM_ERROR");
   }
 
   let payload: unknown;
@@ -234,6 +252,11 @@ async function panelRequest(action: string, params: Record<string, string | numb
   if (!Array.isArray(payload)) {
     const record = asRecord(payload);
     if ("error" in record || "err" in record) {
+      // ...but a rejection that names the balance is a funding refusal, and
+      // must not be retried forever as if it were an outage.
+      if (looksLikeFundingRefusal(refusalText(record))) {
+        throw new SmmPanelError("Panel balance is insufficient", 402, "INSUFFICIENT_BALANCE");
+      }
       throw new SmmPanelError("The panel rejected the request", 502, "PANEL_REJECTED");
     }
   }

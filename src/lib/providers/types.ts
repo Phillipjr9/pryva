@@ -73,3 +73,48 @@ export function isProviderError(error: unknown): error is ProviderError {
 export function isRefusal(error: unknown): boolean {
   return isProviderError(error) && (error.status === 400 || error.status === 402 || error.status === 404);
 }
+
+/**
+ * Codes that mean "the account behind this supplier cannot pay right now".
+ *
+ * Shared so an adapter can raise one and a caller can recognise it without
+ * importing every adapter's vocabulary.
+ */
+const FUNDING_CODES: ReadonlySet<string> = new Set([
+  "INSUFFICIENT_BALANCE",
+  "INSUFFICIENT_FUNDS",
+  "NO_BALANCE",
+  "LOW_BALANCE",
+  "PAYMENT_REQUIRED",
+  "ACCOUNT_UNFUNDED",
+]);
+
+/**
+ * Did this failure mean "we are out of funds" rather than "the supplier is down"?
+ *
+ * The distinction is not cosmetic. An outage is transient — telling a customer to
+ * retry is honest, and the retry may work. An unfunded account is not: no amount
+ * of retrying refills it, so every retry is a promise the shop cannot keep. It is
+ * also the failure that is cheapest to prevent, which is why the adapters raise it
+ * as a 402 instead of folding it into a generic upstream error.
+ */
+export function isFundingFailure(error: unknown): boolean {
+  if (!isProviderError(error)) return false;
+  return error.status === 402 || FUNDING_CODES.has(error.code);
+}
+
+/**
+ * Does an upstream refusal say, in its own words, that the account cannot pay?
+ *
+ * Suppliers refuse in prose far more often than in status codes — an unfunded
+ * account is routinely a 200 with an error field, or a 400 reading "insufficient
+ * balance". Adapters match the text here and re-raise a coded 402; the text
+ * itself is never propagated, so matching is the only use it gets.
+ */
+export function looksLikeFundingRefusal(text: unknown): boolean {
+  if (typeof text !== "string" || !text) return false;
+  // An authentication complaint is a credential problem even when the same
+  // sentence happens to mention a balance ("Invalid API key. Balance: 0").
+  if (/api[\s_-]?key|unauthori[sz]ed|forbidden|invalid\s+(api\s+)?(key|token|secret)|authentication/i.test(text)) return false;
+  return /\binsufficient\s+(balance|funds?|credit)|\bnot\s+enough\s+(balance|funds?|credit)|\bno\s+(available\s+)?(balance|funds)|\bbalance\b[^.]{0,20}\b(low|insufficient|empty|zero|exhausted)|\bunfunded\b|\bout\s+of\s+(balance|funds|credit)|\badd\s+funds\b|\btop\s*up\b|\brecharge\b/i.test(text);
+}

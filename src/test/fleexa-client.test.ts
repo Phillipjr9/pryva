@@ -63,6 +63,28 @@ describe("supplier client safety", () => {
     expect(options.headers).toMatchObject({ Authorization: "Bearer provider-secret" });
   });
 
+  it("reports an unfunded account as a funding refusal, not an outage", async () => {
+    // Fleexa refuses an unfunded account in prose — sometimes even with a 200 and
+    // success:false. Both used to land as a generic 502, which is why an empty
+    // balance rendered as "catalogue unavailable, retry".
+    const refuse = (payload: unknown, status: number) => {
+      vi.stubGlobal("fetch", vi.fn().mockImplementation(() => new Response(JSON.stringify(payload), { status })));
+    };
+
+    refuse({ success: false, message: "Insufficient balance to complete this request" }, 200);
+    await expect(listFleexaSmsServices()).rejects.toMatchObject({ status: 402, code: "INSUFFICIENT_BALANCE" });
+
+    refuse({ message: "Not enough funds. provider-secret" }, 402);
+    const refusal = await listFleexaSmsServices().catch((error: unknown) => error) as Error;
+    expect(refusal).toMatchObject({ status: 402, code: "INSUFFICIENT_BALANCE" });
+    // Classified, never echoed: upstream text can carry the key or the balance.
+    expect(refusal.message).not.toMatch(/provider-secret|not enough funds/i);
+
+    // A credential complaint stays an outage even when it mentions a balance.
+    refuse({ success: false, message: "Invalid API key. Balance: 0" }, 200);
+    await expect(listFleexaSmsServices()).rejects.toMatchObject({ status: 502, code: "UPSTREAM_ERROR" });
+  });
+
   it("handles nested listing shapes, explicit country codes and bounded, sanitized errors", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: { apps: [{ serviceName: "Signal", country_code: "US", price: 500, stock: 4 }, { serviceName: "Other", country_code: "US", price: "", stock: "  " }] } }), { status: 200 }))

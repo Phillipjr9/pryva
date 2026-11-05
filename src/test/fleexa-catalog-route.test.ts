@@ -34,6 +34,8 @@ vi.mock("@/lib/services/boosts/smm-catalog", () => ({ readBoostSnapshot: state.b
 vi.mock("@/lib/providers/bitcall", () => ({ isBitcallConfigured: () => state.bitcallConfigured }));
 vi.mock("@/lib/services/esim/esim-catalog", () => ({ readEsimCatalog: state.esimSnapshot, esimItemsForCountry: state.esimItems }));
 
+import { ProviderError } from "@/lib/providers/types";
+
 import { GET } from "@/app/api/services/catalog/route";
 
 function request(country = "us") { return new NextRequest(`https://pryva.test/api/services/catalog?country=${country}`); }
@@ -158,6 +160,47 @@ describe("supplier catalog endpoint", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(await response.json()).toMatchObject({ ok: true, live: false, reason: "unconfigured", partial: false, fetchedAt: null, items: [] });
+  });
+
+  it("calls an unfunded balance what it is, instead of an outage to retry", async () => {
+    // The customer's suppliers are connected and out of balance. That is a
+    // restocking problem: 200 with a reason, so the hub stops offering a Retry
+    // that cannot refill an account.
+    const unfunded = () => new ProviderError("balance", { provider: "fleexa", status: 402, code: "INSUFFICIENT_BALANCE" });
+    state.boostConfigured = true; state.bitcallConfigured = true;
+    state.snapshot.mockRejectedValue(unfunded());
+    state.boostSnapshot.mockRejectedValue(new ProviderError("balance", { provider: "smm", status: 402, code: "INSUFFICIENT_BALANCE" }));
+    state.esimSnapshot.mockRejectedValue(new ProviderError("balance", { provider: "bitcall", status: 402, code: "INSUFFICIENT_BALANCE" }));
+
+    const response = await GET(request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, live: false, reason: "funding", partial: false, items: [] });
+  });
+
+  it("still reports an outage when the failures are not about money", async () => {
+    state.boostConfigured = true;
+    state.snapshot.mockRejectedValue(new ProviderError("down", { provider: "fleexa", status: 502, code: "UPSTREAM_UNREACHABLE" }));
+    state.boostSnapshot.mockRejectedValue(new ProviderError("down", { provider: "smm", status: 502, code: "UPSTREAM_ERROR" }));
+    expect((await GET(request())).status).toBe(503);
+
+    // One unfunded source next to one outage is an outage: something may still
+    // come back on its own, so retrying stays on the table.
+    state.boostSnapshot.mockRejectedValue(new ProviderError("balance", { provider: "smm", status: 402, code: "INSUFFICIENT_BALANCE" }));
+    expect((await GET(request())).status).toBe(503);
+  });
+
+  it("keeps a funding gap out of the retryable partial path", async () => {
+    // Boosting is unfunded, verification is healthy: the catalogue is genuinely
+    // incomplete, but the gap is money — so it is labelled funding, and the hub
+    // drops the Retry.
+    state.boostConfigured = true;
+    state.boostSnapshot.mockRejectedValue(new ProviderError("balance", { provider: "smm", status: 402, code: "INSUFFICIENT_BALANCE" }));
+    const body = await (await GET(request())).json();
+    expect(body).toMatchObject({ ok: true, live: true, partial: true, reason: "funding", items: [SIGNAL] });
+
+    // A degraded read for an ordinary outage keeps the generic partial reason.
+    state.boostSnapshot.mockResolvedValue({ partial: true, degraded: "outage", fetchedAt: "2026-01-02T00:00:00Z", currency: null, balance: null });
+    expect(await (await GET(request())).json()).toMatchObject({ partial: true, reason: "partial" });
   });
 
   it("passes the refresh flag through to every configured supplier", async () => {
