@@ -553,3 +553,112 @@
     font-size: max(1rem, 16px) !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Printing a document
+   ─────────────────────────────────────────────────────────────────────────────
+
+   "Print or save as PDF" is how a customer hands a receipt to a bank, an
+   employer or a tax officer, so the paper is the deliverable, not a fallback.
+
+   It was broken in the way that is easy to miss: nothing in the app declared a
+   print layout, so the browser printed whatever was on screen. The dashboards
+   put `print:hidden` on their own chrome, but the receipt page did not — the
+   printed A4 sheet came out with the sidebar, the wallet chip, the bottom tab
+   bar and the build stamp on it, the receipt squeezed into the middle column.
+
+   Two pieces:
+
+     1. `.print-document` marks the element that *is* the paper. Everything in
+        the document outside it is hidden for print, once, here — so a new page
+        that prints a document inherits the rule instead of re-deriving it.
+     2. The print block itself: page size, ink on white, no card shadow, no
+        rounding, and a footer that repeats the reference on every page.
+
+   `@page` size is deliberately A4 with a real margin rather than "shrink to
+   fit": a receipt printed at 94% is a receipt that gets re-printed. */
+@media print {
+  .print-document {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  /*
+   * Hide the page around the document, keeping exactly two things: the document
+   * and the chain of elements that contains it. `:has(.print-document)` is what
+   * makes the second half work — an ancestor is kept because it holds the sheet,
+   * and every sibling inside that ancestor is not.
+   *
+   * Listing selectors by tag (`nav`, `aside`, `header`) is how the first attempt
+   * failed: the dashboard's top bar is a plain `div` carrying the greeting, the
+   * wallet chip and the Services button, so the printed sheet still came out
+   * wearing them.
+   */
+  body:has(.print-document) *:not(.print-document):not(.print-document *):not(:has(.print-document)) {
+    display: none !important;
+  }
+
+  /* The kept ancestors are scaffolding: their gutters and max-widths are for a
+     screen with a sidebar, and would inset the sheet on paper. */
+  body:has(.print-document),
+  body:has(.print-document) div:has(.print-document),
+  body:has(.print-document) main:has(.print-document) {
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    background: #fff !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    display: block !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    /* A document is not a viewport: let the sheet take its own width. */
+    overflow: visible !important;
+  }
+
+  .print-document {
+    color: #14101f !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-document a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+
+  .print-document table {
+    page-break-inside: avoid;
+  }
+
+  .print-document thead {
+    display: table-header-group;
+  }
+
+  /* A row split across two sheets is unreadable; keep the total with its table. */
+  .print-document tr,
+  .print-document .print-keep {
+    break-inside: avoid;
+  }
+
+  .print-runner {
+    break-inside: avoid;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 14mm 16mm;
+  }
+}

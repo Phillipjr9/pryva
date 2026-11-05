@@ -198,9 +198,13 @@ describe("responsive overflow regressions", () => {
   });
 
   it("keeps iOS input sizes above the zoom threshold even with text utilities or CSS modules", () => {
-    const rule = css.slice(css.lastIndexOf("@media"));
+    // Locate the rule by what it does, not by being the last @media in the
+    // file: anything appended after it (the print stylesheet is) would otherwise
+    // make this assertion silently test the wrong block.
+    const marker = css.indexOf("font-size: max(1rem, 16px) !important;");
+    expect(marker).toBeGreaterThan(-1);
+    const rule = css.slice(css.lastIndexOf("@media", marker), marker);
     expect(rule).toContain("(max-width: 1023px), (pointer: coarse)");
-    expect(rule).toContain("font-size: max(1rem, 16px) !important;");
   });
 
   it("allows dashboard header actions to wrap on narrow screens", () => {
