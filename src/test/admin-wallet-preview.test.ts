@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({ authorize: vi.fn(), select: vi.fn(), credit: vi.fn(), debit: vi.fn() }));
-vi.mock("@/lib/admin-auth", () => ({ authorizeAdminApi: mocks.authorize }));
+vi.mock("@/lib/identity/admin-auth", () => ({ authorizeAdminApi: mocks.authorize }));
 vi.mock("@/db", () => ({ db: { select: mocks.select } }));
-vi.mock("@/lib/wallet", () => ({ creditWallet: mocks.credit, debitWallet: mocks.debit, InsufficientFundsError: class extends Error {} }));
+vi.mock("@/lib/payments/wallet", () => ({ creditWallet: mocks.credit, debitWallet: mocks.debit, InsufficientFundsError: class extends Error {} }));
 
 import { PUT } from "@/app/api/admin/users/[id]/route";
 

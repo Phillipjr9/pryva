@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { catalogueItems, ESIM_CATALOGUE_LIMIT, type EsimOffer } from "@/lib/esim-catalog";
+import { catalogueItems, ESIM_CATALOGUE_LIMIT, type EsimOffer } from "@/lib/services/esim/esim-catalog";
 import { EsimCatalogue } from "@/app/dashboard/esim/EsimCatalogue";
 
 /**

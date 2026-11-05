@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
+import { SINGLE_NUMBER_WINDOW } from "@/lib/services/refund-policy";
 
 /**
  * The sweep that finishes number orders nobody is watching.
@@ -13,25 +13,25 @@ import { SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
  */
 const mocks = vi.hoisted(() => ({ checkSms: vi.fn(), activation: vi.fn() }));
 
-vi.mock("@/lib/fleexa", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/fleexa")>();
+vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/fleexa")>();
   return { ...actual, checkFleexaSms: mocks.checkSms };
 });
 
-vi.mock("@/lib/bitcall", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/bitcall")>();
+vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/bitcall")>();
   return { ...actual, getBitcallOtpActivation: mocks.activation };
 });
 
 let db: typeof import("@/db").db;
 let schema: typeof import("@/db/schema");
-let sweep: typeof import("@/lib/number-code-sync").sweepPendingNumberCodes;
+let sweep: typeof import("@/lib/services/numbers/number-code-sync").sweepPendingNumberCodes;
 
 beforeAll(async () => {
   vi.stubEnv("DATABASE_URL", "");
   ({ db } = await import("@/db"));
   schema = await import("@/db/schema");
-  ({ sweepPendingNumberCodes: sweep } = await import("@/lib/number-code-sync"));
+  ({ sweepPendingNumberCodes: sweep } = await import("@/lib/services/numbers/number-code-sync"));
 });
 const IDS = [
   "sweep-live", "sweep-gateway", "sweep-waiting", "sweep-broken",

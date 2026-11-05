@@ -3,11 +3,11 @@ import { db } from "@/db";
 import { sessions } from "@/db/schema";
 import { and, eq, gt, ne, desc } from "drizzle-orm";
 import { cookies } from "next/headers";
-import { SESSION_COOKIE, SESSION_COOKIE_EMBEDDED, getCurrentUser } from "@/lib/auth";
-import { isSameOriginMutation } from "@/lib/net";
-import { isPreviewDatabase } from "@/lib/demo-policy";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { logger } from "@/lib/logger";
+import { SESSION_COOKIE, SESSION_COOKIE_EMBEDDED, getCurrentUser } from "@/lib/identity/auth";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { logger } from "@/lib/platform/logger";
 
 export const dynamic = "force-dynamic";
 

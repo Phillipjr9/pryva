@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { diagnosticsAuthorized } from "@/lib/diagnostics-auth";
-import { isPreviewDatabase } from "@/lib/demo-policy";
-import { logger } from "@/lib/logger";
-import { recentWebhookActivity } from "@/lib/webhook-events";
+import { diagnosticsAuthorized } from "@/lib/admin/diagnostics-auth";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
+import { logger } from "@/lib/platform/logger";
+import { recentWebhookActivity } from "@/lib/payments/webhook-events";
 
 export const dynamic = "force-dynamic";
 

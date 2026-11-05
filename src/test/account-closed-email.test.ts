@@ -8,11 +8,11 @@ const mocks = vi.hoisted(() => ({
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 vi.mock("next/server", () => ({ after: mocks.after }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => mocks.preview }));
-vi.mock("@/lib/resend-config", () => ({ resendConfigured: () => mocks.configured }));
-vi.mock("@/lib/logger", () => ({ logger: mocks.log }));
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => mocks.preview }));
+vi.mock("@/lib/email/resend-config", () => ({ resendConfigured: () => mocks.configured }));
+vi.mock("@/lib/platform/logger", () => ({ logger: mocks.log }));
 
-import { buildAccountClosedEmail, scheduleAccountClosedEmail, sendAccountClosedEmail } from "@/lib/account-closed-email";
+import { buildAccountClosedEmail, scheduleAccountClosedEmail, sendAccountClosedEmail } from "@/lib/email/account-closed-email";
 
 const when = new Date("2026-11-05T12:30:00Z");
 const input = { to: "former-owner@example.test", when };

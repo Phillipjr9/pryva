@@ -4,19 +4,19 @@ import { NextRequest } from "next/server";
 const work = vi.hoisted(() => vi.fn());
 // A preview must return before any of the background tasks can query or change
 // a shared database, contact a supplier, process payouts, or send email.
-vi.mock("@/lib/daily-reconciliation", () => ({ lagosDay: work, runDailyReconciliation: work }));
-vi.mock("@/lib/auto-refund", () => ({ processAutoRefunds: work }));
-vi.mock("@/lib/number-code-sync", () => ({ sweepPendingNumberCodes: work }));
-vi.mock("@/lib/wallet-email-outbox", () => ({ dispatchWalletEmails: work, walletEmailConfigured: () => true }));
-vi.mock("@/lib/boost-status", () => ({ sweepBoostDeliveries: work }));
-vi.mock("@/lib/rental-expiry", () => ({ expireFinishedRentals: work }));
-vi.mock("@/lib/scheduled-orders", () => ({ runScheduledOrders: work }));
-vi.mock("@/lib/esim-fulfilment", () => ({ sweepPendingEsimOrders: work }));
-vi.mock("@/lib/referrals", () => ({ settleReferralRewards: work }));
-vi.mock("@/lib/retention", () => ({ purgeExpiredClosedAccounts: work }));
-vi.mock("@/lib/payouts", () => ({ reconcileInFlightPayouts: work }));
-vi.mock("@/lib/webhook-events", () => ({ pruneWebhookEvents: work }));
-vi.mock("@/lib/onboarding-emails", () => ({ backfillOnboardingEmails: work }));
+vi.mock("@/lib/payments/daily-reconciliation", () => ({ lagosDay: work, runDailyReconciliation: work }));
+vi.mock("@/lib/services/auto-refund", () => ({ processAutoRefunds: work }));
+vi.mock("@/lib/services/numbers/number-code-sync", () => ({ sweepPendingNumberCodes: work }));
+vi.mock("@/lib/email/wallet-email-outbox", () => ({ dispatchWalletEmails: work, walletEmailConfigured: () => true }));
+vi.mock("@/lib/services/boosts/boost-status", () => ({ sweepBoostDeliveries: work }));
+vi.mock("@/lib/services/rental-expiry", () => ({ expireFinishedRentals: work }));
+vi.mock("@/lib/services/scheduled-orders", () => ({ runScheduledOrders: work }));
+vi.mock("@/lib/services/esim/esim-fulfilment", () => ({ sweepPendingEsimOrders: work }));
+vi.mock("@/lib/content/referrals", () => ({ settleReferralRewards: work }));
+vi.mock("@/lib/identity/retention", () => ({ purgeExpiredClosedAccounts: work }));
+vi.mock("@/lib/payments/payouts", () => ({ reconcileInFlightPayouts: work }));
+vi.mock("@/lib/payments/webhook-events", () => ({ pruneWebhookEvents: work }));
+vi.mock("@/lib/email/onboarding-emails", () => ({ backfillOnboardingEmails: work }));
 
 import { GET as nightly } from "@/app/api/cron/nightly/route";
 import { GET as autoRefund } from "@/app/api/cron/auto-refund/route";

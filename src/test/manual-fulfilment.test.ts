@@ -16,11 +16,11 @@ import { eq } from "drizzle-orm";
 
 const mocks = vi.hoisted(() => ({ user: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
 
-vi.mock("@/lib/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/auth")>();
+vi.mock("@/lib/identity/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/identity/auth")>();
   return { ...actual, getCurrentUser: mocks.user };
 });
-vi.mock("@/lib/logger", () => ({ logger: { info: mocks.info, warn: mocks.warn, error: mocks.error } }));
+vi.mock("@/lib/platform/logger", () => ({ logger: { info: mocks.info, warn: mocks.warn, error: mocks.error } }));
 
 const ADMIN_EMAIL = "owner@pryva.test";
 const ORIGIN = "https://pryva.test";

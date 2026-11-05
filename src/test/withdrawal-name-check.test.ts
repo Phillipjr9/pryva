@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { comparePayoutNames, normalizePayoutName } from "@/lib/withdrawal-name-check";
+import { comparePayoutNames, normalizePayoutName } from "@/lib/payments/withdrawal-name-check";
 
 /**
  * The comparison that decides whether money may leave the platform.

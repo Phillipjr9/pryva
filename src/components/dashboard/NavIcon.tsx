@@ -1,6 +1,6 @@
 "use client";
 
-import { artworkMaster, artworkSrcSet } from "@/lib/service-artwork";
+import { artworkMaster, artworkSrcSet } from "@/lib/services/service-artwork";
 
 /**
  * Image icons for the dashboard's own destinations.

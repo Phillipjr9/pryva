@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactForm } from "@/components/site/ContactForm";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/identity/auth";
 import { Clock, Mail, MessageCircle, Shield } from "@/components/icons";
 
 export const metadata: Metadata = {

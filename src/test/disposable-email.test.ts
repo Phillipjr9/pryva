@@ -5,7 +5,7 @@ import {
   DISPOSABLE_EMAIL_ERROR,
   emailDomain,
   isDisposableEmailAddress,
-} from "@/lib/disposable-domains";
+} from "@/lib/services/email-otp/disposable-domains";
 
 const signup = readFileSync("src/app/api/auth/signup/route.ts", "utf8");
 

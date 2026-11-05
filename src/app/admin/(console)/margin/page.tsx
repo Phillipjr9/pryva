@@ -1,7 +1,7 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/identity/auth";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
-import { configuredFloor } from "@/lib/margin-guard";
+import { configuredFloor } from "@/lib/services/margin-guard";
 import { desc } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";

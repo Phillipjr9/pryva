@@ -26,17 +26,17 @@ const state = vi.hoisted(() => ({
   balanceAfter: 49000,
 }));
 
-vi.mock("@/lib/auth", () => ({ requireAuthApi: async () => state.user }));
+vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: async () => state.user }));
 
-vi.mock("@/lib/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
+vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/lib/platform/rate-limit", () => ({
   purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }),
 }));
 
-vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
 
-vi.mock("@/lib/fleexa", () => ({
+vi.mock("@/lib/providers/fleexa", () => ({
   FleexaError: class FleexaError extends Error {
     code: string;
     constructor(message: string, _status: number, code: string) {
@@ -46,7 +46,7 @@ vi.mock("@/lib/fleexa", () => ({
   },
 }));
 
-vi.mock("@/lib/fulfillment", () => ({
+vi.mock("@/lib/services/fulfillment", () => ({
   isPlanFulfillable: (slug: string) => state.fulfillable.has(slug),
   fulfillPlan: async (plan: { slug: string; price: number }) => {
     state.calls.push(plan.slug);
@@ -68,8 +68,8 @@ vi.mock("@/lib/fulfillment", () => ({
   },
 }));
 
-vi.mock("@/lib/wallet", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/wallet")>();
+vi.mock("@/lib/payments/wallet", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/payments/wallet")>();
   return {
     ...actual,
     debitWalletInTx: async (_tx: unknown, entry: unknown) => {

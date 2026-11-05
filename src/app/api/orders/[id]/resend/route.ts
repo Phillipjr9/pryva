@@ -1,10 +1,10 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth";
-import { isSameOriginMutation } from "@/lib/net";
-import { canResendNumberCode, resendNumberCode } from "@/lib/otp-resend";
-import { createRateLimiter } from "@/lib/rate-limit";
+import { getCurrentUser } from "@/lib/identity/auth";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { canResendNumberCode, resendNumberCode } from "@/lib/services/numbers/otp-resend";
+import { createRateLimiter } from "@/lib/platform/rate-limit";
 
 export const dynamic = "force-dynamic";
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { withdrawals } from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
-import { requireAuthApi } from "@/lib/auth";
+import { requireAuthApi } from "@/lib/identity/auth";
 
 export const dynamic = "force-dynamic";
 

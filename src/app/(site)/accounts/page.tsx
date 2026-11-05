@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AccountsBrowser } from "./AccountsBrowser";
-import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
+import { isMarketplaceCheckoutConfigured } from "@/lib/services/accounts/marketplace-policy";
 import { PlatformStrip } from "@/components/PlatformBadge";
 import { ServiceIcon } from "@/components/ServiceIcon";
 

@@ -4,13 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AlertCircle, CheckCircle, Loader2, Lock, Trash2 } from "@/components/icons";
-import type { CredentialSummary } from "@/lib/passkeys";
+import type { CredentialSummary } from "@/lib/identity/passkeys";
 import {
   encodeCreationOptions,
   isCancellation,
   registrationResponseToJson,
-} from "@/lib/webauthn-browser";
-import { usePasskeysSupported } from "@/lib/use-passkeys-supported";
+} from "@/lib/identity/webauthn-browser";
+import { usePasskeysSupported } from "@/lib/identity/use-passkeys-supported";
 
 type Props = {
   passkeys: CredentialSummary[];

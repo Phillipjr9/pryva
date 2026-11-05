@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { authorizeAdminApi } from "@/lib/admin-auth";
-import { recordAdminAction } from "@/lib/admin-audit";
-import { listFraudEvents, markFraudEventReviewed } from "@/lib/fraud";
-import { logger } from "@/lib/logger";
-import { isSameOriginMutation } from "@/lib/net";
+import { authorizeAdminApi } from "@/lib/identity/admin-auth";
+import { recordAdminAction } from "@/lib/admin/admin-audit";
+import { listFraudEvents, markFraudEventReviewed } from "@/lib/admin/fraud";
+import { logger } from "@/lib/platform/logger";
+import { isSameOriginMutation } from "@/lib/platform/net";
 
 export const dynamic = "force-dynamic";
 

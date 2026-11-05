@@ -6,7 +6,7 @@ import { sql } from "drizzle-orm";
 
 import * as schema from "@/db/schema";
 import { fraudEvents, users } from "@/db/schema";
-import { fraudAlertEmail } from "@/lib/email-templates";
+import { fraudAlertEmail } from "@/lib/email/email-templates";
 
 /**
  * Fraud alert emails.
@@ -21,13 +21,13 @@ import { fraudAlertEmail } from "@/lib/email-templates";
 const mocks = vi.hoisted(() => ({ db: undefined as unknown, log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/logger", () => ({ logger: mocks.log }));
+vi.mock("@/lib/platform/logger", () => ({ logger: mocks.log }));
 
 const USER = "11111111-1111-4111-8111-111111111111";
 
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
-let alerts: typeof import("@/lib/fraud-alerts");
+let alerts: typeof import("@/lib/admin/fraud-alerts");
 
 const ENV_KEYS = ["RESEND_API_KEY", "RESEND_FROM_EMAIL", "FRAUD_ALERT_EMAIL", "ADMIN_EMAILS"] as const;
 let savedEnv: Record<string, string | undefined>;
@@ -38,7 +38,7 @@ beforeAll(async () => {
   for (const file of files) await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
-  alerts = await import("@/lib/fraud-alerts");
+  alerts = await import("@/lib/admin/fraud-alerts");
 }, 30_000);
 
 afterAll(async () => {
@@ -316,7 +316,7 @@ describe("fraud alert delivery", () => {
     mailConfigured();
     const fetchMock = vi.fn().mockRejectedValue(new Error("mail down"));
     vi.stubGlobal("fetch", fetchMock);
-    const fraud = await import("@/lib/fraud");
+    const fraud = await import("@/lib/admin/fraud");
     await expect(
       fraud.recordFraudEvent({ userId: USER, kind: "purchase_velocity", severity: "high", reasons: ["too many"] }),
     ).resolves.toBeUndefined();

@@ -6,15 +6,15 @@ import { POST } from "@/app/api/orders/[id]/refund/route";
 
 const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), select: vi.fn(), transaction: vi.fn(), cancelUpstream: vi.fn(), flagReconciliation: vi.fn(), refundRateLimit: vi.fn() }));
 vi.mock("@/db", () => ({ db: { select: mocks.select, transaction: mocks.transaction } }));
-vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.currentUser }));
+vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: mocks.currentUser }));
 // Must be mocked: the route releases the number upstream after committing the
 // refund, and an unmocked call would reach the real provider.
-vi.mock("@/lib/fulfillment", () => ({ cancelUpstream: mocks.cancelUpstream }));
-vi.mock("@/lib/reconciliation", () => ({ flagReconciliation: mocks.flagReconciliation }));
+vi.mock("@/lib/services/fulfillment", () => ({ cancelUpstream: mocks.cancelUpstream }));
+vi.mock("@/lib/services/reconciliation", () => ({ flagReconciliation: mocks.flagReconciliation }));
 // The throttle is DB-backed, and the fake database below exposes only select and
 // transaction -- without this the limiter correctly reports itself unavailable
 // and every refund fails closed at 503.
-vi.mock("@/lib/rate-limit", () => ({ refundRateLimiter: mocks.refundRateLimit }));
+vi.mock("@/lib/platform/rate-limit", () => ({ refundRateLimiter: mocks.refundRateLimit }));
 const dialect = new PgDialect();
 const context = { params: Promise.resolve({ id: "order-id" }) };
 function request(origin = "https://pryva.test") {

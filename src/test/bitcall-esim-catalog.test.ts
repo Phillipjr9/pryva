@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { BitcallEsimPlan } from "@/lib/bitcall";
+import type { BitcallEsimPlan } from "@/lib/providers/bitcall";
 
 /**
  * eSIM is now products, not listings.
@@ -23,23 +23,23 @@ const gateway = vi.hoisted(() => ({
   marginOk: true,
 }));
 
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => gateway.preview }));
-vi.mock("@/lib/bitcall", () => ({
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => gateway.preview }));
+vi.mock("@/lib/providers/bitcall", () => ({
   isBitcallConfigured: gateway.configured,
   listBitcallEsimPlans: gateway.plans,
   listBitcallEsimCountries: gateway.countries,
   getBitcallEsimPlan: gateway.single,
 }));
 
-vi.mock("@/lib/exchange-rate", () => ({
+vi.mock("@/lib/payments/exchange-rate", () => ({
   getFreshNgnRate: async (currency: "USD" | "EUR") => {
     const rate = currency === "USD" ? gateway.usdRate : gateway.eurRate;
     return rate === null ? null : { rate, source: "override", fetchedAt: "2026-01-01T00:00:00Z" };
   },
 }));
 
-vi.mock("@/lib/margin-guard", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/margin-guard")>();
+vi.mock("@/lib/services/margin-guard", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/margin-guard")>();
   return { ...actual, checkMargin: (...args: Parameters<typeof actual.checkMargin>) => (gateway.marginOk ? actual.checkMargin(...args) : { ok: false, code: "UNPROFITABLE", costNgn: args[1], priceNgn: args[0], marginNgn: null }) };
 });
 
@@ -78,7 +78,7 @@ beforeEach(() => {
 
 async function catalog(plans: BitcallEsimPlan[]) {
   gateway.plans.mockResolvedValue({ plans, returned: plans.length, unreadable: 0, partial: false });
-  const { readEsimCatalog } = await import("@/lib/esim-catalog");
+  const { readEsimCatalog } = await import("@/lib/services/esim/esim-catalog");
   return readEsimCatalog(true);
 }
 
@@ -88,7 +88,7 @@ describe("eSIM offers", () => {
   it("does not load the live catalogue from a Vercel preview with a persistent database", async () => {
     vi.stubEnv("DATABASE_URL", "postgres://mock.invalid/db");
     vi.stubEnv("VERCEL_ENV", "preview");
-    const { readEsimCatalog } = await import("@/lib/esim-catalog");
+    const { readEsimCatalog } = await import("@/lib/services/esim/esim-catalog");
     await expect(readEsimCatalog()).rejects.toThrow(/unavailable in this environment/i);
     expect(gateway.plans).not.toHaveBeenCalled();
     expect(gateway.countries).not.toHaveBeenCalled();
@@ -96,7 +96,7 @@ describe("eSIM offers", () => {
 
   it("never loads the live catalogue in an in-memory preview", async () => {
     gateway.preview = true;
-    const { readEsimCatalog } = await import("@/lib/esim-catalog");
+    const { readEsimCatalog } = await import("@/lib/services/esim/esim-catalog");
     await expect(readEsimCatalog()).rejects.toThrow(/unavailable in this environment/i);
     expect(gateway.plans).not.toHaveBeenCalled();
   });
@@ -139,7 +139,7 @@ describe("eSIM offers", () => {
     expect(listings.filter((item) => item.priceNgn === null)).toHaveLength(5);
     expect(listings.filter((item) => item.priceNgn === null).every((item) => !item.purchasable)).toBe(true);
     expect(stats).toMatchObject({ skippedRate: 1, skippedNoPrice: 2, skippedCurrency: 2 });
-    const { esimItemsForCountry, catalogueItems, findEsimOffer } = await import("@/lib/esim-catalog");
+    const { esimItemsForCountry, catalogueItems, findEsimOffer } = await import("@/lib/services/esim/esim-catalog");
     const euro = listings.find((listing) => listing.planId === "pln_eur")!;
     expect(catalogueItems([euro])[0]).toMatchObject({ priceNgn: null, purchasable: false });
     expect(esimItemsForCountry([euro], "ng")[0]).toMatchObject({ price: null, action: null });
@@ -174,7 +174,7 @@ describe("eSIM offers", () => {
     const { offers } = await catalog([plan()]);
     expect(offers[0].purchasable).toBe(false);
 
-    const { esimItemsForCountry } = await import("@/lib/esim-catalog");
+    const { esimItemsForCountry } = await import("@/lib/services/esim/esim-catalog");
     const items = esimItemsForCountry(offers, "ng");
     expect(items).toHaveLength(1);
     // A real destination with no way to pay: listed, but no button.
@@ -183,7 +183,7 @@ describe("eSIM offers", () => {
 
   it("sells the priced plans and links them to their own page", async () => {
     const { offers, partial } = await catalog([plan()]);
-    const { esimItemsForCountry } = await import("@/lib/esim-catalog");
+    const { esimItemsForCountry } = await import("@/lib/services/esim/esim-catalog");
     const items = esimItemsForCountry(offers, "ng");
     expect(partial).toBe(false);
     expect(items[0]).toMatchObject({
@@ -201,7 +201,7 @@ describe("eSIM offers", () => {
     expect(first.offers[0].id).toMatch(/^live-esim-[a-f0-9]{20}$/);
     expect(first.offers[0].id).not.toContain("pln_secret");
 
-    const { esimItemsForCountry } = await import("@/lib/esim-catalog");
+    const { esimItemsForCountry } = await import("@/lib/services/esim/esim-catalog");
     const item = esimItemsForCountry(first.offers, "ng")[0] as unknown as Record<string, unknown>;
     expect(JSON.stringify(item)).not.toContain("pln_secret");
   });
@@ -234,7 +234,7 @@ describe("eSIM coverage", () => {
       plan({ planId: "pln_gh", name: "Ghana Plus", countries: ["Ghana"] }),
       plan({ planId: "pln_de", name: "Germany", region: "Europe", countries: ["Germany", "France"] }),
     ]);
-    const { esimItemsForCountry } = await import("@/lib/esim-catalog");
+    const { esimItemsForCountry } = await import("@/lib/services/esim/esim-catalog");
 
     // A Europe-only plan is not shown for Nigeria: guessing coverage would
     // advertise service that may not exist there.
@@ -252,7 +252,7 @@ describe("eSIM coverage", () => {
       plan({ planId: "pln_usa", countries: ["USA"] }),
     ];
     const { offers } = await catalog(plans);
-    const { esimItemsForCountry } = await import("@/lib/esim-catalog");
+    const { esimItemsForCountry } = await import("@/lib/services/esim/esim-catalog");
     expect(esimItemsForCountry(offers, "ng")).toHaveLength(2);
     expect(esimItemsForCountry(offers, "gb")).toHaveLength(1);
     expect(esimItemsForCountry(offers, "us")).toHaveLength(1);
@@ -260,7 +260,7 @@ describe("eSIM coverage", () => {
 
   it("shows a global-labelled plan without named countries with unconfirmed coverage", async () => {
     const { offers } = await catalog([plan({ planId: "pln_global", name: "Global", region: "Worldwide", countries: [] })]);
-    const { esimItemsForCountry } = await import("@/lib/esim-catalog");
+    const { esimItemsForCountry } = await import("@/lib/services/esim/esim-catalog");
     for (const code of ["ng", "de", "jp"]) {
       const items = esimItemsForCountry(offers, code);
       expect(items).toHaveLength(1);
@@ -269,7 +269,7 @@ describe("eSIM coverage", () => {
   });
   it("does not show a global-labelled plan for countries outside its explicit coverage list", async () => {
     const { listings } = await catalog([plan({ planId: "pln_global_limited", name: "Global", region: "Worldwide", countries: ["NG", "GH"] })]);
-    const { esimItemsForCountry } = await import("@/lib/esim-catalog");
+    const { esimItemsForCountry } = await import("@/lib/services/esim/esim-catalog");
     expect(esimItemsForCountry(listings, "ng")).toHaveLength(1);
     expect(esimItemsForCountry(listings, "de")).toHaveLength(0);
   });
@@ -278,7 +278,7 @@ describe("eSIM coverage", () => {
 describe("checkout plan terms", () => {
   it("changes when visible details or features change, but not when coverage is reordered", async () => {
     const { offers } = await catalog([plan({ countries: ["NG", "GH"] })]);
-    const { esimOfferTerms } = await import("@/lib/esim-catalog");
+    const { esimOfferTerms } = await import("@/lib/services/esim/esim-catalog");
     const base = offers[0];
     const fingerprint = esimOfferTerms(base);
     expect(fingerprint).toMatch(/^[a-f0-9]{24}$/);
@@ -300,7 +300,7 @@ describe("eSIM catalogue counters", () => {
       plan({ planId: "pln_c", name: "No price", countries: ["Ghana"], price: null }),
       plan({ planId: "pln_d", name: "Global", region: "Worldwide", countries: [] , price: 9 }),
     ]);
-    const { stats } = await (await import("@/lib/esim-catalog")).readEsimCatalog();
+    const { stats } = await (await import("@/lib/services/esim/esim-catalog")).readEsimCatalog();
     expect(stats.returned).toBe(4);
     expect(stats.priced).toBe(offers.length);
     expect(stats.skippedCurrency).toBe(1);
@@ -315,14 +315,14 @@ describe("eSIM catalogue counters", () => {
 describe("eSIM catalogue reads", () => {
   it("reports a partial plan feed rather than claiming the first pages are complete", async () => {
     gateway.plans.mockResolvedValue({ plans: [plan()], returned: 1, unreadable: 0, partial: true });
-    const { readEsimCatalog } = await import("@/lib/esim-catalog");
+    const { readEsimCatalog } = await import("@/lib/services/esim/esim-catalog");
     expect((await readEsimCatalog(true)).partial).toBe(true);
   });
 
   it("rechecks the selected plan and prices it again before checkout", async () => {
     const { offers } = await catalog([plan()]);
     gateway.single.mockResolvedValue(plan({ price: 6 }));
-    const { recheckEsimOffer } = await import("@/lib/esim-catalog");
+    const { recheckEsimOffer } = await import("@/lib/services/esim/esim-catalog");
     const fresh = await recheckEsimOffer(offers[0]);
     expect(gateway.single).toHaveBeenCalledWith("pln_abc123", {});
     expect(fresh!.costNgn).toBe(9_600);
@@ -334,14 +334,14 @@ describe("eSIM catalogue reads", () => {
   });
 
   it("fails closed when the provider is not configured", async () => {
-    const { readEsimCatalog } = await import("@/lib/esim-catalog");
+    const { readEsimCatalog } = await import("@/lib/services/esim/esim-catalog");
     gateway.configured.mockReturnValue(false);
     await expect(readEsimCatalog(true)).rejects.toThrow(/not configured/i);
     gateway.configured.mockReturnValue(true);
   });
 
   it("fails when the plan list cannot be read, but degrades when only the country list fails", async () => {
-    const { readEsimCatalog } = await import("@/lib/esim-catalog");
+    const { readEsimCatalog } = await import("@/lib/services/esim/esim-catalog");
     gateway.plans.mockRejectedValue(new Error("down"));
     await expect(readEsimCatalog(true)).rejects.toThrow(/unavailable/i);
     expect(gateway.configured).toHaveBeenCalled();

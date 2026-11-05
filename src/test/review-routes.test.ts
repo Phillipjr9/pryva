@@ -10,14 +10,14 @@ const mocks = vi.hoisted(() => ({
   moderate: vi.fn(),
 }));
 
-vi.mock("@/lib/auth", () => ({ requireAuthApi: mocks.user }));
-vi.mock("@/lib/admin-auth", () => ({ authorizeAdminApi: mocks.admin }));
-vi.mock("@/lib/rate-limit", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/rate-limit")>();
+vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: mocks.user }));
+vi.mock("@/lib/identity/admin-auth", () => ({ authorizeAdminApi: mocks.admin }));
+vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
   return { ...actual, reviewRateLimiter: mocks.limit };
 });
-vi.mock("@/lib/reviews", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/reviews")>();
+vi.mock("@/lib/content/reviews", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/content/reviews")>();
   return {
     ...actual,
     createReview: mocks.create,

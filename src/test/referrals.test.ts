@@ -19,8 +19,8 @@ import { orders, referralCodes, referrals, users, walletTransactions } from "@/d
 const mocks = vi.hoisted(() => ({ db: undefined as unknown, log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/logger", () => ({ logger: mocks.log }));
-vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
+vi.mock("@/lib/platform/logger", () => ({ logger: mocks.log }));
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
 
 const REFERRER = "11111111-1111-4111-8111-111111111111";
 const REFEREE = "22222222-2222-4222-8222-222222222222";
@@ -28,7 +28,7 @@ const OTHER = "33333333-3333-4333-8333-333333333333";
 
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
-let lib: typeof import("@/lib/referrals");
+let lib: typeof import("@/lib/content/referrals");
 
 async function seedUser(id: string, email: string, name = "Ada") {
   await database.insert(users).values({ id, name, email, passwordHash: "x", walletBalance: 0 });
@@ -63,7 +63,7 @@ beforeAll(async () => {
   for (const file of files) await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
-  lib = await import("@/lib/referrals");
+  lib = await import("@/lib/content/referrals");
 }, 30_000);
 
 afterAll(async () => {

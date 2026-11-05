@@ -1,14 +1,14 @@
-import { isVercelPreview } from "@/lib/financial-environment";
-import { authorizeAdminApi } from "@/lib/admin-auth";
-import { recordAdminAction } from "@/lib/admin-audit";
+import { isVercelPreview } from "@/lib/platform/financial-environment";
+import { authorizeAdminApi } from "@/lib/identity/admin-auth";
+import { recordAdminAction } from "@/lib/admin/admin-audit";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, orders, walletTransactions, withdrawals } from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
-import { logger } from "@/lib/logger";
-import { creditWallet, debitWallet, InsufficientFundsError } from "@/lib/wallet";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { isSameOriginMutation } from "@/lib/net";
+import { logger } from "@/lib/platform/logger";
+import { creditWallet, debitWallet, InsufficientFundsError } from "@/lib/payments/wallet";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { isSameOriginMutation } from "@/lib/platform/net";
 
 export const dynamic = "force-dynamic";
 

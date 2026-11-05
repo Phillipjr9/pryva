@@ -1,4 +1,4 @@
-import { BUILD_ID } from "@/lib/build-id";
+import { BUILD_ID } from "@/lib/platform/build-id";
 
 export const dynamic = "force-dynamic";
 

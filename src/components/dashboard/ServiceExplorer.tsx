@@ -9,14 +9,14 @@ import { NetworkBadge } from "@/components/NetworkBadge";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
 import { ArrowRight, Globe, Lock, Search, Shield, Sparkle } from "@/components/icons";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira } from "@/lib/services/catalog";
 import {
   orderByReadiness,
   readinessSummary,
   SERVICE_STATE_DOT,
   SERVICE_STATE_LABEL,
   type ServiceReadinessEntry,
-} from "@/lib/service-states";
+} from "@/lib/services/service-states";
 import {
   buildServiceExplorer,
   EXPLORER_CATEGORIES,
@@ -26,7 +26,7 @@ import {
   interleaveExplorerItems,
   type ExplorerFilter,
   type ExplorerItem,
-} from "@/lib/service-explorer";
+} from "@/lib/services/service-explorer";
 
 const PAGE_SIZE = 12;
 

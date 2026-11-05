@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkAuthRateLimit, clientIp, clearAuthRateLimit } from "@/lib/auth-rate-limit";
+import { checkAuthRateLimit, clientIp, clearAuthRateLimit } from "@/lib/identity/auth-rate-limit";
 
 function request(ip: string) {
   return new Request("http://localhost/api/auth/login", {

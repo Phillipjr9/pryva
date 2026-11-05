@@ -1,7 +1,7 @@
-import { isVercelPreview } from "@/lib/financial-environment";
+import { isVercelPreview } from "@/lib/platform/financial-environment";
 import { NextRequest, NextResponse } from "next/server";
-import { processAutoRefunds } from "@/lib/auto-refund";
-import { logger } from "@/lib/logger";
+import { processAutoRefunds } from "@/lib/services/auto-refund";
+import { logger } from "@/lib/platform/logger";
 
 export const dynamic = "force-dynamic";
 

@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { requireUser } from "@/lib/auth";
+import { requireUser } from "@/lib/identity/auth";
 import { SupportStatusPill } from "@/components/support/SupportStatusPill";
 import { SupportChat, type ChatMessage } from "@/components/support/SupportChat";
-import { getThread, getTicketForUser } from "@/lib/support-tickets";
+import { getThread, getTicketForUser } from "@/lib/support/support-tickets";
 import { AlertCircle, ArrowLeft } from "@/components/icons";
 
 export const dynamic = "force-dynamic";

@@ -4,8 +4,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { eq } from "drizzle-orm";
 import * as schema from "@/db/schema";
-import { makeEsimDeliveryEmail } from "@/lib/esim-email-template";
-import { esimQrAttachment } from "@/lib/esim-qr";
+import { makeEsimDeliveryEmail } from "@/lib/email/esim-email-template";
+import { esimQrAttachment } from "@/lib/services/esim/esim-qr";
 
 /**
  * The eSIM handover email.
@@ -18,7 +18,7 @@ import { esimQrAttachment } from "@/lib/esim-qr";
 const mocks = vi.hoisted(() => ({ db: undefined as unknown }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
 
-import { dispatchWalletEmails } from "@/lib/wallet-email-outbox";
+import { dispatchWalletEmails } from "@/lib/email/wallet-email-outbox";
 
 const USER = "8f2a4c31-5d6b-4e79-9a10-3c2d1e4f5a60";
 const ACTIVATION = "LPA:1$rsp.truphone.com$ABC123-DEF456-GHI789";

@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/identity/auth";
 import { SecurityDashboard } from "./SecurityDashboard";
 import { FraudQueue } from "./FraudQueue";
 

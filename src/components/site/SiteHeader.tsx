@@ -1,5 +1,5 @@
 import { HeaderNav } from "@/components/site/HeaderNav";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/identity/auth";
 
 export async function SiteHeader() {
   let user: { name: string; walletBalance: number } | null = null;

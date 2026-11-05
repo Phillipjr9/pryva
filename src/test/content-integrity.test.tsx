@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { blogPosts, getBlogPost } from "@/lib/blog";
+import { blogPosts, getBlogPost } from "@/lib/content/blog";
 import BlogPage from "@/app/(site)/blog/page";
 import BlogArticlePage, { generateStaticParams } from "@/app/(site)/blog/[slug]/page";
 import HelpPage from "@/app/(site)/help/page";

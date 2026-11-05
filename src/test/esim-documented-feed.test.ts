@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const limit = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/rate-limit", () => ({ createRateLimiter: () => limit }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => false }));
+vi.mock("@/lib/platform/rate-limit", () => ({ createRateLimiter: () => limit }));
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => false }));
 
-import { catalogueItems, esimItemsForCountry, esimOfferTerms, readEsimCatalog, recheckEsimOffer } from "@/lib/esim-catalog";
-import { clearRateCache } from "@/lib/exchange-rate";
+import { catalogueItems, esimItemsForCountry, esimOfferTerms, readEsimCatalog, recheckEsimOffer } from "@/lib/services/esim/esim-catalog";
+import { clearRateCache } from "@/lib/payments/exchange-rate";
 
 function json(data: unknown) {
   return new Response(JSON.stringify(data), { headers: { "content-type": "application/json" } });

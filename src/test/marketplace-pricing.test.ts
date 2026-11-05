@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@/lib/exchange-rate", () => ({
+vi.mock("@/lib/payments/exchange-rate", () => ({
   getUsdToNgnRate: async () => ({ rate: 1600, source: "test", fetchedAt: new Date().toISOString() }),
 }));
 
-const { priceMarketplaceListing, applyPromoDiscount } = await import("@/lib/marketplace-pricing");
+const { priceMarketplaceListing, applyPromoDiscount } = await import("@/lib/services/accounts/marketplace-pricing");
 
 describe("marketplace pricing", () => {
   beforeEach(() => {
@@ -96,7 +96,7 @@ describe("marketplace pricing", () => {
   });
 
   it("prices every realistic value a source can round-trip through the money parser", async () => {
-    const { usdMicros, usdStringFromMicros } = await import("@/lib/supplier-money");
+    const { usdMicros, usdStringFromMicros } = await import("@/lib/payments/supplier-money");
     for (const raw of [3.48, 0.06992, 1, 0.5, 19.99, 12.345678, 0.05, 250]) {
       const canonical = usdStringFromMicros(usdMicros(raw));
       const price = await priceMarketplaceListing({ unitPriceUsd: canonical, quantity: 2 });
@@ -131,7 +131,7 @@ describe("marketplace pricing", () => {
   });
 
   it("rounds a cost up and a discount down, so neither moves money our way", async () => {
-    const { usdCents } = await import("@/lib/supplier-money");
+    const { usdCents } = await import("@/lib/payments/supplier-money");
     // A fraction of a cent of cost rounds up (margin floor can only rise)...
     expect(usdCents("0.069920")).toBe(7);
     // ...and the same fraction of a discount rounds down (never over-credited).

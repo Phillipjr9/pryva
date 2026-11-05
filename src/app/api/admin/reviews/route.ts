@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authorizeAdminApi } from "@/lib/admin-auth";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { listReviewsForModeration, moderateReview } from "@/lib/reviews";
-import { logger } from "@/lib/logger";
+import { authorizeAdminApi } from "@/lib/identity/admin-auth";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { listReviewsForModeration, moderateReview } from "@/lib/content/reviews";
+import { logger } from "@/lib/platform/logger";
 
 export const dynamic = "force-dynamic";
 

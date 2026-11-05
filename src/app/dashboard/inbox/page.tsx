@@ -1,5 +1,5 @@
 import { InboxManager } from "./InboxManager";
-import { requireUser } from "@/lib/auth";
+import { requireUser } from "@/lib/identity/auth";
 import { ServiceTitle } from "@/components/ServiceTitle";
 
 export const dynamic = "force-dynamic";

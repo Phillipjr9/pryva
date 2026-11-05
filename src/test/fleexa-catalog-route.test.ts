@@ -15,17 +15,17 @@ const state = vi.hoisted(() => ({
   boostConfigured: false,
   bitcallConfigured: false,
 }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => state.preview }));
-vi.mock("@/lib/auth", () => ({ getCurrentUser: async () => state.user }));
-vi.mock("@/lib/rate-limit", () => ({ purchaseRateLimiter: state.limit }));
-vi.mock("@/lib/fleexa-catalog", () => ({ readSupplierSnapshot: state.snapshot, supplierItemsForCountry: state.items }));
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => state.preview }));
+vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: async () => state.user }));
+vi.mock("@/lib/platform/rate-limit", () => ({ purchaseRateLimiter: state.limit }));
+vi.mock("@/lib/services/numbers/fleexa-catalog", () => ({ readSupplierSnapshot: state.snapshot, supplierItemsForCountry: state.items }));
 // Mocked so the real clients never load: each calls createRateLimiter at import
 // scope, which this file's narrow rate-limit mock does not provide.
-vi.mock("@/lib/fleexa", () => ({ isFleexaConfigured: () => state.fleexaConfigured }));
-vi.mock("@/lib/smm-panel", () => ({ isSmmPanelConfigured: () => state.boostConfigured }));
-vi.mock("@/lib/smm-catalog", () => ({ readBoostSnapshot: state.boostSnapshot, boostItems: state.boostItems }));
-vi.mock("@/lib/bitcall", () => ({ isBitcallConfigured: () => state.bitcallConfigured }));
-vi.mock("@/lib/esim-catalog", () => ({ readEsimCatalog: state.esimSnapshot, esimItemsForCountry: state.esimItems }));
+vi.mock("@/lib/providers/fleexa", () => ({ isFleexaConfigured: () => state.fleexaConfigured }));
+vi.mock("@/lib/providers/smm-panel", () => ({ isSmmPanelConfigured: () => state.boostConfigured }));
+vi.mock("@/lib/services/boosts/smm-catalog", () => ({ readBoostSnapshot: state.boostSnapshot, boostItems: state.boostItems }));
+vi.mock("@/lib/providers/bitcall", () => ({ isBitcallConfigured: () => state.bitcallConfigured }));
+vi.mock("@/lib/services/esim/esim-catalog", () => ({ readEsimCatalog: state.esimSnapshot, esimItemsForCountry: state.esimItems }));
 
 import { GET } from "@/app/api/services/catalog/route";
 

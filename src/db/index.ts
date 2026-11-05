@@ -6,7 +6,7 @@ import { createAwsIamPool } from "@/db/aws-iam";
 import {
   awsIamConfigured,
   persistentDatabaseConfigured,
-} from "@/lib/database-config";
+} from "@/lib/platform/database-config";
 import { getOperators, getOrderByOperators } from "drizzle-orm";
 import * as schema from "./schema";
 

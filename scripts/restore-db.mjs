@@ -25,7 +25,7 @@ import { createInterface } from "node:readline";
 import { createGunzip } from "node:zlib";
 import process from "node:process";
 import pg from "pg";
-import { insertionOrder, verifyManifest } from "../src/lib/backup.ts";
+import { insertionOrder, verifyManifest } from "../src/lib/platform/backup.ts";
 
 function arg(name, fallback = "") {
   const index = process.argv.indexOf(`--${name}`);

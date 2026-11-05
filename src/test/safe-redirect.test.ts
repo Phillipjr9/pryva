@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { safeRedirectPath } from "@/lib/safe-redirect";
+import { safeRedirectPath } from "@/lib/platform/safe-redirect";
 
 describe("authentication redirect destinations", () => {
   it.each([

@@ -17,11 +17,11 @@ import "@fontsource/instrument-serif/400.css";
 import "@fontsource/instrument-serif/400-italic.css";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
-import { BUILD_ID } from "@/lib/build-id";
+import { BUILD_ID } from "@/lib/platform/build-id";
 import { BuildGuard } from "@/components/system/BuildGuard";
 import { ServiceWorkerRegistration } from "@/components/system/ServiceWorkerRegistration";
-import { serializeStructuredData, siteStructuredData } from "@/lib/structured-data";
-import { canonicalSiteUrl } from "@/lib/net";
+import { serializeStructuredData, siteStructuredData } from "@/lib/content/structured-data";
+import { canonicalSiteUrl } from "@/lib/platform/net";
 
 export const metadata: Metadata = {
   metadataBase: new URL(canonicalSiteUrl()),

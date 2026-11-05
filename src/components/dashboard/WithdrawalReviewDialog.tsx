@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { formatNaira } from "@/lib/catalog";
-import { maskAccountNumber, withdrawalStatusLabel, type WithdrawalReceipt, type WithdrawalSubmitResult } from "@/lib/withdrawal-receipt";
+import { formatNaira } from "@/lib/services/catalog";
+import { maskAccountNumber, withdrawalStatusLabel, type WithdrawalReceipt, type WithdrawalSubmitResult } from "@/lib/payments/withdrawal-receipt";
 import { MoneyFlowDialog, MoneyOrbit, MoneyProcessing, MoneyResultIcon, MoneyRoute, downloadTextReceipt, moneyDate } from "./MoneyFlowDialog";
 import styles from "./MoneyFlow.module.css";
 

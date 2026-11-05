@@ -24,9 +24,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
-vi.mock("@/lib/smm-catalog", () => ({ findBoostListing: mocks.find }));
-vi.mock("@/lib/smm-panel", () => ({
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
+vi.mock("@/lib/services/boosts/smm-catalog", () => ({ findBoostListing: mocks.find }));
+vi.mock("@/lib/providers/smm-panel", () => ({
   isSmmPanelConfigured: () => true,
   addSmmOrder: mocks.add,
   SmmPanelError: class SmmPanelError extends Error {
@@ -42,7 +42,7 @@ const REQUEST = "22222222-2222-4222-8222-222222222222";
 
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
-let boost: typeof import("@/lib/boost-orders");
+let boost: typeof import("@/lib/services/boosts/boost-orders");
 
 const LISTING = {
   id: "live-boost-0123456789abcdef0123",
@@ -63,7 +63,7 @@ beforeAll(async () => {
   for (const file of files) await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
-  boost = await import("@/lib/boost-orders");
+  boost = await import("@/lib/services/boosts/boost-orders");
 }, 30_000);
 
 afterAll(async () => {
@@ -210,7 +210,7 @@ describe("placing a boost", () => {
 
     // The receipt nudge used to ride along with the standalone credit. Once the
     // refund commits inside a transaction, somebody has to call it on purpose.
-    const { scheduleWalletEmails } = await import("@/lib/schedule-wallet-emails");
+    const { scheduleWalletEmails } = await import("@/lib/email/schedule-wallet-emails");
     expect(vi.mocked(scheduleWalletEmails)).toHaveBeenCalledTimes(1);
   });
 
@@ -224,7 +224,7 @@ describe("placing a boost", () => {
   });
 
   it("answers cleanly when nothing is configured to fulfil a boost", async () => {
-    const smm = await import("@/lib/smm-panel");
+    const smm = await import("@/lib/providers/smm-panel");
     const spy = vi.spyOn(smm, "isSmmPanelConfigured").mockReturnValue(false);
     const result = await place();
     expect(result.kind).toBe("disabled");

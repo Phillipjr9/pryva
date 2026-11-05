@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check, Card, Shield } from "@/components/icons";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira } from "@/lib/services/catalog";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import {
   GIFT_CARD_MAX_AMOUNT,
   GIFT_CARD_MIN_AMOUNT,
   GIFT_CARD_VALIDITY_MONTHS,
-} from "@/lib/gift-card-rules";
+} from "@/lib/services/gift-cards/gift-card-rules";
 
 /**
  * The explainer page for gift cards.

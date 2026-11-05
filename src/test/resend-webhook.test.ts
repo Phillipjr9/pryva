@@ -7,7 +7,7 @@ import {
   recipientDomain,
   resendOutcome,
   verifyResendSignature,
-} from "@/lib/resend-webhook";
+} from "@/lib/email/resend-webhook";
 
 /**
  * Resend signs through Svix, and the scheme has several ways to be wrong while

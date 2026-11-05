@@ -62,9 +62,9 @@ records also require a separately authorized privacy review.
 Pricing
 -------
 
-The pricing policy, floor and exceptions live in src/lib/pricing.ts. Static
+The pricing policy, floor and exceptions live in src/lib/services/pricing.ts. Static
 catalogue costs are in data/cost-sheet.json, and the generated customer prices
-are in src/lib/prices.generated.ts. When a verified cost changes, regenerate and
+are in src/lib/services/prices.generated.ts. When a verified cost changes, regenerate and
 check the catalogue:
 
   npm run pricing:build

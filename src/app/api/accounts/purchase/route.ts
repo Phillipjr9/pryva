@@ -1,30 +1,30 @@
-import { financialActionsUnavailable } from "@/lib/financial-environment";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, gte, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
-import { requireAuthApi } from "@/lib/auth";
-import { isSameOriginMutation } from "@/lib/net";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { isSameOriginMutation } from "@/lib/platform/net";
 import {
   getMarketplaceListing,
   MarketplaceError,
   purchaseMarketplaceListing,
   supportsPromoCodes,
-} from "@/lib/marketplace-suppliers";
-import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
-import { isManualFulfilmentReachable } from "@/lib/manual-fulfilment";
-import { isManualSlug } from "@/lib/manual-catalog";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
-import { validatePromo } from "@/lib/accszone";
-import { usdCents } from "@/lib/supplier-money";
-import { fulfilmentLabel } from "@/lib/warranty";
-import { applyPromoDiscount, priceMarketplaceListing } from "@/lib/marketplace-pricing";
-import { MIN_ORDER_NGN } from "@/lib/pricing";
-import { logger } from "@/lib/logger";
-import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
-import { formatNaira } from "@/lib/catalog";
-import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+} from "@/lib/services/accounts/marketplace-suppliers";
+import { isMarketplaceCheckoutConfigured } from "@/lib/services/accounts/marketplace-policy";
+import { isManualFulfilmentReachable } from "@/lib/services/accounts/manual-fulfilment";
+import { isManualSlug } from "@/lib/services/accounts/manual-catalog";
+import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
+import { validatePromo } from "@/lib/providers/accszone";
+import { usdCents } from "@/lib/payments/supplier-money";
+import { fulfilmentLabel } from "@/lib/services/warranty";
+import { applyPromoDiscount, priceMarketplaceListing } from "@/lib/services/accounts/marketplace-pricing";
+import { MIN_ORDER_NGN } from "@/lib/services/pricing";
+import { logger } from "@/lib/platform/logger";
+import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
+import { formatNaira } from "@/lib/services/catalog";
+import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;

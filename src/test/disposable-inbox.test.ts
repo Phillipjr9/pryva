@@ -8,8 +8,8 @@ import {
   mayHaveSpentMoney,
   messageFingerprint,
   pollInbox,
-} from "@/lib/disposable-inbox";
-import { FleexaError } from "@/lib/fleexa";
+} from "@/lib/services/email-otp/disposable-inbox";
+import { FleexaError } from "@/lib/providers/fleexa";
 
 /**
  * The free inbox spends real money every time one is created, so the tests that
@@ -34,8 +34,8 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/lib/fleexa", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/fleexa")>();
+vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/fleexa")>();
   return {
     ...actual,
     buyFleexaEmail: mocks.buy,
@@ -47,7 +47,7 @@ vi.mock("@/lib/fleexa", async (importOriginal) => {
 });
 // Every level the real logger exposes: a partial mock turns a call to a missing
 // method into a TypeError that reads as a broken module rather than a broken test.
-vi.mock("@/lib/logger", () => ({
+vi.mock("@/lib/platform/logger", () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 

@@ -16,7 +16,7 @@ import { NextRequest } from "next/server";
  */
 
 const runScheduledOrders = vi.fn();
-vi.mock("@/lib/scheduled-orders", () => ({ runScheduledOrders: (...args: unknown[]) => runScheduledOrders(...args) }));
+vi.mock("@/lib/services/scheduled-orders", () => ({ runScheduledOrders: (...args: unknown[]) => runScheduledOrders(...args) }));
 
 const { GET, POST } = await import("@/app/api/cron/scheduled-orders/route");
 
@@ -70,7 +70,7 @@ describe("the nightly job calls the processor", () => {
   const source = readFileSync("src/app/api/cron/nightly/route.ts", "utf8");
 
   it("imports and runs the schedule sweep", () => {
-    expect(source).toContain('import { runScheduledOrders } from "@/lib/scheduled-orders"');
+    expect(source).toContain('import { runScheduledOrders } from "@/lib/services/scheduled-orders"');
     expect(source).toContain('runStep("scheduled-orders"');
     expect(source).toContain("await runScheduledOrders()");
   });

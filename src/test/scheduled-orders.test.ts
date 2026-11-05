@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import type { Frequency } from "@/lib/scheduled-orders";
+import type { Frequency } from "@/lib/services/scheduled-orders";
 
 /**
  * A scheduled run may not charge for something it did not buy.
@@ -75,7 +75,7 @@ vi.mock("@/db", async () => {
   };
 });
 
-vi.mock("@/lib/fulfillment", () => ({
+vi.mock("@/lib/services/fulfillment", () => ({
   fulfilmentIntent: (slug: string) => (state.fulfilable.has(slug) ? { kind: "sms", country: "ng" } : null),
   fulfillPlan: async (plan: { slug: string; price: number }) => {
     if (state.fulfilError) throw state.fulfilError;
@@ -94,8 +94,8 @@ vi.mock("@/lib/fulfillment", () => ({
   },
 }));
 
-vi.mock("@/lib/wallet", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/wallet")>();
+vi.mock("@/lib/payments/wallet", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/payments/wallet")>();
   return {
     ...actual,
     debitWalletInTx: async (_tx: unknown, entry: unknown) => {
@@ -106,7 +106,7 @@ vi.mock("@/lib/wallet", async (importOriginal) => {
   };
 });
 
-const { calculateNextRun, createScheduledOrder, processScheduledOrder } = await import("@/lib/scheduled-orders");
+const { calculateNextRun, createScheduledOrder, processScheduledOrder } = await import("@/lib/services/scheduled-orders");
 
 const USER_ID = "test-sched-user-1";
 const SCHEDULE_ID = "sched-row-1";
@@ -256,7 +256,7 @@ describe("Scheduled Orders", () => {
       // cannot be produced from a test. The lock is asserted where it is written.
       // Without it the loser of an overlapping sweep reads the same past
       // `nextRunAt` as the winner, both buy, and the customer is charged twice.
-      const source = readFileSync("src/lib/scheduled-orders.ts", "utf8");
+      const source = readFileSync("src/lib/services/scheduled-orders.ts", "utf8");
       expect(source).toMatch(/from\(scheduledOrders\)[^;]*?\.for\("update"\)/);
     });
   });

@@ -6,8 +6,8 @@ import {
   warrantyBadge,
   warrantyDaysForGroup,
   warrantyLabel,
-} from "@/lib/warranty";
-import { GROUP_LABEL_VALUES } from "@/lib/marketplace-suppliers";
+} from "@/lib/services/warranty";
+import { GROUP_LABEL_VALUES } from "@/lib/services/accounts/marketplace-suppliers";
 
 /**
  * The replacement promise a customer actually reads.

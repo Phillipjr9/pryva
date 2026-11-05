@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { AuthForm } from "@/components/auth/AuthForm";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/identity/auth";
 import { redirect } from "next/navigation";
-import { safeRedirectPath } from "@/lib/safe-redirect";
-import { planDestination } from "@/lib/plan-destination";
-import { normalizeReferralCode } from "@/lib/referral-code";
+import { safeRedirectPath } from "@/lib/platform/safe-redirect";
+import { planDestination } from "@/lib/content/plan-destination";
+import { normalizeReferralCode } from "@/lib/content/referral-code";
 
 export const metadata: Metadata = {
   title: "Create your account",

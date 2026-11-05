@@ -34,12 +34,12 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/auth", () => ({ requireAuthApi: async () => mocks.user }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => false }));
-vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.schedule }));
-vi.mock("@/lib/rate-limit", () => ({ purchaseRateLimiter: async () => ({ allowed: true, remaining: 5, resetTime: Date.now() }) }));
-vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
-vi.mock("@/lib/paystack", () => ({
+vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: async () => mocks.user }));
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => false }));
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.schedule }));
+vi.mock("@/lib/platform/rate-limit", () => ({ purchaseRateLimiter: async () => ({ allowed: true, remaining: 5, resetTime: Date.now() }) }));
+vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/payments/paystack", () => ({
   isPaystackConfigured: () => mocks.configured,
   resolveBankAccount: (...args: unknown[]) => mocks.resolveBank(...args),
   createTransferRecipient: (...args: unknown[]) => mocks.createRecipient(...args),

@@ -1,8 +1,8 @@
-import { isVercelPreview } from "@/lib/financial-environment";
+import { isVercelPreview } from "@/lib/platform/financial-environment";
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { runScheduledOrders } from "@/lib/scheduled-orders";
-import { logger } from "@/lib/logger";
+import { runScheduledOrders } from "@/lib/services/scheduled-orders";
+import { logger } from "@/lib/platform/logger";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;

@@ -1,4 +1,4 @@
-import { formatUnitCount } from "@/lib/service-units";
+import { formatUnitCount } from "@/lib/services/service-units";
 
 /** Unknown is intentionally distinct from a confirmed zero. */
 export function UnitsStatus({ stock = null, owned = null }: { stock?: number | null; owned?: number | null }) {

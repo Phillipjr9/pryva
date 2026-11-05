@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import EsimPage from "@/app/(site)/esim/page";
 import StatusPage from "@/app/(site)/status/page";
-import { serviceMap } from "@/lib/catalog";
+import { serviceMap } from "@/lib/services/catalog";
 
 afterEach(() => vi.unstubAllEnvs());
 

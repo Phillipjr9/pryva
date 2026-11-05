@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check, Loader2, Lock, Mail, Shield, User } from "@/components/icons";
-import type { PublicUser } from "@/lib/auth";
+import type { PublicUser } from "@/lib/identity/auth";
 import { AccountDataPanel } from "./AccountDataPanel";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { ProfileAvatar } from "@/components/dashboard/ProfileAvatar";

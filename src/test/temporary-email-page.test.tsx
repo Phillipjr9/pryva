@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import EmailOTPPage from "@/app/(site)/email-otp/page";
-import { plans, plansFor } from "@/lib/catalog";
+import { plans, plansFor } from "@/lib/services/catalog";
 
 /**
  * This page was the clearest example of a defect the rest of the site had

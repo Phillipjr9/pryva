@@ -20,18 +20,18 @@ const state = vi.hoisted(() => ({
   sameOrigin: true,
 }));
 
-vi.mock("@/lib/auth", () => ({ requireAuthApi: async () => state.user }));
-vi.mock("@/lib/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
-vi.mock("@/lib/resend-config", () => ({ resendConfigured: () => state.configured }));
-vi.mock("@/lib/email-verification", () => ({
+vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: async () => state.user }));
+vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
+vi.mock("@/lib/email/resend-config", () => ({ resendConfigured: () => state.configured }));
+vi.mock("@/lib/identity/email-verification", () => ({
   rateLimitEmailVerification: async () => state.throttle,
   issueEmailVerification: (...args: unknown[]) => {
     state.issue(...args);
     return Promise.resolve(state.delivery);
   },
 }));
-vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
-vi.mock("@/lib/onboarding-emails", () => ({
+vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/email/onboarding-emails", () => ({
   scheduleOnboardingEmails: (...args: unknown[]) => {
     state.onboarding(...args);
   },

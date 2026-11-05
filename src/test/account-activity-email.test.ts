@@ -5,21 +5,21 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { eq } from "drizzle-orm";
 import * as schema from "@/db/schema";
-import { makeWalletEmail } from "@/lib/wallet-email-template";
-import { emailVerificationEmail } from "@/lib/email-templates";
-import { makeEsimDeliveryEmail } from "@/lib/esim-email-template";
-import { makeNumberCodeEmail } from "@/lib/number-email-template";
+import { makeWalletEmail } from "@/lib/email/wallet-email-template";
+import { emailVerificationEmail } from "@/lib/email/email-templates";
+import { makeEsimDeliveryEmail } from "@/lib/email/esim-email-template";
+import { makeNumberCodeEmail } from "@/lib/email/number-email-template";
 
 const mocks = vi.hoisted(() => ({ db: undefined as unknown, schedule: vi.fn() }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.schedule }));
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.schedule }));
 
-import { dispatchWalletEmails } from "@/lib/wallet-email-outbox";
-import { buildSecurityNotice } from "@/lib/security-notice";
-import { requestPasswordReset, resetPassword } from "@/lib/password-reset";
-import { logger } from "@/lib/logger";
-import { refundWithdrawal } from "@/lib/withdrawal-refund";
-import { emailQueueStatus } from "@/lib/email-delivery-events";
+import { dispatchWalletEmails } from "@/lib/email/wallet-email-outbox";
+import { buildSecurityNotice } from "@/lib/platform/security-notice";
+import { requestPasswordReset, resetPassword } from "@/lib/identity/password-reset";
+import { logger } from "@/lib/platform/logger";
+import { refundWithdrawal } from "@/lib/payments/withdrawal-refund";
+import { emailQueueStatus } from "@/lib/email/email-delivery-events";
 
 const USER = "72e85c0a-9d4a-4d38-a5d0-2a839e05d250";
 const EMAIL = "buyer@example.test";

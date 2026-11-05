@@ -1,17 +1,17 @@
-import { isVercelPreview } from "@/lib/financial-environment";
+import { isVercelPreview } from "@/lib/platform/financial-environment";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, walletTransactions } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth";
-import { createRateLimiter } from "@/lib/rate-limit";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { getCurrentUser } from "@/lib/identity/auth";
+import { createRateLimiter } from "@/lib/platform/rate-limit";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
 import {
   checkFleexaEmail,
   checkFleexaSms,
   getFleexaRentalSms,
   FleexaError,
-} from "@/lib/fleexa";
-import { readNumberCode } from "@/lib/number-code-sync";
+} from "@/lib/providers/fleexa";
+import { readNumberCode } from "@/lib/services/numbers/number-code-sync";
 
 export const dynamic = "force-dynamic";
 const orderSyncLimiter = createRateLimiter({ windowMs: 20_000, maxRequests: 1 });

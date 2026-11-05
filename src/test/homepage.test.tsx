@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { plansFor } from "@/lib/catalog";
-import { isPlanFulfillable } from "@/lib/fulfillment";
+import { plansFor } from "@/lib/services/catalog";
+import { isPlanFulfillable } from "@/lib/services/fulfillment";
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/lib/identity/auth", () => ({
   getCurrentUser: async () => null,
 }));
 

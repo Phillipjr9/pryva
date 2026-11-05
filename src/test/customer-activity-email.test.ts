@@ -11,8 +11,8 @@ import * as schema from "@/db/schema";
 const mocks = vi.hoisted(() => ({ db: undefined as unknown }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
 
-import { dispatchWalletEmails } from "@/lib/wallet-email-outbox";
-import { addAdminMessage, addAssistantMessage, createTicket, setTicketState } from "@/lib/support-tickets";
+import { dispatchWalletEmails } from "@/lib/email/wallet-email-outbox";
+import { addAdminMessage, addAssistantMessage, createTicket, setTicketState } from "@/lib/support/support-tickets";
 
 const USER = "72e85c0a-9d4a-4d38-a5d0-2a839e05d250";
 const ADMIN = "c26a9b10-8ac2-4a68-8a9c-cbf653020183";

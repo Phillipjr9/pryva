@@ -8,7 +8,7 @@ import {
   bannersAreQuiet,
   inspectBanners,
   revealsVersion,
-} from "@/lib/server-banner";
+} from "@/lib/platform/server-banner";
 
 /**
  * "Remove X-Powered-By and hide the server version."
@@ -45,7 +45,7 @@ describe("what a response is allowed to say about the stack", () => {
 
   it("lists the banners the proxy strips, so the two cannot drift", () => {
     const source = read("src/proxy.ts");
-    expect(source).toContain('from "@/lib/server-banner"');
+    expect(source).toContain('from "@/lib/platform/server-banner"');
     expect(source).toContain("FRAMEWORK_BANNERS");
   });
 

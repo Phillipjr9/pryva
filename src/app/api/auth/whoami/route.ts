@@ -3,8 +3,8 @@ import {
   SESSION_COOKIE,
   SESSION_COOKIE_EMBEDDED,
   getCurrentUser,
-} from "@/lib/auth";
-import { isArenaPreviewHost, requestProto } from "@/lib/net";
+} from "@/lib/identity/auth";
+import { isArenaPreviewHost, requestProto } from "@/lib/platform/net";
 
 export const dynamic = "force-dynamic";
 

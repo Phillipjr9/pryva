@@ -13,7 +13,7 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const { planDestination } = await import("@/lib/plan-destination");
+const { planDestination } = await import("@/lib/content/plan-destination");
 const { ServiceExplorer } = await import("@/components/dashboard/ServiceExplorer");
 const { CommandPalette, CommandPaletteTrigger } = await import("@/components/command/CommandPalette");
 const { AccountDataPanel } = await import("@/app/dashboard/settings/AccountDataPanel");

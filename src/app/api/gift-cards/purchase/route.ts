@@ -1,13 +1,13 @@
-import { financialActionsUnavailable } from "@/lib/financial-environment";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import { NextRequest, NextResponse } from "next/server";
-import { createGiftCard } from "@/lib/gift-cards";
-import { GIFT_CARD_MAX_AMOUNT, GIFT_CARD_MIN_AMOUNT } from "@/lib/gift-card-rules";
-import { requireAuthApi } from "@/lib/auth";
-import { isSameOriginMutation } from "@/lib/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
-import { validateEmail } from "@/lib/validation";
-import { sendGiftCardDelivery } from "@/lib/gift-card-delivery";
+import { createGiftCard } from "@/lib/services/gift-cards/gift-cards";
+import { GIFT_CARD_MAX_AMOUNT, GIFT_CARD_MIN_AMOUNT } from "@/lib/services/gift-cards/gift-card-rules";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
+import { validateEmail } from "@/lib/platform/validation";
+import { sendGiftCardDelivery } from "@/lib/services/gift-cards/gift-card-delivery";
 
 export const dynamic = "force-dynamic";
 

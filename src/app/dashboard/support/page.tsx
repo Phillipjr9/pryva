@@ -4,10 +4,10 @@ import { desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { contactMessages } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
+import { requireUser } from "@/lib/identity/auth";
 import { SupportChat } from "@/components/support/SupportChat";
 import { SupportStatusPill } from "@/components/support/SupportStatusPill";
-import { listTicketsForUser } from "@/lib/support-tickets";
+import { listTicketsForUser } from "@/lib/support/support-tickets";
 import { ArrowRight, CheckCircle, Clock, MessageCircle, Refresh, Sparkle } from "@/components/icons";
 
 export const metadata: Metadata = { title: "Support" };

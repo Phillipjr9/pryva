@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { esimQrDataUrl } from "@/lib/esim-qr";
+import { esimQrDataUrl } from "@/lib/services/esim/esim-qr";
 import { EsimProfile } from "@/app/dashboard/orders/[id]/EsimProfile";
 
 /**

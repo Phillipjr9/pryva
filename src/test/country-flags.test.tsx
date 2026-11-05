@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CountryFlag, CountryChips } from "@/components/CountryFlag";
-import { COUNTRIES, countryFor, dialCodeFor, flagSrc, hasCountryFlag, regionFlagFor } from "@/lib/countries";
+import { COUNTRIES, countryFor, dialCodeFor, flagSrc, hasCountryFlag, regionFlagFor } from "@/lib/platform/countries";
 
 /**
  * Flags are real artwork copied from `flag-icons` (see scripts/copy-flags.mjs).
