@@ -1,12 +1,12 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { plans, services, formatNaira } from "@/lib/catalog";
-import { isPlanFulfillable } from "@/lib/fulfillment";
+import { plans, services, formatNaira } from "@/lib/services/catalog";
+import { isPlanFulfillable } from "@/lib/services/fulfillment";
 import { Check } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { CountryFlag } from "@/components/CountryFlag";
-import { hasCountryFlag } from "@/lib/countries";
-import { isEsimOrderingAvailable } from "@/lib/esim-availability";
+import { hasCountryFlag } from "@/lib/platform/countries";
+import { isEsimOrderingAvailable } from "@/lib/services/esim/esim-availability";
 
 export const metadata: Metadata = {
   title: "Pricing",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { securityRedirectTarget } from "@/lib/legacy-redirects";
+import { securityRedirectTarget } from "@/lib/content/legacy-redirects";
 
 describe("the old security route still lands on the right place", () => {
   it("goes to the security section of settings", () => {

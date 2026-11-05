@@ -6,13 +6,13 @@ const mocks = vi.hoisted(() => ({
   getEnrolment: vi.fn(),
 }));
 
-vi.mock("@/lib/two-factor", () => ({
+vi.mock("@/lib/identity/two-factor", () => ({
   twoFactorAvailable: mocks.twoFactorAvailable,
   getEnrolment: mocks.getEnrolment,
 }));
 
 const { ADMIN_2FA_MESSAGE, adminBlockedForMissingSecondFactor, adminTwoFactorRequired } =
-  await import("@/lib/admin-two-factor");
+  await import("@/lib/identity/admin-two-factor");
 
 const ADMIN_ID = "8d1f4e3a-2b6c-4d5e-9f01-2a3b4c5d6e7f";
 
@@ -65,8 +65,8 @@ describe("administrator second factor", () => {
 });
 
 describe("the rule is wired into both doors", () => {
-  const auth = readFileSync("src/lib/auth.ts", "utf8");
-  const adminApi = readFileSync("src/lib/admin-auth.ts", "utf8");
+  const auth = readFileSync("src/lib/identity/auth.ts", "utf8");
+  const adminApi = readFileSync("src/lib/identity/admin-auth.ts", "utf8");
   const settingsPage = readFileSync("src/app/dashboard/settings/page.tsx", "utf8");
   const securitySection = readFileSync("src/app/dashboard/settings/SecuritySection.tsx", "utf8");
 

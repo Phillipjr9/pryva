@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { Loader2 } from "@/components/icons";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/platform/utils";
 
 interface BlockedAccount {
   id: string;

@@ -5,11 +5,11 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 import { paymentTopups, users, walletTransactions } from "@/db/schema";
 import { POST } from "@/app/api/webhooks/payment/route";
-import { logger } from "@/lib/logger";
+import { logger } from "@/lib/platform/logger";
 
 const mocks = vi.hoisted(() => ({ transaction: vi.fn() }));
 vi.mock("@/db", () => ({ db: { transaction: mocks.transaction } }));
-vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 const secret = "test-paystack-secret";
 const userId = "e6601368-4eef-45e7-a562-f8621c4239f2";

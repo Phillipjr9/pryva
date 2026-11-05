@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { walletEntryDirection, walletEntrySign } from "@/lib/wallet-activity";
+import { walletEntryDirection, walletEntrySign } from "@/lib/payments/wallet-activity";
 
 describe("wallet activity directions", () => {
   it.each([

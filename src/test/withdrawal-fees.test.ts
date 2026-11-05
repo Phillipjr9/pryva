@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_WITHDRAWAL, maxWithdrawalForBalance, withdrawalFee } from "@/lib/withdrawal";
+import { MAX_WITHDRAWAL, maxWithdrawalForBalance, withdrawalFee } from "@/lib/payments/withdrawal";
 
 describe("withdrawal fees and maximum payout", () => {
   it("charges a 1% whole-naira fee in addition only above ₦5,000", () => {

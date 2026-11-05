@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { canonicalSiteUrl } from "@/lib/net";
+import { canonicalSiteUrl } from "@/lib/platform/net";
 
 export default function robots(): MetadataRoute.Robots {
   return {

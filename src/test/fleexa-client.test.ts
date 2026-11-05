@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const runtime = vi.hoisted(() => ({ limit: vi.fn() }));
-vi.mock("@/lib/rate-limit", () => ({ createRateLimiter: () => runtime.limit }));
+vi.mock("@/lib/platform/rate-limit", () => ({ createRateLimiter: () => runtime.limit }));
 
-import { buyFleexaEmail, buyFleexaRental, buyFleexaSmsNumber, listFleexaRentAreas, listFleexaSmsServices } from "@/lib/fleexa";
+import { buyFleexaEmail, buyFleexaRental, buyFleexaSmsNumber, listFleexaRentAreas, listFleexaSmsServices } from "@/lib/providers/fleexa";
 
 beforeEach(() => {
   vi.stubEnv("FLEEXA_API_KEY", "provider-secret");

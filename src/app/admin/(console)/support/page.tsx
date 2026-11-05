@@ -3,14 +3,14 @@ import { and, count, desc, eq, asc } from "drizzle-orm";
 
 import { db } from "@/db";
 import { supportTickets, users } from "@/db/schema";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/identity/auth";
 import {
   SUPPORT_STATUSES,
   SUPPORT_STATUS_LABELS,
   isSupportStatus,
-} from "@/lib/ai-support/types";
+} from "@/lib/support/ai-support/types";
 import { SupportStatusPill } from "@/components/support/SupportStatusPill";
-import { ticketQueueSummary } from "@/lib/support-tickets";
+import { ticketQueueSummary } from "@/lib/support/support-tickets";
 import { Sparkle } from "@/components/icons";
 
 export const dynamic = "force-dynamic";

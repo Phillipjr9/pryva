@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { and, count, inArray, lt, sql } from "drizzle-orm";
 
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/identity/auth";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
-import { isFleexaConfigured } from "@/lib/fleexa";
-import { isSmmPanelConfigured } from "@/lib/smm-panel";
-import { isBitcallConfigured } from "@/lib/bitcall";
-import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
-import { isManualFulfilmentReachable } from "@/lib/manual-fulfilment";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { isFleexaConfigured } from "@/lib/providers/fleexa";
+import { isSmmPanelConfigured } from "@/lib/providers/smm-panel";
+import { isBitcallConfigured } from "@/lib/providers/bitcall";
+import { isMarketplaceCheckoutConfigured } from "@/lib/services/accounts/marketplace-policy";
+import { isManualFulfilmentReachable } from "@/lib/services/accounts/manual-fulfilment";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
 import {
   NOT_FOR_SALE,
   SERVICE_LANES,
@@ -18,7 +18,7 @@ import {
   type LaneId,
   type LaneHealth,
   type OrderTally,
-} from "@/lib/service-coverage";
+} from "@/lib/services/service-coverage";
 
 export const dynamic = "force-dynamic";
 

@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/identity/auth";
 import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { count, sum, eq } from "drizzle-orm";

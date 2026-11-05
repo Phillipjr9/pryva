@@ -9,9 +9,9 @@ import { ServiceIcon } from "@/components/ServiceIcon";
 import { NavIcon, type NavArt } from "@/components/dashboard/NavIcon";
 import { ProfileAvatar } from "@/components/dashboard/ProfileAvatar";
 import { BrandLockup } from "@/components/brand/BrandLockup";
-import { formatNaira } from "@/lib/catalog";
-import { EXPLORER_COUNTRIES } from "@/lib/explorer-countries";
-import type { ExplorerCategory } from "@/lib/service-explorer";
+import { formatNaira } from "@/lib/services/catalog";
+import { EXPLORER_COUNTRIES } from "@/lib/content/explorer-countries";
+import type { ExplorerCategory } from "@/lib/services/service-explorer";
 
 /**
  * Sidebar entries are grouped by what the customer is trying to do — manage what

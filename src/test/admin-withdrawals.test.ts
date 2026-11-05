@@ -7,11 +7,11 @@ import { PUT } from "@/app/api/admin/withdrawals/route";
 
 const mocks = vi.hoisted(() => ({ select: vi.fn(), update: vi.fn(), transaction: vi.fn(), initiateTransfer: vi.fn() }));
 vi.mock("@/db", () => ({ db: { select: mocks.select, update: mocks.update, transaction: mocks.transaction } }));
-vi.mock("@/lib/admin-auth", () => ({
+vi.mock("@/lib/identity/admin-auth", () => ({
   authorizeAdminApi: vi.fn(async () => ({ user: { id: "admin-id", email: "admin@example.com" }, response: null })),
 }));
-vi.mock("@/lib/paystack", () => ({ initiateTransfer: mocks.initiateTransfer, isPaystackConfigured: () => true }));
-vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/payments/paystack", () => ({ initiateTransfer: mocks.initiateTransfer, isPaystackConfigured: () => true }));
+vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 const dialect = new PgDialect();
 const withdrawalId = "9a9963b6-4c1e-4c92-8214-ea901643daba";

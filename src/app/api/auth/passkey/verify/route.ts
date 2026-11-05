@@ -4,14 +4,14 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { createSession } from "@/lib/auth";
-import { clientIp } from "@/lib/auth-rate-limit";
-import { clearFailedLogins, lockoutRemainingMs } from "@/lib/account-lockout";
-import { logger } from "@/lib/logger";
-import { isSameOriginMutation } from "@/lib/net";
-import { finishAuthentication, relyingPartyFor } from "@/lib/passkeys";
-import { passkeyRateLimiter } from "@/lib/rate-limit";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { createSession } from "@/lib/identity/auth";
+import { clientIp } from "@/lib/identity/auth-rate-limit";
+import { clearFailedLogins, lockoutRemainingMs } from "@/lib/identity/account-lockout";
+import { logger } from "@/lib/platform/logger";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { finishAuthentication, relyingPartyFor } from "@/lib/identity/passkeys";
+import { passkeyRateLimiter } from "@/lib/platform/rate-limit";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 
 export const dynamic = "force-dynamic";
 

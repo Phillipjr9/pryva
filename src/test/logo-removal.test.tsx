@@ -17,7 +17,7 @@ import {
   refundEmail,
   walletTopupEmail,
   fraudAlertEmail,
-} from "@/lib/email-templates";
+} from "@/lib/email/email-templates";
 
 /**
  * Brand presentation.

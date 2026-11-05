@@ -1,16 +1,16 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { createSession, hashPassword, isConfiguredAdminEmail, isValidEmail, normalizeEmail } from "@/lib/auth";
-import { creditWallet } from "@/lib/wallet";
-import { checkAuthRateLimit } from "@/lib/auth-rate-limit";
-import { issueEmailVerification } from "@/lib/email-verification";
-import { DISPOSABLE_EMAIL_ERROR, isDisposableEmailAddress } from "@/lib/disposable-domains";
-import { isSameOriginMutation } from "@/lib/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { attributeReferral, readReferralCodeFrom } from "@/lib/referrals";
-import { recordSignupSignal } from "@/lib/fraud";
-import { previewOperatorBootstrapEnabled } from "@/lib/preview-operator";
+import { createSession, hashPassword, isConfiguredAdminEmail, isValidEmail, normalizeEmail } from "@/lib/identity/auth";
+import { creditWallet } from "@/lib/payments/wallet";
+import { checkAuthRateLimit } from "@/lib/identity/auth-rate-limit";
+import { issueEmailVerification } from "@/lib/identity/email-verification";
+import { DISPOSABLE_EMAIL_ERROR, isDisposableEmailAddress } from "@/lib/services/email-otp/disposable-domains";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { attributeReferral, readReferralCodeFrom } from "@/lib/content/referrals";
+import { recordSignupSignal } from "@/lib/admin/fraud";
+import { previewOperatorBootstrapEnabled } from "@/lib/platform/preview-operator";
 
 export async function POST(request: Request) {
   if (!isSameOriginMutation(request)) return Response.json({ ok: false, error: "Invalid origin." }, { status: 403 });

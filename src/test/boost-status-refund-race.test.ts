@@ -21,8 +21,8 @@ const mocks = vi.hoisted(() => ({
   configured: vi.fn(() => true),
 }));
 
-vi.mock("@/lib/smm-panel", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/smm-panel")>();
+vi.mock("@/lib/providers/smm-panel", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/smm-panel")>();
   return {
     ...actual,
     isSmmPanelConfigured: mocks.configured,
@@ -32,13 +32,13 @@ vi.mock("@/lib/smm-panel", async (importOriginal) => {
 
 let db: typeof import("@/db").db;
 let schema: typeof import("@/db/schema");
-let boostStatus: typeof import("@/lib/boost-status");
+let boostStatus: typeof import("@/lib/services/boosts/boost-status");
 
 beforeAll(async () => {
   vi.stubEnv("DATABASE_URL", "");
   ({ db } = await import("@/db"));
   schema = await import("@/db/schema");
-  boostStatus = await import("@/lib/boost-status");
+  boostStatus = await import("@/lib/services/boosts/boost-status");
 });
 
 const IDS = ["boost-race-refunded", "boost-race-open"];

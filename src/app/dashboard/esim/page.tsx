@@ -1,10 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { requireUser } from "@/lib/auth";
-import { financialActionsUnavailable } from "@/lib/financial-environment";
+import { requireUser } from "@/lib/identity/auth";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import { ServiceTitle } from "@/components/ServiceTitle";
-import { formatDateNigerian } from "@/lib/date-utils";
-import { catalogueItems, ESIM_CATALOGUE_LIMIT, readEsimCatalog, type EsimCatalogStats } from "@/lib/esim-catalog";
+import { formatDateNigerian } from "@/lib/platform/date-utils";
+import { catalogueItems, ESIM_CATALOGUE_LIMIT, readEsimCatalog, type EsimCatalogStats } from "@/lib/services/esim/esim-catalog";
 import { EsimCatalogue } from "./EsimCatalogue";
 
 export const metadata: Metadata = { title: "eSIM plans" };

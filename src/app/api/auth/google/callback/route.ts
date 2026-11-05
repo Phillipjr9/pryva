@@ -3,15 +3,15 @@ import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { createSession, hashPassword } from "@/lib/auth";
-import { exchangeGoogleCode, fetchGoogleUser, googleConfigured } from "@/lib/google";
-import { stateAccepted } from "@/lib/google-state";
-import { relativeRedirect } from "@/lib/net";
-import { creditWallet } from "@/lib/wallet";
-import { safeRedirectPath } from "@/lib/safe-redirect";
-import { attributeReferral, readReferralCodeFrom } from "@/lib/referrals";
-import { recordSignupSignal } from "@/lib/fraud";
-import { scheduleOnboardingEmails } from "@/lib/onboarding-emails";
+import { createSession, hashPassword } from "@/lib/identity/auth";
+import { exchangeGoogleCode, fetchGoogleUser, googleConfigured } from "@/lib/identity/google";
+import { stateAccepted } from "@/lib/identity/google-state";
+import { relativeRedirect } from "@/lib/platform/net";
+import { creditWallet } from "@/lib/payments/wallet";
+import { safeRedirectPath } from "@/lib/platform/safe-redirect";
+import { attributeReferral, readReferralCodeFrom } from "@/lib/content/referrals";
+import { recordSignupSignal } from "@/lib/admin/fraud";
+import { scheduleOnboardingEmails } from "@/lib/email/onboarding-emails";
 
 export const dynamic = "force-dynamic";
 

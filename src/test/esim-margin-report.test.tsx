@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
 const rows = vi.hoisted(() => ({ value: [] as unknown[] }));
-vi.mock("@/lib/auth", () => ({ requireAdmin: async () => ({ id: "admin" }) }));
+vi.mock("@/lib/identity/auth", () => ({ requireAdmin: async () => ({ id: "admin" }) }));
 vi.mock("@/db", () => ({
   db: { select: () => ({ from: () => ({ orderBy: () => ({ limit: async () => rows.value }) }) }) },
 }));

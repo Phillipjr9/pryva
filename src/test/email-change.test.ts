@@ -26,15 +26,15 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/logger", () => ({ logger: mocks.log }));
-vi.mock("@/lib/resend-config", () => ({ resendConfigured: () => mocks.configured }));
+vi.mock("@/lib/platform/logger", () => ({ logger: mocks.log }));
+vi.mock("@/lib/email/resend-config", () => ({ resendConfigured: () => mocks.configured }));
 
 const ADA = "3f1c6a2b-9d4e-4a7c-8b1f-2e5d6c7b8a90";
 const BOLA = "7a2b3c4d-5e6f-4a8b-9c0d-1e2f3a4b5c6d";
 
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
-let changes: typeof import("@/lib/email-change");
+let changes: typeof import("@/lib/identity/email-change");
 
 /** The token is emailed, never returned, so the test reads it back out of the send. */
 function sentToken(): string {
@@ -55,7 +55,7 @@ beforeAll(async () => {
   for (const file of files) await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
-  changes = await import("@/lib/email-change");
+  changes = await import("@/lib/identity/email-change");
 }, 30_000);
 
 afterAll(async () => {

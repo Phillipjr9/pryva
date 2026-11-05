@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { getCurrentUser, isAdminUser, type PublicUser } from "@/lib/auth";
+import { getCurrentUser, isAdminUser, type PublicUser } from "@/lib/identity/auth";
 import { db } from "@/db";
 import * as analytics from "@/app/api/admin/analytics/route";
 import * as auditLog from "@/app/api/admin/audit/route";
@@ -16,8 +16,8 @@ import * as userDetails from "@/app/api/admin/users/[id]/route";
 import * as users from "@/app/api/admin/users/route";
 import * as withdrawals from "@/app/api/admin/withdrawals/route";
 
-vi.mock("@/lib/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/auth")>();
+vi.mock("@/lib/identity/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/identity/auth")>();
   return { ...actual, getCurrentUser: vi.fn() };
 });
 

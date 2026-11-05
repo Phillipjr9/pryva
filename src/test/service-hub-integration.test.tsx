@@ -3,16 +3,16 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { NextRequest } from "next/server";
 import { DataPlansForm } from "@/app/dashboard/data/DataPlansForm";
 import { DigitalServicesForm } from "@/app/dashboard/digital/DigitalServicesForm";
-import { getDigitalService } from "@/lib/digital-services";
+import { getDigitalService } from "@/lib/services/digital/digital-services";
 
 const mocks = vi.hoisted(() => ({ listListings: vi.fn(), price: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock("@/lib/accszone", () => ({
+vi.mock("@/lib/providers/accszone", () => ({
   isAccsZoneConfigured: () => true,
   listListings: mocks.listListings,
   AccsZoneError: class AccsZoneError extends Error { code = "error"; status = 502; },
 }));
-vi.mock("@/lib/marketplace-pricing", () => ({ priceMarketplaceListing: mocks.price }));
+vi.mock("@/lib/services/accounts/marketplace-pricing", () => ({ priceMarketplaceListing: mocks.price }));
 
 const user = { id: "preview-user", name: "Preview", email: "preview@example.test", walletBalance: 5000, emailVerifiedAt: null, createdAt: new Date(0) };
 

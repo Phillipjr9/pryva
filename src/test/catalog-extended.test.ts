@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatNaira, findPlan, findService, plansFor, services, plans } from "@/lib/catalog";
+import { formatNaira, findPlan, findService, plansFor, services, plans } from "@/lib/services/catalog";
 
 describe("Catalog Extended", () => {
   describe("formatNaira edge cases", () => {

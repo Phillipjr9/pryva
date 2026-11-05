@@ -3,10 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   confirmEmailVerification,
   rateLimitEmailVerification,
-} from "@/lib/email-verification";
-import { scheduleOnboardingEmails } from "@/lib/onboarding-emails";
-import { isSameOriginMutation } from "@/lib/net";
-import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+} from "@/lib/identity/email-verification";
+import { scheduleOnboardingEmails } from "@/lib/email/onboarding-emails";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 
 export const dynamic = "force-dynamic";
 

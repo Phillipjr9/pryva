@@ -4,8 +4,8 @@ import {
   listMarketplaceCategories,
   listMarketplaceSubcategories,
   MarketplaceError,
-} from "@/lib/marketplace-suppliers";
-import { logger } from "@/lib/logger";
+} from "@/lib/services/accounts/marketplace-suppliers";
+import { logger } from "@/lib/platform/logger";
 
 export const dynamic = "force-dynamic";
 

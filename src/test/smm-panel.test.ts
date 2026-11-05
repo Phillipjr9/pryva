@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const runtime = vi.hoisted(() => ({ limit: vi.fn() }));
-vi.mock("@/lib/rate-limit", () => ({ createRateLimiter: () => runtime.limit }));
+vi.mock("@/lib/platform/rate-limit", () => ({ createRateLimiter: () => runtime.limit }));
 
 import {
   SmmPanelError,
@@ -13,7 +13,7 @@ import {
   normalizeTargetLink,
   panelEndpoint,
   requestSmmRefill,
-} from "@/lib/smm-panel";
+} from "@/lib/providers/smm-panel";
 
 const KEY = "panel-secret-key";
 const ENDPOINT = "https://example-panel.test/api/v2";

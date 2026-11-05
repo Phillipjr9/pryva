@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireUser } from "@/lib/identity/auth";
 import { AccountsBrowser } from "@/app/(site)/accounts/AccountsBrowser";
 import { ArrowRight, Shield } from "@/components/icons";
-import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
+import { isMarketplaceCheckoutConfigured } from "@/lib/services/accounts/marketplace-policy";
 import { ServiceTitle } from "@/components/ServiceTitle";
 
 export const metadata: Metadata = { title: "Accounts" };

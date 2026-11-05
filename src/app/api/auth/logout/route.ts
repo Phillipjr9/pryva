@@ -1,5 +1,5 @@
-import { destroySession } from "@/lib/auth";
-import { isSameOriginMutation } from "@/lib/net";
+import { destroySession } from "@/lib/identity/auth";
+import { isSameOriginMutation } from "@/lib/platform/net";
 
 export async function POST(request: Request) {
   if (!isSameOriginMutation(request)) return Response.json({ ok: false, error: "Invalid origin." }, { status: 403 });

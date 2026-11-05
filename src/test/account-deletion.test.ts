@@ -11,7 +11,7 @@ import {
   retentionSummary,
   sessionIsFresh,
   tombstoneEmail,
-} from "@/lib/account-deletion";
+} from "@/lib/identity/account-deletion";
 
 /**
  * Closing an account, as a set of promises.
@@ -135,7 +135,7 @@ describe("what the customer is told before they confirm", () => {
     const copy = JSON.stringify(DELETION_TERMS) + read("src/app/dashboard/settings/DangerZone.tsx");
     expect(copy).not.toMatch(/\b(10|ten)\s*years?\b/i);
     expect(copy).not.toContain("RETENTION_YEARS");
-    expect(read("src/lib/account-deletion.ts")).not.toContain("RETENTION_YEARS");
+    expect(read("src/lib/identity/account-deletion.ts")).not.toContain("RETENTION_YEARS");
   });
 
   it("says plainly that it cannot be undone", () => {

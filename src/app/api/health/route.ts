@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
 
 export const dynamic = "force-dynamic";
 

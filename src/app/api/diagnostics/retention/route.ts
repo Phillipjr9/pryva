@@ -3,10 +3,10 @@ import { count, isNotNull } from "drizzle-orm";
 
 import { db } from "@/db";
 import { accountDeletions, users } from "@/db/schema";
-import { diagnosticsAuthorized } from "@/lib/diagnostics-auth";
-import { isPreviewDatabase } from "@/lib/demo-policy";
-import { logger } from "@/lib/logger";
-import { RETENTION_YEARS, countDueForPurge, purgeEnabled, retentionCutoff } from "@/lib/retention";
+import { diagnosticsAuthorized } from "@/lib/admin/diagnostics-auth";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
+import { logger } from "@/lib/platform/logger";
+import { RETENTION_YEARS, countDueForPurge, purgeEnabled, retentionCutoff } from "@/lib/identity/retention";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
  * The horizon is deliberately not customer-facing — the owner's decision is that
  * customers are told the record is kept "as long as the law and disputes require".
  * That makes this an operator surface behind a bearer token, and the reason the
- * number lives in a server-only module (`src/lib/retention.ts`).
+ * number lives in a server-only module (`src/lib/identity/retention.ts`).
  */
 export async function GET(request: NextRequest) {
   if (!diagnosticsAuthorized(request)) {

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import PricingPage from "@/app/(site)/pricing/page";
-import { formatNaira, plans } from "@/lib/catalog";
-import { isPlanFulfillable } from "@/lib/fulfillment";
+import { formatNaira, plans } from "@/lib/services/catalog";
+import { isPlanFulfillable } from "@/lib/services/fulfillment";
 
 /**
  * /pricing is the one surface that advertised plans the app cannot deliver.

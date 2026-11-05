@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira } from "@/lib/services/catalog";
 import { Button } from "@/components/ui/Button";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/platform/utils";
 import { PlatformBadge, platformFor } from "@/components/PlatformBadge";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
-import { warrantyBadge, warrantyLabel } from "@/lib/warranty";
+import { warrantyBadge, warrantyLabel } from "@/lib/services/warranty";
 
 type Category = { id: number; title: string; slug: string };
 type Subcategory = { id: number; title: string; slug: string };

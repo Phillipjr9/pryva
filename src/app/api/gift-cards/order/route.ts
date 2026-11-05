@@ -1,10 +1,10 @@
-import { financialActionsUnavailable } from "@/lib/financial-environment";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth";
-import { findGiftCardDenomination } from "@/lib/gift-cards-catalog";
+import { getCurrentUser } from "@/lib/identity/auth";
+import { findGiftCardDenomination } from "@/lib/services/gift-cards/gift-cards-catalog";
 import {
   createFoxreloadOrder,
   isFoxreloadConfigured,
@@ -12,13 +12,13 @@ import {
   pollFoxreloadOrderCodes,
   resolveFoxreloadProductId,
   FoxreloadError,
-} from "@/lib/foxreload";
-import { FOXRELOAD_PROVIDER } from "@/lib/order-providers";
-import { creditWalletInTx, debitWalletInTx, makeReference } from "@/lib/wallet";
-import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
-import { isSameOriginMutation } from "@/lib/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
+} from "@/lib/providers/foxreload";
+import { FOXRELOAD_PROVIDER } from "@/lib/services/order-providers";
+import { creditWalletInTx, debitWalletInTx, makeReference } from "@/lib/payments/wallet";
+import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
 
 export const dynamic = "force-dynamic";
 

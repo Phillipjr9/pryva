@@ -1,11 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/identity/auth";
 import { db } from "@/db";
 import { orders, paymentTopups, withdrawals } from "@/db/schema";
 import { asc, eq, inArray, isNotNull } from "drizzle-orm";
-import { ageHours, ageSeverity, formatAge, type AgeSeverity } from "@/lib/reconciliation-queue";
-import { ledgerBreaks, recentReconciliationRuns } from "@/lib/daily-reconciliation";
+import { ageHours, ageSeverity, formatAge, type AgeSeverity } from "@/lib/admin/reconciliation-queue";
+import { ledgerBreaks, recentReconciliationRuns } from "@/lib/payments/daily-reconciliation";
 
 export const dynamic = "force-dynamic";
 

@@ -20,15 +20,15 @@ as proof of identity.
 2. What is implemented, and where
 ---------------------------------
 
-- src/lib/account-lockout.ts and the shared rate limiter bound sign-in attempts;
+- src/lib/identity/account-lockout.ts and the shared rate limiter bound sign-in attempts;
   neither alone stops a distributed attack.
-- src/lib/admin-two-factor.ts and admin authorization separate operators from
+- src/lib/identity/admin-two-factor.ts and admin authorization separate operators from
   customers. Verified operator addresses and 2FA are required by default.
-- src/lib/security-headers.ts and src/proxy.ts apply browser security headers;
+- src/lib/platform/security-headers.ts and src/proxy.ts apply browser security headers;
   the CSP has deliberate limitations noted below.
-- src/lib/paystack-webhook.ts and webhook routes verify signatures; settlement,
+- src/lib/payments/paystack-webhook.ts and webhook routes verify signatures; settlement,
   refund and ledger paths use transaction and idempotency guards.
-- src/lib/daily-reconciliation.ts checks wallet history; a missing or failed
+- src/lib/payments/daily-reconciliation.ts checks wallet history; a missing or failed
   reconciliation is not a clean run.
 - The wallet-email outbox snapshots attempted payloads, limits retries with
   provider idempotency, exposes failures for review and does not copy sensitive
@@ -36,7 +36,7 @@ as proof of identity.
   contain service secrets and must be treated as sensitive.
 - Account closure removes credentials, sessions and delivery snapshots while
   retaining financial records. Requests already handed to a provider cannot be
-  recalled. src/lib/retention.ts describes the separately gated retention sweep.
+  recalled. src/lib/identity/retention.ts describes the separately gated retention sweep.
 - scripts/backup-db.mjs and scripts/restore-db.mjs provide a second logical
   backup/restore path; provider backups and recovery drills remain essential.
 

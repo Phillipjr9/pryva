@@ -1,19 +1,19 @@
-import { financialActionsUnavailable } from "@/lib/financial-environment";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users, type Order } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth";
-import { findPlan, type Plan } from "@/lib/catalog";
-import { FleexaError } from "@/lib/fleexa";
-import { cancelUpstream, fulfillPlan, type FulfilledOrder } from "@/lib/fulfillment";
-import { debitWalletInTx, InsufficientFundsError, makeReference } from "@/lib/wallet";
-import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
-import { settleReferralRewards } from "@/lib/referrals";
-import { purchaseVelocity, recordFraudEvent } from "@/lib/fraud";
-import { isSameOriginMutation } from "@/lib/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
+import { getCurrentUser } from "@/lib/identity/auth";
+import { findPlan, type Plan } from "@/lib/services/catalog";
+import { FleexaError } from "@/lib/providers/fleexa";
+import { cancelUpstream, fulfillPlan, type FulfilledOrder } from "@/lib/services/fulfillment";
+import { debitWalletInTx, InsufficientFundsError, makeReference } from "@/lib/payments/wallet";
+import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
+import { settleReferralRewards } from "@/lib/content/referrals";
+import { purchaseVelocity, recordFraudEvent } from "@/lib/admin/fraud";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
 
 export const dynamic = "force-dynamic";
 

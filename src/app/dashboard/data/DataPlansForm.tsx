@@ -1,4 +1,4 @@
-import type { PublicUser } from "@/lib/auth";
+import type { PublicUser } from "@/lib/identity/auth";
 
 interface DataPlansFormProps {
   user: PublicUser;

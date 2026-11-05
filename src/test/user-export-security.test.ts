@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({ user: vi.fn(), limit: vi.fn(), orders: vi.fn(), transactions: vi.fn(), cards: vi.fn(), scheduled: vi.fn(), profile: vi.fn() }));
-vi.mock("@/lib/auth", () => ({ requireAuthApi: mocks.user }));
-vi.mock("@/lib/rate-limit", () => ({ userExportRateLimiter: mocks.limit }));
-vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: mocks.user }));
+vi.mock("@/lib/platform/rate-limit", () => ({ userExportRateLimiter: mocks.limit }));
+vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
 vi.mock("@/db", () => ({ db: { query: {
   users: { findFirst: mocks.profile }, orders: { findMany: mocks.orders },
   walletTransactions: { findMany: mocks.transactions }, giftCards: { findMany: mocks.cards },

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireAuthApi } from "@/lib/auth";
+import { requireAuthApi } from "@/lib/identity/auth";
 import {
   issueEmailVerification,
   rateLimitEmailVerification,
-} from "@/lib/email-verification";
-import { isSameOriginMutation } from "@/lib/net";
-import { resendConfigured } from "@/lib/resend-config";
-import { scheduleOnboardingEmails } from "@/lib/onboarding-emails";
+} from "@/lib/identity/email-verification";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { resendConfigured } from "@/lib/email/resend-config";
+import { scheduleOnboardingEmails } from "@/lib/email/onboarding-emails";
 
 export const dynamic = "force-dynamic";
 

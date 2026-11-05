@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { financialActionsUnavailable } from "@/lib/financial-environment";
-import { isFleexaConfigured } from "@/lib/fleexa";
-import { readSupplierSnapshot, supplierItemsForCountry } from "@/lib/fleexa-catalog";
-import { isSmmPanelConfigured } from "@/lib/smm-panel";
-import { boostItems, readBoostSnapshot } from "@/lib/smm-catalog";
-import { isBitcallConfigured } from "@/lib/bitcall";
-import { esimItemsForCountry, readEsimCatalog } from "@/lib/esim-catalog";
-import { explorerCountry } from "@/lib/service-explorer";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
+import { getCurrentUser } from "@/lib/identity/auth";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
+import { isFleexaConfigured } from "@/lib/providers/fleexa";
+import { readSupplierSnapshot, supplierItemsForCountry } from "@/lib/services/numbers/fleexa-catalog";
+import { isSmmPanelConfigured } from "@/lib/providers/smm-panel";
+import { boostItems, readBoostSnapshot } from "@/lib/services/boosts/smm-catalog";
+import { isBitcallConfigured } from "@/lib/providers/bitcall";
+import { esimItemsForCountry, readEsimCatalog } from "@/lib/services/esim/esim-catalog";
+import { explorerCountry } from "@/lib/services/service-explorer";
+import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;

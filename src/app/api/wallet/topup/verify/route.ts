@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthApi } from "@/lib/auth";
-import { financialActionsUnavailable } from "@/lib/financial-environment";
-import { logger } from "@/lib/logger";
-import { isSameOriginMutation } from "@/lib/net";
-import { isPaystackConfigured } from "@/lib/paystack";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
-import { reconcileTopUpPayment } from "@/lib/topup-reconciliation";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
+import { logger } from "@/lib/platform/logger";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isPaystackConfigured } from "@/lib/payments/paystack";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
+import { reconcileTopUpPayment } from "@/lib/payments/topup-reconciliation";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  * The Paystack return URL is a hint, never evidence of payment. Verification
  * and signed webhooks use the same transactional, idempotent credit path.
  *
- * Every check lives in `reconcileTopUpPayment` (src/lib/topup-reconciliation.ts),
+ * Every check lives in `reconcileTopUpPayment` (src/lib/payments/topup-reconciliation.ts),
  * because the support assistant needs to ask the same question — "did this
  * deposit actually arrive?" — and two implementations of that answer would
  * eventually disagree. This route only maps the answer onto HTTP.

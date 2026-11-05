@@ -6,7 +6,7 @@ import {
   serializeStructuredData,
   siteStructuredData,
   websiteSchema,
-} from "@/lib/structured-data";
+} from "@/lib/content/structured-data";
 
 const layout = readFileSync("src/app/layout.tsx", "utf8");
 const globals = readFileSync("src/app/globals.css", "utf8");

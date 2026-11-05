@@ -3,8 +3,8 @@ import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
-import { formatNaira } from "@/lib/catalog";
+import { requireUser } from "@/lib/identity/auth";
+import { formatNaira } from "@/lib/services/catalog";
 import { ArrowRight, ArrowUpRight, Clock, Receipt, Search, Sparkle } from "@/components/icons";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 

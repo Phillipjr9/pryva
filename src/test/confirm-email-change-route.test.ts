@@ -15,10 +15,10 @@ const state = vi.hoisted(() => ({
   notice: vi.fn(),
 }));
 
-vi.mock("@/lib/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
-vi.mock("@/lib/rate-limit", () => ({ authRateLimiter: async () => state.throttle }));
-vi.mock("@/lib/email-change", () => ({ confirmEmailChange: (...args: unknown[]) => state.confirm(...args) }));
-vi.mock("@/lib/security-notice", () => ({ sendSecurityNotice: (...args: unknown[]) => state.notice(...args) }));
+vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
+vi.mock("@/lib/platform/rate-limit", () => ({ authRateLimiter: async () => state.throttle }));
+vi.mock("@/lib/identity/email-change", () => ({ confirmEmailChange: (...args: unknown[]) => state.confirm(...args) }));
+vi.mock("@/lib/platform/security-notice", () => ({ sendSecurityNotice: (...args: unknown[]) => state.notice(...args) }));
 
 import { POST } from "@/app/api/auth/confirm-email-change/route";
 

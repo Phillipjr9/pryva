@@ -43,25 +43,25 @@ vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
 // and `isConfiguredAdminEmail` is now reached through @/lib/manual-fulfilment when
 // a hand-prepared item is bought. Missing, it throws and the gate fails closed —
 // safe in production, but it would make these tests prove nothing.
-vi.mock("@/lib/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/auth")>();
+vi.mock("@/lib/identity/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/identity/auth")>();
   return { ...actual, requireAuthApi: mocks.user, getCurrentUser: mocks.user };
 });
-vi.mock("@/lib/logger", () => ({ logger: mocks.log }));
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/lib/platform/logger", () => ({ logger: mocks.log }));
+vi.mock("@/lib/platform/rate-limit", () => ({
   purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }),
 }));
-vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: () => {} }));
-vi.mock("@/lib/exchange-rate", () => ({
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: () => {} }));
+vi.mock("@/lib/payments/exchange-rate", () => ({
   getUsdToNgnRate: async () => ({ rate: 1600, source: "test", fetchedAt: new Date().toISOString() }),
 }));
-vi.mock("@/lib/marketplace-policy", () => ({
+vi.mock("@/lib/services/accounts/marketplace-policy", () => ({
   isMarketplaceCheckoutConfigured: () => true,
   isMarketplacePurchaseEnabled: () => true,
 }));
 
 // The sources are fake; the price maths between them and the wallet is not.
-vi.mock("@/lib/marketplace-suppliers", () => {
+vi.mock("@/lib/services/accounts/marketplace-suppliers", () => {
   class MarketplaceError extends Error {
     code: string; status: number; ambiguous = false;
     constructor(message: string, code: string, status = 502) {
@@ -94,8 +94,8 @@ vi.mock("@/lib/marketplace-suppliers", () => {
   };
 });
 
-vi.mock("@/lib/accszone", async (original) => {
-  const actual = await original<typeof import("@/lib/accszone")>();
+vi.mock("@/lib/providers/accszone", async (original) => {
+  const actual = await original<typeof import("@/lib/providers/accszone")>();
   return {
     ...actual,
     validatePromo: async (_code: string, basketUsd: number) => {

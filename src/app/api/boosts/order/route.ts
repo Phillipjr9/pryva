@@ -1,11 +1,11 @@
-import { financialActionsUnavailable } from "@/lib/financial-environment";
-import { placeBoostOrder } from "@/lib/boost-orders";
-import { getCurrentUser } from "@/lib/auth";
-import { purchaseVelocity, recordFraudEvent } from "@/lib/fraud";
-import { isSameOriginMutation } from "@/lib/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
-import { normalizeTargetLink } from "@/lib/smm-panel";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
+import { placeBoostOrder } from "@/lib/services/boosts/boost-orders";
+import { getCurrentUser } from "@/lib/identity/auth";
+import { purchaseVelocity, recordFraudEvent } from "@/lib/admin/fraud";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
+import { normalizeTargetLink } from "@/lib/providers/smm-panel";
 
 export const dynamic = "force-dynamic";
 

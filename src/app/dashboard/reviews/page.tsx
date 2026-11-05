@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
-import { listReviewableOrders, listUserReviews } from "@/lib/reviews";
+import { requireUser } from "@/lib/identity/auth";
+import { listReviewableOrders, listUserReviews } from "@/lib/content/reviews";
 import { ReviewForm } from "./ReviewForm";
 
 export const metadata = { title: "Reviews" };

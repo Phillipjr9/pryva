@@ -5,8 +5,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import ProxiesPage from "@/app/(site)/proxies/page";
 import FaqPage from "@/app/(site)/faq/page";
 import RefundPolicyPage from "@/app/(site)/refund-policy/page";
-import { plans, plansFor } from "@/lib/catalog";
-import { isPlanFulfillable } from "@/lib/fulfillment";
+import { plans, plansFor } from "@/lib/services/catalog";
+import { isPlanFulfillable } from "@/lib/services/fulfillment";
 
 /**
  * Public pages may describe what cannot be delivered; they may not offer it.

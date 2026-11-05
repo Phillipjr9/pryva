@@ -20,16 +20,16 @@ const state = vi.hoisted(() => ({
   inboxes: [] as unknown[],
 }));
 
-vi.mock("@/lib/auth", () => ({ requireAuthApi: async () => ({ id: "u1", email: "ada@example.com" }) }));
-vi.mock("@/lib/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => state.preview }));
-vi.mock("@/lib/fleexa", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/fleexa")>();
+vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: async () => ({ id: "u1", email: "ada@example.com" }) }));
+vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => state.preview }));
+vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/fleexa")>();
   return { ...actual, isFleexaConfigured: () => state.configured };
 });
-vi.mock("@/lib/auth-rate-limit", () => ({ clientIp: () => "203.0.113.9" }));
-vi.mock("@/lib/rate-limit", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/rate-limit")>();
+vi.mock("@/lib/identity/auth-rate-limit", () => ({ clientIp: () => "203.0.113.9" }));
+vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
   return {
     ...actual,
     apiRateLimiter: async () => state.limit,
@@ -37,13 +37,13 @@ vi.mock("@/lib/rate-limit", async (importOriginal) => {
     releaseRateLimit: (key: string) => state.release(key),
   };
 });
-vi.mock("@/lib/request-body", () => ({
+vi.mock("@/lib/platform/request-body", () => ({
   readJsonWithLimit: async () => ({}),
   RequestBodyTooLargeError: class extends Error {},
 }));
-vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
-vi.mock("@/lib/disposable-inbox", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/disposable-inbox")>();
+vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/services/email-otp/disposable-inbox", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/email-otp/disposable-inbox")>();
   return {
     ...actual,
     createFreeInbox: (...args: unknown[]) => state.create(...args),
@@ -52,7 +52,7 @@ vi.mock("@/lib/disposable-inbox", async (importOriginal) => {
 });
 
 import { GET, POST } from "@/app/api/inbox/route";
-import { FleexaError } from "@/lib/fleexa";
+import { FleexaError } from "@/lib/providers/fleexa";
 
 function request() {
   return new NextRequest(new URL("https://pryva.test/api/inbox"), {
@@ -116,7 +116,7 @@ describe("POST /api/inbox", () => {
   });
 
   it("gives the attempt back when the customer's own daily limit refused it", async () => {
-    const { InboxError } = await import("@/lib/disposable-inbox");
+    const { InboxError } = await import("@/lib/services/email-otp/disposable-inbox");
     state.create.mockRejectedValue(new InboxError("DAILY_LIMIT", 429, "used today"));
 
     const response = await POST(request());

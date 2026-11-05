@@ -1,5 +1,5 @@
-import { formatNaira } from "@/lib/catalog";
-import { receiptStatusLabel, RECEIPT_FOOTER } from "@/lib/receipt";
+import { formatNaira } from "@/lib/services/catalog";
+import { receiptStatusLabel, RECEIPT_FOOTER } from "@/lib/payments/receipt";
 
 /**
  * One order, as a document.

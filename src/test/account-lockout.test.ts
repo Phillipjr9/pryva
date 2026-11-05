@@ -18,7 +18,7 @@ vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
 
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
-let lockout: typeof import("@/lib/account-lockout");
+let lockout: typeof import("@/lib/identity/account-lockout");
 
 const USER = "2f8f1cad-1a2f-4d0c-9d6e-2b1f7f4d5c11";
 
@@ -39,7 +39,7 @@ beforeAll(async () => {
   }
   database = drizzle(pg, { schema });
   mocks.db = database;
-  lockout = await import("@/lib/account-lockout");
+  lockout = await import("@/lib/identity/account-lockout");
 });
 
 const seeded: string[] = [];
@@ -185,7 +185,7 @@ describe("the sign-in path uses it", () => {
   });
 
   it("releases the lock when a password reset completes", () => {
-    const reset = readFileSync("src/lib/password-reset.ts", "utf8");
+    const reset = readFileSync("src/lib/identity/password-reset.ts", "utf8");
     expect(reset).toContain("failedLoginAttempts: 0");
     expect(reset).toContain("lockedUntil: null");
   });

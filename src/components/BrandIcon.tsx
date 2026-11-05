@@ -1,4 +1,4 @@
-import { BRAND_MARKS, type BrandSlug } from "@/lib/brand-marks";
+import { BRAND_MARKS, type BrandSlug } from "@/lib/content/brand-marks";
 
 /**
  * BrandIcon renders a real, official brand mark — not generated artwork.
@@ -139,7 +139,7 @@ export function BrandIcon({
         style={{ display: "block" }}
       >
         <g
-          // Static path data generated from open icon sets (see src/lib/brand-marks.ts).
+          // Static path data generated from open icon sets (see src/lib/content/brand-marks.ts).
           dangerouslySetInnerHTML={{ __html: mark.body }}
           fill={fill}
         />

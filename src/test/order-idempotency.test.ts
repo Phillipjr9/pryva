@@ -16,14 +16,14 @@ const mocks = vi.hoisted(() => ({
   scheduleWalletEmails: vi.fn(),
 }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.currentUser }));
-vi.mock("@/lib/fulfillment", () => ({
+vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: mocks.currentUser }));
+vi.mock("@/lib/services/fulfillment", () => ({
   fulfillPlan: mocks.fulfillPlan,
   cancelUpstream: mocks.cancelUpstream,
 }));
-vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.scheduleWalletEmails }));
-vi.mock("@/lib/rate-limit", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/rate-limit")>();
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.scheduleWalletEmails }));
+vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
   return { ...actual, purchaseRateLimiter: mocks.rateLimit };
 });
 
@@ -33,7 +33,7 @@ vi.mock("@/lib/rate-limit", async (importOriginal) => {
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
 let POST: typeof import("@/app/api/orders/route").POST;
-let findPlan: typeof import("@/lib/catalog").findPlan;
+let findPlan: typeof import("@/lib/services/catalog").findPlan;
 
 const USER = "11111111-1111-4111-8111-111111111111";
 const SLUG = "vn-ng";
@@ -55,7 +55,7 @@ beforeAll(async () => {
   }
   database = drizzle(pg, { schema });
   mocks.db = database;
-  ({ findPlan } = await import("@/lib/catalog"));
+  ({ findPlan } = await import("@/lib/services/catalog"));
   ({ POST } = await import("@/app/api/orders/route"));
   await database.insert(schema.users).values({
     id: USER, name: "Buyer", email: "buyer@example.com", passwordHash: "hash", walletBalance: 500_000,

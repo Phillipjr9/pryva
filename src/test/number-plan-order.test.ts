@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { findPlan, plansFor } from "@/lib/catalog";
+import { findPlan, plansFor } from "@/lib/services/catalog";
 
 /**
  * The storefront shows the destination it can serve most cheaply first.
@@ -11,8 +11,8 @@ import { findPlan, plansFor } from "@/lib/catalog";
 const fleexa = vi.hoisted(() => ({ configured: true, list: vi.fn(), buy: vi.fn() }));
 const bitcall = vi.hoisted(() => ({ configured: true, list: vi.fn(), buy: vi.fn() }));
 
-vi.mock("@/lib/fleexa", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/fleexa")>();
+vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/fleexa")>();
   return {
     ...actual,
     isFleexaConfigured: () => fleexa.configured,
@@ -21,8 +21,8 @@ vi.mock("@/lib/fleexa", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/bitcall", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/bitcall")>();
+vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/bitcall")>();
   return {
     ...actual,
     isBitcallConfigured: () => bitcall.configured,
@@ -32,8 +32,8 @@ vi.mock("@/lib/bitcall", async (importOriginal) => {
 });
 
 const { orderNumberPlansByCheapestCost, clearNumberPlanOrderCache } =
-  await import("@/lib/number-plan-order");
-const { clearOtpCatalogueCache } = await import("@/lib/otp-suppliers");
+  await import("@/lib/services/numbers/number-plan-order");
+const { clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");
 
 /** The six sellable destinations, in catalogue order. */
 const sellable = () =>

@@ -7,14 +7,14 @@ import { cleanup, render, screen } from "@testing-library/react";
  * is not selling yet, so the states are pinned rather than left to prose.
  */
 
-vi.mock("@/lib/auth", () => ({ requireAdmin: vi.fn().mockResolvedValue({ id: "admin-1" }) }));
-vi.mock("@/lib/smm-panel", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/smm-panel")>();
+vi.mock("@/lib/identity/auth", () => ({ requireAdmin: vi.fn().mockResolvedValue({ id: "admin-1" }) }));
+vi.mock("@/lib/providers/smm-panel", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/smm-panel")>();
   return { ...actual, isSmmPanelConfigured: vi.fn(), smmPanelApiKey: vi.fn(), panelEndpoint: vi.fn() };
 });
 
 import AdminBoostingPage from "@/app/admin/(console)/boosting/page";
-import { isSmmPanelConfigured, panelEndpoint, smmPanelApiKey, SmmPanelError } from "@/lib/smm-panel";
+import { isSmmPanelConfigured, panelEndpoint, smmPanelApiKey, SmmPanelError } from "@/lib/providers/smm-panel";
 
 beforeEach(() => {
   vi.clearAllMocks();

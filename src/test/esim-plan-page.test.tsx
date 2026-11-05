@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import type { EsimOffer } from "@/lib/esim-catalog";
+import type { EsimOffer } from "@/lib/services/esim/esim-catalog";
 
 const findOffer = vi.hoisted(() => vi.fn());
 const recheckOffer = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/esim-catalog", () => ({ findEsimOffer: findOffer, recheckEsimOffer: recheckOffer, esimOfferTerms: () => "a".repeat(24) }));
-vi.mock("@/lib/auth", () => ({ requireUser: async () => ({ walletBalance: 50_000 }) }));
+vi.mock("@/lib/services/esim/esim-catalog", () => ({ findEsimOffer: findOffer, recheckEsimOffer: recheckOffer, esimOfferTerms: () => "a".repeat(24) }));
+vi.mock("@/lib/identity/auth", () => ({ requireUser: async () => ({ walletBalance: 50_000 }) }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("not found"); },
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),

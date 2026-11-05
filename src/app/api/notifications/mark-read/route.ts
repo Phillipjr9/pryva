@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { requireAuthApi } from "@/lib/auth";
-import { isSameOriginMutation } from "@/lib/net";
-import { notificationRateLimiter } from "@/lib/rate-limit";
-import { isPreviewDatabase } from "@/lib/demo-policy";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { logger } from "@/lib/logger";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { notificationRateLimiter } from "@/lib/platform/rate-limit";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { logger } from "@/lib/platform/logger";
 
 export const dynamic = "force-dynamic";
 

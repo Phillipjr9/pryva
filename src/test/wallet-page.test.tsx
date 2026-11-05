@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { renderToStaticMarkup } from "react-dom/server";
 
 const mocks = vi.hoisted(() => ({ user: vi.fn() }));
-vi.mock("@/lib/auth", () => ({ requireUser: mocks.user }));
+vi.mock("@/lib/identity/auth", () => ({ requireUser: mocks.user }));
 vi.mock("@/components/dashboard/TopUpForm", () => ({ TopUpForm: () => null }));
 vi.mock("@/components/dashboard/DemoWithdrawal", () => ({ DemoWithdrawal: () => null }));
 vi.mock("@/app/dashboard/wallet/WithdrawalDashboard", () => ({ WithdrawalDashboard: () => null }));

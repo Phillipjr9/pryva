@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Shield, Sparkle } from "@/components/icons";
-import { safeRedirectPath } from "@/lib/safe-redirect";
+import { safeRedirectPath } from "@/lib/platform/safe-redirect";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { BrandIcon } from "@/components/BrandIcon";
 import { PasskeySignInButton } from "@/components/auth/PasskeySignInButton";
@@ -11,7 +11,7 @@ import {
   normalizeReferralCode,
   REFERRAL_COOKIE,
   REFERRAL_COOKIE_MAX_AGE_SECONDS,
-} from "@/lib/referral-code";
+} from "@/lib/content/referral-code";
 
 type Mode = "login" | "signup";
 

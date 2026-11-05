@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, isNull } from "drizzle-orm";
-import { authorizeAdminApi } from "@/lib/admin-auth";
-import { recordAdminAction } from "@/lib/admin-audit";
+import { authorizeAdminApi } from "@/lib/identity/admin-auth";
+import { recordAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/db";
 import { bankAccounts, payoutNameApprovals, users } from "@/db/schema";
-import { logger } from "@/lib/logger";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { isSameOriginMutation } from "@/lib/net";
-import { depositorNameFor, payoutApprovalFor } from "@/lib/withdrawal-name-check";
-import { payoutDestinationBlocked } from "@/lib/payout-name-review";
+import { logger } from "@/lib/platform/logger";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { depositorNameFor, payoutApprovalFor } from "@/lib/payments/withdrawal-name-check";
+import { payoutDestinationBlocked } from "@/lib/admin/payout-name-review";
 
 export const dynamic = "force-dynamic";
 

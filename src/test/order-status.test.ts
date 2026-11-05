@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { orderStatusLabel } from "@/lib/catalog";
+import { orderStatusLabel } from "@/lib/services/catalog";
 
 describe("Order Status", () => {
   describe("orderStatusLabel", () => {

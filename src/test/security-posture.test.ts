@@ -27,11 +27,11 @@ describe("security posture", () => {
     }
     // Named files, so the document can be checked rather than believed.
     for (const file of [
-      "src/lib/account-lockout.ts",
-      "src/lib/admin-two-factor.ts",
-      "src/lib/security-headers.ts",
-      "src/lib/daily-reconciliation.ts",
-      "src/lib/paystack-webhook.ts",
+      "src/lib/identity/account-lockout.ts",
+      "src/lib/identity/admin-two-factor.ts",
+      "src/lib/platform/security-headers.ts",
+      "src/lib/payments/daily-reconciliation.ts",
+      "src/lib/payments/paystack-webhook.ts",
       "scripts/backup-db.mjs",
     ]) {
       expect(security, file).toContain(file);

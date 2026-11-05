@@ -1,16 +1,16 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
-import { RECONCILIATION_NOTE, SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
+import { RECONCILIATION_NOTE, SINGLE_NUMBER_WINDOW } from "@/lib/services/refund-policy";
 
 const mocks = vi.hoisted(() => ({ cancelUpstream: vi.fn() }));
-vi.mock("@/lib/fulfillment", () => ({ cancelUpstream: mocks.cancelUpstream }));
+vi.mock("@/lib/services/fulfillment", () => ({ cancelUpstream: mocks.cancelUpstream }));
 
 // Exercise the real in-memory adapter as well as the refund policy: its
 // SQL-condition emulation must not ignore IS NULL checks.
 let db: typeof import("@/db").db;
 let schema: typeof import("@/db/schema");
-let processAutoRefunds: typeof import("@/lib/auto-refund").processAutoRefunds;
+let processAutoRefunds: typeof import("@/lib/services/auto-refund").processAutoRefunds;
 let cronPost: typeof import("@/app/api/cron/auto-refund/route").POST;
 
 beforeAll(async () => {
@@ -34,7 +34,7 @@ beforeAll(async () => {
     { ...base, id: "refund-fixture-rental", reference: "FIX-RENTAL", duration: "30 days", otpCode: null },
     { ...base, id: "refund-fixture-esim", reference: "FIX-ESIM", service: "esim", duration: "7 days", otpCode: null },
   ]);
-  ({ processAutoRefunds } = await import("@/lib/auto-refund"));
+  ({ processAutoRefunds } = await import("@/lib/services/auto-refund"));
   ({ POST: cronPost } = await import("@/app/api/cron/auto-refund/route"));
 });
 beforeEach(() => {

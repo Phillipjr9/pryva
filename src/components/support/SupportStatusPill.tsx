@@ -1,4 +1,4 @@
-import { SUPPORT_STATUS_LABELS, isSupportStatus } from "@/lib/ai-support/types";
+import { SUPPORT_STATUS_LABELS, isSupportStatus } from "@/lib/support/ai-support/types";
 
 /**
  * One status, one colour, everywhere.

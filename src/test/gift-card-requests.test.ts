@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { giftCardAttemptLimit, normalizeGiftCardCode } from "@/lib/gift-card-requests";
-import { generateCode } from "@/lib/gift-cards";
+import { giftCardAttemptLimit, normalizeGiftCardCode } from "@/lib/services/gift-cards/gift-card-requests";
+import { generateCode } from "@/lib/services/gift-cards/gift-cards";
 
 afterEach(() => vi.unstubAllEnvs());
 

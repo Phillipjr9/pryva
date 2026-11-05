@@ -8,13 +8,13 @@ const runtime = vi.hoisted(() => ({
   price: { unitNgn: 2500, totalNgn: 2500, discountNgn: 0, profitNgn: 800 },
 }));
 
-vi.mock("@/lib/logger", () => ({
+vi.mock("@/lib/platform/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
-vi.mock("@/lib/marketplace-pricing", () => ({
+vi.mock("@/lib/services/accounts/marketplace-pricing", () => ({
   priceMarketplaceListing: async () => runtime.price,
 }));
-vi.mock("@/lib/marketplace-suppliers", () => {
+vi.mock("@/lib/services/accounts/marketplace-suppliers", () => {
   class MarketplaceError extends Error {
     constructor(message: string, public code: string, public status: number) {
       super(message);
@@ -140,7 +140,7 @@ describe("what the storefront actually receives", () => {
     expect(empty).toEqual({ configured: false, listings: [], meta: null });
 
     runtime.configured = true;
-    const { MarketplaceError } = await import("@/lib/marketplace-suppliers");
+    const { MarketplaceError } = await import("@/lib/services/accounts/marketplace-suppliers");
     runtime.error = new MarketplaceError("busy", "rate_limit_exceeded", 429);
     const busy = await GET(request());
     expect(busy.status).toBe(429);

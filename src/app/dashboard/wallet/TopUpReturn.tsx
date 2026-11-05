@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fireConfetti } from "@/components/ui/Confetti";
 import { MoneyFlowDialog, MoneyOrbit, MoneyProcessing, MoneyResultIcon, downloadTextReceipt, moneyDate } from "@/components/dashboard/MoneyFlowDialog";
-import { formatNaira } from "@/lib/catalog";
-import { forgetPaystackTopUp, notifyPaystackTopUpsChanged } from "@/lib/paystack-topup-intent";
+import { formatNaira } from "@/lib/services/catalog";
+import { forgetPaystackTopUp, notifyPaystackTopUpsChanged } from "@/lib/payments/paystack-topup-intent";
 import styles from "@/components/dashboard/MoneyFlow.module.css";
 
 type Receipt = { reference: string; amount: number; balanceAfter: number; creditedAt: string };

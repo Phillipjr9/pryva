@@ -4,7 +4,7 @@ import {
   getBrandGiftCards,
   findBrandGiftCard,
   findGiftCardDenomination,
-} from "@/lib/gift-cards-catalog";
+} from "@/lib/services/gift-cards/gift-cards-catalog";
 import { GET as getCatalogRoute } from "@/app/api/gift-cards/catalog/route";
 import { POST as orderRoute } from "@/app/api/gift-cards/order/route";
 

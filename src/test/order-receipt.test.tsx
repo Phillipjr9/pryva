@@ -4,7 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { ReceiptBody, type ReceiptData } from "@/app/dashboard/orders/[id]/receipt/ReceiptBody";
 import { PrintButton } from "@/app/dashboard/orders/[id]/receipt/PrintButton";
-import { RECEIPT_STATUS_LABELS, receiptStatusLabel } from "@/lib/receipt";
+import { RECEIPT_STATUS_LABELS, receiptStatusLabel } from "@/lib/payments/receipt";
 
 /**
  * A receipt is a document, not a screen.

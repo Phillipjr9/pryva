@@ -1,17 +1,17 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
-import { authorizeAdminApi } from "@/lib/admin-auth";
+import { authorizeAdminApi } from "@/lib/identity/admin-auth";
 import { db } from "@/db";
 import { withdrawals, users, walletTransactions } from "@/db/schema";
-import { initiateTransfer, isPaystackConfigured } from "@/lib/paystack";
-import { paystackTransferReference } from "@/lib/paystack-transfer-reference";
-import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
-import { financialActionsUnavailable, isVercelPreview } from "@/lib/financial-environment";
-import { logger } from "@/lib/logger";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { isSameOriginMutation } from "@/lib/net";
-import { recordAdminAction } from "@/lib/admin-audit";
+import { initiateTransfer, isPaystackConfigured } from "@/lib/payments/paystack";
+import { paystackTransferReference } from "@/lib/payments/paystack-transfer-reference";
+import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
+import { financialActionsUnavailable, isVercelPreview } from "@/lib/platform/financial-environment";
+import { logger } from "@/lib/platform/logger";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { recordAdminAction } from "@/lib/admin/admin-audit";
 
 export const dynamic = "force-dynamic";
 
@@ -133,7 +133,7 @@ export async function PUT(request: NextRequest) {
         // The row may have moved while Paystack was answering: a signed
         // transfer.success or transfer.reversed event is applied by the webhook
         // whenever it arrives, and what it wrote is newer than this response.
-        // Same guard as `lib/payouts.ts:176`, which does this write properly.
+        // Same guard as `lib/payments/payouts.ts:176`, which does this write properly.
         await db.update(withdrawals)
           .set({ transferReference: transferCode, failureReason: note })
           .where(and(eq(withdrawals.id, id), eq(withdrawals.status, "processing")));

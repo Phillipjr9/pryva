@@ -4,8 +4,8 @@ import {
   CONTENT_SECURITY_POLICY_HEADER,
   contentSecurityPolicy,
   isEmbeddedPreviewHost,
-} from "@/lib/security-headers";
-import { FRAMEWORK_BANNERS } from "@/lib/server-banner";
+} from "@/lib/platform/security-headers";
+import { FRAMEWORK_BANNERS } from "@/lib/platform/server-banner";
 
 export function proxy(request: NextRequest) {
   const response = NextResponse.next();

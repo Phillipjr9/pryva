@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { isPreviewDatabase } from "@/lib/demo-policy";
-import { logger } from "@/lib/logger";
-import { readTextWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { recordEmailDeliveryEvent } from "@/lib/email-delivery-events";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
+import { logger } from "@/lib/platform/logger";
+import { readTextWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { recordEmailDeliveryEvent } from "@/lib/email/email-delivery-events";
 import {
   normaliseEventName,
   recipientDomain,
   resendOutcome,
   verifyResendSignature,
-} from "@/lib/resend-webhook";
+} from "@/lib/email/resend-webhook";
 
 export const dynamic = "force-dynamic";
 

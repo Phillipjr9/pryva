@@ -1,4 +1,4 @@
-import { authorizeAdminApi } from "@/lib/admin-auth";
+import { authorizeAdminApi } from "@/lib/identity/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { securityViolations } from "@/db/schema";

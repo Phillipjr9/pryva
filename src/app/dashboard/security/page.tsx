@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { securityRedirectTarget } from "@/lib/legacy-redirects";
+import { securityRedirectTarget } from "@/lib/content/legacy-redirects";
 
 /**
  * Security moved inside Settings.

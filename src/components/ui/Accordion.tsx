@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/platform/utils";
 import { ChevronDown } from "@/components/icons";
 
 interface AccordionProps {

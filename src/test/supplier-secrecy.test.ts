@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from "vitest";
 
 // The hand-prepared lane is closed in the in-memory preview (it would publish
 // stock the demo cannot deliver), so open it here to inspect what it exposes.
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => false }));
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => false }));
 
 /**
  * The owner's rule: no customer ever learns where a product comes from.
@@ -43,10 +43,10 @@ const USER_FACING = [
   "src/app/dashboard",
   "src/components/site",
   "src/components/dashboard",
-  "src/lib/catalog.ts",
-  "src/lib/digital-services.ts",
-  "src/lib/service-explorer.ts",
-  "src/lib/warranty.ts",
+  "src/lib/services/catalog.ts",
+  "src/lib/services/digital/digital-services.ts",
+  "src/lib/services/service-explorer.ts",
+  "src/lib/services/warranty.ts",
 ];
 
 /**
@@ -151,7 +151,7 @@ describe("supplier secrecy", () => {
   });
 
   it("keeps the hand-prepared catalog's private fields out of the sellable shape", async () => {
-    const { getManualProduct } = await import("@/lib/manual-catalog");
+    const { getManualProduct } = await import("@/lib/services/accounts/manual-catalog");
     const product = getManualProduct("p3:netflix-standard");
     expect(product).not.toBeNull();
     const haystack = JSON.stringify(product).toLowerCase();

@@ -37,7 +37,7 @@ vi.mock("@/db", () => ({
   },
 }));
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/lib/identity/auth", () => ({
   createSession: mocks.session,
   verifyPassword: () => true,
   hashPassword: () => "hash",
@@ -46,12 +46,12 @@ vi.mock("@/lib/auth", () => ({
   isConfiguredAdminEmail: () => false,
 }));
 
-vi.mock("@/lib/auth-rate-limit", () => ({
+vi.mock("@/lib/identity/auth-rate-limit", () => ({
   checkAuthRateLimit: mocks.check,
   clearAuthRateLimit: mocks.clear,
 }));
 
-vi.mock("@/lib/two-factor", () => ({
+vi.mock("@/lib/identity/two-factor", () => ({
   CHALLENGE_TTL_MS: 5 * 60 * 1000,
   getEnrolment: mocks.enrolment,
   createChallenge: mocks.challenge,

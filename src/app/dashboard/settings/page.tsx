@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
-import { resendConfigured } from "@/lib/resend-config";
+import { requireUser } from "@/lib/identity/auth";
+import { resendConfigured } from "@/lib/email/resend-config";
 import { SettingsForm } from "./SettingsForm";
 import { SecuritySection } from "./SecuritySection";
 import { DangerZone } from "./DangerZone";

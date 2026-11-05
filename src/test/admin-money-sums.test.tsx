@@ -26,8 +26,8 @@ import { users, walletTransactions } from "@/db/schema";
 
 const mocks = vi.hoisted(() => ({ db: undefined as unknown }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/auth")>();
+vi.mock("@/lib/identity/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/identity/auth")>();
   return {
     ...actual,
     requireAdmin: vi.fn().mockResolvedValue({ id: "e6601368-4eef-45e7-a562-f8621c4239f2" }),

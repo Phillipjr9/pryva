@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clearRateCache, getFreshNgnRate } from "@/lib/exchange-rate";
+import { clearRateCache, getFreshNgnRate } from "@/lib/payments/exchange-rate";
 
 const NOW = Date.parse("2026-11-05T12:00:00Z");
 

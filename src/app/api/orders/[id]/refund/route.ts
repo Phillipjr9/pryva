@@ -1,15 +1,15 @@
-import { isVercelPreview } from "@/lib/financial-environment";
+import { isVercelPreview } from "@/lib/platform/financial-environment";
 import { randomBytes } from "node:crypto";
 import { and, eq, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth";
-import { isSameOriginMutation } from "@/lib/net";
-import { refundRateLimiter } from "@/lib/rate-limit";
-import { cancelUpstream } from "@/lib/fulfillment";
-import { flagReconciliation } from "@/lib/reconciliation";
-import { isUndeliveredSingleNumber, SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
-import { SERVICE_TIMEOUTS } from "@/lib/service-timeouts";
+import { getCurrentUser } from "@/lib/identity/auth";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { refundRateLimiter } from "@/lib/platform/rate-limit";
+import { cancelUpstream } from "@/lib/services/fulfillment";
+import { flagReconciliation } from "@/lib/services/reconciliation";
+import { isUndeliveredSingleNumber, SINGLE_NUMBER_WINDOW } from "@/lib/services/refund-policy";
+import { SERVICE_TIMEOUTS } from "@/lib/services/service-timeouts";
 
 export const dynamic = "force-dynamic";
 

@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import sitemap from "@/app/sitemap";
 import robots from "@/app/robots";
-import { blogPosts } from "@/lib/blog";
+import { blogPosts } from "@/lib/content/blog";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const read = (relative: string) => readFileSync(join(root, relative), "utf8");

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { resendConfigured } from "@/lib/resend-config";
+import { resendConfigured } from "@/lib/email/resend-config";
 
 describe("resendConfigured", () => {
   afterEach(() => {

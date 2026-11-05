@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/platform/utils";
 
 /**
  * The Pryva lockup — the glossy 3D "P" mark plus the wordmark.

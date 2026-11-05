@@ -28,12 +28,12 @@ vi.mock("@/db", () => ({
   },
 }));
 
-vi.mock("@/lib/auth", () => ({ requireAdmin: vi.fn().mockResolvedValue({ id: "admin-1" }) }));
-vi.mock("@/lib/fleexa", () => ({ isFleexaConfigured: vi.fn(() => true) }));
-vi.mock("@/lib/smm-panel", () => ({ isSmmPanelConfigured: vi.fn(() => true) }));
-vi.mock("@/lib/marketplace-policy", () => ({ isMarketplaceCheckoutConfigured: vi.fn(() => false) }));
-vi.mock("@/lib/manual-fulfilment", () => ({ isManualFulfilmentReachable: vi.fn(() => true) }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: vi.fn(() => false) }));
+vi.mock("@/lib/identity/auth", () => ({ requireAdmin: vi.fn().mockResolvedValue({ id: "admin-1" }) }));
+vi.mock("@/lib/providers/fleexa", () => ({ isFleexaConfigured: vi.fn(() => true) }));
+vi.mock("@/lib/providers/smm-panel", () => ({ isSmmPanelConfigured: vi.fn(() => true) }));
+vi.mock("@/lib/services/accounts/marketplace-policy", () => ({ isMarketplaceCheckoutConfigured: vi.fn(() => false) }));
+vi.mock("@/lib/services/accounts/manual-fulfilment", () => ({ isManualFulfilmentReachable: vi.fn(() => true) }));
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: vi.fn(() => false) }));
 
 import AdminServicesPage from "@/app/admin/(console)/services/page";
 
@@ -73,7 +73,7 @@ describe("the service coverage page", () => {
   });
 
   it("marks a lane with no credential as not for sale rather than broken", async () => {
-    const policy = await import("@/lib/marketplace-policy");
+    const policy = await import("@/lib/services/accounts/marketplace-policy");
     vi.mocked(policy.isMarketplaceCheckoutConfigured).mockReturnValue(false);
     state.results = [[], [], [], [], []];
     render(await AdminServicesPage());

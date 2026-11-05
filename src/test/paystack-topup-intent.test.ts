@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { forgetPaystackTopUp, readPendingPaystackTopUps, rememberPaystackTopUp } from "@/lib/paystack-topup-intent";
-import { paystackAppOrigin } from "@/lib/paystack-origin";
+import { forgetPaystackTopUp, readPendingPaystackTopUps, rememberPaystackTopUp } from "@/lib/payments/paystack-topup-intent";
+import { paystackAppOrigin } from "@/lib/payments/paystack-origin";
 
 function storage(): Storage {
   const values = new Map<string, string>();

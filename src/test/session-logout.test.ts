@@ -5,7 +5,7 @@ import type { SQL } from "drizzle-orm";
 const mocks = vi.hoisted(() => ({ cookies: vi.fn(), headers: vi.fn(), insert: vi.fn(), remove: vi.fn(), set: vi.fn() }));
 vi.mock("next/headers", () => ({ cookies: mocks.cookies, headers: mocks.headers }));
 vi.mock("@/db", () => ({ db: { insert: () => ({ values: mocks.insert }), delete: () => ({ where: mocks.remove }) } }));
-import { createSession, destroySession, requestIsSecure } from "@/lib/auth";
+import { createSession, destroySession, requestIsSecure } from "@/lib/identity/auth";
 
 beforeEach(() => {
   vi.clearAllMocks();
