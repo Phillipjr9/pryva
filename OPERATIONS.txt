@@ -1,0 +1,199 @@
+PRYVA OPERATIONS
+================
+
+Keep this operational guidance separate from customer-facing copy. Tests use
+mocks and embedded PostgreSQL; they are not evidence that providers, hosting,
+email delivery, account recovery or payment settlement work in production.
+Have the owner authorize production promotion and infrastructure changes.
+
+1. Environments and deployment
+------------------------------
+
+Keep production database credentials and provider keys out of preview and
+local environments. Verify the host's actual environment-variable scopes; a
+preview build that skips migrations can still read or write a production database
+if production credentials are present at runtime. A preview without persistent
+database credentials uses empty in-memory data, and is not an integration test.
+Purchase, payment, refund and cron paths have preview guards, but a preview is
+not globally read-only: other authenticated routes can still access or change a
+shared database. Isolate both the database and provider credentials regardless.
+
+Set NEXT_PUBLIC_SITE_URL to https://pryvalogs.com in production. Check the
+approved Google callback in the Google Console matches the app callback at
+https://pryvalogs.com/api/auth/google/callback. Inspect the legacy
+NEXT_PUBLIC_APP_URL and the WEBAUTHN_ORIGIN and WEBAUTHN_RP_ID settings as well;
+stale overrides can still select a retired host. Check the Paystack return URL
+and any provider-side allowlists. These external settings have not been verified.
+Do not change DNS, registrar, Vercel domain settings or other infrastructure
+without owner authorization.
+
+Back up before migrations. npm run db:migrate applies all top-level numbered SQL
+files in order and stops on failure. Production builds apply migrations before
+building, while previews do not. Migrations therefore need to be compatible with
+the old live application as well as the new application. Apply all outstanding
+migrations, including 0032, 0033 and 0034 where applicable. Migration 0034
+preserves pre-existing closed-account snapshots, email-change requests and
+passkeys; the current worker skips their queued email. Those historical records
+may still contain sensitive data and need a separately authorized privacy review.
+An earlier version of 0034 was applied by the production deployment on 5 November
+2026, and included deletes of those closed-account rows. The build log confirms
+application but does not report affected counts. Editing the file neither restores
+records nor causes the filename-based ledger to re-run it. Any investigation or
+restoration must be separately authorized; do not restore data blindly.
+
+Older workers lack the new skip rule and can claim or update historical jobs; some
+older versions may not check for closure before sending. Coordinate the scheduler
+with the owner during a mixed-version rollout. The migration rejects late passkey
+or email-change inserts for closed owners, including from an old app instance. During mixed-version rollout, an old passkey removal concurrent with
+closure can deadlock; PostgreSQL aborts one transaction, which should be retried
+after checking its result. Verify the backup and schema before allowing traffic.
+Never manually replay historical migrations or the legacy directory against an
+incompatible database.
+
+2. Signing in as an operator
+----------------------------
+
+The operator console is a separate surface; operators do not get the customer
+storefront. /admin/login and /login are both sign-in doors. A verified account
+listed in ADMIN_EMAILS goes to /admin; customers go to /dashboard. Admin access
+requires email verification and, when ADMIN_2FA_REQUIRED is enabled (the
+default), two-factor enrolment. /admin/account is the operator's 2FA setup path.
+Preview bootstrap is preview-only and is not a production access method.
+
+Set ADMIN_EMAILS after the account exists and is verified:
+  1. Leave the address out of ADMIN_EMAILS and sign up normally.
+  2. Confirm the address from the verification email.
+  3. Add the verified address to ADMIN_EMAILS using the host's secret manager.
+  4. Follow the owner's deployment approval process, sign in, and enrol 2FA at
+     /admin/account before depending on the account for operations.
+
+Adding the allowlisted address before signup can block the account from being
+created. Do not permanently disable ADMIN_2FA_REQUIRED to work around setup.
+Plan recovery before rotating TWO_FACTOR_KEY: changing it without a migration
+makes enrolled authenticator secrets unreadable. If all enrolled accounts fail,
+restore the prior key rather than mass-clearing factors. A customer who loses an
+authenticator should use a single-use recovery code; if none remain, verify their
+identity independently before any operator-assisted reset. A support message from
+a possibly stolen session alone is not identity proof. Never paste a key into
+logs, Git, tickets, a screenshot or chat.
+
+Google sign-in does not automatically link an existing account merely because
+the provider returns the same email. Google-only legacy users without a bound
+subject require verified, operator-assisted recovery; do not bulk-link identities
+by email. Passkeys are bound to their relying-party domain, so changing domains or
+WEBAUTHN_ORIGIN can make existing credentials unusable. Plan a recovery path.
+
+3. Email and delivery
+---------------------
+
+Configure a verified RESEND_FROM_EMAIL, RESEND_API_KEY, RESEND_WEBHOOK_SECRET
+and CRON_SECRET on the production deployment. Verify the sender and credentials
+in the provider, perform a genuine send to a mailbox the operator controls, and
+verify the webhook separately. Provider acceptance is not proof of inbox
+delivery. Check bounces, complaints and webhook delivery in Resend and the
+operator integration diagnostics. SPF, DKIM and DMARC are operator-managed;
+request approval before changing DNS. Rotate any credentials exposed in chat.
+
+The repository schedules /api/cron/nightly at 01:20 UTC. Timely retries also
+require an authenticated scheduler calling GET /api/cron/wallet-emails at least
+once per minute with Authorization: Bearer <CRON_SECRET>. POST is supported.
+This frequent scheduler is not installed by the repository; daily cron alone is
+not sufficient. Alert on a non-200 result, scheduler failure, old pending jobs or
+review jobs. Each call processes a bounded batch and the app shares a rate
+budget; add capacity and coordinate all senders if volume exceeds it.
+
+The durable outbox queues ledger movements, withdrawal states, bank links,
+password changes, eligible purchase milestones/receipts, marketplace delivery,
+number codes, eSIM delivery, human support replies and passkey changes. It
+snapshots the recipient and the exact first attempted payload. A retry reuses the
+same Resend idempotency key and body. An ambiguous request older than 23 hours,
+an idempotency conflict, test-labelled legacy messages and invalid payloads go
+to review; do not automatically reset or replay them. Changing Resend accounts
+or keys can invalidate provider deduplication assumptions. Test Paystack keys
+hold financial notifications for review rather than presenting them as live.
+Security and support notifications remain eligible.
+
+Only actual human support replies trigger a support email, without copying the
+conversation or assistant trace. A passkey alert contains no credential or
+device label. A receipt does not promise delivery; gift-card codes do not appear
+in purchase receipts. The separate eSIM and number-delivery messages intentionally
+contain the purchased service's activation details or code: treat their stored
+payloads and mailbox as sensitive. Email-change confirmation, email-change
+security and 2FA notices are currently best effort rather than durable; password
+reset and gift-card delivery also have best-effort paths. Monitor provider logs
+and investigate reports rather than promising a retry where none exists.
+
+When an account closes, its saved outbox snapshots and email-change requests are
+removed with its identity, without erasing financial history. An email already in
+flight to the provider cannot be recalled. After commit, the app makes at most one
+best-effort closure-confirmation attempt to the previously verified address. The
+address exists briefly in process memory and at the email provider, not in an app
+retry queue; a lost callback or failed send is not retried. No closure email is
+sent to an unverified address or from the in-memory preview database. Monitor mail
+errors without logging addresses. Old clients that cannot submit the exact balance
+acknowledgement must refresh before forfeiting a positive balance.
+
+The owner chose a ten-year retention horizon after account closure (31 Oct 2026).
+It is an internal policy, not a number to add to customer-facing promises. The
+nightly destructive purge is disabled unless RETENTION_PURGE_ENABLED=true. When
+armed it works in bounded batches and holds accounts with unfinished payouts; the
+read-only retention diagnostics can show what is due without purging it. Review
+legal obligations, backups and outstanding disputes before enabling any purge.
+
+4. Payment and fulfilment safety
+--------------------------------
+
+A wallet credit is valid only after the verified top-up and ledger credit commit.
+A debit receipt is not proof of fulfilment. A withdrawal request or processing
+notice is not proof of bank payout; a completed notice is not a bank statement.
+The ledger, provider status and authenticated operator queue are the records to
+reconcile. Never reset a processing payout, retry a transfer, issue a refund or
+change a status just because a response or webhook was missing: an earlier action
+may have succeeded. First investigate provider references and ledger history.
+Use the existing idempotency and review paths, with operator authorization.
+
+Production rejects Paystack and gateway test or unrecognised keys. Use live keys only
+with an authorized launch plan. Switching keys does not erase earlier test-funded
+wallet credits or reverse transactions. Whether previous tests shared the current
+live database is unknown, and historical top-ups do not reliably identify test
+versus live. Before allowing live withdrawals, an authorized operator must
+reconcile Paystack's test and live records against wallet and bank-transfer history,
+including downstream spending, refunds and payouts. Preserve evidence; do not
+automatically delete, reset or adjust customer records. Escalate uncertain cases
+for review rather than inferring that a balance is safe from a key change.
+
+A configured eSIM catalogue is not a guarantee of stock. Unverified sample plans
+are not shown; preview environments must not make live catalogue, purchase or
+completion calls. Keep provider and sourcing details out of customer copy. Check
+service availability and costs with an isolated account before taking real money.
+
+The nightly job runs reconciliation and bounded sweeps, including number codes,
+refunds, eSIMs, scheduled orders, payouts and onboarding. Check its status and
+reconciliation_runs; a missing run is not a clean run. The destructive retention
+sweep remains off unless explicitly enabled. Investigate alerts rather than
+assuming the job repaired every uncertain transaction.
+
+5. Backups and incident response
+--------------------------------
+
+Enable and test the database provider's backups/PITR. The application archive is
+an additional logical snapshot, not continuous recovery. On an authorized host:
+
+  npm run db:backup
+  npm run db:verify-backup -- path/to/archive.ndjson.gz
+
+Backups contain customer data. Encrypt them, restrict access, keep an independent
+copy and never commit them. Restore drills belong in a separate empty database:
+apply migrations there first, verify the archive, then use npm run db:restore
+with the documented --file, --target and --confirm-restore arguments. Never
+restore over production or use --allow-overwrite without explicit approval and a
+recovery plan. Verify row counts, financial invariants and access before routing
+traffic to a restored database. These scripts need an appropriate connection;
+check scripts/backup-db.mjs and scripts/restore-db.mjs before use.
+
+For suspected compromise: contain access, rotate affected secrets through the
+host/provider, invalidate sessions as appropriate, preserve evidence, reconcile
+payments and contact the owner. Avoid logging credentials, full bank numbers,
+recipient addresses, customer messages or activation codes. ALERT_WEBHOOK_URL
+can surface application errors, but logs and alerts are not a substitute for
+provider monitoring. See SECURITY.txt for known gaps and safe reporting.

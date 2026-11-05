@@ -1,3 +1,4 @@
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, gte, isNull, or, sql } from "drizzle-orm";
@@ -107,6 +108,7 @@ export async function POST(request: NextRequest) {
   if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get("content-type") ?? "")) {
     return NextResponse.json({ error: "Content-Type must be application/json." }, { status: 415 });
   }
+  if (financialActionsUnavailable()) return NextResponse.json({ error: "Purchases are unavailable in this environment." }, { status: 503 });
   if (!isMarketplaceCheckoutConfigured()) {
     return NextResponse.json({ error: "Account purchases are temporarily unavailable." }, { status: 503 });
   }

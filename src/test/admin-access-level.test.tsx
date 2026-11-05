@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { AccessLevel } from "@/app/admin/users/AccessLevel";
+import { AccessLevel } from "@/app/admin/(console)/users/AccessLevel";
 
 /**
  * The access label on /admin/users.

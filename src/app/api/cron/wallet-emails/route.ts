@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { dispatchWalletEmails, walletEmailConfigured } from "@/lib/wallet-email-outbox";
 import { logger } from "@/lib/logger";
 
@@ -17,7 +17,7 @@ function authorized(value: string | null): boolean {
 
 export async function GET(request: NextRequest) {
   if (!authorized(request.headers.get("authorization"))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (isPreviewDatabase() || !walletEmailConfigured()) return NextResponse.json({ error: "Wallet email worker is unavailable" }, { status: 503 });
+  if (financialActionsUnavailable() || !walletEmailConfigured()) return NextResponse.json({ error: "Wallet email worker is unavailable" }, { status: 503 });
   try {
     const counts = await dispatchWalletEmails();
     return NextResponse.json({ ok: true, ...counts }, { headers: { "Cache-Control": "no-store" } });

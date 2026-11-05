@@ -1,14 +1,13 @@
+import { brandedNotificationEmail, type NotificationHero } from "@/lib/email-templates";
+
 export type WalletEmailEvent =
   | { kind: "wallet"; type: string; amount: number; reference: string; description: string; createdAt: Date }
-  | { kind: "withdrawal_processing" | "withdrawal_completed" | "withdrawal_rejected" | "purchase_completed"; amount: number; reference: string; createdAt: Date };
+  | { kind: "withdrawal_processing" | "withdrawal_completed" | "withdrawal_rejected" | "withdrawal_failed" | "purchase_completed"; amount: number; reference: string; createdAt: Date }
+  | { kind: "first_purchase" | "purchase_recorded"; amount: number; reference: string; description: string; productName: string | null; createdAt: Date }
+  | { kind: "bank_linked"; bankName: string; lastFour: string | null; createdAt: Date };
 
-/**
- * Resend takes attachments as base64. A `content_id` makes the image available
- * inline as `cid:<id>` as well as downloadable, which is how the eSIM QR reaches
- * a mail client that blocks remote images.
- */
+/** Resend accepts inline attachments as base64 with a content ID. */
 export type ResendAttachment = { filename: string; content: string; content_id?: string };
-
 export type ResendPayload = {
   from: string;
   to: string[];
@@ -18,98 +17,165 @@ export type ResendPayload = {
   attachments?: ResendAttachment[];
 };
 
-function htmlEscape(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
+function clean(value: string, max: number): string {
+  return value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
-/** Only known server-generated reference shapes may leave the app. Gift-card references contain redeemable codes. */
-function safeReference(event: WalletEmailEvent): string | null {
+/** Only server-generated references can leave the app. Gift-card references are redeemable codes. */
+function safeReference(event: Exclude<WalletEmailEvent, { kind: "bank_linked" }>): string | null {
   const value = event.reference;
-  if (event.kind === "wallet" && /gift\s*card/i.test(event.description)) return null;
+  if ((event.kind === "wallet" || event.kind === "first_purchase" || event.kind === "purchase_recorded") && /gift\s*card/i.test(event.description)) return null;
   if (event.kind === "wallet" && event.type === "credit" && event.description === "Paystack wallet top-up" && /^TOP-[a-f0-9]{24}$/i.test(value)) return value;
   if ((event.kind.startsWith("withdrawal_") || (event.kind === "wallet" && event.type === "withdrawal")) && /^WD-[a-f0-9]{24}$/i.test(value)) return value;
-  if (event.kind === "purchase_completed" && /^MKT-[a-f0-9]{28}$/i.test(value)) return value;
+  if ((event.kind === "purchase_completed" || event.kind === "first_purchase" || event.kind === "purchase_recorded") && /^MKT-[a-f0-9]{28}$/i.test(value)) return value;
+  if ((event.kind === "first_purchase" || event.kind === "purchase_recorded") && /^(?:PRY|GC|BLK)-[a-z0-9]{21}$/i.test(value)) return value;
   if (event.kind === "wallet" && event.type === "refund" && /^(?:RFD|RWD|REF)-[a-f0-9]{24}$/i.test(value)) return value;
   return null;
 }
 
-/** No bank details, balance, gift codes, OTPs, supplier credentials, or arbitrary descriptions leave the app. */
-export function makeWalletEmail(event: WalletEmailEvent, recipient: string, sender: string, testMode: boolean): ResendPayload {
+/** No full bank details, balances, gift codes, OTPs, credentials or arbitrary descriptions leave the app. */
+export function makeWalletEmail(event: WalletEmailEvent, recipient: string, sender: string): ResendPayload {
   if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(recipient) || recipient.length > 200 ||
-      !sender || sender.length > 255 || /[\r\n]/.test(sender) || !Number.isSafeInteger(event.amount) || event.amount <= 0 ||
+      !sender || sender.length > 255 || /[\r\n]/.test(sender) ||
       !Number.isFinite(event.createdAt.getTime())) throw new Error("Invalid notification data");
 
+  const recorded = event.createdAt.toISOString().replace("T", " ").slice(0, 16) + " UTC";
+  const warning = "If you don't recognize this activity, secure your account and contact support. Pryva will never ask for your password, OTP or card details by email.";
+  if (event.kind === "bank_linked") {
+    const bankName = clean(event.bankName, 100) || "Bank account";
+    const account = event.lastFour && /^\d{4}$/.test(event.lastFour) ? `Ending in ${event.lastFour}` : "Details hidden";
+    const message = brandedNotificationEmail({
+      subject: "Pryva: A bank account was linked",
+      eyebrow: "Account security",
+      title: "A bank account was linked",
+      intro: "A bank account was added to your Pryva account. You can review your saved accounts in your wallet.",
+      hero: "bank", heroAlt: "Bank account linked",
+      rows: [{ label: "Bank", value: bankName }, { label: "Account", value: account }, { label: "Added", value: recorded }],
+      ctaPath: "/dashboard/wallet", ctaLabel: "View my wallet", note: warning,
+    });
+    return { from: sender, to: [recipient], ...message };
+  }
+
+  if (!Number.isSafeInteger(event.amount) || event.amount <= 0) throw new Error("Invalid notification data");
   let subject: string;
-  let headline: string;
-  let detail: string;
+  let title: string;
+  let intro: string;
+  let eyebrow = "Wallet activity";
+  let hero: NotificationHero = "wallet";
   let amountLabel = "Amount";
+  let ctaPath = "/dashboard/wallet";
+  let ctaLabel = "View my wallet";
+
   if (event.kind === "wallet") {
     if (event.type === "credit" && event.description === "Paystack wallet top-up") {
       subject = "Wallet top-up confirmed";
-      headline = "Your wallet top-up was confirmed and credited.";
-      detail = "This confirms the wallet credit, not a bank or card statement.";
+      title = "Your wallet has been topped up";
+      intro = "Your wallet top-up was confirmed and credited. This confirms the wallet credit, not a bank or card statement.";
+      eyebrow = "Top-up successful";
       amountLabel = "Amount added";
+    } else if (event.type === "credit" && /^GIFT-(PRYVA-[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){2})$/.test(event.reference)
+      && event.description === `Gift card redemption: ${event.reference.slice(5)}`) {
+      // This is the existing, transactional wallet credit, not a second email.
+      // Neither its bearer code nor an arbitrary ledger description is exposed.
+      subject = "Gift card redeemed";
+      title = "Your gift card was redeemed";
+      intro = "The gift card amount was credited to your wallet. The card's code is not included in this email.";
+      eyebrow = "Gift card redeemed";
+      hero = "gift-redeemed";
+      amountLabel = "Amount credited";
     } else if (event.type === "refund") {
       subject = "Wallet refund credited";
-      headline = "A refund was credited to your wallet.";
-      detail = "Check your transaction history for the latest details.";
+      title = "A refund reached your wallet";
+      intro = "A refund was credited to your wallet. Check your transaction history for the latest details.";
+      eyebrow = "Refund credited";
+      hero = "refund";
       amountLabel = "Amount credited";
     } else if (event.type === "withdrawal") {
       subject = "Withdrawal request recorded";
-      headline = "Your withdrawal request was recorded.";
-      detail = "This is a request, not confirmation of a bank payout. The total below includes the withdrawal fee.";
+      title = "Your withdrawal was requested";
+      intro = "Your withdrawal request was recorded. This is a request, not confirmation of a bank payout. The total below includes the withdrawal fee.";
+      eyebrow = "Withdrawal requested";
+      hero = "withdrawal";
       amountLabel = "Wallet amount reserved";
     } else if (event.type === "debit") {
       subject = "Wallet debit recorded";
-      headline = "A debit was recorded on your wallet.";
-      detail = "This confirms the wallet movement only; check your order for delivery or review status.";
+      title = "A wallet debit was recorded";
+      intro = "This confirms the wallet movement only; check your order for delivery or review status.";
+      hero = "wallet-debit";
       amountLabel = "Amount debited";
     } else if (event.type === "credit") {
       subject = "Wallet credit recorded";
-      headline = "A credit was recorded on your wallet.";
-      detail = "Check your transaction history for the latest details.";
+      title = "A credit reached your wallet";
+      intro = "A credit was recorded on your wallet. Check your transaction history for the latest details.";
+      hero = "wallet-credit";
       amountLabel = "Amount credited";
     } else {
       subject = "Wallet activity recorded";
-      headline = "An activity was recorded on your wallet.";
-      detail = "Check your transaction history for the latest details.";
+      title = "Your wallet activity";
+      intro = "An activity was recorded on your wallet. Check your transaction history for the latest details.";
     }
+  } else if (event.kind === "first_purchase") {
+    subject = "Thank you for your first purchase";
+    title = "Your first Pryva purchase";
+    intro = "Thank you for choosing Pryva. Your purchase has been recorded; open your account for its current status and details.";
+    eyebrow = "A first worth celebrating";
+    hero = "first-purchase";
+    amountLabel = "Purchase amount";
+    ctaPath = "/dashboard";
+    ctaLabel = "Open my account";
+  } else if (event.kind === "purchase_recorded") {
+    subject = "Your purchase was recorded";
+    title = "Your purchase is recorded";
+    intro = "We recorded your paid purchase. Sign in for its current order and delivery status; this email does not confirm delivery.";
+    eyebrow = "Purchase receipt";
+    hero = "purchase-receipt";
+    amountLabel = "Purchase amount";
+    ctaPath = /^Gift card purchase:/i.test(event.description) ? "/dashboard/gift-cards" : "/dashboard/orders";
+    ctaLabel = /^Gift card purchase:/i.test(event.description) ? "View gift cards" : "View my orders";
   } else if (event.kind === "purchase_completed") {
     subject = "Purchase marked delivered";
-    headline = "Your purchase was marked delivered.";
-    detail = "Sign in to view the order. Credentials and account details are not included in this email.";
+    title = "Your purchase was marked delivered";
+    intro = "Sign in to view the order. Credentials and account details are not included in this email.";
+    eyebrow = "Order update";
+    hero = "order";
     amountLabel = "Order amount";
+    ctaPath = "/dashboard/orders";
+    ctaLabel = "View my orders";
   } else {
+    eyebrow = "Withdrawal update";
+    hero = "withdrawal";
     amountLabel = "Requested payout";
     if (event.kind === "withdrawal_processing") {
       subject = "Withdrawal under review";
-      headline = "Your withdrawal is being processed.";
-      detail = "This is not confirmation of a bank payout. Check your requests for updates.";
+      title = "Your withdrawal is being processed";
+      intro = "This is not confirmation of a bank payout. Check your requests for updates.";
+      hero = "withdrawal-processing";
     } else if (event.kind === "withdrawal_completed") {
       subject = "Withdrawal marked complete";
-      headline = "Your withdrawal was marked complete after review.";
-      detail = "Check your bank for the final receipt. This email is not a bank statement.";
+      title = "Your withdrawal was marked complete";
+      intro = "Your withdrawal was marked complete. Check your bank for the final receipt. This email is not a bank statement.";
+      hero = "withdrawal-completed";
+    } else if (event.kind === "withdrawal_failed") {
+      subject = "Withdrawal could not be completed";
+      title = "Your withdrawal could not be completed";
+      intro = "The withdrawal did not complete. The amount and fee were returned to your wallet; check your wallet and withdrawal history for details.";
+      hero = "withdrawal-failed";
     } else {
       subject = "Withdrawal request rejected";
-      headline = "Your withdrawal request was rejected.";
-      detail = "Check your wallet and withdrawal history for details. Any wallet refund is recorded separately.";
+      title = "Your withdrawal request was rejected";
+      intro = "Check your wallet and withdrawal history for details. Any wallet refund is recorded separately.";
+      hero = "withdrawal-rejected";
     }
   }
 
+  const rows = [{ label: amountLabel, value: `₦${event.amount.toLocaleString("en-NG")}` }];
+  if ((event.kind === "first_purchase" || event.kind === "purchase_recorded") && event.productName) rows.unshift({ label: "Product", value: clean(event.productName, 120) });
   const reference = safeReference(event);
-  const lines = [
-    testMode ? "TEST MODE — no real payment or payout." : "Pryva wallet notification",
-    "",
-    headline,
-    `${amountLabel}: ₦${event.amount.toLocaleString("en-NG")}`,
-    ...(reference ? [`Reference: ${reference}`] : []),
-    `Recorded: ${event.createdAt.toISOString().replace("T", " ").replace(".000Z", " UTC")}`,
-    "",
-    detail,
-    "Sign in to Pryva to view your activity. If you don't recognize it, contact support.",
-    "Pryva will never ask for your password, OTP or card details by email.",
-  ];
-  const text = lines.join("\n");
-  const html = `<div style="font-family:Arial,sans-serif;color:#1d1830;max-width:560px;margin:auto;line-height:1.6"><p style="font-weight:700;color:#6742a6">PRYVA</p><div style="white-space:pre-line">${htmlEscape(text)}</div></div>`;
-  return { from: sender, to: [recipient], subject: `${testMode ? "[TEST] " : ""}Pryva: ${subject}`, text, html };
+  if (reference) rows.push({ label: "Reference", value: reference });
+  rows.push({ label: "Recorded", value: recorded });
+  const message = brandedNotificationEmail({
+    subject: `Pryva: ${subject}`,
+    eyebrow, title, intro, hero, heroAlt: title, rows, ctaPath, ctaLabel, note: warning,
+  });
+  return { from: sender, to: [recipient], ...message };
 }

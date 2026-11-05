@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const security = readFileSync("SECURITY.md", "utf8");
+const security = readFileSync("SECURITY.txt", "utf8");
 const securityTxt = readFileSync("public/.well-known/security.txt", "utf8");
 const ci = readFileSync(".github/workflows/ci.yml", "utf8");
 const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
@@ -16,12 +16,12 @@ const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
 describe("security posture", () => {
   it("documents the threat model and the controls, in code terms", () => {
     for (const section of [
-      "## 1. The threat model",
-      "## 2. What is implemented, and where",
-      "## 3. What this pass changed",
-      "## 4. Known gaps",
-      "## 5. The operator checklist",
-      "## 6. Reporting a vulnerability",
+      "1. The threat model",
+      "2. What is implemented, and where",
+      "3. What this pass changed",
+      "4. Known gaps",
+      "5. The operator checklist",
+      "6. Reporting a vulnerability",
     ]) {
       expect(security, section).toContain(section);
     }
@@ -62,8 +62,8 @@ describe("security posture", () => {
   });
 
   it("publishes a security contact that has not expired", () => {
-    expect(securityTxt).toContain("Contact: https://pryva.ng/contact");
-    expect(securityTxt).toContain("Canonical: https://pryva.ng/.well-known/security.txt");
+    expect(securityTxt).toContain("Contact: https://pryvalogs.com/contact");
+    expect(securityTxt).toContain("Canonical: https://pryvalogs.com/.well-known/security.txt");
     const expires = /Expires:\s*(\S+)/.exec(securityTxt)?.[1] ?? "";
     const when = Date.parse(expires);
     expect(Number.isFinite(when)).toBe(true);

@@ -8,7 +8,8 @@ import { isSameOriginMutation } from "@/lib/net";
 import { passwordChangeRateLimiter } from "@/lib/rate-limit";
 import { validatePassword } from "@/lib/validation";
 import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { sendSecurityNotice } from "@/lib/security-notice";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
+import { queuePasswordChangeEmail } from "@/lib/password-change-email";
 
 export const dynamic = "force-dynamic";
 
@@ -59,21 +60,17 @@ export async function POST(request: NextRequest) {
       // Two simultaneous changes must not both succeed against the same old hash.
       const [updated] = await tx.update(users).set({ passwordHash: newHash })
         .where(and(eq(users.id, user.id), eq(users.passwordHash, userProfile.passwordHash)))
-        .returning({ id: users.id });
+        .returning({ id: users.id, email: users.email, name: users.name });
       if (!updated) return false;
       await tx.delete(sessions).where(and(eq(sessions.userId, user.id), ne(sessions.token, currentToken)));
+      await queuePasswordChangeEmail(tx, updated);
       return true;
     });
     if (!changed) return NextResponse.json({ error: "Password changed elsewhere; sign in again." }, { status: 409 });
 
-    // The account holder is the only one who can tell us this was not an
-    // attacker who already had the old password. Best effort by design: the
-    // change has committed, and a mail outage must not report it as failed.
-    try {
-      await sendSecurityNotice({ to: userProfile.email, name: userProfile.name, event: "password_changed" });
-    } catch {
-      // The password has already changed; a mail failure must not report otherwise.
-    }
+    // The password update atomically queued the security alert. Send after the
+    // response; the durable outbox retries without rolling back the change.
+    scheduleWalletEmails();
 
     return NextResponse.json({ ok: true, message: "Password changed; other sessions were signed out." });
   } catch {

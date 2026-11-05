@@ -43,10 +43,10 @@ export default async function ContactPage() {
               <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-lav-100 text-lav-600">
                 <Mail className="h-6 w-6" />
               </div>
-              <h2 className="mb-2 text-[1rem] font-semibold text-ink">Email us</h2>
+              <h2 className="mb-2 text-[1rem] font-semibold text-ink">Contact support</h2>
               <p className="text-[0.86rem] text-ink-2">
-                <a href="mailto:support@pryva.ng" className="text-lav-700 underline underline-offset-2">
-                  support@pryva.ng
+                <a href="#contact-form" className="text-lav-700 underline underline-offset-2">
+                  Open the contact form
                 </a>
               </p>
             </div>
@@ -68,7 +68,7 @@ export default async function ContactPage() {
             </div>
           </div>
 
-          <div className="mx-auto max-w-2xl">
+          <div id="contact-form" className="mx-auto max-w-2xl scroll-mt-6">
             <ContactForm
               signedIn={Boolean(user)}
               defaultName={user?.name ?? ""}

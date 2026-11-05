@@ -29,10 +29,10 @@ function sentBody() {
 beforeEach(() => {
   vi.clearAllMocks();
   state.configured = true;
-  state.fetch.mockResolvedValue({ ok: true, status: 200 });
+  state.fetch.mockImplementation(async () => new Response(JSON.stringify({ id: "message-1" }), { status: 200 }));
   vi.stubGlobal("fetch", state.fetch);
   process.env.RESEND_API_KEY = "re_test";
-  process.env.RESEND_FROM_EMAIL = "Pryva <hello@pryva.ng>";
+  process.env.RESEND_FROM_EMAIL = "Pryva <hello@example.test>";
 });
 
 describe("the four things worth an email", () => {
@@ -49,14 +49,33 @@ describe("the four things worth an email", () => {
     expect(notice.subject).toMatch(/sign-in email was changed/i);
     expect(notice.text).toMatch(/no longer the one used to sign in/i);
     expect(notice.text).toMatch(/contact support immediately/i);
+    expect(notice.html).toContain('/contact"');
+    expect(notice.html).not.toContain('/forgot-password');
   });
 
   it("distinguishes two-factor being switched on from switched off", () => {
     const on = buildSecurityNotice("two_factor_enabled", "Ada", new Date());
     const off = buildSecurityNotice("two_factor_disabled", "Ada", new Date());
     expect(on.text).toMatch(/needs a code from your authenticator/i);
-    expect(off.text).toMatch(/password alone/i);
+    expect(off.text).toMatch(/authenticator code is no longer required/i);
     expect(on.subject).not.toBe(off.subject);
+  });
+
+  it("uses different artwork for each security event", () => {
+    const at = new Date("2026-03-04T09:05:00Z");
+    const expected = {
+      password_changed: "password-changed",
+      email_changed: "email-changed",
+      two_factor_enabled: "two-factor-on",
+      two_factor_disabled: "two-factor-off",
+      passkey_added: "passkey-added",
+      passkey_removed: "passkey-removed",
+    } as const;
+    for (const [event, hero] of Object.entries(expected)) {
+      const notice = buildSecurityNotice(event as keyof typeof expected, "Ada", at);
+      expect(notice.html).toContain(`/images/email/hero-${hero}.jpg`);
+      expect(notice.html).toContain('alt="');
+    }
   });
 
   it("escapes a name that looks like markup", () => {
@@ -71,6 +90,7 @@ describe("sending it", () => {
     const result = await sendSecurityNotice({ to: "ada@example.com", name: "Ada", event: "two_factor_disabled" });
     expect(result).toEqual({ sent: true, detail: null });
     expect(state.fetch).toHaveBeenCalledTimes(1);
+    expect(state.fetch.mock.calls[0][1]).toMatchObject({ redirect: "error", cache: "no-store" });
     expect(sentBody().to).toEqual(["ada@example.com"]);
     expect(sentBody().subject).toMatch(/turned off/i);
   });
@@ -94,6 +114,12 @@ describe("sending it", () => {
     state.fetch.mockResolvedValue({ ok: false, status: 403 });
     const result = await sendSecurityNotice({ to: "ada@example.com", name: "Ada", event: "password_changed" });
     expect(result).toEqual({ sent: false, detail: "provider 403" });
+  });
+
+  it("does not claim acceptance when a successful response has no provider message ID", async () => {
+    state.fetch.mockImplementation(async () => new Response("{}", { status: 200 }));
+    const result = await sendSecurityNotice({ to: "ada@example.com", name: "Ada", event: "two_factor_enabled" });
+    expect(result).toEqual({ sent: false, detail: "acceptance unconfirmed" });
   });
 
   it("swallows a network failure, so the action that triggered it still succeeds", async () => {

@@ -8,6 +8,42 @@ import { isArenaPreviewHost, isLocalHost, requestProto } from "@/lib/net";
 import { adminBlockedForMissingSecondFactor } from "@/lib/admin-two-factor";
 
 export const SESSION_COOKIE = "pryva_session";
+
+/**
+ * The `Domain` a session cookie should carry.
+ *
+ * Two names are involved once a site moves to its own domain: the apex
+ * (`pryvalogs.com`) and the `www.` host. A cookie set without `Domain` is
+ * host-only, so signing in on one and opening the other silently loses the
+ * session — the browser drops it and the user is bounced back to the sign-in
+ * page with no error to point at.
+ *
+ * On the canonical domain the cookie is written for the registrable domain so
+ * both names share it. Everywhere else — previews, `*.vercel.app`, localhost —
+ * it stays host-only, which is the safe default: a `Domain` of `vercel.app` would
+ * be sent to every unrelated project on that suffix.
+ *
+ * Deliberately not derived from `NEXT_PUBLIC_SITE_URL` alone: a request on a
+ * host that is not in the canonical family must not be handed a cookie scoped to
+ * that family.
+ */
+export function sessionCookieDomain(host: string | null | undefined, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const bare = (host ?? "").split(":")[0].trim().toLowerCase();
+  if (!bare || isLocalHost(bare)) return undefined;
+  const pinned = env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (!pinned) return undefined;
+  let pinnedHost: string;
+  try {
+    pinnedHost = new URL(pinned).hostname.toLowerCase();
+  } catch {
+    return undefined;
+  }
+  const apex = pinnedHost.replace(/^www\./, "");
+  // Only for the canonical domain and its own `www.`, and only when the apex
+  // has a dot -- a two-label host is not a registrable domain worth widening to.
+  if (bare !== apex && bare !== `www.${apex}`) return undefined;
+  return apex.includes(".") ? apex : undefined;
+}
 /**
  * Fallback copy of the same token for embedded previews.
  *
@@ -97,11 +133,13 @@ export async function createSession(userId: string, request?: Request): Promise<
   const secure = proto === "https" || embedded;
 
   const jar = await cookies();
+  const cookieDomain = sessionCookieDomain(request?.headers.get("x-forwarded-host") ?? request?.headers.get("host"));
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: embedded ? "none" : "lax",
     secure,
     ...(embedded ? { partitioned: true } : {}),
+    ...(cookieDomain ? { domain: cookieDomain } : {}),
     path: "/",
     expires: expiresAt,
   });
@@ -223,8 +261,15 @@ export async function requireUser(nextPath = "/dashboard"): Promise<PublicUser> 
   return requireAuth(nextPath);
 }
 
-export async function requireAdmin(nextPath = "/admin/dashboard"): Promise<PublicUser> {
-  const user = await requireAuth(nextPath);
+export async function requireAdmin(nextPath = "/admin"): Promise<PublicUser> {
+  // Signed out. The console has its own door, so an operator who follows a console
+  // link lands on the operator sign-in rather than on the storefront's. Both end at
+  // the same session; this only decides which page asks for it.
+  const signedOut = await getCurrentUser();
+  if (!signedOut) {
+    redirect(`/admin/login?next=${encodeURIComponent(nextPath)}`);
+  }
+  const user = signedOut;
 
   if (!isAdminUser(user)) {
     redirect(`/dashboard?error=admin-required`);
@@ -233,9 +278,11 @@ export async function requireAdmin(nextPath = "/admin/dashboard"): Promise<Publi
   // An administrator can approve withdrawals and issue refunds, so the account
   // that does it carries a second factor. Instead of an error, the redirect sends
   // them to the page that fixes it — with where they were going, so the return
-  // trip is one click.
+  // trip is one click. That page lives inside the console, because sending an
+  // operator into the customer dashboard to arm the console contradicts the whole
+  // point of having two.
   if (await adminBlockedForMissingSecondFactor(user.id)) {
-    redirect(`/dashboard/settings?require=2fa&next=${encodeURIComponent(nextPath)}#security`);
+    redirect(`/admin/account?require=2fa&next=${encodeURIComponent(nextPath)}`);
   }
 
   return user;
@@ -257,6 +304,23 @@ export async function destroySession(): Promise<void> {
     path: "/",
     maxAge: 0,
   });
+  // Also clear the domain-scoped copy. A session issued before the site moved to
+  // its own domain was written host-only; one issued after is written for the
+  // registrable domain. Logging out has to remove whichever of the two this
+  // browser holds, or "sign out" leaves a working session behind on one host.
+  const clearDomain = sessionCookieDomain(
+    (await headers()).get("x-forwarded-host") ?? (await headers()).get("host"),
+  );
+  if (clearDomain) {
+    jar.set(SESSION_COOKIE, "", {
+      httpOnly: true,
+      sameSite: embedded ? "none" : "lax",
+      secure,
+      path: "/",
+      domain: clearDomain,
+      maxAge: 0,
+    });
+  }
   jar.set(SESSION_COOKIE_EMBEDDED, "", {
     httpOnly: true,
     sameSite: "lax",

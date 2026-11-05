@@ -1,3 +1,4 @@
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
@@ -84,6 +85,8 @@ export async function POST(request: NextRequest) {
   if (!isJsonRequest(request)) {
     return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
   }
+
+  if (financialActionsUnavailable()) return NextResponse.json({ error: "Purchases are unavailable in this environment." }, { status: 503 });
 
   const limit = await purchaseRateLimiter(`bulk-create:${user.id}`);
   if (limit.unavailable) return NextResponse.json({ error: "Bulk orders are temporarily unavailable." }, { status: 503 });

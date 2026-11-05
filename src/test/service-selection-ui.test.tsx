@@ -15,7 +15,10 @@ describe("choosing services", () => {
   it("filters to the chosen category and type, links the exact item, and restores history", async () => {
     window.history.replaceState(null, "", "/dashboard/services");
     vi.stubGlobal("fetch", vi.fn().mockImplementation(async (url: string) => ({
-      ok: true, json: async () => ({ ok: true, country: new URL(url, window.location.origin).searchParams.get("country"), items: [] }),
+      ok: true, json: async () => ({ ok: true, country: new URL(url, window.location.origin).searchParams.get("country"), items: [
+        { id: "live-views", category: "social", name: "Instagram views", description: "Supplier listing", tag: "Views", artwork: { kind: "brand", name: "instagram" }, source: "live", coverage: "not-country-specific", stock: null, myUnits: null, price: null, action: { label: "Order", href: "/dashboard/boosts/item" } },
+        { id: "live-whatsapp", category: "verification", name: "WhatsApp", description: "Supplier listing", tag: "Messaging", artwork: { kind: "brand", name: "whatsapp" }, source: "live", coverage: "catalog-country", stock: null, myUnits: null, price: null, action: null },
+      ] }),
     })));
     render(<ServiceExplorer initialCountry={null} initialCategory={null} />);
     fireEvent.click(screen.getByRole("button", { name: "Nigeria" }));
@@ -23,12 +26,9 @@ describe("choosing services", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Social promotion" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "WhatsApp" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Views" }));
-    const card = screen.getByRole("heading", { name: "Instagram views" }).closest("article")!;
-    // The demo route this card used to link to no longer exists. Examples are
-    // never purchasable, so the card must render a disabled control rather than
-    // a link that 404s.
-    expect(within(card).queryByRole("link")).toBeNull();
-    expect(within(card).getByRole("button").hasAttribute("disabled")).toBe(true);
+    const card = (await screen.findByRole("heading", { name: "Instagram views" })).closest("article")!;
+    // The only social card is an actual supplier response, not a fabricated entry.
+    expect(within(card).getByRole("link", { name: "Order" }).getAttribute("href")).toBe("/dashboard/boosts/item");
     expect(screen.queryByRole("heading", { name: "Instagram followers" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "App verification" }));
     expect(screen.getByRole("heading", { name: "WhatsApp" })).toBeTruthy();
@@ -51,10 +51,8 @@ describe("choosing services", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Mobile data" }));
     expect(screen.getByRole("heading", { level: 1, name: "Mobile data" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "MTN" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Airtel" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "MTN" }));
-    expect(screen.getByRole("heading", { name: "MTN 1GB" })).toBeTruthy();
+    expect(screen.getByText("No listings match these filters")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "MTN 1GB" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Airtel 1GB" })).toBeNull();
   });
 

@@ -18,7 +18,7 @@ import { recordAdminAction } from "@/lib/admin-audit";
  * is the in-memory preview database.
  */
 
-const admin = { id: "e6601368-4eef-45e7-a562-f8621c4239f2", email: "owner@pryva.ng" };
+const admin = { id: "e6601368-4eef-45e7-a562-f8621c4239f2", email: "owner@example.test" };
 
 describe("recordAdminAction", () => {
   it("writes a durable entry with the actor's email snapshotted", async () => {
@@ -34,7 +34,7 @@ describe("recordAdminAction", () => {
     const rows = await db.select().from(adminAuditLog);
     const entry = rows.find((row) => row.targetId === "audit-order-1");
     expect(entry).toBeDefined();
-    expect(entry?.actorEmail).toBe("owner@pryva.ng");
+    expect(entry?.actorEmail).toBe("owner@example.test");
     expect(entry?.action).toBe("order.refund");
     expect(entry?.targetType).toBe("order");
     expect(entry?.summary).toContain("PV-AUDIT1");

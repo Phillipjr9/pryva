@@ -4,6 +4,7 @@ import { requireAuthApi } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 import { isSameOriginMutation } from "@/lib/net";
 import { deleteCredential, listCredentialSummaries } from "@/lib/passkeys";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   try {
     const deleted = await deleteCredential(user.id, id);
     if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    scheduleWalletEmails();
     return NextResponse.json({ ok: true, passkeys: await listCredentialSummaries(user.id) });
   } catch (error) {
     logger.error("Failed to remove a passkey", { userId: user.id, error });

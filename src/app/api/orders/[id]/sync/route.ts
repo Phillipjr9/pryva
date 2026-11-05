@@ -1,3 +1,4 @@
+import { isVercelPreview } from "@/lib/financial-environment";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, walletTransactions } from "@/db/schema";
@@ -22,6 +23,7 @@ export async function GET(
 ) {
   const user = await getCurrentUser();
   if (!user) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  if (isVercelPreview()) return Response.json({ ok: false, error: "Order sync is unavailable in preview" }, { status: 503 });
 
   const { id } = await params;
   if (!(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) || (isPreviewDatabase() && /^[a-z0-9-]{1,64}$/i.test(id)))) {

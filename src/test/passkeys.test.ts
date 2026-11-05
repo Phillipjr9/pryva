@@ -40,7 +40,7 @@ const USER = "3f1c6a2b-9d4e-4a7c-8b1f-2e5d6c7b8a90";
 const OTHER = "7a2b3c4d-5e6f-4a8b-9c0d-1e2f3a4b5c6d";
 const CHALLENGE = "challenge-value-that-the-device-signs-0001";
 
-const RP = { rpID: "pryva.ng", origin: "https://pryva.ng" };
+const RP = { rpID: "pryvalogs.com", origin: "https://pryvalogs.com" };
 
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
@@ -104,10 +104,36 @@ describe("the relying party", () => {
   };
 
   it("is pinned by configuration when the deployment names its origin", () => {
-    const env = { NEXT_PUBLIC_SITE_URL: "https://pryva.ng" } as unknown as NodeJS.ProcessEnv;
-    expect(passkeys.relyingPartyFor(request("https://preview.example.com/"), env)).toEqual({
-      rpID: "pryva.ng",
-      origin: "https://pryva.ng",
+    // A preview host is rewritten to the canonical origin, so a passkey enrolled
+    // on the preview is still usable on the real site.
+    const env = { NEXT_PUBLIC_SITE_URL: "https://example.test" } as unknown as NodeJS.ProcessEnv;
+    expect(passkeys.relyingPartyFor(request("https://pryva-abc123.vercel.app/"), env)).toEqual({
+      rpID: "example.test",
+      origin: "https://example.test",
+    });
+  });
+
+  it("lets the canonical host sign for itself instead of an old pinned domain", () => {
+    // The pin exists to correct deployment hosts. On the site's own domain it
+    // must describe the request: a stale pin would sign every ceremony for a
+    // domain the deployment no longer serves, and the browser would reject it.
+    const env = { NEXT_PUBLIC_SITE_URL: "https://example.test" } as unknown as NodeJS.ProcessEnv;
+    expect(passkeys.relyingPartyFor(request("https://example.test/"), env)).toEqual({
+      rpID: "example.test",
+      origin: "https://example.test",
+    });
+  });
+
+  it("still lets an explicit passkey origin override everything", () => {
+    // `WEBAUTHN_ORIGIN` is the escape hatch for a deployment that terminates
+    // WebAuthn somewhere the request headers cannot describe.
+    const env = {
+      WEBAUTHN_ORIGIN: "https://keys.example.test",
+      NEXT_PUBLIC_SITE_URL: "https://example.test",
+    } as unknown as NodeJS.ProcessEnv;
+    expect(passkeys.relyingPartyFor(request("https://pryva-abc123.vercel.app/"), env)).toEqual({
+      rpID: "keys.example.test",
+      origin: "https://keys.example.test",
     });
   });
 
@@ -121,12 +147,12 @@ describe("the relying party", () => {
 
   it("refuses plain http on a real host", () => {
     const env = {} as unknown as NodeJS.ProcessEnv;
-    expect(passkeys.relyingPartyFor(request("http://pryva.ng/"), env)).toBeNull();
+    expect(passkeys.relyingPartyFor(request("http://pryvalogs.com/"), env)).toBeNull();
   });
 
   it("refuses an RP ID that is not a suffix of the origin", () => {
-    const env = { WEBAUTHN_ORIGIN: "https://pryva.ng", WEBAUTHN_RP_ID: "example.com" } as unknown as NodeJS.ProcessEnv;
-    expect(passkeys.relyingPartyFor(request("https://pryva.ng/"), env)).toBeNull();
+    const env = { WEBAUTHN_ORIGIN: "https://pryvalogs.com", WEBAUTHN_RP_ID: "example.com" } as unknown as NodeJS.ProcessEnv;
+    expect(passkeys.relyingPartyFor(request("https://pryvalogs.com/"), env)).toBeNull();
   });
 
   it("accepts the arena preview host over https", () => {
@@ -282,6 +308,10 @@ describe("adding a passkey", () => {
     expect(stored.transports).toBe("internal");
     // base64url of [1,2,3] — no padding, no `+` or `/`.
     expect(stored.publicKey).toBe("AQID");
+    const notices = await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.userId, USER));
+    expect(notices).toMatchObject([{ eventKind: "passkey_added", recipient: "ada@example.com", passkeyRowId: stored.id }]);
+    expect(JSON.stringify(notices)).not.toContain("new-credential");
+    expect(JSON.stringify(notices)).not.toContain("AQID");
   });
 
   it("refuses a challenge that belonged to a different account", async () => {
@@ -293,6 +323,7 @@ describe("adding a passkey", () => {
     });
     expect(result).toEqual({ ok: false, reason: "no-challenge" });
     expect(mocks.verifyRegistrationResponse).not.toHaveBeenCalled();
+    expect(await database.select().from(schema.walletEmailOutbox)).toHaveLength(0);
   });
 
   it("refuses the same device twice", async () => {
@@ -319,6 +350,45 @@ describe("adding a passkey", () => {
     });
     expect(result).toEqual({ ok: false, reason: "duplicate" });
     expect(await database.select().from(webauthnCredentials)).toHaveLength(1);
+    expect(await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.userId, USER))).toHaveLength(0);
+  });
+
+  it("does not add a credential if the account closes while the device is being verified", async () => {
+    await passkeys.issueChallenge({ challenge: CHALLENGE, purpose: "register", userId: USER });
+    mocks.verifyRegistrationResponse.mockImplementationOnce(async () => {
+      await database.update(users).set({ deletedAt: new Date() }).where(eq(users.id, USER));
+      return {
+        verified: true,
+        registrationInfo: {
+          credential: { id: "late-device", publicKey: new Uint8Array([1]), counter: 0 },
+          credentialDeviceType: "singleDevice",
+          credentialBackedUp: false,
+        },
+      };
+    });
+    expect(await passkeys.finishRegistration({ userId: USER, rp: RP, response: responseFor(CHALLENGE, "late-device") as never }))
+      .toEqual({ ok: false, reason: "unavailable" });
+    expect(await database.select().from(webauthnCredentials)).toHaveLength(0);
+    expect(await database.select().from(schema.walletEmailOutbox)).toHaveLength(0);
+  });
+
+  it("rechecks capacity when a previously started ceremony finishes", async () => {
+    await passkeys.issueChallenge({ challenge: CHALLENGE, purpose: "register", userId: USER });
+    await database.insert(webauthnCredentials).values(
+      Array.from({ length: 10 }, (_, index) => ({ userId: USER, credentialId: `key-${index}`, publicKey: "AQID", counter: 0 })),
+    );
+    mocks.verifyRegistrationResponse.mockResolvedValue({
+      verified: true,
+      registrationInfo: {
+        credential: { id: "eleventh", publicKey: new Uint8Array([1]), counter: 0 },
+        credentialDeviceType: "singleDevice",
+        credentialBackedUp: false,
+      },
+    });
+    expect(await passkeys.finishRegistration({ userId: USER, rp: RP, response: responseFor(CHALLENGE, "eleventh") as never }))
+      .toEqual({ ok: false, reason: "at-capacity" });
+    expect(await database.select().from(webauthnCredentials)).toHaveLength(10);
+    expect(await database.select().from(schema.walletEmailOutbox)).toHaveLength(10);
   });
 
   it("stops at ten", async () => {
@@ -348,9 +418,13 @@ describe("removing a passkey", () => {
 
     expect(await passkeys.deleteCredential(USER, row.id)).toBe(false);
     expect(await database.select().from(webauthnCredentials)).toHaveLength(1);
+    expect(await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "passkey_removed"))).toHaveLength(0);
 
     expect(await passkeys.deleteCredential(OTHER, row.id)).toBe(true);
     expect(await database.select().from(webauthnCredentials)).toHaveLength(0);
+    expect(await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "passkey_removed"))).toMatchObject([
+      { userId: OTHER, recipient: "bola@example.com", passkeyRowId: row.id },
+    ]);
   });
 
   it("ignores a malformed id", async () => {

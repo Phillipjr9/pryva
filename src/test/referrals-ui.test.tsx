@@ -20,7 +20,7 @@ const authForm = read("src/components/auth/AuthForm.tsx");
 
 const base = {
   code: "ABC23DEF",
-  link: "https://pryva.ng/signup?ref=ABC23DEF",
+  link: "https://pryvalogs.com/signup?ref=ABC23DEF",
   earned: 500,
   invited: 2,
   pending: 1,
@@ -44,7 +44,7 @@ const html = (renderToStaticMarkup(<ReferralProgram {...base} />));
  */
 describe("the referral page", () => {
   it("shows the link and the code, both copyable", () => {
-    expect(html).toContain("https://pryva.ng/signup?ref=ABC23DEF");
+    expect(html).toContain("https://pryvalogs.com/signup?ref=ABC23DEF");
     expect(html).toContain(">ABC23DEF<");
     expect(html).toContain("Copy link");
     expect(html).toContain("select-all");

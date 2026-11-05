@@ -53,9 +53,13 @@ export function InboxManager() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
-  const inFlight = useRef(false);
+  // Track which inbox owns a poll. Switching inboxes may start a new poll even
+  // while the previous one is still in flight; stale results must not be shown
+  // under a different address.
+  const inFlight = useRef<{ inboxId: string } | null>(null);
 
   const active = inboxes.find((inbox) => inbox.status === "active") ?? null;
+  const activeId = active?.id ?? null;
   const savedInboxes = inboxes.filter((inbox) => inbox.status !== "discarded");
 
   const [reloadKey, setReloadKey] = useState(0);
@@ -86,9 +90,10 @@ export function InboxManager() {
 
   const checkForMail = useCallback(
     async (inboxId: string, silent = false) => {
-      if (inFlight.current) return;
-      inFlight.current = true;
-      if (!silent) setChecking(true);
+      if (inFlight.current?.inboxId === inboxId) return;
+      const request = { inboxId };
+      inFlight.current = request;
+      setChecking(!silent);
       try {
         const response = await fetch("/api/inbox/poll", {
           method: "POST",
@@ -97,6 +102,7 @@ export function InboxManager() {
           body: JSON.stringify({ inboxId }),
         });
         const data = await response.json();
+        if (inFlight.current !== request) return;
         if (!response.ok || !data.ok) {
           if (!silent) setError(data?.error ?? "Could not read that inbox.");
           return;
@@ -106,10 +112,12 @@ export function InboxManager() {
         setLastChecked(new Date());
         setError(null);
       } catch {
-        if (!silent) setError("Could not reach the inbox. Try again.");
+        if (inFlight.current === request && !silent) setError("Could not reach the inbox. Try again.");
       } finally {
-        inFlight.current = false;
-        if (!silent) setChecking(false);
+        if (inFlight.current === request) {
+          inFlight.current = null;
+          setChecking(false);
+        }
       }
     },
     [],
@@ -117,18 +125,19 @@ export function InboxManager() {
 
   // Check as soon as an inbox becomes active, then on interval
   useEffect(() => {
-    if (!active) return;
+    if (!activeId) return;
     const tick = () => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
-      void checkForMail(active.id, true);
+      void checkForMail(activeId, true);
     };
     const first = window.setTimeout(tick, 0);
     const id = window.setInterval(tick, POLL_INTERVAL_MS);
     return () => {
       window.clearTimeout(first);
       window.clearInterval(id);
+      if (inFlight.current?.inboxId === activeId) inFlight.current = null;
     };
-  }, [active?.id, checkForMail]);
+  }, [activeId, checkForMail]);
 
   async function handleCreate() {
     setCreating(true);
@@ -217,8 +226,11 @@ export function InboxManager() {
         current.map((ib) => (ib.id === inboxId ? (data.inbox as InboxView) : ib)),
       );
 
-      // If we discarded the active one, auto-switch to the next saved inbox
+      // If we discarded the active one, invalidate its poll immediately, then
+      // switch to a saved inbox. A late response must not restore its messages.
       if (active?.id === inboxId) {
+        if (inFlight.current?.inboxId === inboxId) inFlight.current = null;
+        setChecking(false);
         const nextSaved = inboxes.find((ib) => ib.id !== inboxId && ib.status !== "discarded");
         if (nextSaved) {
           void handleSelect(nextSaved.id);
@@ -285,7 +297,7 @@ export function InboxManager() {
         }
         body={
           disabledReason === "preview"
-            ? "This is the preview environment, which has no mailbox provider behind it. The feature works on production."
+            ? "This preview has no mailbox provider behind it. Availability on the live site depends on its configuration."
             : "The mailbox provider is not configured on this server, so there is nothing to create an inbox from."
         }
       />

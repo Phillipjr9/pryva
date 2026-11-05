@@ -50,9 +50,11 @@ describe("public site destinations", () => {
 
   it("lists the help centre, feedback page and every blog post in the sitemap", () => {
     const urls = sitemap().map((entry) => entry.url);
-    expect(urls).toContain("https://pryva.ng/help");
-    expect(urls).toContain("https://pryva.ng/testimonials");
-    for (const post of blogPosts) expect(urls).toContain(`https://pryva.ng/blog/${post.slug}`);
+    // Host-agnostic on purpose: the origin is configuration, the paths are the
+    // contract. A path contract must not depend on an environment-specific host.
+    expect(urls.some((url) => url.endsWith("/help"))).toBe(true);
+    expect(urls.some((url) => url.endsWith("/testimonials"))).toBe(true);
+    for (const post of blogPosts) expect(urls.some((url) => url.endsWith(`/blog/${post.slug}`))).toBe(true);
     expect(new Set(urls).size).toBe(urls.length);
   });
 

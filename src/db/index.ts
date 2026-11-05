@@ -1,4 +1,4 @@
-import { randomBytes, scryptSync } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
@@ -16,11 +16,6 @@ function toCamelCase(value: string): string {
   return value.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 }
 
-function hashPassword(password: string): string {
-  const salt = randomBytes(16).toString("hex");
-  const derived = scryptSync(password, salt, 64).toString("hex");
-  return `${salt}:${derived}`;
-}
 
 function isDrizzleColumn(value: unknown): value is { name: string; table: unknown } {
   return (
@@ -258,9 +253,14 @@ function matchesConditionInContext(
   if (cleaned.length > 0) clauses.push(cleaned);
 
   return clauses.every((clause) => {
-    const [leftTok, opTok, rightTok] = clause;
+    // Email-change lookups use lower(users.email) to match Postgres' case-
+    // insensitive uniqueness check. Without recognizing that function, the
+    // preview adapter treated its leading token as an unconstrained clause.
+    const lowerLeft = clause[0]?.kind === "op" && clause[0].text.toLowerCase() === "lower";
+    const [leftTok, opTok, rightTok] = lowerLeft ? clause.slice(1) : clause;
     if (!leftTok || !opTok || opTok.kind !== "op") return true;
-    const leftVal = resolveValue(leftTok, ctx, defaultTable);
+    const resolved = resolveValue(leftTok, ctx, defaultTable);
+    const leftVal = lowerLeft && typeof resolved === "string" ? resolved.toLowerCase() : resolved;
     const operator = opTok.text.trim().toLowerCase();
     // Drizzle emits IS NULL without a right-hand value. Treating a two-token
     // clause as automatically true silently ignored refund safety conditions.
@@ -402,7 +402,7 @@ export type PreviewState = Record<
   | "securityViolations" | "withdrawals" | "bankAccounts" | "adminAuditLog"
   | "userTwoFactor" | "twoFactorRecoveryCodes" | "twoFactorChallenges"
   | "productReviews" | "supportTickets" | "supportMessages"
-  | "webauthnCredentials" | "webauthnChallenges"
+  | "webauthnCredentials" | "webauthnChallenges" | "emailChangeRequests"
   | "referralCodes" | "referrals"
   | "accountSignals" | "fraudEvents",
   Array<Record<string, unknown>>
@@ -436,6 +436,7 @@ const mockState: PreviewState =
     supportMessages: [],
     webauthnCredentials: [],
     webauthnChallenges: [],
+    emailChangeRequests: [],
     referralCodes: [],
     referrals: [],
     accountSignals: [],
@@ -445,221 +446,13 @@ const mockState: PreviewState =
 // Next can load route handlers and server components in separate bundles.
 // Share the in-memory preview state across those bundles in this process.
 if (!databaseUrl) {
-  for (const key of ["users", "sessions", "orders", "walletTransactions", "paymentTopups", "contactMessages", "giftCards", "scheduledOrders", "notifications", "securityViolations", "withdrawals", "bankAccounts", "adminAuditLog", "userTwoFactor", "twoFactorRecoveryCodes", "twoFactorChallenges", "productReviews", "supportTickets", "supportMessages", "webauthnCredentials", "webauthnChallenges", "referralCodes", "referrals", "accountSignals", "fraudEvents"] as const) {
+  for (const key of ["users", "sessions", "orders", "walletTransactions", "paymentTopups", "contactMessages", "giftCards", "scheduledOrders", "notifications", "securityViolations", "withdrawals", "bankAccounts", "adminAuditLog", "userTwoFactor", "twoFactorRecoveryCodes", "twoFactorChallenges", "productReviews", "supportTickets", "supportMessages", "webauthnCredentials", "webauthnChallenges", "emailChangeRequests", "referralCodes", "referrals", "accountSignals", "fraudEvents"] as const) {
     mockState[key] ??= [];
   }
   globalForDb.__arenaPryvaMockState = mockState;
 }
 
-/**
- * A demo account with nothing in it demonstrates nothing. This seeds the states
- * a real account passes through — a live code on a timer, a rental that is
- * still running, an eSIM, a refunded order and a gift card — plus the wallet
- * ledger that matches them, so the dashboard's live-codes block, refund flow and
- * history all have something to show on first sign-in.
- *
- * The ledger is kept balanced: the credits and debits below end at exactly the
- * demo balance (₦25,000), so "balance" and "sum of transactions" can never
- * disagree in the preview.
- */
-function ensureDemoUser() {
-  const state = mockState.users;
-  const demoUserId = "demo-user";
-  const now = Date.now();
-  const daysAgo = (days: number) => new Date(now - days * 24 * 60 * 60 * 1000);
-  const minutesFromNow = (minutes: number) => new Date(now + minutes * 60 * 1000);
-
-  // Seed per row, not "if the user exists, stop": a preview process that signed
-  // in before the orders were added must still pick them up on the next render.
-  const seedOnce = (key: keyof PreviewState, row: Record<string, unknown>) => {
-    if (!mockState[key].some((existing) => existing.id === row.id)) {
-      mockState[key].push(row);
-    }
-  };
-
-  const hasDemoUser = state.some((user) => user.email === "demo@pryva.ng");
-  if (!hasDemoUser) state.push({
-    id: demoUserId,
-    name: "Ada Demo",
-    email: "demo@pryva.ng",
-    passwordHash: hashPassword("pryva-demo-2026"),
-    walletBalance: 25000,
-    createdAt: daysAgo(14),
-  });
-
-  const demoOrders: Array<Record<string, unknown>> = [
-    {
-      id: "demo-order-live",
-      reference: "PV-DEMO0001",
-      userId: demoUserId,
-      service: "numbers",
-      productSlug: "vn-ng",
-      productName: "Virtual Numbers",
-      planLabel: "Nigeria number",
-      region: "Nigeria",
-      duration: "Single verification · 20 min window",
-      amount: 1340,
-      status: "active",
-      provider: "preview",
-      providerRequestId: null,
-      referenceCode: "+000 555 4820",
-      otpCode: "482069",
-      accounts: null,
-      expiresAt: minutesFromNow(18),
-      refundedAt: null,
-      createdAt: new Date(now - 2 * 60 * 1000),
-    },
-    {
-      id: "demo-order-rental",
-      reference: "PV-DEMO0002",
-      userId: demoUserId,
-      service: "numbers",
-      productSlug: "rent-ng-7",
-      productName: "Virtual Numbers",
-      planLabel: "7-day Nigeria rental",
-      region: "Nigeria",
-      duration: "7 days",
-      amount: 4250,
-      status: "active",
-      provider: "preview",
-      providerRequestId: null,
-      referenceCode: "+000 555 4820",
-      otpCode: null,
-      accounts: null,
-      expiresAt: new Date(now + 4 * 24 * 60 * 60 * 1000),
-      refundedAt: null,
-      createdAt: daysAgo(3),
-    },
-    {
-      id: "demo-order-esim",
-      reference: "PV-DEMO0003",
-      userId: demoUserId,
-      service: "esim",
-      productSlug: "esim-ng-1",
-      productName: "eSIM",
-      planLabel: "Nigeria · 1GB · 30 days",
-      region: "Nigeria",
-      duration: "30 days",
-      amount: 4700,
-      status: "active",
-      provider: "preview",
-      providerRequestId: null,
-      referenceCode: "LPA:1$demo.invalid$PRYVA-DEMO-1GB-NG",
-      otpCode: null,
-      accounts: null,
-      expiresAt: new Date(now + 24 * 24 * 60 * 60 * 1000),
-      refundedAt: null,
-      createdAt: daysAgo(6),
-    },
-    {
-      id: "demo-order-refunded",
-      reference: "PV-DEMO0004",
-      userId: demoUserId,
-      service: "numbers",
-      productSlug: "vn-us",
-      productName: "Virtual Numbers",
-      planLabel: "United States number",
-      region: "United States",
-      duration: "Single verification · 20 min window",
-      amount: 1670,
-      status: "refunded",
-      provider: "preview",
-      providerRequestId: null,
-      referenceCode: null,
-      otpCode: null,
-      accounts: null,
-      expiresAt: null,
-      refundedAt: daysAgo(9),
-      createdAt: daysAgo(9),
-    },
-    {
-      id: "demo-order-gift",
-      reference: "PV-DEMO0005",
-      userId: demoUserId,
-      service: "gift-cards",
-      productSlug: "gift-5000",
-      productName: "Gift Cards",
-      planLabel: "₦5,000 gift card",
-      region: "Nigeria",
-      duration: "90 days to redeem",
-      amount: 5000,
-      status: "active",
-      provider: "preview",
-      providerRequestId: null,
-      referenceCode: "PRYVA-DEMO-4F2K",
-      otpCode: null,
-      accounts: null,
-      expiresAt: new Date(now + 80 * 24 * 60 * 60 * 1000),
-      refundedAt: null,
-      createdAt: daysAgo(12),
-    },
-  ];
-  for (const order of demoOrders) seedOnce("orders", order);
-  // Safely update older seeded examples in a running preview without resetting
-  // the shared wallet or touching real/user-created orders.
-  for (const row of mockState.orders) {
-    if (row.userId !== demoUserId || row.provider !== "preview") continue;
-    if ((row.id === "demo-order-live" || row.id === "demo-order-rental") && row.referenceCode === "+234 812 445 9081") row.referenceCode = "+000 555 4820";
-    if (row.id === "demo-order-esim" && row.referenceCode === "LPA:1$rsp.truphone.com$PRYVA-DEMO-1GB-NG") row.referenceCode = "LPA:1$demo.invalid$PRYVA-DEMO-1GB-NG";
-  }
-
-  const ledger: Array<[string, string, number, number, string, string, Date]> = [
-    // id, description, amount (+/-), balanceAfter, reference, type, createdAt
-    ["demo-welcome-credit", "Demo starter wallet credit", 25000, 25000, "TOP-DEMO01", "credit", daysAgo(14)],
-    ["demo-tx-gift", "Gift card purchase — ₦5,000", -5000, 20000, "PV-DEMO0005", "debit", daysAgo(12)],
-    ["demo-tx-us-number", "US number purchase", -1670, 18330, "PV-DEMO0004", "debit", daysAgo(9)],
-    ["demo-tx-refund", "Auto-refund — US number (no code)", 1670, 20000, "RF-DEMO0004", "credit", daysAgo(9)],
-    ["demo-tx-esim", "eSIM purchase — Nigeria 1GB", -4700, 15300, "PV-DEMO0003", "debit", daysAgo(6)],
-    ["demo-tx-topup", "Wallet top-up — bank transfer", 15290, 30590, "TOP-DEMO02", "credit", daysAgo(4)],
-    ["demo-tx-rental", "Nigeria 7-day rental", -4250, 26340, "PV-DEMO0002", "debit", daysAgo(3)],
-    ["demo-tx-live", "Nigeria number purchase", -1340, 25000, "PV-DEMO0001", "debit", new Date(now - 2 * 60 * 1000)],
-  ];
-
-  for (const [id, description, amount, balanceAfter, reference, type, createdAt] of ledger) {
-    seedOnce("walletTransactions", {
-      id,
-      userId: demoUserId,
-      orderId: null,
-      type,
-      amount: Math.abs(amount),
-      balanceAfter,
-      description,
-      reference,
-      createdAt,
-    });
-  }
-
-  for (const notification of [
-    {
-      id: "demo-notification-1",
-      userId: demoUserId,
-      title: "Your Nigeria number is live",
-      message: "Demo code 482069 arrived on +000 555 4820. It is fictional.",
-      type: "order",
-      read: 0,
-      createdAt: new Date(now - 2 * 60 * 1000),
-    },
-    {
-      id: "demo-notification-2",
-      userId: demoUserId,
-      title: "Refund completed",
-      message: "₦1,670 returned to your wallet — the US number never delivered a code.",
-      type: "refund",
-      read: 1,
-      createdAt: daysAgo(9),
-    },
-  ]) {
-    seedOnce("notifications", notification);
-  }
-  const seededNotice = mockState.notifications.find((row) => row.id === "demo-notification-1" && row.userId === demoUserId);
-  if (seededNotice?.message === "Code 482069 arrived on +234 812 445 9081. It expires in 20 minutes.") seededNotice.message = "Demo code 482069 arrived on +000 555 4820. It is fictional.";
-}
-
-// Gates on the shared predicate, not on DATABASE_URL. Aurora provisioned through
-// the Vercel AWS integration has no DATABASE_URL, so testing that variable alone
-// seeded the shared demo account -- published credentials and a wallet balance --
-// into a process that was connected to a real production database.
-if (!persistentDatabaseConfigured()) ensureDemoUser();
+// An unconfigured preview starts empty: never seed balances, accounts or transactions.
 
 /** Read an isolated snapshot; never expose the mutable process-local state. */
 export function readPreviewDatabase<T>(reader: (snapshot: PreviewState) => T): T {
@@ -753,7 +546,7 @@ function buildQueryResult(
   }
 
   const projected = contexts.map((ctx) => projectRow(selection, ctx, defaultTable));
-  return Object.assign([...projected], {
+  const result = Object.assign([...projected], {
     orderBy() {
       const sorted = sortDescendingByCreatedAt(projected);
       return withLimit(sorted);
@@ -764,7 +557,13 @@ function buildQueryResult(
     offset(start: number) {
       return withLimit(projected.slice(start));
     },
+    // The in-memory adapter is process-local and cannot emulate PostgreSQL row
+    // locks. Preserve the query shape for preview, without implying isolation.
+    for() {
+      return result;
+    },
   });
+  return result;
 }
 
 function sortQueryRows<T extends Record<string, unknown>>(rows: T[], orderBy: unknown): T[] {
@@ -863,7 +662,9 @@ const mockDb: any = {
           provider: tableKey === "orders" ? "preview" : undefined,
           walletBalance: tableKey === "users" ? 0 : undefined,
           ...input,
-          id: input.id ?? randomBytes(16).toString("hex"),
+          // Match PostgreSQL's uuid default so links and passkey deletion accept
+          // preview-generated ids just as they do persistent rows.
+          id: input.id ?? randomUUID(),
           createdAt: input.createdAt ?? new Date(),
         }));
         rows.push(...inserted);
@@ -909,14 +710,22 @@ const mockDb: any = {
   delete(table: unknown) {
     const tableKey = tableNameFor(table) as keyof PreviewState;
     return {
-      where(condition: unknown) {
-        const rows = mockState[tableKey] ?? [];
-        const survivors = rows.filter(
-          (row) => !evaluateCondition(condition, { [tableKey]: row }, tableKey),
-        );
-        mockState[tableKey] = survivors;
-        return { rows: survivors };
-      },
+          where(condition: unknown) {
+            const rows = mockState[tableKey] ?? [];
+            const removed = rows.filter(
+              (row) => evaluateCondition(condition, { [tableKey]: row }, tableKey),
+            );
+            const survivors = rows.filter(
+              (row) => !evaluateCondition(condition, { [tableKey]: row }, tableKey),
+            );
+            mockState[tableKey] = survivors;
+            return {
+              rows: survivors,
+              returning(selection?: Record<string, unknown>) {
+                return removed.map((row) => projectRow(selection, { [tableKey]: row }, tableKey));
+              },
+            };
+          },
     };
   },
   async transaction<T>(callback: (tx: typeof mockDb) => Promise<T> | T): Promise<T> {

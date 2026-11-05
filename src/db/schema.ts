@@ -92,6 +92,65 @@ export const webhookEvents = pgTable(
   ],
 );
 
+/**
+ * What Resend reported happened to a message after we handed it over.
+ *
+ * Mirrors `webhookEvents` on the payment side. See
+ * `migrations/0031_email_delivery_events.sql` for why "sent" is not "delivered".
+ */
+export const emailDeliveryEvents = pgTable(
+  "email_delivery_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    providerEventId: varchar("provider_event_id", { length: 100 }),
+    event: varchar("event", { length: 60 }).notNull(),
+    messageId: varchar("message_id", { length: 100 }),
+    recipientDomain: varchar("recipient_domain", { length: 200 }),
+    signatureValid: boolean("signature_valid").notNull(),
+    outcome: varchar("outcome", { length: 40 }).notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("email_delivery_events_provider_event_idx").on(table.providerEventId),
+    index("email_delivery_events_received_idx").on(table.receivedAt),
+    index("email_delivery_events_message_idx").on(table.messageId),
+  ],
+);
+
+/**
+ * The two emails a new account receives exactly once: the verification receipt
+ * and the welcome.
+ *
+ * The unique `(user_id, kind)` index is the duplicate guard, not the code around
+ * it. Both sends hang off `users.email_verified_at` becoming non-null, and two
+ * callers can reach that state at the same moment -- the token confirm route and
+ * the resend route's "already verified" branch. A race can therefore cost a
+ * duplicate insert attempt, never a duplicate email in somebody's inbox.
+ *
+ * See `migrations/0032_welcome_verified_emails.sql`.
+ */
+export const onboardingEmailLog = pgTable(
+  "onboarding_email_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** `verified` (the receipt) or `welcome` (the introduction). */
+    kind: varchar("kind", { length: 24 }).notNull(),
+    /** `pending`, `accepted`, `refused`, `skipped`, or `review`. */
+    status: varchar("status", { length: 24 }).notNull().default("pending"),
+    providerMessageId: varchar("provider_message_id", { length: 100 }),
+    detail: varchar("detail", { length: 200 }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("onboarding_email_log_user_kind_idx").on(table.userId, table.kind),
+    index("onboarding_email_log_created_idx").on(table.createdAt),
+  ],
+);
+
 export const accountDeletions = pgTable(
   "account_deletions",
   {
@@ -394,6 +453,17 @@ export const walletEmailOutbox = pgTable("wallet_email_outbox", {
   walletTransactionId: uuid("wallet_transaction_id").references(() => walletTransactions.id, { onDelete: "cascade" }),
   withdrawalId: uuid("withdrawal_id").references(() => withdrawals.id, { onDelete: "cascade" }),
   orderId: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }),
+  // Snapshot, not a foreign key: deleting a bank must not erase its security alert.
+  bankAccountId: uuid("bank_account_id"),
+  // IDs only: neither support messages nor WebAuthn credential material is copied.
+  supportTicketId: uuid("support_ticket_id"),
+  supportMessageId: uuid("support_message_id"),
+  passkeyRowId: uuid("passkey_row_id"),
+  bankNameSnapshot: varchar("bank_name_snapshot", { length: 100 }),
+  bankLastFour: varchar("bank_last_four", { length: 4 }),
+  recipientName: varchar("recipient_name", { length: 120 }),
+  notificationDueAt: timestamp("notification_due_at", { withTimezone: true }),
+  notificationLockedUntil: timestamp("notification_locked_until", { withTimezone: true }),
   eventKind: varchar("event_kind", { length: 40 }).notNull(),
   recipient: varchar("recipient", { length: 200 }).notNull(),
   payload: text("payload"),
@@ -408,11 +478,24 @@ export const walletEmailOutbox = pgTable("wallet_email_outbox", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   sentAt: timestamp("sent_at", { withTimezone: true }),
 }, (table) => [
-  uniqueIndex("wallet_email_outbox_transaction_idx").on(table.walletTransactionId),
+  uniqueIndex("wallet_email_outbox_transaction_idx").on(table.walletTransactionId).where(sql`event_kind = 'wallet'`),
+  uniqueIndex("wallet_email_outbox_bank_link_idx").on(table.bankAccountId).where(sql`event_kind = 'bank_linked'`),
+  uniqueIndex("wallet_email_outbox_support_reply_idx").on(table.supportMessageId).where(sql`event_kind = 'support_reply'`),
+  uniqueIndex("wallet_email_outbox_passkey_event_idx").on(table.passkeyRowId, table.eventKind).where(sql`event_kind IN ('passkey_added', 'passkey_removed')`),
+  uniqueIndex("wallet_email_outbox_purchase_recorded_idx").on(table.walletTransactionId).where(sql`event_kind = 'purchase_recorded'`),
   uniqueIndex("wallet_email_outbox_withdrawal_event_idx").on(table.withdrawalId, table.eventKind),
-  uniqueIndex("wallet_email_outbox_order_event_idx").on(table.orderId, table.eventKind),
+  uniqueIndex("wallet_email_outbox_order_event_idx").on(table.orderId, table.eventKind).where(sql`event_kind <> 'number_code'`),
+  index("wallet_email_outbox_user_idx").on(table.userId),
   index("wallet_email_outbox_due_idx").on(table.status, table.availableAt),
+  index("wallet_email_outbox_notification_due_idx").on(table.status, table.notificationDueAt).where(sql`notification_due_at IS NOT NULL`),
 ]);
+
+/** Once-per-account milestone; historical buyers are marked without sending mail. */
+export const firstPurchaseEmailClaims = pgTable("first_purchase_email_claims", {
+  userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  source: varchar("source", { length: 16 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const contactMessages = pgTable("contact_messages", {
   id: uuid("id").primaryKey().defaultRandom(),

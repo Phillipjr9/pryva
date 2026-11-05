@@ -167,6 +167,7 @@ export async function placeBoostOrder(input: {
       .set({ status: "active", providerRequestId: placement.orderId })
       .where(eq(orders.id, orderId))
       .returning();
+    scheduleWalletEmails();
     return { kind: "created", order: updated ?? ({ id: orderId } as Order), balance };
   } catch (error) {
     // The supplier did not accept the order: give the money back, record why,

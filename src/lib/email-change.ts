@@ -6,6 +6,9 @@ import { db } from "@/db";
 import { emailChangeRequests, users } from "@/db/schema";
 import { logger } from "@/lib/logger";
 import { resendConfigured } from "@/lib/resend-config";
+import { canonicalSiteUrl } from "@/lib/net";
+import { emailBrandLockup } from "@/lib/email-brand";
+import { readJsonWithLimit } from "@/lib/request-body";
 
 /**
  * Changing the sign-in address, with proof of control of the new one.
@@ -35,7 +38,7 @@ export function normaliseEmail(raw: string): string {
 }
 
 function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://pryva.ng").replace(/\/$/, "");
+  return canonicalSiteUrl();
 }
 
 function escapeHtml(value: string): string {
@@ -46,10 +49,11 @@ async function sendConfirmation(to: string, link: string, name: string): Promise
   const sender = process.env.RESEND_FROM_EMAIL?.trim();
   if (!sender) return false;
   const safeName = escapeHtml(name.slice(0, 80) || "there");
-  const html = `<!doctype html><html lang="en"><body style="margin:0;padding:28px 16px;background:#faf7f1;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
-    <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="width:520px;max-width:100%;">
-      <tr><td style="padding-bottom:16px;font-family:'Manrope',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:20px;font-weight:800;letter-spacing:-1.2px;color:#241b3a;">Pryva</td></tr>
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:28px 16px;background:#faf7f1;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;table-layout:fixed;"><tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:520px;table-layout:fixed;">
+      <tr><td style="padding-bottom:16px;">${emailBrandLockup(siteUrl())}</td></tr>
+      <tr><td style="padding-bottom:16px;"><img src="${siteUrl()}/images/email/hero-email-confirm.jpg" width="520" alt="Confirm your new email address" style="display:block;width:100%;max-width:520px;height:auto;border:0;border-radius:22px;"></td></tr>
       <tr><td style="border-radius:22px;background:#fffdfa;border:1px solid #e7e0ee;box-shadow:0 22px 40px -26px rgba(45,30,80,0.55);padding:26px 24px;">
         <h1 style="margin:0 0 12px;font-family:'Manrope',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:22px;font-weight:800;color:#241b3a;">Confirm your new email</h1>
         <p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#5b4f6b;">Hi ${safeName}, confirm this address to use it for signing in to Pryva. The link works for two hours.</p>
@@ -65,7 +69,7 @@ async function sendConfirmation(to: string, link: string, name: string): Promise
 
   try {
     const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
+      method: "POST", redirect: "error", cache: "no-store",
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY!.trim()}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         from: sender,
@@ -76,11 +80,21 @@ async function sendConfirmation(to: string, link: string, name: string): Promise
       }),
       signal: AbortSignal.timeout(8_000),
     });
-    return response.ok;
-  } catch (error) {
-    logger.warn("Email change confirmation failed to send", {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    if (!response.ok) {
+      logger.warn("Email change confirmation refused", { status: response.status });
+      return false;
+    }
+    let data: unknown;
+    try { data = await readJsonWithLimit(response, 32_768); } catch { /* Acceptance is unconfirmed. */ }
+    const id = data && typeof data === "object" && !Array.isArray(data) ? (data as { id?: unknown }).id : null;
+    if (typeof id !== "string" || id.length === 0 || id.length > 100) {
+      logger.warn("Email change confirmation acceptance unconfirmed");
+      return false;
+    }
+    return true;
+  } catch {
+    // The response may contain the one-use link or recipient: never log it.
+    logger.warn("Email change confirmation failed or timed out");
     return false;
   }
 }
@@ -89,14 +103,16 @@ export type RequestResult = { ok: true; message: string } | { ok: false; error: 
 
 export async function requestEmailChange(input: { userId: string; newEmail: string }): Promise<RequestResult> {
   const email = normaliseEmail(input.newEmail);
-  if (!EMAIL_SHAPE.test(email) || email.length > 320) {
+  // The users.email column is varchar(200), even though the request table can
+  // hold a longer address. Never send a link that cannot be applied later.
+  if (!EMAIL_SHAPE.test(email) || email.length > 200) {
     return { ok: false, error: "Enter a valid email address.", status: 400 };
   }
 
   const [user] = await db
     .select({ id: users.id, email: users.email, name: users.name })
     .from(users)
-    .where(eq(users.id, input.userId))
+    .where(and(eq(users.id, input.userId), isNull(users.deletedAt)))
     .limit(1);
   if (!user) return { ok: false, error: "Account not found.", status: 404 };
   if (normaliseEmail(user.email) === email) {
@@ -117,20 +133,31 @@ export async function requestEmailChange(input: { userId: string; newEmail: stri
   }
 
   const token = randomBytes(32).toString("base64url");
-  await db
-    .delete(emailChangeRequests)
-    .where(and(eq(emailChangeRequests.userId, user.id), isNull(emailChangeRequests.consumedAt)));
-  await db.insert(emailChangeRequests).values({
-    userId: user.id,
-    newEmail: email,
-    tokenHash: hashToken(token),
-    expiresAt: new Date(Date.now() + EMAIL_CHANGE_TTL_MS),
+  const created = await db.transaction(async (tx) => {
+    // Take the same first lock as closure and confirmation. This prevents a
+    // request from retaining an address after closure, and serializes two
+    // concurrent replacements of the account's one live confirmation link.
+    const [active] = await tx.select({ id: users.id, email: users.email }).from(users)
+      .where(and(eq(users.id, user.id), isNull(users.deletedAt))).for("update");
+    if (!active) return "missing" as const;
+    if (normaliseEmail(active.email) === email) return "unchanged" as const;
+    await tx.delete(emailChangeRequests)
+      .where(and(eq(emailChangeRequests.userId, user.id), isNull(emailChangeRequests.consumedAt)));
+    await tx.insert(emailChangeRequests).values({
+      userId: user.id,
+      newEmail: email,
+      tokenHash: hashToken(token),
+      expiresAt: new Date(Date.now() + EMAIL_CHANGE_TTL_MS),
+    });
+    return "created" as const;
   });
+  if (created === "missing") return { ok: false, error: "Account not found.", status: 404 };
+  if (created === "unchanged") return { ok: false, error: "That is already your sign-in address.", status: 409 };
 
   const link = `${siteUrl()}/confirm-email?token=${encodeURIComponent(token)}`;
   const sent = await sendConfirmation(email, link, user.name);
   if (!sent) {
-    return { ok: false, error: "We couldn't send the confirmation email. Try again in a moment.", status: 502 };
+    return { ok: false, error: "We couldn't confirm the email was sent. Check your inbox or try again.", status: 502 };
   }
   return { ok: true, message: EMAIL_CHANGE_SENT };
 }
@@ -159,7 +186,7 @@ export async function confirmEmailChange(rawToken: string): Promise<ConfirmResul
   const [user] = await db
     .select({ id: users.id, email: users.email, name: users.name })
     .from(users)
-    .where(eq(users.id, request.userId))
+    .where(and(eq(users.id, request.userId), isNull(users.deletedAt)))
     .limit(1);
   if (!user) return { ok: false, error: EMAIL_CHANGE_INVALID };
 
@@ -178,18 +205,27 @@ export async function confirmEmailChange(rawToken: string): Promise<ConfirmResul
       const [updated] = await tx
         .update(users)
         .set({ email: request.newEmail, emailVerifiedAt: new Date() })
-        .where(and(eq(users.id, user.id), eq(users.email, user.email)))
+        .where(and(eq(users.id, user.id), eq(users.email, user.email), isNull(users.deletedAt)))
         .returning({ id: users.id });
       if (!updated) throw new Error("address changed while confirming");
-      await tx
-        .update(emailChangeRequests)
+      // The request may have expired or been replaced while this confirmation
+      // waited for the user lock. Spend the same live token in this transaction;
+      // if it is gone, throw so the email update rolls back too.
+      const [spent] = await tx.update(emailChangeRequests)
         .set({ consumedAt: new Date() })
-        .where(eq(emailChangeRequests.id, request.id));
+        .where(and(
+          eq(emailChangeRequests.id, request.id),
+          eq(emailChangeRequests.userId, user.id),
+          eq(emailChangeRequests.tokenHash, hashToken(token)),
+          isNull(emailChangeRequests.consumedAt),
+          gt(emailChangeRequests.expiresAt, new Date()),
+        ))
+        .returning({ id: emailChangeRequests.id });
+      if (!spent) throw new Error("confirmation link is no longer live");
     });
-  } catch (error) {
-    logger.warn("Email change could not be applied", {
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch {
+    // Database errors can contain the new address or token hash in query data.
+    logger.warn("Email change could not be applied");
     return { ok: false, error: EMAIL_CHANGE_INVALID };
   }
 

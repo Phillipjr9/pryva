@@ -1,6 +1,8 @@
 import "server-only";
 
 import type { ResendPayload } from "@/lib/wallet-email-template";
+import { emailBrandLockup } from "@/lib/email-brand";
+import { canonicalSiteUrl } from "@/lib/net";
 
 /**
  * "Your code arrived."
@@ -10,9 +12,9 @@ import type { ResendPayload } from "@/lib/wallet-email-template";
  * another device, in another app, waiting for the SMS that never comes to the
  * handset they can see. Sending the code closes that loop.
  *
- * The code is short-lived and single-use, but it is still a credential: it goes
- * only to the account's own address, the message says so, and nothing else in
- * the order (number, plan, expiry) is secret.
+ * The received code is a credential: it goes only to the account's own address,
+ * stays out of the subject line, and the message reminds the customer to keep
+ * it private. Its validity is controlled by the service that issued it.
  */
 
 const C = {
@@ -63,10 +65,11 @@ export function makeNumberCodeEmail(input: NumberCodeInput): ResendPayload {
   const reference = clip(input.orderReference, 40);
   const phone = input.phoneNumber ? clip(input.phoneNumber, 32) : null;
   const window = input.expiresAt && Number.isFinite(input.expiresAt.getTime())
-    ? input.expiresAt.toISOString().slice(11, 16) + " UTC"
+    ? input.expiresAt.toISOString().replace("T", " ").slice(0, 16) + " UTC"
     : null;
 
-  const subject = `Your verification code: ${code}`;
+  // Subjects are exposed in notifications, previews and provider dashboards.
+  const subject = "Your verification code has arrived";
   const text = [
     `Your verification code has arrived.`,
     ``,
@@ -77,11 +80,11 @@ export function makeNumberCodeEmail(input: NumberCodeInput): ResendPayload {
     `Order reference: ${reference}`,
     window ? `The number stops receiving messages around ${window}.` : "",
     ``,
-    `Enter this code in the app you are signing up to. It is single-use and expires with the number.`,
+    `Enter this code in the app that sent it. It may expire, so keep it private.`,
     `Nobody at Pryva will ask you for it — don't forward this email.`,
     `View the order: ${input.orderUrl}`,
     ``,
-    `If you didn't ask for a number, reply to this email and we'll refund it.`,
+    `If you didn't request this, review your account security and contact support: ${canonicalSiteUrl()}/dashboard/support`,
     `Pryva Technologies · Lagos, Nigeria`,
   ].filter((line) => line !== "").join("\n");
 
@@ -92,11 +95,14 @@ export function makeNumberCodeEmail(input: NumberCodeInput): ResendPayload {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Manrope:wght@700;800&display=swap">
 </head>
 <body style="margin:0;padding:0;background:${C.cream};">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#f4efe6 0%,#faf7f1 50%,#f6f2ec 100%);">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;table-layout:fixed;background:linear-gradient(180deg,#f4efe6 0%,#faf7f1 50%,#f6f2ec 100%);">
 <tr><td align="center" style="padding:34px 14px 10px;">
-<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:100%;">
-  <tr><td style="padding:0 8px 18px;font-family:'Manrope',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:20px;font-weight:800;letter-spacing:-1.2px;color:${C.ink};">Pryva</td></tr>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;table-layout:fixed;">
+  <tr><td style="padding:0 8px 18px;">${emailBrandLockup(input.orderUrl.replace(/\/dashboard.*$/, ""))}</td></tr>
 
+  <tr><td style="padding:0 8px 16px;">
+    <img src="${canonicalSiteUrl()}/images/email/hero-number-code.jpg" width="544" alt="A message received on a phone" style="display:block;width:100%;max-width:544px;height:auto;border:0;border-radius:22px;">
+  </td></tr>
   <tr><td style="padding:0 8px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:26px;background:linear-gradient(155deg,#3a2b63 0%,#241b3a 55%,#4b3480 100%);box-shadow:0 28px 52px -24px rgba(30,20,55,0.8),inset 0 1px 0 rgba(255,255,255,0.22);">
       <tr><td style="padding:32px 28px 30px;">
@@ -111,7 +117,7 @@ export function makeNumberCodeEmail(input: NumberCodeInput): ResendPayload {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:24px;background:${C.card};border:1px solid ${C.line};box-shadow:0 22px 40px -26px rgba(45,30,80,0.55),inset 0 1px 0 #ffffff;">
       <tr><td style="padding:28px 24px;text-align:center;">
         <div style="border-radius:18px;background:linear-gradient(160deg,#ffffff,#f4efff);border:1px solid #e6ddf6;box-shadow:inset 0 2px 8px rgba(60,40,110,0.14),0 12px 24px -16px rgba(60,40,110,0.7);padding:22px 18px;">
-          <span style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:34px;font-weight:700;letter-spacing:8px;color:${C.ink};">${esc(code)}</span>
+          <span style="display:inline-block;max-width:100%;overflow-wrap:anywhere;word-break:break-all;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:34px;font-weight:700;letter-spacing:8px;color:${C.ink};">${esc(code)}</span>
         </div>
         ${phone ? `<p style="margin:16px 0 0;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;color:${C.ink2};">Received on <strong style="color:${C.ink};">${esc(phone)}</strong></p>` : ""}
         ${window ? `<p style="margin:6px 0 0;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;color:${C.ink3};">The number stops receiving messages around ${esc(window)}.</p>` : ""}
@@ -122,7 +128,7 @@ export function makeNumberCodeEmail(input: NumberCodeInput): ResendPayload {
   <tr><td style="padding:20px 8px 0;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:20px;background:#fff8e8;border:1px solid #f0e0bd;box-shadow:inset 0 1px 0 #fffdf6;">
       <tr><td style="padding:16px 18px;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;line-height:1.7;color:#7a5f22;">
-        This code is single-use and tied to the number above. Nobody at Pryva will ask you for it — don&apos;t forward this email.
+        Keep this code private; it may expire. Nobody at Pryva will ask you for it — don&apos;t forward this email.
       </td></tr>
     </table>
   </td></tr>
@@ -137,7 +143,7 @@ export function makeNumberCodeEmail(input: NumberCodeInput): ResendPayload {
 
   <tr><td align="center" style="padding:26px 24px 34px;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;line-height:1.7;color:${C.ink3};">
     Order ${esc(reference)} · ${esc(plan)}<br><br>
-    Didn&apos;t ask for this? Reply and we&apos;ll look after it.<br><br>
+    Didn&apos;t ask for this? Review your account security and <a href="${canonicalSiteUrl()}/dashboard/support" style="color:${C.lav};font-weight:600;text-decoration:none;">contact support</a>.<br><br>
     Pryva Technologies · Lagos, Nigeria
   </td></tr>
 </table>

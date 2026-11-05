@@ -6,6 +6,7 @@ import { Check } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { CountryFlag } from "@/components/CountryFlag";
 import { hasCountryFlag } from "@/lib/countries";
+import { isEsimOrderingAvailable } from "@/lib/esim-availability";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -29,13 +30,27 @@ export default function PricingPage() {
             Simple, transparent pricing
           </h1>
           <p className="mt-4 text-[1.1rem] text-ink-2 max-w-2xl mx-auto">
-            Compare catalog prices in Naira. Every price is fixed before checkout, and your wallet is only debited once delivery succeeds.
+            Compare catalog prices in Naira. Availability varies, so review the final amount and terms before confirming an order.
           </p>
         </div>
       </section>
 
       {/* Pricing by Service */}
       {serviceGroups.map((group) => {
+        if (group.slug === "esim") {
+          const live = isEsimOrderingAvailable();
+          return (
+            <section key={group.slug} className="pb-16">
+              <div className="shell">
+                <div className="mb-8 flex items-center gap-4"><ServiceIcon service="esim" size="lg" /><h2 className="text-[1.75rem] font-semibold text-ink">eSIM</h2></div>
+                <div className="rounded-2xl border border-line bg-white p-6">
+                  <p className="text-ink-2">{live ? "Current eSIM plans, prices and coverage are listed in the dashboard." : "eSIM ordering is currently unavailable; prices and coverage cannot be confirmed."}</p>
+                  {live && <Link href="/dashboard/esim" className="mt-4 inline-flex font-semibold text-lav-700 underline underline-offset-2">Browse current eSIM plans</Link>}
+                </div>
+              </div>
+            </section>
+          );
+        }
         const servicePlans = plans.filter((p) => p.service === group.slug);
         if (servicePlans.length === 0) return null;
 

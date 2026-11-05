@@ -85,20 +85,18 @@ function ServiceCard({ item, countryName }: { item: ExplorerItem; countryName: s
   const coverage = item.source === "live"
       ? (item.coverage === "catalog-country" ? `Reported region: ${countryName}` : "Not country-specific")
       : item.coverage === "catalog-country" ? `Catalog region: ${countryName}` : item.coverage === "unconfirmed" ? "Country coverage unconfirmed" : "Not filtered by country";
-  const noAction = item.source === "live" ? "Ordering paused" : item.source === "example" ? "Not connected" : "Not available";
+  const noAction = item.source === "live" ? "Ordering paused" : "Not available";
   const action = item.action;
   const price = item.price;
-  const sourceLabel = item.source === "live" ? "Live listing" : item.source === "example" ? "Example" : item.source === "tool" ? "Tool" : "Catalog";
+  const sourceLabel = item.source === "live" ? "Live listing" : item.source === "tool" ? "Tool" : "Catalog";
   const sourceTone = item.source === "live"
     ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
-    : item.source === "example"
-    ? "border border-lav-200 bg-lav-50 text-lav-700"
     : item.source === "tool"
     ? "border border-indigo-200 bg-indigo-50 text-indigo-700"
     : "border border-line bg-cream-2 text-ink-2";
   const priceLine = price !== null
     ? `${item.source === "live" ? "Indicative" : "Listed"} ${item.priceFrom ? "from " : "price "}${formatNaira(price)}`
-    : item.source === "example" ? "Price not connected" : "See details";
+    : "See details";
 
   /*
    * One card, two densities. On a phone this is a 68 px row: artwork, name,
@@ -286,7 +284,7 @@ export function ServiceExplorer({
         <div>
           <p className="text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Explore Pryva</p>
           <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">{selectedCategory?.label ?? "Your service hub"}</h1>
-          <p className="mt-1.5 max-w-2xl text-[0.82rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Choose a country, then select a service below.` : "Choose a country, then browse categories and service examples in one place."}</p>
+          <p className="mt-1.5 max-w-2xl text-[0.82rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Choose a country, then select a service below.` : "Choose a country, then browse categories and available services in one place."}</p>
         </div>
         <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline">My orders <ArrowRight className="h-3.5 w-3.5" /></Link>
       </div>
@@ -321,7 +319,7 @@ export function ServiceExplorer({
         <div className="rounded-[1.5rem] border border-dashed border-lav-200 bg-white/70 px-4 py-8 text-center sm:px-6 sm:py-10">
           <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-lav-50 text-lav-700"><Globe className="h-5 w-5" /></span>
           <h2 className="mt-3 text-[1rem] font-semibold text-ink">Choose a country to explore</h2>
-          <p className="mx-auto mt-1.5 max-w-md text-[0.8rem] leading-relaxed text-ink-2">We&apos;ll show the service categories and example plans after you make your selection.</p>
+          <p className="mx-auto mt-1.5 max-w-md text-[0.8rem] leading-relaxed text-ink-2">We&apos;ll show service categories and available listings after you make your selection.</p>
           <div className="mx-auto mt-5 grid max-w-xl grid-cols-2 gap-2 sm:mt-6 sm:grid-cols-3 sm:gap-3">
             {POPULAR_COUNTRIES.map((c) => (
               <button
@@ -395,7 +393,7 @@ export function ServiceExplorer({
 
           <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-meta leading-relaxed border-amber-200 bg-amber-50/70 text-amber-900`}>
             <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-            {liveState?.country === country && !liveState.failed ? <p><strong>Live listings are current.</strong> Boosting services can be bought now, from your wallet. Plan and eSIM listings are still indicative until ordering is switched on for them, and examples are separate. {liveState.partial && "Some listing types are temporarily unavailable. "}<Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p> : <p><strong>Examples, not a verified live catalog.</strong> Stock is unknown and purchased service units aren&apos;t tracked yet. Country coverage is unverified. <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
+            {liveState?.country === country && !liveState.failed ? <p><strong>Live listings are current.</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. {liveState.partial && "Some listing types are temporarily unavailable. "}<Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>Live availability is not shown yet.</strong> Check each listing for availability; stock and country coverage may be unconfirmed. <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
           </div>
 
           <section aria-labelledby="services-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-3.5 sm:p-6">
@@ -403,7 +401,7 @@ export function ServiceExplorer({
               <div>
                 <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Sparkle className="h-3.5 w-3.5" /> Step 03</p>
                 <h2 id="services-title" className="mt-1 text-[1.05rem] font-semibold text-ink">{selectedCategory ? `Explore ${selectedCategory.label}` : "Explore services"}</h2>
-                <p aria-live="polite" className="mt-1 text-meta text-ink-3">{filtered.length} {`listing${filtered.length === 1 ? "" : "s"} and examples`} · {selectedCountry.name} selected</p>
+                <p aria-live="polite" className="mt-1 text-meta text-ink-3">{filtered.length} {`listing${filtered.length === 1 ? "" : "s"}`} · {selectedCountry.name} selected</p>
                 {liveState?.country === country && liveState.fetchedAt && <p className="mt-1 text-micro text-ink-3">Stock checked: <time dateTime={liveState.fetchedAt}>{new Date(liveState.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
               </div>
               <div className="relative w-full sm:max-w-[260px]">
@@ -425,7 +423,7 @@ export function ServiceExplorer({
             </div>
             {filtered.length === 0 && (
               <div className="rounded-2xl border border-dashed border-line bg-cream/50 p-8 text-center">
-                <p className="text-[0.88rem] font-semibold text-ink">No examples match these filters</p>
+                <p className="text-[0.88rem] font-semibold text-ink">No listings match these filters</p>
                 <p className="mt-1 text-meta text-ink-2">Try another search, category or country. This doesn&apos;t indicate live availability.</p>
                 {(search || tag !== "all") && <button type="button" onClick={() => { setSearch(""); setTag("all"); setVisible(PAGE_SIZE); }} className="mt-3 text-meta font-semibold text-lav-700 underline underline-offset-2">Clear filters</button>}
               </div>
@@ -435,7 +433,7 @@ export function ServiceExplorer({
                 <button type="button" onClick={() => setVisible((current) => current + PAGE_SIZE)} className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2.5 text-meta font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-lav-700">Show more <span className="text-ink-3">({filtered.length - visible} remaining)</span></button>
               </div>
             )}
-            <p className="mt-5 border-t border-line pt-4 text-micro leading-relaxed text-ink-3">Stock means available inventory. My units means your remaining purchased units. Unknown and not tracked are not the same as zero. Examples do not imply platform support or verified coverage.</p>
+            <p className="mt-5 border-t border-line pt-4 text-micro leading-relaxed text-ink-3">Stock means available inventory. My units means your remaining purchased units. Unknown and not tracked are not the same as zero. Listings do not guarantee platform support or verified coverage.</p>
           </section>
         </>
       )}

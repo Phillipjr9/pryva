@@ -2,8 +2,8 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { orders, walletEmailOutbox, walletTransactions, withdrawals } from "@/db/schema";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { orders, users, walletEmailOutbox, walletTransactions, withdrawals } from "@/db/schema";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { logger } from "@/lib/logger";
 import { readJsonWithLimit } from "@/lib/request-body";
 import { createRateLimiter } from "@/lib/rate-limit";
@@ -12,6 +12,9 @@ import { makeEsimDeliveryEmail } from "@/lib/esim-email-template";
 import { makeNumberCodeEmail } from "@/lib/number-email-template";
 import { esimQrAttachment } from "@/lib/esim-qr";
 import { makeWalletEmail, type ResendPayload, type WalletEmailEvent } from "@/lib/wallet-email-template";
+import { buildSecurityNotice } from "@/lib/security-notice";
+import { makeSupportReplyEmail } from "@/lib/support-reply-email";
+import { canonicalSiteUrl } from "@/lib/net";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const SEND_TIMEOUT_MS = 8_000;
@@ -19,7 +22,17 @@ const SEND_TIMEOUT_MS = 8_000;
 // boundaries and other traffic; separate applications still need coordination.
 const resendBudget = createRateLimiter({ windowMs: 1_000, maxRequests: 4 });
 
-type Claimed = { id: string; lock_token: string };
+type Claimed = { id: string; lock_token: string; event_kind: string };
+// These were introduced by a build-time migration. Older live workers do not
+// understand them, so their available_at stays far in the future even on retry.
+const NEW_KINDS = new Set([
+  "bank_linked", "password_changed", "first_purchase", "withdrawal_failed",
+  "passkey_added", "passkey_removed", "support_reply", "purchase_recorded",
+]);
+// A single list drives both claim and retry logic: old workers only understand
+// available_at/locked_until, so these events use the protected parallel fields.
+const protectedKinds = sql.join([...NEW_KINDS].map((kind) => sql`${kind}`), sql`, `);
+const FINANCIAL_KINDS = new Set(["wallet", "first_purchase", "purchase_recorded", "purchase_completed", "withdrawal_processing", "withdrawal_completed", "withdrawal_rejected", "withdrawal_failed"]);
 type DispatchResult = "sent" | "retry" | "review" | "empty" | "throttled";
 class InvalidNotificationData extends Error {}
 
@@ -69,9 +82,13 @@ function validPayload(value: unknown): value is ResendPayload {
  */
 async function expireUncertainJobs(): Promise<number> {
   const result = await db.execute(sql`
-    UPDATE wallet_email_outbox SET status = 'review', last_error = 'idempotency_window_elapsed', locked_until = NULL, lock_token = NULL
+    UPDATE wallet_email_outbox AS job SET status = 'review', last_error = 'idempotency_window_elapsed', locked_until = NULL, notification_locked_until = NULL, lock_token = NULL
     WHERE first_attempt_at < now() - interval '23 hours'
-      AND (status = 'pending' OR (status = 'sending' AND (locked_until IS NULL OR locked_until <= now())))
+      AND (status = 'pending' OR (status = 'sending' AND (
+        (event_kind IN (${protectedKinds}) AND (notification_locked_until IS NULL OR notification_locked_until <= now()))
+        OR (event_kind NOT IN (${protectedKinds}) AND (locked_until IS NULL OR locked_until <= now()))
+      )))
+      AND EXISTS (SELECT 1 FROM users AS owner WHERE owner.id = job.user_id AND owner.deleted_at IS NULL)
     RETURNING id
   `);
   return result.rows.length;
@@ -81,17 +98,27 @@ async function claim(): Promise<Claimed | null> {
   const token = randomUUID();
   const result = await db.execute(sql`
     UPDATE wallet_email_outbox AS job
-      SET status = 'sending', lock_token = ${token}::uuid, locked_until = now() + interval '2 minutes',
+      SET status = 'sending', lock_token = ${token}::uuid,
+          locked_until = CASE WHEN event_kind IN (${protectedKinds})
+            THEN now() + interval '10 years' ELSE now() + interval '2 minutes' END,
+          notification_locked_until = CASE WHEN event_kind IN (${protectedKinds})
+            THEN now() + interval '2 minutes' ELSE NULL END,
           attempts = attempts + 1, first_attempt_at = COALESCE(first_attempt_at, now())
     WHERE job.id = (
       SELECT id FROM wallet_email_outbox
-      WHERE ((status = 'pending' AND available_at <= now())
-        OR (status = 'sending' AND (locked_until IS NULL OR locked_until <= now())))
+      WHERE ((status = 'pending' AND (
+          (event_kind IN (${protectedKinds}) AND notification_due_at <= now())
+          OR (event_kind NOT IN (${protectedKinds}) AND available_at <= now())
+        )) OR (status = 'sending' AND (
+          (event_kind IN (${protectedKinds}) AND (notification_locked_until IS NULL OR notification_locked_until <= now()))
+          OR (event_kind NOT IN (${protectedKinds}) AND (locked_until IS NULL OR locked_until <= now()))
+        )))
         AND (first_attempt_at IS NULL OR first_attempt_at >= now() - interval '23 hours')
-      ORDER BY available_at, created_at
+        AND EXISTS (SELECT 1 FROM users AS owner WHERE owner.id = wallet_email_outbox.user_id AND owner.deleted_at IS NULL)
+      ORDER BY COALESCE(notification_due_at, available_at), created_at
       LIMIT 1 FOR UPDATE SKIP LOCKED
     )
-    RETURNING job.id, job.lock_token
+    RETURNING job.id, job.lock_token, job.event_kind
   `);
   const row = result.rows[0] as Claimed | undefined;
   return row ?? null;
@@ -103,8 +130,12 @@ async function mark(job: Claimed, status: "sent" | "pending" | "review", error: 
     lastError: error,
     lockToken: null,
     lockedUntil: null,
+    notificationLockedUntil: null,
     ...(status === "sent" ? { sentAt: new Date(), providerMessageId: providerId ?? null } : {}),
-    ...(status === "pending" ? { availableAt: new Date(Date.now() + (error === "provider_configuration" ? 30 * 60_000 : 60_000)) } : {}),
+    ...(status === "pending" ? {
+      [NEW_KINDS.has(job.event_kind) ? "notificationDueAt" : "availableAt"]:
+        new Date(Date.now() + (error === "provider_configuration" ? 30 * 60_000 : 60_000)),
+    } : {}),
   }).where(and(eq(walletEmailOutbox.id, job.id), eq(walletEmailOutbox.status, "sending"), eq(walletEmailOutbox.lockToken, job.lock_token)))
     .returning({ id: walletEmailOutbox.id });
   return updated.length === 1;
@@ -117,6 +148,11 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
     eventKind: walletEmailOutbox.eventKind,
     payload: walletEmailOutbox.payload,
     eventTime: walletEmailOutbox.createdAt,
+    bankName: walletEmailOutbox.bankNameSnapshot,
+    bankLastFour: walletEmailOutbox.bankLastFour,
+    recipientName: walletEmailOutbox.recipientName,
+    supportTicketId: walletEmailOutbox.supportTicketId,
+    accountDeletedAt: users.deletedAt,
     txType: walletTransactions.type,
     txAmount: walletTransactions.amount,
     txReference: walletTransactions.reference,
@@ -138,17 +174,49 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
     orderPhoneNumber: orders.referenceCode,
     orderExpiresAt: orders.expiresAt,
   }).from(walletEmailOutbox)
+    .innerJoin(users, eq(walletEmailOutbox.userId, users.id))
     .leftJoin(walletTransactions, eq(walletEmailOutbox.walletTransactionId, walletTransactions.id))
     .leftJoin(withdrawals, eq(walletEmailOutbox.withdrawalId, withdrawals.id))
-    .leftJoin(orders, eq(walletEmailOutbox.orderId, orders.id))
+    .leftJoin(orders, sql`${orders.id} = COALESCE(${walletEmailOutbox.orderId}, ${walletTransactions.orderId})`)
     .where(and(eq(walletEmailOutbox.id, job.id), eq(walletEmailOutbox.status, "sending"), eq(walletEmailOutbox.lockToken, job.lock_token)))
     .limit(1);
   if (!row) throw new Error("Notification no longer available");
+  // Never deliberately send a queued message for an account already closed.
+  if (row.accountDeletedAt) throw new InvalidNotificationData();
   if (row.payload) {
     let saved: unknown;
     try { saved = JSON.parse(row.payload); } catch { throw new InvalidNotificationData(); }
     if (!validPayload(saved)) throw new InvalidNotificationData();
     return saved;
+  }
+
+  if (row.eventKind === "password_changed" || row.eventKind === "passkey_added" || row.eventKind === "passkey_removed") {
+    const sender = process.env.RESEND_FROM_EMAIL?.trim();
+    if (!sender || !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(row.recipient) || row.recipient.length > 200) throw new InvalidNotificationData();
+    const notice = buildSecurityNotice(row.eventKind, row.recipientName ?? "", new Date(row.eventTime));
+    const payload: ResendPayload = { from: sender, to: [row.recipient], ...notice };
+    const [saved] = await db.update(walletEmailOutbox).set({ payload: JSON.stringify(payload) })
+      .where(and(eq(walletEmailOutbox.id, job.id), eq(walletEmailOutbox.status, "sending"), eq(walletEmailOutbox.lockToken, job.lock_token)))
+      .returning({ id: walletEmailOutbox.id });
+    if (!saved) throw new Error("Notification lease expired");
+    return payload;
+  }
+
+  if (row.eventKind === "support_reply") {
+    if (!row.supportTicketId) throw new InvalidNotificationData();
+    let payload: ResendPayload;
+    try {
+      payload = makeSupportReplyEmail({
+        ticketId: row.supportTicketId, recipient: row.recipient,
+        sender: process.env.RESEND_FROM_EMAIL?.trim() ?? "",
+        name: row.recipientName ?? "", createdAt: new Date(row.eventTime),
+      });
+    } catch { throw new InvalidNotificationData(); }
+    const [saved] = await db.update(walletEmailOutbox).set({ payload: JSON.stringify(payload) })
+      .where(and(eq(walletEmailOutbox.id, job.id), eq(walletEmailOutbox.status, "sending"), eq(walletEmailOutbox.lockToken, job.lock_token)))
+      .returning({ id: walletEmailOutbox.id });
+    if (!saved) throw new Error("Notification lease expired");
+    return payload;
   }
 
   // The eSIM handover is built from the order itself, and carries the QR as an
@@ -158,7 +226,7 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
     if (!row.orderId || !row.orderActivationCode || !row.orderReference) throw new InvalidNotificationData();
     const sender = process.env.RESEND_FROM_EMAIL?.trim();
     if (!sender) throw new InvalidNotificationData();
-    const siteUrl = (process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://pryva.ng").replace(/\/$/, "");
+    const siteUrl = canonicalSiteUrl();
     let delivery: ResendPayload;
     try {
       delivery = makeEsimDeliveryEmail({
@@ -191,7 +259,7 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
     if (!row.orderId || !row.orderOtpCode || !row.orderReference) throw new InvalidNotificationData();
     const sender = process.env.RESEND_FROM_EMAIL?.trim();
     if (!sender) throw new InvalidNotificationData();
-    const siteUrl = (process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://pryva.ng").replace(/\/$/, "");
+    const siteUrl = canonicalSiteUrl();
     let notice: ResendPayload;
     try {
       notice = makeNumberCodeEmail({
@@ -219,16 +287,19 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
   let event: WalletEmailEvent;
   if (row.eventKind === "wallet" && row.txType && row.txAmount != null && row.txReference && row.txDescription != null && row.txTime) {
     event = { kind: "wallet", type: row.txType, amount: row.txAmount, reference: row.txReference, description: row.txDescription, createdAt: new Date(row.txTime) };
-  } else if ((row.eventKind === "withdrawal_processing" || row.eventKind === "withdrawal_completed" || row.eventKind === "withdrawal_rejected") && row.withdrawalAmount != null && row.withdrawalReference) {
+  } else if ((row.eventKind === "withdrawal_processing" || row.eventKind === "withdrawal_completed" || row.eventKind === "withdrawal_rejected" || row.eventKind === "withdrawal_failed") && row.withdrawalAmount != null && row.withdrawalReference) {
     event = { kind: row.eventKind, amount: row.withdrawalAmount, reference: row.withdrawalReference, createdAt: new Date(row.eventTime) };
   } else if (row.eventKind === "purchase_completed" && row.orderAmount != null && row.orderReference) {
     event = { kind: "purchase_completed", amount: row.orderAmount, reference: row.orderReference, createdAt: new Date(row.eventTime) };
+  } else if ((row.eventKind === "first_purchase" || row.eventKind === "purchase_recorded") && row.txAmount != null && row.txReference && row.txDescription != null) {
+    event = { kind: row.eventKind, amount: row.txAmount, reference: row.txReference, description: row.txDescription, productName: row.orderProductName, createdAt: new Date(row.eventTime) };
+  } else if (row.eventKind === "bank_linked" && row.bankName != null) {
+    event = { kind: "bank_linked", bankName: row.bankName, lastFour: row.bankLastFour, createdAt: new Date(row.eventTime) };
   } else {
     throw new InvalidNotificationData();
   }
-  const testMode = process.env.WALLET_EMAIL_TEST_MODE === "true" || Boolean(process.env.PAYSTACK_SECRET_KEY?.trim().startsWith("sk_test_"));
   let payload: ResendPayload;
-  try { payload = makeWalletEmail(event, row.recipient, process.env.RESEND_FROM_EMAIL!.trim(), testMode); }
+  try { payload = makeWalletEmail(event, row.recipient, process.env.RESEND_FROM_EMAIL!.trim()); }
   catch { throw new InvalidNotificationData(); }
   // Persist the exact payload before contacting Resend. Retries must not change
   // recipients, sender or body while reusing the same idempotency key.
@@ -247,6 +318,13 @@ async function dispatchOne(): Promise<DispatchResult> {
   if (!budget.allowed) return "throttled";
   const job = await claim();
   if (!job) return "empty";
+  // Never disguise a sandbox transaction as a real payment. The old test-mode
+  // label is gone, but a test Paystack key puts financial notices into review
+  // instead of sending misleading confirmations to customers.
+  if (FINANCIAL_KINDS.has(job.event_kind) && process.env.PAYSTACK_SECRET_KEY?.trim().startsWith("sk_test_")) {
+    logger.error("Financial email held: Paystack is using a test key", { eventKind: job.event_kind });
+    return await mark(job, "review", "test_payment_key") ? "review" : "retry";
+  }
   let payload: ResendPayload;
   try {
     payload = await payloadFor(job);
@@ -257,6 +335,13 @@ async function dispatchOne(): Promise<DispatchResult> {
     // Database or lease failures can be transient; no provider call was made.
     await mark(job, "pending", "notification_unavailable");
     return "retry";
+  }
+
+  // A previously attempted payload is immutable under Resend's idempotency key.
+  // Do not rewrite or send an old test-labelled receipt as a real transaction.
+  if (/^\[TEST\]/i.test(payload.subject) || /^TEST MODE/i.test(payload.text)) {
+    logger.error("Legacy test-labelled email needs review", { eventKind: job.event_kind });
+    return await mark(job, "review", "legacy_test_payload") ? "review" : "retry";
   }
 
   try {
@@ -275,6 +360,7 @@ async function dispatchOne(): Promise<DispatchResult> {
       return await mark(job, "review", "idempotency_conflict") ? "review" : "retry";
     }
     const error = [400, 401, 403, 422].includes(response.status) ? "provider_configuration" : "provider_unconfirmed";
+    if (error === "provider_configuration") logger.error("Email provider refused a notification", { status: response.status, eventKind: job.event_kind });
     await mark(job, "pending", error);
     return "retry";
   } catch {
@@ -288,7 +374,7 @@ async function dispatchOne(): Promise<DispatchResult> {
 /** Best-effort dispatch; ledger commits and customer responses never depend on email delivery. */
 export async function dispatchWalletEmails(limit = 4): Promise<{ sent: number; retry: number; review: number; throttled: boolean }> {
   const counts = { sent: 0, retry: 0, review: 0, throttled: false };
-  if (isPreviewDatabase() || !walletEmailConfigured()) return counts;
+  if (financialActionsUnavailable() || !walletEmailConfigured()) return counts;
   counts.review += await expireUncertainJobs();
   for (let index = 0; index < Math.min(Math.max(limit, 1), 8); index++) {
     const result = await dispatchOne();

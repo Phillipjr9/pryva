@@ -1,6 +1,6 @@
 import "server-only";
 
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { isBitcallConfigured } from "@/lib/bitcall";
 import { isFleexaConfigured } from "@/lib/fleexa";
 import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
@@ -21,11 +21,11 @@ import { orderByReadiness, type ServiceReadinessEntry } from "@/lib/service-stat
  * a key, a mapping, or a decision not to sell it.
  */
 export function readServiceReadiness(): ServiceReadinessEntry[] {
-  const preview = isPreviewDatabase();
-  const fleexa = isFleexaConfigured();
-  const boosting = isSmmPanelConfigured();
-  const accounts = isMarketplaceCheckoutConfigured();
-  const esim = isBitcallConfigured();
+  const preview = financialActionsUnavailable();
+  const fleexa = !preview && isFleexaConfigured();
+  const boosting = !preview && isSmmPanelConfigured();
+  const accounts = !preview && isMarketplaceCheckoutConfigured();
+  const esim = !preview && isBitcallConfigured();
 
   const entries: ServiceReadinessEntry[] = [
     {
@@ -33,8 +33,8 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
       label: "App verification",
       state: "preview",
       detail: fleexa
-        ? "Supplier listings are readable, but each app still needs its own mapping before a code can be bought."
-        : "Platform examples only. Per-app ordering needs a supplier key and a service mapping.",
+        ? "Listings are readable, but each app still needs its own mapping before a code can be bought."
+        : "App-specific listings are not currently available to order.",
     },
     {
       id: "social",
@@ -42,7 +42,7 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
       state: boosting ? "buy" : "paused",
       detail: boosting
         ? "Boosts are priced live and can be bought from your wallet."
-        : "The boosting panel is not connected, so nothing here can be ordered or charged.",
+        : preview ? "Ordering is unavailable in this environment." : "The boosting panel is not connected, so nothing here can be ordered or charged.",
     },
     {
       id: "numbers",
@@ -50,28 +50,30 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
       state: fleexa ? "buy" : "paused",
       detail: fleexa
         ? "Single-use numbers and rentals are delivered automatically, and bulk orders buy the same units."
-        : "Plans are catalogued with prices; ordering opens when the number supplier is connected.",
+        : preview ? "Ordering is unavailable in this environment." : "Plans are catalogued with prices; ordering is not connected yet.",
     },
     {
       id: "esim",
       label: "eSIM",
       state: esim ? "buy" : "paused",
-      detail: esim
-        ? "Travel data plans are read live from the network, priced in naira and issued as an activation code."
-        : "Live travel plans need the eSIM network key; nothing can be ordered until it is set.",
+      detail: preview
+        ? "eSIM ordering is unavailable in this environment."
+        : esim
+          ? "Travel data plans are read live from the network, priced in naira and issued as an activation code."
+          : "eSIM ordering is not connected yet, so no plans can be ordered.",
     },
     {
       id: "proxies",
       label: "Proxies",
       state: "unavailable",
-      detail: "No proxy supplier is connected, so no proxy plan can be ordered or charged.",
+      detail: "Proxy ordering is not connected, so no proxy plan can be ordered or charged.",
     },
     {
       id: "email",
       label: "Email OTP",
       state: preview ? "paused" : "free",
       detail: preview
-        ? "The free temporary inbox needs the persistent database; this preview cannot issue one."
+        ? "The temporary inbox is unavailable in this environment."
         : "The temporary inbox is free and needs no order. Paid inbox durations are not mapped yet.",
     },
     {
@@ -80,27 +82,27 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
       state: accounts ? "buy" : "paused",
       detail: accounts
         ? "Live marketplace listings can be bought from your wallet."
-        : "The marketplace is browsable when a supplier key is set; without one it has nothing to show.",
+        : preview ? "Ordering is unavailable in this environment." : "Marketplace ordering is not connected, so there are no available listings to buy.",
     },
     {
       id: "subscriptions",
       label: "Subscriptions",
       state: "unavailable",
-      detail: "No subscription supplier is connected. Prices here are examples, not offers.",
+      detail: "Subscriptions cannot be ordered yet; plans and prices are not currently shown.",
     },
     {
       id: "data",
       label: "Mobile data",
       state: "unavailable",
-      detail: "Data plans are catalogued, but no supplier is connected to deliver them.",
+      detail: "Mobile data ordering is not connected, so plans and prices are not currently shown.",
     },
     {
       id: "tools",
       label: "Order tools",
       state: fleexa ? "buy" : "paused",
       detail: fleexa
-        ? "Bulk orders buy and deliver the same units as a single order. Scheduled ordering is not launched yet."
-        : "Bulk and scheduled tools need deliverable plans before they can place anything.",
+        ? "Bulk orders buy the same units as a single order. Eligible schedules run nightly."
+        : preview ? "Ordering is unavailable in this environment." : "Bulk and scheduled tools need deliverable plans before they can place anything.",
     },
   ];
 
@@ -113,7 +115,7 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
         id: category.id,
         label: category.label,
         state: "unavailable",
-        detail: "No supplier integration exists for this category yet.",
+        detail: "Ordering is not available for this category yet.",
       });
     }
   }

@@ -66,7 +66,7 @@ export default async function WalletPage({
         </p>
       </div>
 
-      {paystackTestMode && <p role="note" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8rem] leading-relaxed text-amber-900"><strong>Paystack test mode.</strong> Checkout and transfers are simulated by Paystack; no real payment is made. Use test data and a separate staging database.</p>}
+      {paystackTestMode && <p role="note" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8rem] leading-relaxed text-amber-900"><strong>Paystack test mode.</strong> A test key cannot take real payments. Production checkout is disabled with this key; use an isolated staging database for testing.</p>}
       <TopUpReturn key={`${params.topup ?? ""}:${params.reference ?? params.trxref ?? ""}`} status={params.topup} reference={params.reference ?? params.trxref} userId={user.id} testMode={paystackTestMode} />
 
       <div className="grid gap-2.5 sm:grid-cols-3">

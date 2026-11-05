@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 /**
@@ -56,14 +56,25 @@ const ORDER = {
 };
 
 beforeEach(() => {
+  // These tests exercise a mocked live database; no external database is contacted.
+  vi.stubEnv("DATABASE_URL", "postgres://test.invalid/db");
+  vi.stubEnv("VERCEL_ENV", "");
   vi.clearAllMocks();
-  mocks.user.mockResolvedValue({ id: "user-1", email: "buyer@pryva.ng" });
+  mocks.user.mockResolvedValue({ id: "user-1", email: "buyer@example.test" });
   mocks.limit.mockResolvedValue({ allowed: true, unavailable: false });
   mocks.velocity.mockResolvedValue({ allowed: true, count: 1, limit: 20 });
   mocks.place.mockResolvedValue({ kind: "created", order: ORDER, balance: 23_500 });
 });
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe("POST /api/boosts/order", () => {
+  it("never places a supplier order from a Vercel preview", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect((await POST(post(valid))).status).toBe(503);
+    expect(mocks.place).not.toHaveBeenCalled();
+  });
+
   it("requires a session, same origin and JSON", async () => {
     mocks.user.mockResolvedValueOnce(null);
     expect((await POST(post(valid))).status).toBe(401);

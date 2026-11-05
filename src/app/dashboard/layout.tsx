@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { and, count, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
@@ -11,6 +12,20 @@ import { BUILD_ID } from "@/lib/build-id";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();
+
+  /*
+   * The console and the storefront are two products now, not one product with a
+   * tab. An operator who lands here is put back on their own surface -- which is
+   * the point of the split: the dashboard's wallet, its cart, its "explore
+   * services" rail and its balance chip all describe a person spending money,
+   * and showing them to the account that approves withdrawals is how an operator
+   * mistakes a customer view for a control panel.
+   *
+   * This is a redirect, not a hiding: every customer page underneath re-checks
+   * `requireUser` on its own, and the console re-checks `requireAdmin`. Nothing
+   * is left reachable-but-invisible.
+   */
+  if (isAdminUser(user)) redirect("/admin");
 
   // The bell lives in the shell, so the unread count is fetched once here rather
   // than by every page.
@@ -24,7 +39,6 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       user={{ name: user.name, email: user.email, walletBalance: user.walletBalance }}
       unreadNotifications={Number(unread?.value ?? 0)}
       buildId={BUILD_ID}
-      isAdmin={isAdminUser(user)}
     >
       {/*
         /verify-email existed with no link to it anywhere in the app, so the only
@@ -53,7 +67,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       )}
       {isPreviewDatabase() && (
         <div role="status" className="mb-5 rounded-xl border border-lav-200 bg-lav-50 px-4 py-3 text-sm text-lav-800">
-          Demo mode · Payments, balances and services are simulated. This account is shared, so use fictional details only.
+          This deployment has no persistent database. Purchases and payments are unavailable, and any data entered here will not persist.
         </div>
       )}
       {children}

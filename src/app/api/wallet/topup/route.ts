@@ -1,9 +1,10 @@
+import { paystackKeyUsable } from "@/lib/paystack-policy";
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { paymentTopups } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { isSameOriginMutation, publicOrigin } from "@/lib/net";
 import { initializePayment } from "@/lib/paystack";
 import { logger } from "@/lib/logger";
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Cross-origin request denied" }, { status: 403 });
     if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
 
-    if (isPreviewDatabase() || !process.env.PAYSTACK_SECRET_KEY?.trim()) {
+    if (financialActionsUnavailable() || !paystackKeyUsable(process.env.PAYSTACK_SECRET_KEY)) {
       return NextResponse.json({ error: "Wallet top-ups are not configured." }, { status: 503 });
     }
     const limit = await purchaseRateLimiter(`topup-init:${user.id}`);
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Enter a whole-naira amount between ₦1,000 and ₦500,000." }, { status: 400 });
     }
 
-    const origin = paystackAppOrigin(process.env.NEXT_PUBLIC_APP_URL?.trim() || publicOrigin(request), process.env.NODE_ENV !== "production");
+    const origin = paystackAppOrigin(process.env.NEXT_PUBLIC_SITE_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim() || publicOrigin(request), process.env.NODE_ENV !== "production");
     if (!origin) return NextResponse.json({ error: "The payment return URL is not configured correctly." }, { status: 503 });
     const reference = `TOP-${randomBytes(12).toString("hex")}`;
     const callbackUrl = `${origin}/dashboard/wallet?topup=return`;

@@ -159,7 +159,6 @@ describe("FoxReload client", () => {
       itemId: "steam_10_usd",
       quantity: 1,
       idempotencyKey: "test-req-123",
-      isMock: true,
     });
     expect(order.id).toBe("ord_fox123");
     expect(fetchSpy).toHaveBeenCalledWith(
@@ -168,8 +167,8 @@ describe("FoxReload client", () => {
         method: "POST",
         body: JSON.stringify({
           items: [{ itemId: "steam_10_usd", quantity: 1 }],
+          isMock: false,
           idempotencyKey: "test-req-123",
-          isMock: true,
         }),
       }),
     );

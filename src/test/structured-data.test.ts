@@ -49,8 +49,12 @@ describe("sitewide structured data", () => {
   });
 
   it("uses the canonical origin the rest of the app uses", () => {
-    expect(SITE_URL).toBe("https://pryva.ng");
-    expect(layout).toContain(`new URL("${SITE_URL}")`);
+    // The origin is configuration, not a constant: one resolver feeds metadata,
+    // robots, the sitemap and structured data, so they can never disagree about
+    // which domain this is. Asserting a literal here is what let the site keep
+    // advertising a domain it does not own.
+    expect(SITE_URL).toMatch(/^https:\/\/[a-z0-9.-]+$/);
+    expect(layout).toContain("new URL(canonicalSiteUrl())");
     expect(globals).toContain("--font-sans");
     expect(globals).toContain("--font-display");
   });

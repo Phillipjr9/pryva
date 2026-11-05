@@ -68,8 +68,8 @@ describe("Catalog Extended", () => {
   });
 
   describe("plans array", () => {
-    it("should have at least 20 plans", () => {
-      expect(plans.length).toBeGreaterThanOrEqual(20);
+    it("retains actual number and proxy catalog plans", () => {
+      expect(plans.length).toBeGreaterThanOrEqual(17);
     });
 
     it("should have all required fields for each plan", () => {

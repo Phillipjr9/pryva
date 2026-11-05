@@ -70,6 +70,7 @@ beforeEach(() => {
 
 afterEach(() => {
   clearBoostStatusCache();
+  vi.unstubAllEnvs();
 });
 
 describe("mapping a panel state onto an order status", () => {
@@ -92,6 +93,13 @@ describe("mapping a panel state onto an order status", () => {
 });
 
 describe("reading one order back", () => {
+  it("does not contact a supplier or update a shared record from preview", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(await syncBoostOrderStatus(boostOrder)).toMatchObject({ synced: false });
+    expect(getSmmOrderStatus).not.toHaveBeenCalled();
+    expect(writes).toHaveLength(0);
+  });
+
   it("records a completed delivery and reports progress", async () => {
     vi.mocked(getSmmOrderStatus).mockResolvedValue(report({ status: "completed", remains: 0 }));
     const result = await syncBoostOrderStatus(boostOrder);

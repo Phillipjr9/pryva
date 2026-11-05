@@ -258,7 +258,6 @@ export async function createFoxreloadOrder(params: {
   note?: Record<string, unknown>;
   totalPrice?: number;
   idempotencyKey?: string;
-  isMock?: boolean;
   contactEmail?: string;
 }): Promise<FoxreloadOrder> {
   const item: Record<string, unknown> = {
@@ -270,10 +269,10 @@ export async function createFoxreloadOrder(params: {
 
   const body: Record<string, unknown> = {
     items: [item],
+    isMock: false,
   };
 
   if (params.idempotencyKey) body.idempotencyKey = params.idempotencyKey;
-  if (params.isMock !== undefined) body.isMock = params.isMock;
   if (params.contactEmail) body.contactEmail = params.contactEmail;
 
   const data = (await foxreloadFetch("/api/orders/", {

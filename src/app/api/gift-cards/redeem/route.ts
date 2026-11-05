@@ -1,3 +1,4 @@
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { NextRequest, NextResponse } from "next/server";
 import { redeemGiftCard } from "@/lib/gift-cards";
 import { requireAuthApi } from "@/lib/auth";
@@ -14,6 +15,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
     if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
+    if (financialActionsUnavailable()) return NextResponse.json({ error: "Gift cards are unavailable in this environment." }, { status: 503 });
     const limited = await giftCardAttemptLimit(request, user.id);
     if (limited) return limited;
     let body: unknown;

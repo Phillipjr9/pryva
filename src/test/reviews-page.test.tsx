@@ -18,7 +18,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/auth", () => ({
   requireAdmin: vi.fn().mockResolvedValue({
     id: "33333333-3333-4333-8333-333333333333",
-    email: "owner@pryva.ng",
+    email: "owner@example.test",
     name: "Owner",
     walletBalance: 0,
     emailVerifiedAt: new Date("2026-01-02T00:00:00Z"),
@@ -27,7 +27,7 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 import ReviewsPage from "@/app/(site)/reviews/page";
-import AdminReviewsPage from "@/app/admin/reviews/page";
+import AdminReviewsPage from "@/app/admin/(console)/reviews/page";
 
 const buyer = "66666666-6666-4666-8666-666666666666";
 const PENDING_BODY = "This one is still waiting for a decision and must not be public.";
@@ -37,7 +37,7 @@ async function seed() {
   await db.insert(users).values({
     id: buyer,
     name: "Ada Demo",
-    email: "buyer@pryva.ng",
+    email: "buyer@example.test",
     passwordHash: "hash",
     walletBalance: 0,
     emailVerifiedAt: new Date(),
@@ -105,7 +105,7 @@ describe("public reviews page", () => {
     await seed();
     const html = renderToStaticMarkup(await ReviewsPage());
 
-    expect(html).not.toContain("buyer@pryva.ng");
+    expect(html).not.toContain("buyer@example.test");
     expect(html).not.toContain("Ada Demo");
     expect(html).not.toContain("Ada");
   });
@@ -126,7 +126,7 @@ describe("admin moderation page", () => {
       await AdminReviewsPage({ searchParams: Promise.resolve({ status: "pending" }) }),
     );
 
-    expect(html).toContain("buyer@pryva.ng");
+    expect(html).toContain("buyer@example.test");
     expect(html).toContain(PENDING_BODY);
     expect(html).toContain("Publish");
     expect(html).toContain("Reject");

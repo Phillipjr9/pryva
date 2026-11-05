@@ -119,6 +119,9 @@ function jsonRequest(body: unknown, origin = "https://pryva.test") {
 }
 
 beforeEach(() => {
+  // These tests exercise a mocked live database; no external database is contacted.
+  vi.stubEnv("DATABASE_URL", "postgres://test.invalid/db");
+  vi.stubEnv("VERCEL_ENV", "");
   state.user = { id: "u1", email: "user@example.com", walletBalance: 50000 };
   state.sameOrigin = true;
   state.balance = 50000;
@@ -132,10 +135,18 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   vi.clearAllMocks();
 });
 
 describe("POST /api/orders/bulk", () => {
+  it("never buys from a supplier in a Vercel preview", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect((await POST(jsonRequest({ items: [{ productSlug: "vn-ng", quantity: 1 }] }))).status).toBe(503);
+    expect(state.calls).toEqual([]);
+    expect(state.debits).toEqual([]);
+  });
+
   it("rejects unauthenticated and cross-origin requests", async () => {
     state.user = null;
     expect((await POST(jsonRequest({ items: [{ productSlug: "vn-ng", quantity: 1 }] }))).status).toBe(401);

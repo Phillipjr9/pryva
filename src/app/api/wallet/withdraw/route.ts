@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { users, withdrawals, walletTransactions, bankAccounts } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { isSameOriginMutation } from "@/lib/net";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { logger } from "@/lib/logger";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Cross-origin request denied" }, { status: 403 });
     if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
-    if (isPreviewDatabase()) return NextResponse.json({ error: "Withdrawals are unavailable with preview funds" }, { status: 503 });
+    if (financialActionsUnavailable()) return NextResponse.json({ error: "Withdrawals are unavailable with preview funds" }, { status: 503 });
     // Payouts are sent on request now, so without a provider there is nothing to
     // send: refusing up front is honest, and it never debits a wallet it cannot pay.
     if (!isPaystackConfigured()) {

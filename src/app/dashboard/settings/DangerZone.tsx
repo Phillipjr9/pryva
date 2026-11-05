@@ -45,7 +45,7 @@ export function DangerZone({
   const [typedEmail, setTypedEmail] = useState("");
   const [password, setPassword] = useState("");
   const [understood, setUnderstood] = useState(false);
-  const [forfeitAcknowledged, setForfeitAcknowledged] = useState(false);
+  const [acknowledgedForfeitAmount, setAcknowledgedForfeitAmount] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Failure | null>(null);
   const [done, setDone] = useState<{ retained: Record<string, number>; forfeited: number } | null>(null);
@@ -54,12 +54,24 @@ export function DangerZone({
   // Money on the table gets its own acknowledgement, in the amount the customer
   // is giving up — a second tick, not a sentence inside a longer one.
   const forfeiture = forfeitureWarning(walletBalance);
+  // If refreshed props show a different amount, the old tick is not consent to
+  // the new balance. The customer must explicitly acknowledge that amount.
+  const forfeitAcknowledged = forfeiture !== null && acknowledgedForfeitAmount === forfeiture.amount;
   const canSubmit =
     emailMatches &&
     understood &&
     (!forfeiture || forfeitAcknowledged) &&
     (!hasPassword || password.length > 0) &&
     !busy;
+
+  function keepAccount() {
+    setOpen(false);
+    setTypedEmail("");
+    setPassword("");
+    setUnderstood(false);
+    setAcknowledgedForfeitAmount(null);
+    setError(null);
+  }
 
   async function submit() {
     if (!canSubmit) return;
@@ -73,6 +85,7 @@ export function DangerZone({
           confirm: typedEmail,
           password: hasPassword ? password : undefined,
           forfeitAcknowledged: forfeiture ? true : undefined,
+          forfeitAmount: forfeiture?.amount,
         }),
       });
       const data = (await response.json().catch(() => ({}))) as Failure & {
@@ -85,12 +98,13 @@ export function DangerZone({
         setError(data);
         return;
       }
+      setPassword("");
       setDone({ retained: data.retained ?? {}, forfeited: data.forfeited ?? 0 });
       // The session cookie is gone; the shell this page sits in is not.
       router.refresh();
     } catch {
       setError({
-        error: "That did not go through — the connection dropped. Nothing was changed; please try again.",
+        error: "The connection dropped, so we couldn't confirm whether your account closed. Try signing in or contact support before trying again.",
       });
     } finally {
       setBusy(false);
@@ -107,8 +121,8 @@ export function DangerZone({
           <div>
             <h2 className="text-[0.95rem] font-semibold text-emerald-900">Your account is closed</h2>
             <p className="mt-1 text-meta leading-relaxed text-emerald-900/80">
-              You have been signed out on every device, and the address on this account no longer exists. The
-              records below were kept, without your name or email attached — nothing in them identifies you.
+              You have been signed out on every device, and your sign-in address was removed from the account.
+              The records below were kept and may still contain identifying information, such as payout details or support conversations.
             </p>
             <ul className="mt-2.5 grid gap-1 text-meta text-emerald-900/80">
               {Object.entries(done.retained)
@@ -192,7 +206,7 @@ export function DangerZone({
 
             <div className="rounded-xl border border-line bg-white p-3.5">
               <p className="flex items-center gap-1.5 text-[0.82rem] font-semibold text-ink">
-                <Shield className="h-3.5 w-3.5 text-emerald-600" /> Kept, without your name
+                <Shield className="h-3.5 w-3.5 text-emerald-600" /> Records kept
               </p>
               <ul className="mt-2 grid gap-2 text-meta text-ink-2">
                 {DELETION_TERMS.kept.map((item) => (
@@ -207,6 +221,7 @@ export function DangerZone({
           <p className="rounded-xl bg-white/80 px-3.5 py-2.5 text-meta leading-relaxed text-ink-2">
             {DELETION_TERMS.summary}
           </p>
+          <p className="text-meta leading-relaxed text-ink-2">{DELETION_TERMS.confirmationEmail}</p>
 
           {forfeiture ? (
             <div className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-meta leading-relaxed text-amber-900">
@@ -226,7 +241,7 @@ export function DangerZone({
                 <input
                   type="checkbox"
                   checked={forfeitAcknowledged}
-                  onChange={(event) => setForfeitAcknowledged(event.target.checked)}
+                  onChange={(event) => setAcknowledgedForfeitAmount(event.target.checked ? forfeiture.amount : null)}
                   className="mt-0.5"
                   disabled={busy}
                 />
@@ -317,7 +332,7 @@ export function DangerZone({
             </button>
             <button
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={keepAccount}
               disabled={busy}
               className="btn w-fit border border-line bg-white !px-4 !py-2.5 !text-[0.8rem] text-ink-2 hover:border-lav-300 disabled:opacity-50"
             >

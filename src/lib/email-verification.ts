@@ -6,6 +6,9 @@ import { db } from "@/db";
 import { emailVerificationTokens, users } from "@/db/schema";
 import { emailVerificationEmail } from "@/lib/email-templates";
 import { authRateLimiter } from "@/lib/rate-limit";
+import { canonicalSiteUrl } from "@/lib/net";
+import { logger } from "@/lib/logger";
+import { readJsonWithLimit } from "@/lib/request-body";
 
 /**
  * Verification is not urgent the way a password reset is, so the link lasts a day
@@ -47,37 +50,18 @@ export function rateLimitEmailVerification(key: string) {
  */
 export type VerificationDelivery = {
   delivered: boolean;
-  /** A short, human-readable reason. Null when the message was accepted. */
+  /** A short, human-readable reason. `delivered` means provider acceptance, not inbox delivery. */
   detail: string | null;
 };
-
-/** The provider's own words, bounded and stripped, so a form can show them. */
-function deliveryDetail(status: number, body: string): string {
-  const parsed = (() => {
-    try {
-      return JSON.parse(body) as { message?: unknown };
-    } catch {
-      return null;
-    }
-  })();
-  const message = typeof parsed?.message === "string" ? parsed.message : "";
-  const readable = message.replace(/\s+/g, " ").trim().slice(0, 140);
-  if (!readable) return `the mail service refused the message (${status})`;
-  return `the mail service refused the message (${status}): ${readable}`;
-}
 
 async function sendVerificationEmail(to: string, name: string, token: string): Promise<VerificationDelivery> {
   const key = process.env.RESEND_API_KEY?.trim();
   const from = process.env.RESEND_FROM_EMAIL?.trim();
   if (!key || !from) {
-    console.error("[auth] verification email not sent: Resend is not configured");
+    logger.error("Verification email not sent: mail is not configured");
     return { delivered: false, detail: "email delivery is not configured on this server" };
   }
-  const base = (
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    "https://pryva.ng"
-  ).replace(/\/$/, "");
+  const base = canonicalSiteUrl();
   const link = `${base}/verify-email?token=${encodeURIComponent(token)}`;
   // The shared branded template: gradient header bar, hero image, brand mark,
   // DM Sans/Manrope, a plain-text fallback. This route was sending three bare
@@ -87,6 +71,9 @@ async function sendVerificationEmail(to: string, name: string, token: string): P
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      redirect: "error",
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
       body: JSON.stringify({
         from,
         to,
@@ -96,15 +83,23 @@ async function sendVerificationEmail(to: string, name: string, token: string): P
       }),
     });
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      // The status and the provider's message are logged in full for the owner;
-      // what reaches the user is bounded by `deliveryDetail`.
-      console.error("[auth] verification email refused", response.status, body.slice(0, 300));
-      return { delivered: false, detail: deliveryDetail(response.status, body) };
+      // Provider bodies can echo recipient addresses or other sensitive data.
+      logger.error("Verification email refused by the provider", { status: response.status });
+      return { delivered: false, detail: `the mail service refused the message (${response.status})` };
     }
+    let messageId: unknown;
+    try {
+      const reply = await readJsonWithLimit(response, 32_768) as { id?: unknown };
+      messageId = reply.id;
+    } catch { /* A malformed success is not proof of acceptance. */ }
+    if (typeof messageId !== "string" || !messageId || messageId.length > 100) {
+      logger.error("Verification email acceptance was not confirmed");
+      return { delivered: false, detail: "the mail service did not confirm acceptance" };
+    }
+    // This is provider acceptance, not a confirmed delivery into the inbox.
     return { delivered: true, detail: null };
-  } catch (error) {
-    console.error("[auth] verification email failed", error);
+  } catch {
+    logger.error("Verification email could not be confirmed");
     return { delivered: false, detail: "the mail service could not be reached" };
   }
 }
@@ -139,7 +134,7 @@ export async function issueEmailVerification(
 
 export async function confirmEmailVerification(
   token: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {
   if (typeof token !== "string" || token.length < 20 || token.length > 200) {
     return { ok: false, error: VERIFY_INVALID_MESSAGE };
   }
@@ -170,5 +165,9 @@ export async function confirmEmailVerification(
       .set({ usedAt: new Date() })
       .where(eq(emailVerificationTokens.id, row.id));
   });
-  return { ok: true };
+  // The user id is returned so the caller can send the receipt and the welcome
+  // without a second lookup. They are deliberately *not* sent from inside the
+  // transaction above: mail latency and provider failures have no business
+  // holding a row lock on the account that was just verified.
+  return { ok: true, userId: row.userId };
 }

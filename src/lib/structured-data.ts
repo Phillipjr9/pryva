@@ -1,3 +1,4 @@
+import { canonicalSiteUrl } from "@/lib/net";
 /**
  * Sitewide structured data: who publishes this site, and what the site is.
  *
@@ -15,7 +16,7 @@
  */
 
 /** The canonical origin. `metadataBase` in `layout.tsx` uses the same value. */
-export const SITE_URL = "https://pryva.ng";
+export const SITE_URL = canonicalSiteUrl();
 
 export type StructuredDataNode = Record<string, unknown>;
 

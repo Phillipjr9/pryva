@@ -15,6 +15,7 @@ import {
 import { logger } from "@/lib/logger";
 import { ESIM_PROVIDER } from "@/lib/order-providers";
 import { debitWalletInTx, InsufficientFundsError } from "@/lib/wallet";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 
 /**
  * Buying and delivering an eSIM.
@@ -222,6 +223,7 @@ export async function completeEsimOrder(row: EsimRow): Promise<Completion> {
     throw error;
   }
 
+  scheduleWalletEmails();
   return { kind: "delivered", order: claimed.order, balance: claimed.balance };
 }
 

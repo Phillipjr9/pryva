@@ -3,6 +3,7 @@ import "server-only";
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 
 import { db } from "@/db";
+import { isVercelPreview } from "@/lib/financial-environment";
 import { orders, type Order } from "@/db/schema";
 import { getSmmOrderStatus, isSmmPanelConfigured, type SmmOrderState } from "@/lib/smm-panel";
 
@@ -110,6 +111,7 @@ export async function syncBoostOrderStatus(
   order: SyncableOrder,
   options: { skipCooldown?: boolean } = {},
 ): Promise<BoostSyncResult> {
+  if (isVercelPreview()) return NO_NEWS;
   if (order.provider !== BOOST_PROVIDER) return NO_NEWS;
   const panelOrderId = order.providerRequestId?.trim();
   if (!panelOrderId) return NO_NEWS;

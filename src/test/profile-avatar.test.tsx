@@ -25,7 +25,7 @@ vi.mock("next/navigation", () => ({
 const user = {
   id: "11111111-1111-4111-8111-111111111111",
   name: "Ada Demo",
-  email: "demo@pryva.ng",
+  email: "demo@example.test",
   walletBalance: 25_000,
   emailVerifiedAt: new Date("2026-10-01T09:00:00Z"),
   createdAt: new Date("2026-10-01T09:00:00Z"),
@@ -33,12 +33,12 @@ const user = {
 
 describe("avatar selection", () => {
   it("is stable for the same account", () => {
-    expect(avatarNumberFor("demo@pryva.ng")).toBe(avatarNumberFor("demo@pryva.ng"));
+    expect(avatarNumberFor("demo@example.test")).toBe(avatarNumberFor("demo@example.test"));
     expect(avatarNumberFor("")).toBe(avatarNumberFor(""));
   });
 
   it("stays inside the set that exists on disk", () => {
-    for (const seed of ["a@b.co", "demo@pryva.ng", "z".repeat(200), "😀", ""]) {
+    for (const seed of ["a@b.co", "demo@example.test", "z".repeat(200), "😀", ""]) {
       const n = avatarNumberFor(seed);
       expect(n).toBeGreaterThanOrEqual(1);
       expect(n).toBeLessThanOrEqual(AVATAR_COUNT);
@@ -48,7 +48,7 @@ describe("avatar selection", () => {
 
   it("spreads different accounts across the set", () => {
     const picks = new Set(
-      ["ada@example.com", "bola@example.com", "chidi@example.com", "demo@pryva.ng", "ops@example.com"].map(
+      ["ada@example.com", "bola@example.com", "chidi@example.com", "demo@example.test", "ops@example.com"].map(
         avatarNumberFor,
       ),
     );
@@ -56,8 +56,8 @@ describe("avatar selection", () => {
   });
 
   it("renders a real image with the small derivatives, and no accessible duplication", () => {
-    const html = renderToStaticMarkup(<ProfileAvatar seed="demo@pryva.ng" />);
-    const n = avatarNumberFor("demo@pryva.ng");
+    const html = renderToStaticMarkup(<ProfileAvatar seed="demo@example.test" />);
+    const n = avatarNumberFor("demo@example.test");
     expect(html).toContain(`/images/avatars/avatar-${n}.png`);
     expect(html).toContain(`/images/avatars/avatar-${n}-64.webp 64w`);
     expect(html).toContain(`/images/avatars/avatar-${n}-192.webp 192w`);

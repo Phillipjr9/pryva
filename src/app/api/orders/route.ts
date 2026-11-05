@@ -1,3 +1,4 @@
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -106,6 +107,7 @@ export async function POST(request: Request) {
   }
 
   if (!isJsonRequest(request)) return Response.json({ ok: false, error: "Expected JSON." }, { status: 415 });
+  if (financialActionsUnavailable()) return Response.json({ ok: false, error: "Purchases are unavailable in this environment." }, { status: 503 });
   const limit = await purchaseRateLimiter(`order-create:${user.id}`);
   if (limit.unavailable) return Response.json({ ok: false, error: "Purchases are temporarily unavailable." }, { status: 503 });
   if (!limit.allowed) return Response.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
@@ -167,7 +169,7 @@ export async function POST(request: Request) {
     const alreadyPurchased = await findRequestOrder(user.id, requestId);
     if (alreadyPurchased) return receipt(alreadyPurchased, await currentBalance(user.id), true);
 
-    // Fulfil first; only in-memory previews use simulated provider data.
+    // Fulfil first using the configured supplier; ephemeral and preview environments were refused above.
     // No wallet charge is made until fulfilment succeeds.
     let fulfilled: FulfilledOrder;
     try {
