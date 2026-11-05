@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { orders, users, type Order } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
-import { findEsimOffer, type EsimOffer } from "@/lib/esim-catalog";
+import { esimOfferTerms, findEsimOffer, recheckEsimOffer, type EsimOffer } from "@/lib/esim-catalog";
 import { purchaseEsim } from "@/lib/esim-fulfilment";
 import { purchaseVelocity, recordFraudEvent } from "@/lib/fraud";
 import { MARGIN_BLOCKED_MESSAGE } from "@/lib/margin-guard";
@@ -66,15 +66,13 @@ async function currentBalance(userId: string): Promise<number> {
   return row?.balance ?? 0;
 }
 
-function isUniqueViolation(error: unknown): boolean {
-  return (error as { code?: unknown } | null)?.code === "23505";
-}
-
 /**
  * Buy an eSIM plan.
  *
- * Money moves only once the activation material is in hand, so the three
- * outcomes that matter are:
+ * A unique order is claimed before any supplier call. A retry or concurrent
+ * submit therefore cannot spend twice, even if the first call times out or the
+ * process dies. A claim with an unknown outcome remains in review. Customer
+ * money moves only once the activation material is in hand, so the outcomes are:
  *
  *   * **delivered** — record `active`, store the profile, debit once;
  *   * **provisioning** — record `processing`, charge nothing, and let the order
@@ -123,6 +121,14 @@ export async function POST(request: Request) {
   }
 
   const record = body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
+  // Do not silently ignore a selected number (or any other unsupported option):
+  // that could charge for a plan without honouring what the caller requested.
+  if (Object.keys(record).some((key) => key !== "offerId" && key !== "requestId" && key !== "expectedPriceNgn" && key !== "expectedTerms")) {
+    return Response.json(
+      { ok: false, error: "Additional purchase options are not supported. Check your orders before trying again." },
+      { status: 400 },
+    );
+  }
   const offerId = typeof record.offerId === "string" ? record.offerId : null;
   if (!offerId || offerId.length > 64) {
     return Response.json({ ok: false, error: "Invalid plan." }, { status: 400 });
@@ -138,9 +144,30 @@ export async function POST(request: Request) {
     const already = await findRequestOrder(user.id, requestId);
     if (already) return receipt(already, await currentBalance(user.id), true);
 
-    const offer = await findEsimOffer(offerId);
-    if (!offer) return Response.json({ ok: false, error: "That eSIM plan is no longer available." }, { status: 400 });
-    if (!offer.purchasable) return Response.json({ ok: false, error: MARGIN_BLOCKED_MESSAGE }, { status: 503 });
+    // A customer must never be charged a different price from the one they saw.
+    // Older clients may replay an existing request above, but cannot start a new
+    // purchase until they reload and send the displayed whole-naira price.
+    const expectedPriceNgn = record.expectedPriceNgn;
+    const expectedTerms = record.expectedTerms;
+    if (typeof expectedPriceNgn !== "number" || !Number.isSafeInteger(expectedPriceNgn) || expectedPriceNgn <= 0 ||
+        typeof expectedTerms !== "string" || !/^[a-f0-9]{24}$/.test(expectedTerms)) {
+      return Response.json({ ok: false, error: "Please reload the plan to confirm its current details and price." }, { status: 400 });
+    }
+    const listed = await findEsimOffer(offerId);
+    if (!listed) return Response.json({ ok: false, error: "That eSIM plan is no longer available." }, { status: 400 });
+    if (!listed.purchasable) return Response.json({ ok: false, error: MARGIN_BLOCKED_MESSAGE }, { status: 503 });
+    // The catalog may be cached. Re-read the plan and recompute its price and
+    // margin before spending provider funds; a read failure is not a buy signal.
+    const offer = await recheckEsimOffer(listed).catch(() => null);
+    if (!offer || !offer.purchasable) {
+      return Response.json({ ok: false, error: "That plan cannot be confirmed right now. Nothing was charged." }, { status: 503 });
+    }
+    if (esimOfferTerms(offer) !== expectedTerms) {
+      return Response.json({ ok: false, error: "The plan details changed. Reload this plan to review them before buying." }, { status: 409 });
+    }
+    if (offer.priceNgn !== expectedPriceNgn) {
+      return Response.json({ ok: false, error: "The price changed. Reload this plan to review the new price before buying." }, { status: 409 });
+    }
 
     if (user.walletBalance < offer.priceNgn) {
       return Response.json(
@@ -154,36 +181,62 @@ export async function POST(request: Request) {
       );
     }
 
-    const outcome = await purchaseEsim(offer);
     const reference = makeReference("PRY");
     const orderId = randomUUID();
     const shape = planShape(offer);
+    // Claim this request *before* touching the supplier. The database's existing
+    // (user_id, request_id) unique index makes concurrent retries safe across
+    // application instances. Review is intentionally conservative: if the
+    // process stops at any point, nobody is allowed to buy again automatically.
+    const claimed = await db.insert(orders).values({
+      id: orderId,
+      reference,
+      userId: user.id,
+      requestId,
+      service: "esim",
+      productSlug: shape.slug,
+      productName: shape.name,
+      planLabel: shape.planLabel,
+      region: shape.region,
+      duration: shape.duration,
+      amount: offer.priceNgn,
+      status: "review",
+      provider: ESIM_PROVIDER,
+      // Retain the pre-purchase estimate for reconciliation, not as confirmed
+      // supplier spending; realised-margin reporting excludes eSIM estimates.
+      providerCostNgn: offer.costNgn,
+      reconciliationNote: "eSIM purchase initiated; awaiting supplier outcome. Nothing has been charged.",
+    }).onConflictDoNothing({ target: [orders.userId, orders.requestId] }).returning({ id: orders.id });
+    if (claimed.length === 0) {
+      const winner = await findRequestOrder(user.id, requestId);
+      if (winner) return receipt(winner, await currentBalance(user.id), true);
+      return Response.json({ ok: false, error: "Check your orders before trying again." }, { status: 409 });
+    }
 
+    const outcome = await purchaseEsim(offer, async (providerOrderId) => {
+      const [recorded] = await db.update(orders).set({
+        providerRequestId: providerOrderId,
+        reconciliationNote: "Supplier accepted the eSIM order; awaiting delivery. Nothing has been charged.",
+      }).where(and(eq(orders.id, orderId), eq(orders.status, "review"))).returning({ id: orders.id });
+      if (!recorded) throw new Error("eSIM order is no longer awaiting a supplier outcome");
+    });
     if (outcome.kind === "refused") {
+      const [cancelled] = await db.update(orders).set({
+        status: "cancelled",
+        reconciliationNote: "Supplier refused the eSIM purchase; nothing was charged.",
+      }).where(and(eq(orders.id, orderId), eq(orders.status, "review"))).returning({ id: orders.id });
+      if (!cancelled) throw new Error("eSIM order is no longer awaiting a supplier outcome");
       return Response.json(
-        { ok: false, error: "We couldn't deliver that eSIM right now — nothing was charged. Try again in a moment." },
+        { ok: false, error: "We couldn't deliver that eSIM right now — nothing was charged. Reload the plan if you want to try again." },
         { status: 502 },
       );
     }
 
     if (outcome.kind === "unknown") {
-      await db.insert(orders).values({
-        id: orderId,
-        reference,
-        userId: user.id,
-        requestId,
-        service: "esim",
-        productSlug: shape.slug,
-        productName: shape.name,
-        planLabel: shape.planLabel,
-        region: shape.region,
-        duration: shape.duration,
-        amount: offer.priceNgn,
-        status: "review",
-        provider: ESIM_PROVIDER,
-        providerCostNgn: offer.costNgn,
+      const [reviewed] = await db.update(orders).set({
         reconciliationNote: "eSIM purchase outcome unknown at the supplier; nothing was charged.",
-      });
+      }).where(and(eq(orders.id, orderId), eq(orders.status, "review"))).returning({ id: orders.id });
+      if (!reviewed) throw new Error("eSIM order is no longer awaiting a supplier outcome");
       return Response.json(
         {
           ok: true,
@@ -197,23 +250,12 @@ export async function POST(request: Request) {
     }
 
     if (outcome.kind === "pending") {
-      await db.insert(orders).values({
-        id: orderId,
-        reference,
-        userId: user.id,
-        requestId,
-        service: "esim",
-        productSlug: shape.slug,
-        productName: shape.name,
-        planLabel: shape.planLabel,
-        region: shape.region,
-        duration: shape.duration,
-        amount: offer.priceNgn,
+      const [processing] = await db.update(orders).set({
         status: "processing",
-        provider: ESIM_PROVIDER,
         providerRequestId: outcome.providerRequestId,
-        providerCostNgn: offer.costNgn,
-      });
+        reconciliationNote: null,
+      }).where(and(eq(orders.id, orderId), eq(orders.status, "review"))).returning({ id: orders.id });
+      if (!processing) throw new Error("eSIM order is no longer awaiting a supplier outcome");
       return Response.json(
         {
           ok: true,
@@ -227,39 +269,21 @@ export async function POST(request: Request) {
     }
 
     const { delivery } = outcome;
-    let outcomeTx: { kind: "created"; balance: number } | { kind: "replay"; order: Order };
+    let balance: number;
     try {
-      outcomeTx = await db.transaction(async (tx: any) => {
-        const [raced] = await tx
-          .select()
-          .from(orders)
-          .where(and(eq(orders.userId, user.id), eq(orders.requestId, requestId)))
-          .limit(1);
-        if (raced) return { kind: "replay", order: raced };
-
-        await tx.insert(orders).values({
-          id: orderId,
-          reference,
-          userId: user.id,
-          requestId,
-          service: "esim",
-          productSlug: shape.slug,
-          productName: shape.name,
-          planLabel: shape.planLabel,
-          region: shape.region,
-          duration: shape.duration,
-          amount: offer.priceNgn,
+      balance = await db.transaction(async (tx) => {
+        const [activated] = await tx.update(orders).set({
           status: "active",
           provider: delivery.provider,
           providerRequestId: delivery.providerRequestId,
-          providerCostNgn: offer.costNgn,
           referenceCode: delivery.iccid,
           esimIccid: delivery.iccid,
           esimActivationCode: delivery.activationCode,
           esimInstallUrl: delivery.installUrl,
-        });
-
-        const balance = await debitWalletInTx(tx, {
+          reconciliationNote: null,
+        }).where(and(eq(orders.id, orderId), eq(orders.status, "review"))).returning({ id: orders.id });
+        if (!activated) throw new Error("eSIM order is no longer awaiting activation");
+        return debitWalletInTx(tx, {
           userId: user.id,
           amount: offer.priceNgn,
           type: "debit",
@@ -267,50 +291,36 @@ export async function POST(request: Request) {
           orderId,
           reference,
         });
-        return { kind: "created" as const, balance };
       });
     } catch (error) {
-      // The profile exists upstream and we cannot refund it ourselves. Park it
-      // for an operator instead of silently losing a paid-for unit.
-      if (error instanceof InsufficientFundsError || isUniqueViolation(error)) {
-        await db.insert(orders).values({
-          id: orderId,
-          reference,
-          userId: user.id,
-          requestId: `${requestId}`,
-          service: "esim",
-          productSlug: shape.slug,
-          productName: shape.name,
-          planLabel: shape.planLabel,
-          region: shape.region,
-          duration: shape.duration,
-          amount: offer.priceNgn,
-          status: "review",
-          provider: ESIM_PROVIDER,
-          providerRequestId: delivery.providerRequestId,
-          providerCostNgn: offer.costNgn,
-          reconciliationNote: "eSIM delivered by the supplier but the charge could not be recorded; nothing was charged.",
-        }).onConflictDoNothing();
-        if (isUniqueViolation(error)) {
-          const winner = await findRequestOrder(user.id, requestId);
-          if (winner) return receipt(winner, await currentBalance(user.id), true);
-        }
-        return Response.json(
-          { ok: false, error: "We couldn't finish recording that order — nothing was charged. Contact support with your reference." },
-          { status: 409 },
-        );
-      }
-      throw error;
+      // The profile exists upstream and we cannot refund it ourselves. The
+      // transaction rolls back on failure; keep the claimed order for review and
+      // retain the provider order reference for recovery, without exposing the
+      // activation credential on an unpaid order.
+      const insufficient = error instanceof InsufficientFundsError;
+      await db.update(orders).set({
+        status: "review",
+        providerRequestId: delivery.providerRequestId,
+        reconciliationNote: insufficient
+          ? "eSIM delivered but the wallet no longer covered the price; nothing was charged."
+          : "eSIM delivered but the charge outcome needs reconciliation.",
+      }).where(and(eq(orders.id, orderId), eq(orders.status, "review")));
+      // A generic transaction error can happen after a commit was sent; its
+      // outcome is not necessarily known. Never claim the wallet was untouched.
+      return Response.json(
+        { ok: false, error: insufficient
+          ? "The wallet no longer covers this order — nothing was charged. Contact support with your reference."
+          : "We couldn't confirm the order. Check your orders or contact support before trying again." },
+        { status: 409 },
+      );
     }
-
-    if (outcomeTx.kind === "replay") return receipt(outcomeTx.order, await currentBalance(user.id), true);
 
     scheduleWalletEmails();
     await settleReferralRewards({ refereeId: user.id }).catch(() => undefined);
 
     return Response.json({
       ok: true,
-      balance: outcomeTx.balance,
+      balance,
       replayed: false,
       order: {
         id: orderId,
@@ -323,6 +333,6 @@ export async function POST(request: Request) {
       },
     });
   } catch {
-    return Response.json({ ok: false, error: "We couldn't complete that order. Please try again." }, { status: 500 });
+    return Response.json({ ok: false, error: "We couldn't complete that order. Check your orders or contact support before trying again." }, { status: 500 });
   }
 }

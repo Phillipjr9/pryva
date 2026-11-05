@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const runtime = vi.hoisted(() => ({ limit: vi.fn() }));
-vi.mock("@/lib/rate-limit", () => ({ createRateLimiter: () => runtime.limit }));
+const runtime = vi.hoisted(() => ({ limit: vi.fn(), catalogLimit: vi.fn() }));
+vi.mock("@/lib/rate-limit", () => ({ createRateLimiter: (config: { maxRequests: number }) => config.maxRequests === 12 ? runtime.catalogLimit : runtime.limit }));
 
 import {
   BitcallError,
@@ -13,6 +13,7 @@ import {
   classifyRetry,
   findBitcallOtpService,
   getBitcallBalance,
+  getBitcallEsimPlan,
   getBitcallEsimOrder,
   getBitcallEsimProfile,
   getBitcallOtpActivation,
@@ -47,6 +48,7 @@ beforeEach(() => {
   vi.stubEnv("BITCALL_API_SECRET", SECRET);
   vi.stubEnv("BITCALL_API_URL", "");
   runtime.limit.mockResolvedValue({ allowed: true });
+  runtime.catalogLimit.mockResolvedValue({ allowed: true });
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
@@ -148,6 +150,19 @@ describe("gateway transport", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("caps catalog reads separately so they leave shared headroom for orders", async () => {
+    runtime.catalogLimit.mockResolvedValue({ allowed: false });
+    const fetchMock = vi.fn().mockImplementation(() => json({ data: { orderId: "ord_1", status: "pending" } }, 202));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(listBitcallEsimPlans()).rejects.toMatchObject({ code: "LOCAL_RATE_BUDGET" });
+    expect(runtime.limit).not.toHaveBeenCalled();
+    await expect(getBitcallEsimPlan("pln_abc123", { browse: true })).rejects.toMatchObject({ code: "LOCAL_RATE_BUDGET" });
+    expect(runtime.limit).not.toHaveBeenCalled();
+    await buyBitcallEsimPlan("pln_abc123");
+    expect(runtime.limit).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("branches on the gateway's code, keeps requestId and fields, and drops its prose", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
       error: {
@@ -244,7 +259,7 @@ describe("eSIM catalog", () => {
       ],
     };
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json(rows)));
-    const plans = await listBitcallEsimPlans();
+    const { plans } = await listBitcallEsimPlans();
     expect(plans).toHaveLength(2);
     expect(plans[0]).toMatchObject({
       planId: "pln_abc123", name: "Nigeria Lite", region: "Africa",
@@ -256,7 +271,112 @@ describe("eSIM catalog", () => {
     expect(plans[1]).toMatchObject({ planId: "pln_def456", price: 12, currency: "EUR", countries: [] });
 
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json([rows.data[0]])));
-    expect(await listBitcallEsimPlans()).toHaveLength(1);
+    expect((await listBitcallEsimPlans()).plans).toHaveLength(1);
+  });
+
+  it("parses the documented money object, megabytes, unlimited flag and validity", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({ data: [
+      { planId: "pln_tunisia", name: "1 GB - 7 days", countries: ["TN"], dataMb: 1024, unlimitedData: false, validityDays: 7, price: { amount: 0.87, currency: "eur" }, capabilities: { voice: false, sms: false } },
+      { planId: "pln_uk", dataMb: 1, validityDays: 5, price: { amount: 0.74, currency: "EUR" } },
+      { planId: "pln_unlimited", unlimitedData: true, price: { amount: 5, currency: "USD" } },
+      // Never borrow a top-level USD currency for an incomplete EUR money object.
+      { planId: "pln_ambiguous", price: { amount: 9 }, currency: "USD", dataMb: 1536 },
+    ], meta: { page: 1, hasNext: false } })));
+    const result = await listBitcallEsimPlans();
+    expect(result.partial).toBe(false);
+    expect(result.plans[0]).toMatchObject({ allowance: 1, allowanceUnit: "GB", validity: 7, validityUnit: "days", price: 0.87, currency: "EUR", unlimitedData: false });
+    expect(result.plans[1]).toMatchObject({ allowance: 1, allowanceUnit: "MB", validity: 5, price: 0.74, currency: "EUR" });
+    expect(result.plans[2]).toMatchObject({ unlimitedData: true, price: 5, currency: "USD" });
+    expect(result.plans[3]).toMatchObject({ allowance: 1536, allowanceUnit: "MB", price: 9, currency: null });
+  });
+
+  it("fetches successive documented pages, deduplicates and reports completeness", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: URL) => {
+      const page = Number(url.searchParams.get("page"));
+      return json(page === 1
+        ? { data: [{ planId: "pln_a" }, { planId: "pln_b" }], meta: { page: 1, hasNext: true } }
+        : { data: [{ planId: "pln_b" }, { planId: "pln_c" }], meta: { page: 2, hasNext: false } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await listBitcallEsimPlans({ region: "Europe" });
+    expect(result.plans.map((plan) => plan.planId)).toEqual(["pln_a", "pln_b", "pln_c"]);
+    expect(result).toMatchObject({ returned: 4, unreadable: 0, partial: false });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [url] of fetchMock.mock.calls as [URL][]) {
+      expect(url.searchParams.get("pageSize")).toBe("200");
+      expect(url.searchParams.get("sort")).toBe("price_asc");
+      expect(url.searchParams.get("region")).toBe("Europe");
+    }
+  });
+
+  it("keeps earlier pages when a later read fails and marks the result partial", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json({ data: [{ planId: "pln_a" }], meta: { page: 1, hasNext: true } }))
+      .mockResolvedValueOnce(json({ error: { code: "RATE_LIMITED" } }, 429));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await listBitcallEsimPlans()).toMatchObject({ plans: [{ planId: "pln_a" }], partial: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("bounds pagination and reports missing, repeated or malformed metadata", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: URL) => {
+      const page = Number(url.searchParams.get("page"));
+      return json({ data: [{ planId: `pln_${page}` }], meta: { page, hasNext: true } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await listBitcallEsimPlans();
+    expect(result.plans).toHaveLength(5);
+    expect(result.partial).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({ data: [{ planId: "pln_same" }], meta: { hasNext: true } })));
+    expect((await listBitcallEsimPlans()).partial).toBe(true);
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({ data: [{ planId: "pln_one" }] })));
+    expect((await listBitcallEsimPlans()).partial).toBe(true);
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({ unexpected: [] })));
+    await expect(listBitcallEsimPlans()).rejects.toMatchObject({ code: "SERVICE_RESPONSE_INVALID" });
+  });
+
+  it("rechecks a single documented plan and refuses a mismatched identity", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => json({ data: {
+      planId: "pln_single", dataMb: 1024, validityDays: 7, price: { amount: 1.5, currency: "EUR" },
+    } }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await getBitcallEsimPlan("pln_single")).toMatchObject({ planId: "pln_single", price: 1.5, currency: "EUR", allowance: 1, allowanceUnit: "GB" });
+    expect(lastCall(fetchMock).url.pathname).toBe("/v1/esim/plans/pln_single");
+    expect(await getBitcallEsimPlan("pln_other")).toBeNull();
+  });
+
+  it("preserves explicit number, calling and SMS flags without guessing unknown values", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
+      data: [
+        { planId: "pln_yes", includesPhoneNumber: true, capabilities: { voice: false, sms: true } },
+        { planId: "pln_no", includesPhoneNumber: false, capabilities: { voice: true, sms: false } },
+        { planId: "pln_null", includesPhoneNumber: null, capabilities: { voice: null, sms: null } },
+        { planId: "pln_missing" },
+        // Strings and numbers are not the booleans the documented catalog uses.
+        { planId: "pln_malformed", includesPhoneNumber: "true", capabilities: { voice: "false", sms: 1 } },
+      ],
+    })));
+    const { plans } = await listBitcallEsimPlans();
+    expect(plans.map(({ includesPhoneNumber, supportsVoice, supportsSms }) => ({ includesPhoneNumber, supportsVoice, supportsSms }))).toEqual([
+      { includesPhoneNumber: true, supportsVoice: false, supportsSms: true },
+      { includesPhoneNumber: false, supportsVoice: true, supportsSms: false },
+      { includesPhoneNumber: null, supportsVoice: null, supportsSms: null },
+      { includesPhoneNumber: null, supportsVoice: null, supportsSms: null },
+      { includesPhoneNumber: null, supportsVoice: null, supportsSms: null },
+    ]);
+  });
+
+  it("does not substitute an unrelated amount for a malformed explicit price", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({ data: [
+      { planId: "pln_invalid_array", price: [], amount: 5, currency: "USD" },
+      { planId: "pln_invalid_string", price: "broken", amount: 6, currency: "EUR" },
+    ] })));
+    const { plans } = await listBitcallEsimPlans();
+    expect(plans.map(({ price, currency }) => ({ price, currency }))).toEqual([
+      { price: null, currency: null }, { price: null, currency: null },
+    ]);
   });
 
   it("reads coverage from a scalar country field, which is how most single-destination plans state it", async () => {
@@ -267,13 +387,13 @@ describe("eSIM catalog", () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
       data: [
         { planId: "pln_single", name: "Nigeria 1GB", country: "NG", price: 4, currency: "USD" },
-        { planId: "pln_code", name: "Ghana 2GB", countryCode: "GH", price: 5, currency: "USD" },
+        { planId: "pln_code", name: "Ghana 2GB", countries: [], countryCode: "GH", price: 5, currency: "USD" },
         { planId: "pln_list", name: "West Africa", coverage: "NG, GH | SN", price: 9, currency: "USD" },
         { planId: "pln_array", name: "Two countries", countries: ["Kenya", "Tanzania"], price: 7, currency: "USD" },
         { planId: "pln_none", name: "Global-ish", price: 12, currency: "USD" },
       ],
     })));
-    const plans = await listBitcallEsimPlans();
+    const { plans } = await listBitcallEsimPlans();
     const byId = new Map(plans.map((plan) => [plan.planId, plan.countries]));
     expect(byId.get("pln_single")).toEqual(["NG"]);
     expect(byId.get("pln_code")).toEqual(["GH"]);
@@ -287,7 +407,7 @@ describe("eSIM catalog", () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
       data: [{ planId: "pln_both", name: "Both", countries: ["Nigeria"], country: "GH", price: 4, currency: "USD" }],
     })));
-    const [plan] = await listBitcallEsimPlans();
+    const { plans: [plan] } = await listBitcallEsimPlans();
     expect(plan.countries).toEqual(["Nigeria"]);
   });
 
@@ -301,7 +421,7 @@ describe("eSIM catalog", () => {
   it("deduplicates a repeated plan reference", async () => {
     const row = { planId: "pln_same", name: "Repeated" };
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({ data: [row, row] })));
-    expect(await listBitcallEsimPlans()).toHaveLength(1);
+    expect((await listBitcallEsimPlans()).plans).toHaveLength(1);
   });
 });
 
@@ -310,7 +430,7 @@ describe("eSIM ordering", () => {
     const fetchMock = vi.fn().mockImplementation(() => json({ data: { orderId: "ord_1", status: "pending" } }, 202));
     vi.stubGlobal("fetch", fetchMock);
 
-    for (const bad of ["9OOXVUPmNmI_MPiVZuWLcO7Q", "", "  ", "pln_" + "x".repeat(200)]) {
+    for (const bad of ["9OOXVUPmNmI_MPiVZuWLcO7Q", "", "  ", "pln_" + "x".repeat(200), "pln_", "pln_bad/ref"]) {
       await expect(buyBitcallEsimPlan(bad), bad).rejects.toMatchObject({ code: "VALIDATION_ERROR", fields: ["body.planId"] });
     }
     expect(fetchMock).not.toHaveBeenCalled();

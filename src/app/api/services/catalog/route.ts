@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
 
   const items = [
     ...(supplier.snapshot ? supplierItemsForCountry(supplier.snapshot, country.code) : []),
-    ...(esim.snapshot ? esimItemsForCountry(esim.snapshot.offers, country.code) : []),
+    ...(esim.snapshot ? esimItemsForCountry(esim.snapshot.listings, country.code) : []),
     ...(boost.snapshot ? boostItems(boost.snapshot) : []),
   ];
   // Partial means "this may be incomplete": a configured source that failed, or

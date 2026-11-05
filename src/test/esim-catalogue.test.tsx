@@ -25,6 +25,9 @@ function offer(overrides: Partial<EsimOffer> = {}): EsimOffer {
     dataLabel: "1GB of data",
     validityLabel: "7 days",
     coverage: "catalog-country",
+    includesPhoneNumber: null,
+    supportsVoice: null,
+    supportsSms: null,
     costNgn: 4_500,
     priceNgn: 6_500,
     purchasable: true,
@@ -106,6 +109,13 @@ describe("EsimCatalogue", () => {
     expect(screen.queryByText("Nigeria 1GB")).toBeNull();
   });
 
+  it("finds regional plans by a named country even when the feed uses country codes", () => {
+    const regional = catalogueItems([offer({ name: "West Africa pack", region: "Africa", countries: ["NG", "GH"] })]);
+    render(<EsimCatalogue items={regional} truncated={false} />);
+    fireEvent.change(screen.getByPlaceholderText("Search a country, region or data allowance"), { target: { value: "Nigeria" } });
+    expect(screen.getByText("West Africa pack")).toBeTruthy();
+  });
+
   it("filters by region and counts each one", () => {
     render(<EsimCatalogue items={items} truncated={false} />);
     const select = screen.getByRole("combobox") as HTMLSelectElement;
@@ -119,6 +129,21 @@ describe("EsimCatalogue", () => {
     expect(screen.getAllByText("Not sellable at this price")).toHaveLength(1);
     expect(screen.getAllByRole("link", { name: "Buy eSIM" })).toHaveLength(3);
     expect(screen.getByText("Global 10GB")).toBeTruthy();
+  });
+
+  it("shows real unpriced plans without a buy link or a guessed price", () => {
+    const unpriced = { ...items[0], id: "live-esim-eeeeeeeeeeeeeeeeeeee", name: "Price pending", priceNgn: null, purchasable: false };
+    render(<EsimCatalogue items={[unpriced]} truncated={false} />);
+    expect(screen.getByText("Price pending")).toBeTruthy();
+    expect(screen.getByText("Price unavailable")).toBeTruthy();
+    expect(screen.getByText("Not available to buy")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Buy eSIM" })).toBeNull();
+  });
+
+  it("does not call an unknown-coverage plan a zero-destination plan", () => {
+    const unknown = { ...items[0], destinations: 0, global: false };
+    render(<EsimCatalogue items={[unknown]} truncated={false} />);
+    expect(screen.getByText(/Coverage not listed/)).toBeTruthy();
   });
 
   it("pages rather than rendering the whole supplier feed at once", () => {

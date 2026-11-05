@@ -83,7 +83,7 @@ function itemArt(item: ExplorerItem) {
 
 function ServiceCard({ item, countryName }: { item: ExplorerItem; countryName: string }) {
   const coverage = item.source === "live"
-      ? (item.coverage === "catalog-country" ? `Reported region: ${countryName}` : "Not country-specific")
+      ? (item.coverage === "catalog-country" ? `Reported region: ${countryName}` : item.coverage === "unconfirmed" ? "Country coverage unconfirmed" : "Not country-specific")
       : item.coverage === "catalog-country" ? `Catalog region: ${countryName}` : item.coverage === "unconfirmed" ? "Country coverage unconfirmed" : "Not filtered by country";
   const noAction = item.source === "live" ? "Ordering paused" : "Not available";
   const action = item.action;
@@ -96,7 +96,7 @@ function ServiceCard({ item, countryName }: { item: ExplorerItem; countryName: s
     : "border border-line bg-cream-2 text-ink-2";
   const priceLine = price !== null
     ? `${item.source === "live" ? "Indicative" : "Listed"} ${item.priceFrom ? "from " : "price "}${formatNaira(price)}`
-    : "See details";
+    : item.category === "esim" && item.source === "live" ? "Price unavailable" : "See details";
 
   /*
    * One card, two densities. On a phone this is a 68 px row: artwork, name,
@@ -124,7 +124,7 @@ function ServiceCard({ item, countryName }: { item: ExplorerItem; countryName: s
           {/* Deliberately not the desktop wording: two visible-in-one-breakpoint
               copies of the same sentence would be read out twice, and the tests
               that look up the full price line would match both. */}
-          {price !== null ? ` · ${formatNaira(price)}${item.priceFrom ? "+" : ""}` : item.source === "live" ? " · Price on request" : " · Price not listed"}
+          {price !== null ? ` · ${formatNaira(price)}${item.priceFrom ? "+" : ""}` : item.category === "esim" && item.source === "live" ? " · Price unavailable" : item.source === "live" ? " · Price on request" : " · Price not listed"}
         </p>
         <p className="mt-1 hidden text-meta text-ink-3 sm:block">{item.description} · <span className="capitalize">{item.tag}</span></p>
         <p className="mt-3 hidden text-micro leading-relaxed text-ink-3 sm:block">{coverage}</p>
@@ -393,7 +393,7 @@ export function ServiceExplorer({
 
           <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-meta leading-relaxed border-amber-200 bg-amber-50/70 text-amber-900`}>
             <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-            {liveState?.country === country && !liveState.failed ? <p><strong>Live listings are current.</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. {liveState.partial && "Some listing types are temporarily unavailable. "}<Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>Live availability is not shown yet.</strong> Check each listing for availability; stock and country coverage may be unconfirmed. <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
+            {liveState?.country === country && !liveState.failed ? <p><strong>Live listings are current.</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. {liveState.partial && "Some listings may be missing. "}<Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>Live availability is not shown yet.</strong> Check each listing for availability; stock and country coverage may be unconfirmed. <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
           </div>
 
           <section aria-labelledby="services-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-3.5 sm:p-6">
@@ -433,7 +433,7 @@ export function ServiceExplorer({
                 <button type="button" onClick={() => setVisible((current) => current + PAGE_SIZE)} className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2.5 text-meta font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-lav-700">Show more <span className="text-ink-3">({filtered.length - visible} remaining)</span></button>
               </div>
             )}
-            <p className="mt-5 border-t border-line pt-4 text-micro leading-relaxed text-ink-3">Stock means available inventory. My units means your remaining purchased units. Unknown and not tracked are not the same as zero. Listings do not guarantee platform support or verified coverage.</p>
+            <p className="mt-5 border-t border-line pt-4 text-micro leading-relaxed text-ink-3">Stock means available inventory. My units means your remaining purchased units. Unknown and not tracked are not the same as zero. Listings do not guarantee platform support or verified coverage. <a href="https://www.exchangerate-api.com" className="underline underline-offset-2">Rates By Exchange Rate API</a></p>
           </section>
         </>
       )}

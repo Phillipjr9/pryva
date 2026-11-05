@@ -62,7 +62,7 @@ export default function StatusPage() {
       name: SERVICE_LABELS.esim,
       status: esimCategoryOrderable() ? "Ordering configured" : "Not available",
       detail: esimCategoryOrderable()
-        ? "eSIM ordering is connected. Check current plans and coverage in your dashboard."
+        ? "eSIM ordering is configured. Live plans and coverage are not verified here; check your dashboard."
         : "eSIM ordering is unavailable here. Coverage and prices are not currently available.",
     },
     {

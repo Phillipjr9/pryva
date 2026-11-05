@@ -101,7 +101,11 @@ export async function waitForEsimDelivery(providerOrderId: string, budgetMs = ES
       });
     }
     if (order && order.status === "delivered") {
-      const delivery = await activationFor(order);
+      const delivery = await activationFor(order).catch(() => {
+        // A transient profile read does not negate the already accepted order.
+        logger.warn("eSIM activation profile could not be read yet");
+        return null;
+      });
       if (delivery) return delivery;
     }
     if (order && terminal(order.status)) return "refused";
@@ -118,7 +122,10 @@ export async function waitForEsimDelivery(providerOrderId: string, budgetMs = ES
  * happened, so a crash between the purchase and the record cannot take money for
  * a profile nobody received.
  */
-export async function purchaseEsim(offer: EsimOffer): Promise<EsimPurchaseOutcome> {
+export async function purchaseEsim(
+  offer: EsimOffer,
+  onAccepted: (providerOrderId: string) => Promise<void>,
+): Promise<EsimPurchaseOutcome> {
   let bought: BitcallEsimOrder;
   try {
     bought = await buyBitcallEsimPlan(offer.planId);
@@ -138,14 +145,22 @@ export async function purchaseEsim(offer: EsimOffer): Promise<EsimPurchaseOutcom
     return { kind: "unknown", message: "The supplier accepted the purchase without an order reference." };
   }
 
+  // Store the reference before polling. If this function times out or the
+  // process stops, an operator can find the accepted supplier order rather than
+  // re-purchasing it. Failure to persist the reference must stop this flow.
+  await onAccepted(bought.orderId);
+
   if (bought.status === "delivered") {
     const delivery = await activationFor(bought).catch(() => null);
     if (delivery) return { kind: "delivered", delivery: { ...delivery, providerRequestId: bought.orderId! } };
   }
-  if (terminal(bought.status)) return { kind: "refused", message: "The eSIM supplier cancelled that purchase." };
+  // Once an order ID exists, a terminal status does not prove whether the
+  // supplier debited or refunded us. Keep it for reconciliation, not as a
+  // definite no-spend refusal.
+  if (terminal(bought.status)) return { kind: "unknown", message: "The accepted supplier order needs review." };
 
   const result = await waitForEsimDelivery(bought.orderId);
-  if (result === "refused") return { kind: "refused", message: "The eSIM supplier cancelled that purchase." };
+  if (result === "refused") return { kind: "unknown", message: "The accepted supplier order needs review." };
   if (result === "pending") return { kind: "pending", providerRequestId: bought.orderId };
   return { kind: "delivered", delivery: { ...result, providerRequestId: bought.orderId } };
 }
