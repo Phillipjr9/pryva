@@ -102,13 +102,19 @@ describe("SMM panel transport", () => {
 
   it("treats an HTTP 200 carrying an error field as a rejection, without echoing it", async () => {
     // This is the trap: panels reject with a success status code.
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({ error: "Invalid API key. Balance: 999" })));
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({ error: "Service is not available right now" })));
     const caught = await listSmmServices().catch((error: unknown) => error) as SmmPanelError;
     expect(caught).toBeInstanceOf(SmmPanelError);
     expect(caught.code).toBe("PANEL_REJECTED");
     // Upstream text can carry the key or the balance, so it is never surfaced.
-    expect(caught.message).not.toContain("Invalid API key");
-    expect(caught.message).not.toContain("999");
+    expect(caught.message).not.toContain("not available");
+
+    // The same shape naming the key is a configuration refusal, not an outage.
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({ error: "Invalid API key. Balance: 999" })));
+    const credential = await listSmmServices().catch((error: unknown) => error) as SmmPanelError;
+    expect(credential).toMatchObject({ status: 401, code: "AUTHENTICATION_REQUIRED" });
+    expect(credential.message).not.toContain("Invalid API key");
+    expect(credential.message).not.toContain("999");
   });
 
   it("reports an unfunded panel as funding, whatever shape the refusal takes", async () => {
@@ -128,7 +134,7 @@ describe("SMM panel transport", () => {
 
     // An authentication rejection is not funding, even when it mentions balance.
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({ error: "Invalid API key. Balance: 0" })));
-    await expect(listSmmServices()).rejects.toMatchObject({ status: 502, code: "PANEL_REJECTED" });
+    await expect(listSmmServices()).rejects.toMatchObject({ status: 401, code: "AUTHENTICATION_REQUIRED" });
   });
 
   it("maps transport failures onto distinct codes", async () => {

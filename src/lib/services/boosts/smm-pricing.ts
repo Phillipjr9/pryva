@@ -74,7 +74,10 @@ export function retailPerThousand(input: {
   }
 
   const markup = smmMarkupPercent(input.env);
-  return Math.max(1, Math.ceil(naira * (1 + markup / 100)));
+  // Multiply the percentage out in integer space before dividing. `naira * 1.35`
+  // is 2025.0000000000002 in binary floating point, and rounding that up charged
+  // one naira more than the margin the owner configured.
+  return Math.max(1, Math.ceil((naira * (100 + markup)) / 100));
 }
 
 /**

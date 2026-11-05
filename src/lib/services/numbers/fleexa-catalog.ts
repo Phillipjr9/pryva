@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { isFundingFailure } from "@/lib/providers/types";
+import { classifyProviderFailure, type ProviderGap } from "@/lib/providers/types";
 import { isFleexaConfigured, listFleexaEmailProducts, listFleexaRentAreas, listFleexaSmsServices, type FleexaEmailProduct, type FleexaRentArea, type FleexaSmsService } from "@/lib/providers/fleexa";
 import { priceFromCost, isPriceInBand } from "@/lib/services/pricing";
 import { safeUnitCount } from "@/lib/services/service-units";
@@ -16,7 +16,7 @@ export type SupplierSnapshot = {
    * pay, so the gap will not close by itself; "outage" is transient. The hub
    * shows different copy for the two, and only offers a Retry for the second.
    */
-  degraded: "funding" | "outage" | null;
+  degraded: ProviderGap | null;
   fetchedAt: string;
 };
 
@@ -35,7 +35,11 @@ export async function readSupplierSnapshot(refresh = false): Promise<SupplierSna
     // An unfunded account is not an outage: preserve the refusal's own class so
     // the hub can say "restocking" instead of offering a Retry that cannot work.
     if (failures.length === results.length) {
-      if (failures.every((failure) => isFundingFailure(failure.reason))) throw failures[0].reason;
+      // Permanent reasons are rethrown intact (unfunded, or a rejected key) so the
+      // hub can say what is actually wrong; a mixed or transient set stays generic.
+      const gaps = failures.map((failure) => classifyProviderFailure(failure.reason));
+      if (gaps.every((gap) => gap === "funding")) throw failures[0].reason;
+      if (gaps.every((gap) => gap === "configuration")) throw failures[0].reason;
       throw new Error("Supplier catalog unavailable");
     }
     const snapshot: SupplierSnapshot = {
@@ -43,7 +47,11 @@ export async function readSupplierSnapshot(refresh = false): Promise<SupplierSna
       email: email.status === "fulfilled" ? email.value.slice(0, 2000) : [],
       rentals: rentals.status === "fulfilled" ? rentals.value.slice(0, 2000) : [],
       partial: failures.length > 0,
-      degraded: failures.length === 0 ? null : failures.every((failure) => isFundingFailure(failure.reason)) ? "funding" : "outage",
+      degraded: failures.length === 0
+        ? null
+        : failures.every((failure) => classifyProviderFailure(failure.reason) === "funding") ? "funding"
+        : failures.every((failure) => classifyProviderFailure(failure.reason) === "configuration") ? "configuration"
+        : "outage",
       fetchedAt: new Date().toISOString(),
     };
     cache = { snapshot, expires: Date.now() + 30_000 };

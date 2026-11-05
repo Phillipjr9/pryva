@@ -32,7 +32,7 @@
 import "server-only";
 import { createRateLimiter } from "@/lib/platform/rate-limit";
 import { readJsonWithLimit } from "@/lib/platform/request-body";
-import { ProviderError, looksLikeFundingRefusal } from "@/lib/providers/types";
+import { ProviderError, looksLikeCredentialRefusal, looksLikeFundingRefusal } from "@/lib/providers/types";
 
 const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_CATALOG_ENTRIES = 5_000;
@@ -237,6 +237,9 @@ async function panelRequest(action: string, params: Record<string, string | numb
     if (response.status === 402 || looksLikeFundingRefusal(refusalText(detail))) {
       throw new SmmPanelError("Panel balance is insufficient", 402, "INSUFFICIENT_BALANCE");
     }
+    if (response.status === 401 || response.status === 403 || looksLikeCredentialRefusal(refusalText(detail))) {
+      throw new SmmPanelError("The panel rejected the credential", 401, "AUTHENTICATION_REQUIRED");
+    }
     throw new SmmPanelError("Panel request failed", 502, "UPSTREAM_ERROR");
   }
 
@@ -256,6 +259,10 @@ async function panelRequest(action: string, params: Record<string, string | numb
       // must not be retried forever as if it were an outage.
       if (looksLikeFundingRefusal(refusalText(record))) {
         throw new SmmPanelError("Panel balance is insufficient", 402, "INSUFFICIENT_BALANCE");
+      }
+      // A bad key is a setup mistake, not a transient rejection.
+      if (looksLikeCredentialRefusal(refusalText(record))) {
+        throw new SmmPanelError("The panel rejected the credential", 401, "AUTHENTICATION_REQUIRED");
       }
       throw new SmmPanelError("The panel rejected the request", 502, "PANEL_REJECTED");
     }

@@ -71,7 +71,9 @@ export function isProviderError(error: unknown): error is ProviderError {
  * something. Adapters answer the ambiguous half; this answers the safe half.
  */
 export function isRefusal(error: unknown): boolean {
-  return isProviderError(error) && (error.status === 400 || error.status === 402 || error.status === 404);
+  // A rejected credential joins the list: the request never executed, so nothing
+  // was bought and there is nothing to reconcile.
+  return isProviderError(error) && (error.status === 400 || error.status === 401 || error.status === 402 || error.status === 403 || error.status === 404);
 }
 
 /**
@@ -127,6 +129,34 @@ export function isConfigurationFailure(error: unknown): boolean {
   if (!isProviderError(error)) return false;
   if (error.status === 401 || error.status === 403) return true;
   return CONFIGURATION_CODES.has(error.code);
+}
+
+/**
+ * Why a supplier is not contributing: the three answers the whole app uses.
+ *
+ *   funding       — the account cannot pay; an operator tops it up
+ *   configuration — the credential or endpoint is wrong; an operator fixes it
+ *   outage        — the supplier is unreachable or broken; only this one is
+ *                   worth a customer's Retry
+ */
+export type ProviderGap = "funding" | "configuration" | "outage";
+
+/**
+ * Does an upstream refusal say the credential itself was rejected?
+ *
+ * Suppliers answer a bad key in prose as readily as in a status code, and the
+ * difference matters: an invalid key is a setup mistake that no retry fixes.
+ */
+export function looksLikeCredentialRefusal(text: unknown): boolean {
+  if (typeof text !== "string" || !text) return false;
+  return /api[\s_-]?key|unauthori[sz]ed|forbidden|invalid\s+(api\s+)?(key|token|secret)|authentication|credentials?/i.test(text);
+}
+
+/** One function decides which of the three a failure is, everywhere. */
+export function classifyProviderFailure(error: unknown): ProviderGap {
+  if (isFundingFailure(error)) return "funding";
+  if (isConfigurationFailure(error)) return "configuration";
+  return "outage";
 }
 
 /**

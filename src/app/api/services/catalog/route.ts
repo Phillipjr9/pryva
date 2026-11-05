@@ -9,7 +9,7 @@ import { isBitcallConfigured } from "@/lib/providers/bitcall";
 import { esimItemsForCountry, readEsimCatalog } from "@/lib/services/esim/esim-catalog";
 import { explorerCountry } from "@/lib/services/service-explorer";
 import { catalogRateLimiter } from "@/lib/platform/rate-limit";
-import { isConfigurationFailure, isFundingFailure } from "@/lib/providers/types";
+import { classifyProviderFailure, type ProviderGap } from "@/lib/providers/types";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -23,33 +23,27 @@ export const maxDuration = 30;
  * both into `null`, which is how an unfunded account became an endless
  * "couldn't load, Retry" banner.
  */
-type Gap = "funding" | "configuration" | "outage";
-
 /**
  * A gap a customer can do nothing about.
  *
  * Funding and a broken credential are both permanent from the shop's side: the
  * next click returns exactly the same answer. Only `outage` is worth a Retry.
  */
-const PERMANENT_GAPS: ReadonlySet<Gap> = new Set(["funding", "configuration"]);
+const PERMANENT_GAPS: ReadonlySet<ProviderGap> = new Set(["funding", "configuration"]);
 
-type Source<T> = { configured: boolean; snapshot: T | null; failure: Gap | null };
+type Source<T> = { configured: boolean; snapshot: T | null; failure: ProviderGap | null };
 
 async function attempt<T>(configured: boolean, read: () => Promise<T>): Promise<Source<T>> {
   if (!configured) return { configured: false, snapshot: null, failure: null };
   try {
     return { configured: true, snapshot: await read(), failure: null };
   } catch (error) {
-    return {
-      configured: true,
-      snapshot: null,
-      failure: isFundingFailure(error) ? "funding" : isConfigurationFailure(error) ? "configuration" : "outage",
-    };
+    return { configured: true, snapshot: null, failure: classifyProviderFailure(error) };
   }
 }
 
 /** Why the catalogue is incomplete, in the customer's terms, or null for an outage. */
-function gapReason(gaps: Gap[]): "funding" | "configuration" | null {
+function gapReason(gaps: ProviderGap[]): "funding" | "configuration" | null {
   if (gaps.length === 0 || !gaps.every((gap) => PERMANENT_GAPS.has(gap))) return null;
   // Funding first: it is the one an operator fixes by topping up, and its copy is
   // true of both ("we are restocking").
@@ -119,7 +113,7 @@ export async function GET(request: NextRequest) {
    * Retry button here would be a promise the shop cannot keep — answer 200 with
    * the reason and let the hub say which of the two it is.
    */
-  const absent: Gap[] = sources.filter((source) => source.configured && !source.snapshot).map((source) => source.failure ?? "outage");
+  const absent: ProviderGap[] = sources.filter((source) => source.configured && !source.snapshot).map((source) => source.failure ?? "outage");
   const permanent = gapReason(absent);
   if (sources.every((source) => !source.snapshot)) {
     if (permanent) {
@@ -143,7 +137,7 @@ export async function GET(request: NextRequest) {
   // Partial means "this may be incomplete": a configured source that failed, or
   // one that reported its own degraded read. A source that is simply not
   // configured is the steady state, not a warning.
-  const gaps: Gap[] = [];
+  const gaps: ProviderGap[] = [];
   for (const source of sources) {
     if (!source.configured) continue;
     if (!source.snapshot) gaps.push(source.failure ?? "outage");

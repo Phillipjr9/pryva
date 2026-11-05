@@ -31,8 +31,6 @@ export default async function BoostPage({ params }: { params: Promise<{ id: stri
 
   const perThousand = listing.perThousand;
   const min = listing.min;
-  const priceFrom =
-    perThousand !== null && min !== null ? Math.ceil((perThousand * min) / 1_000) : null;
 
   return (
     <div className="grid gap-5">
@@ -50,14 +48,16 @@ export default async function BoostPage({ params }: { params: Promise<{ id: stri
         </h1>
         <p className="mt-1 text-[0.84rem] text-ink-2">
           {listing.tag}
-          {priceFrom !== null && <> · from {formatNaira(priceFrom)}</>}
+          {/* The rate, not the entry price: "from ₦14" was the panel's ten-unit
+              minimum and read as a wrong price for a thousand followers. */}
+          {perThousand !== null && <> · {formatNaira(perThousand)} per 1,000</>}
           {listing.min !== null && listing.max !== null && (
             <> · between {listing.min.toLocaleString("en-NG")} and {listing.max.toLocaleString("en-NG")} units</>
           )}
         </p>
       </div>
 
-      {priceFrom === null || perThousand === null || min === null ? (
+      {perThousand === null || min === null ? (
         <div role="note" className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-meta leading-relaxed text-amber-900">
           <p className="font-semibold">This boosting service is not for sale right now.</p>
           <p className="mt-1">

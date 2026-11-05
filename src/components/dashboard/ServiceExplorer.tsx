@@ -94,8 +94,13 @@ function ServiceCard({ item, countryName }: { item: ExplorerItem; countryName: s
     : item.source === "tool"
     ? "border border-indigo-200 bg-indigo-50 text-indigo-700"
     : "border border-line bg-cream-2 text-ink-2";
+  // A rate and an order total are different sentences. Boosting is quoted per
+  // thousand, so the card says so; everything else keeps its old wording.
+  const perThousand = item.priceUnit === "per-1000";
   const priceLine = price !== null
-    ? `${item.source === "live" ? "Indicative" : "Listed"} ${item.priceFrom ? "from " : "price "}${formatNaira(price)}`
+    ? perThousand
+      ? `${item.source === "live" ? "Indicative " : ""}${formatNaira(price)} per 1,000`
+      : `${item.source === "live" ? "Indicative" : "Listed"} ${item.priceFrom ? "from " : "price "}${formatNaira(price)}`
     : item.category === "esim" && item.source === "live" ? "Price unavailable" : "See details";
 
   /*
@@ -124,7 +129,7 @@ function ServiceCard({ item, countryName }: { item: ExplorerItem; countryName: s
           {/* Deliberately not the desktop wording: two visible-in-one-breakpoint
               copies of the same sentence would be read out twice, and the tests
               that look up the full price line would match both. */}
-          {price !== null ? ` · ${formatNaira(price)}${item.priceFrom ? "+" : ""}` : item.category === "esim" && item.source === "live" ? " · Price unavailable" : item.source === "live" ? " · Price on request" : " · Price not listed"}
+          {price !== null ? ` · ${formatNaira(price)}${perThousand ? "/1,000" : item.priceFrom ? "+" : ""}` : item.category === "esim" && item.source === "live" ? " · Price unavailable" : item.source === "live" ? " · Price on request" : " · Price not listed"}
         </p>
         <p className="mt-1 hidden text-meta text-ink-3 sm:block">{item.description} · <span className="capitalize">{item.tag}</span></p>
         <p className="mt-3 hidden text-micro leading-relaxed text-ink-3 sm:block">{coverage}</p>

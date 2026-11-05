@@ -80,9 +80,14 @@ describe("supplier client safety", () => {
     // Classified, never echoed: upstream text can carry the key or the balance.
     expect(refusal.message).not.toMatch(/provider-secret|not enough funds/i);
 
-    // A credential complaint stays an outage even when it mentions a balance.
+    // A credential complaint is neither funding nor an outage: it is a setup
+    // mistake, and no retry replaces a key.
     refuse({ success: false, message: "Invalid API key. Balance: 0" }, 200);
-    await expect(listFleexaSmsServices()).rejects.toMatchObject({ status: 502, code: "UPSTREAM_ERROR" });
+    await expect(listFleexaSmsServices()).rejects.toMatchObject({ status: 401, code: "AUTHENTICATION_REQUIRED" });
+
+    // A bare 401/403 is the same answer without any prose.
+    refuse({}, 403);
+    await expect(listFleexaSmsServices()).rejects.toMatchObject({ status: 401, code: "AUTHENTICATION_REQUIRED" });
   });
 
   it("handles nested listing shapes, explicit country codes and bounded, sanitized errors", async () => {

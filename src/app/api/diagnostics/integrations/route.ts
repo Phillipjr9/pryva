@@ -12,7 +12,7 @@ import { isBitcallConfigured, getBitcallBalance } from "@/lib/providers/bitcall"
 import { esimItemsForCountry, readEsimCatalog } from "@/lib/services/esim/esim-catalog";
 import { explorerCountry } from "@/lib/services/service-explorer";
 import { getSmmBalance, isSmmPanelConfigured } from "@/lib/providers/smm-panel";
-import { LISTED_TAGS, describeBoost, readBoostSnapshot, selectBoostServices } from "@/lib/services/boosts/smm-catalog";
+import { LISTED_TAGS, describeBoost, selectBoostServices } from "@/lib/services/boosts/smm-catalog";
 import { smmMarkupPercent, smmUsdNgnRate, totalForQuantity } from "@/lib/services/boosts/smm-pricing";
 import { resendConfigured } from "@/lib/email/resend-config";
 import { emailQueueStatus, recentEmailActivity } from "@/lib/email/email-delivery-events";
@@ -26,6 +26,10 @@ import { isMarketplaceCatalogAvailable } from "@/lib/services/accounts/marketpla
 import { isManualFulfilmentReachable } from "@/lib/services/accounts/manual-fulfilment";
 import { logger } from "@/lib/platform/logger";
 import { diagnosticsAuthorized } from "@/lib/admin/diagnostics-auth";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
+import { classifyProviderFailure } from "@/lib/providers/types";
+import { readSupplierSnapshot } from "@/lib/services/numbers/fleexa-catalog";
+import { readBoostSnapshot } from "@/lib/services/boosts/smm-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +48,24 @@ async function probe<T>(label: string, fn: () => Promise<T>): Promise<Probe<T>> 
     return { ok: true, value: await fn() };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * Why a catalogue source is not contributing, in the same three words the hub
+ * uses: funding, configuration or outage.
+ *
+ * This is the question "why is the banner up?" answered from one request instead
+ * of from runtime logs. A gap that is funding or configuration will not clear by
+ * itself, so it is worth knowing which.
+ */
+async function probeSource(configured: boolean, read: () => Promise<unknown>) {
+  if (!configured) return { configured: false as const };
+  try {
+    await read();
+    return { configured: true as const, ok: true as const };
+  } catch (error) {
+    return { configured: true as const, ok: false as const, gap: classifyProviderFailure(error) };
   }
 }
 
@@ -139,6 +161,17 @@ export async function GET(request: NextRequest) {
 
   const boostingConfigured = isSmmPanelConfigured();
 
+  /**
+   * What `GET /api/services/catalog` would report right now, per source. The hub
+   * only ever says "some listings couldn't be loaded"; this says which source and
+   * whether anything can be done about it.
+   */
+  const catalogSources = {
+    numbers: await probeSource(numbersConfigured, () => readSupplierSnapshot(true)),
+    esim: await probeSource(gatewayConfigured, () => readEsimCatalog(true)),
+    boosts: await probeSource(boostingConfigured, () => readBoostSnapshot(true)),
+  };
+
   return NextResponse.json(
     {
       database: { persistent: persistentDatabaseConfigured() },
@@ -157,6 +190,12 @@ export async function GET(request: NextRequest) {
       fallbackAccounts: { configured: isAccsZoneConfigured() },
       numbers,
       gateway,
+      catalog: {
+        // When this is true the hub answers "live availability is off here" and
+        // never contacts a supplier, whatever the probes above say.
+        disabledByEnvironment: financialActionsUnavailable(),
+        sources: catalogSources,
+      },
       boosting: boostingConfigured
         ? await (async () => {
             /**

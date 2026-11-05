@@ -72,6 +72,35 @@ afterEach(() => {
   clearBulkaccCache();
 });
 
+describe("live catalogue gaps: which source, and can anything be done", () => {
+  const auth = `Bearer ${CRON_SECRET}`;
+
+  it("names a rejected credential as configuration rather than an outage", async () => {
+    // The hub can only say "some listings couldn't be loaded". This says which
+    // source, and whether retrying could ever change the answer.
+    vi.stubEnv("FLEEXA_API_KEY", "fleexa-key");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ message: "Invalid API key" }), { status: 401 })));
+
+    const body = await (await GET(request(undefined, auth))).json();
+
+    expect(body.catalog.sources.numbers).toMatchObject({ configured: true, ok: false, gap: "configuration" });
+    // Nothing configured for boosting in this environment, so it is not a gap.
+    expect(body.catalog.sources.boosts).toEqual({ configured: false });
+  });
+
+  it("reports a healthy source as ok and keeps the environment switch visible", async () => {
+    const body = await (await GET(request(undefined, auth))).json();
+    expect(body.catalog.sources).toEqual({
+      numbers: { configured: false },
+      esim: { configured: false },
+      boosts: { configured: false },
+    });
+    // Only a preview/local database turns live listings off; a production
+    // deployment with a database must not be reported as disabled.
+    expect(body.catalog.disabledByEnvironment).toBe(false);
+  });
+});
+
 describe("catalog probe: an empty feed explains itself", () => {
   it("keeps the reason when the supplier returns HTTP 200 with no data", async () => {
     stubFetch({ products: NO_BALANCE });

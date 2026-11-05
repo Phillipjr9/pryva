@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { isFundingFailure } from "@/lib/providers/types";
+import { classifyProviderFailure, type ProviderGap } from "@/lib/providers/types";
 import {
   getSmmBalance,
   isSmmPanelConfigured,
@@ -9,7 +9,7 @@ import {
   type SmmService,
 } from "@/lib/providers/smm-panel";
 import { PROMOTION_EXAMPLES, type ExplorerItem } from "@/lib/services/service-explorer";
-import { boostRetailIsSane, normalizeCurrency, retailPerThousand, totalForQuantity } from "@/lib/services/boosts/smm-pricing";
+import { boostRetailIsSane, normalizeCurrency, retailPerThousand } from "@/lib/services/boosts/smm-pricing";
 
 export type BoostSnapshot = {
   services: SmmService[];
@@ -22,8 +22,8 @@ export type BoostSnapshot = {
   currency: string | null;
   balance: number | null;
   partial: boolean;
-  /** "funding" cannot be retried away; "outage" can. Null when the read is whole. */
-  degraded: "funding" | "outage" | null;
+  /** "funding" and "configuration" cannot be retried away; "outage" can. */
+  degraded: ProviderGap | null;
   /**
    * The balance read failed, so the panel's billing currency is unknown.
    *
@@ -50,7 +50,7 @@ export async function readBoostSnapshot(refresh = false): Promise<BoostSnapshot>
     // fatal — but keep an unfunded-account refusal intact, because it is not an
     // outage and the hub must not offer a Retry for it.
     if (services.status === "rejected") {
-      if (isFundingFailure(services.reason)) throw services.reason;
+      if (classifyProviderFailure(services.reason) !== "outage") throw services.reason;
       throw new Error("Boosting catalog unavailable");
     }
     const settled = balance.status === "fulfilled" ? balance.value : null;
@@ -305,9 +305,9 @@ function beats(listing: BoostListing, service: SmmService, other: BoostListing, 
  * not country-specific and are shown for every selection.
  *
  * `stock` stays null: a panel reports a per-order maximum, not inventory, and
- * the two must not be confused. `price` is the retail cost of the supplier's
- * minimum quantity and the card says "from", because the customer chooses how
- * many units to buy.
+ * the two must not be confused. `price` is the retail rate per thousand units and
+ * carries `priceUnit`, because that is the unit the supplier quotes in and the
+ * customer chooses the quantity on the purchase page.
  */
 export function boostItems(snapshot: BoostSnapshot): ExplorerItem[] {
   const items: ExplorerItem[] = [];
@@ -318,12 +318,11 @@ export function boostItems(snapshot: BoostSnapshot): ExplorerItem[] {
     if (ids.has(listing.id)) continue;
     ids.add(listing.id);
 
-    // The supplier's minimum is the smallest quantity that can be bought, so it
-    // is the only honest "from" price. Without a minimum there is no quantity to
-    // price, and the listing stays read-only.
-    const price = listing.perThousand !== null && listing.min !== null
-      ? totalForQuantity(listing.perThousand, listing.min)
-      : null;
+    // The card quotes the rate the price is defined by — naira per thousand —
+    // not the supplier's minimum order. A panel minimum of ten units turned a
+    // ₦1,399-per-thousand service into "from ₦14", which is not a price anyone
+    // means, and the customer's actual total belongs in the purchase form.
+    const price = listing.perThousand;
 
     items.push({
       id: listing.id,
@@ -338,7 +337,8 @@ export function boostItems(snapshot: BoostSnapshot): ExplorerItem[] {
       stock: null,
       myUnits: null,
       price,
-      priceFrom: price !== null,
+      priceFrom: false,
+      priceUnit: "per-1000",
       action: price !== null ? { label: "Buy boost", href: `/dashboard/services/boost/${listing.id}` } : null,
     });
   }

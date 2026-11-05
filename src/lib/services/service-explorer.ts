@@ -40,6 +40,15 @@ export type ExplorerItem = {
   myUnits: number | null;
   price: number | null;
   priceFrom?: boolean;
+  /**
+   * Set when `price` is a rate rather than an order total.
+   *
+   * Boosting is sold per thousand units, so quoting the supplier's minimum order
+   * (often ten) as a "from" price told customers ₦14 for a thousand followers.
+   * The card says "per 1,000" instead, and the purchase form totals the quantity
+   * the customer actually picks.
+   */
+  priceUnit?: "per-1000";
   action: { label: string; href: string } | null;
 };
 

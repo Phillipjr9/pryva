@@ -46,13 +46,15 @@ describe("boosting catalog listings", () => {
     expect(boostItems(snapshot([usdPanel]))).toHaveLength(0);
 
     // With a rate the same service becomes a real listing: 0.74 USD per 1,000 at
-    // ₦1,600 and a 35% margin is ₦1,598.40 per 1,000, and the panel's smallest
-    // order is 10 units.
+    // ₦1,600 and a 35% margin is ₦1,598.40, so ₦1,599 per thousand.
     process.env.SMM_USD_NGN_RATE = "1600";
     try {
       const priced = boostItems(snapshot([usdPanel]))[0];
-      expect(priced.price).toBe(16); // ceil(1598.4 * 10 / 1000)
-      expect(priced.priceFrom).toBe(true);
+      // The rate, not the panel's ten-unit minimum. Quoting the minimum gave
+      // "from ₦16", which reads as the price of a thousand followers.
+      expect(priced.price).toBe(1_599);
+      expect(priced.priceUnit).toBe("per-1000");
+      expect(priced.priceFrom).toBe(false);
       expect(priced.action).toEqual({ label: "Buy boost", href: `/dashboard/services/boost/${priced.id}` });
       expect(priced.stock).toBeNull();
     } finally {
@@ -65,8 +67,10 @@ describe("boosting catalog listings", () => {
     process.env.SMM_MARKUP_PERCENT = "50";
     try {
       const [item] = boostItems(snapshot([service({ ratePer1000: 1000, currency: "NGN", min: 1000 })]));
-      // ₦1,000 per 1,000 wholesale, 50% margin, 1,000 units.
+      // ₦1,000 per 1,000 wholesale with a 50% margin is ₦1,500 per thousand — the
+      // same number as the minimum order here, because the minimum *is* 1,000.
       expect(item.price).toBe(1500);
+      expect(item.priceUnit).toBe("per-1000");
       expect(item.action?.label).toBe("Buy boost");
     } finally {
       delete process.env.SMM_MARKUP_PERCENT;
@@ -77,10 +81,11 @@ describe("boosting catalog listings", () => {
     const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
     const serialized = JSON.stringify(boostItems(snapshot([service({ id: "svc-secret-999", ratePer1000: 1_500 })])));
     expect(serialized).not.toContain("svc-secret-999");
-    // The retail total for the smallest order (100 units at ₦2,025/1,000 = ₦203)
-    // is what ships; the wholesale rate per thousand is not.
+    // The retail rate (₦1,500 wholesale at 35% = ₦2,025 per 1,000) is what ships;
+    // the wholesale rate itself is not.
     expect(serialized).not.toContain("1500");
-    expect(serialized).toContain('"price":203');
+    expect(serialized).toContain('"price":2025');
+    expect(serialized).toContain('"priceUnit":"per-1000"');
     expect(serialized).not.toContain("177.69");
     expect(boostItems(snapshot([service()]))[0].id).toMatch(/^live-boost-[0-9a-f]{20}$/);
   });
@@ -264,7 +269,7 @@ describe("boosting snapshot", () => {
       const premium = service({ id: "svc-p", currency: "USD", ratePer1000: 40, min: 100 });
       // 40 × 1400 × 1.35 = ₦75,600 per thousand — expensive, not impossible.
       expect(describeBoost(premium, "USD").perThousand).toBe(75_600);
-      expect(boostItems(snapshot([premium]))[0].price).toBe(7_560);
+      expect(boostItems(snapshot([premium]))[0].price).toBe(75_600);
     } finally {
       delete process.env.SMM_USD_NGN_RATE;
     }

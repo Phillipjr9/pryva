@@ -20,7 +20,7 @@
 import "server-only";
 import { createRateLimiter } from "@/lib/platform/rate-limit";
 import { readJsonWithLimit } from "@/lib/platform/request-body";
-import { ProviderError, looksLikeFundingRefusal } from "@/lib/providers/types";
+import { ProviderError, looksLikeCredentialRefusal, looksLikeFundingRefusal } from "@/lib/providers/types";
 
 const DEFAULT_BASE_URL = "https://fleexa.com.ng/developer";
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -130,6 +130,10 @@ async function fleexaFetch(
     if (response.status === 402 || looksLikeFundingRefusal(refusalText(detail))) {
       throw new FleexaError("Provider balance is insufficient", 402, "INSUFFICIENT_BALANCE");
     }
+    // A rejected key never heals, so it must not look like an outage either.
+    if (response.status === 401 || response.status === 403 || looksLikeCredentialRefusal(refusalText(detail))) {
+      throw new FleexaError("Provider rejected the credential", 401, "AUTHENTICATION_REQUIRED");
+    }
     throw new FleexaError("Provider request failed", 502, "UPSTREAM_ERROR");
   }
   let payload: unknown;
@@ -145,6 +149,9 @@ async function fleexaFetch(
     // ...but do read it far enough to tell a refusal from an outage.
     if (looksLikeFundingRefusal(refusalText(envelope))) {
       throw new FleexaError("Provider balance is insufficient", 402, "INSUFFICIENT_BALANCE");
+    }
+    if (looksLikeCredentialRefusal(refusalText(envelope))) {
+      throw new FleexaError("Provider rejected the credential", 401, "AUTHENTICATION_REQUIRED");
     }
     throw new FleexaError("Provider request failed", 502, "UPSTREAM_ERROR");
   }

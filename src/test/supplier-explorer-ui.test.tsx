@@ -35,7 +35,7 @@ describe("service explorer live listings", () => {
       ok: true, country: "ng", partial: false, fetchedAt: "2026-01-01T12:34:56.000Z", items: [{
         id: "live-boost-0123456789abcdef0123", category: "social", name: "Instagram Followers", description: "Followers boost",
         tag: "Followers", artwork: { kind: "brand", name: "instagram" }, source: "live", coverage: "not-country-specific",
-        stock: null, myUnits: null, price: 1600, priceFrom: true,
+        stock: null, myUnits: null, price: 1600, priceFrom: false, priceUnit: "per-1000",
         action: { label: "Buy boost", href: "/dashboard/services/boost/live-boost-0123456789abcdef0123" },
       }],
     }) });
@@ -44,7 +44,10 @@ describe("service explorer live listings", () => {
     const card = (await screen.findByRole("heading", { name: "Instagram Followers" })).closest("article")!;
     const buy = within(card).getByRole("link", { name: /Buy boost/ });
     expect(buy.getAttribute("href")).toBe("/dashboard/services/boost/live-boost-0123456789abcdef0123");
-    expect(within(card).getByText(/from ₦1,600/)).toBeTruthy();
+    // The rate, not the panel's minimum order: "from ₦16" for ten units read as
+    // the price of a thousand followers.
+    expect(within(card).getByText(/₦1,600 per 1,000/)).toBeTruthy();
+    expect(within(card).queryByText(/from ₦/)).toBeNull();
   });
 
   it("requests the live catalog and never a demo endpoint", async () => {

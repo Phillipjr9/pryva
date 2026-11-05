@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 
 import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import { getBitcallEsimPlan, isBitcallConfigured, listBitcallEsimCountries, listBitcallEsimPlans, type BitcallEsimPlan } from "@/lib/providers/bitcall";
-import { isFundingFailure } from "@/lib/providers/types";
+import { classifyProviderFailure, type ProviderGap } from "@/lib/providers/types";
 import { getFreshNgnRate, type NgnQuoteCurrency } from "@/lib/payments/exchange-rate";
 import { logger } from "@/lib/platform/logger";
 import { checkMargin } from "@/lib/services/margin-guard";
@@ -86,7 +86,7 @@ export type EsimCatalog = {
   listings: EsimListing[];
   partial: boolean;
   /** Why the catalogue is incomplete, when it is; null when it is whole. */
-  degraded?: "funding" | "outage" | null;
+  degraded?: ProviderGap | null;
   fetchedAt: string;
   stats: EsimCatalogStats;
 };
@@ -101,8 +101,8 @@ type EsimSnapshot = {
   returned: number;
   unreadable: number;
   partial: boolean;
-  /** "funding" cannot be retried away; "outage" can. Null when the read is whole. */
-  degraded: "funding" | "outage" | null;
+  /** "funding" and "configuration" cannot be retried away; "outage" can. */
+  degraded: ProviderGap | null;
   fetchedAt: string;
 };
 
@@ -123,7 +123,9 @@ async function readEsimSnapshot(refresh = false): Promise<EsimSnapshot> {
     // The country list only annotates coverage, so it degrades instead.
     // Keep an unfunded-account refusal intact: it is not an outage.
     if (plans.status === "rejected") {
-      if (isFundingFailure(plans.reason)) throw plans.reason;
+      // A permanent reason is rethrown intact: it is not an outage, and retrying
+      // it changes nothing.
+      if (classifyProviderFailure(plans.reason) !== "outage") throw plans.reason;
       throw new Error("eSIM catalog unavailable");
     }
     const snapshot: EsimSnapshot = {
@@ -134,7 +136,9 @@ async function readEsimSnapshot(refresh = false): Promise<EsimSnapshot> {
       partial: plans.value.partial || countries.status === "rejected",
       degraded: countries.status === "fulfilled" && !plans.value.partial
         ? null
-        : countries.status === "rejected" && isFundingFailure(countries.reason) ? "funding" : "outage",
+        : countries.status === "rejected" && classifyProviderFailure(countries.reason) !== "outage"
+          ? classifyProviderFailure(countries.reason)
+          : "outage",
       fetchedAt: new Date().toISOString(),
     };
     snapshotCache = { snapshot, expires: Date.now() + CATALOG_TTL_MS };
