@@ -1,4 +1,4 @@
-import { isConfiguredAdminEmail } from "@/lib/auth";
+import { isConfiguredAdminEmail } from "@/lib/identity/auth";
 
 /**
  * Which accounts can open the operator console, and why.

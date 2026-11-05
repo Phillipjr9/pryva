@@ -1,9 +1,9 @@
 import type { NextRequest } from "next/server";
-import { isSameOriginMutation } from "@/lib/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { clientIp } from "@/lib/auth-rate-limit";
-import { GENERIC_REQUEST_MESSAGE, rateLimitPasswordReset, requestPasswordReset } from "@/lib/password-reset";
-import { resendConfigured } from "@/lib/resend-config";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { clientIp } from "@/lib/identity/auth-rate-limit";
+import { GENERIC_REQUEST_MESSAGE, rateLimitPasswordReset, requestPasswordReset } from "@/lib/identity/password-reset";
+import { resendConfigured } from "@/lib/email/resend-config";
 
 export async function POST(request: NextRequest) {
   if (!isSameOriginMutation(request)) return Response.json({ ok: false, error: "Invalid origin." }, { status: 403 });

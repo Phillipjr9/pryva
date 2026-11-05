@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/identity/auth";
 import { db } from "@/db";
 import { adminAuditLog } from "@/db/schema";
 import { and, count, desc, ilike, or } from "drizzle-orm";
@@ -12,7 +12,7 @@ const PAGE_SIZE = 50;
  * The audit trail an operator can actually read.
  *
  * This is a record, not the source of truth for money: the wallet ledger is.
- * An entry can be missing if its insert failed (see `src/lib/admin-audit.ts`),
+ * An entry can be missing if its insert failed (see `src/lib/admin/admin-audit.ts`),
  * so the page says so instead of implying completeness.
  *
  * Nothing here is customer-facing, and nothing here is editable: the table is

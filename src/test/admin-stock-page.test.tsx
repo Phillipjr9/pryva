@@ -13,8 +13,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 
 const state = vi.hoisted(() => ({ report: null as unknown }));
 
-vi.mock("@/lib/auth", () => ({ requireAdmin: vi.fn().mockResolvedValue({ id: "admin-1" }) }));
-vi.mock("@/lib/stock-live", () => ({ buildStockReport: async () => state.report }));
+vi.mock("@/lib/identity/auth", () => ({ requireAdmin: vi.fn().mockResolvedValue({ id: "admin-1" }) }));
+vi.mock("@/lib/admin/stock-live", () => ({ buildStockReport: async () => state.report }));
 
 import AdminStockPage from "@/app/admin/(console)/stock/page";
 

@@ -9,14 +9,14 @@ import { NetworkBadge } from "@/components/NetworkBadge";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
 import { ArrowRight, Globe, Lock, Search, Shield, Sparkle } from "@/components/icons";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira } from "@/lib/services/catalog";
 import {
   orderByReadiness,
   readinessSummary,
   SERVICE_STATE_DOT,
   SERVICE_STATE_LABEL,
   type ServiceReadinessEntry,
-} from "@/lib/service-states";
+} from "@/lib/services/service-states";
 import {
   buildServiceExplorer,
   EXPLORER_CATEGORIES,
@@ -26,7 +26,7 @@ import {
   interleaveExplorerItems,
   type ExplorerFilter,
   type ExplorerItem,
-} from "@/lib/service-explorer";
+} from "@/lib/services/service-explorer";
 
 const PAGE_SIZE = 12;
 
@@ -168,6 +168,54 @@ function writeSelection(country: string, category: ExplorerFilter) {
   if (next !== `${window.location.pathname}${window.location.search}`) window.history.pushState(null, "", next);
 }
 
+/**
+ * What the live catalogue request did, in the customer's terms.
+ *
+ * The three "not live" cases are deliberately distinct: an environment with
+ * live listings switched off and a deployment with no supplier connected are
+ * both steady states, so they must not read as breakage or offer a Retry that
+ * cannot change the answer. Only `error` and `throttled` are worth retrying.
+ */
+type LiveState = {
+  country: string;
+  items: ExplorerItem[];
+  live: boolean;
+  partial: boolean;
+  failed: boolean;
+  reason: "environment" | "unconfigured" | "funding" | "throttled" | "error" | null;
+  fetchedAt: string | null;
+};
+
+type CatalogPayload = {
+  ok?: boolean; country?: string; live?: boolean; partial?: boolean;
+  reason?: string | null; fetchedAt?: string | null; items?: ExplorerItem[];
+};
+
+function liveUnavailableCopy(reason: LiveState["reason"]) {
+  if (reason === "environment") return {
+    lead: "Live availability is off in this environment.",
+    rest: "Stock and coverage below come from the catalogue, so check each listing before ordering.",
+  };
+  if (reason === "unconfigured") return {
+    lead: "Live availability isn\'t connected yet.",
+    rest: "Stock and coverage below come from the catalogue, so check each listing before ordering.",
+  };
+  if (reason === "throttled") return {
+    lead: "Live listings were refreshed too quickly.",
+    rest: "Give it a minute and press Retry; the listings below are unaffected.",
+  };
+  if (reason === "funding") return {
+    // Out of stock at the source, not out of order. Nothing here is the
+    // customer's to fix, and no amount of retrying restocks it.
+    lead: "Live listings are paused while we restock.",
+    rest: "Nothing is wrong with your account or your orders; check back soon.",
+  };
+  return {
+    lead: "Live availability is not shown yet.",
+    rest: "Check each listing for availability; stock and country coverage may be unconfirmed.",
+  };
+}
+
 export function ServiceExplorer({
   initialCountry,
   initialCategory,
@@ -192,7 +240,7 @@ export function ServiceExplorer({
   const [search, setSearch] = useState("");
   const [tag, setTag] = useState("all");
   const [visible, setVisible] = useState(PAGE_SIZE);
-  const [liveState, setLiveState] = useState<{ country: string; items: ExplorerItem[]; partial: boolean; failed: boolean; fetchedAt: string | null } | null>(null);
+  const [liveState, setLiveState] = useState<LiveState | null>(null);
   const [liveRevision, setLiveRevision] = useState(0);
   const selectedCountry = explorerCountry(country);
   const selectedCategory = EXPLORER_CATEGORIES.find((entry) => entry.id === category);
@@ -237,12 +285,29 @@ export function ServiceExplorer({
     const controller = new AbortController();
     fetch(`/api/services/catalog?country=${encodeURIComponent(country)}${liveRevision ? "&refresh=1" : ""}`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
-        const data = await response.json() as { ok?: boolean; country?: string; partial?: boolean; fetchedAt?: string; items?: ExplorerItem[] };
-        if (!response.ok || !data.ok || data.country !== country || !Array.isArray(data.items)) throw new Error("Catalog unavailable");
+        const data = (await response.json().catch(() => null)) as CatalogPayload | null;
+        if (!response.ok || !data?.ok || data.country !== country || !Array.isArray(data.items)) {
+          // A throttled read is the one failure a customer can clear themselves.
+          const throttled = response.status === 429;
+          if (!controller.signal.aborted) {
+            setLiveState({ country, items: [], live: false, partial: false, failed: true, reason: throttled ? "throttled" : "error", fetchedAt: null });
+          }
+          return;
+        }
         const fetchedAt = typeof data.fetchedAt === "string" && Number.isFinite(Date.parse(data.fetchedAt)) ? data.fetchedAt : null;
-        if (!controller.signal.aborted) setLiveState({ country, items: data.items, partial: Boolean(data.partial), failed: false, fetchedAt });
+        // `live !== false` keeps older payloads (which predate the flag) working.
+        // "partial" travels as `partial: true`; `reason` names why, in the
+        // customer's terms: closed environment, no supplier, or out of funds.
+        const reason = data.reason === "environment" || data.reason === "unconfigured" || data.reason === "funding"
+          ? data.reason
+          : null;
+        if (!controller.signal.aborted) {
+          setLiveState({ country, items: data.items, live: data.live !== false, partial: Boolean(data.partial), failed: false, reason: data.live === false || data.partial ? reason : null, fetchedAt });
+        }
       })
-      .catch(() => { if (!controller.signal.aborted) setLiveState({ country, items: [], partial: false, failed: true, fetchedAt: null }); });
+      .catch(() => {
+        if (!controller.signal.aborted) setLiveState({ country, items: [], live: false, partial: false, failed: true, reason: "error", fetchedAt: null });
+      });
     return () => controller.abort();
   }, [country, liveRevision]);
 
@@ -405,7 +470,7 @@ export function ServiceExplorer({
 
           <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-meta leading-relaxed border-amber-200 bg-amber-50/70 text-amber-900`}>
             <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-            {liveState?.country === country && !liveState.failed ? <p><strong>Live listings are current.</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. {liveState.partial && "Some listings may be missing. "}<Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>Live availability is not shown yet.</strong> Check each listing for availability; stock and country coverage may be unconfirmed. <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
+            {liveState?.country === country && liveState.live && liveState.reason !== "funding" && !liveState.failed ? <p><strong>Live listings are current.</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. {liveState.partial && "Some listings may be missing. "}<Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).lead}</strong>{" "}{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).rest} <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
           </div>
 
           <section aria-labelledby="services-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-3.5 sm:p-6">
@@ -429,7 +494,13 @@ export function ServiceExplorer({
               </div>
             )}
 
-            {liveState?.country === country && (liveState.failed || liveState.partial) && <p role="status" className="mt-4 text-meta text-amber-800">Some live listings couldn&apos;t be loaded. <button type="button" className="font-semibold underline" onClick={() => setLiveRevision((value) => value + 1)}>Retry</button></p>}
+            {liveState?.country === country && (liveState.failed || (liveState.live && liveState.partial)) && (
+              <p role="status" className="mt-4 text-meta text-amber-800">
+                {liveState.reason === "throttled" ? "Live listings were refreshed too quickly." : liveState.reason === "funding" ? "Some live listings are paused while we restock." : "Some live listings couldn&apos;t be loaded."}{" "}
+                {/* No Retry on a funding gap: retrying cannot restock it. */}
+                {liveState.reason !== "funding" && <button type="button" className="font-semibold underline" onClick={() => setLiveRevision((value) => value + 1)}>Retry</button>}
+              </p>
+            )}
             <div className="mt-3 grid grid-cols-1 gap-2 sm:mt-4 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
               {filtered.slice(0, visible).map((item) => <ServiceCard key={item.id} item={item} countryName={selectedCountry.name} />)}
             </div>

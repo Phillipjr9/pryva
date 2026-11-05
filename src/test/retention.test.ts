@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { RETENTION_YEARS, isPastRetention, purgeDueAt, purgeEnabled, retentionCutoff } from "@/lib/retention";
+import { RETENTION_YEARS, isPastRetention, purgeDueAt, purgeEnabled, retentionCutoff } from "@/lib/identity/retention";
 
 /**
  * The ten-year horizon.
@@ -54,7 +54,7 @@ describe("the horizon", () => {
 describe("the number stays on the server", () => {
   it("is not in the copy a customer reads", () => {
     const customerCopy = [
-      "src/lib/account-deletion.ts",
+      "src/lib/identity/account-deletion.ts",
       "src/app/dashboard/settings/DangerZone.tsx",
       "src/app/(site)/privacy/page.tsx",
     ];
@@ -70,18 +70,18 @@ describe("the number stays on the server", () => {
     // A `"use client"` module that imported the horizon would put the number in
     // the JavaScript every visitor downloads, which is disclosure whatever the UI
     // renders.
-    const retention = read("src/lib/retention.ts");
+    const retention = read("src/lib/identity/retention.ts");
     expect(retention).not.toContain('"use client"');
     expect(retention).toContain("export const RETENTION_YEARS = 10");
     expect(retention).toContain("purgeEnabled");
 
     const dangerZone = read("src/app/dashboard/settings/DangerZone.tsx");
     expect(dangerZone).toContain('"use client"');
-    expect(dangerZone).not.toContain("@/lib/retention");
+    expect(dangerZone).not.toContain("@/lib/identity/retention");
   });
 
   it("records in the server-only policy that the horizon was chosen by the owner", () => {
     // The decision is dated so a future session knows it was chosen, not assumed.
-    expect(read("src/lib/retention.ts")).toContain("owner's decision (31 Oct 2026)");
+    expect(read("src/lib/identity/retention.ts")).toContain("owner's decision (31 Oct 2026)");
   });
 });

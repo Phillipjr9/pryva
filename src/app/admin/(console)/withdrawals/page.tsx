@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/identity/auth";
 import { WithdrawalsManager } from "./WithdrawalsManager";
 
 export const dynamic = "force-dynamic";

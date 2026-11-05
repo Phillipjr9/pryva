@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SmmService } from "@/lib/smm-panel";
-import type { BoostSnapshot } from "@/lib/smm-catalog";
+import type { SmmService } from "@/lib/providers/smm-panel";
+import type { BoostSnapshot } from "@/lib/services/boosts/smm-catalog";
 
 const panel = vi.hoisted(() => ({
   configured: vi.fn(), services: vi.fn(), balance: vi.fn(), urlSetting: vi.fn(),
 }));
-vi.mock("@/lib/smm-panel", () => ({
+vi.mock("@/lib/providers/smm-panel", () => ({
   isSmmPanelConfigured: panel.configured,
   listSmmServices: panel.services,
   getSmmBalance: panel.balance,
@@ -24,7 +24,7 @@ function service(overrides: Partial<SmmService> = {}): SmmService {
 }
 
 function snapshot(services: SmmService[]): BoostSnapshot {
-  return { services, currency: "USD", balance: 177.69, partial: false, fetchedAt: "2026-01-01T00:00:00Z" };
+  return { services, currency: "USD", balance: 177.69, partial: false, degraded: null, balanceUnavailable: false, fetchedAt: "2026-01-01T00:00:00Z" };
 }
 
 beforeEach(() => {
@@ -36,7 +36,7 @@ beforeEach(() => {
 
 describe("boosting catalog listings", () => {
   it("lists nothing from a USD panel until a naira rate exists", async () => {
-    const { boostItems } = await import("@/lib/smm-catalog");
+    const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
     const usdPanel = service({ currency: "USD", ratePer1000: 0.74, min: 10 });
 
     // No rate means no defensible retail price. Rather than a shop full of cards
@@ -61,7 +61,7 @@ describe("boosting catalog listings", () => {
   });
 
   it("readies an NGN-billed service without any exchange rate", async () => {
-    const { boostItems } = await import("@/lib/smm-catalog");
+    const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
     process.env.SMM_MARKUP_PERCENT = "50";
     try {
       const [item] = boostItems(snapshot([service({ ratePer1000: 1000, currency: "NGN", min: 1000 })]));
@@ -74,7 +74,7 @@ describe("boosting catalog listings", () => {
   });
 
   it("hides the panel's service identifiers and wholesale rate", async () => {
-    const { boostItems } = await import("@/lib/smm-catalog");
+    const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
     const serialized = JSON.stringify(boostItems(snapshot([service({ id: "svc-secret-999", ratePer1000: 1_500 })])));
     expect(serialized).not.toContain("svc-secret-999");
     // The retail total for the smallest order (100 units at ₦2,025/1,000 = ₦203)
@@ -86,7 +86,7 @@ describe("boosting catalog listings", () => {
   });
 
   it("collapses the emoji and newlines panels decorate names with", async () => {
-    const { boostItems } = await import("@/lib/smm-catalog");
+    const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
     const decorated = service({ name: "\u26a1 TikTok Views\n\n\ud83d\udfe2 Fast start \u267b\ufe0f Refill 30 days" });
     const [item] = boostItems(snapshot([decorated]));
     expect(item.name).toBe("TikTok Views Fast start Refill 30 days");
@@ -95,7 +95,7 @@ describe("boosting catalog listings", () => {
   });
 
   it("never reveals the panel's name or that stock is bought in", async () => {
-    const { boostItems } = await import("@/lib/smm-catalog");
+    const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
     const tainted = [
       service({ id: "1", name: "CheapFollows Instagram Likes", category: "Instagram" }),
       service({ id: "2", name: "SMM Panel TikTok Views", category: "TikTok" }),
@@ -116,7 +116,7 @@ describe("boosting catalog listings", () => {
   });
 
   it("lists recognized social intents and drops unsupported services", async () => {
-    const { boostItems } = await import("@/lib/smm-catalog");
+    const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
     const items = boostItems(snapshot([
       service({ id: "1", name: "Instagram Followers", category: "Instagram" }),
       service({ id: "2", name: "Instagram Likes", category: "Instagram" }),
@@ -129,7 +129,7 @@ describe("boosting catalog listings", () => {
   });
 
   it("matches a platform for artwork without matching a single letter loosely", async () => {
-    const { boostItems } = await import("@/lib/smm-catalog");
+    const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
     const items = boostItems(snapshot([
       service({ id: "1", name: "X Followers", category: "Social" }),
       // "Max" contains an x but is not the X platform.
@@ -146,7 +146,7 @@ describe("boosting catalog listings", () => {
   });
 
   it("does not list a service it cannot describe or place on a platform", async () => {
-    const { boostItems } = await import("@/lib/smm-catalog");
+    const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
     // A name and category are how the shop knows what it is selling. Rather than
     // invent "Social other", the service is left out — the panel still sells it,
     // we simply cannot promise a customer what it does.
@@ -156,7 +156,7 @@ describe("boosting catalog listings", () => {
 
 describe("selecting from a real panel catalogue", () => {
   it("collapses near-identical offers to one per platform and intent", async () => {
-    const { selectBoostServices } = await import("@/lib/smm-catalog");
+    const { selectBoostServices } = await import("@/lib/services/boosts/smm-catalog");
     // The shape a production panel actually returns: many variants of the same
     // product, priced by speed and quality.
     const catalogue = [
@@ -175,7 +175,7 @@ describe("selecting from a real panel catalogue", () => {
   });
 
   it("drops inventory that is not a social boost at all", async () => {
-    const { selectBoostServices } = await import("@/lib/smm-catalog");
+    const { selectBoostServices } = await import("@/lib/services/boosts/smm-catalog");
     const selection = selectBoostServices([
       service({ id: "seo", name: "Website Traffic", category: "SEO" }),
       service({ id: "maps", name: "Google Maps Reviews", category: "Google" }),
@@ -187,7 +187,7 @@ describe("selecting from a real panel catalogue", () => {
   });
 
   it("lists expanded platforms such as Spotify plays", async () => {
-    const { selectBoostServices } = await import("@/lib/smm-catalog");
+    const { selectBoostServices } = await import("@/lib/services/boosts/smm-catalog");
     const selection = selectBoostServices([
       service({ id: "spot", name: "Spotify Plays", category: "Spotify" }),
     ], "NGN");
@@ -196,8 +196,8 @@ describe("selecting from a real panel catalogue", () => {
   });
 
   it("keeps a large catalogue to a shop-sized list", async () => {
-    const { selectBoostServices } = await import("@/lib/smm-catalog");
-    const { PROMOTION_EXAMPLES } = await import("@/lib/service-explorer");
+    const { selectBoostServices } = await import("@/lib/services/boosts/smm-catalog");
+    const { PROMOTION_EXAMPLES } = await import("@/lib/services/service-explorer");
     // Many variants per platform and intent.
     const catalogue = PROMOTION_EXAMPLES.map((entry) => entry.name).flatMap((platform) =>
       ["Followers", "Likes", "Views", "Subscribers"].flatMap((tag) =>
@@ -224,14 +224,14 @@ describe("selecting from a real panel catalogue", () => {
 describe("boosting snapshot", () => {
   it("fails closed when the panel is not configured", async () => {
     panel.configured.mockReturnValue(false);
-    const { readBoostSnapshot } = await import("@/lib/smm-catalog");
+    const { readBoostSnapshot } = await import("@/lib/services/boosts/smm-catalog");
     await expect(readBoostSnapshot()).rejects.toThrow("Boosting supplier not configured");
     expect(panel.services).not.toHaveBeenCalled();
   });
 
   it("fails when the catalog cannot be read, but degrades when only the balance fails", async () => {
     panel.services.mockRejectedValue(new Error("upstream down"));
-    const { readBoostSnapshot } = await import("@/lib/smm-catalog");
+    const { readBoostSnapshot } = await import("@/lib/services/boosts/smm-catalog");
     await expect(readBoostSnapshot()).rejects.toThrow("Boosting catalog unavailable");
 
     vi.resetModules();
@@ -239,15 +239,20 @@ describe("boosting snapshot", () => {
     panel.urlSetting.mockReturnValue("https://cheapfollows.test/api/v2");
     panel.services.mockResolvedValue([service()]);
     panel.balance.mockRejectedValue(new Error("balance unavailable"));
-    const reloaded = await import("@/lib/smm-catalog");
-    // Currency is unknown rather than assumed, so pricing cannot be derived.
-    expect(await reloaded.readBoostSnapshot()).toMatchObject({ partial: true, currency: null, balance: null });
+    const reloaded = await import("@/lib/services/boosts/smm-catalog");
+    // Currency is unknown rather than assumed, so pricing cannot be derived —
+    // but no listing is missing, so the catalogue is not "partial": a balance
+    // read is a pricing input, and reporting it as a gap told customers to
+    // retry a request that had already succeeded.
+    expect(await reloaded.readBoostSnapshot()).toMatchObject({
+      partial: false, balanceUnavailable: true, degraded: null, currency: null, balance: null,
+    });
   });
 
   it("caps the catalog, caches briefly and deduplicates concurrent reads", async () => {
     panel.services.mockResolvedValue(Array.from({ length: 2500 }, (_, index) => service({ id: `svc-${index}` })));
     panel.balance.mockResolvedValue({ balance: 10, currency: "NGN" });
-    const { readBoostSnapshot } = await import("@/lib/smm-catalog");
+    const { readBoostSnapshot } = await import("@/lib/services/boosts/smm-catalog");
 
     const [first, second] = await Promise.all([readBoostSnapshot(), readBoostSnapshot()]);
     expect(first).toBe(second);

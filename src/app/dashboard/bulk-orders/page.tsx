@@ -1,7 +1,7 @@
 import { BulkOrdersForm } from "./BulkOrdersForm";
-import { requireUser } from "@/lib/auth";
-import { fulfilablePlans } from "@/lib/fulfillment";
-import { MAX_BULK_UNITS } from "@/lib/bulk-orders";
+import { requireUser } from "@/lib/identity/auth";
+import { fulfilablePlans } from "@/lib/services/fulfillment";
+import { MAX_BULK_UNITS } from "@/lib/services/bulk-orders";
 import { ServiceTitle } from "@/components/ServiceTitle";
 
 export const dynamic = "force-dynamic";

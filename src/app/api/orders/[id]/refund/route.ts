@@ -1,15 +1,15 @@
-import { isVercelPreview } from "@/lib/financial-environment";
+import { isVercelPreview } from "@/lib/platform/financial-environment";
 import { randomBytes } from "node:crypto";
 import { and, eq, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth";
-import { isSameOriginMutation } from "@/lib/net";
-import { refundRateLimiter } from "@/lib/rate-limit";
-import { cancelUpstream } from "@/lib/fulfillment";
-import { flagReconciliation } from "@/lib/reconciliation";
-import { isUndeliveredSingleNumber, SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
-import { SERVICE_TIMEOUTS } from "@/lib/service-timeouts";
+import { getCurrentUser } from "@/lib/identity/auth";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { refundRateLimiter } from "@/lib/platform/rate-limit";
+import { cancelUpstream } from "@/lib/services/fulfillment";
+import { flagReconciliation } from "@/lib/services/reconciliation";
+import { isUndeliveredSingleNumber, SINGLE_NUMBER_WINDOW } from "@/lib/services/refund-policy";
+import { deliveryWindowMs } from "@/lib/services/registry";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +51,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return Response.json({ ok: false, error: "This order is already complete or refunded." }, { status: 409 });
     }
 
-    const cutoff = new Date(Date.now() - SERVICE_TIMEOUTS.numbers.delivery);
+    const cutoff = new Date(Date.now() - deliveryWindowMs("numbers"));
     const createdAt = new Date(order.createdAt).getTime();
     if (!isUndeliveredSingleNumber(order) || !Number.isFinite(createdAt) || createdAt > cutoff.getTime()) {
       // Rentals land here too: no upstream cancel exists for them, so a human

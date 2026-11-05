@@ -4,10 +4,10 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Lock, Shield, Sparkle } from "@/components/icons";
-import { formatNaira, type Plan } from "@/lib/catalog";
+import { formatNaira, type Plan } from "@/lib/services/catalog";
 import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
 import { CountryFlag } from "@/components/CountryFlag";
-import { hasCountryFlag } from "@/lib/countries";
+import { hasCountryFlag } from "@/lib/platform/countries";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
 

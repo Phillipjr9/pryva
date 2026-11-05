@@ -1,9 +1,9 @@
-import { authorizeAdminApi } from "@/lib/admin-auth";
+import { authorizeAdminApi } from "@/lib/identity/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, orders, walletTransactions, giftCards } from "@/db/schema";
 import { sql, gte, and, eq } from "drizzle-orm";
-import { logger } from "@/lib/logger";
+import { logger } from "@/lib/platform/logger";
 
 export const dynamic = "force-dynamic";
 

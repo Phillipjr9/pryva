@@ -2,10 +2,10 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { userTwoFactor } from "@/db/schema";
-import { requireAdmin } from "@/lib/auth";
-import { remainingRecoveryCodes, twoFactorAvailable } from "@/lib/two-factor";
+import { requireAdmin } from "@/lib/identity/auth";
+import { remainingRecoveryCodes, twoFactorAvailable } from "@/lib/identity/two-factor";
 import { TwoFactorCard } from "@/app/dashboard/settings/TwoFactorCard";
-import { safeRedirectPath } from "@/lib/safe-redirect";
+import { safeRedirectPath } from "@/lib/platform/safe-redirect";
 import { Shield } from "@/components/icons";
 
 export const dynamic = "force-dynamic";

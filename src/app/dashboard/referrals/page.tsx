@@ -1,8 +1,8 @@
 import { headers } from "next/headers";
 
-import { requireUser } from "@/lib/auth";
-import { publicOrigin } from "@/lib/net";
-import { referralOverview } from "@/lib/referrals";
+import { requireUser } from "@/lib/identity/auth";
+import { publicOrigin } from "@/lib/platform/net";
+import { referralOverview } from "@/lib/content/referrals";
 import { ReferralProgram } from "./ReferralProgram";
 
 export const metadata = { title: "Refer a friend" };

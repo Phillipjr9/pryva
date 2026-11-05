@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { paystackTransferReference } from "@/lib/paystack-transfer-reference";
+import { paystackTransferReference } from "@/lib/payments/paystack-transfer-reference";
 
 describe("Paystack transfer references", () => {
   it("derives a stable, distinct, lowercase provider reference from each withdrawal UUID", () => {

@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
-import { blogPosts } from "@/lib/blog";
-import { canonicalSiteUrl } from "@/lib/net";
+import { blogPosts } from "@/lib/content/blog";
+import { canonicalSiteUrl } from "@/lib/platform/net";
 
 const routes = [
   "",

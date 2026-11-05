@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { formatNaira } from "@/lib/catalog";
-import { MAX_WITHDRAWAL, MIN_WITHDRAWAL, maxWithdrawalForBalance, withdrawalFee } from "@/lib/withdrawal";
-import { clearTrackedWithdrawalIntent, readWithdrawalIntents, saveTrackedWithdrawalIntent, type WithdrawalIntent } from "@/lib/withdrawal-intent";
-import { parseWithdrawalReceipt, type WithdrawalSubmitResult } from "@/lib/withdrawal-receipt";
+import { formatNaira } from "@/lib/services/catalog";
+import { MAX_WITHDRAWAL, MIN_WITHDRAWAL, maxWithdrawalForBalance, withdrawalFee } from "@/lib/payments/withdrawal";
+import { clearTrackedWithdrawalIntent, readWithdrawalIntents, saveTrackedWithdrawalIntent, type WithdrawalIntent } from "@/lib/payments/withdrawal-intent";
+import { parseWithdrawalReceipt, type WithdrawalSubmitResult } from "@/lib/payments/withdrawal-receipt";
 import { useToast } from "@/components/ui/Toast";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { WithdrawalReviewDialog, type WithdrawalReview } from "@/components/dashboard/WithdrawalReviewDialog";

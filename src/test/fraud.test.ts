@@ -31,8 +31,8 @@ import {
 const mocks = vi.hoisted(() => ({ db: undefined as unknown, log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/logger", () => ({ logger: mocks.log }));
-vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
+vi.mock("@/lib/platform/logger", () => ({ logger: mocks.log }));
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
 
 const USER = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -42,8 +42,8 @@ const REFEREE = "55555555-5555-4555-8555-555555555555";
 
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
-let fraud: typeof import("@/lib/fraud");
-let refLib: typeof import("@/lib/referrals");
+let fraud: typeof import("@/lib/admin/fraud");
+let refLib: typeof import("@/lib/content/referrals");
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -79,8 +79,8 @@ beforeAll(async () => {
   for (const file of files) await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
-  fraud = await import("@/lib/fraud");
-  refLib = await import("@/lib/referrals");
+  fraud = await import("@/lib/admin/fraud");
+  refLib = await import("@/lib/content/referrals");
 }, 30_000);
 
 afterAll(async () => {
@@ -242,7 +242,7 @@ describe("velocity ceilings", () => {
       database.insert(orders).values({
         reference: `ORD-${index}`,
         userId: USER,
-        service: "virtual-numbers",
+        service: "numbers",
         productSlug: "netflix-otp",
         productName: "Netflix",
         planLabel: "One code",
@@ -265,7 +265,7 @@ describe("velocity ceilings", () => {
     await database.insert(orders).values({
       reference: "ORD-OLD",
       userId: USER,
-      service: "virtual-numbers",
+      service: "numbers",
       productSlug: "netflix-otp",
       productName: "Netflix",
       planLabel: "One code",
@@ -356,7 +356,7 @@ describe("referral abuse", () => {
     await database.insert(orders).values({
       reference: "ORD-REF",
       userId: REFEREE,
-      service: "virtual-numbers",
+      service: "numbers",
       productSlug: "netflix-otp",
       productName: "Netflix",
       planLabel: "One code",

@@ -3,10 +3,10 @@ import { count, gt } from "drizzle-orm";
 
 import { db } from "@/db";
 import { disposableInboxes } from "@/db/schema";
-import { diagnosticsAuthorized } from "@/lib/diagnostics-auth";
-import { isPreviewDatabase } from "@/lib/demo-policy";
-import { isFleexaConfigured, listFleexaEmailProducts, type FleexaEmailProduct } from "@/lib/fleexa";
-import { logger } from "@/lib/logger";
+import { diagnosticsAuthorized } from "@/lib/admin/diagnostics-auth";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
+import { isFleexaConfigured, listFleexaEmailProducts, type FleexaEmailProduct } from "@/lib/providers/fleexa";
+import { logger } from "@/lib/platform/logger";
 
 export const dynamic = "force-dynamic";
 

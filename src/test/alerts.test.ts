@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { alertText, alertsConfigured, redactContext, resetAlertThrottle, sendAlert } from "@/lib/alerts";
+import { alertText, alertsConfigured, redactContext, resetAlertThrottle, sendAlert } from "@/lib/platform/alerts";
 
 /**
  * Error reporting.
@@ -102,7 +102,7 @@ describe("redaction", () => {
 
 describe("logger integration", () => {
   it("forwards logger.error to the webhook when one is configured", async () => {
-    const { logger } = await import("@/lib/logger");
+    const { logger } = await import("@/lib/platform/logger");
     const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     logger.error("Cron job failed", { step: "daily-reconciliation" });
     // The forward is fire-and-forget: give the dynamic import its turn.

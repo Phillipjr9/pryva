@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { readJsonWithLimit, readTextWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { readJsonWithLimit, readTextWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 
 function streamRequest(chunks: Uint8Array[], cancel = vi.fn()) {
   const stream = new ReadableStream<Uint8Array>({

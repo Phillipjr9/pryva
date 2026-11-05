@@ -3,20 +3,15 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { financialActionsUnavailable } from "@/lib/financial-environment";
+import { afterPurchase, beginPurchase } from "@/lib/checkout/purchase";
 import { orders, users, type Order } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth";
-import { esimOfferTerms, findEsimOffer, recheckEsimOffer, type EsimOffer } from "@/lib/esim-catalog";
-import { purchaseEsim } from "@/lib/esim-fulfilment";
-import { purchaseVelocity, recordFraudEvent } from "@/lib/fraud";
-import { MARGIN_BLOCKED_MESSAGE } from "@/lib/margin-guard";
-import { isSameOriginMutation } from "@/lib/net";
-import { ESIM_PROVIDER } from "@/lib/order-providers";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
-import { settleReferralRewards } from "@/lib/referrals";
-import { debitWalletInTx, InsufficientFundsError, makeReference } from "@/lib/wallet";
+import { getCurrentUser } from "@/lib/identity/auth";
+import { esimOfferTerms, findEsimOffer, recheckEsimOffer, type EsimOffer } from "@/lib/services/esim/esim-catalog";
+import { purchaseEsim } from "@/lib/services/esim/esim-fulfilment";
+import { MARGIN_BLOCKED_MESSAGE } from "@/lib/services/margin-guard";
+import { ESIM_PROVIDER } from "@/lib/services/order-providers";
+import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
+import { debitWalletInTx, InsufficientFundsError, makeReference } from "@/lib/payments/wallet";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -81,44 +76,17 @@ async function currentBalance(userId: string): Promise<number> {
  *     the order is parked on the review queue with no charge.
  */
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return Response.json({ ok: false, error: "Please sign in to complete this order." }, { status: 401 });
-
-  // Never spend against the live network from an in-memory preview database.
-  if (financialActionsUnavailable()) return Response.json({ ok: false, error: "eSIM ordering is unavailable in this environment." }, { status: 503 });
-
-  if (!isSameOriginMutation(request)) {
-    return Response.json({ ok: false, error: "Cross-origin request denied." }, { status: 403 });
-  }
-  if (!isJsonRequest(request)) return Response.json({ ok: false, error: "Expected JSON." }, { status: 415 });
-
-  const limit = await purchaseRateLimiter(`esim-create:${user.id}`);
-  if (limit.unavailable) return Response.json({ ok: false, error: "Purchases are temporarily unavailable." }, { status: 503 });
-  if (!limit.allowed) return Response.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
-
-  const velocity = await purchaseVelocity(user.id).catch(() => ({ allowed: true, count: 0, limit: 0 }));
-  if (!velocity.allowed) {
-    await recordFraudEvent({
-      userId: user.id,
-      kind: "purchase_velocity",
-      severity: "warn",
-      reasons: [`${velocity.count} orders in the last hour (limit ${velocity.limit})`],
-    });
-    return Response.json(
-      { ok: false, error: "That is a lot of orders in a short time. Please try again in a few minutes." },
-      { status: 429 },
-    );
-  }
-
-  let body: unknown;
-  try {
-    body = await readJsonWithLimit(request, 2_048);
-  } catch (error) {
-    return Response.json(
-      { ok: false, error: "Invalid request body." },
-      { status: error instanceof RequestBodyTooLargeError ? 413 : 400 },
-    );
-  }
+  const begun = await beginPurchase<Record<string, unknown>>(request, {
+    bucket: "esim-create",
+    maxBodyBytes: 2_048,
+    copy: {
+      // The preview refusal names the product: "purchases are unavailable" made
+      // an operator checking eSIM think the whole wallet path was closed.
+      unavailable: "eSIM ordering is unavailable in this environment.",
+    },
+  });
+  if (!begun.ok) return begun.response;
+  const { user, body } = begun;
 
   const record = body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
   // Do not silently ignore a selected number (or any other unsupported option):
@@ -315,8 +283,7 @@ export async function POST(request: Request) {
       );
     }
 
-    scheduleWalletEmails();
-    await settleReferralRewards({ refereeId: user.id }).catch(() => undefined);
+    void afterPurchase(user.id);
 
     return Response.json({
       ok: true,

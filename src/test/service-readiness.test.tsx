@@ -1,20 +1,20 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { EXPLORER_CATEGORIES } from "@/lib/service-explorer";
-import { readinessSummary, orderByReadiness, SERVICE_STATE_RANK } from "@/lib/service-states";
+import { EXPLORER_CATEGORIES } from "@/lib/services/service-explorer";
+import { readinessSummary, orderByReadiness, SERVICE_STATE_RANK } from "@/lib/services/service-states";
 import { ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 
 const config = vi.hoisted(() => ({ fleexa: false, boosting: false, accounts: false, preview: true }));
 
-vi.mock("@/lib/fleexa", () => ({ isFleexaConfigured: () => config.fleexa }));
-vi.mock("@/lib/smm-panel", () => ({ isSmmPanelConfigured: () => config.boosting }));
-vi.mock("@/lib/marketplace-policy", () => ({ isMarketplaceCheckoutConfigured: () => config.accounts }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => config.preview }));
+vi.mock("@/lib/providers/fleexa", () => ({ isFleexaConfigured: () => config.fleexa }));
+vi.mock("@/lib/providers/smm-panel", () => ({ isSmmPanelConfigured: () => config.boosting }));
+vi.mock("@/lib/services/accounts/marketplace-policy", () => ({ isMarketplaceCheckoutConfigured: () => config.accounts }));
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => config.preview }));
 
-const { readServiceReadiness } = await import("@/lib/service-readiness");
+const { readServiceReadiness } = await import("@/lib/services/service-readiness");
 
 afterEach(() => {
   cleanup();

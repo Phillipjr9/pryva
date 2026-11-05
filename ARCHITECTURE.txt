@@ -1,0 +1,196 @@
+PRYVA — ARCHITECTURE
+====================
+
+What this file is for
+---------------------
+
+Where things live, which module owns each decision, and how to add a service, a
+supplier or a money path without creating a second copy of something that already
+exists. README.txt explains how to run the project; OPERATIONS.txt explains the
+risky operations; SECURITY.txt explains the threat model. This one explains the
+shape.
+
+If you only read one section, read "The four vocabularies".
+
+
+Layout
+------
+
+  src/app/(site)      public marketing and legal pages
+  src/app/(auth)      sign-in, sign-up, verification, password reset
+  src/app/dashboard   customer application (orders, wallet, services, support)
+  src/app/admin       operator console (coverage, reconciliation, queues)
+  src/app/api         route handlers, one folder per URL
+
+  src/components      presentation only; no business rules
+
+  src/lib
+    platform/   infrastructure with no business meaning: logging, request
+                parsing, rate limits, security headers, backups, config
+    identity/   sessions, 2FA, passkeys, OAuth, email verification, retention
+    payments/   wallet, Paystack, withdrawals, payouts, FX, reconciliation
+    services/   the product catalogue and its families
+                numbers/ esim/ accounts/ boosts/ gift-cards/ email-otp/
+                data/ digital/
+                plus catalog.ts (price book), pricing.ts, fulfillment.ts,
+                service-coverage.ts, and registry.ts (below)
+    providers/  supplier API clients only — one adapter per supplier
+    checkout/   the shared money-path gates
+    admin/      operator-only tooling (fraud, stock, queues)
+    content/    marketing, reviews, referrals, SEO, destination pages
+    support/    tickets and the support assistant
+    email/      templates, branding, outbox
+    db/         schema and connection (src/db)
+
+
+The four vocabularies
+---------------------
+
+Four decisions were each repeated in several places and had drifted. Each now has
+exactly one owner, and a test that fails when a second copy appears.
+
+1. What the shop sells — src/lib/services/registry.ts
+
+   One row per product family: label, description, sale rule, coverage lane,
+   the `orders.service` tags it writes, and its delivery window. The service hub,
+   the readiness verdicts, the coverage lanes and the operator console all read
+   it. Pure data, so a client component may import it.
+
+   The hub's shelves are `SERVICES`, in order. `ORDER_SERVICE_TAGS` is the
+   vocabulary the `orders.service` column is typed against: an invented tag is a
+   compile error, not a support ticket.
+
+2. Whether a supplier is connected — src/lib/services/service-config.ts
+
+   The only module that turns a supplier credential into a boolean. The hub uses
+   it for customer-facing readiness, the console uses it for lane verdicts, and
+   neither keeps a `switch` of its own.
+
+3. Which supplier can deliver — src/lib/providers/index.ts
+
+   One descriptor per supplier: id, internal label, credential check, and the
+   order tags it can deliver. Every adapter throws `ProviderError` (from
+   providers/types.ts), which carries the supplier id, the HTTP-ish status and
+   the adapter's own code.
+
+   Provider *names* never reach a customer. Customer-facing capability flags live
+   in src/lib/services/order-providers.ts, which is `server-only` on purpose.
+   supplier-secrecy.test.ts enforces that.
+
+4. How money is taken — src/lib/checkout/purchase.ts
+
+   `beginPurchase()` runs the gates in a fixed order and returns the caller, the
+   parsed body, or the refusal:
+
+     identity → origin → content type → financial environment → supplier gate
+     → per-minute limiter → hourly velocity ceiling → bounded body parse
+
+   `afterPurchase()` runs the receipt queue and referral settlement on every
+   money path, best-effort. A route keeps its own price resolution, supplier
+   call, transaction and refund path: those differ because the products differ.
+
+
+Invariants, and the tests that hold them
+----------------------------------------
+
+  service-registry.test.ts   every family is declared once; lanes have a
+                             credential and a delivery window; no purchase path
+                             writes an undeclared order tag or a hard-coded
+                             provider name; the scheduled lane does not exist.
+  provider-port.test.ts      every supplier has a descriptor and an error that
+                             identifies it; refusal is distinguishable from an
+                             unknown outcome.
+  checkout-pipeline.test.ts  the gate order and each refusal; and, by reading the
+                             route sources, that no money route has re-implemented
+                             the prologue.
+  service-coverage.test.ts   a lane is healthy from evidence (a delivery), never
+                             from a key being present.
+  supplier-secrecy.test.ts   no supplier name reaches a customer bundle.
+  esim-lane.test.ts          two families on one gateway are told apart by what
+                             was bought, not by the provider alone.
+
+Adding things
+-------------
+
+A new product family:
+
+  1. Add a row to `SERVICES` in registry.ts, with a sale rule and — if it can
+     take money — a lane, order tags and a delivery window.
+  2. Add its customer copy to `DETAIL` in service-readiness.ts. This is a
+     compile error until you do.
+  3. If it is orderable, add a `LANE_PROVIDERS` row in service-coverage.ts and
+     a case in service-config.ts if the credential is new.
+  4. Add the purchase route, starting with `beginPurchase()`.
+  5. Run `npm test`: the registry test checks the vocabulary, the checkout test
+     checks the route.
+
+A new supplier:
+
+  1. Add an adapter under providers/, throwing ProviderError with its id.
+  2. Add a descriptor row to providers/index.ts, including the order tags it can
+     deliver.
+  3. If it decides whether a family can sell, point that family's sale rule at
+     the new source and add it to `SUPPLIERS` in service-config.ts.
+
+A new money path:
+
+  1. `beginPurchase()` with a unique rate-limit bucket and the product's copy.
+  2. Resolve the price server-side; never trust a client total.
+  3. Buy upstream before debiting, and release upstream if the charge fails —
+     that is the order every existing path uses.
+  4. `afterPurchase()` once the order exists.
+  5. A client-supplied `requestId`, unique per attempt, so a retry replays
+     instead of buying twice.
+
+
+What is deliberately not unified
+--------------------------------
+
+- Supplier failure codes and ambiguity. "Refused" and "we do not know whether it
+  bought" differ per supplier contract, and guessing wrong either double-buys or
+  gives away stock. Each adapter answers that question itself.
+- Admin routes. They are a parallel surface with different authorisation and
+  different read models; sharing handlers with the customer API would blur that.
+- `getCurrentUser()` and `requireAuthApi()`. They are the same function; the API
+  spelling exists so a route handler can never call the redirecting `requireAuth()`
+  by mistake. The shared checkout gates call the API one.
+- "Live listings are off" and "live listings broke". `GET /api/services/catalog`
+  answers 200 with `live: false` and a `reason`: `environment` (the deployment
+  has live availability switched off), `unconfigured` (no supplier key) or
+  `funding` (every configured supplier's account is out of balance). All three
+  are steady states, not incidents. It answers 503 only when a configured
+  supplier is unreachable — retry helps there — and 429 when the customer is
+  refreshing too fast. `partial: true` carries the same `reason` vocabulary for
+  an incomplete-but-served read. The hub renders a neutral note for the steady
+  states and keeps the amber warning with a Retry only where retrying can change
+  the answer, because a Retry button on a state that cannot change is a lie.
+  This endpoint reads through its own limiter (`catalogRateLimiter`); browsing
+  must never spend the purchase budget.
+- "We cannot pay" versus "they are down". `isFundingFailure()` in
+  `lib/providers/types.ts` is the only place that answer is decided, and adapters
+  raise a 402 `INSUFFICIENT_BALANCE` rather than a generic 502 when a supplier
+  refuses for want of funds. `looksLikeFundingRefusal()` reads a refusal's prose
+  to decide that — suppliers say "not enough balance" in a 200 body far more
+  often than in a status code — but the prose itself is never forwarded, and a
+  complaint that names a credential is never treated as funding. Everything that
+  swallows a supplier error (`attempt()` in the catalogue route, each
+  `read*Snapshot`) must keep this distinction; folding it into `null` is what
+  turned an empty balance into an endless "retry" banner.
+- A read that cannot change the listing is not "partial". The boosting balance
+  call only supplies a billing currency, so its failure is reported as
+  `balanceUnavailable`, not as an incomplete catalogue: the listings were all
+  there, and telling a customer otherwise invites a retry that changes nothing.
+
+
+Known gaps
+----------
+
+- The catalogue (`catalog.ts`) and the fulfilment allowlist (`fulfillment.ts`)
+  are separate structures. `isPlanFulfillable()` is the only thing that decides
+  what may be sold, and non-fulfilable plans are still listed with an explanation
+  rather than removed. There is no database constraint tying the two together.
+- The service hub excludes gift cards on purpose (they are wallet credit, not a
+  catalogue service), so the hub's categories are not identical to every product
+  the shop sells.
+- `src/lib/services/data/airtime.ts` prices data and airtime plans that no
+  supplier fulfils; the purchase endpoints answer 503 by design.

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { findPlan, plansFor } from "@/lib/catalog";
+import { findPlan, plansFor } from "@/lib/services/catalog";
 
 /**
  * Fulfilment is the point where a customer's wallet meets a real supplier, so
@@ -15,8 +15,8 @@ const provider = vi.hoisted(() => ({
   cancelSms: vi.fn(),
 }));
 
-vi.mock("@/lib/fleexa", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/fleexa")>();
+vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/fleexa")>();
   return {
     ...actual,
     isFleexaConfigured: () => provider.configured,
@@ -28,8 +28,8 @@ vi.mock("@/lib/fleexa", async (importOriginal) => {
   };
 });
 
-const { cancelUpstream, fulfillPlan, isPlanFulfillable } = await import("@/lib/fulfillment");
-const { clearOtpCatalogueCache } = await import("@/lib/otp-suppliers");
+const { cancelUpstream, fulfillPlan, isPlanFulfillable } = await import("@/lib/services/fulfillment");
+const { clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");
 
 beforeEach(() => {
   vi.clearAllMocks();

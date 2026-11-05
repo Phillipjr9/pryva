@@ -25,8 +25,8 @@ vi.mock("@/db", () => ({
   },
 }));
 
-vi.mock("@/lib/smm-panel", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/smm-panel")>();
+vi.mock("@/lib/providers/smm-panel", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/smm-panel")>();
   return {
     ...actual,
     isSmmPanelConfigured: vi.fn(() => true),
@@ -34,12 +34,12 @@ vi.mock("@/lib/smm-panel", async (importOriginal) => {
   };
 });
 
-import { getSmmOrderStatus, isSmmPanelConfigured, SmmPanelError, type SmmOrderStatus } from "@/lib/smm-panel";
+import { getSmmOrderStatus, isSmmPanelConfigured, SmmPanelError, type SmmOrderStatus } from "@/lib/providers/smm-panel";
 import {
   clearBoostStatusCache,
   orderStatusForState,
   syncBoostOrderStatus,
-} from "@/lib/boost-status";
+} from "@/lib/services/boosts/boost-status";
 
 const boostOrder = {
   id: "order-1",

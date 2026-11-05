@@ -1,12 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { PHOTOS } from "@/lib/photos";
+import { PHOTOS } from "@/lib/platform/photos";
 import { Reveal } from "@/components/ui/Reveal";
 import { FaqAccordion } from "@/components/ui/FaqAccordion";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { BrandIcon } from "@/components/BrandIcon";
-import { PLATFORM_SHOWCASE } from "@/lib/platform-showcase";
+import { PLATFORM_SHOWCASE } from "@/lib/content/platform-showcase";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -21,13 +21,13 @@ import {
   Sparkle,
   Wallet,
 } from "@/components/icons";
-import { formatNaira, plansFor, serviceMap, services } from "@/lib/catalog";
-import { isPlanFulfillable } from "@/lib/fulfillment";
+import { formatNaira, plansFor, serviceMap, services } from "@/lib/services/catalog";
+import { isPlanFulfillable } from "@/lib/services/fulfillment";
 import { CountryFlag } from "@/components/CountryFlag";
-import { hasCountryFlag } from "@/lib/countries";
+import { hasCountryFlag } from "@/lib/platform/countries";
 import { BrandMark } from "@/components/brand/BrandLockup";
 import { StickyMobileCta } from "@/components/site/StickyMobileCta";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/identity/auth";
 
 export const metadata: Metadata = {
   title: "Pryva — Virtual numbers, eSIMs and proxies for Nigeria",

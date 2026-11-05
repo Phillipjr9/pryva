@@ -1,5 +1,5 @@
 import { BrandMark } from "@/components/brand/BrandLockup";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira } from "@/lib/services/catalog";
 import {
   RECEIPT_DOCUMENT_TITLE,
   RECEIPT_FOOTER,
@@ -10,7 +10,7 @@ import {
   receiptStatusNote,
   receiptStatusTone,
   type ReceiptData,
-} from "@/lib/receipt";
+} from "@/lib/payments/receipt";
 
 /**
  * One order, as a document.

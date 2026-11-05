@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatNaira, findPlan, findService, plansFor, services, plans } from "@/lib/catalog";
+import { formatNaira, findPlan, findService, plansFor, services, plans } from "@/lib/services/catalog";
 
 describe("Catalog Extended", () => {
   describe("formatNaira edge cases", () => {
@@ -92,7 +92,7 @@ describe("Catalog Extended", () => {
     });
 
     it("should have valid service references", () => {
-      const serviceSlugs = new Set(services.map((s) => s.slug));
+      const serviceSlugs = new Set<string>(services.map((s) => s.slug));
       plans.forEach((plan) => {
         expect(serviceSlugs.has(plan.service)).toBe(true);
       });

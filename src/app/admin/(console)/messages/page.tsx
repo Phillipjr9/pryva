@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/identity/auth";
 import { db } from "@/db";
 import { contactMessages } from "@/db/schema";
 import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { MessageStatusControl } from "./MessageStatusControl";
-import { isMessageStatus, MESSAGE_STATUS_LABELS, MESSAGE_STATUSES } from "@/lib/support-messages";
+import { isMessageStatus, MESSAGE_STATUS_LABELS, MESSAGE_STATUSES } from "@/lib/support/support-messages";
 
 export const dynamic = "force-dynamic";
 

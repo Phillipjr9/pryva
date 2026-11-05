@@ -1,12 +1,12 @@
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { financialActionsUnavailable } from "@/lib/financial-environment";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import { orders } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth";
-import { completeEsimOrder } from "@/lib/esim-fulfilment";
-import { isSameOriginMutation } from "@/lib/net";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
+import { getCurrentUser } from "@/lib/identity/auth";
+import { completeEsimOrder } from "@/lib/services/esim/esim-fulfilment";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;

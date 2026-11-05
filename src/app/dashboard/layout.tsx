@@ -4,11 +4,11 @@ import { redirect } from "next/navigation";
 import { and, count, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
-import { isAdminUser, requireUser } from "@/lib/auth";
+import { isAdminUser, requireUser } from "@/lib/identity/auth";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { isPreviewDatabase } from "@/lib/demo-policy";
-import { resendConfigured } from "@/lib/resend-config";
-import { BUILD_ID } from "@/lib/build-id";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
+import { resendConfigured } from "@/lib/email/resend-config";
+import { BUILD_ID } from "@/lib/platform/build-id";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();

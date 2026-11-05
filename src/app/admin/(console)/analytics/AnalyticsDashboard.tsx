@@ -1,6 +1,6 @@
 "use client";
 
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira } from "@/lib/services/catalog";
 import { Users, ShoppingCart, DollarSign } from "@/components/icons";
 
 interface AnalyticsDashboardProps {

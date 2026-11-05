@@ -14,9 +14,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => false }));
-vi.mock("@/lib/logger", () => ({ logger: mocks.log }));
-vi.mock("@/lib/paystack", () => ({
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => false }));
+vi.mock("@/lib/platform/logger", () => ({ logger: mocks.log }));
+vi.mock("@/lib/payments/paystack", () => ({
   isPaystackConfigured: () => true,
   verifyPayment: mocks.verifyPayment,
 }));
@@ -26,9 +26,9 @@ const OTHER = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
 
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
-let tickets: typeof import("@/lib/support-tickets");
-let assistant: typeof import("@/lib/ai-support");
-let actions: typeof import("@/lib/ai-support/actions");
+let tickets: typeof import("@/lib/support/support-tickets");
+let assistant: typeof import("@/lib/support/ai-support");
+let actions: typeof import("@/lib/support/ai-support/actions");
 
 beforeAll(async () => {
   pg = new PGlite();
@@ -36,9 +36,9 @@ beforeAll(async () => {
   for (const file of files) await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
-  tickets = await import("@/lib/support-tickets");
-  assistant = await import("@/lib/ai-support");
-  actions = await import("@/lib/ai-support/actions");
+  tickets = await import("@/lib/support/support-tickets");
+  assistant = await import("@/lib/support/ai-support");
+  actions = await import("@/lib/support/ai-support/actions");
 }, 30_000);
 
 afterAll(async () => {

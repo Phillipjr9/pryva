@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/lib/platform/format";
 import { useToast } from "@/components/ui/Toast";
 import { Loader2, CheckCircle, XCircle, Clock, Filter } from "@/components/icons";
 

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it, vi } from "vitest";
-import { BUILD_ID, staleBuildScript } from "@/lib/build-id";
+import { BUILD_ID, staleBuildScript } from "@/lib/platform/build-id";
 
 /**
  * Exercises the guard the way a browser would: it runs the exact string the

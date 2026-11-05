@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authorizeAdminApi } from "@/lib/admin-auth";
-import { logger } from "@/lib/logger";
+import { authorizeAdminApi } from "@/lib/identity/admin-auth";
+import { logger } from "@/lib/platform/logger";
 import {
   getSmmBalance,
   isSmmPanelConfigured,
   listSmmServices,
   panelEndpoint,
   SmmPanelError,
-} from "@/lib/smm-panel";
-import { selectBoostServices } from "@/lib/smm-catalog";
-import { normalizeCurrency, smmMarkupPercent, smmUsdNgnRate } from "@/lib/smm-pricing";
+} from "@/lib/providers/smm-panel";
+import { selectBoostServices } from "@/lib/services/boosts/smm-catalog";
+import { normalizeCurrency, smmMarkupPercent, smmUsdNgnRate } from "@/lib/services/boosts/smm-pricing";
 
 export const dynamic = "force-dynamic";
 

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "@/components/icons";
-import { requireAdmin } from "@/lib/auth";
-import { isSmmPanelConfigured, panelEndpoint, SmmPanelError, smmPanelApiKey } from "@/lib/smm-panel";
-import { smmMarkupPercent, smmUsdNgnRate } from "@/lib/smm-pricing";
-import { boostingReadiness, readinessHeadline, type ReadinessStep } from "@/lib/boosting-readiness";
+import { requireAdmin } from "@/lib/identity/auth";
+import { isSmmPanelConfigured, panelEndpoint, SmmPanelError, smmPanelApiKey } from "@/lib/providers/smm-panel";
+import { smmMarkupPercent, smmUsdNgnRate } from "@/lib/services/boosts/smm-pricing";
+import { boostingReadiness, readinessHeadline, type ReadinessStep } from "@/lib/services/boosts/boosting-readiness";
 import { BoostingLiveCheck } from "./BoostingLiveCheck";
 
 export const metadata: Metadata = { title: "Boosting · Admin" };
@@ -87,7 +87,7 @@ export default async function AdminBoostingPage() {
         </ol>
         <p className="mt-3">
           The supplier&apos;s name, its service ids and its wholesale rates never reach a customer surface. Pricing
-          rules live in <code>src/lib/smm-pricing.ts</code>; the purchase flow in <code>src/lib/boost-orders.ts</code>.
+          rules live in <code>src/lib/services/boosts/smm-pricing.ts</code>; the purchase flow in <code>src/lib/services/boosts/boost-orders.ts</code>.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
           <Link href="/dashboard/services?category=social" className="btn btn-ghost !px-4 !py-2.5 !text-[0.8rem]">

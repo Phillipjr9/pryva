@@ -11,7 +11,7 @@ import {
   receiptStatusLabel,
   receiptStatusNote,
   receiptStatusTone,
-} from "@/lib/receipt";
+} from "@/lib/payments/receipt";
 
 /**
  * A receipt is a document, not a screen.

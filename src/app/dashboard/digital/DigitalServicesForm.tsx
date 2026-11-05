@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { type DigitalService } from "@/lib/digital-services";
-import { formatNaira } from "@/lib/catalog";
+import { type DigitalService } from "@/lib/services/digital/digital-services";
+import { formatNaira } from "@/lib/services/catalog";
 import { ServiceIcon } from "@/components/ServiceIcon";
-import type { PublicUser } from "@/lib/auth";
+import type { PublicUser } from "@/lib/identity/auth";
 
 interface DigitalServicesFormProps {
   user: PublicUser;

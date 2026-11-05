@@ -1,12 +1,12 @@
-import { financialActionsUnavailable, isVercelPreview } from "@/lib/financial-environment";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable, isVercelPreview } from "@/lib/platform/financial-environment";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthApi } from "@/lib/auth";
-import { createScheduledOrder, getUserScheduledOrders, pauseScheduledOrder, resumeScheduledOrder, cancelScheduledOrder, type Frequency } from "@/lib/scheduled-orders";
-import { findPlan } from "@/lib/catalog";
-import { isSameOriginMutation } from "@/lib/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { createScheduledOrder, getUserScheduledOrders, pauseScheduledOrder, resumeScheduledOrder, cancelScheduledOrder, type Frequency } from "@/lib/services/scheduled-orders";
+import { findPlan } from "@/lib/services/catalog";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
 
 export const dynamic = "force-dynamic";
 

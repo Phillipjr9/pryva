@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateCode } from "@/lib/gift-cards";
+import { generateCode } from "@/lib/services/gift-cards/credit";
 
 describe("Gift Cards Extended", () => {
   describe("generateCode edge cases", () => {

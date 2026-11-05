@@ -8,8 +8,8 @@ import {
   WALLET_DEBIT_TYPES,
   type WalletEntryType,
 } from "@/db/schema";
-import { walletEntryDirection, walletEntrySign } from "@/lib/wallet-activity";
-import { requireAdmin } from "@/lib/auth";
+import { walletEntryDirection, walletEntrySign } from "@/lib/payments/wallet-activity";
+import { requireAdmin } from "@/lib/identity/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
  * The balance column is shown deliberately. A transaction list tells you what
  * moved; the running balance tells you whether the arithmetic still holds, which
  * is what the nightly close checks across every account
- * (`src/lib/daily-reconciliation.ts`).
+ * (`src/lib/payments/daily-reconciliation.ts`).
  *
  * Direction is never decided from the type word here. This page used to render
  * anything that was not literally `debit` with a green plus, so a payout — money

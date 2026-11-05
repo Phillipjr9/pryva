@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isArenaPreviewHost, isSameOriginMutation, requestProto } from "@/lib/net";
+import { isArenaPreviewHost, isSameOriginMutation, requestProto } from "@/lib/platform/net";
 
 afterEach(() => vi.unstubAllEnvs());
 

@@ -20,19 +20,19 @@ const runtime = vi.hoisted(() => ({
   listings: [] as Record<string, unknown>[],
 }));
 
-vi.mock("@/lib/logger", () => ({
+vi.mock("@/lib/platform/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
-vi.mock("@/lib/marketplace-pricing", () => ({
+vi.mock("@/lib/services/accounts/marketplace-pricing", () => ({
   priceMarketplaceListing: async () => ({ unitNgn: 4750, totalNgn: 4750, discountNgn: 0, profitNgn: 1200 }),
 }));
-vi.mock("@/lib/marketplace-policy", () => ({
+vi.mock("@/lib/services/accounts/marketplace-policy", () => ({
   isMarketplaceCheckoutConfigured: () => runtime.checkoutEnabled,
 }));
-vi.mock("@/lib/manual-fulfilment", () => ({
+vi.mock("@/lib/services/accounts/manual-fulfilment", () => ({
   isManualFulfilmentReachable: async () => runtime.manualReachable,
 }));
-vi.mock("@/lib/marketplace-suppliers", () => {
+vi.mock("@/lib/services/accounts/marketplace-suppliers", () => {
   class MarketplaceError extends Error {
     constructor(message: string, public code: string, public status: number) {
       super(message);

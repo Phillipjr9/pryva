@@ -14,7 +14,7 @@ import {
   resolveFoxreloadProductId,
   resetFoxreloadRateBudget,
   FoxreloadError,
-} from "@/lib/foxreload";
+} from "@/lib/providers/foxreload";
 
 describe("FoxReload client", () => {
   const originalEnv = process.env.FOXRELOAD_API_KEY;

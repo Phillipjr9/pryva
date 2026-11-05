@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { formatNaira } from "@/lib/catalog";
-import type { EsimCatalogueItem } from "@/lib/esim-catalog";
+import { formatNaira } from "@/lib/services/catalog";
+import type { EsimCatalogueItem } from "@/lib/services/esim/esim-catalog";
 
 const PAGE = 24;
 

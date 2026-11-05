@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { confirmEmailChange } from "@/lib/email-change";
-import { isSameOriginMutation } from "@/lib/net";
-import { authRateLimiter } from "@/lib/rate-limit";
-import { sendSecurityNotice } from "@/lib/security-notice";
+import { confirmEmailChange } from "@/lib/identity/email-change";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { authRateLimiter } from "@/lib/platform/rate-limit";
+import { sendSecurityNotice } from "@/lib/platform/security-notice";
 
 export const dynamic = "force-dynamic";
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
-import { listReviewsForModeration } from "@/lib/reviews";
+import { requireAdmin } from "@/lib/identity/auth";
+import { listReviewsForModeration } from "@/lib/content/reviews";
 import { ModerationQueue } from "./ModerationQueue";
 
 export const dynamic = "force-dynamic";

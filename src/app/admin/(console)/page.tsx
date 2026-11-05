@@ -3,7 +3,7 @@ import Link from "next/link";
 import { and, count, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { contactMessages, orders, payoutNameApprovals, supportTickets, withdrawals } from "@/db/schema";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/identity/auth";
 import { ArrowRight } from "@/components/icons";
 
 export const dynamic = "force-dynamic";

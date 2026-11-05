@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { BulkaccProduct } from "@/lib/bulkacc";
-import type { FleexaRentArea, FleexaSmsService } from "@/lib/fleexa";
-import { plans } from "@/lib/catalog";
-import { fulfilmentIntent } from "@/lib/fulfillment";
-import type { SmmService } from "@/lib/smm-panel";
+import type { BulkaccProduct } from "@/lib/providers/bulkacc";
+import type { FleexaRentArea, FleexaSmsService } from "@/lib/providers/fleexa";
+import { plans } from "@/lib/services/catalog";
+import { fulfilmentIntent } from "@/lib/services/fulfillment";
+import type { SmmService } from "@/lib/providers/smm-panel";
 import {
   accountProductLines,
   boostLines,
@@ -12,7 +12,7 @@ import {
   numberPlanLines,
   rentalPlanLines,
   summariseLane,
-} from "@/lib/stock-report";
+} from "@/lib/admin/stock-report";
 
 /**
  * What the stock page is allowed to claim.

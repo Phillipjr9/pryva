@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSafePaystackCheckoutUrl } from "@/lib/paystack-checkout";
+import { isSafePaystackCheckoutUrl } from "@/lib/payments/paystack-checkout";
 
 describe("Paystack checkout destinations", () => {
   it("allows only HTTPS URLs on the documented checkout host", () => {

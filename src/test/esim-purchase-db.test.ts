@@ -14,18 +14,26 @@ const mocks = vi.hoisted(() => ({
   purchase: vi.fn(),
 }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/auth", () => ({ getCurrentUser: async () => ({ id: "11111111-1111-4111-8111-111111111111", walletBalance: 50_000 }) }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => false }));
-vi.mock("@/lib/net", () => ({ isSameOriginMutation: () => true }));
-vi.mock("@/lib/rate-limit", () => ({ purchaseRateLimiter: async () => ({ allowed: true }) }));
-vi.mock("@/lib/fraud", () => ({ purchaseVelocity: async () => ({ allowed: true }), recordFraudEvent: vi.fn() }));
-vi.mock("@/lib/esim-catalog", () => ({ findEsimOffer: async () => offer(), recheckEsimOffer: mocks.recheck, esimOfferTerms: () => "a".repeat(24) }));
-vi.mock("@/lib/esim-fulfilment", () => ({ purchaseEsim: mocks.purchase }));
-vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
-vi.mock("@/lib/referrals", () => ({ settleReferralRewards: async () => ({ credited: 0 }) }));
-vi.mock("@/lib/admin-auth", () => ({ authorizeAdminApi: async () => ({ user: { id: "admin" }, response: null }) }));
-vi.mock("@/lib/admin-audit", () => ({ recordAdminAction: async () => undefined }));
-vi.mock("@/lib/reconciliation", () => ({ flagReconciliation: async () => undefined }));
+vi.mock("@/lib/identity/auth", () => ({
+  getCurrentUser: async () => ({ id: "11111111-1111-4111-8111-111111111111", walletBalance: 50_000 }),
+  requireAuthApi: async () => ({ id: "11111111-1111-4111-8111-111111111111", walletBalance: 50_000 }),
+}));
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => false }));
+vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => true }));
+vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
+  // Keep the real module: other limiters are constructed when a route imports
+  // a money module, and a factory that omits them fails at import time.
+  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
+  return { ...actual, purchaseRateLimiter: async () => ({ allowed: true }) };
+});
+vi.mock("@/lib/admin/fraud", () => ({ purchaseVelocity: async () => ({ allowed: true }), recordFraudEvent: vi.fn() }));
+vi.mock("@/lib/services/esim/esim-catalog", () => ({ findEsimOffer: async () => offer(), recheckEsimOffer: mocks.recheck, esimOfferTerms: () => "a".repeat(24) }));
+vi.mock("@/lib/services/esim/esim-fulfilment", () => ({ purchaseEsim: mocks.purchase }));
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
+vi.mock("@/lib/content/referrals", () => ({ settleReferralRewards: async () => ({ credited: 0 }) }));
+vi.mock("@/lib/identity/admin-auth", () => ({ authorizeAdminApi: async () => ({ user: { id: "admin" }, response: null }) }));
+vi.mock("@/lib/admin/admin-audit", () => ({ recordAdminAction: async () => undefined }));
+vi.mock("@/lib/services/reconciliation", () => ({ flagReconciliation: async () => undefined }));
 
 const USER = "11111111-1111-4111-8111-111111111111";
 let pg: PGlite;

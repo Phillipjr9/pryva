@@ -1,15 +1,11 @@
 import Link from "next/link";
 import { and, count, inArray, lt, sql } from "drizzle-orm";
 
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/identity/auth";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
-import { isFleexaConfigured } from "@/lib/fleexa";
-import { isSmmPanelConfigured } from "@/lib/smm-panel";
-import { isBitcallConfigured } from "@/lib/bitcall";
-import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
-import { isManualFulfilmentReachable } from "@/lib/manual-fulfilment";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { isManualFulfilmentReachable } from "@/lib/services/accounts/manual-fulfilment";
+import { laneConfigured } from "@/lib/services/service-config";
 import {
   NOT_FOR_SALE,
   SERVICE_LANES,
@@ -18,7 +14,7 @@ import {
   type LaneId,
   type LaneHealth,
   type OrderTally,
-} from "@/lib/service-coverage";
+} from "@/lib/services/service-coverage";
 
 export const dynamic = "force-dynamic";
 
@@ -34,28 +30,6 @@ export const dynamic = "force-dynamic";
  * It does not call any supplier. A live call would tell you what the supplier
  * says about itself; this page tells you what happened to customers.
  */
-
-function configuredFor(id: LaneId): boolean {
-  switch (id) {
-    // The one that is not an env var: purchases are refused outright on the
-    // preview database, so the lane is genuinely closed there.
-    case "scheduled":
-      return isPreviewDatabase();
-    case "numbers":
-      return isFleexaConfigured();
-    case "boosts":
-      return isSmmPanelConfigured();
-    case "esim":
-      // Same gateway as numbers, but a different product with its own order
-      // path; "configured" is genuinely the key, because the catalogue is read
-      // from the supplier on every request.
-      return isBitcallConfigured();
-    case "accounts":
-      return isMarketplaceCheckoutConfigured();
-    default:
-      return false;
-  }
-}
 
 const VERDICT_STYLES: Record<LaneHealth["verdict"], { chip: string; label: string }> = {
   delivering: { chip: "bg-emerald-50 text-emerald-700", label: "Delivering" },
@@ -122,7 +96,7 @@ export default async function AdminServicesPage() {
       spec,
       tallies,
       stale: staleByLane.get(spec.id) ?? 0,
-      configured: configuredFor(spec.id),
+      configured: laneConfigured(spec.id),
       now,
     }),
   );
@@ -241,6 +215,11 @@ export default async function AdminServicesPage() {
             the ledger
           </Link>
           , not in the orders table.
+        </p>
+        <p className="mt-2 text-[0.84rem] text-ink-2">
+          Scheduled purchases are not a lane either: a run buys the same plan a manual order buys and
+          writes the same supplier, so its outcome is counted inside the lane that sold it. A lane of
+          its own would read &quot;nothing has ever been bought&quot; forever while the runs delivered.
         </p>
         <p className="mt-2 text-[0.84rem] text-ink-2">
           Hand-prepared fulfilment is{" "}

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { recordAdminAction } from "@/lib/admin-audit";
-import { authorizeAdminApi } from "@/lib/admin-auth";
-import { isSupportPriority, isSupportStatus } from "@/lib/ai-support/types";
-import { logger } from "@/lib/logger";
-import { isSameOriginMutation } from "@/lib/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { addAdminMessage, getTicket, setTicketState } from "@/lib/support-tickets";
-import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
+import { recordAdminAction } from "@/lib/admin/admin-audit";
+import { authorizeAdminApi } from "@/lib/identity/admin-auth";
+import { isSupportPriority, isSupportStatus } from "@/lib/support/ai-support/types";
+import { logger } from "@/lib/platform/logger";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { addAdminMessage, getTicket, setTicketState } from "@/lib/support/support-tickets";
+import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
 
 export const dynamic = "force-dynamic";
 

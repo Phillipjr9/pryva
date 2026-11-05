@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthApi } from "@/lib/auth";
-import { isPaystackConfigured, getBanks } from "@/lib/paystack";
-import { FALLBACK_BANKS, type Bank } from "@/lib/banks";
-import { logger } from "@/lib/logger";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { isPaystackConfigured, getBanks } from "@/lib/payments/paystack";
+import { FALLBACK_BANKS, type Bank } from "@/lib/payments/banks";
+import { logger } from "@/lib/platform/logger";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
 
 export const dynamic = "force-dynamic";
 

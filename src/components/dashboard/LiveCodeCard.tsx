@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Clock, Copy } from "@/components/icons";
 import { CountryFlag } from "@/components/CountryFlag";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira } from "@/lib/services/catalog";
 
 export type LiveCode = {
   id: string;

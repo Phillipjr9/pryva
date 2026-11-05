@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { requireAuthApi } from "@/lib/auth";
-import { listCredentialSummaries } from "@/lib/passkeys";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { listCredentialSummaries } from "@/lib/identity/passkeys";
 
 export const dynamic = "force-dynamic";
 

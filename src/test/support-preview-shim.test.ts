@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { persistentDatabaseConfigured } from "@/lib/database-config";
+import { persistentDatabaseConfigured } from "@/lib/platform/database-config";
 
 /**
  * Support in the preview, where there is no database at all.
@@ -18,8 +18,8 @@ const previewOnly = persistentDatabaseConfigured() ? it.skip : it;
 
 describe("support works in the preview too", () => {
   previewOnly("opens, reads back, and replies without a database", async () => {
-    const { createTicket, getTicketForUser, getThread, listTicketsForUser } = await import("@/lib/support-tickets");
-    const { respondToTicket } = await import("@/lib/ai-support");
+    const { createTicket, getTicketForUser, getThread, listTicketsForUser } = await import("@/lib/support/support-tickets");
+    const { respondToTicket } = await import("@/lib/support/ai-support");
     const { db } = await import("@/db");
     const { users } = await import("@/db/schema");
 
@@ -56,7 +56,7 @@ describe("support works in the preview too", () => {
   }, 20_000);
 
   previewOnly("never pretends it can reach the payment provider from the preview", async () => {
-    const { loadSupportFacts, runSupportRemedy } = await import("@/lib/ai-support");
+    const { loadSupportFacts, runSupportRemedy } = await import("@/lib/support/ai-support");
     const { db } = await import("@/db");
     const { users } = await import("@/db/schema");
 

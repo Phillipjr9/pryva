@@ -5,7 +5,7 @@ import nextConfig from "../../next.config";
 import {
   contentSecurityPolicy,
   isEmbeddedPreviewHost,
-} from "@/lib/security-headers";
+} from "@/lib/platform/security-headers";
 
 /**
  * A Content-Security-Policy is only useful if it matches what the app actually

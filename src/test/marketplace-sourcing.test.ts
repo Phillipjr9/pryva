@@ -21,10 +21,10 @@ const runtime = vi.hoisted(() => ({
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => runtime.preview }));
-vi.mock("@/lib/logger", () => ({ logger: runtime.log }));
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => runtime.preview }));
+vi.mock("@/lib/platform/logger", () => ({ logger: runtime.log }));
 
-vi.mock("@/lib/bulkacc", () => {
+vi.mock("@/lib/providers/bulkacc", () => {
   class BulkaccError extends Error {
     constructor(message: string, public code: string, public status: number) {
       super(message);
@@ -66,7 +66,7 @@ vi.mock("@/lib/bulkacc", () => {
   };
 });
 
-vi.mock("@/lib/accszone", () => {
+vi.mock("@/lib/providers/accszone", () => {
   class AccsZoneError extends Error {
     constructor(message: string, public code: string, public status: number) {
       super(message);
@@ -113,8 +113,8 @@ import {
   parseListingSlug,
   purchaseMarketplaceListing,
   supportsPromoCodes,
-} from "@/lib/marketplace-suppliers";
-import { availableManualProducts, clearManualCatalogCache, getManualProduct, manualWarrantyDays } from "@/lib/manual-catalog";
+} from "@/lib/services/accounts/marketplace-suppliers";
+import { availableManualProducts, clearManualCatalogCache, getManualProduct, manualWarrantyDays } from "@/lib/services/accounts/manual-catalog";
 import { readFileSync } from "node:fs";
 
 /** Every string a customer could receive, from every source at once. */

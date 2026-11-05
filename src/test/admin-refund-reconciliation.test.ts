@@ -8,13 +8,13 @@ const mocks = vi.hoisted(() => ({
   scheduleWalletEmails: vi.fn(),
 }));
 
-vi.mock("@/lib/admin-auth", () => ({
+vi.mock("@/lib/identity/admin-auth", () => ({
   authorizeAdminApi: vi.fn(async () => ({ user: { id: "admin-1" }, response: null })),
 }));
 vi.mock("@/db", () => ({ db: { select: vi.fn(), transaction: mocks.transaction } }));
-vi.mock("@/lib/reconciliation", () => ({ flagReconciliation: mocks.flagReconciliation }));
-vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.scheduleWalletEmails }));
-vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() } }));
+vi.mock("@/lib/services/reconciliation", () => ({ flagReconciliation: mocks.flagReconciliation }));
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.scheduleWalletEmails }));
+vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() } }));
 
 const { POST } = await import("@/app/api/admin/refunds/route");
 

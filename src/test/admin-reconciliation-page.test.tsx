@@ -15,8 +15,8 @@ import { orders, paymentTopups, withdrawals } from "@/db/schema";
  *   * it says plainly that nothing resolves itself.
  */
 
-vi.mock("@/lib/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/auth")>();
+vi.mock("@/lib/identity/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/identity/auth")>();
   return {
     ...actual,
     requireAdmin: vi.fn().mockResolvedValue({

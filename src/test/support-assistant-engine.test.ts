@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { runSupportEngine, scoreAll } from "@/lib/ai-support/engine";
-import { PLAYBOOKS } from "@/lib/ai-support/knowledge";
+import { runSupportEngine, scoreAll } from "@/lib/support/ai-support/engine";
+import { PLAYBOOKS } from "@/lib/support/ai-support/knowledge";
 import type {
   ActionOutcome,
   RemedyId,
   RemedyTarget,
   SupportFacts,
-} from "@/lib/ai-support/types";
+} from "@/lib/support/ai-support/types";
 
 const NOW = new Date("2026-10-30T12:00:00.000Z");
 const minutesAgo = (minutes: number) => new Date(NOW.getTime() - minutes * 60_000);

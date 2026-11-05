@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { BRAND_MARKS } from "@/lib/brand-marks";
-import { SOCIAL_LINKS, socialHref, socialIsPlaceholder, socialLabel } from "@/lib/social";
+import { BRAND_MARKS } from "@/lib/content/brand-marks";
+import { SOCIAL_LINKS, socialHref, socialIsPlaceholder, socialLabel } from "@/lib/content/social";
 
 const footer = readFileSync("src/components/site/SiteFooter.tsx", "utf8");
-const social = readFileSync("src/lib/social.ts", "utf8");
+const social = readFileSync("src/lib/content/social.ts", "utf8");
 
 describe("social links", () => {
   it("offers the platforms the owner asked for", () => {

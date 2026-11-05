@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { googleAuthorizeUrl, googleConfigured, makeState } from "@/lib/google";
-import { signState } from "@/lib/google-state";
-import { safeRedirectPath } from "@/lib/safe-redirect";
-import { publicOrigin, requestProto } from "@/lib/net";
+import { googleAuthorizeUrl, googleConfigured, makeState } from "@/lib/identity/google";
+import { signState } from "@/lib/identity/google-state";
+import { safeRedirectPath } from "@/lib/platform/safe-redirect";
+import { publicOrigin, requestProto } from "@/lib/platform/net";
 
 export const dynamic = "force-dynamic";
 

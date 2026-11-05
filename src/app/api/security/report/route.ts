@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { logger } from "@/lib/logger";
-import { requireAuthApi } from "@/lib/auth";
-import { clientIp } from "@/lib/auth-rate-limit";
-import { securityReportRateLimiter } from "@/lib/rate-limit";
-import { isSameOriginMutation, publicOrigin } from "@/lib/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { logger } from "@/lib/platform/logger";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { clientIp } from "@/lib/identity/auth-rate-limit";
+import { securityReportRateLimiter } from "@/lib/platform/rate-limit";
+import { isSameOriginMutation, publicOrigin } from "@/lib/platform/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 import { db } from "@/db";
 import { securityViolations } from "@/db/schema";
 
