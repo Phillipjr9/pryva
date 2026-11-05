@@ -35,10 +35,16 @@ migrations, including 0032, 0033 and 0034 where applicable. Migration 0034
 preserves pre-existing closed-account snapshots, email-change requests and
 passkeys; the current worker skips their queued email. Those historical records
 may still contain sensitive data and need a separately authorized privacy review.
-The older worker does not have the new skip rule and could still process an old
-queued message during a mixed-version rollout; coordinate the scheduler with the
-owner before production promotion. The migration rejects late passkey or
-email-change inserts for closed owners, including from an old app instance. During mixed-version rollout, an old passkey removal concurrent with
+An earlier version of 0034 was applied by the production deployment on 5 November
+2026, and included deletes of those closed-account rows. The build log confirms
+application but does not report affected counts. Editing the file neither restores
+records nor causes the filename-based ledger to re-run it. Any investigation or
+restoration must be separately authorized; do not restore data blindly.
+
+Older workers lack the new skip rule and can claim or update historical jobs; some
+older versions may not check for closure before sending. Coordinate the scheduler
+with the owner during a mixed-version rollout. The migration rejects late passkey
+or email-change inserts for closed owners, including from an old app instance. During mixed-version rollout, an old passkey removal concurrent with
 closure can deadlock; PostgreSQL aborts one transaction, which should be retried
 after checking its result. Verify the backup and schema before allowing traffic.
 Never manually replay historical migrations or the legacy directory against an
