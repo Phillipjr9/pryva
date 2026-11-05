@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { REMEDY_IDS, SUPPORT_STATUSES } from "@/lib/ai-support/types";
+import { REMEDY_IDS, SUPPORT_STATUSES } from "@/lib/support/ai-support/types";
 
 const read = (path: string) => readFileSync(path, "utf8");
 
@@ -22,7 +22,7 @@ describe("the assistant's capabilities are a closed list", () => {
   });
 
   it("cannot reach money, payouts or account privilege", () => {
-    const actions = read("src/lib/ai-support/actions.ts");
+    const actions = read("src/lib/support/ai-support/actions.ts");
     for (const forbidden of [
       "creditWallet",
       "debitWallet",
@@ -42,12 +42,12 @@ describe("the assistant's capabilities are a closed list", () => {
   });
 
   it("keeps every decision out of the language model", () => {
-    const model = read("src/lib/ai-support/model.ts");
+    const model = read("src/lib/support/ai-support/model.ts");
     // The model rewrites prose. It is never asked what to do.
     expect(model).toContain("polishSupportReply");
     expect(model).not.toContain("runRemedy");
     expect(model).not.toContain("remedy");
-    const index = read("src/lib/ai-support/index.ts");
+    const index = read("src/lib/support/ai-support/index.ts");
     // And an escalated reply is never re-worded, so the hand-over sentence is
     // exactly the one the engine wrote.
     expect(index).toContain('result.outcome === "escalated" ? null : await polishSupportReply');
@@ -115,7 +115,7 @@ describe("support surfaces are scoped to the account", () => {
     // A status the dashboard cannot label would render as a raw database string.
     const pill = read("src/components/support/SupportStatusPill.tsx");
     for (const status of SUPPORT_STATUSES) {
-      expect(read("src/lib/ai-support/types.ts")).toContain(status);
+      expect(read("src/lib/support/ai-support/types.ts")).toContain(status);
       expect(pill).toContain(status);
     }
   });

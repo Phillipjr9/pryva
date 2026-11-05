@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import * as schema from "@/db/schema";
-import { customerWelcomeEmail, emailVerifiedEmail, emailVerificationEmail, passwordResetEmail } from "@/lib/email-templates";
+import { customerWelcomeEmail, emailVerifiedEmail, emailVerificationEmail, passwordResetEmail } from "@/lib/email/email-templates";
 
 /**
  * The receipt for the click, and the welcome.
@@ -31,8 +31,8 @@ vi.mock("next/server", () => ({
 }));
 vi.mock("server-only", () => ({}));
 
-import { sendOnboardingEmails, backfillOnboardingEmails } from "@/lib/onboarding-emails";
-import { emailQueueStatus } from "@/lib/email-delivery-events";
+import { sendOnboardingEmails, backfillOnboardingEmails } from "@/lib/email/onboarding-emails";
+import { emailQueueStatus } from "@/lib/email/email-delivery-events";
 
 const USER = "b1a6f0e2-3c4d-4e5f-8a9b-0c1d2e3f4a5b";
 let pg: PGlite;

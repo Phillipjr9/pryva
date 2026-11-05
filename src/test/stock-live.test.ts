@@ -13,6 +13,8 @@ const state = vi.hoisted(() => ({
   bulkacc: true,
   smm: true,
   bitcall: true,
+  esim: null as unknown,
+  esimError: null as string | null,
   snapshot: null as unknown,
   snapshotError: null as string | null,
   boost: null as unknown,
@@ -23,20 +25,20 @@ const state = vi.hoisted(() => ({
   accszone: false,
 }));
 
-vi.mock("@/lib/fleexa", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/fleexa")>();
+vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/fleexa")>();
   return { ...actual, isFleexaConfigured: () => state.fleexa };
 });
 
-vi.mock("@/lib/fleexa-catalog", () => ({
+vi.mock("@/lib/services/numbers/fleexa-catalog", () => ({
   readSupplierSnapshot: async () => {
     if (state.snapshotError) throw new Error(state.snapshotError);
     return state.snapshot;
   },
 }));
 
-vi.mock("@/lib/bulkacc", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/bulkacc")>();
+vi.mock("@/lib/providers/bulkacc", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/bulkacc")>();
   return {
     ...actual,
     isBulkaccConfigured: () => state.bulkacc,
@@ -47,13 +49,13 @@ vi.mock("@/lib/bulkacc", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/smm-panel", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/smm-panel")>();
+vi.mock("@/lib/providers/smm-panel", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/smm-panel")>();
   return { ...actual, isSmmPanelConfigured: () => state.smm };
 });
 
-vi.mock("@/lib/smm-catalog", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/smm-catalog")>();
+vi.mock("@/lib/services/boosts/smm-catalog", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/boosts/smm-catalog")>();
   return {
     ...actual,
     readBoostSnapshot: async () => {
@@ -63,20 +65,27 @@ vi.mock("@/lib/smm-catalog", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/bitcall", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/bitcall")>();
+vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/bitcall")>();
   return { ...actual, isBitcallConfigured: () => state.bitcall };
 });
 
-vi.mock("@/lib/accszone", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/accszone")>();
+vi.mock("@/lib/services/esim/esim-catalog", () => ({
+  readEsimCatalog: async () => {
+    if (state.esimError) throw new Error(state.esimError);
+    return state.esim;
+  },
+}));
+
+vi.mock("@/lib/providers/accszone", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/accszone")>();
   return { ...actual, isAccsZoneConfigured: () => state.accszone };
 });
 
-vi.mock("@/lib/manual-catalog", () => ({ availableManualProducts: () => Array(state.manual).fill({}) }));
+vi.mock("@/lib/services/accounts/manual-catalog", () => ({ availableManualProducts: () => Array(state.manual).fill({}) }));
 
-import { buildStockReport } from "@/lib/stock-live";
-import { laneHeadline } from "@/lib/stock-report";
+import { buildStockReport } from "@/lib/admin/stock-live";
+import { laneHeadline } from "@/lib/admin/stock-report";
 
 function snapshot() {
   return {
@@ -84,6 +93,8 @@ function snapshot() {
     email: [{ id: "e1", name: "Gmail inbox", domain: "gmail.com", priceNgn: 500, stock: 3 }],
     rentals: [{ id: "r1", country: "ng", pricePerMonthNgn: 20_000, stock: 2 }],
     partial: false,
+    failedFeeds: [],
+    truncatedFeeds: [],
     fetchedAt: new Date().toISOString(),
   };
 }
@@ -117,6 +128,14 @@ beforeEach(() => {
   state.bulkacc = true;
   state.smm = true;
   state.bitcall = true;
+  state.esim = {
+    listings: [
+      { id: "esim-priced", name: "Nigeria 1 GB", priceNgn: 2500, purchasable: true },
+      { id: "esim-unpriced", name: "Nigeria 2 GB", priceNgn: null, purchasable: false },
+    ],
+    partial: false,
+  };
+  state.esimError = null;
   state.snapshot = snapshot();
   state.snapshotError = null;
   state.boost = boostSnapshot();
@@ -185,7 +204,44 @@ describe("the stock report", () => {
     }
   });
 
-  it("stops reporting email inboxes as stock once the feed stops answering", async () => {
+  it("does not turn an endpoint failure into a claim that every number is unlisted", async () => {
+    state.snapshot = { ...snapshot(), sms: [], partial: true, failedFeeds: ["sms"] };
+    const { lanes } = await buildStockReport();
+    expect(lanes.find((lane) => lane.lane === "numbers")).toMatchObject({
+      connected: false, lines: [], error: "number feed did not answer",
+    });
+    expect(lanes.find((lane) => lane.lane === "rentals")?.connected).toBe(true);
+  });
+
+  it("cannot infer a missing destination from a truncated feed sample", async () => {
+    state.snapshot = { ...snapshot(), partial: true, truncatedFeeds: ["sms"] };
+    const { lanes } = await buildStockReport();
+    const numbers = lanes.find((lane) => lane.lane === "numbers")!;
+    const other = numbers.lines.find((line) => line.id !== "vn-ng")!;
+    expect(other).toMatchObject({ state: "unknown", stock: null });
+    expect(other.note).toMatch(/incomplete/);
+    expect(numbers.error).toMatch(/sample is incomplete/);
+  });
+
+  it("keeps a boost balance failure and a capped catalog sample apart", async () => {
+    // A missing balance says the account currency may be unknown; a capped
+    // catalog says the sample is incomplete. Neither is an outage, and the
+    // admin note must say which one happened.
+    state.boost = { ...boostSnapshot(), balanceUnavailable: true, partial: true, degraded: "truncated" };
+    const { lanes } = await buildStockReport();
+    const boosts = lanes.find((lane) => lane.lane === "boosts")!;
+    expect(boosts.connected).toBe(true);
+    expect(boosts.error).toContain("balance did not answer");
+    expect(boosts.error).toContain("catalog sample is incomplete");
+
+    state.boost = { ...boostSnapshot(), balanceUnavailable: true, partial: false, degraded: null };
+    const again = await buildStockReport();
+    const lane = again.lanes.find((entry) => entry.lane === "boosts")!;
+    expect(lane.error).toContain("balance did not answer");
+    expect(lane.error).not.toContain("incomplete");
+  });
+
+  it("reports an actually empty email feed without inventing inboxes", async () => {
     state.snapshot = { ...snapshot(), email: [] };
     const { lanes } = await buildStockReport();
     const email = lanes.find((lane) => lane.lane === "email-otp")!;
@@ -209,11 +265,22 @@ describe("the stock report", () => {
     expect(line?.note).toMatch(/not the active source/i);
   });
 
-  it("marks eSIM as connected but not sold, so it never counts as buyable", async () => {
+  it("reports live eSIM plans and leaves inventory unknown instead of claiming eSIM is not sold", async () => {
     const { lanes } = await buildStockReport();
     const esim = lanes.find((lane) => lane.lane === "esim")!;
     expect(esim.connected).toBe(true);
-    expect(esim.sellable).toBe(0);
-    expect(esim.lines[0].state).toBe("not-sold");
+    expect(esim.sellable).toBe(1);
+    expect(esim.lines).toMatchObject([
+      { state: "listed", stock: null },
+      { state: "unpriced", stock: null },
+    ]);
+    expect(esim.lines[0].note).toMatch(/inventory not reported/);
+  });
+
+  it("isolates an unavailable eSIM catalog from the other lanes", async () => {
+    state.esimError = "eSIM feed unavailable";
+    const { lanes } = await buildStockReport();
+    expect(lanes.find((lane) => lane.lane === "esim")).toMatchObject({ connected: false, error: "eSIM feed unavailable" });
+    expect(lanes.find((lane) => lane.lane === "accounts")?.connected).toBe(true);
   });
 });

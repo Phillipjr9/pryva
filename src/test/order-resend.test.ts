@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
+import { SINGLE_NUMBER_WINDOW } from "@/lib/services/refund-policy";
 
 /**
  * Asking for the code again.
@@ -13,8 +13,8 @@ import { SINGLE_NUMBER_WINDOW } from "@/lib/refund-policy";
  */
 const mocks = vi.hoisted(() => ({ resend: vi.fn(), user: vi.fn() }));
 
-vi.mock("@/lib/bitcall", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/bitcall")>();
+vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/bitcall")>();
   return {
     ...actual,
     isBitcallConfigured: () => true,
@@ -22,22 +22,22 @@ vi.mock("@/lib/bitcall", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/auth")>();
+vi.mock("@/lib/identity/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/identity/auth")>();
   return { ...actual, getCurrentUser: mocks.user };
 });
 
 let db: typeof import("@/db").db;
 let schema: typeof import("@/db/schema");
 let POST: typeof import("@/app/api/orders/[id]/resend/route").POST;
-let BitcallError: typeof import("@/lib/bitcall").BitcallError;
+let BitcallError: typeof import("@/lib/providers/bitcall").BitcallError;
 
 beforeAll(async () => {
   vi.stubEnv("DATABASE_URL", "");
   ({ db } = await import("@/db"));
   schema = await import("@/db/schema");
   ({ POST } = await import("@/app/api/orders/[id]/resend/route"));
-  ({ BitcallError } = await import("@/lib/bitcall"));
+  ({ BitcallError } = await import("@/lib/providers/bitcall"));
 });
 afterAll(() => vi.unstubAllEnvs());
 

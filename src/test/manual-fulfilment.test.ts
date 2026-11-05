@@ -16,11 +16,11 @@ import { eq } from "drizzle-orm";
 
 const mocks = vi.hoisted(() => ({ user: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
 
-vi.mock("@/lib/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/auth")>();
+vi.mock("@/lib/identity/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/identity/auth")>();
   return { ...actual, getCurrentUser: mocks.user };
 });
-vi.mock("@/lib/logger", () => ({ logger: { info: mocks.info, warn: mocks.warn, error: mocks.error } }));
+vi.mock("@/lib/platform/logger", () => ({ logger: { info: mocks.info, warn: mocks.warn, error: mocks.error } }));
 
 const ADMIN_EMAIL = "owner@pryva.test";
 const ORIGIN = "https://pryva.test";
@@ -65,7 +65,7 @@ const post = (body: unknown, json = true) => new NextRequest(`${ORIGIN}/api/admi
 async function makeOrder(overrides: Record<string, unknown> = {}) {
   const id = randomUUID();
   await database.db.insert(schema.orders).values({
-    id, userId: customerId, reference: `PRYVA-${id.slice(0, 8).toUpperCase()}`, service: "digital",
+    id, userId: customerId, reference: `PRYVA-${id.slice(0, 8).toUpperCase()}`, service: "accounts",
     productSlug: NETFLIX_SLUG, productName: "Netflix Standard (1080p)", planLabel: "3 × account",
     region: "Global", duration: "120 days", amount: 15000, status: "processing", provider: "manual",
     ...overrides,

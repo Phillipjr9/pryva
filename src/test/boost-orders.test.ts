@@ -6,6 +6,8 @@ import { eq, sql } from "drizzle-orm";
 
 import * as schema from "@/db/schema";
 import { orders, users, walletTransactions } from "@/db/schema";
+import { publicBoostQuote } from "@/lib/services/boosts/boost-quote";
+import { totalForQuantity } from "@/lib/services/boosts/boost-money";
 
 /**
  * Buying a boost spends wallet money against a supplier with no idempotency key
@@ -24,9 +26,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
-vi.mock("@/lib/smm-catalog", () => ({ findBoostListing: mocks.find }));
-vi.mock("@/lib/smm-panel", () => ({
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
+vi.mock("@/lib/services/boosts/smm-catalog", () => ({ findBoostListing: mocks.find }));
+vi.mock("@/lib/providers/smm-panel", () => ({
   isSmmPanelConfigured: () => true,
   addSmmOrder: mocks.add,
   SmmPanelError: class SmmPanelError extends Error {
@@ -42,7 +44,7 @@ const REQUEST = "22222222-2222-4222-8222-222222222222";
 
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
-let boost: typeof import("@/lib/boost-orders");
+let boost: typeof import("@/lib/services/boosts/boost-orders");
 
 const LISTING = {
   id: "live-boost-0123456789abcdef0123",
@@ -63,7 +65,7 @@ beforeAll(async () => {
   for (const file of files) await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
-  boost = await import("@/lib/boost-orders");
+  boost = await import("@/lib/services/boosts/boost-orders");
 }, 30_000);
 
 afterAll(async () => {
@@ -90,12 +92,15 @@ async function balance(): Promise<number> {
 }
 
 function place(overrides: Partial<Parameters<typeof boost.placeBoostOrder>[0]> = {}) {
+  const quantity = overrides.quantity ?? 1_000;
   return boost.placeBoostOrder({
     userId: USER,
     itemId: LISTING.id,
     link: "https://instagram.com/ada",
-    quantity: 1_000,
+    quantity,
     requestId: REQUEST,
+    expectedTotalNgn: totalForQuantity(LISTING.perThousand, quantity) || 1,
+    expectedTerms: publicBoostQuote(LISTING)!.terms,
     ...overrides,
   });
 }
@@ -197,7 +202,8 @@ describe("placing a boost", () => {
     mocks.add.mockRejectedValue(new Error("panel said no"));
     const result = await place();
     expect(result.kind).toBe("unavailable");
-    expect((result as { error: string }).error).toContain("nothing was charged");
+    expect((result as { error: string }).error).toContain("wallet has been refunded");
+    expect((result as { error: string }).error).toContain("before placing another order");
 
     expect(await balance()).toBe(25_000);
     const [order] = await database.select().from(orders).where(eq(orders.userId, USER));
@@ -210,21 +216,70 @@ describe("placing a boost", () => {
 
     // The receipt nudge used to ride along with the standalone credit. Once the
     // refund commits inside a transaction, somebody has to call it on purpose.
-    const { scheduleWalletEmails } = await import("@/lib/schedule-wallet-emails");
+    const { scheduleWalletEmails } = await import("@/lib/email/schedule-wallet-emails");
     expect(vi.mocked(scheduleWalletEmails)).toHaveBeenCalledTimes(1);
   });
 
-  it("never trusts a price the browser sends", async () => {
-    // The only price in play is the server's listing: there is no parameter for
-    // it, and a cheap listing still charges what the catalogue says.
+  it("charges the server price only when it matches the amount reviewed", async () => {
     const result = await place({ quantity: 100 });
     expect(result.kind).toBe("created");
     const [order] = await database.select().from(orders).where(eq(orders.userId, USER));
     expect(order.amount).toBe(150); // 100 units at ₦1,500 / 1,000
   });
 
+  it("requires a reviewed quote for a new order and rejects a tampered amount", async () => {
+    expect((await place({ expectedTotalNgn: undefined, expectedTerms: undefined })).kind).toBe("quote_required");
+    expect((await place({ expectedTotalNgn: 1 })).kind).toBe("quote_changed");
+    expect(await balance()).toBe(25_000);
+    expect(await database.select().from(orders)).toHaveLength(0);
+    expect(mocks.add).not.toHaveBeenCalled();
+  });
+
+  it("rechecks a changed price, requires another confirmation and charges the reviewed new total", async () => {
+    const updated = { ...LISTING, perThousand: 2_100 };
+    mocks.find.mockResolvedValue({ listing: updated, snapshot: {} });
+    const changed = await place();
+    expect(changed.kind).toBe("quote_changed");
+    if (changed.kind !== "quote_changed") throw new Error("expected a changed quote");
+    expect(changed.quote).toMatchObject({ perThousand: 2_100, min: 100, max: 50_000 });
+    expect(changed.quote).not.toHaveProperty("serviceId");
+    expect(changed.quote).not.toHaveProperty("currency");
+    expect(await balance()).toBe(25_000);
+    expect(await database.select().from(orders)).toHaveLength(0);
+    expect(mocks.add).not.toHaveBeenCalled();
+
+    const confirmed = await place({ expectedTotalNgn: 2_100, expectedTerms: changed.quote.terms });
+    expect(confirmed.kind).toBe("created");
+    expect(await balance()).toBe(22_900);
+    const [order] = await database.select().from(orders);
+    expect(order.amount).toBe(2_100);
+    expect(mocks.add).toHaveBeenCalledTimes(1);
+  });
+
+  it("also requests review when visible terms or quantity bounds change at the same price", async () => {
+    mocks.find.mockResolvedValue({ listing: { ...LISTING, name: "Instagram followers revised", min: 2_000 }, snapshot: {} });
+    const result = await place();
+    expect(result.kind).toBe("quote_changed");
+    expect(mocks.add).not.toHaveBeenCalled();
+    expect(await balance()).toBe(25_000);
+  });
+
+  it("replays an existing attempt even when configuration or price data is unavailable", async () => {
+    expect((await place()).kind).toBe("created");
+    const smm = await import("@/lib/providers/smm-panel");
+    const spy = vi.spyOn(smm, "isSmmPanelConfigured").mockReturnValue(false);
+    mocks.find.mockRejectedValue(new Error("catalog offline"));
+    try {
+      expect((await place({ expectedTotalNgn: undefined, expectedTerms: undefined })).kind).toBe("replay");
+      expect((await place({ link: "https://instagram.com/other" })).kind).toBe("request_conflict");
+      expect((await place({ quantity: 2_000 })).kind).toBe("request_conflict");
+      expect(mocks.add).toHaveBeenCalledTimes(1);
+      expect(await balance()).toBe(23_500);
+    } finally { spy.mockRestore(); }
+  });
+
   it("answers cleanly when nothing is configured to fulfil a boost", async () => {
-    const smm = await import("@/lib/smm-panel");
+    const smm = await import("@/lib/providers/smm-panel");
     const spy = vi.spyOn(smm, "isSmmPanelConfigured").mockReturnValue(false);
     const result = await place();
     expect(result.kind).toBe("disabled");
@@ -256,6 +311,9 @@ describe("placing a boost", () => {
       try {
         const result = await place();
         expect(result.kind).toBe("unavailable");
+        expect((result as { error: string }).error).toContain("couldn't confirm your boost or its refund");
+        expect((result as { error: string }).error).not.toContain("nothing was charged");
+        expect((result as { error: string }).error).not.toContain("has been refunded");
 
         const { order, moneyIsBack, balance: wallet } = await refundState();
         // Either the customer has the money and the order says so, or nothing
@@ -266,12 +324,42 @@ describe("placing a boost", () => {
         expect(moneyIsBack).toBe(order.refundedAt !== null);
         expect(order.status).toBe(moneyIsBack ? "refunded" : "processing");
         expect(wallet).toBe(moneyIsBack ? 25_000 : 23_500);
-        expect(order.reconciliationNote).toContain("automatic refund failed");
+        expect(order.reconciliationNote).toContain("automatic refund could not be confirmed");
         expect(state.fired).toBe(true);
       } finally {
         mocks.db = database;
       }
     });
+  });
+
+  it("does not overwrite a refund if its commit acknowledgement is lost", async () => {
+    let transactions = 0;
+    mocks.db = {
+      select: (...args: unknown[]) => (database.select as any)(...args),
+      insert: (...args: unknown[]) => (database.insert as any)(...args),
+      update: (...args: unknown[]) => (database.update as any)(...args),
+      transaction: async (callback: (tx: any) => Promise<unknown>) => {
+        transactions += 1;
+        const result = await database.transaction(callback);
+        if (transactions === 2) throw new Error("commit acknowledgement lost");
+        return result;
+      },
+    };
+    mocks.add.mockRejectedValue(new Error("supplier outcome unknown"));
+    try {
+      const result = await place();
+      expect(result.kind).toBe("unavailable");
+      expect((result as { error: string }).error).toContain("couldn't confirm your boost or its refund");
+      expect((result as { error: string }).error).not.toContain("has been refunded");
+      const { order, moneyIsBack, balance: wallet } = await refundState();
+      expect(moneyIsBack).toBe(true);
+      expect(order.status).toBe("refunded");
+      expect(order.refundedAt).not.toBeNull();
+      expect(order.reconciliationNote).not.toContain("automatic refund could not be confirmed");
+      expect(wallet).toBe(25_000);
+    } finally {
+      mocks.db = database;
+    }
   });
 
   it("refuses an unpriced listing rather than guessing", async () => {

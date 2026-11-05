@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const runtime = vi.hoisted(() => ({ limit: vi.fn() }));
-vi.mock("@/lib/rate-limit", () => ({ createRateLimiter: () => runtime.limit }));
+vi.mock("@/lib/platform/rate-limit", () => ({ createRateLimiter: () => runtime.limit }));
 
-import { buyFleexaEmail, buyFleexaRental, buyFleexaSmsNumber, listFleexaRentAreas, listFleexaSmsServices } from "@/lib/fleexa";
+import { buyFleexaEmail, buyFleexaRental, buyFleexaSmsNumber, listFleexaRentAreas, listFleexaSmsServices } from "@/lib/providers/fleexa";
 
 beforeEach(() => {
   vi.stubEnv("FLEEXA_API_KEY", "provider-secret");
@@ -61,6 +61,42 @@ describe("supplier client safety", () => {
     expect(url).toBe("https://fleexa.com.ng/developer/sms4/apps");
     expect(options.redirect).toBe("error");
     expect(options.headers).toMatchObject({ Authorization: "Bearer provider-secret" });
+  });
+
+  it("reports an unfunded account as a funding refusal, not an outage", async () => {
+    // Fleexa refuses an unfunded account in prose — sometimes even with a 200 and
+    // success:false. Both used to land as a generic 502, which is why an empty
+    // balance rendered as "catalogue unavailable, retry".
+    const refuse = (payload: unknown, status: number) => {
+      vi.stubGlobal("fetch", vi.fn().mockImplementation(() => new Response(JSON.stringify(payload), { status })));
+    };
+
+    refuse({ success: false, message: "Insufficient balance to complete this request" }, 200);
+    await expect(listFleexaSmsServices()).rejects.toMatchObject({ status: 402, code: "INSUFFICIENT_BALANCE" });
+
+    refuse({ message: "Not enough funds. provider-secret" }, 402);
+    const refusal = await listFleexaSmsServices().catch((error: unknown) => error) as Error;
+    expect(refusal).toMatchObject({ status: 402, code: "INSUFFICIENT_BALANCE" });
+    // Classified, never echoed: upstream text can carry the key or the balance.
+    expect(refusal.message).not.toMatch(/provider-secret|not enough funds/i);
+
+    // A credential complaint stays an outage even when it mentions a balance.
+    refuse({ success: false, message: "Invalid API key. Balance: 0" }, 200);
+    await expect(listFleexaSmsServices()).rejects.toMatchObject({ status: 502, code: "UPSTREAM_ERROR" });
+  });
+
+  it("preserves the app-specific quantity from the documented US-only response", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      success: true, data: [
+        { id: "telegram", name: "telegram", api_rate_usd: "0.35", quantity: 50 },
+        { id: "whatsapp", name: "whatsapp", api_rate_usd: "0.42", quantity: 0 },
+      ],
+    }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await listFleexaSmsServices()).toEqual([
+      { id: "telegram", name: "telegram", country: null, priceNgn: null, stock: 50 },
+      { id: "whatsapp", name: "whatsapp", country: null, priceNgn: null, stock: 0 },
+    ]);
   });
 
   it("handles nested listing shapes, explicit country codes and bounded, sanitized errors", async () => {

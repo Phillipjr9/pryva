@@ -18,11 +18,11 @@ const state = vi.hoisted(() => ({
   recentThrows: false,
 }));
 
-vi.mock("@/lib/diagnostics-auth", () => ({ diagnosticsAuthorized: () => state.authorized }));
-vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => state.preview }));
-vi.mock("@/lib/fleexa", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/fleexa")>();
+vi.mock("@/lib/admin/diagnostics-auth", () => ({ diagnosticsAuthorized: () => state.authorized }));
+vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => state.preview }));
+vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/fleexa")>();
   return {
     ...actual,
     isFleexaConfigured: () => state.configured,

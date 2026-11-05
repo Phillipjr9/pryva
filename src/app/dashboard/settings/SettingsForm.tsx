@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check, Loader2, Lock, Mail, Shield, User } from "@/components/icons";
-import type { PublicUser } from "@/lib/auth";
+import type { PublicUser } from "@/lib/identity/auth";
 import { AccountDataPanel } from "./AccountDataPanel";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { ProfileAvatar } from "@/components/dashboard/ProfileAvatar";
@@ -93,12 +93,15 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-      const data = await response.json();
+      const data = (await response.json()) as { ok?: boolean; error?: string };
 
-      if (!response.ok || !data.ok) throw new Error(data.error || "Failed to update profile");
+      if (!response.ok || !data.ok) {
+        setError(response.status < 500 && typeof data.error === "string" ? data.error : "We couldn't confirm the profile update. Check your settings before trying again.");
+        return;
+      }
       setSuccess("Profile updated");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update profile");
+    } catch {
+      setError("We couldn't confirm the profile update. Check your settings before trying again.");
     } finally {
       setSavingProfile(false);
     }
@@ -124,15 +127,18 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPassword, newPassword }),
       });
-      const data = await response.json();
+      const data = (await response.json()) as { ok?: boolean; error?: string };
 
-      if (!response.ok || !data.ok) throw new Error(data.error || "Failed to change password");
+      if (!response.ok || !data.ok) {
+        setError(response.status < 500 && typeof data.error === "string" ? data.error : "We couldn't confirm whether your password changed. Check your account before trying again.");
+        return;
+      }
       setSuccess("Password changed");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to change password");
+    } catch {
+      setError("We couldn't confirm whether your password changed. Check your account before trying again.");
     } finally {
       setSavingPassword(false);
     }

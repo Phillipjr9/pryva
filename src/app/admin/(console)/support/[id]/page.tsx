@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/identity/auth";
 import { SupportStatusPill } from "@/components/support/SupportStatusPill";
-import { getThread, getTicket } from "@/lib/support-tickets";
+import { getThread, getTicket } from "@/lib/support/support-tickets";
 import { ArrowLeft, Sparkle, User } from "@/components/icons";
 
 import { AdminTicketControls } from "./AdminTicketControls";

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clearRateCache, getFreshNgnRate } from "@/lib/exchange-rate";
+import { clearRateCache, getFreshNgnRate } from "@/lib/payments/exchange-rate";
 
 const NOW = Date.parse("2026-11-05T12:00:00Z");
 
@@ -8,7 +8,7 @@ function response(overrides: Record<string, unknown> = {}) {
     result: "success",
     base_code: "EUR",
     time_last_update_unix: NOW / 1000 - 60,
-    rates: { NGN: 1800 },
+    conversion_rates: { NGN: 1800 },
     ...overrides,
   }), { status: 200, headers: { "content-type": "application/json" } });
 }
@@ -18,6 +18,7 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   vi.stubEnv("USD_NGN_RATE", "");
   vi.stubEnv("EUR_NGN_RATE", "");
+  vi.stubEnv("EXCHANGE_RATE_API_KEY", "fake-esim-fixture-key");
   clearRateCache();
 });
 
@@ -52,9 +53,10 @@ describe("purchase-sensitive eSIM rates", () => {
     vi.stubGlobal("fetch", fetchMock);
     const [a, b] = await Promise.all([getFreshNgnRate("EUR"), getFreshNgnRate("EUR")]);
     expect(a).toEqual(b);
-    expect(a).toMatchObject({ rate: 1800, source: "live" });
+    expect(a).toMatchObject({ rate: 1800, source: "authenticated" });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe("https://open.er-api.com/v6/latest/EUR");
+    expect(fetchMock.mock.calls[0][0]).toBe("https://v6.exchangerate-api.com/v6/latest/EUR");
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer fake-esim-fixture-key");
     expect(await getFreshNgnRate("EUR")).toEqual(a);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -62,8 +64,8 @@ describe("purchase-sensitive eSIM rates", () => {
   it.each([
     { result: "error" },
     { base_code: "USD" },
-    { rates: { NGN: 0 } },
-    { rates: { NGN: "1800" } },
+    { conversion_rates: { NGN: 0 } },
+    { conversion_rates: { NGN: "1800" } },
     { time_last_update_unix: NOW / 1000 - 37 * 60 * 60 },
     { time_last_update_unix: NOW / 1000 + 6 * 60 },
     { time_last_update_unix: null },
@@ -81,6 +83,7 @@ describe("purchase-sensitive eSIM rates", () => {
     vi.stubGlobal("fetch", fetchMock);
     vi.stubEnv("USD_NGN_FALLBACK", "1600");
     expect(await getFreshNgnRate("USD")).toBeNull();
-    expect(fetchMock.mock.calls[0][0]).toBe("https://open.er-api.com/v6/latest/USD");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("https://v6.exchangerate-api.com/v6/latest/USD");
   });
 });

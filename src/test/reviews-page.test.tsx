@@ -15,7 +15,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: () => {}, push: () => {} }),
 }));
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/lib/identity/auth", () => ({
   requireAdmin: vi.fn().mockResolvedValue({
     id: "33333333-3333-4333-8333-333333333333",
     email: "owner@example.test",
@@ -59,7 +59,7 @@ async function seed() {
 
   const base = {
     userId: buyer,
-    service: "numbers",
+    service: "numbers" as const,
     productName: "US virtual number",
     rating: 5,
     moderatorNote: null,

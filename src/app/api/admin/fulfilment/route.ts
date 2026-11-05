@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users } from "@/db/schema";
-import { authorizeAdminApi } from "@/lib/admin-auth";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { manualWarrantyDays } from "@/lib/manual-catalog";
-import { MANUAL_PROVIDER, MAX_QUEUE_ITEMS, QUEUE_STATUSES, quantityFromPlanLabel } from "@/lib/fulfilment-queue";
-import { logger } from "@/lib/logger";
-import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
-import { isSameOriginMutation } from "@/lib/net";
-import { recordAdminAction } from "@/lib/admin-audit";
+import { authorizeAdminApi } from "@/lib/identity/admin-auth";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { manualWarrantyDays } from "@/lib/services/accounts/manual-catalog";
+import { MANUAL_PROVIDER, MAX_QUEUE_ITEMS, QUEUE_STATUSES, quantityFromPlanLabel } from "@/lib/admin/fulfilment-queue";
+import { logger } from "@/lib/platform/logger";
+import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { recordAdminAction } from "@/lib/admin/admin-audit";
 
 export const dynamic = "force-dynamic";
 

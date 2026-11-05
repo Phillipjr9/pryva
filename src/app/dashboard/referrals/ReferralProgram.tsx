@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { AlertCircle, Check, Copy, Gift, Send, Users } from "@/components/icons";
-import type { ReferralInvite } from "@/lib/referrals";
+import type { ReferralInvite } from "@/lib/content/referrals";
 
 type Props = {
   code: string | null;

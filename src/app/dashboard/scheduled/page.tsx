@@ -1,9 +1,9 @@
 import { ScheduledManager } from "./ScheduledManager";
-import { requireUser } from "@/lib/auth";
-import { findPlan, plans } from "@/lib/catalog";
-import { fulfilmentIntent } from "@/lib/fulfillment";
-import { getUserScheduledOrders } from "@/lib/scheduled-orders";
-import { formatDateNigerian } from "@/lib/date-utils";
+import { requireUser } from "@/lib/identity/auth";
+import { findPlan, plans } from "@/lib/services/catalog";
+import { fulfilmentIntent } from "@/lib/services/fulfillment";
+import { getUserScheduledOrders } from "@/lib/services/scheduled-orders";
+import { formatDateNigerian } from "@/lib/platform/date-utils";
 import { ServiceTitle } from "@/components/ServiceTitle";
 
 export const dynamic = "force-dynamic";

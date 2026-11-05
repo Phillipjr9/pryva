@@ -60,18 +60,26 @@ describe("pressing 'Email me a link'", () => {
   it("does not say a link was sent without provider acceptance", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ ok: true })));
     pressEmailButton();
-    await waitFor(() => expect(screen.getByText("We could not send that email")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Email not confirmed")).toBeTruthy());
     expect(screen.queryByText("Link sent")).toBeNull();
   });
 
-  it("shows the server's reason when the mail was refused, instead of silence", async () => {
-    const message = "A new link was created, but the mail service refused the message (403).";
+  it("shows the clear message when delivery was not confirmed", async () => {
+    const message = "We couldn't confirm that the verification email was sent. Check your inbox; if nothing arrives, try again or contact support.";
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ error: message }, 502)));
 
     pressEmailButton();
 
-    await waitFor(() => expect(screen.getByText("We could not send that email")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Email not confirmed")).toBeTruthy());
     expect(screen.getByText(message)).toBeTruthy();
+  });
+
+  it("does not display unexpected upstream errors in the page", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ error: "API ERROR 403 secret-response" }, 502)));
+    pressEmailButton();
+    await waitFor(() => expect(screen.getByText(/couldn't confirm that the verification email was sent/i)).toBeTruthy());
+    expect(document.body.textContent).not.toContain("secret-response");
+    expect(document.body.textContent).not.toContain("API ERROR");
   });
 
   it("tells a signed-out visitor to sign in rather than pretending to fail", async () => {

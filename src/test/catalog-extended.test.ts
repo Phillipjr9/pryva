@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatNaira, findPlan, findService, plansFor, services, plans } from "@/lib/catalog";
+import { formatNaira, findPlan, findService, plansFor, services, plans } from "@/lib/services/catalog";
 
 describe("Catalog Extended", () => {
   describe("formatNaira edge cases", () => {
@@ -36,6 +36,20 @@ describe("Catalog Extended", () => {
       expect(inbox, "the email category is kept, only its paid tiers are gone").toBeDefined();
       expect(inbox!.fromPrice).toBeUndefined();
       expect(plansFor("email-otp")).toEqual([]);
+    });
+
+    /**
+     * Data plans have no fulfilment path, so the service carries no floor
+     * price: a `fromPrice` is a promise to sell, and the purchase endpoint
+     * fails closed. The category stays, with copy that says it is not
+     * available yet.
+     */
+    it("leaves data plans with no floor price and no delivery claims", () => {
+      const data = findService("data");
+      expect(data).toBeDefined();
+      expect(data!.fromPrice).toBeUndefined();
+      expect(JSON.stringify(data)).not.toMatch(/instant|immediately/);
+      expect(data!.description).toMatch(/not available/i);
     });
 
     it("should have all required fields for each service", () => {
@@ -92,7 +106,7 @@ describe("Catalog Extended", () => {
     });
 
     it("should have valid service references", () => {
-      const serviceSlugs = new Set(services.map((s) => s.slug));
+      const serviceSlugs = new Set<string>(services.map((s) => s.slug));
       plans.forEach((plan) => {
         expect(serviceSlugs.has(plan.service)).toBe(true);
       });

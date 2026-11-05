@@ -4,13 +4,13 @@ import {
   listMarketplaceListings,
   MarketplaceError,
   type ListingQuery,
-} from "@/lib/marketplace-suppliers";
-import { isMarketplaceCatalogAvailable } from "@/lib/marketplace-suppliers";
-import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
-import { isManualFulfilmentReachable } from "@/lib/manual-fulfilment";
-import { priceMarketplaceListing } from "@/lib/marketplace-pricing";
-import { logger } from "@/lib/logger";
-import { safeUnitCount } from "@/lib/service-units";
+} from "@/lib/services/accounts/marketplace-suppliers";
+import { isMarketplaceCatalogAvailable } from "@/lib/services/accounts/marketplace-suppliers";
+import { isMarketplaceCheckoutConfigured } from "@/lib/services/accounts/marketplace-policy";
+import { isManualFulfilmentReachable } from "@/lib/services/accounts/manual-fulfilment";
+import { priceMarketplaceListing } from "@/lib/services/accounts/marketplace-pricing";
+import { logger } from "@/lib/platform/logger";
+import { safeUnitCount } from "@/lib/services/service-units";
 
 export const dynamic = "force-dynamic";
 

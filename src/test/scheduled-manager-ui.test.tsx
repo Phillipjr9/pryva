@@ -142,6 +142,24 @@ describe("ScheduledManager", () => {
     );
   });
 
+  it.each(["network", "server"])("treats %s schedule creation as unconfirmed", async (kind) => {
+    vi.stubGlobal("fetch", kind === "network"
+      ? vi.fn().mockRejectedValue(new Error("Failed to fetch SECRET_RESPONSE"))
+      : fetchMock(() => json({ error: "API ERROR SECRET_RESPONSE" }, 500)));
+    render(<ScheduledManager rows={[]} creatable={[PLAN]} balance={5_000} />);
+    fireEvent.click(screen.getByRole("button", { name: "Schedule this purchase" }));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/couldn't confirm whether the schedule was created.*check/i);
+    expect(document.body.textContent).not.toMatch(/API ERROR|SECRET_RESPONSE/);
+  });
+
+  it("treats a 5xx schedule change as unconfirmed", async () => {
+    vi.stubGlobal("fetch", fetchMock(() => json({ error: "API ERROR SECRET_RESPONSE" }, 500)));
+    render(<ScheduledManager rows={[ACTIVE]} creatable={[PLAN]} balance={5_000} />);
+    fireEvent.click(screen.getByRole("button", { name: "Pause Verification number" }));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/couldn't confirm the schedule change.*check/i);
+    expect(document.body.textContent).not.toContain("SECRET_RESPONSE");
+  });
+
   it("says nothing can be scheduled when no plan is deliverable", () => {
     vi.stubGlobal("fetch", fetchMock());
     render(<ScheduledManager rows={[]} creatable={[]} balance={5_000} />);

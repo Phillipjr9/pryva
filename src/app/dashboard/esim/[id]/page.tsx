@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { esimOfferTerms, findEsimOffer, recheckEsimOffer } from "@/lib/esim-catalog";
-import { requireUser } from "@/lib/auth";
-import { formatNaira } from "@/lib/catalog";
+import { esimOfferTerms, findEsimOffer, recheckEsimOffer } from "@/lib/services/esim/esim-catalog";
+import { requireUser } from "@/lib/identity/auth";
+import { formatNaira } from "@/lib/services/catalog";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { EsimBuy } from "./EsimBuy";
 
@@ -133,9 +133,6 @@ export default async function EsimPlanPage({ params }: { params: Promise<{ id: s
           />
         </aside>
       </div>
-      <p className="text-micro text-ink-3">
-        <a href="https://www.exchangerate-api.com" className="underline underline-offset-2">Rates By Exchange Rate API</a>
-      </p>
     </div>
   );
 }

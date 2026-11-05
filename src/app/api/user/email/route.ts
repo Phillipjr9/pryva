@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import { requireAuthApi } from "@/lib/auth";
-import { requestEmailChange } from "@/lib/email-change";
-import { isSameOriginMutation } from "@/lib/net";
-import { authRateLimiter } from "@/lib/rate-limit";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { requestEmailChange } from "@/lib/identity/email-change";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { authRateLimiter } from "@/lib/platform/rate-limit";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 
 export const dynamic = "force-dynamic";
 

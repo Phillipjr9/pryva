@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { serviceMap } from "@/lib/catalog";
+import { serviceMap } from "@/lib/services/catalog";
 import { ServiceIcon } from "@/components/ServiceIcon";
 
 export const metadata: Metadata = {

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthApi } from "@/lib/auth";
-import { isSameOriginMutation } from "@/lib/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { logger } from "@/lib/logger";
-import { sendSecurityNotice } from "@/lib/security-notice";
-import { confirmEnrolment, twoFactorAvailable } from "@/lib/two-factor";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { logger } from "@/lib/platform/logger";
+import { sendSecurityNotice } from "@/lib/platform/security-notice";
+import { confirmEnrolment, twoFactorAvailable } from "@/lib/identity/two-factor";
 
 export const dynamic = "force-dynamic";
 

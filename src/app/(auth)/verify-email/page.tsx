@@ -70,11 +70,16 @@ function VerifyEmail() {
             ? { status: "verified" }
             : response.ok && data.delivered
               ? { status: "sent" }
-              : { status: "sendFailed", message: data.error || "Could not confirm that email was sent." },
+              : {
+                  status: "sendFailed",
+                  message: response.status >= 500
+                    ? "We couldn't confirm that the verification email was sent. Check your inbox; if nothing arrives, try again or contact support."
+                    : data.error || "Could not confirm that email was sent.",
+                },
         );
       }
     } catch {
-      setOutcome({ status: "sendFailed", message: "Could not reach the server." });
+      setOutcome({ status: "sendFailed", message: "We couldn't confirm that the verification email was sent. Check your inbox; if nothing arrives, try again or contact support." });
     } finally {
       setSending(false);
     }
@@ -122,7 +127,7 @@ function VerifyEmail() {
       return (
         <>
           <h1 className="text-xl font-semibold text-slate-900">
-            {needsSignIn ? "Sign in to get a link" : "We could not send that email"}
+            {needsSignIn ? "Sign in to get a link" : "Email not confirmed"}
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">{outcome.message}</p>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">

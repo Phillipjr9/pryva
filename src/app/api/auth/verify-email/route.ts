@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireAuthApi } from "@/lib/auth";
+import { requireAuthApi } from "@/lib/identity/auth";
 import {
   issueEmailVerification,
   rateLimitEmailVerification,
-} from "@/lib/email-verification";
-import { isSameOriginMutation } from "@/lib/net";
-import { resendConfigured } from "@/lib/resend-config";
-import { scheduleOnboardingEmails } from "@/lib/onboarding-emails";
+} from "@/lib/identity/email-verification";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { resendConfigured } from "@/lib/email/resend-config";
+import { scheduleOnboardingEmails } from "@/lib/email/onboarding-emails";
 
 export const dynamic = "force-dynamic";
 
@@ -68,19 +68,18 @@ export async function POST(request: NextRequest) {
     // path that re-requests one.
     if (!resendConfigured()) {
       return NextResponse.json(
-        { error: "Email delivery is not configured on this server, so the link cannot be sent." },
+        { error: "Email confirmations are unavailable right now. Please try later or contact support." },
         { status: 503 },
       );
     }
 
     const delivery = await issueEmailVerification(user.id, user.email, user.name);
     if (!delivery.delivered) {
-      // The link exists and is valid, but nothing was delivered. Answering ok here
-      // is what made the button look like it did nothing: the person waited for a
-      // message the provider had already refused.
+      // Acceptance is not confirmed. The detailed reason is logged by the mail
+      // service, but must not be copied into the customer's response.
       return NextResponse.json(
         {
-          error: `A new link was created, but ${delivery.detail ?? "the mail service could not confirm it"}. Check your inbox; if nothing arrives, try again or contact support.`,
+          error: "We couldn't confirm that the verification email was sent. Check your inbox; if nothing arrives, try again or contact support.",
           delivered: false,
         },
         { status: 502 },

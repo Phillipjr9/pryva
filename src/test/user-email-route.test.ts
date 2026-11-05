@@ -18,10 +18,10 @@ const state = vi.hoisted(() => ({
   request: vi.fn(),
 }));
 
-vi.mock("@/lib/auth", () => ({ requireAuthApi: async () => state.user }));
-vi.mock("@/lib/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
-vi.mock("@/lib/rate-limit", () => ({ authRateLimiter: async () => state.throttle }));
-vi.mock("@/lib/email-change", () => ({ requestEmailChange: (...args: unknown[]) => state.request(...args) }));
+vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: async () => state.user }));
+vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
+vi.mock("@/lib/platform/rate-limit", () => ({ authRateLimiter: async () => state.throttle }));
+vi.mock("@/lib/identity/email-change", () => ({ requestEmailChange: (...args: unknown[]) => state.request(...args) }));
 
 import { POST } from "@/app/api/user/email/route";
 

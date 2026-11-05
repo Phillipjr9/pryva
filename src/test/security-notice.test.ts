@@ -12,10 +12,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({ configured: true, fetch: vi.fn() }));
 
-vi.mock("@/lib/resend-config", () => ({ resendConfigured: () => state.configured }));
-vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/email/resend-config", () => ({ resendConfigured: () => state.configured }));
+vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
-import { buildSecurityNotice, sendSecurityNotice } from "@/lib/security-notice";
+import { buildSecurityNotice, sendSecurityNotice } from "@/lib/platform/security-notice";
 
 function sentBody() {
   return JSON.parse(state.fetch.mock.calls.at(-1)![1].body as string) as {

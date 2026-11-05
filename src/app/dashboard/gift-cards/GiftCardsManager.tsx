@@ -1,15 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira } from "@/lib/services/catalog";
 import { Gift, Copy, Check, ShoppingCart, Shield } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
 import { fireConfetti } from "@/components/ui/Confetti";
 import { BrandIcon } from "@/components/BrandIcon";
-import { BRAND_GIFT_CARDS, type BrandGiftCardCatalogEntry } from "@/lib/gift-cards-catalog";
+import { BRAND_GIFT_CARDS, type BrandGiftCardCatalogEntry } from "@/lib/services/gift-cards/brand-catalog";
 import type { GiftCard } from "@/db/schema";
-import type { PublicUser } from "@/lib/auth";
+import type { PublicUser } from "@/lib/identity/auth";
 
 interface GiftCardsManagerProps {
   user: PublicUser;
@@ -118,7 +118,13 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
       const data = await response.json();
 
       if (!response.ok || !data.ok) {
-        setBrandOrderError(data.error || "Order failed. Please check your balance and try again.");
+        // Trust the server's explicit financial outcome, not arbitrary 5xx text.
+        // A missing response can mean an order is still being processed.
+        const reference = typeof data.reference === "string" && /^GC-[A-Z0-9]{10,32}$/.test(data.reference)
+          ? ` Reference: ${data.reference}.` : "";
+        const unconfirmed = `We couldn't confirm your gift card order. Check your orders and wallet, then contact support before placing another order.${reference}`;
+        const refunded = "We couldn't confirm your gift card delivery. Your wallet has been refunded. Check your orders or contact support before placing another order.";
+        setBrandOrderError(response.status >= 500 ? (data.outcome === "refunded" ? refunded : unconfirmed) : typeof data.error === "string" ? data.error : unconfirmed);
         return;
       }
 
@@ -132,7 +138,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
       });
       router.refresh();
     } catch {
-      setBrandOrderError("Failed to process your gift card order. Please check your wallet before trying again.");
+      setBrandOrderError("We couldn't confirm your gift card order. Check your orders and wallet, then contact support before placing another order.");
     } finally {
       setBrandOrderLoading(false);
       orderingBrand.current = false;
@@ -201,15 +207,16 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
       const data = await response.json();
 
       if (!response.ok || !data.ok) {
-        throw new Error(data.error || "Redemption failed");
+        setError(response.status < 500 && typeof data.error === "string" ? data.error : "We couldn't confirm the redemption. Check your wallet activity or contact support before trying again.");
+        return;
       }
 
       fireConfetti();
       setRedeemSuccess(data.amount);
       setRedeemCode("");
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Redemption failed");
+    } catch {
+      setError("We couldn't confirm the redemption. Check your wallet activity or contact support before trying again.");
     } finally {
       setRedeemLoading(false);
       redeeming.current = false;

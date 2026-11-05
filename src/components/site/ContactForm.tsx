@@ -45,14 +45,14 @@ export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = fa
       });
       const data = (await response.json()) as { ok?: boolean; error?: string };
       if (!response.ok || !data.ok) {
-        setError(data.error ?? "We couldn't send that. Please try again.");
+        setError(response.status < 500 && typeof data.error === "string" ? data.error : "We couldn't confirm whether your message was sent. Please wait before sending it again.");
         return;
       }
       setSent(true);
       setForm({ ...form, message: "" });
       if (signedIn) router.refresh();
     } catch {
-      setError("Network hiccup. Please try again.");
+      setError("We couldn't confirm whether your message was sent. Please wait before sending it again.");
     } finally {
       setPending(false);
     }
@@ -150,7 +150,7 @@ export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = fa
         />
       </div>
 
-      {error && <p className="mt-3 text-[0.8rem] font-medium text-rose-600">{error}</p>}
+      {error && <p role="alert" className="mt-3 text-[0.8rem] font-medium text-rose-600">{error}</p>}
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="inline-flex items-center gap-1.5 text-meta text-ink-3">

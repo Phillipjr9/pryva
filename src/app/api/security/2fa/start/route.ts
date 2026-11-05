@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthApi } from "@/lib/auth";
-import { isSameOriginMutation } from "@/lib/net";
-import { logger } from "@/lib/logger";
-import { beginEnrolment, getEnrolment, twoFactorAvailable } from "@/lib/two-factor";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { logger } from "@/lib/platform/logger";
+import { beginEnrolment, getEnrolment, twoFactorAvailable } from "@/lib/identity/two-factor";
 
 export const dynamic = "force-dynamic";
 

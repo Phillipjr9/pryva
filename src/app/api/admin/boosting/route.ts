@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authorizeAdminApi } from "@/lib/admin-auth";
-import { logger } from "@/lib/logger";
+import { authorizeAdminApi } from "@/lib/identity/admin-auth";
+import { logger } from "@/lib/platform/logger";
 import {
   getSmmBalance,
   isSmmPanelConfigured,
   listSmmServices,
   panelEndpoint,
   SmmPanelError,
-} from "@/lib/smm-panel";
-import { selectBoostServices } from "@/lib/smm-catalog";
-import { normalizeCurrency, smmMarkupPercent, smmUsdNgnRate } from "@/lib/smm-pricing";
+} from "@/lib/providers/smm-panel";
+import { selectBoostServices } from "@/lib/services/boosts/smm-catalog";
+import { normalizeCurrency, smmMarkupPercent } from "@/lib/services/boosts/smm-pricing";
+import { resolveBoostUsdNgnRate } from "@/lib/services/boosts/boost-fx";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,9 @@ export async function GET(request: NextRequest) {
 
   const configured = isSmmPanelConfigured();
   const markupPercent = smmMarkupPercent();
-  const fxRate = smmUsdNgnRate();
+  // The same rate the shop prices with: the explicit funding pin, else a
+  // validated shared purchase quote — never the legacy display fallback.
+  const fxRate = await resolveBoostUsdNgnRate().catch(() => null);
 
   let endpointHost: string | null = null;
   let endpointProblem: string | null = null;
@@ -89,7 +92,7 @@ export async function GET(request: NextRequest) {
   // What the shop would actually show, which is the number that matters: a large
   // panel returns thousands of services and Pryva lists a handful, one per
   // platform and intent, every one of them priced.
-  const selection = selectBoostServices(services, balance?.currency ?? null);
+  const selection = selectBoostServices(services, balance?.currency ?? null, fxRate);
 
   const hint = (() => {
     if (error) return "Boosting is on, but the supplier did not answer. Check the key, the endpoint and the balance.";
@@ -97,7 +100,7 @@ export async function GET(request: NextRequest) {
     // An unpriced catalogue is usually one missing number, not a broken panel, so
     // say which one before saying nothing is listed.
     if (currency === "USD" && fxRate === null) {
-      return "The supplier bills in USD and SMM_USD_NGN_RATE is not set, so no price can be computed. Nothing is listed rather than sold at a guessed exchange rate.";
+      return "The supplier bills in USD and no usable naira rate is available (set the SMM_USD_NGN_RATE funding pin or configure the authenticated rate), so no price can be computed. Nothing is listed rather than sold at a guessed exchange rate.";
     }
     if (selection.listed === 0) {
       return "The supplier answered, but none of its services is a social boost Pryva lists. Check that this is the catalogue you expect.";

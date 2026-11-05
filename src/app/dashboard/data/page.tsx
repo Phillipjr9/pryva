@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { DataPlansForm } from "./DataPlansForm";
-import { requireUser } from "@/lib/auth";
-import { findDataPlan } from "@/lib/airtime";
+import { requireUser } from "@/lib/identity/auth";
+import { findDataPlan } from "@/lib/services/data/airtime";
 import { ServiceTitle } from "@/components/ServiceTitle";
 
 export const dynamic = "force-dynamic";

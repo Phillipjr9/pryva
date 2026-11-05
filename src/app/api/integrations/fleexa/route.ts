@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authorizeAdminApi } from "@/lib/admin-auth";
-import { getFleexaStatus } from "@/lib/fleexa";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { authorizeAdminApi } from "@/lib/identity/admin-auth";
+import { getFleexaStatus } from "@/lib/providers/fleexa";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
 
 export const dynamic = "force-dynamic";
 

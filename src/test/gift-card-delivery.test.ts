@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { escapeHtml, sendGiftCardDelivery } from "@/lib/gift-card-delivery";
+import { escapeHtml, sendGiftCardDelivery } from "@/lib/services/gift-cards/credit-delivery";
 
 /**
  * A gift card bought "for someone" used to reach nobody.
@@ -90,12 +90,14 @@ describe("the gift card order route tells the truth when its own refund fails", 
 
   it("moves the order where an operator will see it", () => {
     expect(source).toContain('status: "review"');
-    expect(source).toContain("automatic refund failed — debit still stands");
+    expect(source).toContain("automatic refund could not be confirmed");
+    expect(source).toContain("isNull(orders.refundedAt)");
   });
 
   it("does not claim a refund that did not happen", () => {
     // The old code printed the same sentence whether or not the credit committed.
-    expect(source).toContain("We could not return the money to your wallet automatically");
+    expect(source).toContain("couldn't confirm your gift card delivery or refund");
+    expect(source).not.toContain("support has been flagged");
     expect(source).toContain("refunded\n          ?");
   });
 });

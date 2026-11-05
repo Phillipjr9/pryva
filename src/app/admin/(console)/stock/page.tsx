@@ -1,8 +1,8 @@
 import Link from "next/link";
 
-import { requireAdmin } from "@/lib/auth";
-import { buildStockReport } from "@/lib/stock-live";
-import { laneHeadline, type StockLane, type StockState } from "@/lib/stock-report";
+import { requireAdmin } from "@/lib/identity/auth";
+import { buildStockReport } from "@/lib/admin/stock-live";
+import { laneHeadline, type StockLane, type StockState } from "@/lib/admin/stock-report";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +25,7 @@ const STATE_STYLES: Record<StockState, { chip: string; label: string }> = {
   "out-of-stock": { chip: "bg-red-50 text-red-700", label: "Out of stock" },
   "no-match": { chip: "bg-red-50 text-red-700", label: "Not listed" },
   unknown: { chip: "bg-slate-100 text-ink-2", label: "Unknown" },
+  listed: { chip: "bg-blue-50 text-blue-800", label: "Listed · count unknown" },
   unpriced: { chip: "bg-amber-50 text-amber-800", label: "No price" },
   "not-sold": { chip: "bg-slate-100 text-ink-2", label: "Not sold" },
 };
@@ -104,13 +105,16 @@ export default async function AdminStockPage({
           <p className="mt-1 max-w-2xl text-[0.86rem] text-ink-2">
             Read live from the feeds just now, not from the catalogue we advertise.{" "}
             <strong>In stock</strong> means a feed reported units, <strong>unknown</strong> means it
-            listed the product without saying how many — not the same as zero — and{" "}
-            <strong>not sold</strong> means the feed answers but nothing of ours is mapped to it.
+            listed the product without saying how many — not the same as zero. A priced listing
+            without a count is marked <strong>listed</strong>; checkout can still refuse it. {" "}
+            Number and rental counts cover one feed and individual app or area pools, not all suppliers
+            or guaranteed plan inventory. Social limits are order sizes, not stock. {" "}
+            <strong>Not sold</strong> means the feed answers but nothing of ours is mapped to it.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <div className="rounded-xl border border-line bg-white px-4 py-2 text-right">
-            <p className="text-meta uppercase tracking-wide text-ink-3">Buyable now</p>
+            <p className="text-meta uppercase tracking-wide text-ink-3">Listed or stocked</p>
             <p className="text-[1rem] font-semibold text-ink">
               {buyable} of {listed}
             </p>
@@ -126,9 +130,9 @@ export default async function AdminStockPage({
 
       {down.length > 0 && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[0.86rem] text-red-800">
-          <strong>{down.length} feed{down.length === 1 ? "" : "s"} did not answer:</strong>{" "}
-          {down.map((lane) => lane.label).join(", ")}. Their lanes cannot sell until they do — check
-          the credential and the feed itself, not the code.
+          <strong>{down.length} feed{down.length === 1 ? "" : "s"} unavailable or not configured:</strong>{" "}
+          {down.map((lane) => lane.label).join(", ")}. Availability from those feeds is unknown;
+          other sources may still be available. Check the credentials, funding and feed response.
         </div>
       )}
 

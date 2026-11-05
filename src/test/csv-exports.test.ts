@@ -6,9 +6,9 @@ vi.mock("@/db", () => ({ db: {
   select: () => ({ from: () => ({ where: mocks.where }) }),
   query: { walletTransactions: { findMany: mocks.findMany } },
 } }));
-vi.mock("@/lib/auth", () => ({ requireAuthApi: mocks.user }));
-vi.mock("@/lib/admin-auth", () => ({ authorizeAdminApi: mocks.admin }));
-vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: mocks.user }));
+vi.mock("@/lib/identity/admin-auth", () => ({ authorizeAdminApi: mocks.admin }));
+vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
 
 import * as adminExport from "@/app/api/admin/export/route";
 import * as walletExport from "@/app/api/wallet/transactions/export/route";

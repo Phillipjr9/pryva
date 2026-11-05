@@ -6,15 +6,15 @@ import { POST } from "@/app/api/orders/[id]/refund/route";
 
 const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), select: vi.fn(), transaction: vi.fn(), cancelUpstream: vi.fn(), flagReconciliation: vi.fn(), refundRateLimit: vi.fn() }));
 vi.mock("@/db", () => ({ db: { select: mocks.select, transaction: mocks.transaction } }));
-vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.currentUser }));
+vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: mocks.currentUser }));
 // Must be mocked: the route releases the number upstream after committing the
 // refund, and an unmocked call would reach the real provider.
-vi.mock("@/lib/fulfillment", () => ({ cancelUpstream: mocks.cancelUpstream }));
-vi.mock("@/lib/reconciliation", () => ({ flagReconciliation: mocks.flagReconciliation }));
+vi.mock("@/lib/services/fulfillment", () => ({ cancelUpstream: mocks.cancelUpstream }));
+vi.mock("@/lib/services/reconciliation", () => ({ flagReconciliation: mocks.flagReconciliation }));
 // The throttle is DB-backed, and the fake database below exposes only select and
 // transaction -- without this the limiter correctly reports itself unavailable
 // and every refund fails closed at 503.
-vi.mock("@/lib/rate-limit", () => ({ refundRateLimiter: mocks.refundRateLimit }));
+vi.mock("@/lib/platform/rate-limit", () => ({ refundRateLimiter: mocks.refundRateLimit }));
 const dialect = new PgDialect();
 const context = { params: Promise.resolve({ id: "order-id" }) };
 function request(origin = "https://pryva.test") {
@@ -37,6 +37,7 @@ function fakeDatabase() {
     balance: 500,
     ledger: [] as Array<Record<string, unknown>>,
     failLedger: false,
+    loseCommitAcknowledgement: false,
   };
   mocks.select.mockImplementation(() => ({
     from: () => ({ where: () => ({ limit: async () => [{ ...state.order }] }) }),
@@ -79,14 +80,17 @@ function fakeDatabase() {
   };
   mocks.transaction.mockImplementation(async (callback: (transaction: typeof tx) => Promise<unknown>) => {
     const previous = { order: { ...state.order }, balance: state.balance, ledger: [...state.ledger] };
+    let result: unknown;
     try {
-      return await callback(tx);
+      result = await callback(tx);
     } catch (error) {
       state.order = previous.order;
       state.balance = previous.balance;
       state.ledger = previous.ledger;
       throw error;
     }
+    if (state.loseCommitAcknowledgement) throw new Error("database commit acknowledgement lost");
+    return result;
   });
   return state;
 }
@@ -188,6 +192,27 @@ describe("order refund safety", () => {
     expect(state.order.status).toBe("active");
     expect(state.order.refundedAt).toBeNull();
     expect(state.balance).toBe(500);
+  });
+
+  it("does not claim the refund failed if the commit acknowledgement is lost", async () => {
+    const state = fakeDatabase();
+    state.loseCommitAcknowledgement = true;
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const result = await POST(request(), context);
+      const body = await result.json();
+      expect(result.status).toBe(500);
+      expect(body.error).toMatch(/couldn't confirm this refund.*check your wallet/i);
+      expect(body.error).not.toMatch(/didn't go through|database/i);
+      expect(state.order.status).toBe("refunded");
+      expect(state.balance).toBe(1700);
+      expect(state.ledger).toHaveLength(1);
+      expect((await POST(request(), context)).status).toBe(409);
+      expect(state.ledger).toHaveLength(1);
+      expect(consoleError).toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it("throttles a refund before looking the order up", async () => {

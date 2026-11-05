@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { retailPerThousand, smmMarkupPercent, totalForQuantity, normalizeCurrency } from "@/lib/smm-pricing";
+import { retailPerThousand, smmMarkupPercent, totalForQuantity, normalizeCurrency } from "@/lib/services/boosts/smm-pricing";
 
 /**
  * Retail pricing for boosting.
@@ -17,6 +17,9 @@ describe("markup", () => {
     expect(smmMarkupPercent(env())).toBe(35);
     expect(smmMarkupPercent(env({ SMM_MARKUP_PERCENT: "50" }))).toBe(50);
     expect(smmMarkupPercent(env({ SMM_MARKUP_PERCENT: "abc" }))).toBe(35);
+    expect(smmMarkupPercent(env({ SMM_MARKUP_PERCENT: "" }))).toBe(35);
+    expect(smmMarkupPercent(env({ SMM_MARKUP_PERCENT: "   " }))).toBe(35);
+    expect(smmMarkupPercent(env({ SMM_MARKUP_PERCENT: "0" }))).toBe(0);
     expect(smmMarkupPercent(env({ SMM_MARKUP_PERCENT: "-10" }))).toBe(0);
     expect(smmMarkupPercent(env({ SMM_MARKUP_PERCENT: "9999" }))).toBe(400);
   });
@@ -38,6 +41,14 @@ describe("retail price per 1,000", () => {
     expect(retailPerThousand({ wholesaleRatePerThousand: 1_000, currency: "NGN", env: env() })).toBe(1_350);
     // 501 at 35% = 676.35, rounded up so never below cost.
     expect(retailPerThousand({ wholesaleRatePerThousand: 501, currency: "NGN", env: env() })).toBe(677);
+  });
+
+  it("avoids floating-point rounding up an exact whole-naira price", () => {
+    expect(retailPerThousand({ wholesaleRatePerThousand: 180, currency: "NGN", env: env() })).toBe(243);
+    expect(retailPerThousand({ wholesaleRatePerThousand: 340, currency: "NGN", env: env() })).toBe(459);
+    expect(retailPerThousand({ wholesaleRatePerThousand: 180.01, currency: "NGN", env: env() })).toBe(244);
+    expect(retailPerThousand({ wholesaleRatePerThousand: 1e-7, currency: "NGN", env: env() })).toBe(1);
+    expect(retailPerThousand({ wholesaleRatePerThousand: 1e100, currency: "NGN", env: env() })).toBeNull();
   });
 
   it("converts a USD rate only when a rate is configured", () => {
@@ -66,5 +77,10 @@ describe("quantity total", () => {
     expect(totalForQuantity(1_500, -1)).toBe(0);
     expect(totalForQuantity(1_500, 1.5)).toBe(0);
     expect(totalForQuantity(0, 1_000)).toBe(0);
+    expect(totalForQuantity(1.5, 1_000)).toBe(0);
+    expect(totalForQuantity(Number.MAX_SAFE_INTEGER, 1_000)).toBe(0);
+    expect(totalForQuantity(2_147_483_647, 1_000)).toBe(2_147_483_647);
+    expect(totalForQuantity(2_147_483_648, 1_000)).toBe(0);
+    expect(totalForQuantity(1_500, 100_000_001)).toBe(0);
   });
 });

@@ -10,7 +10,7 @@
 // table, and the foreign-key edges a restore needs). Every following line is one
 // table's rows as JSON.
 //
-// Why not pg_dump: see the comment at the top of src/lib/backup.ts. In short,
+// Why not pg_dump: see the comment at the top of src/lib/platform/backup.ts. In short,
 // the schema is reproducible from migrations/, so this archive carries data and
 // the restore rebuilds the schema first.
 //
@@ -30,7 +30,7 @@ import {
   expiredBackups,
   sha256Hex,
   verifyManifest,
-} from "../src/lib/backup.ts";
+} from "../src/lib/platform/backup.ts";
 
 function arg(name, fallback = "") {
   const index = process.argv.indexOf(`--${name}`);

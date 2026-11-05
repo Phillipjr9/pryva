@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Clock, Copy, Shield } from "@/components/icons";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira } from "@/lib/services/catalog";
 
 type Props = {
   orderId: string;
@@ -120,9 +120,9 @@ export function OrderActions({
       }
       // Not eligible yet (window still open) and not eligible at all (a rental)
       // both arrive here; the server's wording is the honest answer either way.
-      setRefundError(data.error ?? "The refund didn't go through. Please contact support.");
+      setRefundError(response.status < 500 && typeof data.error === "string" ? data.error : "We couldn't confirm this refund. Check your wallet or contact support before trying again.");
     } catch {
-      setRefundError("The refund didn't go through. Please contact support.");
+      setRefundError("We couldn't confirm this refund. Check your wallet or contact support before trying again.");
     } finally {
       setRefunding(false);
     }
@@ -143,9 +143,9 @@ export function OrderActions({
       }
       // A cooldown and a number that can no longer receive codes are different
       // problems, so the server's wording is shown rather than a guess.
-      setResendNotice(data.error ?? "The code couldn't be sent again just now.");
+      setResendNotice(response.status < 500 && typeof data.error === "string" ? data.error : "We couldn't confirm whether the code was sent. Wait a moment and check your order.");
     } catch {
-      setResendNotice("The code couldn't be sent again just now.");
+      setResendNotice("We couldn't confirm whether the code was sent. Wait a moment and check your order.");
     } finally {
       setResending(false);
     }

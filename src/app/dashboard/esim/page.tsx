@@ -1,10 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { requireUser } from "@/lib/auth";
-import { financialActionsUnavailable } from "@/lib/financial-environment";
+import { requireUser } from "@/lib/identity/auth";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import { ServiceTitle } from "@/components/ServiceTitle";
-import { formatDateNigerian } from "@/lib/date-utils";
-import { catalogueItems, ESIM_CATALOGUE_LIMIT, readEsimCatalog, type EsimCatalogStats } from "@/lib/esim-catalog";
+import { formatDateNigerian } from "@/lib/platform/date-utils";
+import { catalogueItems, ESIM_CATALOGUE_LIMIT, readEsimCatalog, type EsimCatalogStats } from "@/lib/services/esim/esim-catalog";
 import { EsimCatalogue } from "./EsimCatalogue";
 
 export const metadata: Metadata = { title: "eSIM plans" };
@@ -106,9 +106,6 @@ export default async function EsimCataloguePage() {
           <EsimCatalogue items={items} truncated={total > ESIM_CATALOGUE_LIMIT} />
         </>
       )}
-      <p className="text-micro text-ink-3">
-        <a href="https://www.exchangerate-api.com" className="underline underline-offset-2">Rates By Exchange Rate API</a>
-      </p>
     </div>
   );
 }

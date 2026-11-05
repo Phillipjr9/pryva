@@ -24,7 +24,7 @@ vi.mock("@/db", () => ({
   },
 }));
 
-import { expireFinishedRentals } from "@/lib/rental-expiry";
+import { expireFinishedRentals } from "@/lib/services/rental-expiry";
 
 beforeEach(() => {
   state.rows = [];

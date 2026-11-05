@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { operatorHomeFor } from "@/lib/operator";
-import { previewOperatorBootstrapEnabled } from "@/lib/preview-operator";
+import { operatorHomeFor } from "@/lib/platform/operator";
+import { previewOperatorBootstrapEnabled } from "@/lib/platform/preview-operator";
 
 /**
  * The operator's separate door.
@@ -58,14 +58,14 @@ describe("the console door does not authorise anything", () => {
   });
 
   it("sends a signed-out console visitor to the operator door, not the storefront", () => {
-    const auth = read("lib/auth.ts");
+    const auth = read("lib/identity/auth.ts");
     expect(auth).toContain('redirect(`/admin/login?next=');
   });
 
   it("keeps the 2FA requirement inside the console", () => {
     // Bouncing an operator into /dashboard to arm the console is the split
     // personality this separation exists to remove.
-    const auth = read("lib/auth.ts");
+    const auth = read("lib/identity/auth.ts");
     expect(auth).toContain("/admin/account?require=2fa");
     expect(auth).not.toContain("/dashboard/settings?require=2fa");
   });

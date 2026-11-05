@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ check: vi.fn(), clear: vi.fn(), select: vi.fn(), session: vi.fn() }));
 vi.mock("@/db", () => ({ db: { select: mocks.select } }));
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/lib/identity/auth", () => ({
   createSession: mocks.session, hashPassword: () => "hash", verifyPassword: () => true,
   isValidEmail: (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email),
   normalizeEmail: (email: string) => email.trim().toLowerCase(), isConfiguredAdminEmail: () => false,
 }));
-vi.mock("@/lib/auth-rate-limit", () => ({ checkAuthRateLimit: mocks.check, clearAuthRateLimit: mocks.clear }));
-vi.mock("@/lib/wallet", () => ({ creditWallet: vi.fn() }));
+vi.mock("@/lib/identity/auth-rate-limit", () => ({ checkAuthRateLimit: mocks.check, clearAuthRateLimit: mocks.clear }));
+vi.mock("@/lib/payments/wallet", () => ({ creditWallet: vi.fn() }));
 
 import * as login from "@/app/api/auth/login/route";
 import * as signup from "@/app/api/auth/signup/route";

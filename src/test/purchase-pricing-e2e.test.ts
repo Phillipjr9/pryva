@@ -19,9 +19,9 @@ import * as schema from "@/db/schema";
  * So here the sources are mocked and **pricing is not**. The route runs against
  * embedded PostgreSQL and the assertions are about money actually moving:
  *
- *   • the storefront price and the checkout charge are the same figure
+ *   • a reviewed quote and the checkout charge are the same figure
  *   • the wallet, the order and the ledger all agree on it
- *   • nothing is written and no source is called when the balance is short
+ *   • no money is moved and no paid source call is made when the balance is short
  *
  * Providers and auth are mocked; this is not a live-source test.
  */
@@ -31,10 +31,13 @@ const mocks = vi.hoisted(() => ({
   user: vi.fn(),
   listing: null as Record<string, unknown> | null,
   listingError: null as Error | null,
+  listingReads: 0,
+  rate: 1600,
   delivered: null as string[] | null,
   purchaseCalls: 0,
   promo: null as { discount: string } | null,
   promoBaskets: [] as number[],
+  rateLimit: vi.fn(),
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
@@ -43,25 +46,26 @@ vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
 // and `isConfiguredAdminEmail` is now reached through @/lib/manual-fulfilment when
 // a hand-prepared item is bought. Missing, it throws and the gate fails closed —
 // safe in production, but it would make these tests prove nothing.
-vi.mock("@/lib/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/auth")>();
+vi.mock("@/lib/identity/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/identity/auth")>();
   return { ...actual, requireAuthApi: mocks.user, getCurrentUser: mocks.user };
 });
-vi.mock("@/lib/logger", () => ({ logger: mocks.log }));
-vi.mock("@/lib/rate-limit", () => ({
-  purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }),
+vi.mock("@/lib/platform/logger", () => ({ logger: mocks.log }));
+vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
+  return { ...actual, purchaseRateLimiter: mocks.rateLimit };
+});
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: () => {} }));
+vi.mock("@/lib/payments/exchange-rate", () => ({
+  getUsdToNgnRate: async () => ({ rate: mocks.rate, source: "test", fetchedAt: new Date().toISOString() }),
 }));
-vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: () => {} }));
-vi.mock("@/lib/exchange-rate", () => ({
-  getUsdToNgnRate: async () => ({ rate: 1600, source: "test", fetchedAt: new Date().toISOString() }),
-}));
-vi.mock("@/lib/marketplace-policy", () => ({
+vi.mock("@/lib/services/accounts/marketplace-policy", () => ({
   isMarketplaceCheckoutConfigured: () => true,
   isMarketplacePurchaseEnabled: () => true,
 }));
 
 // The sources are fake; the price maths between them and the wallet is not.
-vi.mock("@/lib/marketplace-suppliers", () => {
+vi.mock("@/lib/services/accounts/marketplace-suppliers", () => {
   class MarketplaceError extends Error {
     code: string; status: number; ambiguous = false;
     constructor(message: string, code: string, status = 502) {
@@ -74,6 +78,7 @@ vi.mock("@/lib/marketplace-suppliers", () => {
     supportsPromoCodes: (slug: string) => slug.startsWith("p2:"),
     labelId: (label: string) => label.length + 1000,
     getMarketplaceListing: async () => {
+      mocks.listingReads += 1;
       if (mocks.listingError) throw mocks.listingError;
       if (!mocks.listing) throw new MarketplaceError("Gone", "listing_not_found", 404);
       return mocks.listing;
@@ -94,8 +99,8 @@ vi.mock("@/lib/marketplace-suppliers", () => {
   };
 });
 
-vi.mock("@/lib/accszone", async (original) => {
-  const actual = await original<typeof import("@/lib/accszone")>();
+vi.mock("@/lib/providers/accszone", async (original) => {
+  const actual = await original<typeof import("@/lib/providers/accszone")>();
   return {
     ...actual,
     validatePromo: async (_code: string, basketUsd: number) => {
@@ -109,6 +114,7 @@ vi.mock("@/lib/accszone", async (original) => {
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
 let purchaseRoute: typeof import("@/app/api/accounts/purchase/route");
+let quoteRoute: typeof import("@/app/api/accounts/quote/route");
 let listingsRoute: typeof import("@/app/api/accounts/listings/route");
 let promoRoute: typeof import("@/app/api/accounts/promo/route");
 
@@ -136,11 +142,27 @@ function listing(overrides: Record<string, unknown> = {}) {
   };
 }
 
-const purchaseRequest = (body: Record<string, unknown>) => new NextRequest("https://pryva.test/api/accounts/purchase", {
+const quoteRequest = (body: Record<string, unknown>) => new NextRequest("https://pryva.test/api/accounts/quote", {
+  method: "POST",
+  headers: { host: "pryva.test", "x-forwarded-proto": "https", origin: "https://pryva.test", "content-type": "application/json" },
+  body: JSON.stringify(body),
+});
+const rawPurchaseRequest = (body: Record<string, unknown>) => new NextRequest("https://pryva.test/api/accounts/purchase", {
   method: "POST",
   headers: { host: "pryva.test", "x-forwarded-proto": "https", origin: "https://pryva.test", "content-type": "application/json" },
   body: JSON.stringify({ requestId: randomUUID(), quantity: 1, ...body }),
 });
+// Existing money tests confirm a real server quote before invoking checkout.
+// For refusal cases use syntactically valid placeholders so checkout reaches the
+// same validation failure instead of failing early for a missing quote.
+const purchaseRequest = async (body: Record<string, unknown>) => {
+  const response = await quoteRoute.POST(quoteRequest({ quantity: 1, ...body }));
+  const data = await response.json();
+  const expected = data.ok
+    ? { expectedTotalNgn: data.quote.totalNgn, expectedTerms: data.quote.terms }
+    : { expectedTotalNgn: 1, expectedTerms: "0".repeat(24) };
+  return rawPurchaseRequest({ ...expected, ...body });
+};
 const listingsRequest = () => new NextRequest("https://pryva.test/api/accounts/listings", { headers: { host: "pryva.test" } });
 const promoRequest = (body: Record<string, unknown>) => new NextRequest("https://pryva.test/api/accounts/promo", {
   method: "POST",
@@ -158,8 +180,9 @@ beforeAll(async () => {
   }
   database = drizzle(pg, { schema });
   mocks.db = database;
-  [purchaseRoute, listingsRoute, promoRoute] = await Promise.all([
+  [purchaseRoute, quoteRoute, listingsRoute, promoRoute] = await Promise.all([
     import("@/app/api/accounts/purchase/route"),
+    import("@/app/api/accounts/quote/route"),
     import("@/app/api/accounts/listings/route"),
     import("@/app/api/accounts/promo/route"),
   ]);
@@ -184,6 +207,8 @@ async function seedReachableAdmin() {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  mocks.rateLimit.mockReset();
+  mocks.rateLimit.mockResolvedValue({ allowed: true, unavailable: false });
   vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db");
   vi.stubEnv("ADMIN_EMAILS", ADMIN_EMAIL);
   await pg.exec('TRUNCATE TABLE "users" CASCADE');
@@ -193,6 +218,8 @@ beforeEach(async () => {
   mocks.user.mockResolvedValue({ id: USER, email: "buyer@example.com", name: "Buyer", walletBalance: START_BALANCE });
   mocks.listing = listing();
   mocks.listingError = null;
+  mocks.listingReads = 0;
+  mocks.rate = 1600;
   mocks.purchaseCalls = 0;
   mocks.promo = null;
   mocks.promoBaskets = [];
@@ -216,7 +243,7 @@ describe("checkout with real pricing", () => {
     // ...is the price checkout actually takes. One unit, so the advertised unit
     // price and the charged total must be the same figure, not two computations
     // that happen to agree today.
-    const response = await purchaseRoute.POST(purchaseRequest({ slug: "p1:300004", quantity: 1 }));
+    const response = await purchaseRoute.POST(await purchaseRequest({ slug: "p1:300004", quantity: 1 }));
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.ok).toBe(true);
@@ -226,7 +253,7 @@ describe("checkout with real pricing", () => {
   });
 
   it("keeps the wallet, the order and the ledger in agreement", async () => {
-    const response = await purchaseRoute.POST(purchaseRequest({ slug: "p1:300004", quantity: 3 }));
+    const response = await purchaseRoute.POST(await purchaseRequest({ slug: "p1:300004", quantity: 3 }));
     expect(response.status).toBe(200);
     const charged = (await response.json()).totalNgn;
 
@@ -246,7 +273,7 @@ describe("checkout with real pricing", () => {
   });
 
   it("prices a bulk basket below the single-unit multiple, and charges that", async () => {
-    const single = await purchaseRoute.POST(purchaseRequest({ slug: "p1:300004", quantity: 1 }));
+    const single = await purchaseRoute.POST(await purchaseRequest({ slug: "p1:300004", quantity: 1 }));
     const singleTotal = (await single.json()).totalNgn;
 
     await pg.exec('TRUNCATE TABLE "users" CASCADE');
@@ -254,7 +281,7 @@ describe("checkout with real pricing", () => {
       id: USER, name: "Buyer", email: "buyer@example.com", passwordHash: "hash", walletBalance: START_BALANCE,
     });
 
-    const bulk = await purchaseRoute.POST(purchaseRequest({ slug: "p1:300004", quantity: 25 }));
+    const bulk = await purchaseRoute.POST(await purchaseRequest({ slug: "p1:300004", quantity: 25 }));
     expect(bulk.status).toBe(200);
     const bulkTotal = (await bulk.json()).totalNgn;
 
@@ -268,7 +295,7 @@ describe("checkout with real pricing", () => {
   it("moves no money and calls no source when the wallet is short", async () => {
     await database.update(schema.users).set({ walletBalance: 100 }).where(eq(schema.users.id, USER));
 
-    const response = await purchaseRoute.POST(purchaseRequest({ slug: "p1:300004", quantity: 1 }));
+    const response = await purchaseRoute.POST(await purchaseRequest({ slug: "p1:300004", quantity: 1 }));
     expect(response.status).toBe(402);
     const body = await response.json();
     expect(body.error).toBe("Insufficient wallet balance.");
@@ -277,7 +304,7 @@ describe("checkout with real pricing", () => {
     expect(await balance()).toBe(100);
     expect(await orderRows()).toHaveLength(0);
     expect(await ledger()).toHaveLength(0);
-    // The debit is refused before any source is contacted, so nothing is owed.
+    // The debit is refused before any paid source call, so nothing is owed.
     expect(mocks.purchaseCalls).toBe(0);
   });
 
@@ -285,7 +312,7 @@ describe("checkout with real pricing", () => {
     mocks.listing = listing({ slug: "p2:legacy-1", sourceId: "1" });
     mocks.promo = { discount: "0.500000" };
 
-    const plain = await purchaseRoute.POST(purchaseRequest({ slug: "p2:legacy-1", quantity: 1 }));
+    const plain = await purchaseRoute.POST(await purchaseRequest({ slug: "p2:legacy-1", quantity: 1 }));
     const plainTotal = (await plain.json()).totalNgn;
 
     await pg.exec('TRUNCATE TABLE "users" CASCADE');
@@ -294,7 +321,7 @@ describe("checkout with real pricing", () => {
     });
     mocks.purchaseCalls = 0;
 
-    const discounted = await purchaseRoute.POST(purchaseRequest({ slug: "p2:legacy-1", quantity: 1, promoCode: "SAVE50" }));
+    const discounted = await purchaseRoute.POST(await purchaseRequest({ slug: "p2:legacy-1", quantity: 1, promoCode: "SAVE50" }));
     expect(discounted.status).toBe(200);
     const body = await discounted.json();
     expect(body.totalNgn).toBeLessThan(plainTotal);
@@ -311,7 +338,7 @@ describe("checkout with real pricing", () => {
   });
 
   it("refuses a promo on a listing whose source has no promo API, at the shown price", async () => {
-    const response = await purchaseRoute.POST(purchaseRequest({ slug: "p1:300004", quantity: 1, promoCode: "SAVE50" }));
+    const response = await purchaseRoute.POST(await purchaseRequest({ slug: "p1:300004", quantity: 1, promoCode: "SAVE50" }));
     expect(response.status).toBe(409);
     expect((await response.json()).error).toBe("Promo codes do not apply to this item.");
     // Refused rather than silently charged the undiscounted price.
@@ -323,7 +350,7 @@ describe("checkout with real pricing", () => {
   it("rejects a basket below the minimum order instead of charging a token amount", async () => {
     mocks.listing = listing({ priceUsd: "0.000001" });
 
-    const response = await purchaseRoute.POST(purchaseRequest({ slug: "p1:300004", quantity: 1 }));
+    const response = await purchaseRoute.POST(await purchaseRequest({ slug: "p1:300004", quantity: 1 }));
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.minimumOrderNgn).toBe(500);
@@ -343,7 +370,7 @@ describe("checkout with real pricing", () => {
       priceUsd: "2.500000", stock: null, sold: null, warrantyDays: 120, fulfilment: "manual",
     });
 
-    const response = await purchaseRoute.POST(purchaseRequest({ slug: "p3:netflix-standard", quantity: 2 }));
+    const response = await purchaseRoute.POST(await purchaseRequest({ slug: "p3:netflix-standard", quantity: 2 }));
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.preparing).toBe(true);
@@ -371,7 +398,7 @@ describe("checkout with real pricing", () => {
       priceUsd: "2.500000", stock: null, sold: null, warrantyDays: 120, fulfilment: "manual",
     });
 
-    const response = await purchaseRoute.POST(purchaseRequest({ slug: "p3:netflix-standard", quantity: 2 }));
+    const response = await purchaseRoute.POST(await purchaseRequest({ slug: "p3:netflix-standard", quantity: 2 }));
     expect(response.status).toBe(503);
     // Refused before the wallet was touched: no order, no debit, no source call.
     expect(await orderRows()).toHaveLength(0);
@@ -391,7 +418,7 @@ describe("checkout with real pricing", () => {
       priceUsd: "2.500000", stock: null, sold: null, warrantyDays: 120, fulfilment: "manual",
     });
 
-    const response = await purchaseRoute.POST(purchaseRequest({ slug: "p3:netflix-standard", quantity: 2 }));
+    const response = await purchaseRoute.POST(await purchaseRequest({ slug: "p3:netflix-standard", quantity: 2 }));
     expect(response.status).toBe(503);
     expect(await balance()).toBe(START_BALANCE);
   });
@@ -403,7 +430,7 @@ describe("checkout with real pricing", () => {
     // behind a delivered badge.
     mocks.delivered = ["only-one|credential"];
 
-    const response = await purchaseRoute.POST(purchaseRequest({ slug: "p1:300004", quantity: 3 }));
+    const response = await purchaseRoute.POST(await purchaseRequest({ slug: "p1:300004", quantity: 3 }));
     expect(response.status).toBe(202);
     const body = await response.json();
     expect(body.pending).toBe(true);
@@ -421,6 +448,215 @@ describe("checkout with real pricing", () => {
     expect(mocks.purchaseCalls).toBe(1);
   });
 
+describe("reviewed marketplace quote safety", () => {
+  async function getQuote(slug = "p1:300004", quantity = 1, promoCode = "") {
+    const response = await quoteRoute.POST(quoteRequest({ slug, quantity, promoCode }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    return (await response.json()).quote;
+  }
+  function confirmed(quote: { slug: string; quantity: number; promoCode: string; totalNgn: number; terms: string }, requestId = randomUUID()) {
+    return rawPurchaseRequest({
+      slug: quote.slug, quantity: quote.quantity, promoCode: quote.promoCode, requestId,
+      expectedTotalNgn: quote.totalNgn, expectedTerms: quote.terms,
+    });
+  }
+
+  it("quotes a bulk total using the actual pricing rules without moving money or revealing costs", async () => {
+    const shown = await (await listingsRoute.GET(listingsRequest())).json();
+    const oldBrowserEstimate = Math.ceil((shown.listings[0].priceNgn * 25 * 0.9) / 50) * 50;
+    const quote = await getQuote("p1:300004", 25);
+    // The old client estimate did not account for the server's profit floor.
+    expect(quote.totalNgn).not.toBe(oldBrowserEstimate);
+    expect(quote.quantity).toBe(25);
+    expect(JSON.stringify(quote).toLowerCase()).not.toMatch(/wholesale|priceusd|costngn|fxrate|bulkacc|accszone/);
+    expect(await balance()).toBe(START_BALANCE);
+    expect(await orderRows()).toHaveLength(0);
+    expect(await ledger()).toHaveLength(0);
+    expect(mocks.purchaseCalls).toBe(0);
+    const response = await purchaseRoute.POST(confirmed(quote));
+    expect(response.status).toBe(200);
+    expect((await response.json()).totalNgn).toBe(quote.totalNgn);
+    expect(await balance()).toBe(START_BALANCE - quote.totalNgn);
+    expect((await ledger())[0].amount).toBe(quote.totalNgn);
+  });
+
+  it.each(["5.000000", "2.000000"])("refuses a changed price (%s) until the customer confirms the new amount", async (newPrice) => {
+    const quote = await getQuote();
+    const requestId = randomUUID();
+    mocks.listing = listing({ priceUsd: newPrice });
+    const first = await purchaseRoute.POST(confirmed(quote, requestId));
+    const body = await first.json();
+    expect(first.status).toBe(409);
+    expect(body.code).toBe("quote_changed");
+    expect(body.quote.totalNgn).not.toBe(quote.totalNgn);
+    expect(await balance()).toBe(START_BALANCE);
+    expect(await orderRows()).toHaveLength(0);
+    expect(await ledger()).toHaveLength(0);
+    expect(mocks.purchaseCalls).toBe(0);
+
+    const second = await purchaseRoute.POST(confirmed(body.quote, requestId));
+    expect(second.status).toBe(200);
+    expect((await second.json()).totalNgn).toBe(body.quote.totalNgn);
+    expect(await balance()).toBe(START_BALANCE - body.quote.totalNgn);
+    expect((await ledger())[0].amount).toBe(body.quote.totalNgn);
+    expect(mocks.purchaseCalls).toBe(1);
+
+    // A retry of the already-processed request, including an older client without
+    // quote fields, must return the receipt rather than purchase again.
+    const replay = await purchaseRoute.POST(rawPurchaseRequest({ slug: quote.slug, quantity: 1, requestId }));
+    expect(replay.status).toBe(200);
+    expect((await replay.json()).totalNgn).toBe(body.quote.totalNgn);
+    expect(mocks.purchaseCalls).toBe(1);
+    expect(await ledger()).toHaveLength(1);
+  });
+
+  it("requires a new confirmation when the exchange rate changes the customer total", async () => {
+    const quote = await getQuote();
+    mocks.rate = 1800;
+    const response = await purchaseRoute.POST(confirmed(quote));
+    const body = await response.json();
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("quote_changed");
+    expect(body.quote.totalNgn).toBeGreaterThan(quote.totalNgn);
+    expect(await balance()).toBe(START_BALANCE);
+    expect(await orderRows()).toHaveLength(0);
+    expect(await ledger()).toHaveLength(0);
+    expect(mocks.purchaseCalls).toBe(0);
+    const approved = await purchaseRoute.POST(confirmed(body.quote));
+    expect(approved.status).toBe(200);
+    expect(await balance()).toBe(START_BALANCE - body.quote.totalNgn);
+  });
+
+  it.each([
+    ["title", { title: "Updated account listing" }],
+    ["warranty", { warrantyDays: 30 }],
+    ["fulfilment", { fulfilment: "manual" }],
+  ])("requires reconfirmation for a changed %s at the same total", async (_field, updated) => {
+    const quote = await getQuote();
+    mocks.listing = listing(updated);
+    const response = await purchaseRoute.POST(confirmed(quote));
+    const body = await response.json();
+    expect(response.status).toBe(409);
+    expect(body.quote.totalNgn).toBe(quote.totalNgn);
+    expect(body.quote.terms).not.toBe(quote.terms);
+    expect(body.quote).toMatchObject(updated);
+    expect(await balance()).toBe(START_BALANCE);
+    expect(await orderRows()).toHaveLength(0);
+    expect(await ledger()).toHaveLength(0);
+    expect(mocks.purchaseCalls).toBe(0);
+  });
+
+  it("rejects missing, malformed, and tampered confirmations before any debit or paid supplier call", async () => {
+    const quote = await getQuote();
+    for (const bad of [
+      {},
+      { expectedTotalNgn: 0, expectedTerms: quote.terms },
+      { expectedTotalNgn: quote.totalNgn, expectedTerms: "not-a-terms-fingerprint" },
+      { expectedTotalNgn: 2_147_483_648, expectedTerms: quote.terms },
+    ]) {
+      const response = await purchaseRoute.POST(rawPurchaseRequest({ slug: quote.slug, ...bad }));
+      expect(response.status).toBe(400);
+      expect((await response.json()).code).toBe("quote_required");
+    }
+    const spoofed = await purchaseRoute.POST(rawPurchaseRequest({ slug: quote.slug, expectedTotalNgn: 1, expectedTerms: quote.terms }));
+    expect(spoofed.status).toBe(409);
+    expect((await spoofed.json()).code).toBe("quote_changed");
+    expect(await balance()).toBe(START_BALANCE);
+    expect(await orderRows()).toHaveLength(0);
+    expect(await ledger()).toHaveLength(0);
+    expect(mocks.purchaseCalls).toBe(0);
+  });
+
+  it("requires renewed confirmation if the promo value changes and never silently drops an expired promo", async () => {
+    mocks.listing = listing({ slug: "p2:legacy-1", sourceId: "1" });
+    mocks.promo = { discount: "0.500000" };
+    const quote = await getQuote("p2:legacy-1", 2, "SAVE50");
+    mocks.promo = { discount: "0.250000" };
+    const changed = await purchaseRoute.POST(confirmed(quote));
+    const body = await changed.json();
+    expect(changed.status).toBe(409);
+    expect(body.code).toBe("quote_changed");
+    expect(body.quote.totalNgn).toBeGreaterThan(quote.totalNgn);
+    expect(await balance()).toBe(START_BALANCE);
+    expect(mocks.purchaseCalls).toBe(0);
+    mocks.promo = null;
+    const expired = await purchaseRoute.POST(confirmed(body.quote));
+    expect(expired.status).toBe(409);
+    expect((await expired.json()).code).toBe("promo_unavailable");
+    expect(await balance()).toBe(START_BALANCE);
+    expect(await orderRows()).toHaveLength(0);
+  });
+
+  it("binds confirmation to the promo code even when two codes calculate the same total", async () => {
+    mocks.listing = listing({ slug: "p2:legacy-1", sourceId: "1" });
+    mocks.promo = { discount: "0.500000" };
+    const quote = await getQuote("p2:legacy-1", 1, "FIRST");
+    const response = await purchaseRoute.POST(rawPurchaseRequest({
+      slug: quote.slug, quantity: 1, promoCode: "SECOND", expectedTotalNgn: quote.totalNgn, expectedTerms: quote.terms,
+    }));
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.quote.totalNgn).toBe(quote.totalNgn);
+    expect(body.quote.promoCode).toBe("SECOND");
+    expect(body.quote.terms).not.toBe(quote.terms);
+    expect(await balance()).toBe(START_BALANCE);
+    expect(await ledger()).toHaveLength(0);
+    expect(mocks.purchaseCalls).toBe(0);
+  });
+
+  it("replays a completed manual order even when fulfilment later becomes unreachable", async () => {
+    await seedReachableAdmin();
+    mocks.listing = listing({ slug: "p3:netflix-standard", sourceId: "netflix-standard", stock: null, fulfilment: "manual" });
+    const quote = await getQuote("p3:netflix-standard");
+    // Manual quotes do not consume the shared supplier-read budget.
+    expect(mocks.rateLimit.mock.calls.map(([key]) => key)).toEqual([`accounts-quote:${USER}`]);
+    const requestId = randomUUID();
+    const original = await purchaseRoute.POST(confirmed(quote, requestId));
+    expect(original.status).toBe(200);
+    expect((await original.json()).preparing).toBe(true);
+    await database.update(schema.users).set({ emailVerifiedAt: null }).where(eq(schema.users.email, ADMIN_EMAIL));
+    mocks.listing = null;
+    const replay = await purchaseRoute.POST(rawPurchaseRequest({ slug: quote.slug, quantity: 1, requestId }));
+    expect(replay.status).toBe(200);
+    expect((await replay.json()).preparing).toBe(true);
+    expect(await ledger()).toHaveLength(1);
+    expect(await balance()).toBe(START_BALANCE - quote.totalNgn);
+    expect(mocks.purchaseCalls).toBe(0);
+  });
+
+  it.each([
+    ["per-user denial", [{ allowed: false }], 429],
+    ["per-user store failure", [{ allowed: false, unavailable: true }], 503],
+    ["shared denial", [{ allowed: true }, { allowed: false }], 429],
+    ["shared store failure", [{ allowed: true }, { allowed: false, unavailable: true }], 503],
+  ])("fails closed on %s before a supplier read", async (_name, answers, status) => {
+    mocks.rateLimit.mockReset();
+    for (const answer of answers) mocks.rateLimit.mockResolvedValueOnce(answer);
+    const response = await quoteRoute.POST(quoteRequest({ slug: "p1:300004", quantity: 1 }));
+    expect(response.status).toBe(status);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(mocks.listingReads).toBe(0);
+    expect(await balance()).toBe(START_BALANCE);
+    expect(await orderRows()).toHaveLength(0);
+    expect(mocks.purchaseCalls).toBe(0);
+  });
+
+  it("protects price review with authentication, origin checks and shared budget limits", async () => {
+    mocks.user.mockResolvedValueOnce(null);
+    expect((await quoteRoute.POST(quoteRequest({ slug: "p1:300004", quantity: 1 }))).status).toBe(401);
+    const crossOrigin = new NextRequest("https://pryva.test/api/accounts/quote", {
+      method: "POST", headers: { host: "pryva.test", "x-forwarded-proto": "https", origin: "https://evil.test", "content-type": "application/json" },
+      body: JSON.stringify({ slug: "p1:300004", quantity: 1 }),
+    });
+    expect((await quoteRoute.POST(crossOrigin)).status).toBe(403);
+    mocks.rateLimit.mockResolvedValueOnce({ allowed: true }).mockResolvedValueOnce({ allowed: false });
+    expect((await quoteRoute.POST(quoteRequest({ slug: "p1:300004", quantity: 1 }))).status).toBe(429);
+    expect(await balance()).toBe(START_BALANCE);
+    expect(mocks.purchaseCalls).toBe(0);
+  });
+});
+
 describe("the promo quote agrees with what checkout charges", () => {
   // The quote is shown before payment. If it diverges from checkout, the customer
   // is promised a discount they do not get — the same class of split-brain the
@@ -437,7 +673,7 @@ describe("the promo quote agrees with what checkout charges", () => {
     expect(quoted.valid).toBe(true);
     expect(quoted.code).toBe("SAVE50");
 
-    const charged = await purchaseRoute.POST(purchaseRequest({ slug: "p2:legacy-1", quantity: 2, promoCode: "SAVE50" }));
+    const charged = await purchaseRoute.POST(await purchaseRequest({ slug: "p2:legacy-1", quantity: 2, promoCode: "SAVE50" }));
     expect(charged.status).toBe(200);
     const receipt = await charged.json();
 
@@ -451,7 +687,7 @@ describe("the promo quote agrees with what checkout charges", () => {
     const quote = await (await promoRoute.POST(promoRequest({ code: "SAVE50", slug: "p2:legacy-1", quantity: 2 }))).json();
 
     mocks.promo = null; // no code applied
-    const plain = await purchaseRoute.POST(purchaseRequest({ slug: "p2:legacy-1", quantity: 2 }));
+    const plain = await purchaseRoute.POST(await purchaseRequest({ slug: "p2:legacy-1", quantity: 2 }));
     expect((await plain.json()).totalNgn).toBe(quote.originalTotalNgn);
 
     // The saving is the difference between those two, exactly.
@@ -465,7 +701,7 @@ describe("the promo quote agrees with what checkout charges", () => {
     // arithmetic, not intent, and nothing else in the repo would notice a drift.
     await promoRoute.POST(promoRequest({ code: "SAVE50", slug: "p2:legacy-1", quantity: 7 }));
     mocks.promoBaskets = [];
-    await purchaseRoute.POST(purchaseRequest({ slug: "p2:legacy-1", quantity: 7, promoCode: "SAVE50" }));
+    await purchaseRoute.POST(await purchaseRequest({ slug: "p2:legacy-1", quantity: 7, promoCode: "SAVE50" }));
 
     expect(mocks.promoBaskets.length).toBeGreaterThan(0);
     for (const basket of mocks.promoBaskets) {
@@ -486,7 +722,7 @@ describe("the promo quote agrees with what checkout charges", () => {
 
     // The customer is told at the quote, so checkout never has to refuse a
     // discount it already showed. Both routes use the same wording.
-    const checkout = await purchaseRoute.POST(purchaseRequest({ slug: "p1:300004", quantity: 1, promoCode: "SAVE50" }));
+    const checkout = await purchaseRoute.POST(await purchaseRequest({ slug: "p1:300004", quantity: 1, promoCode: "SAVE50" }));
     expect(checkout.status).toBe(409);
     expect((await checkout.json()).error).toBe(body.message);
     expect(mocks.purchaseCalls).toBe(0);
@@ -507,7 +743,7 @@ describe("the promo quote agrees with what checkout charges", () => {
 
 describe("the purchase response carries no cost or source identity", () => {
   it("never writes a wholesale cost or a source identity into what the customer receives", async () => {
-    const response = await purchaseRoute.POST(purchaseRequest({ slug: "p1:300004", quantity: 2 }));
+    const response = await purchaseRoute.POST(await purchaseRequest({ slug: "p1:300004", quantity: 2 }));
     const body = await response.json();
     const json = JSON.stringify(body).toLowerCase();
 

@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fireConfetti } from "@/components/ui/Confetti";
 import { MoneyFlowDialog, MoneyOrbit, MoneyProcessing, MoneyResultIcon, downloadTextReceipt, moneyDate } from "@/components/dashboard/MoneyFlowDialog";
-import { formatNaira } from "@/lib/catalog";
-import { forgetPaystackTopUp, notifyPaystackTopUpsChanged } from "@/lib/paystack-topup-intent";
+import { formatNaira } from "@/lib/services/catalog";
+import { forgetPaystackTopUp, notifyPaystackTopUpsChanged } from "@/lib/payments/paystack-topup-intent";
 import styles from "@/components/dashboard/MoneyFlow.module.css";
 
 type Receipt = { reference: string; amount: number; balanceAfter: number; creditedAt: string };
@@ -60,7 +60,8 @@ export function TopUpReturn({ status, reference, userId, testMode = false }: { s
           setMessage(typeof result.error === "string" ? result.error : "Paystack reports this payment failed. Check your wallet history or contact support before paying again.");
         } else {
           setState("pending");
-          setMessage(typeof result.message === "string" ? result.message : typeof result.error === "string" ? result.error : "We couldn't confirm the payment yet. Check your wallet history or contact support with the reference before paying again.");
+          const unconfirmed = "We couldn't confirm the payment yet. Check your wallet history or contact support with the reference before paying again.";
+          setMessage(response.status >= 500 ? unconfirmed : typeof result.message === "string" ? result.message : typeof result.error === "string" ? result.error : unconfirmed);
         }
       } catch {
         if (!cancelled) {

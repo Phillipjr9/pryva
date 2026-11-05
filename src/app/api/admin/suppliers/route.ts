@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { authorizeAdminApi } from "@/lib/admin-auth";
-import { bitcallKeyEnvironment, getBitcallBalance, isBitcallConfigured } from "@/lib/bitcall";
-import { getUsdToNgnRate } from "@/lib/exchange-rate";
-import { fulfilablePlans } from "@/lib/fulfillment";
-import { checkMargin } from "@/lib/margin-guard";
-import { otpSupplierConfigured, otpSupplierOrder, otpSupplierProbe } from "@/lib/otp-suppliers";
-import { supplierAmountToNgn } from "@/lib/supplier-currency";
+import { authorizeAdminApi } from "@/lib/identity/admin-auth";
+import { bitcallKeyEnvironment, getBitcallBalance, isBitcallConfigured } from "@/lib/providers/bitcall";
+import { getUsdToNgnRate } from "@/lib/payments/exchange-rate";
+import { fulfilablePlans } from "@/lib/services/fulfillment";
+import { checkMargin } from "@/lib/services/margin-guard";
+import { otpSupplierConfigured, otpSupplierOrder, otpSupplierProbe } from "@/lib/services/numbers/otp-suppliers";
+import { supplierAmountToNgn } from "@/lib/payments/supplier-currency";
 
 export const dynamic = "force-dynamic";
 

@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { formatNaira } from "@/lib/catalog";
-import { isSafePaystackCheckoutUrl } from "@/lib/paystack-checkout";
-import { navigateToPaystack } from "@/lib/paystack-navigate";
-import { notifyPaystackTopUpsChanged, readPendingPaystackTopUps, rememberPaystackTopUp } from "@/lib/paystack-topup-intent";
+import { formatNaira } from "@/lib/services/catalog";
+import { isSafePaystackCheckoutUrl } from "@/lib/payments/paystack-checkout";
+import { navigateToPaystack } from "@/lib/payments/paystack-navigate";
+import { notifyPaystackTopUpsChanged, readPendingPaystackTopUps, rememberPaystackTopUp } from "@/lib/payments/paystack-topup-intent";
 import { MoneyFlowDialog, MoneyOrbit, MoneyProcessing, MoneyRoute } from "./MoneyFlowDialog";
 import styles from "./MoneyFlow.module.css";
 
@@ -69,8 +69,12 @@ export function PaystackTopUpFlow({ balance, userId, onClose, testMode = false }
       const data: unknown = await response.json();
       const result = data && typeof data === "object" && !Array.isArray(data) ? data as Record<string, unknown> : {};
       if (!response.ok || result.ok !== true || !isSafePaystackCheckoutUrl(result.authorizationUrl) || typeof result.reference !== "string") {
-        const message = typeof result.error === "string" && result.error.length <= 240 ? result.error : "Could not prepare a secure Paystack checkout.";
-        throw new Error(message);
+        const message = response.status < 500 && typeof result.error === "string" && result.error.length <= 240
+          ? result.error : "Could not prepare a secure Paystack checkout.";
+        if (!mounted.current) return;
+        setStage("review");
+        setError(`${message} No payment was opened here. Check your wallet history before trying again.`);
+        return;
       }
       // A user never leaves for payment until their non-secret reference is
       // saved. Each reference has its own key; concurrent tabs cannot erase it.
@@ -86,11 +90,10 @@ export function PaystackTopUpFlow({ balance, userId, onClose, testMode = false }
       setEmbedded(insideFrame);
       // Never derive success from this redirect. The return must be verified.
       if (!insideFrame) navigateToPaystack(result.authorizationUrl);
-    } catch (reason) {
+    } catch {
       if (!mounted.current) return;
       setStage("review");
-      const message = reason instanceof Error && reason.name !== "AbortError" && reason.message.length <= 240 ? reason.message : "Could not open checkout.";
-      setError(`${message} No payment was opened here. Check your wallet history before trying again.`);
+      setError("Could not open Paystack checkout. No payment was opened here. Check your wallet history before trying again.");
     } finally {
       window.clearTimeout(timeout);
       controller.current = null;

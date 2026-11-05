@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { AlertCircle, Check, Loader2, Shield } from "@/components/icons";
-import type { FraudQueueRow } from "@/lib/fraud";
+import type { FraudQueueRow } from "@/lib/admin/fraud";
 
 const KIND_LABEL: Record<string, string> = {
   withdrawal_review: "Withdrawal flagged",

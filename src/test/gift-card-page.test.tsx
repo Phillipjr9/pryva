@@ -3,12 +3,12 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import GiftCardsPage from "@/app/(site)/gift-cards/page";
 import sitemap from "@/app/sitemap";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira } from "@/lib/services/catalog";
 import {
   GIFT_CARD_MAX_AMOUNT,
   GIFT_CARD_MIN_AMOUNT,
   GIFT_CARD_VALIDITY_MONTHS,
-} from "@/lib/gift-card-rules";
+} from "@/lib/services/gift-cards/credit-rules";
 
 /**
  * A gift-card page is a promise about money. These tests hold the visible copy
@@ -27,7 +27,7 @@ describe("gift-card explainer", () => {
     expect(text).toContain(formatNaira(GIFT_CARD_MAX_AMOUNT));
     expect(text).toContain(`${GIFT_CARD_VALIDITY_MONTHS} months`);
 
-    const checkout = readFileSync("src/lib/gift-cards.ts", "utf8");
+    const checkout = readFileSync("src/lib/services/gift-cards/credit.ts", "utf8");
     expect(checkout).toContain("GIFT_CARD_MIN_AMOUNT");
     expect(checkout).toContain("GIFT_CARD_MAX_AMOUNT");
     expect(checkout).toContain("GIFT_CARD_VALIDITY_MONTHS");

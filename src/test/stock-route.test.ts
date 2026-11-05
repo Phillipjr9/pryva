@@ -11,9 +11,9 @@ import { NextRequest } from "next/server";
 
 const state = vi.hoisted(() => ({ authorized: false, build: vi.fn() }));
 
-vi.mock("@/lib/diagnostics-auth", () => ({ diagnosticsAuthorized: () => state.authorized }));
-vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
-vi.mock("@/lib/stock-live", () => ({ buildStockReport: state.build }));
+vi.mock("@/lib/admin/diagnostics-auth", () => ({ diagnosticsAuthorized: () => state.authorized }));
+vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/admin/stock-live", () => ({ buildStockReport: state.build }));
 
 import { GET } from "@/app/api/diagnostics/stock/route";
 
@@ -55,7 +55,7 @@ describe("GET /api/diagnostics/stock", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
-    expect(body.lanes[0].headline).toBe("2 of 6 buyable now");
+    expect(body.lanes[0].headline).toBe("2 of 6 listed or stocked");
     expect(body.lanes[0].lines[0].stock).toBe(12);
   });
 

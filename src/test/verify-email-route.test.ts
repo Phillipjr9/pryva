@@ -20,18 +20,18 @@ const state = vi.hoisted(() => ({
   sameOrigin: true,
 }));
 
-vi.mock("@/lib/auth", () => ({ requireAuthApi: async () => state.user }));
-vi.mock("@/lib/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
-vi.mock("@/lib/resend-config", () => ({ resendConfigured: () => state.configured }));
-vi.mock("@/lib/email-verification", () => ({
+vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: async () => state.user }));
+vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
+vi.mock("@/lib/email/resend-config", () => ({ resendConfigured: () => state.configured }));
+vi.mock("@/lib/identity/email-verification", () => ({
   rateLimitEmailVerification: async () => state.throttle,
   issueEmailVerification: (...args: unknown[]) => {
     state.issue(...args);
     return Promise.resolve(state.delivery);
   },
 }));
-vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
-vi.mock("@/lib/onboarding-emails", () => ({
+vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/email/onboarding-emails", () => ({
   scheduleOnboardingEmails: (...args: unknown[]) => {
     state.onboarding(...args);
   },
@@ -72,14 +72,26 @@ describe("POST /api/auth/verify-email", () => {
 
     expect(response.status).toBe(502);
     expect(body.delivered).toBe(false);
-    expect(body.error).toContain("403");
+    expect(body.error).not.toContain("403");
+    expect(body.error).not.toContain("mail service");
+    expect(body.error).toMatch(/couldn't confirm/i);
     expect(body.error).toMatch(/check your inbox/i);
+  });
+
+  it("does not expose an unexpected delivery detail", async () => {
+    state.delivery = { delivered: false, detail: "API ERROR SECRET_TEXT 503" };
+    const response = await POST(request());
+    const body = await response.text();
+    expect(response.status).toBe(502);
+    expect(body).not.toContain("SECRET_TEXT");
+    expect(body).not.toContain("API ERROR");
   });
 
   it("says mail is not configured before it issues anything", async () => {
     state.configured = false;
     const response = await POST(request());
     expect(response.status).toBe(503);
+    expect((await response.json()).error).toBe("Email confirmations are unavailable right now. Please try later or contact support.");
     expect(state.issue).not.toHaveBeenCalled();
   });
 

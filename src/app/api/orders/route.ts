@@ -1,19 +1,13 @@
-import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users, type Order } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth";
-import { findPlan, type Plan } from "@/lib/catalog";
-import { FleexaError } from "@/lib/fleexa";
-import { cancelUpstream, fulfillPlan, type FulfilledOrder } from "@/lib/fulfillment";
-import { debitWalletInTx, InsufficientFundsError, makeReference } from "@/lib/wallet";
-import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
-import { settleReferralRewards } from "@/lib/referrals";
-import { purchaseVelocity, recordFraudEvent } from "@/lib/fraud";
-import { isSameOriginMutation } from "@/lib/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
+import { afterPurchase, beginPurchase } from "@/lib/checkout/purchase";
+import { getCurrentUser } from "@/lib/identity/auth";
+import { findPlan, type Plan } from "@/lib/services/catalog";
+import { FleexaError } from "@/lib/providers/fleexa";
+import { cancelUpstream, fulfillPlan, type FulfilledOrder } from "@/lib/services/fulfillment";
+import { debitWalletInTx, InsufficientFundsError, makeReference } from "@/lib/payments/wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -86,56 +80,45 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
+  // This is an order index, not an operator view. Do not expose internal
+  // reconciliation notes, supplier costs or eSIM/account bearer credentials.
   const rows = await db
-    .select()
+    .select({
+      id: orders.id,
+      reference: orders.reference,
+      service: orders.service,
+      productSlug: orders.productSlug,
+      productName: orders.productName,
+      planLabel: orders.planLabel,
+      region: orders.region,
+      duration: orders.duration,
+      amount: orders.amount,
+      status: orders.status,
+      referenceCode: orders.referenceCode,
+      otpCode: orders.otpCode,
+      targetLink: orders.targetLink,
+      quantity: orders.quantity,
+      expiresAt: orders.expiresAt,
+      refundedAt: orders.refundedAt,
+      createdAt: orders.createdAt,
+    })
     .from(orders)
     .where(eq(orders.userId, user.id))
     .orderBy(desc(orders.createdAt))
     .limit(50);
 
-  return Response.json({ ok: true, orders: rows });
+  return Response.json({ ok: true, orders: rows }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return Response.json({ ok: false, error: "Please sign in to complete this order." }, { status: 401 });
-  }
+  const begun = await beginPurchase<Record<string, unknown>>(request, {
+    bucket: "order-create",
+    maxBodyBytes: 2_048,
+    copy: { tooFast: "That is a lot of orders in a short time. Please try again in a few minutes." },
+  });
+  if (!begun.ok) return begun.response;
+  const { user, body } = begun;
 
-  if (!isSameOriginMutation(request)) {
-    return Response.json({ ok: false, error: "Cross-origin request denied." }, { status: 403 });
-  }
-
-  if (!isJsonRequest(request)) return Response.json({ ok: false, error: "Expected JSON." }, { status: 415 });
-  if (financialActionsUnavailable()) return Response.json({ ok: false, error: "Purchases are unavailable in this environment." }, { status: 503 });
-  const limit = await purchaseRateLimiter(`order-create:${user.id}`);
-  if (limit.unavailable) return Response.json({ ok: false, error: "Purchases are temporarily unavailable." }, { status: 503 });
-  if (!limit.allowed) return Response.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
-
-  // A ceiling on orders per hour, counted from the database so it holds across
-  // instances. The per-minute limiter above stops a burst; this stops a script
-  // that paces itself. Failing to read the count is not a reason to refuse a
-  // purchase, so the check is best effort in that direction only.
-  const velocity = await purchaseVelocity(user.id).catch(() => ({ allowed: true, count: 0, limit: 0 }));
-  if (!velocity.allowed) {
-    await recordFraudEvent({
-      userId: user.id,
-      kind: "purchase_velocity",
-      severity: "warn",
-      reasons: [`${velocity.count} orders in the last hour (limit ${velocity.limit})`],
-    });
-    return Response.json(
-      { ok: false, error: "That is a lot of orders in a short time. Please try again in a few minutes." },
-      { status: 429 },
-    );
-  }
-
-  let body: unknown;
-  try {
-    body = await readJsonWithLimit(request, 2_048);
-  } catch (error) {
-    return Response.json({ ok: false, error: "Invalid request body." }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
-  }
   const planSlug = body && typeof body === "object" && !Array.isArray(body) ? (body as { planSlug?: unknown }).planSlug : null;
   if (typeof planSlug !== "string" || !planSlug || planSlug.length > 80) return Response.json({ ok: false, error: "Invalid plan." }, { status: 400 });
 
@@ -177,10 +160,9 @@ export async function POST(request: Request) {
     } catch (error) {
       if (error instanceof FleexaError) {
         console.error("Fleexa fulfilment failed", error.code, error.message);
-        // Every one of these leaves nothing bought and nothing charged, so they
-        // read as "unavailable" rather than a provider failure. The margin codes
-        // in particular must not leak wholesale economics into the wording a
-        // customer sees -- the figures stay in the server log above.
+        // The margin codes must not leak wholesale economics into the wording a
+        // customer sees. Another attempt with this request ID may be in flight,
+        // so even a refusal here does not establish its overall outcome.
         const unavailable =
           error.code === "NO_API_KEY" ||
           error.code === "SERVICE_UNAVAILABLE" ||
@@ -190,8 +172,8 @@ export async function POST(request: Request) {
           {
             ok: false,
             error: unavailable
-              ? "Fulfilment is temporarily unavailable."
-              : "Our provider couldn't fulfil that right now — nothing was charged. Try again in a moment.",
+              ? "This service is temporarily unavailable. Check your orders before trying again."
+              : "We couldn't confirm this order. Check your orders and wallet or contact support before trying again.",
           },
           { status: unavailable ? 503 : 502 },
         );
@@ -255,8 +237,9 @@ export async function POST(request: Request) {
         return { kind: "created", balance };
       });
     } catch (error) {
-      // Nothing was recorded and nothing was charged, but the number was already
-      // bought -- release it, or a failed charge leaves us holding paid-for stock.
+      // Existing cleanup releases the purchased item on a transaction error.
+      // A lost COMMIT acknowledgement is ambiguous, so this can also release
+      // an item whose order and debit committed; that requires reconciliation.
       await releaseUpstream(fulfilled, plan);
 
       if (error instanceof InsufficientFundsError) {
@@ -283,10 +266,10 @@ export async function POST(request: Request) {
       return receipt(outcome.order, await currentBalance(user.id), true);
     }
 
-    scheduleWalletEmails();
-    // Best effort: a reward for the person who invited this customer, paid once
-    // their first delivered order exists. It must never affect this purchase.
-    await settleReferralRewards({ refereeId: user.id }).catch(() => undefined);
+    // Best effort: the receipt queue and a reward for whoever invited this
+    // customer, paid once their first delivered order exists. Neither may affect
+    // this purchase, and both run on every money path, not just this one.
+    void afterPurchase(user.id);
     return receipt(
       {
         id: orderId,
@@ -302,7 +285,7 @@ export async function POST(request: Request) {
     );
   } catch {
     return Response.json(
-      { ok: false, error: "We couldn't complete that order. Please try again." },
+      { ok: false, error: "We couldn't confirm this order. Check your orders and wallet or contact support before trying again." },
       { status: 500 },
     );
   }

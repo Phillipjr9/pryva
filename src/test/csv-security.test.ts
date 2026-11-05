@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { csvCell, csvRows } from "@/lib/csv";
+import { csvCell, csvRows } from "@/lib/platform/csv";
 
 describe("CSV spreadsheet safety", () => {
   it.each(["=SUM(1,2)", "+1+2", "-1+2", "@HYPERLINK(\"x\")", "  =1+2", "\u00a0=1+2", "\tvalue", "\r=1"])(

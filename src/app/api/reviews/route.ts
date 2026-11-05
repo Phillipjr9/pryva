@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthApi } from "@/lib/auth";
-import { isSameOriginMutation } from "@/lib/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { reviewRateLimiter } from "@/lib/rate-limit";
-import { createReview, normalizeReview } from "@/lib/reviews";
-import { logger } from "@/lib/logger";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { reviewRateLimiter } from "@/lib/platform/rate-limit";
+import { createReview, normalizeReview } from "@/lib/content/reviews";
+import { logger } from "@/lib/platform/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /**
  * Write a review for one of your own delivered orders.
  *
- * The eligibility rules live in `src/lib/reviews.ts`, not here, so the dashboard,
+ * The eligibility rules live in `src/lib/content/reviews.ts`, not here, so the dashboard,
  * this route and the tests all consult one implementation: ownership, a
  * delivered/completed status, no existing review, and a 1–5 rating with a body
  * between 20 and 1,200 characters. Every new review is pending until an operator
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     logger.error("Review submission failed", { userId: user.id, error });
     return NextResponse.json(
-      { ok: false, error: "Could not save the review. Please try again." },
+      { ok: false, error: "We couldn't confirm whether your review was saved. Reload this page to check before submitting it again." },
       { status: 500 },
     );
   }

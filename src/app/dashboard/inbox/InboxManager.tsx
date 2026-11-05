@@ -104,7 +104,7 @@ export function InboxManager() {
         const data = await response.json();
         if (inFlight.current !== request) return;
         if (!response.ok || !data.ok) {
-          if (!silent) setError(data?.error ?? "Could not read that inbox.");
+          if (!silent) setError(response.status < 500 && typeof data?.error === "string" ? data.error : "Could not read that inbox right now. Try again.");
           return;
         }
         setMessages(Array.isArray(data.messages) ? data.messages : []);
@@ -151,7 +151,7 @@ export function InboxManager() {
       });
       const data = await response.json();
       if (!response.ok || !data.ok) {
-        setError(data?.error ?? "Could not create an inbox.");
+        setError(response.status < 500 && typeof data?.error === "string" ? data.error : "We couldn't confirm whether your inbox was created. Reload this page to check before trying again.");
         return;
       }
       setMessages([]);
@@ -165,7 +165,7 @@ export function InboxManager() {
       ]);
       void checkForMail(newInbox.id);
     } catch {
-      setError("Could not create an inbox. Try again.");
+      setError("We couldn't confirm whether your inbox was created. Reload this page to check before trying again.");
     } finally {
       setCreating(false);
     }
@@ -183,7 +183,7 @@ export function InboxManager() {
       });
       const data = await response.json();
       if (!response.ok || !data.ok) {
-        setError(data?.error ?? "Could not switch to that inbox.");
+        setError(response.status < 500 && typeof data?.error === "string" ? data.error : "We couldn't confirm that change. Reload your inboxes to check before trying again.");
         return;
       }
       const activated = data.inbox as InboxView;
@@ -201,7 +201,7 @@ export function InboxManager() {
       setLastChecked(null);
       void checkForMail(inboxId);
     } catch {
-      setError("Could not switch inboxes. Try again.");
+      setError("We couldn't confirm that change. Reload your inboxes to check before trying again.");
     } finally {
       setSelectingId(null);
     }
@@ -219,7 +219,7 @@ export function InboxManager() {
       });
       const data = await response.json();
       if (!response.ok || !data.ok) {
-        setError(data?.error ?? "Could not discard that inbox.");
+        setError(response.status < 500 && typeof data?.error === "string" ? data.error : "We couldn't confirm that change. Reload your inboxes to check before trying again.");
         return;
       }
       setInboxes((current) =>
@@ -241,7 +241,7 @@ export function InboxManager() {
         }
       }
     } catch {
-      setError("Could not discard that inbox. Try again.");
+      setError("We couldn't confirm that change. Reload your inboxes to check before trying again.");
     } finally {
       setDiscardingId(null);
     }
@@ -292,13 +292,13 @@ export function InboxManager() {
         icon={Mail}
         title={
           disabledReason === "preview"
-            ? "Temporary inboxes are not available on this deployment"
-            : "Temporary inboxes are not switched on yet"
+            ? "Temporary inboxes are not available in this preview"
+            : "Temporary inboxes are not available right now"
         }
         body={
           disabledReason === "preview"
-            ? "This preview has no mailbox provider behind it. Availability on the live site depends on its configuration."
-            : "The mailbox provider is not configured on this server, so there is nothing to create an inbox from."
+            ? "Check the live site for availability."
+            : "Please check back later."
         }
       />
     );

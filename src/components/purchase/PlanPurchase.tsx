@@ -4,10 +4,10 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Lock, Shield, Sparkle } from "@/components/icons";
-import { formatNaira, type Plan } from "@/lib/catalog";
+import { formatNaira, type Plan } from "@/lib/services/catalog";
 import { PaymentSuccess } from "@/components/ui/PaymentSuccess";
 import { CountryFlag } from "@/components/CountryFlag";
-import { hasCountryFlag } from "@/lib/countries";
+import { hasCountryFlag } from "@/lib/platform/countries";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
 
@@ -98,7 +98,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
         return;
       }
       if (!response.ok || !data.ok || !data.order) {
-        setError(data.error ?? "We couldn't complete that order. Please try again.");
+        setError(response.status < 500 && typeof data.error === "string" ? data.error : "We couldn't confirm this order. Check your orders and wallet or contact support before trying again.");
         if (response.status === 402) setNeedsFunds(true);
         return;
       }
@@ -111,7 +111,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
       attempt.current = null;
       router.refresh();
     } catch {
-      setError("Network hiccup. Please try again.");
+      setError("We couldn't confirm this order. Check your orders and wallet or contact support before trying again.");
     } finally {
       setPending(false);
     }
@@ -231,7 +231,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
                     )}
                   </div>
                   <span className="mt-1.5 text-meta text-ink-3">{plan.duration}</span>
-                  <span className="mt-2 block w-full sm:mt-3"><UnitsStatus /></span>
+                  <span className="mt-2 block w-full sm:mt-3"><UnitsStatus unknownStockLabel="Checked at checkout" /></span>
 
                   <ul className="mt-2.5 space-y-1 sm:mt-4 sm:space-y-1.5">
                     {/* Past the first two, the list is a detail: on a phone it is
@@ -308,7 +308,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
                 </Link>
               )}
               {error && (
-                <p className="max-w-xs text-right text-meta font-medium text-rose-600">
+                <p role="alert" className="max-w-xs text-right text-meta font-medium text-rose-600">
                   {error}
                   {needsFunds && (
                     <>

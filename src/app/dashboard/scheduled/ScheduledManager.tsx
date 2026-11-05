@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira } from "@/lib/services/catalog";
 
 export interface ScheduledRow {
   id: string;
@@ -79,13 +79,13 @@ export function ScheduledManager({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Could not create the schedule.");
+        setError(res.status < 500 && typeof data.error === "string" ? data.error : "We couldn't confirm whether the schedule was created. Reload this page to check before creating it again.");
         return;
       }
       setMessage(`Scheduled. The first run is on ${new Date(data.nextRunAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}.`);
       router.refresh();
     } catch {
-      setError("An unexpected error occurred. Please try again.");
+      setError("We couldn't confirm whether the schedule was created. Reload this page to check before creating it again.");
     } finally {
       setCreating(false);
     }
@@ -103,12 +103,12 @@ export function ScheduledManager({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "That change could not be made.");
+        setError(res.status < 500 && typeof data.error === "string" ? data.error : "We couldn't confirm the schedule change. Reload this page to check before trying again.");
         return;
       }
       router.refresh();
     } catch {
-      setError("An unexpected error occurred. Please try again.");
+      setError("We couldn't confirm the schedule change. Reload this page to check before trying again.");
     } finally {
       setBusyId(null);
     }

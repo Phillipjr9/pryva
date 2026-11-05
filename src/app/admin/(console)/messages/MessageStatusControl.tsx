@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/Toast";
 import { Loader2 } from "@/components/icons";
-import { isMessageStatus, MESSAGE_STATUS_LABELS as LABELS, MESSAGE_STATUSES, type MessageStatus } from "@/lib/support-messages";
+import { isMessageStatus, MESSAGE_STATUS_LABELS as LABELS, MESSAGE_STATUSES, type MessageStatus } from "@/lib/support/support-messages";
 
 
 /**

@@ -15,13 +15,13 @@ const mocks = vi.hoisted(() => ({
   place: vi.fn(),
 }));
 
-vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.user }));
-vi.mock("@/lib/fraud", () => ({ purchaseVelocity: mocks.velocity, recordFraudEvent: mocks.fraud }));
-vi.mock("@/lib/rate-limit", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/rate-limit")>();
+vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: mocks.user, requireAuthApi: mocks.user }));
+vi.mock("@/lib/admin/fraud", () => ({ purchaseVelocity: mocks.velocity, recordFraudEvent: mocks.fraud }));
+vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
   return { ...actual, purchaseRateLimiter: mocks.limit };
 });
-vi.mock("@/lib/boost-orders", () => ({ placeBoostOrder: mocks.place }));
+vi.mock("@/lib/services/boosts/boost-orders", () => ({ placeBoostOrder: mocks.place }));
 
 import { POST } from "@/app/api/boosts/order/route";
 
@@ -42,7 +42,7 @@ function post(body: unknown, headers: Record<string, string> = {}) {
   });
 }
 
-const valid = { itemId: ITEM, link: "https://instagram.com/ada", quantity: 1_000, requestId: REQUEST };
+const valid = { itemId: ITEM, link: "https://instagram.com/ada", quantity: 1_000, requestId: REQUEST, expectedTotalNgn: 1_500, expectedTerms: "a".repeat(24) };
 
 const ORDER = {
   id: "order-1",
@@ -156,7 +156,26 @@ describe("POST /api/boosts/order", () => {
     expect(data.order).toMatchObject({ reference: "PRY-BOOST1", amount: 1_500, quantity: 1_000 });
     expect(mocks.place).toHaveBeenCalledWith({
       userId: "user-1", itemId: ITEM, link: "https://instagram.com/ada", quantity: 1_000, requestId: REQUEST,
+      expectedTotalNgn: 1_500, expectedTerms: "a".repeat(24),
     });
+  });
+
+  it("returns updated customer-facing terms for review, not an order", async () => {
+    mocks.place.mockResolvedValueOnce({
+      kind: "quote_changed", error: "Review the updated total.",
+      quote: { id: ITEM, name: "Instagram Followers", tag: "Followers", min: 100, max: 10_000, perThousand: 2_100, terms: "b".repeat(24) },
+    });
+    const response = await POST(post(valid));
+    expect(response.status).toBe(409);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toMatchObject({ ok: false, code: "quote_changed", quote: { perThousand: 2_100 } });
+  });
+
+  it("returns a conflict when an idempotency key names a different purchase", async () => {
+    mocks.place.mockResolvedValueOnce({ kind: "request_conflict", error: "Check your orders." });
+    const response = await POST(post(valid));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "request_conflict" });
   });
 
   it("flags a replay so the interface never implies a second charge", async () => {
@@ -174,5 +193,7 @@ describe("POST /api/boosts/order", () => {
     const text = await response.text();
     expect(text).not.toContain("ECONNREFUSED");
     expect(text).not.toContain("10.0.0.4");
+    expect(text).toMatch(/check your orders and wallet/i);
+    expect(text).not.toMatch(/please try again/i);
   });
 });

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { ArrowRight, Lock } from "@/components/icons";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira } from "@/lib/services/catalog";
 
 /**
  * One eSIM plan, one button.
@@ -73,7 +73,7 @@ export function EsimBuy({
         return;
       }
       if (!response.ok || !payload.ok) {
-        setError(payload.error ?? "We couldn't complete that order. Please try again.");
+        setError(response.status < 500 && typeof payload.error === "string" ? payload.error : "We couldn't confirm this order. Check your orders or contact support before trying again.");
         return;
       }
       if (payload.order?.id) {
@@ -82,7 +82,7 @@ export function EsimBuy({
       }
       router.refresh();
     } catch {
-      setError("We couldn't reach the server. Check your connection and try again.");
+      setError("We couldn't confirm this order. Check your orders or contact support before trying again.");
     } finally {
       setPending(false);
     }

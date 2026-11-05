@@ -28,7 +28,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/logger", () => ({ logger: mocks.log }));
+vi.mock("@/lib/platform/logger", () => ({ logger: mocks.log }));
 vi.mock("@simplewebauthn/server", () => ({
   generateRegistrationOptions: mocks.generateRegistrationOptions,
   verifyRegistrationResponse: mocks.verifyRegistrationResponse,
@@ -44,7 +44,7 @@ const RP = { rpID: "pryvalogs.com", origin: "https://pryvalogs.com" };
 
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
-let passkeys: typeof import("@/lib/passkeys");
+let passkeys: typeof import("@/lib/identity/passkeys");
 
 /** A response whose clientDataJSON carries the challenge the server issued. */
 function responseFor(challenge: string, credentialId: string) {
@@ -72,7 +72,7 @@ beforeAll(async () => {
   for (const file of files) await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
-  passkeys = await import("@/lib/passkeys");
+  passkeys = await import("@/lib/identity/passkeys");
 }, 30_000);
 
 afterAll(async () => {

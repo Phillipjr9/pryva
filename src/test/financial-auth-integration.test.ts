@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFile } from "node:fs/promises";
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle, type PgliteDatabase } from "drizzle-orm/pglite";
 import { eq } from "drizzle-orm";
@@ -35,28 +35,28 @@ const mocks = vi.hoisted(() => ({
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/lib/identity/auth", () => ({
   requireAuthApi: mocks.user, getCurrentUser: mocks.user,
   createSession: mocks.session, destroySession: mocks.destroySession, hashPassword: () => "test-password-hash",
   verifyPassword: (password: string, hash: string) => password === hash,
   SESSION_COOKIE: "pryva_session", SESSION_COOKIE_EMBEDDED: "pryva_session_3p",
 }));
-vi.mock("@/lib/admin-auth", () => ({
+vi.mock("@/lib/identity/admin-auth", () => ({
   authorizeAdminApi: async () => ({ user: { id: "admin-id" }, response: null }),
 }));
-vi.mock("@/lib/logger", () => ({ logger: mocks.log }));
-vi.mock("@/lib/account-closed-email", () => ({ scheduleAccountClosedEmail: mocks.scheduleClosed }));
+vi.mock("@/lib/platform/logger", () => ({ logger: mocks.log }));
+vi.mock("@/lib/email/account-closed-email", () => ({ scheduleAccountClosedEmail: mocks.scheduleClosed }));
 vi.mock("next/headers", () => ({ cookies: mocks.cookies }));
-vi.mock("@/lib/google", () => ({
+vi.mock("@/lib/identity/google", () => ({
   googleConfigured: () => true, exchangeGoogleCode: mocks.exchange, fetchGoogleUser: mocks.googleProfile,
 }));
 // The real ledger arithmetic is kept (the deletion path writes a forfeiture debit
 // through it); only the outbound credit is stubbed.
-vi.mock("@/lib/wallet", async (original) => ({
-  ...(await original<typeof import("@/lib/wallet")>()),
+vi.mock("@/lib/payments/wallet", async (original) => ({
+  ...(await original<typeof import("@/lib/payments/wallet")>()),
   creditWallet: vi.fn(),
 }));
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/lib/platform/rate-limit", () => ({
   purchaseRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   giftCardIpRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   giftCardUserRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
@@ -67,24 +67,24 @@ vi.mock("@/lib/rate-limit", () => ({
   createRateLimiter: () => async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   resetRateLimit: async () => {},
 }));
-vi.mock("@/lib/accszone", async (original) => {
-  const actual = await original<typeof import("@/lib/accszone")>();
+vi.mock("@/lib/providers/accszone", async (original) => {
+  const actual = await original<typeof import("@/lib/providers/accszone")>();
   return { ...actual, isAccsZoneConfigured: () => true, getListing: mocks.getListing, purchaseAccounts: mocks.purchase, validatePromo: mocks.promo };
 });
-vi.mock("@/lib/fleexa", async (original) => {
-  const actual = await original<typeof import("@/lib/fleexa")>();
+vi.mock("@/lib/providers/fleexa", async (original) => {
+  const actual = await original<typeof import("@/lib/providers/fleexa")>();
   return { ...actual, checkFleexaSms: mocks.checkSms, getFleexaRentalSms: mocks.rentalSms };
 });
 // A number can come from either supplier; the poll must ask the one that sold it.
-vi.mock("@/lib/bitcall", async (original) => {
-  const actual = await original<typeof import("@/lib/bitcall")>();
+vi.mock("@/lib/providers/bitcall", async (original) => {
+  const actual = await original<typeof import("@/lib/providers/bitcall")>();
   return { ...actual, getBitcallOtpActivation: mocks.otpActivation };
 });
-vi.mock("@/lib/marketplace-pricing", () => ({
+vi.mock("@/lib/services/accounts/marketplace-pricing", () => ({
   priceMarketplaceListing: mocks.price,
   applyPromoDiscount: (price: unknown) => price,
 }));
-vi.mock("@/lib/paystack", () => ({
+vi.mock("@/lib/payments/paystack", () => ({
   isPaystackConfigured: () => true, getBanks: mocks.getBanks,
   resolveBankAccount: mocks.resolveBank, createTransferRecipient: mocks.createRecipient,
   initializePayment: mocks.initializePayment, verifyPayment: mocks.verifyPayment, initiateTransfer: mocks.initiateTransfer,
@@ -120,16 +120,19 @@ let scheduledRoute: typeof import("@/app/api/scheduled-orders/route");
 let promoRoute: typeof import("@/app/api/accounts/promo/route");
 let withdrawalRoute: typeof import("@/app/api/wallet/withdraw/route");
 let adminWithdrawalRoute: typeof import("@/app/api/admin/withdrawals/route");
-let integrity: typeof import("@/lib/payment-integrity");
-let autoRefund: typeof import("@/lib/auto-refund");
-let retention: typeof import("@/lib/retention");
+let integrity: typeof import("@/lib/payments/payment-integrity");
+let autoRefund: typeof import("@/lib/services/auto-refund");
+let retention: typeof import("@/lib/identity/retention");
 
 function purchaseRequest(id = REQUEST_ID, origin = "https://pryva.test", type = "application/json") {
   return new NextRequest("https://pryva.test/api/accounts/purchase", {
     method: "POST", headers: { host: "pryva.test", "x-forwarded-proto": "https", origin, "content-type": type },
     // Listing ids are opaque routing tokens: the prefix says which source owns
     // the reference, so a purchase can never be sent to the wrong supplier.
-    body: JSON.stringify({ slug: "p2:listing", quantity: 1, requestId: id }),
+    body: JSON.stringify({
+      slug: "p2:listing", quantity: 1, requestId: id, expectedTotalNgn: 2000,
+      expectedTerms: createHash("sha256").update(JSON.stringify(["p2:listing", 1, "", "Test listing", "instant", 30])).digest("hex").slice(0, 24),
+    }),
   });
 }
 function adminRefund(orderId: string, extra: Record<string, unknown> = {}) {
@@ -191,14 +194,14 @@ beforeAll(async () => {
     import("@/app/api/wallet/bank-accounts/route"), import("@/app/api/wallet/verify-account/route"),
     import("@/app/api/auth/google/callback/route"), import("@/app/api/contact/route"),
     import("@/app/api/user/delete/route"), import("@/app/api/user/password/route"),
-    import("@/app/api/user/sessions/route"), import("@/lib/auto-refund"),
+    import("@/app/api/user/sessions/route"), import("@/lib/services/auto-refund"),
     import("@/app/api/gift-cards/purchase/route"), import("@/app/api/gift-cards/check/route"), import("@/app/api/gift-cards/redeem/route"),
     import("@/app/api/wallet/topup/route"), import("@/app/api/wallet/topup/verify/route"), import("@/app/api/webhooks/payment/route"),
     import("@/app/api/user/profile/route"), import("@/app/api/notifications/route"),
     import("@/app/api/notifications/mark-read/route"), import("@/app/api/auth/logout/route"),
-    import("@/app/api/orders/[id]/sync/route"), import("@/app/api/scheduled-orders/route"), import("@/app/api/accounts/promo/route"), import("@/app/api/wallet/withdraw/route"), import("@/app/api/admin/withdrawals/route"), import("@/lib/payment-integrity"),
+    import("@/app/api/orders/[id]/sync/route"), import("@/app/api/scheduled-orders/route"), import("@/app/api/accounts/promo/route"), import("@/app/api/wallet/withdraw/route"), import("@/app/api/admin/withdrawals/route"), import("@/lib/payments/payment-integrity"),
   ]);
-  retention = await import("@/lib/retention");
+  retention = await import("@/lib/identity/retention");
 }, 30_000);
 
 afterAll(async () => { await pg?.close(); });
@@ -1640,7 +1643,7 @@ describe("payout settlement from the provider's own events", () => {
     await database.update(schema.withdrawals)
       .set({ createdAt: new Date(Date.now() - 30 * 60_000) })
       .where(eq(schema.withdrawals.id, row.id));
-    const payouts = await import("@/lib/payouts");
+    const payouts = await import("@/lib/payments/payouts");
 
     // Not settled yet: the provider says it is still processing.
     mocks.verifyTransfer.mockResolvedValueOnce({
@@ -1693,7 +1696,7 @@ describe("payout settlement from the provider's own events", () => {
   });
 
   it("answers the operator's question: are payout events arriving?", async () => {
-    const activity = await import("@/lib/webhook-events");
+    const activity = await import("@/lib/payments/webhook-events");
 
     // Nothing delivered yet.
     const empty = await activity.recentWebhookActivity();

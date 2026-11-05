@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, orders, walletTransactions, giftCards, scheduledOrders } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireAuthApi } from "@/lib/auth";
-import { logger } from "@/lib/logger";
-import { userExportRateLimiter } from "@/lib/rate-limit";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { logger } from "@/lib/platform/logger";
+import { userExportRateLimiter } from "@/lib/platform/rate-limit";
 
 const MAX_EXPORT_ROWS_PER_CATEGORY = 5_000;
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { BrandIcon, type BrandIconProps } from "@/components/BrandIcon";
-import { artworkMaster, artworkSrcSet } from "@/lib/service-artwork";
+import { artworkMaster, artworkSrcSet } from "@/lib/services/service-artwork";
 
 type DigitalServiceType = "netflix" | "spotify" | "youtube" | "disney" | "chatgpt" | "canva";
 type CoreServiceType = "numbers" | "esim" | "proxies" | "email-otp";

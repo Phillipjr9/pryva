@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { checkMargin, MARGIN_BLOCKED_MESSAGE } from "@/lib/margin-guard";
+import { checkMargin, MARGIN_BLOCKED_MESSAGE } from "@/lib/services/margin-guard";
 
 afterEach(() => vi.unstubAllEnvs());
 

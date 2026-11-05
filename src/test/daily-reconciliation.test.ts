@@ -13,19 +13,19 @@ import {
   users,
   walletTransactions,
 } from "@/db/schema";
-import { completeTopUp } from "@/lib/topups";
+import { completeTopUp } from "@/lib/payments/topups";
 
 const mocks = vi.hoisted(() => ({ db: undefined as unknown }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
 // The sweep skips the ledger check in the in-memory preview, so open it here to
 // exercise the real SQL against PGlite.
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => false }));
-vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
-vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => false }));
+vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
 
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
-let reconciliation: typeof import("@/lib/daily-reconciliation");
+let reconciliation: typeof import("@/lib/payments/daily-reconciliation");
 
 const USER = "6b1f2c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d";
 const DAY = "2026-10-30";
@@ -38,7 +38,7 @@ beforeAll(async () => {
   for (const file of files) await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
-  reconciliation = await import("@/lib/daily-reconciliation");
+  reconciliation = await import("@/lib/payments/daily-reconciliation");
 });
 
 afterAll(async () => {

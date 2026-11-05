@@ -4,7 +4,8 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Lock } from "@/components/icons";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira } from "@/lib/services/catalog";
+import { MAX_BOOST_QUANTITY, totalForQuantity } from "@/lib/services/boosts/boost-money";
 
 /**
  * Same idempotency-key rule as every other purchase: one key per attempt, kept
@@ -28,12 +29,26 @@ type Listing = {
   perThousand: number;
   min: number;
   max: number | null;
+  terms: string;
 };
+
+function isListing(value: unknown, expectedId: string): value is Listing {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const item = value as Partial<Listing>;
+  return item.id === expectedId && typeof item.name === "string" && item.name.length > 0 && item.name.length <= 160 &&
+    typeof item.tag === "string" && item.tag.length > 0 && item.tag.length <= 80 &&
+    typeof item.perThousand === "number" && Number.isSafeInteger(item.perThousand) && item.perThousand > 0 &&
+    typeof item.min === "number" && Number.isSafeInteger(item.min) && item.min > 0 && item.min <= MAX_BOOST_QUANTITY &&
+    (item.max === null || (typeof item.max === "number" && Number.isSafeInteger(item.max) && item.max >= item.min)) &&
+    typeof item.terms === "string" && /^[a-f0-9]{24}$/.test(item.terms);
+}
 
 type Receipt = { reference: string; amount: number; quantity: number; link: string; replayed: boolean };
 
 export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing; walletBalance: number }) {
   const router = useRouter();
+  const [currentListing, setCurrentListing] = useState(listing);
+  const [quoteChanged, setQuoteChanged] = useState(false);
   const [link, setLink] = useState("");
   const [quantity, setQuantity] = useState<number>(listing.min);
   const [pending, setPending] = useState(false);
@@ -41,21 +56,21 @@ export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const attempt = useRef<string | null>(null);
 
-  const total = Number.isFinite(quantity) && quantity > 0 ? Math.ceil((listing.perThousand * quantity) / 1_000) : 0;
+  const total = totalForQuantity(currentListing.perThousand, quantity);
   const shortfall = Math.max(0, total - walletBalance);
   const quantityValid =
-    Number.isSafeInteger(quantity) &&
-    quantity >= listing.min &&
-    (listing.max === null || quantity <= listing.max);
+    Number.isSafeInteger(quantity) && quantity <= MAX_BOOST_QUANTITY &&
+    quantity >= currentListing.min &&
+    (currentListing.max === null || quantity <= currentListing.max);
 
   async function buy() {
     if (pending) return;
     setError(null);
     if (!quantityValid) {
       setError(
-        listing.max === null
-          ? `Enter at least ${listing.min.toLocaleString("en-NG")} units.`
-          : `Enter between ${listing.min.toLocaleString("en-NG")} and ${listing.max.toLocaleString("en-NG")} units.`,
+        currentListing.max === null
+          ? `Enter between ${currentListing.min.toLocaleString("en-NG")} and ${MAX_BOOST_QUANTITY.toLocaleString("en-NG")} units.`
+          : `Enter between ${currentListing.min.toLocaleString("en-NG")} and ${Math.min(currentListing.max, MAX_BOOST_QUANTITY).toLocaleString("en-NG")} units.`,
       );
       return;
     }
@@ -69,16 +84,44 @@ export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing
       const response = await fetch("/api/boosts/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: listing.id, link, quantity, requestId: attempt.current }),
+        body: JSON.stringify({
+          itemId: currentListing.id, link, quantity, requestId: attempt.current,
+          expectedTotalNgn: total, expectedTerms: currentListing.terms,
+        }),
       });
       const data = (await response.json()) as {
         ok?: boolean;
         error?: string;
         replayed?: boolean;
         balance?: number;
-        order?: { reference: string; amount: number; quantity: number; targetLink: string };
+        outcome?: "refunded" | "unconfirmed";
+        code?: string;
+        quote?: unknown;
+        order?: { reference: string; amount: number; quantity: number; targetLink: string; status: string };
       };
-      if (!response.ok || !data.ok || !data.order) throw new Error(data.error || "That order could not be placed.");
+      if (response.status === 409 && data.code === "quote_changed" && isListing(data.quote, currentListing.id)) {
+        setCurrentListing(data.quote);
+        setQuoteChanged(true);
+        setError("The price or service details changed. Review the updated details and total before confirming.");
+        return;
+      }
+      if (!response.ok || !data.ok || !data.order) {
+        const unconfirmed = "We couldn't confirm this order. Check your orders and wallet or contact support before trying again.";
+        const refunded = "We couldn't confirm your boost. Your wallet has been refunded. Check your orders or contact support before placing another order.";
+        const refundUnconfirmed = "We couldn't confirm your boost or its refund. Check your orders and wallet, then contact support before placing another order.";
+        setError(response.status >= 500
+          ? data.outcome === "refunded" ? refunded : data.outcome === "unconfirmed" ? refundUnconfirmed : unconfirmed
+          : typeof data.error === "string" ? data.error : unconfirmed);
+        return;
+      }
+      if (data.order.status !== "active") {
+        setError(data.order.status === "refunded"
+          ? "This order was refunded. Check your orders and wallet before placing another order."
+          : data.order.status === "delivered"
+            ? "This order was already delivered. Check your orders before placing another order."
+            : "We couldn't confirm this order's status. Check your orders or contact support before placing another order.");
+        return;
+      }
       attempt.current = null;
       setReceipt({
         reference: data.order.reference,
@@ -88,10 +131,10 @@ export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing
         replayed: Boolean(data.replayed),
       });
       router.refresh();
-    } catch (caught) {
-      // The key is kept on failure: if the request did reach the server, the
-      // retry replays that order instead of charging a second time.
-      setError(caught instanceof Error ? caught.message : "That order could not be placed.");
+    } catch {
+      // Keep the key for this attempt, but a lost response is not proof that
+      // nothing happened; check the existing order before submitting another.
+      setError("We couldn't confirm this order. Check your orders and wallet or contact support before trying again.");
     } finally {
       setPending(false);
     }
@@ -104,7 +147,7 @@ export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing
           <Check className="h-4 w-4" /> Boost started
         </p>
         <p className="mt-1 text-meta text-emerald-900">
-          {receipt.quantity.toLocaleString("en-NG")} {listing.tag.toLowerCase()} for{" "}
+          {receipt.quantity.toLocaleString("en-NG")} {currentListing.tag.toLowerCase()} for{" "}
           <span className="break-all">{receipt.link}</span>. Reference <strong>{receipt.reference}</strong> ·{" "}
           {formatNaira(receipt.amount)}.
         </p>
@@ -117,7 +160,7 @@ export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing
           </Link>
           <button
             type="button"
-            onClick={() => { setReceipt(null); setLink(""); setQuantity(listing.min); }}
+            onClick={() => { setReceipt(null); setLink(""); setQuantity(currentListing.min); }}
             className="btn border border-line bg-white !px-4 !py-2.5 !text-[0.8rem] text-ink"
           >
             Buy another
@@ -129,6 +172,11 @@ export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing
 
   return (
     <div className="grid gap-4 rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
+      {quoteChanged && (
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-meta text-amber-900">
+          Updated service: <strong>{currentListing.name}</strong> · {currentListing.tag}. Review the amount below before paying.
+        </p>
+      )}
       <div>
         <label htmlFor="boost-link" className="field-label">
           Profile or post link
@@ -153,17 +201,17 @@ export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing
         <input
           id="boost-quantity"
           type="number"
-          min={listing.min}
-          max={listing.max ?? undefined}
+          min={currentListing.min}
+          max={Math.min(currentListing.max ?? MAX_BOOST_QUANTITY, MAX_BOOST_QUANTITY)}
           step={1}
           value={Number.isFinite(quantity) ? quantity : ""}
           onChange={(event) => setQuantity(Number(event.target.value))}
           className="field"
         />
         <p className="mt-1 text-meta text-ink-3">
-          {listing.min.toLocaleString("en-NG")}
-          {listing.max === null ? "+" : `–${listing.max.toLocaleString("en-NG")}`} units ·{" "}
-          {formatNaira(listing.perThousand)} per 1,000
+          {currentListing.min.toLocaleString("en-NG")}
+          {currentListing.max === null ? "+" : `–${currentListing.max.toLocaleString("en-NG")}`} units ·{" "}
+          {formatNaira(currentListing.perThousand)} per 1,000
         </p>
       </div>
 
@@ -172,6 +220,9 @@ export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing
         <span className="text-[1.05rem] font-semibold text-ink">{formatNaira(total)}</span>
       </div>
 
+      {quantityValid && total === 0 && (
+        <p className="text-meta text-amber-800">This amount cannot be ordered. Try a smaller quantity.</p>
+      )}
       {shortfall > 0 && (
         <p className="text-meta text-amber-800">
           You need {formatNaira(shortfall)} more in your wallet.{" "}
@@ -190,8 +241,8 @@ export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing
         {pending ? "Placing order…" : <>Pay {formatNaira(total)} from wallet</>}
       </button>
       <p className="flex items-center gap-1.5 text-micro text-ink-3">
-        <Lock className="h-3 w-3" /> Charged from your Pryva wallet. If the boost cannot be started, the charge is
-        reversed automatically.
+        <Lock className="h-3 w-3" /> Charged from your Pryva wallet. If delivery or a refund is not confirmed, check your
+        orders and wallet or contact support.
       </p>
     </div>
   );

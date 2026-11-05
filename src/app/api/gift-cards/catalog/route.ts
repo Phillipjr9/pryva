@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getBrandGiftCards } from "@/lib/gift-cards-catalog";
-import { isFoxreloadConfigured } from "@/lib/foxreload";
+import { getBrandGiftCards } from "@/lib/services/gift-cards/brand-catalog";
+import { isFoxreloadConfigured } from "@/lib/providers/foxreload";
 
 export const dynamic = "force-dynamic";
 

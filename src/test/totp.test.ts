@@ -7,7 +7,7 @@ import {
   totpAt,
   totpUri,
   verifyTotp,
-} from "@/lib/totp";
+} from "@/lib/identity/totp";
 
 /**
  * RFC 6238 Appendix B vectors, SHA-1, truncated to the six digits every

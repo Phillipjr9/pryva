@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it, expect, vi } from "vitest";
-import { plans, services } from "@/lib/catalog";
-import { digitalServices } from "@/lib/digital-services";
-import { CATALOG_PRICES, DIGITAL_PRICES } from "@/lib/prices.generated";
+import { plans, services } from "@/lib/services/catalog";
+import { digitalServices } from "@/lib/services/digital/digital-services";
+import { CATALOG_PRICES, DIGITAL_PRICES } from "@/lib/services/prices.generated";
 import {
   PROFIT_BAND,
   isPriceInBand,
@@ -12,13 +12,13 @@ import {
   priceFromCost,
   profitFloorNgn,
   targetMarkupPercent,
-} from "@/lib/pricing";
+} from "@/lib/services/pricing";
 
-vi.mock("@/lib/exchange-rate", () => ({
+vi.mock("@/lib/payments/exchange-rate", () => ({
   getUsdToNgnRate: async () => ({ rate: 1600, source: "test", fetchedAt: new Date().toISOString() }),
 }));
 
-const { priceMarketplaceListing, applyPromoDiscount } = await import("@/lib/marketplace-pricing");
+const { priceMarketplaceListing, applyPromoDiscount } = await import("@/lib/services/accounts/marketplace-pricing");
 
 /** The owner-editable supplier price sheet — the single source of every price. */
 type CostRow = { service: string; label: string; cost: number };
@@ -108,7 +108,7 @@ describe("catalogue prices", () => {
 
   it("ships prices without leaking supplier costs to the browser bundle", () => {
     const generated = readFileSync(
-      path.join(process.cwd(), "src/lib/prices.generated.ts"),
+      path.join(process.cwd(), "src/lib/services/prices.generated.ts"),
       "utf8",
     );
     expect(generated).not.toMatch(/"?cost"?\s*:/i);
@@ -188,8 +188,8 @@ describe("marketplace pipeline respects the band", () => {
 
 describe("discounts may not breach the floor", () => {
   it("caps a bulk basket at the thinnest line's headroom", async () => {
-    const { calculateBulkOrder } = await import("@/lib/bulk-orders");
-    const { CATALOG_PRICES } = await import("@/lib/prices.generated");
+    const { calculateBulkOrder } = await import("@/lib/services/bulk-orders");
+    const { CATALOG_PRICES } = await import("@/lib/services/prices.generated");
 
     // The proxy plan sits near the bottom of the band (35%), so a 10% basket discount
     // would drop it under 30%. The basket must shrink its own discount instead.
@@ -204,7 +204,7 @@ describe("discounts may not breach the floor", () => {
   });
 
   it("still gives the full 10% where the margin allows it", async () => {
-    const { calculateBulkOrder } = await import("@/lib/bulk-orders");
+    const { calculateBulkOrder } = await import("@/lib/services/bulk-orders");
     // A 45%-markup plan can afford the whole tier.
     const basket = calculateBulkOrder([{ productSlug: "vn-ng", quantity: 25 }]);
     expect(basket.discountPercent).toBe(10);

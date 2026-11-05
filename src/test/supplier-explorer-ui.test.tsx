@@ -45,6 +45,7 @@ describe("service explorer live listings", () => {
     const buy = within(card).getByRole("link", { name: /Buy boost/ });
     expect(buy.getAttribute("href")).toBe("/dashboard/services/boost/live-boost-0123456789abcdef0123");
     expect(within(card).getByText(/from ₦1,600/)).toBeTruthy();
+    expect(within(card).getByText("Not reported")).toBeTruthy();
   });
 
   it("requests the live catalog and never a demo endpoint", async () => {
@@ -56,5 +57,99 @@ describe("service explorer live listings", () => {
     // The demo inventory endpoint was deleted with the demo subsystem.
     expect(fetchMock.mock.calls.every(([url]) => !String(url).includes("/demo/"))).toBe(true);
     expect(screen.queryByText(/Demo catalog/)).toBeNull();
+  });
+
+  it("says live availability is off instead of offering a retry that cannot work", async () => {
+    // The endpoint answers 200 with live:false when the environment is closed.
+    // Rendering that as "couldn't be loaded + Retry" was the recurring banner.
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+      ok: true, country: "us", live: false, reason: "environment", partial: false, fetchedAt: null, items: [],
+    }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    expect(await screen.findByText(/Live availability is off in this environment/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(screen.queryByText(/couldn&apos;t be loaded/)).toBeNull();
+    expect(screen.queryByText(/couldn't be loaded/)).toBeNull();
+  });
+
+  it("separates a missing supplier connection from a failed read", async () => {
+    const unconfigured = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+      ok: true, country: "us", live: false, reason: "unconfigured", partial: false, fetchedAt: null, items: [],
+    }) });
+    vi.stubGlobal("fetch", unconfigured);
+    const first = render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
+    expect(await screen.findByText(/isn't connected yet/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    first.unmount();
+
+    // A genuine outage keeps the retry, because retrying is the right advice.
+    const broken = vi.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({ error: "nope", reason: "unavailable" }) });
+    vi.stubGlobal("fetch", broken);
+    render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
+    expect(await screen.findByRole("status")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+    expect(screen.getByText(/Live availability is not shown yet/)).toBeTruthy();
+  });
+
+  it("says we are restocking when the balance is the reason, and drops the retry", async () => {
+    // Connected suppliers with an empty balance: there is nothing for the
+    // customer to retry, and telling them to would be a promise we cannot keep.
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+      ok: true, country: "us", live: false, reason: "funding", partial: false, fetchedAt: null, items: [],
+    }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
+    expect(await screen.findByText(/paused while we restock/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByText(/couldn't be loaded/)).toBeNull();
+  });
+
+  it("shows a funding gap as restocking even when some listings loaded", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+      ok: true, country: "us", live: true, reason: "funding", partial: true, fetchedAt: "2026-01-01T00:00:00Z", items: [
+        { id: "live-sms-test", category: "verification", name: "Example live app", description: "SMS verification listing", tag: "Other",
+          artwork: { kind: "service", name: "numbers" }, source: "live", coverage: "catalog-country", stock: 3, myUnits: null, price: null, action: null },
+      ],
+    }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
+    const note = await screen.findByRole("status");
+    expect(note.textContent).toMatch(/paused while we restock/);
+    // The row still renders, and no Retry is offered for a money gap.
+    expect(await screen.findByRole("heading", { name: "Example live app" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
+  it("says some listings may be missing for a capped read, without a retry", async () => {
+    // Our own read cap (the social catalog row limit) is not an outage: a Retry
+    // would return the same capped sample, so the banner must not offer one.
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+      ok: true, country: "us", live: true, reason: "truncated", partial: true, fetchedAt: "2026-01-01T00:00:00Z", items: [
+        { id: "live-boost-test", category: "social", name: "Instagram followers", description: "Social promotion", tag: "Followers",
+          artwork: { kind: "brand", name: "instagram" }, source: "live", coverage: "not-country-specific", stock: null, myUnits: null, price: 203, priceFrom: true, action: { label: "Buy boost", href: "/dashboard/services/boost/live-boost-test" } },
+      ],
+    }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="us" initialCategory="social" />);
+    const note = await screen.findByRole("status");
+    expect(note.textContent).toMatch(/Some listings may be missing/);
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(screen.queryByText(/couldn't be loaded/)).toBeNull();
+    // The listing itself still renders.
+    expect(await screen.findByRole("heading", { name: "Instagram followers" })).toBeTruthy();
+  });
+
+  it("names a throttle as a throttle and still offers the retry", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 429, json: async () => ({ error: "slow down", reason: "throttled" }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
+    const note = await screen.findByRole("status");
+    expect(note.textContent).toMatch(/refreshed too quickly/);
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+    // The neutral note explains it too, rather than claiming nothing is shown yet.
+    expect(screen.getAllByText(/refreshed too quickly/).length).toBeGreaterThan(1);
   });
 });

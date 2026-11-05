@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { SUPPORT_PRIORITIES, SUPPORT_STATUSES, SUPPORT_STATUS_LABELS } from "@/lib/ai-support/types";
+import { SUPPORT_PRIORITIES, SUPPORT_STATUSES, SUPPORT_STATUS_LABELS } from "@/lib/support/ai-support/types";
 import { Loader2 } from "@/components/icons";
 
 /**

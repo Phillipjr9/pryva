@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const limit = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/rate-limit", () => ({ createRateLimiter: () => limit }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => false }));
+vi.mock("@/lib/platform/rate-limit", () => ({ createRateLimiter: () => limit }));
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => false }));
 
-import { catalogueItems, esimItemsForCountry, esimOfferTerms, readEsimCatalog, recheckEsimOffer } from "@/lib/esim-catalog";
-import { clearRateCache } from "@/lib/exchange-rate";
+import { catalogueItems, esimItemsForCountry, esimOfferTerms, readEsimCatalog, recheckEsimOffer } from "@/lib/services/esim/esim-catalog";
+import { clearRateCache } from "@/lib/payments/exchange-rate";
 
 function json(data: unknown) {
   return new Response(JSON.stringify(data), { headers: { "content-type": "application/json" } });
@@ -16,6 +16,7 @@ beforeEach(() => {
   vi.stubEnv("BITCALL_API_SECRET", "aa".repeat(64));
   vi.stubEnv("VERCEL_ENV", "");
   vi.stubEnv("EUR_NGN_RATE", "1800");
+  vi.stubEnv("EXCHANGE_RATE_API_KEY", "");
   limit.mockResolvedValue({ allowed: true });
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.clearAllMocks(); clearRateCache(); });
@@ -61,10 +62,14 @@ describe("documented eSIM feed through the storefront mapper", () => {
     expect(JSON.stringify(publicList)).not.toMatch(/pln_|1332|1566|bitcall/i);
     expect(fetchMock.mock.calls.every((call) => (call[1] as RequestInit).method === "GET")).toBe(true);
   });
-  it("still lists documented EUR plans safely if the rate service is unavailable", async () => {
+  it.each([
+    ["not configured", ""],
+    ["unavailable", "fake-rate-service-key"],
+  ])("still lists documented EUR plans safely if the rate service is %s", async (_reason, key) => {
     vi.stubEnv("EUR_NGN_RATE", "");
+    vi.stubEnv("EXCHANGE_RATE_API_KEY", key);
     const fetchMock = vi.fn().mockImplementation((url: URL | string) => {
-      if (typeof url === "string" && url.includes("open.er-api.com")) return new Response("down", { status: 503 });
+      if (typeof url === "string" && url.startsWith("https://v6.exchangerate-api.com/v6/latest/")) return new Response("down", { status: 503 });
       const parsed = url as URL;
       if (parsed.pathname === "/v1/esim/countries") return json({ data: [] });
       if (parsed.pathname === "/v1/esim/plans") return json({ data: [{
@@ -79,6 +84,8 @@ describe("documented eSIM feed through the storefront mapper", () => {
     expect(catalog.stats.skippedRate).toBe(1);
     expect(catalogueItems(catalog.listings)[0]).toMatchObject({ name: "Nigeria data", dataLabel: "1GB of data", priceNgn: null, purchasable: false });
     expect(esimItemsForCountry(catalog.listings, "ng")[0]).toMatchObject({ price: null, action: null });
+    const rateCalls = fetchMock.mock.calls.filter(([url]) => typeof url === "string");
+    expect(rateCalls).toHaveLength(key ? 1 : 0);
   });
 
 });

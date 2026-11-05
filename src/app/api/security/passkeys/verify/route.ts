@@ -1,13 +1,13 @@
 import type { RegistrationResponseJSON } from "@simplewebauthn/server";
 import { NextResponse } from "next/server";
 
-import { requireAuthApi } from "@/lib/auth";
-import { logger } from "@/lib/logger";
-import { isSameOriginMutation } from "@/lib/net";
-import { MAX_PASSKEYS_PER_ACCOUNT, finishRegistration, listCredentialSummaries, relyingPartyFor } from "@/lib/passkeys";
-import { passkeyRateLimiter } from "@/lib/rate-limit";
-import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { logger } from "@/lib/platform/logger";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { MAX_PASSKEYS_PER_ACCOUNT, finishRegistration, listCredentialSummaries, relyingPartyFor } from "@/lib/identity/passkeys";
+import { passkeyRateLimiter } from "@/lib/platform/rate-limit";
+import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 
 export const dynamic = "force-dynamic";
 

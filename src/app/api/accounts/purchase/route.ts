@@ -1,35 +1,21 @@
-import { financialActionsUnavailable } from "@/lib/financial-environment";
+import { afterPurchase, beginPurchase } from "@/lib/checkout/purchase";
 import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, gte, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
-import { requireAuthApi } from "@/lib/auth";
-import { isSameOriginMutation } from "@/lib/net";
-import {
-  getMarketplaceListing,
-  MarketplaceError,
-  purchaseMarketplaceListing,
-  supportsPromoCodes,
-} from "@/lib/marketplace-suppliers";
-import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
-import { isManualFulfilmentReachable } from "@/lib/manual-fulfilment";
-import { isManualSlug } from "@/lib/manual-catalog";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
-import { validatePromo } from "@/lib/accszone";
-import { usdCents } from "@/lib/supplier-money";
-import { fulfilmentLabel } from "@/lib/warranty";
-import { applyPromoDiscount, priceMarketplaceListing } from "@/lib/marketplace-pricing";
-import { MIN_ORDER_NGN } from "@/lib/pricing";
-import { logger } from "@/lib/logger";
-import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
-import { formatNaira } from "@/lib/catalog";
-import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { MarketplaceError, purchaseMarketplaceListing } from "@/lib/services/accounts/marketplace-suppliers";
+import { isMarketplaceCheckoutConfigured } from "@/lib/services/accounts/marketplace-policy";
+import { isManualFulfilmentReachable } from "@/lib/services/accounts/manual-fulfilment";
+import { isManualSlug } from "@/lib/services/accounts/manual-catalog";
+import { ACCOUNTS_PROVIDER, MANUAL_PROVIDER } from "@/lib/services/order-providers";
+import { fulfilmentLabel } from "@/lib/services/warranty";
+import { calculateMarketplaceCheckoutQuote, marketplaceQuoteError, MAX_MARKETPLACE_QUANTITY, publicMarketplaceCheckoutQuote } from "@/lib/services/accounts/marketplace-checkout-quote";
+import { logger } from "@/lib/platform/logger";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const MAX_QUANTITY = 50;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type Order = typeof orders.$inferSelect;
 
@@ -102,36 +88,35 @@ async function markForReview(orderId: string, reference: string) {
  * than retried or automatically refunded. Live checkout is disabled by default.
  */
 export async function POST(request: NextRequest) {
-  const user = await requireAuthApi();
-  if (!user) return NextResponse.json({ error: "Please sign in to buy accounts." }, { status: 401 });
-  if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
-  if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get("content-type") ?? "")) {
-    return NextResponse.json({ error: "Content-Type must be application/json." }, { status: 415 });
+  const begun = await beginPurchase<{ slug?: unknown; quantity?: unknown; promoCode?: unknown; requestId?: unknown; expectedTotalNgn?: unknown; expectedTerms?: unknown }>(
+    request,
+    {
+      bucket: "accounts-purchase",
+      maxBodyBytes: 4_096,
+      copy: {
+        unauthorized: "Please sign in to buy accounts.",
+        // This route used to say how long the wait was; the shared limiter knows
+        // the window, so it keeps saying it rather than falling back to "later".
+        rateLimited: (retryAfterMs) => `Too many attempts. Try again in ${Math.max(1, Math.ceil(retryAfterMs / 1000))}s.`,
+      },
+      supplierGate: {
+        open: isMarketplaceCheckoutConfigured,
+        message: "Account purchases are temporarily unavailable.",
+      },
+    },
+  );
+  if (!begun.ok) return begun.response;
+  const { user } = begun;
+  if (!begun.body || typeof begun.body !== "object" || Array.isArray(begun.body)) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
-  if (financialActionsUnavailable()) return NextResponse.json({ error: "Purchases are unavailable in this environment." }, { status: 503 });
-  if (!isMarketplaceCheckoutConfigured()) {
-    return NextResponse.json({ error: "Account purchases are temporarily unavailable." }, { status: 503 });
-  }
+  const body = begun.body;
 
-  const limit = await purchaseRateLimiter(`accounts-purchase:${user.id}`);
-  if (limit.unavailable) return NextResponse.json({ error: "Purchases are temporarily unavailable." }, { status: 503 });
-  if (!limit.allowed) {
-    const seconds = Math.max(1, Math.ceil((limit.resetTime - Date.now()) / 1000));
-    return NextResponse.json({ error: `Too many attempts. Try again in ${seconds}s.` }, { status: 429 });
-  }
 
-  let body: { slug?: unknown; quantity?: unknown; promoCode?: unknown; requestId?: unknown };
-  try {
-    const value = await readJsonWithLimit(request, 4_096);
-    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid body");
-    body = value;
-  } catch (error) {
-    return NextResponse.json({ error: "Invalid request body" }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
-  }
   const slug = typeof body.slug === "string" ? body.slug.trim() : "";
   const quantity = typeof body.quantity === "number" ? body.quantity : Number(body.quantity);
   const requestId = typeof body.requestId === "string" ? body.requestId : "";
-  if (!slug || slug.length > 80 || !Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY || !UUID.test(requestId)) {
+  if (!slug || slug.length > 80 || !Number.isInteger(quantity) || quantity < 1 || quantity > MAX_MARKETPLACE_QUANTITY || !UUID.test(requestId)) {
     return NextResponse.json({ error: "Invalid listing, quantity or request ID." }, { status: 400 });
   }
   if (body.promoCode != null && (typeof body.promoCode !== "string" || body.promoCode.trim().length > 40)) {
@@ -143,21 +128,8 @@ export async function POST(request: NextRequest) {
   // Hand-sourced items are recorded and queued; no supplier call is made.
   const isManual = isManualSlug(slug);
 
-  // A hand-sourced item is prepared through /admin/fulfilment, which needs an
-  // administrator with a verified address. Refuse here, before the wallet is
-  // touched: the debit happens in a transaction further down, and taking money
-  // for an item nobody can prepare is not made right by refunding it — the
-  // customer still did not get what they bought. The storefront already hides
-  // the button, but a hidden button is not a control.
-  if (isManual && !(await isManualFulfilmentReachable())) {
-    return NextResponse.json(
-      { error: "This item cannot be prepared right now. No payment was taken." },
-      { status: 503 },
-    );
-  }
-
-  // A repeat of the same request must not call the supplier a second time, even
-  // when the listing or provider is no longer available.
+  // A repeat of the same request must return its existing receipt/review state,
+  // even if a quote is now missing or the item is no longer available.
   try {
     const [previous] = await db.select().from(orders)
       .where(and(eq(orders.userId, user.id), eq(orders.reference, reference))).limit(1);
@@ -166,68 +138,45 @@ export async function POST(request: NextRequest) {
     return pendingResponse(reference);
   }
 
+  // Old clients must refresh rather than paying an amount they did not review.
+  if (typeof body.expectedTotalNgn !== "number" || !Number.isSafeInteger(body.expectedTotalNgn) ||
+      body.expectedTotalNgn <= 0 || body.expectedTotalNgn > 2_147_483_647 ||
+      typeof body.expectedTerms !== "string" || !/^[a-f0-9]{24}$/.test(body.expectedTerms)) {
+    return NextResponse.json({ error: "Review the current price before ordering. Refresh the page if needed.", code: "quote_required" }, { status: 400 });
+  }
+
+  // A hand-prepared item is buyable only when an administrator can prepare it.
+  if (isManual && !(await isManualFulfilmentReachable())) {
+    return NextResponse.json({ error: "This item cannot be prepared right now." }, { status: 503 });
+  }
+
   let listing;
   let price;
-  let appliedPromo: string | undefined;
+  const appliedPromo = promoCode || undefined;
   try {
-    listing = await getMarketplaceListing(slug);
-    if (!listing.title.trim() || listing.title.length > 160 ||
-        usdCents(listing.priceUsd) <= 0 ||
-        (listing.category?.length ?? 0) > 80 ||
-        !Number.isSafeInteger(listing.minQuantity) || listing.minQuantity < 1 || listing.minQuantity > MAX_QUANTITY) {
-      throw new Error("Invalid supplier listing");
-    }
-    if (quantity < listing.minQuantity) {
-      return NextResponse.json({
-        error: `This item has a minimum order of ${listing.minQuantity}.`,
-        minQuantity: listing.minQuantity,
-      }, { status: 400 });
-    }
-    if (!listing.available) {
-      return NextResponse.json({ error: "This item is not available right now." }, { status: 409 });
-    }
-    if (quantity > listing.maxQuantity) {
-      return NextResponse.json({
-        error: `The most you can order at once is ${listing.maxQuantity}.`,
-        maxQuantity: listing.maxQuantity,
-      }, { status: 400 });
-    }
-    // `stock === null` is unknown, not zero: the source is still the authority.
-    if (listing.stock !== null && listing.stock < quantity) {
-      return NextResponse.json({ error: `Only ${listing.stock} left in stock.`, available: listing.stock }, { status: 409 });
-    }
-    price = await priceMarketplaceListing({
-      unitPriceUsd: listing.priceUsd,
-      quantity,
-      categoryTitle: listing.category ?? undefined,
-      subcategoryTitle: listing.subcategory ?? undefined,
-    });
-    if (promoCode) {
-      // Only one source publishes a promo API. Refuse the code rather than
-      // silently charging the undiscounted price a customer was shown.
-      if (!supportsPromoCodes(slug)) {
-        return NextResponse.json({ error: "Promo codes do not apply to this item." }, { status: 409 });
-      }
-      // Do not silently charge the non-discounted price if validation changed.
+    // The same calculator powers the review endpoint and this fresh recheck.
+    // Neither the client-provided total nor its terms can set the charged amount.
+    const current = await calculateMarketplaceCheckoutQuote({ slug, quantity, promoCode });
+    listing = current.listing;
+    price = current.price;
+    const publicQuote = publicMarketplaceCheckoutQuote(current);
+    if (body.expectedTotalNgn !== price.totalNgn || body.expectedTerms !== publicQuote.terms) {
+      // A concurrent replay may have committed while we were rechecking.
       try {
-        const promo = await validatePromo(promoCode, usdCents(listing.priceUsd) * quantity / 100);
-        const discounted = applyPromoDiscount(price, promo.discount);
-        if (discounted.totalNgn >= price.totalNgn) throw new Error("Promo unavailable");
-        price = discounted;
-        appliedPromo = promoCode;
+        const [previous] = await db.select().from(orders)
+          .where(and(eq(orders.userId, user.id), eq(orders.reference, reference))).limit(1);
+        if (previous) return existingResponse(previous, slug, quantity);
       } catch {
-        return NextResponse.json({ error: "That promo is no longer available. Review your total before ordering." }, { status: 409 });
+        return pendingResponse(reference);
       }
+      return NextResponse.json({
+        error: "The price or item details changed. Review the updated quote before confirming.",
+        code: "quote_changed", quote: publicQuote,
+      }, { status: 409, headers: { "Cache-Control": "no-store" } });
     }
   } catch (error) {
-    const status = error instanceof MarketplaceError && error.code === "listing_not_found" ? 404 : 502;
-    return NextResponse.json({ error: "Could not verify this listing. Please try again later." }, { status });
-  }
-  if (!Number.isSafeInteger(price.totalNgn) || price.totalNgn > 2_147_483_647 || price.totalNgn <= 0) {
-    return NextResponse.json({ error: "Could not verify the order price." }, { status: 502 });
-  }
-  if (price.totalNgn < MIN_ORDER_NGN) {
-    return NextResponse.json({ error: `Minimum order is ${formatNaira(MIN_ORDER_NGN)}. Add a second unit or pick a bigger listing.`, minimumOrderNgn: MIN_ORDER_NGN, totalNgn: price.totalNgn }, { status: 400 });
+    const failure = marketplaceQuoteError(error);
+    return NextResponse.json(failure.body, { status: failure.status });
   }
 
   let orderId: string;
@@ -258,7 +207,7 @@ export async function POST(request: NextRequest) {
         // A hand-sourced order makes no supplier call, so it carries its own
         // provider value: the unresolved-purchase guard above exists to stop a
         // second automated supplier request and must not block these.
-        provider: isManual ? "manual" : "accounts",
+        provider: isManual ? MANUAL_PROVIDER : ACCOUNTS_PROVIDER,
         providerRequestId: isManual ? null : clientReference,
       }).returning({ id: orders.id });
       if (!created) throw new Error("Order insert failed");
@@ -271,7 +220,7 @@ export async function POST(request: NextRequest) {
     });
     if (reservation.previous) return existingResponse(reservation.previous, slug, quantity);
     orderId = reservation.orderId!;
-    scheduleWalletEmails();
+    void afterPurchase(user.id);
     if (isManual) {
       // No supplier call to make. The order waits in the fulfilment queue and
       // its credentials appear on the order page once they are confirmed.
@@ -342,7 +291,7 @@ export async function POST(request: NextRequest) {
     return pendingResponse(reference, orderId);
   }
   if (!complete) return pendingResponse(reference, orderId);
-  scheduleWalletEmails();
+  void afterPurchase(user.id);
   return NextResponse.json({
     ok: true, order: { id: orderId, reference }, listing: listing.title, quantity,
     accounts, totalNgn: price.totalNgn, discountNgn: price.discountNgn, promoCode: appliedPromo ?? null,

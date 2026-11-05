@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { plans, formatNaira, findPlan } from "@/lib/catalog";
-import { calculateBulkOrder, getBulkDiscountMessage, type BulkOrderItem } from "@/lib/bulk-orders";
-import type { PublicUser } from "@/lib/auth";
+import { plans, formatNaira, findPlan } from "@/lib/services/catalog";
+import { calculateBulkOrder, getBulkDiscountMessage, type BulkOrderItem } from "@/lib/services/bulk-orders";
+import type { PublicUser } from "@/lib/identity/auth";
 
 interface BulkOrdersFormProps {
   user: PublicUser;
@@ -72,14 +72,14 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Failed to complete bulk purchase.");
+        setError(res.status < 500 && typeof data.error === "string" ? data.error : "We couldn't confirm this order. Check your orders and wallet or contact support before trying again.");
         return;
       }
 
       setSuccessMessage(`Bulk order placed: ${data.count} ${data.count === 1 ? "item" : "items"}. Codes appear in your orders as they arrive. Reference: ${data.reference}`);
       setItems([]);
     } catch {
-      setError("An unexpected error occurred. Please try again.");
+      setError("We couldn't confirm this order. Check your orders and wallet or contact support before trying again.");
     } finally {
       setSubmitting(false);
     }
@@ -204,7 +204,7 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
 
       {/* Messages */}
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.9rem] text-red-700">
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.9rem] text-red-700">
           {error}
         </div>
       )}

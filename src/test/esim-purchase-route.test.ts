@@ -28,24 +28,29 @@ const state = vi.hoisted(() => ({
   txError: null as Error | null,
 }));
 
-vi.mock("@/lib/auth", () => ({ getCurrentUser: async () => state.user }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => state.preview }));
-vi.mock("@/lib/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
-vi.mock("@/lib/rate-limit", () => ({ purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }) }));
-vi.mock("@/lib/fraud", () => ({
+vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: async () => state.user, requireAuthApi: async () => state.user }));
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => state.preview }));
+vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
+vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
+  // Keep the real module: other limiters are constructed when a route imports
+  // a money module, and a factory that omits them fails at import time.
+  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
+  return { ...actual, purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }) };
+});
+vi.mock("@/lib/admin/fraud", () => ({
   purchaseVelocity: async () => ({ allowed: true, count: 0, limit: 20 }),
   recordFraudEvent: vi.fn(),
 }));
-vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
-vi.mock("@/lib/referrals", () => ({ settleReferralRewards: async () => ({ credited: 0 }) }));
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
+vi.mock("@/lib/content/referrals", () => ({ settleReferralRewards: async () => ({ credited: 0 }) }));
 
-vi.mock("@/lib/esim-catalog", () => ({
+vi.mock("@/lib/services/esim/esim-catalog", () => ({
   findEsimOffer: async () => state.offer,
   recheckEsimOffer: state.recheck,
   esimOfferTerms: (value: { includesPhoneNumber?: boolean }) => (value.includesPhoneNumber ? "b" : "a").repeat(24),
 }));
 
-vi.mock("@/lib/esim-fulfilment", () => ({
+vi.mock("@/lib/services/esim/esim-fulfilment", () => ({
   purchaseEsim: async (offer: unknown) => {
     state.purchased.push(offer);
     if (state.purchaseWait) await state.purchaseWait;
@@ -53,8 +58,8 @@ vi.mock("@/lib/esim-fulfilment", () => ({
   },
 }));
 
-vi.mock("@/lib/wallet", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/wallet")>();
+vi.mock("@/lib/payments/wallet", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/payments/wallet")>();
   return {
     ...actual,
     debitWalletInTx: async (_tx: unknown, entry: unknown) => {

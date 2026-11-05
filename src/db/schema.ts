@@ -1,4 +1,6 @@
 import { sql } from "drizzle-orm";
+
+import type { OrderServiceTag } from "@/lib/services/registry";
 import {
   bigint,
   boolean,
@@ -267,7 +269,7 @@ export const orders = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    service: varchar("service", { length: 40 }).notNull(),
+    service: varchar("service", { length: 40 }).$type<OrderServiceTag>().notNull(),
     productSlug: varchar("product_slug", { length: 80 }).notNull(),
     productName: varchar("product_name", { length: 160 }).notNull(),
     planLabel: varchar("plan_label", { length: 120 }).notNull(),
@@ -404,7 +406,7 @@ export const paymentTopups = pgTable(
     /**
      * The account holder's name at the moment this deposit settled, frozen
      * thereafter. Withdrawals may only be paid to a bank account whose resolved
-     * name matches it — see src/lib/withdrawal-name-check.ts.
+     * name matches it — see src/lib/payments/withdrawal-name-check.ts.
      *
      * Deliberately not `users.name`, which the profile endpoint edits at any
      * time: a reference that can be changed after the money arrives cannot prove
@@ -425,7 +427,7 @@ export const paymentTopups = pgTable(
  * The depositor name frozen on the first deposit is never edited — it is the
  * evidence of what was recorded when the money arrived. An approval beside it
  * widens the set of bank-account names that may be paid, for one user, until it
- * is revoked. See src/lib/withdrawal-name-check.ts.
+ * is revoked. See src/lib/payments/withdrawal-name-check.ts.
  */
 export const payoutNameApprovals = pgTable(
   "payout_name_approvals",
@@ -542,7 +544,7 @@ export const scheduledOrders = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    service: varchar("service", { length: 40 }).notNull(),
+    service: varchar("service", { length: 40 }).$type<OrderServiceTag>().notNull(),
     productSlug: varchar("product_slug", { length: 80 }).notNull(),
     frequency: varchar("frequency", { length: 24 }).notNull(),
     nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull(),
@@ -784,7 +786,7 @@ export const productReviews = pgTable(
     orderId: uuid("order_id")
       .notNull()
       .references(() => orders.id, { onDelete: "cascade" }),
-    service: varchar("service", { length: 40 }).notNull(),
+    service: varchar("service", { length: 40 }).$type<OrderServiceTag>().notNull(),
     productName: varchar("product_name", { length: 160 }).notNull(),
     rating: integer("rating").notNull(),
     headline: varchar("headline", { length: 80 }),
@@ -826,7 +828,7 @@ export type ProductReview = typeof productReviews.$inferSelect;
  *
  * The entry is a *record*, not the source of truth: the wallet ledger remains
  * authoritative for money. A failed insert is logged loudly and does not roll
- * back an action that already moved funds -- see `src/lib/admin-audit.ts` for why
+ * back an action that already moved funds -- see `src/lib/admin/admin-audit.ts` for why
  * that trade was chosen and what it costs.
  */
 /**
@@ -883,7 +885,7 @@ export type AdminAuditEntry = typeof adminAuditLog.$inferSelect;
  * abandoned; sign-in only demands a code once it is set.
  *
  * The secret is encrypted here, never stored as issued: a database dump must not
- * hand over the second factor. See `src/lib/two-factor.ts`.
+ * hand over the second factor. See `src/lib/identity/two-factor.ts`.
  */
 export const userTwoFactor = pgTable("user_two_factor", {
   userId: uuid("user_id")

@@ -62,7 +62,7 @@ describe("dashboard navigation", () => {
   it("routes accounts through the country-first dashboard hub instead of the marketing page", () => {
     expect(shell).toContain('{ href: "/dashboard/services", label: "Accounts", art: "accounts", category: "accounts"');
     expect(shell).not.toContain('{ href: "/accounts"');
-    const explorer = readFileSync(join(root, "lib/service-explorer.ts"), "utf8");
+    const explorer = readFileSync(join(root, "lib/services/service-explorer.ts"), "utf8");
     expect(explorer).toContain('href: "/dashboard/accounts"');
   });
 

@@ -1,9 +1,9 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { serviceMap } from "@/lib/catalog";
+import { serviceMap } from "@/lib/services/catalog";
 import { ArrowRight } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
-import { isEsimOrderingAvailable } from "@/lib/esim-availability";
+import { isEsimOrderingAvailable } from "@/lib/services/esim/esim-availability";
 
 export const dynamic = "force-dynamic";
 

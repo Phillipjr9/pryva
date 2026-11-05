@@ -23,6 +23,10 @@ const state = vi.hoisted(() => ({
   orderRows: [] as Array<Record<string, unknown>>,
   ledger: [] as Array<Record<string, unknown>>,
   failOrderWrite: false,
+  refundAckLost: false,
+  configured: true,
+  racedOrder: null as Record<string, unknown> | null,
+  orderReads: 0,
   fulfillError: null as Error | null,
   codes: ["GIFT-CODE-1"],
   upstreamId: "fox-1",
@@ -40,9 +44,9 @@ class FoxreloadErrorMock extends Error {
   }
 }
 
-vi.mock("@/lib/foxreload", () => ({
+vi.mock("@/lib/providers/foxreload", () => ({
   FoxreloadError: FoxreloadErrorMock,
-  isFoxreloadConfigured: () => true,
+  isFoxreloadConfigured: () => state.configured,
   resolveFoxreloadProductId: async () => "item-steam-10",
   createFoxreloadOrder: async () => ({ id: state.upstreamId }),
   payFoxreloadOrder: async () => {
@@ -51,10 +55,18 @@ vi.mock("@/lib/foxreload", () => ({
   pollFoxreloadOrderCodes: async () => state.codes,
 }));
 
-vi.mock("@/lib/auth", () => ({ getCurrentUser: async () => ({ id: "u1", email: "buyer@example.com" }) }));
-vi.mock("@/lib/net", () => ({ isSameOriginMutation: () => true }));
-vi.mock("@/lib/rate-limit", () => ({ purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }) }));
-vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.scheduleWalletEmails }));
+vi.mock("@/lib/identity/auth", () => ({
+  getCurrentUser: async () => ({ id: "u1", email: "buyer@example.com" }),
+  requireAuthApi: async () => ({ id: "u1", email: "buyer@example.com" }),
+}));
+vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => true }));
+vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
+  // Keep the real module: other limiters are constructed when a route imports
+  // a money module, and a factory that omits them fails at import time.
+  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
+  return { ...actual, purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }) };
+});
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.scheduleWalletEmails }));
 
 vi.mock("@/db", () => {
   const dialect = new PgDialect();
@@ -66,6 +78,8 @@ vi.mock("@/db", () => {
       return fields ? [{ balance }] : [{ id: String(params[0]), walletBalance: balance }];
     }
     if (table === orders) {
+      state.orderReads += 1;
+      if (state.racedOrder && state.orderReads >= 2) return [state.racedOrder];
       const row = state.orderRows.find((entry) => entry.userId === params[0] && entry.requestId === params[1]);
       return row ? [row] : [];
     }
@@ -90,8 +104,10 @@ vi.mock("@/db", () => {
 
   function writeOrders(values: Record<string, unknown>, condition: SQL) {
     if (state.failOrderWrite) throw new Error("orders table unavailable");
-    const [orderId] = dialect.sqlToQuery(condition).params;
+    const query = dialect.sqlToQuery(condition);
+    const [orderId] = query.params;
     const row = state.orderRows.find((entry) => entry.id === orderId);
+    if (row && /"refunded_at" is null/i.test(query.sql) && row.refundedAt != null) return [];
     if (row) Object.assign(row, values);
     return [row].filter(Boolean);
   }
@@ -147,12 +163,21 @@ vi.mock("@/db", () => {
           orderRows: state.orderRows.map((row) => ({ ...row })),
           ledger: [...state.ledger],
         };
+        let committed = false;
         try {
-          return await callback(tx);
+          const result = await callback(tx);
+          committed = true;
+          if (state.refundAckLost && state.ledger.some((entry) => entry.type === "refund")) {
+            state.refundAckLost = false;
+            throw new Error("refund commit acknowledgement lost");
+          }
+          return result;
         } catch (error) {
-          state.balances = snapshot.balances;
-          state.orderRows = snapshot.orderRows;
-          state.ledger = snapshot.ledger;
+          if (!committed) {
+            state.balances = snapshot.balances;
+            state.orderRows = snapshot.orderRows;
+            state.ledger = snapshot.ledger;
+          }
           throw error;
         }
       },
@@ -178,6 +203,10 @@ beforeEach(() => {
   state.orderRows = [];
   state.ledger = [];
   state.failOrderWrite = false;
+  state.refundAckLost = false;
+  state.configured = true;
+  state.racedOrder = null;
+  state.orderReads = 0;
   state.fulfillError = new Error("provider is down");
   state.codes = ["GIFT-CODE-1"];
   mocks.scheduleWalletEmails.mockReset();
@@ -195,10 +224,24 @@ describe("POST /api/gift-cards/order refund", () => {
     expect(state.balances.u1).toBe(20_000);
   });
 
+  it("uses a customer message when gift card ordering is not configured", async () => {
+    state.configured = false;
+    const response = await POST(request());
+    const body = await response.text();
+    expect(response.status).toBe(503);
+    expect(body).toContain("Gift card purchases are unavailable right now");
+    expect(body).not.toMatch(/provider|API|configured/i);
+    expect(state.ledger).toEqual([]);
+  });
+
   it("hands the money back and records the refund together", async () => {
     const response = await POST(request());
 
     expect(response.status).toBe(502);
+    const body = await response.json();
+    expect(body.outcome).toBe("refunded");
+    expect(body.error).toContain("wallet has been refunded");
+    expect(body.error).toContain("before placing another order");
     expect(state.orderRows[0]).toMatchObject({ status: "refunded", providerRequestId: "fox-1" });
     expect(state.ledger.map((entry) => entry.type)).toEqual(["debit", "refund"]);
     expect(state.balances.u1).toBe(20_000);
@@ -213,10 +256,72 @@ describe("POST /api/gift-cards/order refund", () => {
     const response = await POST(request());
 
     expect(response.status).toBe(502);
+    const body = await response.json();
+    expect(body.outcome).toBe("unconfirmed");
+    expect(body.error).toMatch(/couldn't confirm.*refund/i);
+    expect(body.error).toContain(body.reference);
+    expect(body.error).not.toMatch(/support has been flagged|will refund|has been refunded/i);
     // Nothing was recorded as refunded, so nothing may have been credited back.
     expect(state.orderRows[0].status).toBe("processing");
     expect(state.ledger.map((entry) => entry.type)).toEqual(["debit"]);
     expect(state.balances.u1).toBe(3_500);
+  });
+
+  it("keeps raw supplier text out of the response, order notes and logs", async () => {
+    const sensitive = "API ERROR secret-and-upstream-response";
+    state.fulfillError = new FoxreloadErrorMock(sensitive, 401, "AUTH_ERROR");
+    const response = await POST(request());
+    const body = await response.text();
+    expect(response.status).toBe(502);
+    expect(body).not.toContain(sensitive);
+    expect(JSON.stringify(state.orderRows)).not.toContain(sensitive);
+    const logs = vi.mocked(console.error).mock.calls;
+    expect(JSON.stringify(logs)).not.toContain(sensitive);
+    expect(logs).toEqual(expect.arrayContaining([
+      expect.arrayContaining([expect.objectContaining({ code: "AUTH_ERROR", status: 401 })]),
+    ]));
+  });
+
+  it("does not overwrite a refund when the commit acknowledgement is lost", async () => {
+    state.refundAckLost = true;
+    const response = await POST(request());
+    const body = await response.json();
+    expect(body.outcome).toBe("unconfirmed");
+    expect(body.error).not.toContain("has been refunded");
+    expect(state.orderRows[0].status).toBe("refunded");
+    expect(state.orderRows[0].refundedAt).toBeInstanceOf(Date);
+    expect(state.ledger.map((entry) => entry.type)).toEqual(["debit", "refund"]);
+    expect(state.balances.u1).toBe(20_000);
+  });
+
+  it.each(["processing", "review", "refunded"])("does not claim a %s replay delivered a gift card", async (status) => {
+    state.orderRows.push({ userId: "u1", requestId: "11111111-2222-4333-8444-555555555555", status, reference: "GC-EXISTING", referenceCode: null });
+    const response = await POST(request());
+    const body = await response.json();
+    expect(response.status).toBe(409);
+    expect(body.ok).toBe(false);
+    expect(body.error).toMatch(/check your orders and wallet/i);
+    expect(body.code).toBeUndefined();
+    expect(state.ledger).toEqual([]);
+  });
+
+  it("does not claim delivery when an in-flight request wins the idempotency race", async () => {
+    state.racedOrder = { status: "processing", reference: "GC-RACE", referenceCode: null };
+    const response = await POST(request());
+    const body = await response.json();
+    expect(response.status).toBe(409);
+    expect(body.ok).toBe(false);
+    expect(body.error).toMatch(/check your orders and wallet/i);
+    expect(state.ledger).toEqual([]);
+  });
+
+  it("still replays a delivered gift card without another debit", async () => {
+    state.racedOrder = { status: "delivered", reference: "GC-RACE", referenceCode: "EXISTING-CODE" };
+    const response = await POST(request());
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({ ok: true, replayed: true, code: "EXISTING-CODE" });
+    expect(state.ledger).toEqual([]);
   });
 
   it("delivers a code without touching the refund path", async () => {

@@ -1,12 +1,12 @@
-import { financialActionsUnavailable, isVercelPreview } from "@/lib/financial-environment";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable, isVercelPreview } from "@/lib/platform/financial-environment";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthApi } from "@/lib/auth";
-import { createScheduledOrder, getUserScheduledOrders, pauseScheduledOrder, resumeScheduledOrder, cancelScheduledOrder, type Frequency } from "@/lib/scheduled-orders";
-import { findPlan } from "@/lib/catalog";
-import { isSameOriginMutation } from "@/lib/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { createScheduledOrder, getUserScheduledOrders, pauseScheduledOrder, resumeScheduledOrder, cancelScheduledOrder, type Frequency } from "@/lib/services/scheduled-orders";
+import { findPlan } from "@/lib/services/catalog";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -73,9 +73,9 @@ export async function POST(request: NextRequest) {
       id: result.id,
       nextRunAt: result.nextRunAt.toISOString(),
     });
-  } catch {
-    console.error("Failed to create scheduled order");
-    return NextResponse.json({ error: "Failed to create scheduled order" }, { status: 500 });
+  } catch (error) {
+    console.error("Schedule creation could not be confirmed", error);
+    return NextResponse.json({ error: "We couldn't confirm whether the schedule was created. Reload this page to check before creating it again." }, { status: 500 });
   }
 }
 
@@ -113,8 +113,8 @@ export async function PATCH(request: NextRequest) {
     }
     if (!updated) return NextResponse.json({ error: "Schedule not found or cannot be changed in its current state" }, { status: 409 });
     return NextResponse.json({ ok: true });
-  } catch {
-    console.error("Failed to update scheduled order");
-    return NextResponse.json({ error: "Failed to update scheduled order" }, { status: 500 });
+  } catch (error) {
+    console.error("Schedule update could not be confirmed", error);
+    return NextResponse.json({ error: "We couldn't confirm the schedule change. Reload this page to check before trying again." }, { status: 500 });
   }
 }

@@ -5,8 +5,8 @@ import {
   countingSummary,
   summariseLane,
   type OrderTally,
-} from "@/lib/service-coverage";
-import { isNumberProvider, pollsForCode } from "@/lib/order-providers";
+} from "@/lib/services/service-coverage";
+import { isNumberProvider, pollsForCode } from "@/lib/services/order-providers";
 
 /**
  * The coverage verdict.

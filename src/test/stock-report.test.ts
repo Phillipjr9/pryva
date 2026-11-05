@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { BulkaccProduct } from "@/lib/bulkacc";
-import type { FleexaRentArea, FleexaSmsService } from "@/lib/fleexa";
-import { plans } from "@/lib/catalog";
-import { fulfilmentIntent } from "@/lib/fulfillment";
-import type { SmmService } from "@/lib/smm-panel";
+import type { BulkaccProduct } from "@/lib/providers/bulkacc";
+import type { FleexaRentArea, FleexaSmsService } from "@/lib/providers/fleexa";
+import { plans } from "@/lib/services/catalog";
+import { fulfilmentIntent } from "@/lib/services/fulfillment";
+import type { SmmService } from "@/lib/providers/smm-panel";
 import {
   accountProductLines,
   boostLines,
@@ -12,7 +12,7 @@ import {
   numberPlanLines,
   rentalPlanLines,
   summariseLane,
-} from "@/lib/stock-report";
+} from "@/lib/admin/stock-report";
 
 /**
  * What the stock page is allowed to claim.
@@ -68,13 +68,29 @@ function service(overrides: Partial<SmmService> = {}): SmmService {
 }
 
 describe("number plans against a live catalog", () => {
-  it("reports the units the feed counted", () => {
+  it("does not sum app pools that may overlap into a plan stock count", () => {
     const lines = numberPlanLines(sellable.filter((entry) => entry.plan.slug === "vn-ng"), [
       sms({ stock: 7 }),
       sms({ id: "s2", stock: 5 }),
     ]);
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toMatchObject({ id: "vn-ng", state: "in-stock", stock: 12 });
+    expect(lines[0]).toMatchObject({ id: "vn-ng", state: "unknown", stock: null });
+    expect(lines[0].note).toMatch(/overlap/);
+  });
+
+  it("recognizes the countryless US-only app feed without mapping it to other destinations", () => {
+    const documented = sms({ country: null, priceNgn: null, stock: 7 });
+    const us = numberPlanLines(sellable.filter((entry) => entry.plan.slug === "vn-us"), [documented]);
+    const nigeria = numberPlanLines(sellable.filter((entry) => entry.plan.slug === "vn-ng"), [documented]);
+    expect(us).toHaveLength(1);
+    expect(us[0]).toMatchObject({ stock: 7, state: "in-stock" });
+    expect(nigeria[0]).toMatchObject({ stock: null, state: "no-match" });
+  });
+
+  it("reports a single app's count without pretending it covers other suppliers", () => {
+    const [line] = numberPlanLines(sellable.filter((entry) => entry.plan.slug === "vn-ng"), [sms({ stock: 7 })]);
+    expect(line).toMatchObject({ state: "in-stock", stock: 7 });
+    expect(line.note).toMatch(/one app; other sources may differ/);
   });
 
   it("says 'not listed' when the feed has no number for that destination", () => {
@@ -147,9 +163,17 @@ describe("account listings", () => {
 describe("boosts", () => {
   it("reports an orderable listing with its range instead of fake inventory", () => {
     const [line] = boostLines([service()], "NGN");
-    expect(line.state).toBe("in-stock");
+    expect(line.state).toBe("listed");
     expect(line.stock).toBeNull();
     expect(line.note).toContain("100–10000");
+  });
+
+  it("uses the service billing currency and does not treat an unknown maximum as stock", () => {
+    const [line] = boostLines([service({ currency: "NGN", max: null })], "USD");
+    expect(line).toMatchObject({ state: "listed", stock: null });
+    expect(line.note).toMatch(/maximum not reported/);
+    expect(line.note).toMatch(/billed in NGN/);
+    expect(line.note).not.toMatch(/billed in USD/);
   });
 
   it("says so when a feed answers but nothing can be priced", () => {
@@ -174,7 +198,7 @@ describe("lane summaries", () => {
       { id: "c", label: "C", state: "no-match", stock: null, note: "" },
     ]);
     expect(lane.sellable).toBe(1);
-    expect(laneHeadline(lane)).toBe("1 of 3 buyable now");
+    expect(laneHeadline(lane)).toBe("1 of 3 listed or stocked");
   });
 
   it("puts the feed's own error ahead of any count", () => {

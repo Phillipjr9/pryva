@@ -57,7 +57,7 @@ export function ReviewForm({ orders }: { orders: ReviewableOrder[] }) {
       });
       const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!response.ok || !data.ok) {
-        setError(data.error ?? "Could not save the review.");
+        setError(response.status < 500 && typeof data.error === "string" ? data.error : "We couldn't confirm whether your review was saved. Reload this page to check before submitting it again.");
         return;
       }
       setSent(true);
@@ -65,7 +65,7 @@ export function ReviewForm({ orders }: { orders: ReviewableOrder[] }) {
       setBody("");
       router.refresh();
     } catch {
-      setError("Network hiccup. Your review was not saved.");
+      setError("We couldn't confirm whether your review was saved. Reload this page to check before submitting it again.");
     } finally {
       setPending(false);
     }

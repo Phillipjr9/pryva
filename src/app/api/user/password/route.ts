@@ -3,13 +3,13 @@ import { cookies } from "next/headers";
 import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { users, sessions } from "@/db/schema";
-import { requireAuthApi, hashPassword, verifyPassword, SESSION_COOKIE, SESSION_COOKIE_EMBEDDED } from "@/lib/auth";
-import { isSameOriginMutation } from "@/lib/net";
-import { passwordChangeRateLimiter } from "@/lib/rate-limit";
-import { validatePassword } from "@/lib/validation";
-import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
-import { queuePasswordChangeEmail } from "@/lib/password-change-email";
+import { requireAuthApi, hashPassword, verifyPassword, SESSION_COOKIE, SESSION_COOKIE_EMBEDDED } from "@/lib/identity/auth";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { passwordChangeRateLimiter } from "@/lib/platform/rate-limit";
+import { validatePassword } from "@/lib/platform/validation";
+import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
+import { queuePasswordChangeEmail } from "@/lib/email/password-change-email";
 
 export const dynamic = "force-dynamic";
 

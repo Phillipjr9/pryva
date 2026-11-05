@@ -199,7 +199,10 @@ export function SupportChat({
       const data = (await response.json().catch(() => ({}))) as Reply;
 
       if (!response.ok || !data.ok) {
-        throw new Error(data.error ?? "That did not send. Please try again.");
+        setMessages((current) => current.filter((message) => message.id !== optimistic.id));
+        setDraft(text);
+        setError(response.status < 500 && data.error ? data.error : "We couldn't confirm whether your message was sent. Check your conversations before sending it again.");
+        return;
       }
 
       const createdId = typeof data.ticketId === "string" ? data.ticketId : null;
@@ -229,12 +232,12 @@ export function SupportChat({
 
       if (typeof data.status === "string") setStatus(data.status);
       if (data.status === "escalated") setEscalated(true);
-    } catch (failure) {
-      // Nothing was recorded, so take the optimistic bubble back and put the text
-      // where it was: losing a complaint to a network blip is worse than a retry.
+    } catch {
+      // A lost response is not proof that nothing was recorded. Preserve the
+      // draft and ask the customer to check the conversation before resending.
       setMessages((current) => current.filter((message) => message.id !== optimistic.id));
       setDraft(text);
-      setError(failure instanceof Error ? failure.message : "That did not send. Please try again.");
+      setError("We couldn't confirm whether your message was sent. Check your conversations before sending it again.");
     } finally {
       setSending(false);
       setPresence("idle");
@@ -252,15 +255,18 @@ export function SupportChat({
         body: JSON.stringify({ action: "escalate" }),
       });
       const data = (await response.json().catch(() => ({}))) as Reply;
-      if (!response.ok || !data.ok) throw new Error(data.error ?? "That did not go through.");
+      if (!response.ok || !data.ok) {
+        setError(response.status < 500 && data.error ? data.error : "We couldn't confirm your request. Check this conversation before trying again.");
+        return;
+      }
       setEscalated(true);
       setStatus("escalated");
       setMessages((current) => [
         ...current,
         localMessage("system", "Passed to a person. Replies appear in this thread, and you will not be asked to explain it again."),
       ]);
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "That did not go through.");
+    } catch {
+      setError("We couldn't confirm your request. Check this conversation before trying again.");
     } finally {
       setEscalating(false);
     }

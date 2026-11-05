@@ -1,5 +1,5 @@
 /**
- * Generates `src/lib/brand-marks.ts` from official open icon sources.
+ * Generates `src/lib/content/brand-marks.ts` from official open icon sources.
  *
  * Run:
  *   npm i --no-save simple-icons @iconify-json/logos devicon
@@ -11,7 +11,7 @@
  */
 import { createRequire } from "node:module";
 import { readFileSync, writeFileSync } from "node:fs";
-const require = createRequire("/home/user/pryva/package.json");
+const require = createRequire(new URL("../package.json", import.meta.url));
 
 const si = require("simple-icons");
 const logos = require("@iconify-json/logos/icons.json");
@@ -131,6 +131,6 @@ lines.push(`  return (BRAND_MARKS as Record<string, BrandMark>)[slug];`);
 lines.push(`}`);
 lines.push(``);
 
-writeFileSync("/home/user/pryva/src/lib/brand-marks.ts", lines.join("\n"));
+writeFileSync(new URL("../src/lib/content/brand-marks.ts", import.meta.url), lines.join("\n"));
 console.log("wrote brand-marks.ts", Object.keys(out).length, "marks");
 for (const k of Object.keys(out)) console.log(" -", k, out[k].viewBox, out[k].body.length);

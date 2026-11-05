@@ -14,7 +14,7 @@
  * `Server: Vercel` is written by the platform after the app runs, so it appears
  * here as a note — hiding it needs a proxy in front of the deployment.
  */
-import { inspectBanners, revealsVersion } from "../src/lib/server-banner.ts";
+import { inspectBanners, revealsVersion } from "../src/lib/platform/server-banner.ts";
 
 const base = (process.argv[2] ?? "https://pryvalogs.com").replace(/\/$/, "");
 const paths = process.argv.slice(3);

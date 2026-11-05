@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { plansFor } from "@/lib/catalog";
-import { isPlanFulfillable } from "@/lib/fulfillment";
+import { plansFor } from "@/lib/services/catalog";
+import { isPlanFulfillable } from "@/lib/services/fulfillment";
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/lib/identity/auth", () => ({
   getCurrentUser: async () => null,
 }));
 
@@ -95,6 +95,20 @@ describe("homepage promises", () => {
     expect(html).not.toContain("₦790");
     expect(html).not.toContain("per inbox");
     expect(html).toContain("Free");
+  });
+
+  /**
+   * Data plans have no purchase path (the endpoint fails closed), so the data
+   * card must not advertise "Catalog from ₦500" — a floor price is a promise
+   * to sell, and nothing can be sold. Same rule as the inbox above: no price
+   * on something that cannot take money.
+   */
+  it("advertises no price for data plans, only that they are not available yet", () => {
+    // Other catalog services do show "Catalog from ₦X"; data's unit is
+    // "per plan", so its absence pins the data card specifically.
+    expect(html).not.toContain("₦500");
+    expect(html).not.toContain("per plan");
+    expect(html).toContain("Not available yet");
   });
 
   it("no longer sells subscription tiers that do not exist", () => {

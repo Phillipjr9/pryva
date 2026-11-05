@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowRight, Close, Menu } from "@/components/icons";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira } from "@/lib/services/catalog";
 import { BrandLockup } from "@/components/brand/BrandLockup";
 
 type NavUser = { name: string; walletBalance: number } | null;

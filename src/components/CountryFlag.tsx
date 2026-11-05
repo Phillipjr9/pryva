@@ -1,4 +1,4 @@
-import { countryFor, flagSrc, regionFlagFor } from "@/lib/countries";
+import { countryFor, flagSrc, regionFlagFor } from "@/lib/platform/countries";
 
 /**
  * CountryFlag shows the real flag artwork for a country or regional product.

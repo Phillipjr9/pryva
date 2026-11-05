@@ -157,9 +157,9 @@ describe("a customer talking to the assistant", () => {
     fireEvent.click(submit());
 
     await waitFor(() =>
-      expect(screen.getByText("That did not send. Please try again.")).toBeTruthy(),
+      expect(screen.getByText("We couldn't confirm whether your message was sent. Check your conversations before sending it again.")).toBeTruthy(),
     );
-    // The optimistic bubble is gone — it never happened — and the text is editable again.
+    // The response did not confirm the save; the draft is still editable.
     expect(transcript().textContent).not.toContain("My refund never arrived");
     expect(composer().value).toBe("My refund never arrived");
     expect(refresh).not.toHaveBeenCalled();
@@ -172,7 +172,8 @@ describe("a customer talking to the assistant", () => {
     fireEvent.change(composer(), { target: { value: "Hello, are you there?" } });
     fireEvent.click(submit());
 
-    await waitFor(() => expect(screen.getByText("Failed to fetch")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("We couldn't confirm whether your message was sent. Check your conversations before sending it again.")).toBeTruthy());
+    expect(screen.queryByText("Failed to fetch")).toBeNull();
     expect(composer().value).toBe("Hello, are you there?");
   });
 

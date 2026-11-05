@@ -1,17 +1,17 @@
-import { paystackKeyUsable } from "@/lib/paystack-policy";
+import { paystackKeyUsable } from "@/lib/payments/paystack-policy";
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { paymentTopups } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth";
-import { financialActionsUnavailable } from "@/lib/financial-environment";
-import { isSameOriginMutation, publicOrigin } from "@/lib/net";
-import { initializePayment } from "@/lib/paystack";
-import { logger } from "@/lib/logger";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { isSafePaystackCheckoutUrl } from "@/lib/paystack-checkout";
-import { paystackAppOrigin } from "@/lib/paystack-origin";
+import { getCurrentUser } from "@/lib/identity/auth";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
+import { isSameOriginMutation, publicOrigin } from "@/lib/platform/net";
+import { initializePayment } from "@/lib/payments/paystack";
+import { logger } from "@/lib/platform/logger";
+import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { isSafePaystackCheckoutUrl } from "@/lib/payments/paystack-checkout";
+import { paystackAppOrigin } from "@/lib/payments/paystack-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
 
     if (financialActionsUnavailable() || !paystackKeyUsable(process.env.PAYSTACK_SECRET_KEY)) {
-      return NextResponse.json({ error: "Wallet top-ups are not configured." }, { status: 503 });
+      return NextResponse.json({ error: "Wallet top-ups are unavailable right now." }, { status: 503 });
     }
     const limit = await purchaseRateLimiter(`topup-init:${user.id}`);
     if (limit.unavailable) return NextResponse.json({ error: "Wallet top-ups are temporarily unavailable." }, { status: 503 });
@@ -47,7 +47,10 @@ export async function POST(request: NextRequest) {
     }
 
     const origin = paystackAppOrigin(process.env.NEXT_PUBLIC_SITE_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim() || publicOrigin(request), process.env.NODE_ENV !== "production");
-    if (!origin) return NextResponse.json({ error: "The payment return URL is not configured correctly." }, { status: 503 });
+    if (!origin) {
+      logger.error("Wallet top-up return URL is not configured correctly");
+      return NextResponse.json({ error: "Wallet top-ups are unavailable right now." }, { status: 503 });
+    }
     const reference = `TOP-${randomBytes(12).toString("hex")}`;
     const callbackUrl = `${origin}/dashboard/wallet?topup=return`;
     // Record the intended user and amount before Paystack can send an event.

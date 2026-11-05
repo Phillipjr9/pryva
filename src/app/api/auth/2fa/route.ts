@@ -2,18 +2,18 @@ import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { createSession } from "@/lib/auth";
-import { checkAuthRateLimit, clearAuthRateLimit } from "@/lib/auth-rate-limit";
-import { isSameOriginMutation } from "@/lib/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { logger } from "@/lib/logger";
+import { createSession } from "@/lib/identity/auth";
+import { checkAuthRateLimit, clearAuthRateLimit } from "@/lib/identity/auth-rate-limit";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { logger } from "@/lib/platform/logger";
 import {
   MAX_CHALLENGE_ATTEMPTS,
   consumeChallenge,
   failChallenge,
   findChallenge,
   verifySecondFactor,
-} from "@/lib/two-factor";
+} from "@/lib/identity/two-factor";
 
 export const dynamic = "force-dynamic";
 

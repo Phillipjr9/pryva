@@ -3,8 +3,8 @@ import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
-import { formatNaira } from "@/lib/catalog";
+import { requireUser } from "@/lib/identity/auth";
+import { formatNaira } from "@/lib/services/catalog";
 import { ArrowRight, ArrowUpRight, Clock, Receipt, Search, Sparkle } from "@/components/icons";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 
@@ -172,12 +172,13 @@ export default async function OrdersPage({
                   <span />
                 </div>
                 <div className="divide-y divide-line/80">
+                  {/* `relative` anchor for the desktop receipt link below. */}
                   {group.items.map((order) => {
                     const expires = order.expiresAt ? new Date(order.expiresAt) : null;
                     const live = expires && expires.getTime() > Date.now();
                     return (
+                      <div key={order.id} className="relative">
                       <Link
-                        key={order.id}
                         href={`/dashboard/orders/${order.id}`}
                         className="grid gap-1.5 px-4 py-3.5 transition-colors hover:bg-lav-50/40 md:grid-cols-[1.45fr_0.9fr_0.7fr_0.75fr_0.25fr] md:items-center md:gap-3 md:px-5"
                       >
@@ -217,6 +218,22 @@ export default async function OrdersPage({
                           Open order <ArrowRight className="h-3 w-3" />
                         </span>
                       </Link>
+                      {/*
+                        A sibling, not a child: the row above is one big link, and
+                        a link inside a link is invalid and unreachable by keyboard.
+                        A receipt is the thing people come back for when a bank or
+                        an employer asks for proof, so it gets its own control here
+                        rather than two taps deep behind the order page.
+                      */}
+                      <Link
+                        href={`/dashboard/orders/${order.id}/receipt`}
+                        aria-label={`Receipt for ${order.productName}, ${order.reference}`}
+                        className="mb-3 ml-4 inline-flex items-center gap-1.5 text-meta font-semibold text-ink-3 hover:text-lav-700 md:absolute md:right-14 md:top-1/2 md:mb-0 md:ml-0 md:-translate-y-1/2"
+                      >
+                        <Receipt className="h-3.5 w-3.5" aria-hidden="true" />
+                        Receipt
+                      </Link>
+                      </div>
                     );
                   })}
                 </div>

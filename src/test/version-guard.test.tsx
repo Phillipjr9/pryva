@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GET } from "@/app/api/version/route";
-import { BUILD_GUARD_SCRIPT_ID, BUILD_ID, staleBuildScript } from "@/lib/build-id";
+import { BUILD_GUARD_SCRIPT_ID, BUILD_ID, staleBuildScript } from "@/lib/platform/build-id";
 
 describe("build version endpoint", () => {
   it("reports the build this server is running", async () => {

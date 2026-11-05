@@ -6,7 +6,7 @@ import { sql } from "drizzle-orm";
 
 import * as schema from "@/db/schema";
 import { users } from "@/db/schema";
-import { makeNumberCodeEmail } from "@/lib/number-email-template";
+import { makeNumberCodeEmail } from "@/lib/email/number-email-template";
 
 /**
  * "Your code arrived."

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { twoFactorChallenges, twoFactorRecoveryCodes, userTwoFactor } from "@/db/schema";
-import { totpAt, currentStep } from "@/lib/totp";
+import { totpAt, currentStep } from "@/lib/identity/totp";
 import {
   MAX_CHALLENGE_ATTEMPTS,
   beginEnrolment,
@@ -17,7 +17,7 @@ import {
   remainingRecoveryCodes,
   twoFactorAvailable,
   verifySecondFactor,
-} from "@/lib/two-factor";
+} from "@/lib/identity/two-factor";
 
 /**
  * A second factor is only worth having if every "I could not check it" path

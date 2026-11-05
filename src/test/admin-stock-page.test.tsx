@@ -13,8 +13,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 
 const state = vi.hoisted(() => ({ report: null as unknown }));
 
-vi.mock("@/lib/auth", () => ({ requireAdmin: vi.fn().mockResolvedValue({ id: "admin-1" }) }));
-vi.mock("@/lib/stock-live", () => ({ buildStockReport: async () => state.report }));
+vi.mock("@/lib/identity/auth", () => ({ requireAdmin: vi.fn().mockResolvedValue({ id: "admin-1" }) }));
+vi.mock("@/lib/admin/stock-live", () => ({ buildStockReport: async () => state.report }));
 
 import AdminStockPage from "@/app/admin/(console)/stock/page";
 
@@ -53,19 +53,23 @@ afterEach(() => {
 });
 
 describe("the stock page", () => {
-  it("renders each lane with its buyable count", async () => {
+  it("renders feed summaries without calling them guaranteed buyable counts", async () => {
     state.report = report();
     render(await AdminStockPage({ searchParams: Promise.resolve({}) }));
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Stock");
     expect(screen.getByText("Virtual numbers")).toBeTruthy();
-    expect(screen.getByText("1 of 2 buyable now")).toBeTruthy();
+    expect(screen.getByText("1 of 2 listed or stocked")).toBeTruthy();
+    expect(screen.queryByText(/buyable now/i)).toBeNull();
+    expect(screen.getByText(/Number and rental counts cover one feed/)).toBeTruthy();
   });
 
   it("names the feed that did not answer instead of showing an empty lane", async () => {
     state.report = report();
     render(await AdminStockPage({ searchParams: Promise.resolve({}) }));
-    expect(screen.getByText(/1 feed did not answer/i)).toBeTruthy();
+    expect(screen.getByText(/1 feed unavailable or not configured/i)).toBeTruthy();
     expect(screen.getAllByText(/panel unreachable/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/other sources may still be available/i)).toBeTruthy();
+    expect(screen.queryByText(/cannot sell until/i)).toBeNull();
   });
 
   it("shows units and the miss reason per line", async () => {

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { contactMessages } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth";
-import { isSameOriginMutation } from "@/lib/net";
-import { clientIp } from "@/lib/auth-rate-limit";
-import { contactRateLimiter } from "@/lib/rate-limit";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { getCurrentUser } from "@/lib/identity/auth";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { clientIp } from "@/lib/identity/auth-rate-limit";
+import { contactRateLimiter } from "@/lib/platform/rate-limit";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -56,8 +56,9 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ ok: true });
-  } catch {
-    console.error("Failed to submit contact form");
-    return NextResponse.json({ error: "Failed to submit message" }, { status: 500 });
+  } catch (error) {
+    // Do not log SQL parameters: they can include the customer's message and email.
+    console.error("Contact message could not be confirmed", { type: error instanceof Error ? error.name : "unknown" });
+    return NextResponse.json({ error: "We couldn't confirm whether your message was sent. Please wait before sending it again." }, { status: 500 });
   }
 }

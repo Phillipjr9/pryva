@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthApi } from "@/lib/auth";
-import { clientIp } from "@/lib/auth-rate-limit";
-import { financialActionsUnavailable } from "@/lib/financial-environment";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { clientIp } from "@/lib/identity/auth-rate-limit";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import {
   createFreeInbox,
   InboxError,
   isInboxConfigured,
   listInboxes,
   mayHaveSpentMoney,
-} from "@/lib/disposable-inbox";
-import { logger } from "@/lib/logger";
-import { isSameOriginMutation } from "@/lib/net";
-import { apiRateLimiter, inboxCreateIpRateLimiter, releaseRateLimit } from "@/lib/rate-limit";
-import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+} from "@/lib/services/email-otp/disposable-inbox";
+import { logger } from "@/lib/platform/logger";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { apiRateLimiter, inboxCreateIpRateLimiter, releaseRateLimit } from "@/lib/platform/rate-limit";
+import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -67,13 +67,13 @@ export async function POST(request: NextRequest) {
     // "the feature is off".
     if (financialActionsUnavailable()) {
       return NextResponse.json(
-        { error: "Temporary inboxes are unavailable on this deployment.", code: "PREVIEW" },
+        { error: "Temporary inboxes are unavailable in this preview.", code: "PREVIEW" },
         { status: 503 },
       );
     }
     if (!isInboxConfigured()) {
       return NextResponse.json(
-        { error: "Temporary inboxes are not configured on this server.", code: "NOT_CONFIGURED" },
+        { error: "Temporary inboxes are unavailable right now.", code: "NOT_CONFIGURED" },
         { status: 503 },
       );
     }
@@ -134,6 +134,6 @@ export async function POST(request: NextRequest) {
       code: error instanceof Error && "code" in error ? String((error as { code: unknown }).code) : undefined,
       reason: error instanceof Error ? error.message : String(error),
     });
-    return NextResponse.json({ error: "Could not create an inbox." }, { status: 502 });
+    return NextResponse.json({ error: "We couldn't confirm whether your inbox was created. Reload this page to check before trying again." }, { status: 502 });
   }
 }

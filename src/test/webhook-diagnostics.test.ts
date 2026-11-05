@@ -17,10 +17,10 @@ const state = vi.hoisted(() => ({
   throws: false,
 }));
 
-vi.mock("@/lib/diagnostics-auth", () => ({ diagnosticsAuthorized: () => state.authorized }));
-vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => state.preview }));
-vi.mock("@/lib/webhook-events", () => ({
+vi.mock("@/lib/admin/diagnostics-auth", () => ({ diagnosticsAuthorized: () => state.authorized }));
+vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => state.preview }));
+vi.mock("@/lib/payments/webhook-events", () => ({
   recentWebhookActivity: async () => {
     if (state.throws) throw new Error("database down");
     return {

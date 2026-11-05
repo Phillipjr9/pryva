@@ -7,8 +7,8 @@ import { drizzle } from "drizzle-orm/pglite";
 const mocks = vi.hoisted(() => ({ db: undefined as unknown }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
 
-import { createRateLimiter, releaseRateLimit, resetRateLimit } from "@/lib/rate-limit";
-import { checkAuthRateLimit } from "@/lib/auth-rate-limit";
+import { createRateLimiter, releaseRateLimit, resetRateLimit } from "@/lib/platform/rate-limit";
+import { checkAuthRateLimit } from "@/lib/identity/auth-rate-limit";
 
 let pg: PGlite;
 let database: ReturnType<typeof drizzle>;

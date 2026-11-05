@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { canonicalSiteUrl, publicOrigin } from "@/lib/net";
+import { canonicalSiteUrl, publicOrigin } from "@/lib/platform/net";
 
 /**
  * Moving the site to its own domain.
@@ -101,7 +101,7 @@ describe("a pinned origin steps aside on the canonical host", () => {
 describe("the session cookie follows the site across www", () => {
   it("scopes to the registrable domain on the canonical host", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://example.test");
-    const { sessionCookieDomain } = await import("@/lib/auth");
+    const { sessionCookieDomain } = await import("@/lib/identity/auth");
     // Without this, signing in on `www.example.test` and opening `example.test`
     // loses the session: a host-only cookie is not sent to the sibling name.
     expect(sessionCookieDomain("example.test")).toBe("example.test");
@@ -111,7 +111,7 @@ describe("the session cookie follows the site across www", () => {
 
   it("stays host-only everywhere else", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://example.test");
-    const { sessionCookieDomain } = await import("@/lib/auth");
+    const { sessionCookieDomain } = await import("@/lib/identity/auth");
     // A `Domain=vercel.app` cookie would be offered to every unrelated project on
     // that suffix, so this must stay undefined off the canonical domain.
     expect(sessionCookieDomain("pryva-abc123.vercel.app")).toBeUndefined();
@@ -124,7 +124,7 @@ describe("the session cookie follows the site across www", () => {
 
   it("declines to widen a bare two-label host", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "http://pryva");
-    const { sessionCookieDomain } = await import("@/lib/auth");
+    const { sessionCookieDomain } = await import("@/lib/identity/auth");
     expect(sessionCookieDomain("pryva")).toBeUndefined();
   });
 });

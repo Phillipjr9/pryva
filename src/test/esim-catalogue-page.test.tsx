@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
 const readCatalog = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/auth", () => ({ requireUser: async () => ({ id: "buyer" }) }));
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => false }));
-vi.mock("@/lib/esim-catalog", () => ({
+vi.mock("@/lib/identity/auth", () => ({ requireUser: async () => ({ id: "buyer" }) }));
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => false }));
+vi.mock("@/lib/services/esim/esim-catalog", () => ({
   readEsimCatalog: readCatalog,
   ESIM_CATALOGUE_LIMIT: 1000,
   catalogueItems: (listings: unknown[]) => listings,

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getBanks, resolveBankAccount } from "@/lib/paystack";
+import { getBanks, resolveBankAccount } from "@/lib/payments/paystack";
 
 afterEach(() => vi.unstubAllGlobals());
 

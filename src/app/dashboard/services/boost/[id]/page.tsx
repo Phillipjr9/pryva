@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
-import { findBoostListing } from "@/lib/smm-catalog";
-import { isSmmPanelConfigured } from "@/lib/smm-panel";
-import { formatNaira } from "@/lib/catalog";
+import { requireUser } from "@/lib/identity/auth";
+import { findBoostListing } from "@/lib/services/boosts/smm-catalog";
+import { publicBoostQuote } from "@/lib/services/boosts/boost-quote";
+import { totalForQuantity } from "@/lib/services/boosts/boost-money";
+import { isSmmPanelConfigured } from "@/lib/providers/smm-panel";
+import { formatNaira } from "@/lib/services/catalog";
 import { BrandIcon } from "@/components/BrandIcon";
 import { BoostPurchaseForm } from "./BoostPurchaseForm";
 
@@ -29,10 +31,8 @@ export default async function BoostPage({ params }: { params: Promise<{ id: stri
   if (!found) notFound();
   const { listing } = found;
 
-  const perThousand = listing.perThousand;
-  const min = listing.min;
-  const priceFrom =
-    perThousand !== null && min !== null ? Math.ceil((perThousand * min) / 1_000) : null;
+  const quote = publicBoostQuote(listing);
+  const priceFrom = quote ? totalForQuantity(quote.perThousand, quote.min) : null;
 
   return (
     <div className="grid gap-5">
@@ -57,7 +57,7 @@ export default async function BoostPage({ params }: { params: Promise<{ id: stri
         </p>
       </div>
 
-      {priceFrom === null || perThousand === null || min === null ? (
+      {!quote || priceFrom === null ? (
         <div role="note" className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-meta leading-relaxed text-amber-900">
           <p className="font-semibold">This boosting service is not for sale right now.</p>
           <p className="mt-1">
@@ -65,17 +65,7 @@ export default async function BoostPage({ params }: { params: Promise<{ id: stri
           </p>
         </div>
       ) : (
-        <BoostPurchaseForm
-          listing={{
-            id: listing.id,
-            name: listing.name,
-            tag: listing.tag,
-            perThousand,
-            min,
-            max: listing.max,
-          }}
-          walletBalance={user.walletBalance}
-        />
+        <BoostPurchaseForm listing={quote} walletBalance={user.walletBalance} />
       )}
 
       <div role="note" className="rounded-2xl border border-line bg-white p-4 text-meta leading-relaxed text-ink-2">

@@ -5,12 +5,12 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ServiceIcon, type ServiceType } from "@/components/ServiceIcon";
 import { NetworkBadge } from "@/components/NetworkBadge";
-import { BRAND_MARKS } from "@/lib/brand-marks";
+import { BRAND_MARKS } from "@/lib/content/brand-marks";
 import { BrandIcon, WORDMARK_BRANDS } from "@/components/BrandIcon";
 import { PlatformBadge, platformName, type PlatformSlug } from "@/components/PlatformBadge";
-import { PROMOTION_EXAMPLES, VERIFICATION_EXAMPLES } from "@/lib/service-explorer";
-import { digitalServices } from "@/lib/digital-services";
-import { ARTWORK_WIDTHS } from "@/lib/service-artwork";
+import { PROMOTION_EXAMPLES, VERIFICATION_EXAMPLES } from "@/lib/services/service-explorer";
+import { digitalServices } from "@/lib/services/digital/digital-services";
+import { ARTWORK_WIDTHS } from "@/lib/services/service-artwork";
 
 /**
  * Every service shows its own icon.

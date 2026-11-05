@@ -1,4 +1,4 @@
-import type { AirtimeProvider } from "@/lib/airtime";
+import type { AirtimeProvider } from "@/lib/services/data/airtime";
 import { BrandIcon, type BrandIconProps } from "@/components/BrandIcon";
 
 /**

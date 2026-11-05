@@ -137,6 +137,60 @@ describe("tables on a narrow screen", () => {
   });
 });
 
+/**
+ * Reported: the service hub "always zoom out inconsistently" on a phone — the
+ * whole page rendered at roughly a third of the screen, so a customer had to
+ * pinch back in on every visit.
+ *
+ * The cause was not a wide card. The category chips are a horizontal scroll
+ * strip on a phone, and each chip carries an `sr-only` status label. Tailwind's
+ * `sr-only` is `position: absolute`, and none of the strip's ancestors were
+ * positioned — so the labels left the strip and resolved against the page,
+ * landing past the right edge at the unscrolled offset of a chip nobody could
+ * see. The document measured 1403px on a 390px phone, and a mobile browser
+ * that finds a page three times the screen width zooms out to fit it.
+ *
+ * A *silent screenshot test cannot catch this*: every visible element sat in
+ * the right place. These assertions are on the source, plus the two rules that
+ * stop any future escapee from being believed by the browser.
+ */
+describe("screen-zoom regressions", () => {
+  it("keeps an absolutely positioned label inside its scroll strip", () => {
+    // Every `overflow-x-auto` strip that holds an `sr-only` label needs its own
+    // containing block, or those labels escape to the page.
+    const offenders = files.filter((file) => {
+      const source = readFileSync(file, "utf8");
+      for (const match of source.matchAll(/className="([^"]*overflow-x-auto[^"]*)"/g)) {
+        const classes = match[1];
+        // Round the strip's own element: the label is a descendant, not a sibling.
+        const after = source.slice(match.index, match.index + 4000);
+        const closes = after.indexOf("</div>");
+        const body = closes === -1 ? after : after.slice(0, closes);
+        if (!body.includes("sr-only")) continue;
+        if (!/\b(relative|absolute|fixed|sticky)\b/.test(classes)) return true;
+      }
+      return false;
+    });
+
+    expect(
+      offenders,
+      `sr-only labels escape these scroll strips and widen the page:\n${offenders.join("\n")}`,
+    ).toHaveLength(0);
+  });
+
+  it("clips the page on the body as well as the html element", () => {
+    // `html { overflow-x: clip }` propagates to the viewport but leaves the
+    // document free to *report* an overflowing width — which is the number a
+    // phone acts on. The body has to clip too.
+    const start = css.indexOf("\n  body {");
+    expect(start).toBeGreaterThan(-1);
+    // Up to the next rule that starts at the same indentation.
+    const end = css.indexOf("\n  input, select, textarea {", start);
+    const bodyRule = css.slice(start, end === -1 ? start + 3000 : end);
+    expect(bodyRule).toContain("overflow-x: clip;");
+  });
+});
+
 describe("responsive overflow regressions", () => {
   it("lets flex and grid children shrink instead of imposing min-content widths", () => {
     expect(css).toContain(":where(.flex, .inline-flex, .grid) > * {");
@@ -144,9 +198,13 @@ describe("responsive overflow regressions", () => {
   });
 
   it("keeps iOS input sizes above the zoom threshold even with text utilities or CSS modules", () => {
-    const rule = css.slice(css.lastIndexOf("@media"));
+    // Locate the rule by what it does, not by being the last @media in the
+    // file: anything appended after it (the print stylesheet is) would otherwise
+    // make this assertion silently test the wrong block.
+    const marker = css.indexOf("font-size: max(1rem, 16px) !important;");
+    expect(marker).toBeGreaterThan(-1);
+    const rule = css.slice(css.lastIndexOf("@media", marker), marker);
     expect(rule).toContain("(max-width: 1023px), (pointer: coarse)");
-    expect(rule).toContain("font-size: max(1rem, 16px) !important;");
   });
 
   it("allows dashboard header actions to wrap on narrow screens", () => {

@@ -7,7 +7,8 @@ import {
   SERVICE_LANES,
   summariseLane,
   type OrderTally,
-} from "@/lib/service-coverage";
+} from "@/lib/services/service-coverage";
+import { LANES } from "@/lib/services/registry";
 
 /**
  * "The eSIM listing is empty" has to be answerable from the console.
@@ -103,12 +104,20 @@ describe("eSIM is a lane the console is accountable for", () => {
   });
 
   it("treats the gateway key as the gate, on the page as well as in the lane", () => {
+    // The page used to hold its own `switch` over lane ids, so the credential
+    // that decided a verdict lived in a second place. It now asks the lane's
+    // declared service, and `service-config.ts` is the only module that reads
+    // supplier keys. The intent is unchanged: eSIM's gate is the gateway key.
     const page = read("app/admin/(console)/services/page.tsx");
-    expect(page).toContain("isBitcallConfigured");
-    // Whitespace-normalised so a comment added inside the case does not fail it.
-    const compressed = page.replace(/\s+/g, " ");
-    expect(compressed).toContain('case "esim":');
-    expect(compressed).toMatch(/case "esim":[^}]*return isBitcallConfigured\(\)/);
+    expect(page).toContain("laneConfigured(spec.id)");
+    expect(page).not.toContain("isBitcallConfigured");
+
+    // …and that module asks the provider table, which is the one place that
+    // maps a supplier id to its credential check.
+    const config = read("lib/services/service-config.ts");
+    expect(config).toMatch(/bitcall: PROVIDERS\.bitcall\.configured/);
+    expect(read("lib/providers/index.ts")).toMatch(/configured: isBitcallConfigured/);
+    expect(LANES.find((lane) => lane.id === "esim")?.configuredBy).toBe("esim");
   });
 
   it("filters the stuck-order sweep by service too", () => {
@@ -142,7 +151,7 @@ describe("an unreadable supplier schema is loud, not empty", () => {
     // A supplier that renames `planId` makes every row unreadable. The read still
     // succeeds, so nothing throws: the storefront simply lists nothing and the
     // health check stays green. That is the bug report "the listing is empty".
-    const client = read("lib/bitcall.ts");
+    const client = read("lib/providers/bitcall.ts");
     expect(client).toContain("eSIM catalog returned rows but none were readable");
     expect(client).toContain("eSIM catalog rows skipped");
     // Only key *names* are logged -- never a plan reference, never a price.
@@ -163,7 +172,7 @@ describe("the public eSIM page agrees with itself", () => {
     expect(page).toContain("const faqs = live");
     expect(page).toContain("Check current plans");
     // The pre-launch strings must survive for the no-supplier case.
-    expect(read("lib/catalog.ts")).toContain("not available for purchase yet");
+    expect(read("lib/services/catalog.ts")).toContain("not available for purchase yet");
   });
 });
 
@@ -173,13 +182,13 @@ describe("no public page says eSIM cannot be bought while it is being bought", (
     vi.stubEnv("DATABASE_URL", "postgres://configured.test/database");
     vi.stubEnv("BITCALL_KEY_ID", "ak_live_abc");
     vi.stubEnv("BITCALL_API_SECRET", "a".repeat(128));
-    const { esimCategoryOrderable } = await import("@/lib/esim-availability");
+    const { esimCategoryOrderable } = await import("@/lib/services/esim/esim-availability");
     expect(esimCategoryOrderable()).toBe(true);
 
     vi.resetModules();
     vi.stubEnv("BITCALL_KEY_ID", "");
     vi.stubEnv("BITCALL_API_SECRET", "");
-    const off = await import("@/lib/esim-availability");
+    const off = await import("@/lib/services/esim/esim-availability");
     expect(off.esimCategoryOrderable()).toBe(false);
     vi.unstubAllEnvs();
   });

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { findPlan } from "@/lib/catalog";
+import { findPlan } from "@/lib/services/catalog";
 
 /**
  * Two suppliers now sell the same product, so the risk moves from "can we buy?"
@@ -20,8 +20,8 @@ const bitcall = vi.hoisted(() => ({
   read: vi.fn(),
 }));
 
-vi.mock("@/lib/fleexa", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/fleexa")>();
+vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/fleexa")>();
   return {
     ...actual,
     isFleexaConfigured: () => fleexa.configured,
@@ -30,8 +30,8 @@ vi.mock("@/lib/fleexa", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/bitcall", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/bitcall")>();
+vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/bitcall")>();
   return {
     ...actual,
     isBitcallConfigured: () => bitcall.configured,
@@ -42,9 +42,9 @@ vi.mock("@/lib/bitcall", async (importOriginal) => {
   };
 });
 
-const { cancelUpstream, fulfillPlan } = await import("@/lib/fulfillment");
-const { otpSupplierOrder, otpSupplierProbe, clearOtpCatalogueCache } = await import("@/lib/otp-suppliers");
-const { FleexaError } = await import("@/lib/fleexa");
+const { cancelUpstream, fulfillPlan } = await import("@/lib/services/fulfillment");
+const { otpSupplierOrder, otpSupplierProbe, clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");
+const { FleexaError } = await import("@/lib/providers/fleexa");
 
 const RATE = 1500;
 const plan = findPlan("vn-ng")!;
@@ -108,7 +108,7 @@ describe("supplier order", () => {
   it("lets an environment list reorder suppliers without dropping any", async () => {
     vi.resetModules();
     vi.stubEnv("OTP_PROVIDER_ORDER", " bitcall ");
-    const fresh = await import("@/lib/otp-suppliers");
+    const fresh = await import("@/lib/services/numbers/otp-suppliers");
     expect(fresh.otpSupplierOrder()).toEqual(["bitcall", "fleexa"]);
     vi.resetModules();
   });

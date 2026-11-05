@@ -1,15 +1,15 @@
 import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { findPlan, plans } from "@/lib/catalog";
+import { findPlan, plans } from "@/lib/services/catalog";
 import { ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
-import { formatUnitCount, safeUnitCount } from "@/lib/service-units";
-import { EXPLORER_COUNTRIES } from "@/lib/explorer-countries";
+import { formatUnitCount, safeUnitCount } from "@/lib/services/service-units";
+import { EXPLORER_COUNTRIES } from "@/lib/content/explorer-countries";
 import {
   buildServiceExplorer, canPreviewPlan, EXPLORER_CATEGORIES, explorerCategory, explorerCountry,
   filterExplorerItems, planMatchesCountry,
-} from "@/lib/service-explorer";
+} from "@/lib/services/service-explorer";
 
 describe("country-first service explorer", () => {
   it("does not construct or show services before a valid country is chosen", () => {
@@ -147,5 +147,11 @@ describe("unit counts", () => {
     const markup = renderToStaticMarkup(<UnitsStatus stock={0} owned={23} />);
     expect(markup).toContain("0 left");
     expect(markup).toContain("23 left");
+    const label = renderToStaticMarkup(<UnitsStatus stock={null} unknownStockLabel="Checked at checkout" />);
+    expect(label).toContain("Checked at checkout");
+    expect(label).not.toContain("0 left");
+    const actualZero = renderToStaticMarkup(<UnitsStatus stock={0} unknownStockLabel="Checked at checkout" />);
+    expect(actualZero).toContain("0 left");
+    expect(actualZero).not.toContain("Checked at checkout");
   });
 });

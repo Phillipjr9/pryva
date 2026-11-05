@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { signState, stateAccepted, verifyState } from "@/lib/google-state";
+import { signState, stateAccepted, verifyState } from "@/lib/identity/google-state";
 import { GET as startGoogle } from "@/app/api/auth/google/route";
 
 const SECRET = "GOCSPX-test-secret";

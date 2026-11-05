@@ -6,15 +6,15 @@ const runtime = vi.hoisted(() => ({
   manualReachable: vi.fn(),
 }));
 
-vi.mock("@/lib/rate-limit", () => ({ createRateLimiter: () => runtime.limit }));
-vi.mock("@/lib/logger", () => ({ logger: runtime.log }));
+vi.mock("@/lib/platform/rate-limit", () => ({ createRateLimiter: () => runtime.limit }));
+vi.mock("@/lib/platform/logger", () => ({ logger: runtime.log }));
 // Separate module because it reaches the database, and `@/lib/auth` pulls in
 // `next/headers`. The diagnostics route only needs its answer.
-vi.mock("@/lib/manual-fulfilment", () => ({
+vi.mock("@/lib/services/accounts/manual-fulfilment", () => ({
   isManualFulfilmentReachable: () => runtime.manualReachable(),
 }));
 
-import { clearBulkaccCache, probeCatalog } from "@/lib/bulkacc";
+import { clearBulkaccCache, probeCatalog } from "@/lib/providers/bulkacc";
 import { GET } from "@/app/api/diagnostics/integrations/route";
 import { NextRequest } from "next/server";
 

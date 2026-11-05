@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthApi } from "@/lib/auth";
-import { resolveBankAccount, isPaystackConfigured } from "@/lib/paystack";
-import { financialActionsUnavailable } from "@/lib/financial-environment";
-import { isSameOriginMutation } from "@/lib/net";
-import { logger } from "@/lib/logger";
-import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { resolveBankAccount, isPaystackConfigured } from "@/lib/payments/paystack";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { logger } from "@/lib/platform/logger";
+import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
 
 export const dynamic = "force-dynamic";
 

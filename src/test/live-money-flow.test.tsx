@@ -6,9 +6,9 @@ import { TopUpForm } from "@/components/dashboard/TopUpForm";
 import { TopUpReturn } from "@/app/dashboard/wallet/TopUpReturn";
 import { WithdrawalReviewDialog, type WithdrawalReview } from "@/components/dashboard/WithdrawalReviewDialog";
 import { WithdrawalDashboard } from "@/app/dashboard/wallet/WithdrawalDashboard";
-import { readPendingPaystackTopUps, rememberPaystackTopUp } from "@/lib/paystack-topup-intent";
-import { readWithdrawalIntents } from "@/lib/withdrawal-intent";
-import type { WithdrawalReceipt } from "@/lib/withdrawal-receipt";
+import { readPendingPaystackTopUps, rememberPaystackTopUp } from "@/lib/payments/paystack-topup-intent";
+import { readWithdrawalIntents } from "@/lib/payments/withdrawal-intent";
+import type { WithdrawalReceipt } from "@/lib/payments/withdrawal-receipt";
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(), confetti: vi.fn(), addToast: vi.fn(),
@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => mocks.router }));
 vi.mock("next/link", () => ({ default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={href} {...props}>{children}</a> }));
-vi.mock("@/lib/paystack-navigate", () => ({ navigateToPaystack: mocks.navigate }));
+vi.mock("@/lib/payments/paystack-navigate", () => ({ navigateToPaystack: mocks.navigate }));
 vi.mock("@/components/ui/Confetti", () => ({ fireConfetti: mocks.confetti }));
 vi.mock("@/components/ui/Toast", () => ({ useToast: () => ({ addToast: mocks.addToast }) }));
 
@@ -88,6 +88,20 @@ describe("real Paystack top-up flow", () => {
     expect(mocks.navigate).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["network", () => Promise.reject(new TypeError("Failed to fetch API SECRET"))],
+    ["upstream response", () => Promise.resolve(response({ error: "API ERROR secret-response" }, 502))],
+  ])("does not show technical checkout errors from %s", async (_kind, fail) => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(fail));
+    render(<PaystackTopUpFlow balance={5000} userId={userId} onClose={vi.fn()} />);
+    topupReview();
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Paystack" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("No payment was opened here");
+    expect(alert.textContent).not.toMatch(/API ERROR|SECRET|Failed to fetch/i);
+    expect(mocks.navigate).not.toHaveBeenCalled();
+  });
+
   it("shows outstanding references and blocks another checkout until reconciliation", async () => {
     rememberPaystackTopUp(localStorage, userId, { reference, amount: 2000 });
     render(<TopUpForm balance={5000} userId={userId} />);
@@ -145,7 +159,16 @@ describe("Paystack return confirmation", () => {
     expect(await screen.findByRole("heading", { name: heading })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Download receipt" })).toBeNull();
     expect(mocks.confetti).not.toHaveBeenCalled();
-    expect(screen.getByText(/before paying again/i)).toBeTruthy();
+    expect(screen.getAllByText(/before paying again/i).length).toBeGreaterThan(0);
+  });
+
+  it("hides unexpected technical verification errors without declaring a payment failure", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ error: "API ERROR secret-response" }, 502)));
+    render(<TopUpReturn status="return" reference={reference} userId={userId} />);
+    expect(await screen.findByRole("heading", { name: "Payment not confirmed yet" })).toBeTruthy();
+    expect(document.body.textContent).not.toContain("API ERROR");
+    expect(document.body.textContent).not.toContain("secret-response");
+    expect(screen.getAllByText(/before paying again/i).length).toBeGreaterThan(0);
   });
 
   it("clearly marks test-key checkout and confirmed test receipts as not real payments", async () => {

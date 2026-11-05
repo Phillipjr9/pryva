@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira } from "@/lib/services/catalog";
 import { Button } from "@/components/ui/Button";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/platform/utils";
 import { PlatformBadge, platformFor } from "@/components/PlatformBadge";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
-import { warrantyBadge, warrantyLabel } from "@/lib/warranty";
+import { fulfilmentLabel, warrantyBadge, warrantyLabel } from "@/lib/services/warranty";
 
 type Category = { id: number; title: string; slug: string };
 type Subcategory = { id: number; title: string; slug: string };
@@ -42,6 +42,25 @@ type Listing = {
   purchasable?: boolean;
 };
 type Meta = { current_page: number; last_page: number; per_page: number; total: number };
+type CheckoutQuote = {
+  slug: string; quantity: number; promoCode: string; totalNgn: number; savedNgn: number;
+  terms: string; title: string; fulfilment: "instant" | "manual"; warrantyDays: number; stock: number | null;
+};
+
+/** Refuse malformed or out-of-date responses instead of enabling a Pay button. */
+function readQuote(value: unknown, slug: string, quantity: number, promoCode: string): CheckoutQuote | null {
+  if (!value || typeof value !== "object") return null;
+  const q = value as Partial<CheckoutQuote>;
+  if (q.slug !== slug || q.quantity !== quantity || q.promoCode !== promoCode ||
+      !Number.isSafeInteger(q.totalNgn) || (q.totalNgn as number) <= 0 || (q.totalNgn as number) > 2_147_483_647 ||
+      !Number.isSafeInteger(q.savedNgn) || (q.savedNgn as number) < 0 ||
+      typeof q.terms !== "string" || !/^[a-f0-9]{24}$/.test(q.terms) ||
+      typeof q.title !== "string" || !q.title.trim() || q.title.length > 160 ||
+      (q.fulfilment !== "instant" && q.fulfilment !== "manual") ||
+      !Number.isSafeInteger(q.warrantyDays) || (q.warrantyDays as number) < 0 ||
+      (q.stock !== null && (!Number.isSafeInteger(q.stock) || (q.stock as number) < 0))) return null;
+  return q as CheckoutQuote;
+}
 
 const SORTS = [
   { value: "sort_key", label: "Recommended" },
@@ -78,9 +97,12 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
   const purchaseRequestId = useRef<string | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
   const [promoInput, setPromoInput] = useState("");
-  const [promo, setPromo] = useState<{ code: string; totalNgn: number; savedNgn: number; message: string } | null>(null);
-  const [promoBusy, setPromoBusy] = useState(false);
-  const [promoMessage, setPromoMessage] = useState<string | null>(null);
+  const [quote, setQuote] = useState<CheckoutQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteChanged, setQuoteChanged] = useState(false);
+  const quoteSequence = useRef(0);
+  const quoteBusy = useRef(false);
+  const buyBusy = useRef(false);
 
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const requestId = useRef(0);
@@ -141,7 +163,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
       if (current !== requestId.current) return;
       setConfigured(data.configured !== false);
       if (!response.ok) {
-        setError(data.error ?? "Could not load accounts.");
+        setError(response.status < 500 && typeof data.error === "string" ? data.error : "Could not load accounts. Please try again.");
         setListings([]);
         setMeta(null);
         setLastChecked(null);
@@ -195,73 +217,80 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
     return listing.stock === null ? listing.fulfilment === "manual" : listing.stock >= listing.minQuantity;
   }
 
+  function invalidateQuote() {
+    quoteSequence.current += 1;
+    quoteBusy.current = false;
+    setQuoteLoading(false);
+    setQuote(null);
+    setQuoteChanged(false);
+    setBuyError(null);
+    setNeedsSignIn(false);
+  }
+
+  function closeBuy() {
+    if (buyBusy.current) return;
+    invalidateQuote();
+    setSelected(null);
+    setResult(null);
+    setPreparing(null);
+  }
+
   function openBuy(listing: Listing) {
     if (!canBuy(listing)) return;
+    invalidateQuote();
     purchaseRequestId.current = null;
     setPending(null);
     setPreparing(null);
     setSelected(listing);
     setQuantity(Math.max(1, listing.minQuantity));
-    setBuyError(null);
     setResult(null);
-    setNeedsSignIn(false);
-    setPromo(null);
     setPromoInput("");
-    setPromoMessage(null);
   }
 
-  const estimatedTotal = useMemo(() => {
-    if (!selected) return 0;
-    if (promo) return promo.totalNgn;
-    const discountPercent = quantity >= 25 ? 10 : quantity >= 10 ? 8 : quantity >= 5 ? 5 : 0;
-    return Math.ceil((selected.priceNgn * quantity * (1 - discountPercent / 100)) / 50) * 50;
-  }, [selected, quantity, promo]);
-
-  async function applyPromo() {
-    if (!selected) return;
-    const code = promoInput.trim();
-    if (!code) {
-      setPromoMessage("Enter a promo code.");
-      return;
-    }
-    setPromoBusy(true);
-    setPromoMessage(null);
+  async function reviewPrice() {
+    if (!selected || quoteBusy.current || buyBusy.current) return;
+    const slug = selected.slug;
+    const code = promoInput.trim().toUpperCase();
+    const sequence = ++quoteSequence.current;
+    quoteBusy.current = true;
+    setQuoteLoading(true);
+    setQuote(null);
+    setQuoteChanged(false);
+    setBuyError(null);
+    setNeedsSignIn(false);
     try {
-      const response = await fetch("/api/accounts/promo", {
+      const response = await fetch("/api/accounts/quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, slug: selected.slug, quantity }),
+        body: JSON.stringify({ slug, quantity, promoCode: code }),
       });
-      const data = (await response.json()) as {
-        valid?: boolean;
-        code?: string;
-        totalNgn?: number;
-        savedNgn?: number;
-        message?: string;
-        error?: string;
-      };
-      if (data.valid && typeof data.totalNgn === "number") {
-        setPromo({
-          code: data.code ?? code,
-          totalNgn: data.totalNgn,
-          savedNgn: data.savedNgn ?? 0,
-          message: data.message ?? "Promo applied.",
-        });
-        setPromoMessage(null);
-      } else {
-        setPromo(null);
-        setPromoMessage(data.message ?? data.error ?? "That code isn't valid for this order.");
+      const data = await response.json() as { ok?: boolean; quote?: unknown; error?: string };
+      if (sequence !== quoteSequence.current) return;
+      if (response.status === 401) setNeedsSignIn(true);
+      if (!response.ok || !data.ok) {
+        setBuyError(response.status < 500 && typeof data.error === "string" ? data.error : "Could not review this price. Please try again.");
+        return;
       }
+      const reviewed = readQuote(data.quote, slug, quantity, code);
+      if (!reviewed) {
+        setBuyError("Could not verify this price. Please try again.");
+        return;
+      }
+      setQuote(reviewed);
     } catch {
-      setPromo(null);
-      setPromoMessage("We couldn't check that code. Please try again.");
+      if (sequence === quoteSequence.current) setBuyError("Could not review this price. Check your connection and try again.");
     } finally {
-      setPromoBusy(false);
+      if (sequence === quoteSequence.current) {
+        quoteBusy.current = false;
+        setQuoteLoading(false);
+      }
     }
   }
 
   async function buy() {
-    if (!selected) return;
+    if (!selected || !quote || quoteBusy.current || buyBusy.current ||
+        quote.slug !== selected.slug || quote.quantity !== quantity || quote.promoCode !== promoInput.trim().toUpperCase()) return;
+    buyBusy.current = true;
     setBuying(true);
     setBuyError(null);
 
@@ -270,24 +299,20 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
       const response = await fetch("/api/accounts/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: selected.slug, quantity, promoCode: promo?.code, requestId: purchaseRequestId.current }),
+        body: JSON.stringify({
+          slug: quote.slug, quantity: quote.quantity, promoCode: quote.promoCode, requestId: purchaseRequestId.current,
+          expectedTotalNgn: quote.totalNgn, expectedTerms: quote.terms,
+        }),
       });
       const data = (await response.json()) as {
-        ok?: boolean;
-        accounts?: string[];
-        totalNgn?: number;
-        error?: string;
-        pending?: boolean;
-        preparing?: boolean;
-        message?: string;
-        warning?: string;
-        order?: { reference: string };
+        ok?: boolean; accounts?: string[]; totalNgn?: number; error?: string; code?: string; quote?: unknown;
+        pending?: boolean; preparing?: boolean; message?: string; warning?: string; order?: { reference: string };
       };
 
       if (data.pending || response.status >= 500) {
         setPending({
           reference: data.order?.reference,
-          message: data.message ?? "We could not confirm the purchase. Your wallet may have been charged. Check your orders or contact support before trying again.",
+          message: response.status < 500 && typeof data.message === "string" ? data.message : "We could not confirm the purchase. Your wallet may have been charged. Check your orders or contact support before trying again.",
         });
         return;
       }
@@ -296,13 +321,22 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
         setBuyError("Please sign in to complete this purchase.");
         return;
       }
+      if (response.status === 409 && data.code === "quote_changed") {
+        const updated = readQuote(data.quote, quote.slug, quote.quantity, quote.promoCode);
+        setQuote(updated);
+        setQuoteChanged(Boolean(updated));
+        setBuyError(updated
+          ? "The price or item details changed. Review the updated total and confirm again."
+          : "The price changed. Review it again before ordering.");
+        return;
+      }
       if (!response.ok || !data.ok) {
+        if (response.status !== 402) setQuote(null);
         setBuyError(data.error ?? "That purchase could not be completed.");
         return;
       }
 
-      // A hand-prepared item is paid for but not delivered yet. Showing an empty
-      // credential list would look like a failed order, so it gets its own state.
+      // A hand-prepared item is paid for but not delivered yet.
       if (data.preparing) {
         setPreparing({
           reference: data.order?.reference,
@@ -315,13 +349,14 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
       setResult({
         accounts: data.accounts ?? [],
         reference: data.order?.reference ?? "—",
-        totalNgn: data.totalNgn ?? estimatedTotal,
+        totalNgn: data.totalNgn ?? quote.totalNgn,
         warning: data.warning,
       });
       void loadListings();
     } catch {
       setPending({ message: "We could not confirm the purchase. Your wallet may have been charged. Check your orders or contact support before trying again." });
     } finally {
+      buyBusy.current = false;
       setBuying(false);
     }
   }
@@ -608,9 +643,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
           }
           onClick={(event) => {
             if (event.target === event.currentTarget && !buying) {
-              setSelected(null);
-              setResult(null);
-              setPreparing(null);
+              closeBuy();
             }
           }}
         >
@@ -682,7 +715,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link href="/dashboard/orders" className="btn btn-primary inline-flex items-center">View orders</Link>
                   <Link href="/dashboard/support" className="btn btn-secondary inline-flex items-center">Contact support</Link>
-                  <Button variant="ghost" onClick={() => { setSelected(null); setPreparing(null); }}>Close</Button>
+                  <Button variant="ghost" onClick={closeBuy}>Close</Button>
                 </div>
               </div>
             ) : pending ? (
@@ -693,26 +726,22 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link href="/dashboard/orders" className="btn btn-primary inline-flex items-center">View orders</Link>
                   <Link href="/dashboard/support" className="btn btn-secondary inline-flex items-center">Contact support</Link>
-                  <Button variant="ghost" onClick={() => setSelected(null)}>Close</Button>
+                  <Button variant="ghost" onClick={closeBuy}>Close</Button>
                 </div>
               </div>
             ) : (
               <div>
-                <h3 className="text-[1.02rem] font-semibold text-ink">{selected.title}</h3>
+                <h3 className="text-[1.02rem] font-semibold text-ink">{quote?.title ?? selected.title}</h3>
                 <p className="mt-1 text-[0.8rem] text-ink-2">
-                  {formatNaira(selected.priceNgn)} per account ·{" "}
-                  {selected.stock === null
-                    ? selected.fulfilment === "manual"
-                      ? "Confirmed after payment"
-                      : "Stock unknown"
-                    : `${selected.stock} in stock when last checked`}
+                  {!quote && <>Listed {formatNaira(selected.priceNgn)} per account · </>}
+                  {(quote ? quote.stock : selected.stock) === null
+                    ? (quote?.fulfilment ?? selected.fulfilment) === "manual" ? "Confirmed after payment" : "Stock unknown"
+                    : `${quote ? quote.stock : selected.stock} in stock when last checked`}
                 </p>
-                {(selected.warrantyDays ?? 0) > 0 && (
-                  <p className="mt-1 text-meta text-ink-3">
-                    {warrantyLabel(selected.warrantyDays)} on this item.
-                  </p>
-                )}
-                {selected.fulfilment === "manual" && (
+                <p className="mt-1 text-meta text-ink-3">
+                  {fulfilmentLabel(quote?.fulfilment ?? selected.fulfilment)} · {warrantyLabel(quote?.warrantyDays ?? selected.warrantyDays) ?? "No replacement warranty listed"}.
+                </p>
+                {(quote?.fulfilment ?? selected.fulfilment) === "manual" && (
                   <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-meta leading-relaxed text-amber-900">
                     This item is prepared for you after payment rather than delivered instantly. It
                     appears on your order page as soon as it is confirmed.
@@ -720,124 +749,70 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                 )}
 
                 <div className="mt-4 flex items-center justify-between gap-3">
-                  <label htmlFor="quantity" className="text-[0.84rem] font-medium text-ink">
-                    Quantity
-                  </label>
+                  <label htmlFor="quantity" className="text-[0.84rem] font-medium text-ink">Quantity</label>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => {
-                        setPromo(null);
-                        setPromoMessage(null);
-                        setQuantity((q) => Math.max(selected.minQuantity, q - 1));
-                      }}
-                      disabled={quantity <= selected.minQuantity}
-                      aria-label="Decrease quantity"
-                    >
-                      −
-                    </Button>
-                    <input
-                      id="quantity"
-                      type="number"
-                      min={selected.minQuantity}
-                      max={selected.maxQuantity}
-                      value={quantity}
+                    <Button variant="secondary" size="sm" onClick={() => {
+                      invalidateQuote();
+                      setQuantity((q) => Math.max(selected.minQuantity, q - 1));
+                    }} disabled={buying || quoteLoading || quantity <= selected.minQuantity} aria-label="Decrease quantity">−</Button>
+                    <input id="quantity" type="number" min={selected.minQuantity} max={selected.maxQuantity} value={quantity}
+                      disabled={buying || quoteLoading}
                       onChange={(event) => {
                         const next = Number(event.target.value);
                         if (Number.isFinite(next)) {
-                          setPromo(null);
-                          setPromoMessage(null);
+                          invalidateQuote();
                           setQuantity(Math.min(selected.maxQuantity, Math.max(selected.minQuantity, Math.floor(next))));
                         }
                       }}
-                      className="w-16 rounded-lg border border-line bg-white px-2 py-1.5 text-center text-[0.85rem] text-ink outline-none focus:border-lav-400"
-                    />
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => {
-                        setPromo(null);
-                        setPromoMessage(null);
-                        setQuantity((q) => Math.min(selected.maxQuantity, q + 1));
-                      }}
-                      disabled={quantity >= selected.maxQuantity}
-                      aria-label="Increase quantity"
-                    >
-                      +
-                    </Button>
+                      className="w-16 rounded-lg border border-line bg-white px-2 py-1.5 text-center text-[0.85rem] text-ink outline-none focus:border-lav-400" />
+                    <Button variant="secondary" size="sm" onClick={() => {
+                      invalidateQuote();
+                      setQuantity((q) => Math.min(selected.maxQuantity, q + 1));
+                    }} disabled={buying || quoteLoading || quantity >= selected.maxQuantity} aria-label="Increase quantity">+</Button>
                   </div>
                 </div>
 
                 <div className="mt-4">
-                  <label htmlFor="promo" className="text-meta font-medium text-ink-2">
-                    Promo code
-                  </label>
-                  <div className="mt-1.5 flex gap-2">
-                    <input
-                      id="promo"
-                      value={promoInput}
-                      onChange={(event) => setPromoInput(event.target.value.toUpperCase())}
-                      placeholder="Optional"
-                      autoComplete="off"
-                      className="min-w-0 flex-1 rounded-lg border border-line bg-white px-2.5 py-1.5 text-[0.82rem] uppercase tracking-wide text-ink outline-none placeholder:normal-case placeholder:tracking-normal placeholder:text-ink-3 focus:border-lav-400"
-                    />
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => void applyPromo()}
-                      loading={promoBusy}
-                      disabled={promoBusy || !promoInput.trim()}
-                    >
-                      Apply
-                    </Button>
-                  </div>
-                  {promo && <p className="mt-1.5 text-meta font-medium text-emerald-700">{promo.message}</p>}
-                  {promoMessage && !promo && <p className="mt-1.5 text-meta text-red-700">{promoMessage}</p>}
+                  <label htmlFor="promo" className="text-meta font-medium text-ink-2">Promo code (optional)</label>
+                  <input id="promo" value={promoInput} disabled={buying || quoteLoading} maxLength={40}
+                    onChange={(event) => { invalidateQuote(); setPromoInput(event.target.value.toUpperCase()); }}
+                    placeholder="Enter a code before reviewing" autoComplete="off"
+                    className="mt-1.5 w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[0.82rem] uppercase tracking-wide text-ink outline-none placeholder:normal-case placeholder:tracking-normal placeholder:text-ink-3 focus:border-lav-400" />
                 </div>
 
-                <div className="mt-4 rounded-xl border border-line bg-cream/70 p-3">
+                <div className="mt-4 rounded-xl border border-line bg-cream/70 p-3" aria-live="polite">
                   <div className="flex items-center justify-between text-[0.85rem]">
                     <span className="text-ink-2">Total</span>
-                    <span className="font-semibold text-ink">{formatNaira(estimatedTotal)}</span>
+                    <span className="font-semibold text-ink">{quote ? formatNaira(quote.totalNgn) : "Not reviewed"}</span>
                   </div>
                   <p className="mt-1 text-meta text-ink-3">
-                    Paid from your Pryva wallet. Volume discounts apply automatically at 5, 10 and 25
-                    accounts. Final total is confirmed by the server.
+                    Review the server-calculated total before paying from your Pryva wallet. The price and item details are checked again when you pay.
                   </p>
-                  {promo && (
+                  {quote?.promoCode && (
                     <p className="mt-1 text-meta font-medium text-emerald-700">
-                      {promo.code} applied — you save {formatNaira(promo.savedNgn)}.
+                      {quote.promoCode} applied — you save {formatNaira(quote.savedNgn)}.
                     </p>
                   )}
                 </div>
 
                 {buyError && (
-                  <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[0.8rem] text-red-800">
+                  <div role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[0.8rem] text-red-800">
                     {buyError}
-                    {needsSignIn && (
-                      <>
-                        {" "}
-                        <Link href="/login?next=/accounts" className="font-semibold underline">
-                          Sign in
-                        </Link>
-                      </>
-                    )}
+                    {needsSignIn && <> <Link href="/login?next=/accounts" className="font-semibold underline">Sign in</Link></>}
                   </div>
                 )}
 
                 <div className="mt-5 flex flex-wrap gap-2">
-                  <Button onClick={() => void buy()} loading={buying} disabled={
-                        !selected.available ||
-                        quantity < selected.minQuantity ||
-                        quantity > selected.maxQuantity ||
-                        (selected.stock !== null && selected.stock < quantity)
-                      }>
-                    {buying ? "Buying…" : `Pay ${formatNaira(estimatedTotal)}`}
-                  </Button>
-                  <Button variant="ghost" onClick={() => setSelected(null)} disabled={buying}>
-                    Cancel
-                  </Button>
+                  {quote ? (
+                    <Button onClick={() => void buy()} loading={buying} disabled={buying || quoteLoading}>
+                      {buying ? "Buying…" : `${quoteChanged ? "Confirm and pay" : "Pay"} ${formatNaira(quote.totalNgn)}`}
+                    </Button>
+                  ) : (
+                    <Button onClick={() => void reviewPrice()} loading={quoteLoading} disabled={quoteLoading || buying}>
+                      {quoteLoading ? "Checking price…" : "Review price"}
+                    </Button>
+                  )}
+                  <Button variant="ghost" onClick={closeBuy} disabled={buying}>Cancel</Button>
                 </div>
               </div>
             )}
