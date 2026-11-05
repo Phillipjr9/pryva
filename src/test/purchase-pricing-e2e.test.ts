@@ -48,9 +48,10 @@ vi.mock("@/lib/identity/auth", async (importOriginal) => {
   return { ...actual, requireAuthApi: mocks.user, getCurrentUser: mocks.user };
 });
 vi.mock("@/lib/platform/logger", () => ({ logger: mocks.log }));
-vi.mock("@/lib/platform/rate-limit", () => ({
-  purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }),
-}));
+vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
+  return { ...actual, purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }) };
+});
 vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: () => {} }));
 vi.mock("@/lib/payments/exchange-rate", () => ({
   getUsdToNgnRate: async () => ({ rate: 1600, source: "test", fetchedAt: new Date().toISOString() }),

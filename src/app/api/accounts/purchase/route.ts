@@ -1,11 +1,9 @@
-import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
+import { afterPurchase, beginPurchase } from "@/lib/checkout/purchase";
 import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, gte, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
-import { requireAuthApi } from "@/lib/identity/auth";
-import { isSameOriginMutation } from "@/lib/platform/net";
 import {
   getMarketplaceListing,
   MarketplaceError,
@@ -15,7 +13,6 @@ import {
 import { isMarketplaceCheckoutConfigured } from "@/lib/services/accounts/marketplace-policy";
 import { isManualFulfilmentReachable } from "@/lib/services/accounts/manual-fulfilment";
 import { isManualSlug } from "@/lib/services/accounts/manual-catalog";
-import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
 import { ACCOUNTS_PROVIDER, MANUAL_PROVIDER } from "@/lib/services/order-providers";
 import { validatePromo } from "@/lib/providers/accszone";
 import { usdCents } from "@/lib/payments/supplier-money";
@@ -23,9 +20,7 @@ import { fulfilmentLabel } from "@/lib/services/warranty";
 import { applyPromoDiscount, priceMarketplaceListing } from "@/lib/services/accounts/marketplace-pricing";
 import { MIN_ORDER_NGN } from "@/lib/services/pricing";
 import { logger } from "@/lib/platform/logger";
-import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
 import { formatNaira } from "@/lib/services/catalog";
-import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -103,32 +98,30 @@ async function markForReview(orderId: string, reference: string) {
  * than retried or automatically refunded. Live checkout is disabled by default.
  */
 export async function POST(request: NextRequest) {
-  const user = await requireAuthApi();
-  if (!user) return NextResponse.json({ error: "Please sign in to buy accounts." }, { status: 401 });
-  if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
-  if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get("content-type") ?? "")) {
-    return NextResponse.json({ error: "Content-Type must be application/json." }, { status: 415 });
+  const begun = await beginPurchase<{ slug?: unknown; quantity?: unknown; promoCode?: unknown; requestId?: unknown }>(
+    request,
+    {
+      bucket: "accounts-purchase",
+      maxBodyBytes: 4_096,
+      copy: {
+        unauthorized: "Please sign in to buy accounts.",
+        // This route used to say how long the wait was; the shared limiter knows
+        // the window, so it keeps saying it rather than falling back to "later".
+        rateLimited: (retryAfterMs) => `Too many attempts. Try again in ${Math.max(1, Math.ceil(retryAfterMs / 1000))}s.`,
+      },
+      supplierGate: {
+        open: isMarketplaceCheckoutConfigured,
+        message: "Account purchases are temporarily unavailable.",
+      },
+    },
+  );
+  if (!begun.ok) return begun.response;
+  const { user } = begun;
+  if (!begun.body || typeof begun.body !== "object" || Array.isArray(begun.body)) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
-  if (financialActionsUnavailable()) return NextResponse.json({ error: "Purchases are unavailable in this environment." }, { status: 503 });
-  if (!isMarketplaceCheckoutConfigured()) {
-    return NextResponse.json({ error: "Account purchases are temporarily unavailable." }, { status: 503 });
-  }
+  const body = begun.body;
 
-  const limit = await purchaseRateLimiter(`accounts-purchase:${user.id}`);
-  if (limit.unavailable) return NextResponse.json({ error: "Purchases are temporarily unavailable." }, { status: 503 });
-  if (!limit.allowed) {
-    const seconds = Math.max(1, Math.ceil((limit.resetTime - Date.now()) / 1000));
-    return NextResponse.json({ error: `Too many attempts. Try again in ${seconds}s.` }, { status: 429 });
-  }
-
-  let body: { slug?: unknown; quantity?: unknown; promoCode?: unknown; requestId?: unknown };
-  try {
-    const value = await readJsonWithLimit(request, 4_096);
-    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid body");
-    body = value;
-  } catch (error) {
-    return NextResponse.json({ error: "Invalid request body" }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
-  }
   const slug = typeof body.slug === "string" ? body.slug.trim() : "";
   const quantity = typeof body.quantity === "number" ? body.quantity : Number(body.quantity);
   const requestId = typeof body.requestId === "string" ? body.requestId : "";
@@ -272,7 +265,7 @@ export async function POST(request: NextRequest) {
     });
     if (reservation.previous) return existingResponse(reservation.previous, slug, quantity);
     orderId = reservation.orderId!;
-    scheduleWalletEmails();
+    void afterPurchase(user.id);
     if (isManual) {
       // No supplier call to make. The order waits in the fulfilment queue and
       // its credentials appear on the order page once they are confirmed.
@@ -343,7 +336,7 @@ export async function POST(request: NextRequest) {
     return pendingResponse(reference, orderId);
   }
   if (!complete) return pendingResponse(reference, orderId);
-  scheduleWalletEmails();
+  void afterPurchase(user.id);
   return NextResponse.json({
     ok: true, order: { id: orderId, reference }, listing: listing.title, quantity,
     accounts, totalNgn: price.totalNgn, discountNgn: price.discountNgn, promoCode: appliedPromo ?? null,

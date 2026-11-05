@@ -37,7 +37,12 @@ vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
 vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: async () => mocks.user }));
 vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => false }));
 vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.schedule }));
-vi.mock("@/lib/platform/rate-limit", () => ({ purchaseRateLimiter: async () => ({ allowed: true, remaining: 5, resetTime: Date.now() }) }));
+vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
+  // Keep the real module: other limiters are constructed when a route imports
+  // a money module, and a factory that omits them fails at import time.
+  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
+  return { ...actual, purchaseRateLimiter: async () => ({ allowed: true, remaining: 5, resetTime: Date.now() }) };
+});
 vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/payments/paystack", () => ({
   isPaystackConfigured: () => mocks.configured,
