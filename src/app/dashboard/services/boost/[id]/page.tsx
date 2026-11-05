@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
-import { findBoostListing } from "@/lib/smm-catalog";
-import { isSmmPanelConfigured } from "@/lib/smm-panel";
-import { formatNaira } from "@/lib/catalog";
+import { requireUser } from "@/lib/identity/auth";
+import { findBoostListing } from "@/lib/services/boosts/smm-catalog";
+import { isSmmPanelConfigured } from "@/lib/providers/smm-panel";
+import { formatNaira } from "@/lib/services/catalog";
 import { BrandIcon } from "@/components/BrandIcon";
 import { BoostPurchaseForm } from "./BoostPurchaseForm";
 

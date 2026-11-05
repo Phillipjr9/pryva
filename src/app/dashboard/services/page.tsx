@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { requireUser } from "@/lib/auth";
+import { requireUser } from "@/lib/identity/auth";
 import { ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
-import { explorerCategory, explorerCountry } from "@/lib/service-explorer";
-import { readServiceReadiness } from "@/lib/service-readiness";
+import { explorerCategory, explorerCountry } from "@/lib/services/service-explorer";
+import { readServiceReadiness } from "@/lib/services/service-readiness";
 
 export const metadata: Metadata = { title: "Service hub" };
 export const dynamic = "force-dynamic";

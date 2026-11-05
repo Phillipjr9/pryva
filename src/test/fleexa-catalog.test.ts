@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SupplierSnapshot } from "@/lib/fleexa-catalog";
+import type { SupplierSnapshot } from "@/lib/services/numbers/fleexa-catalog";
 
 const supplier = vi.hoisted(() => ({
   configured: vi.fn(), sms: vi.fn(), email: vi.fn(), rentals: vi.fn(),
 }));
-vi.mock("@/lib/fleexa", () => ({
+vi.mock("@/lib/providers/fleexa", () => ({
   isFleexaConfigured: supplier.configured,
   listFleexaSmsServices: supplier.sms,
   listFleexaEmailProducts: supplier.email,
@@ -12,7 +12,7 @@ vi.mock("@/lib/fleexa", () => ({
 }));
 
 const snapshot: SupplierSnapshot = {
-  fetchedAt: "2026-01-01T00:00:00Z", partial: false,
+  fetchedAt: "2026-01-01T00:00:00Z", partial: false, degraded: null,
   sms: [
     { id: "secret-sms-id", name: "WhatsApp", country: "US", priceNgn: 1234, stock: 7 },
     { id: "gb-id", name: "Telegram", country: "GB", priceNgn: 1000, stock: 5 },
@@ -32,7 +32,7 @@ beforeEach(() => { vi.resetModules(); vi.clearAllMocks(); supplier.configured.mo
 
 describe("read-only supplier catalog", () => {
   it("shows only explicitly matching countries, hides raw IDs and cost, and preserves unknown counts", async () => {
-    const { supplierItemsForCountry } = await import("@/lib/fleexa-catalog");
+    const { supplierItemsForCountry } = await import("@/lib/services/numbers/fleexa-catalog");
     const items = supplierItemsForCountry(snapshot, "us");
     expect(items.map((item) => item.name)).toEqual(["WhatsApp", "Signal", "Temporary inbox", "Number rental"]);
     expect(items.every((item) => item.source === "live" && item.action === null && item.myUnits === null)).toBe(true);
@@ -54,7 +54,7 @@ describe("read-only supplier catalog", () => {
     supplier.sms.mockResolvedValue(snapshot.sms);
     supplier.email.mockRejectedValue(new Error("offline"));
     supplier.rentals.mockResolvedValue(snapshot.rentals);
-    const { readSupplierSnapshot } = await import("@/lib/fleexa-catalog");
+    const { readSupplierSnapshot } = await import("@/lib/services/numbers/fleexa-catalog");
     const [first, second] = await Promise.all([readSupplierSnapshot(), readSupplierSnapshot()]);
     expect(first).toEqual(second);
     expect(first.partial).toBe(true);
@@ -70,7 +70,7 @@ describe("read-only supplier catalog", () => {
     supplier.sms.mockRejectedValue(new Error("down"));
     supplier.email.mockRejectedValue(new Error("down"));
     supplier.rentals.mockRejectedValue(new Error("down"));
-    const { readSupplierSnapshot } = await import("@/lib/fleexa-catalog");
+    const { readSupplierSnapshot } = await import("@/lib/services/numbers/fleexa-catalog");
     await expect(readSupplierSnapshot()).rejects.toThrow("Supplier catalog unavailable");
   });
 });

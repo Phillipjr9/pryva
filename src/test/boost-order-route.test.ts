@@ -15,13 +15,13 @@ const mocks = vi.hoisted(() => ({
   place: vi.fn(),
 }));
 
-vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.user }));
-vi.mock("@/lib/fraud", () => ({ purchaseVelocity: mocks.velocity, recordFraudEvent: mocks.fraud }));
-vi.mock("@/lib/rate-limit", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/rate-limit")>();
+vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: mocks.user, requireAuthApi: mocks.user }));
+vi.mock("@/lib/admin/fraud", () => ({ purchaseVelocity: mocks.velocity, recordFraudEvent: mocks.fraud }));
+vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
   return { ...actual, purchaseRateLimiter: mocks.limit };
 });
-vi.mock("@/lib/boost-orders", () => ({ placeBoostOrder: mocks.place }));
+vi.mock("@/lib/services/boosts/boost-orders", () => ({ placeBoostOrder: mocks.place }));
 
 import { POST } from "@/app/api/boosts/order/route";
 

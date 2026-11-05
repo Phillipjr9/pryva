@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
-import { findPlan } from "@/lib/catalog";
-import { isPlanFulfillable } from "@/lib/fulfillment";
-import { canPreviewPlan, explorerCountry } from "@/lib/service-explorer";
+import { requireUser } from "@/lib/identity/auth";
+import { findPlan } from "@/lib/services/catalog";
+import { isPlanFulfillable } from "@/lib/services/fulfillment";
+import { canPreviewPlan, explorerCountry } from "@/lib/services/service-explorer";
 import { CountryFlag } from "@/components/CountryFlag";
 import { PlanPurchase } from "@/components/purchase/PlanPurchase";
 

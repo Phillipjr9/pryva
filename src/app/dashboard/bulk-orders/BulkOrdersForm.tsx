@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { plans, formatNaira, findPlan } from "@/lib/catalog";
-import { calculateBulkOrder, getBulkDiscountMessage, type BulkOrderItem } from "@/lib/bulk-orders";
-import type { PublicUser } from "@/lib/auth";
+import { plans, formatNaira, findPlan } from "@/lib/services/catalog";
+import { calculateBulkOrder, getBulkDiscountMessage, type BulkOrderItem } from "@/lib/services/bulk-orders";
+import type { PublicUser } from "@/lib/identity/auth";
 
 interface BulkOrdersFormProps {
   user: PublicUser;

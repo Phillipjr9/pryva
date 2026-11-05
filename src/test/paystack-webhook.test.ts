@@ -8,7 +8,7 @@ describe("Paystack webhook signature", () => {
 
   it("rejects every webhook when no secret key is configured", async () => {
     delete process.env.PAYSTACK_SECRET_KEY;
-    const { verifyWebhookSignature } = await import("@/lib/paystack");
+    const { verifyWebhookSignature } = await import("@/lib/payments/paystack");
 
     // An empty key would let anyone compute a valid HMAC, so it must fail closed.
     expect(verifyWebhookSignature("{}", "anything")).toBe(false);
@@ -17,7 +17,7 @@ describe("Paystack webhook signature", () => {
 
   it("accepts a body signed with the configured secret", async () => {
     process.env.PAYSTACK_SECRET_KEY = "sk_test_secret";
-    const { verifyWebhookSignature } = await import("@/lib/paystack");
+    const { verifyWebhookSignature } = await import("@/lib/payments/paystack");
 
     const body = JSON.stringify({ event: "charge.success", data: { reference: "TOPUP-1" } });
     const signature = createHmac("sha512", "sk_test_secret").update(body).digest("hex");

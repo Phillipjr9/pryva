@@ -15,7 +15,7 @@
  */
 import { Pool, type PoolConfig } from "pg";
 
-import { awsIamConfigured } from "@/lib/database-config";
+import { awsIamConfigured } from "@/lib/platform/database-config";
 
 const TOKEN_TTL_MS = 14 * 60 * 1000; // AWS issues 15-minute tokens; refresh early.
 

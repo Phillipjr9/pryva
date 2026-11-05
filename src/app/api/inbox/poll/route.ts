@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthApi } from "@/lib/auth";
-import { InboxError, pollInbox } from "@/lib/disposable-inbox";
-import { logger } from "@/lib/logger";
-import { isSameOriginMutation } from "@/lib/net";
-import { inboxPollRateLimiter } from "@/lib/rate-limit";
-import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { InboxError, pollInbox } from "@/lib/services/email-otp/disposable-inbox";
+import { logger } from "@/lib/platform/logger";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { inboxPollRateLimiter } from "@/lib/platform/rate-limit";
+import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 
 export const dynamic = "force-dynamic";
 

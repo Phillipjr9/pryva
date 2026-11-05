@@ -7,15 +7,15 @@ import { POST } from "@/app/api/wallet/withdraw/route";
 
 const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), select: vi.fn(), transaction: vi.fn() }));
 vi.mock("@/db", () => ({ db: { select: mocks.select, transaction: mocks.transaction } }));
-vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.currentUser }));
+vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: mocks.currentUser }));
 // Every level the real logger exposes. A partial mock turns a call to a missing
 // method into a TypeError that the route's catch reports as a 500, which reads as
 // "the route broke" when it was the test double that was incomplete.
-vi.mock("@/lib/logger", () => ({ logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
-vi.mock("@/lib/paystack", () => ({ isPaystackConfigured: () => true }));
+vi.mock("@/lib/platform/logger", () => ({ logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/payments/paystack", () => ({ isPaystackConfigured: () => true }));
 // Payouts leave as part of the request now; the provider is not this file's subject.
-vi.mock("@/lib/payouts", () => ({ sendPayout: vi.fn(async () => ({ outcome: "sent", transferCode: "TRF-test", providerStatus: "pending" })) }));
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/lib/payments/payouts", () => ({ sendPayout: vi.fn(async () => ({ outcome: "sent", transferCode: "TRF-test", providerStatus: "pending" })) }));
+vi.mock("@/lib/platform/rate-limit", () => ({
   purchaseRateLimiter: async () => ({ allowed: true }),
   createRateLimiter: () => async () => ({ allowed: true }),
 }));

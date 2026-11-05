@@ -1,21 +1,21 @@
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireUser } from "@/lib/identity/auth";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { formatNaira } from "@/lib/catalog";
+import { formatNaira } from "@/lib/services/catalog";
 import Link from "next/link";
 import { ArrowLeft } from "@/components/icons";
 import { CredentialList } from "./CredentialList";
 import { EsimProfile } from "./EsimProfile";
 import { OrderActions } from "@/components/dashboard/OrderActions";
-import { pollsForCode } from "@/lib/order-providers";
-import { canResendNumberCode } from "@/lib/otp-resend";
-import { syncBoostOrderStatus, type BoostSyncResult } from "@/lib/boost-status";
-import { esimQrDataUrl } from "@/lib/esim-qr";
+import { pollsForCode } from "@/lib/services/order-providers";
+import { canResendNumberCode } from "@/lib/services/numbers/otp-resend";
+import { syncBoostOrderStatus, type BoostSyncResult } from "@/lib/services/boosts/boost-status";
+import { esimQrDataUrl } from "@/lib/services/esim/esim-qr";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

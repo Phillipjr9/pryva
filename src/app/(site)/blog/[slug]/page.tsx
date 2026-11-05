@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { blogPosts, getBlogPost } from "@/lib/blog";
+import { blogPosts, getBlogPost } from "@/lib/content/blog";
 
 type PageProps = { params: Promise<{ slug: string }> };
 

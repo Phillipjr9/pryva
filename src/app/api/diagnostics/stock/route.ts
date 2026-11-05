@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { diagnosticsAuthorized } from "@/lib/diagnostics-auth";
-import { logger } from "@/lib/logger";
-import { buildStockReport } from "@/lib/stock-live";
-import { laneHeadline } from "@/lib/stock-report";
+import { diagnosticsAuthorized } from "@/lib/admin/diagnostics-auth";
+import { logger } from "@/lib/platform/logger";
+import { buildStockReport } from "@/lib/admin/stock-live";
+import { laneHeadline } from "@/lib/admin/stock-report";
 
 export const dynamic = "force-dynamic";
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check } from "@/components/icons";
-import { listPublishedReviews } from "@/lib/reviews";
+import { listPublishedReviews } from "@/lib/content/reviews";
 
 export const dynamic = "force-dynamic";
 

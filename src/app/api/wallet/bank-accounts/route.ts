@@ -2,21 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { bankAccounts } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { requireAuthApi } from "@/lib/auth";
-import { resolveBankAccount, createTransferRecipient, getBanks, isPaystackConfigured } from "@/lib/paystack";
-import { FALLBACK_BANKS } from "@/lib/banks";
-import { financialActionsUnavailable } from "@/lib/financial-environment";
-import { isSameOriginMutation } from "@/lib/net";
-import { logger } from "@/lib/logger";
-import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
-import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { resolveBankAccount, createTransferRecipient, getBanks, isPaystackConfigured } from "@/lib/payments/paystack";
+import { FALLBACK_BANKS } from "@/lib/payments/banks";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { logger } from "@/lib/platform/logger";
+import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
+import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
 import {
   checkPayoutDestination,
   depositorNameFor,
   payoutApprovalFor,
   PAYOUT_NAME_MESSAGES,
-} from "@/lib/withdrawal-name-check";
+} from "@/lib/payments/withdrawal-name-check";
 
 export const dynamic = "force-dynamic";
 

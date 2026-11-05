@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/identity/auth";
 import { db } from "@/db";
 import { orders, users } from "@/db/schema";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { FulfilmentControl } from "./FulfilmentControl";
-import { MANUAL_PROVIDER, QUEUE_STATUSES, quantityFromPlanLabel } from "@/lib/fulfilment-queue";
-import { manualWarrantyDays, readManualCatalog } from "@/lib/manual-catalog";
-import { formatNaira } from "@/lib/catalog";
-import { warrantyLabel } from "@/lib/warranty";
+import { MANUAL_PROVIDER, QUEUE_STATUSES, quantityFromPlanLabel } from "@/lib/admin/fulfilment-queue";
+import { manualWarrantyDays, readManualCatalog } from "@/lib/services/accounts/manual-catalog";
+import { formatNaira } from "@/lib/services/catalog";
+import { warrantyLabel } from "@/lib/services/warranty";
 
 export const dynamic = "force-dynamic";
 

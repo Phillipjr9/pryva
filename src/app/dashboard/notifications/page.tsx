@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requireUser } from "@/lib/identity/auth";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
 import { and, count, eq, desc } from "drizzle-orm";

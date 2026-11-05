@@ -1,8 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { financialActionsUnavailable } from "@/lib/financial-environment";
-import { dispatchWalletEmails, walletEmailConfigured } from "@/lib/wallet-email-outbox";
-import { logger } from "@/lib/logger";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
+import { dispatchWalletEmails, walletEmailConfigured } from "@/lib/email/wallet-email-outbox";
+import { logger } from "@/lib/platform/logger";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;

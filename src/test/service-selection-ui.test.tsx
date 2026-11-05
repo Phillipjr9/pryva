@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
 import { DigitalServicesForm } from "@/app/dashboard/digital/DigitalServicesForm";
-import { getDigitalService } from "@/lib/digital-services";
+import { getDigitalService } from "@/lib/services/digital/digital-services";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 

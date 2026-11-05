@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { db } from "@/db";
 import { adminAuditLog } from "@/db/schema";
-import { recordAdminAction } from "@/lib/admin-audit";
+import { recordAdminAction } from "@/lib/admin/admin-audit";
 
 /**
  * The audit trail is a record, not the money ledger, and the two failure modes

@@ -1,14 +1,14 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildAccountClosedEmail } from "@/lib/account-closed-email";
-import { requestEmailChange } from "@/lib/email-change";
-import { customerWelcomeEmail, emailVerificationEmail, emailVerifiedEmail, giftCardEmail, passwordResetEmail } from "@/lib/email-templates";
-import { makeEsimDeliveryEmail } from "@/lib/esim-email-template";
-import { makeNumberCodeEmail } from "@/lib/number-email-template";
-import { buildSecurityNotice } from "@/lib/security-notice";
-import { makeSupportReplyEmail } from "@/lib/support-reply-email";
-import { makeWalletEmail, type WalletEmailEvent } from "@/lib/wallet-email-template";
+import { buildAccountClosedEmail } from "@/lib/email/account-closed-email";
+import { requestEmailChange } from "@/lib/identity/email-change";
+import { customerWelcomeEmail, emailVerificationEmail, emailVerifiedEmail, giftCardEmail, passwordResetEmail } from "@/lib/email/email-templates";
+import { makeEsimDeliveryEmail } from "@/lib/email/esim-email-template";
+import { makeNumberCodeEmail } from "@/lib/email/number-email-template";
+import { buildSecurityNotice } from "@/lib/platform/security-notice";
+import { makeSupportReplyEmail } from "@/lib/email/support-reply-email";
+import { makeWalletEmail, type WalletEmailEvent } from "@/lib/email/wallet-email-template";
 
 // Every entry renders its real template. The confirmation email is captured from
 // the real sender with only its database and external provider stubbed; the

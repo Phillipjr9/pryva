@@ -1,8 +1,8 @@
 "use client";
 
 import { CountryFlag } from "@/components/CountryFlag";
-import { EXPLORER_COUNTRIES } from "@/lib/explorer-countries";
-import { explorerCountry } from "@/lib/service-explorer";
+import { EXPLORER_COUNTRIES } from "@/lib/content/explorer-countries";
+import { explorerCountry } from "@/lib/services/service-explorer";
 
 const QUICK_COUNTRIES = ["ng", "us", "gb", "ca", "gh"];
 

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/identity/auth";
 import { OperatorNav, OperatorSignOut } from "./OperatorNav";
 
 /**

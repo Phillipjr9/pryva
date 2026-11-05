@@ -24,15 +24,15 @@ const runtime = vi.hoisted(() => ({
   legacyListings: [] as Record<string, unknown>[],
 }));
 
-vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => runtime.preview }));
-vi.mock("@/lib/logger", () => ({
+vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => runtime.preview }));
+vi.mock("@/lib/platform/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
-vi.mock("@/lib/exchange-rate", () => ({
+vi.mock("@/lib/payments/exchange-rate", () => ({
   getUsdToNgnRate: async () => ({ rate: 1600, source: "test", fetchedAt: new Date().toISOString() }),
 }));
 
-vi.mock("@/lib/bulkacc", () => ({
+vi.mock("@/lib/providers/bulkacc", () => ({
   isBulkaccConfigured: () => runtime.bulkaccConfigured,
   listAllProducts: async () => runtime.products,
   getProduct: async (code: string) => runtime.products.find((p) => p.code === code),
@@ -45,7 +45,7 @@ vi.mock("@/lib/bulkacc", () => ({
   clearBulkaccCache: () => {},
 }));
 
-vi.mock("@/lib/accszone", () => {
+vi.mock("@/lib/providers/accszone", () => {
   class AccsZoneError extends Error {
     constructor(message: string, public code: string, public status: number) {
       super(message);
@@ -68,7 +68,7 @@ vi.mock("@/lib/accszone", () => {
 });
 
 const { GET } = await import("@/app/api/accounts/listings/route");
-const { clearManualCatalogCache } = await import("@/lib/manual-catalog");
+const { clearManualCatalogCache } = await import("@/lib/services/accounts/manual-catalog");
 
 const request = () => new NextRequest("https://pryva.test/api/accounts/listings", {
   headers: { host: "pryva.test" },

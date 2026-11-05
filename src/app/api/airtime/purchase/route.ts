@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAuthApi } from "@/lib/auth";
+import { requireAuthApi } from "@/lib/identity/auth";
 
 export const dynamic = "force-dynamic";
 

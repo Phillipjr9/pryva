@@ -1,13 +1,13 @@
-import { authorizeAdminApi } from "@/lib/admin-auth";
-import { recordAdminAction } from "@/lib/admin-audit";
+import { authorizeAdminApi } from "@/lib/identity/admin-auth";
+import { recordAdminAction } from "@/lib/admin/admin-audit";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { contactMessages } from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
-import { logger } from "@/lib/logger";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { isMessageStatus } from "@/lib/support-messages";
-import { isSameOriginMutation } from "@/lib/net";
+import { logger } from "@/lib/platform/logger";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { isMessageStatus } from "@/lib/support/support-messages";
+import { isSameOriginMutation } from "@/lib/platform/net";
 
 export const dynamic = "force-dynamic";
 

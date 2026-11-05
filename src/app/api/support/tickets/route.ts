@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireAuthApi } from "@/lib/auth";
-import { respondToTicket } from "@/lib/ai-support";
-import { logger } from "@/lib/logger";
-import { isSameOriginMutation } from "@/lib/net";
-import { supportMessageRateLimiter } from "@/lib/rate-limit";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { createTicket, isValidTicketBody, listTicketsForUser } from "@/lib/support-tickets";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { respondToTicket } from "@/lib/support/ai-support";
+import { logger } from "@/lib/platform/logger";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { supportMessageRateLimiter } from "@/lib/platform/rate-limit";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { createTicket, isValidTicketBody, listTicketsForUser } from "@/lib/support/support-tickets";
 
 export const dynamic = "force-dynamic";
 

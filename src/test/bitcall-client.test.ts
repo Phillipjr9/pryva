@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const runtime = vi.hoisted(() => ({ limit: vi.fn(), catalogLimit: vi.fn() }));
-vi.mock("@/lib/rate-limit", () => ({ createRateLimiter: (config: { maxRequests: number }) => config.maxRequests === 12 ? runtime.catalogLimit : runtime.limit }));
+vi.mock("@/lib/platform/rate-limit", () => ({ createRateLimiter: (config: { maxRequests: number }) => config.maxRequests === 12 ? runtime.catalogLimit : runtime.limit }));
 
 import {
   BitcallError,
@@ -28,7 +28,7 @@ import {
   listBitcallOtpPools,
   listBitcallOtpServices,
   reactivateBitcallOtpActivation,
-} from "@/lib/bitcall";
+} from "@/lib/providers/bitcall";
 
 const KEY_ID = "ak_test_1a2b3c";
 const SECRET = "a1".repeat(64); // 128 hex characters

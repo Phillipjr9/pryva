@@ -23,20 +23,20 @@ const state = vi.hoisted(() => ({
   accszone: false,
 }));
 
-vi.mock("@/lib/fleexa", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/fleexa")>();
+vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/fleexa")>();
   return { ...actual, isFleexaConfigured: () => state.fleexa };
 });
 
-vi.mock("@/lib/fleexa-catalog", () => ({
+vi.mock("@/lib/services/numbers/fleexa-catalog", () => ({
   readSupplierSnapshot: async () => {
     if (state.snapshotError) throw new Error(state.snapshotError);
     return state.snapshot;
   },
 }));
 
-vi.mock("@/lib/bulkacc", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/bulkacc")>();
+vi.mock("@/lib/providers/bulkacc", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/bulkacc")>();
   return {
     ...actual,
     isBulkaccConfigured: () => state.bulkacc,
@@ -47,13 +47,13 @@ vi.mock("@/lib/bulkacc", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/smm-panel", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/smm-panel")>();
+vi.mock("@/lib/providers/smm-panel", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/smm-panel")>();
   return { ...actual, isSmmPanelConfigured: () => state.smm };
 });
 
-vi.mock("@/lib/smm-catalog", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/smm-catalog")>();
+vi.mock("@/lib/services/boosts/smm-catalog", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/boosts/smm-catalog")>();
   return {
     ...actual,
     readBoostSnapshot: async () => {
@@ -63,20 +63,20 @@ vi.mock("@/lib/smm-catalog", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/bitcall", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/bitcall")>();
+vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/bitcall")>();
   return { ...actual, isBitcallConfigured: () => state.bitcall };
 });
 
-vi.mock("@/lib/accszone", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/accszone")>();
+vi.mock("@/lib/providers/accszone", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/accszone")>();
   return { ...actual, isAccsZoneConfigured: () => state.accszone };
 });
 
-vi.mock("@/lib/manual-catalog", () => ({ availableManualProducts: () => Array(state.manual).fill({}) }));
+vi.mock("@/lib/services/accounts/manual-catalog", () => ({ availableManualProducts: () => Array(state.manual).fill({}) }));
 
-import { buildStockReport } from "@/lib/stock-live";
-import { laneHeadline } from "@/lib/stock-report";
+import { buildStockReport } from "@/lib/admin/stock-live";
+import { laneHeadline } from "@/lib/admin/stock-report";
 
 function snapshot() {
   return {

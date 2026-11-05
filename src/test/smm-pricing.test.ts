@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { retailPerThousand, smmMarkupPercent, totalForQuantity, normalizeCurrency } from "@/lib/smm-pricing";
+import { retailPerThousand, smmMarkupPercent, totalForQuantity, normalizeCurrency } from "@/lib/services/boosts/smm-pricing";
 
 /**
  * Retail pricing for boosting.

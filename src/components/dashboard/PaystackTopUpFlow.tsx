@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { formatNaira } from "@/lib/catalog";
-import { isSafePaystackCheckoutUrl } from "@/lib/paystack-checkout";
-import { navigateToPaystack } from "@/lib/paystack-navigate";
-import { notifyPaystackTopUpsChanged, readPendingPaystackTopUps, rememberPaystackTopUp } from "@/lib/paystack-topup-intent";
+import { formatNaira } from "@/lib/services/catalog";
+import { isSafePaystackCheckoutUrl } from "@/lib/payments/paystack-checkout";
+import { navigateToPaystack } from "@/lib/payments/paystack-navigate";
+import { notifyPaystackTopUpsChanged, readPendingPaystackTopUps, rememberPaystackTopUp } from "@/lib/payments/paystack-topup-intent";
 import { MoneyFlowDialog, MoneyOrbit, MoneyProcessing, MoneyRoute } from "./MoneyFlowDialog";
 import styles from "./MoneyFlow.module.css";
 

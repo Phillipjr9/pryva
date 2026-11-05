@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthApi } from "@/lib/auth";
-import { clientIp } from "@/lib/auth-rate-limit";
-import { financialActionsUnavailable } from "@/lib/financial-environment";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { clientIp } from "@/lib/identity/auth-rate-limit";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import {
   createFreeInbox,
   InboxError,
   isInboxConfigured,
   listInboxes,
   mayHaveSpentMoney,
-} from "@/lib/disposable-inbox";
-import { logger } from "@/lib/logger";
-import { isSameOriginMutation } from "@/lib/net";
-import { apiRateLimiter, inboxCreateIpRateLimiter, releaseRateLimit } from "@/lib/rate-limit";
-import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+} from "@/lib/services/email-otp/disposable-inbox";
+import { logger } from "@/lib/platform/logger";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { apiRateLimiter, inboxCreateIpRateLimiter, releaseRateLimit } from "@/lib/platform/rate-limit";
+import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 
 export const dynamic = "force-dynamic";
 

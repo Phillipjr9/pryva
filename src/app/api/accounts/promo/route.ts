@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AccsZoneError, validatePromo } from "@/lib/accszone";
+import { AccsZoneError, validatePromo } from "@/lib/providers/accszone";
 import {
   getMarketplaceListing,
   isMarketplaceCatalogAvailable,
   MarketplaceError,
   supportsPromoCodes,
-} from "@/lib/marketplace-suppliers";
-import { usdCents } from "@/lib/supplier-money";
-import { applyPromoDiscount, priceMarketplaceListing } from "@/lib/marketplace-pricing";
-import { requireAuthApi } from "@/lib/auth";
-import { logger } from "@/lib/logger";
-import { isSameOriginMutation } from "@/lib/net";
-import { isMarketplacePurchaseEnabled } from "@/lib/marketplace-policy";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { purchaseRateLimiter } from "@/lib/rate-limit";
+} from "@/lib/services/accounts/marketplace-suppliers";
+import { usdCents } from "@/lib/payments/supplier-money";
+import { applyPromoDiscount, priceMarketplaceListing } from "@/lib/services/accounts/marketplace-pricing";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { logger } from "@/lib/platform/logger";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isMarketplacePurchaseEnabled } from "@/lib/services/accounts/marketplace-policy";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
 
 export const dynamic = "force-dynamic";
 

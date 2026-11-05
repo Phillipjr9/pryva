@@ -1,29 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isBulkaccConfigured, maskedKey, getBalanceMicros, probeCatalog } from "@/lib/bulkacc";
-import { isAccsZoneConfigured } from "@/lib/accszone";
+import { isBulkaccConfigured, maskedKey, getBalanceMicros, probeCatalog } from "@/lib/providers/bulkacc";
+import { isAccsZoneConfigured } from "@/lib/providers/accszone";
 import {
   isFleexaConfigured,
   getFleexaBalance,
   listFleexaEmailProducts,
   listFleexaSmsServices,
   listFleexaRentAreas,
-} from "@/lib/fleexa";
-import { isBitcallConfigured, getBitcallBalance } from "@/lib/bitcall";
-import { esimItemsForCountry, readEsimCatalog } from "@/lib/esim-catalog";
-import { explorerCountry } from "@/lib/service-explorer";
-import { isSmmPanelConfigured } from "@/lib/smm-panel";
-import { resendConfigured } from "@/lib/resend-config";
-import { emailQueueStatus, recentEmailActivity } from "@/lib/email-delivery-events";
-import { isPaystackConfigured, paystackKeyMode, getBanks } from "@/lib/paystack";
-import { persistentDatabaseConfigured } from "@/lib/database-config";
+} from "@/lib/providers/fleexa";
+import { isBitcallConfigured, getBitcallBalance } from "@/lib/providers/bitcall";
+import { esimItemsForCountry, readEsimCatalog } from "@/lib/services/esim/esim-catalog";
+import { explorerCountry } from "@/lib/services/service-explorer";
+import { isSmmPanelConfigured } from "@/lib/providers/smm-panel";
+import { resendConfigured } from "@/lib/email/resend-config";
+import { emailQueueStatus, recentEmailActivity } from "@/lib/email/email-delivery-events";
+import { isPaystackConfigured, paystackKeyMode, getBanks } from "@/lib/payments/paystack";
+import { persistentDatabaseConfigured } from "@/lib/platform/database-config";
 import {
   isMarketplaceCheckoutConfigured,
   isMarketplacePurchaseEnabled,
-} from "@/lib/marketplace-policy";
-import { isMarketplaceCatalogAvailable } from "@/lib/marketplace-suppliers";
-import { isManualFulfilmentReachable } from "@/lib/manual-fulfilment";
-import { logger } from "@/lib/logger";
-import { diagnosticsAuthorized } from "@/lib/diagnostics-auth";
+} from "@/lib/services/accounts/marketplace-policy";
+import { isMarketplaceCatalogAvailable } from "@/lib/services/accounts/marketplace-suppliers";
+import { isManualFulfilmentReachable } from "@/lib/services/accounts/manual-fulfilment";
+import { logger } from "@/lib/platform/logger";
+import { diagnosticsAuthorized } from "@/lib/admin/diagnostics-auth";
 
 export const dynamic = "force-dynamic";
 

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { requireAuthApi } from "@/lib/auth";
-import { publicOrigin } from "@/lib/net";
-import { referralOverview } from "@/lib/referrals";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { publicOrigin } from "@/lib/platform/net";
+import { referralOverview } from "@/lib/content/referrals";
 
 export const dynamic = "force-dynamic";
 

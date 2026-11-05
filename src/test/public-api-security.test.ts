@@ -6,10 +6,10 @@ const mocks = vi.hoisted(() => ({
   log: { warn: vi.fn(), error: vi.fn() },
 }));
 vi.mock("@/db", () => ({ db: { execute: mocks.execute, transaction: mocks.transaction } }));
-vi.mock("@/lib/auth", () => ({ requireAuthApi: mocks.user }));
-vi.mock("@/lib/auth-rate-limit", () => ({ clientIp: () => "203.0.113.5" }));
-vi.mock("@/lib/rate-limit", () => ({ securityReportRateLimiter: mocks.limit }));
-vi.mock("@/lib/logger", () => ({ logger: mocks.log }));
+vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: mocks.user }));
+vi.mock("@/lib/identity/auth-rate-limit", () => ({ clientIp: () => "203.0.113.5" }));
+vi.mock("@/lib/platform/rate-limit", () => ({ securityReportRateLimiter: mocks.limit }));
+vi.mock("@/lib/platform/logger", () => ({ logger: mocks.log }));
 
 import * as health from "@/app/api/health/route";
 import * as report from "@/app/api/security/report/route";

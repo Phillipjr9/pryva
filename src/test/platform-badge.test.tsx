@@ -2,8 +2,8 @@ import React from "react";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BrandIcon } from "@/components/BrandIcon";
-import { BRAND_MARKS } from "@/lib/brand-marks";
-import { PLATFORM_SHOWCASE } from "@/lib/platform-showcase";
+import { BRAND_MARKS } from "@/lib/content/brand-marks";
+import { PLATFORM_SHOWCASE } from "@/lib/content/platform-showcase";
 import {
   PlatformBadge,
   PlatformStrip,

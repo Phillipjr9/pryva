@@ -16,9 +16,9 @@ const mocks = vi.hoisted(() => ({
   services: vi.fn(),
 }));
 
-vi.mock("@/lib/admin-auth", () => ({ authorizeAdminApi: mocks.admin }));
-vi.mock("@/lib/smm-panel", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/smm-panel")>();
+vi.mock("@/lib/identity/admin-auth", () => ({ authorizeAdminApi: mocks.admin }));
+vi.mock("@/lib/providers/smm-panel", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/smm-panel")>();
   return {
     ...actual,
     isSmmPanelConfigured: mocks.configured,
@@ -29,7 +29,7 @@ vi.mock("@/lib/smm-panel", async (importOriginal) => {
 });
 
 import { GET } from "@/app/api/admin/boosting/route";
-import { SmmPanelError } from "@/lib/smm-panel";
+import { SmmPanelError } from "@/lib/providers/smm-panel";
 
 const SERVICE = {
   id: "svc-1",

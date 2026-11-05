@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { ArrowRight, Card, Shield, Check } from "@/components/icons";
-import { services } from "@/lib/catalog";
+import { services } from "@/lib/services/catalog";
 import { BrandLockup } from "@/components/brand/BrandLockup";
 import { BrandIcon } from "@/components/BrandIcon";
-import { SOCIAL_LINKS, socialHref, socialIsPlaceholder, socialLabel } from "@/lib/social";
+import { SOCIAL_LINKS, socialHref, socialIsPlaceholder, socialLabel } from "@/lib/content/social";
 
 const columns = [
   {
@@ -111,7 +111,7 @@ export function SiteFooter() {
             </div>
 
             {/* Our accounts are still being set up: until a `profileUrl` exists in
-                src/lib/social.ts these go to the platform and say "coming soon".
+                src/lib/content/social.ts these go to the platform and say "coming soon".
                 The label is not decoration — it is the difference between a
                 placeholder and a dead link. */}
             <div className="mt-5 flex flex-wrap items-center gap-2">

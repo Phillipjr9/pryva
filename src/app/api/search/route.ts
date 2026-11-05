@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders, walletTransactions, giftCards } from "@/db/schema";
 import { eq, and, or, ilike } from "drizzle-orm";
-import { requireAuthApi } from "@/lib/auth";
-import { logger } from "@/lib/logger";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { logger } from "@/lib/platform/logger";
 
 export const dynamic = "force-dynamic";
 

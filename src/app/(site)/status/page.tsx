@@ -1,11 +1,11 @@
-import { paystackKeyUsable } from "@/lib/paystack-policy";
-import { financialActionsUnavailable } from "@/lib/financial-environment";
+import { paystackKeyUsable } from "@/lib/payments/paystack-policy";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { plans } from "@/lib/catalog";
-import { isNumberPlanOrderingConfigured } from "@/lib/number-availability";
-import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
-import { esimCategoryOrderable } from "@/lib/esim-availability";
+import { plans } from "@/lib/services/catalog";
+import { isNumberPlanOrderingConfigured } from "@/lib/services/numbers/number-availability";
+import { isMarketplaceCheckoutConfigured } from "@/lib/services/accounts/marketplace-policy";
+import { esimCategoryOrderable } from "@/lib/services/esim/esim-availability";
 
 export const metadata: Metadata = {
   title: "Service Status",

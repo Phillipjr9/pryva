@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/auth/AuthForm";
-import { getCurrentUser, isAdminUser } from "@/lib/auth";
-import { operatorHomeFor } from "@/lib/operator";
-import { safeRedirectPath } from "@/lib/safe-redirect";
+import { getCurrentUser, isAdminUser } from "@/lib/identity/auth";
+import { operatorHomeFor } from "@/lib/platform/operator";
+import { safeRedirectPath } from "@/lib/platform/safe-redirect";
 import { Shield, Lock } from "@/components/icons";
 
 export const dynamic = "force-dynamic";

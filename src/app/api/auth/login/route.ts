@@ -1,17 +1,17 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { createSession, isValidEmail, normalizeEmail, verifyPassword } from "@/lib/auth";
-import { LOCKOUT_DURATION_MS, clearFailedLogins, lockoutRemainingMs, recordFailedLogin } from "@/lib/account-lockout";
-import { checkAuthRateLimit, clearAuthRateLimit } from "@/lib/auth-rate-limit";
-import { isSameOriginMutation } from "@/lib/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { createSession, isValidEmail, normalizeEmail, verifyPassword } from "@/lib/identity/auth";
+import { LOCKOUT_DURATION_MS, clearFailedLogins, lockoutRemainingMs, recordFailedLogin } from "@/lib/identity/account-lockout";
+import { checkAuthRateLimit, clearAuthRateLimit } from "@/lib/identity/auth-rate-limit";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 import {
   CHALLENGE_TTL_MS,
   createChallenge,
   getEnrolment,
   twoFactorAvailable,
-} from "@/lib/two-factor";
+} from "@/lib/identity/two-factor";
 
 /**
  * One reply for both "this account is locked" and "this address is limited".

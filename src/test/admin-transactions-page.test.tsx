@@ -16,8 +16,8 @@ import { users, walletTransactions } from "@/db/schema";
  * operator actually reads.
  */
 
-vi.mock("@/lib/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/auth")>();
+vi.mock("@/lib/identity/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/identity/auth")>();
   return { ...actual, requireAdmin: vi.fn().mockResolvedValue({ id: "admin-1", email: "owner@example.test" }) };
 });
 

@@ -13,7 +13,7 @@ import {
   moderateReview,
   normalizeReview,
   pendingReviewCount,
-} from "@/lib/reviews";
+} from "@/lib/content/reviews";
 
 /**
  * The promise of "verified purchase" is structural, not editorial: a review can

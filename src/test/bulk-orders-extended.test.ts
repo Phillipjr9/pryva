@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { calculateBulkOrder, getBulkDiscountMessage } from "@/lib/bulk-orders";
-import { plans } from "@/lib/catalog";
+import { calculateBulkOrder, getBulkDiscountMessage } from "@/lib/services/bulk-orders";
+import { plans } from "@/lib/services/catalog";
 
 describe("Bulk Orders Extended", () => {
   describe("calculateBulkOrder edge cases", () => {

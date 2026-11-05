@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { contactMessages } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth";
-import { isSameOriginMutation } from "@/lib/net";
-import { clientIp } from "@/lib/auth-rate-limit";
-import { contactRateLimiter } from "@/lib/rate-limit";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { getCurrentUser } from "@/lib/identity/auth";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { clientIp } from "@/lib/identity/auth-rate-limit";
+import { contactRateLimiter } from "@/lib/platform/rate-limit";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 
 export const dynamic = "force-dynamic";
 

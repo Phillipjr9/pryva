@@ -37,7 +37,7 @@ beforeAll(async () => {
       productName: "Nigeria Starter", planLabel: "1GB", region: "Nigeria",
       duration: "30 days", amount: 4500, status: "refunded",
     },
-  ];
+  ] as const;
   for (const row of orderRows) {
     await database.db.insert(schema.orders).values({ ...row, userId, provider: "preview" });
   }
@@ -103,7 +103,7 @@ describe("preview database condition evaluation", () => {
   });
 
   it("keeps passkey removal usable in the process-local preview", async () => {
-    const { deleteCredential } = await import("@/lib/passkeys");
+    const { deleteCredential } = await import("@/lib/identity/passkeys");
     const userId = randomUUID();
     await database.db.insert(schema.users).values({
       id: userId, name: "Preview", email: `${userId}@example.test`, passwordHash: "hash", walletBalance: 0,
@@ -118,7 +118,7 @@ describe("preview database condition evaluation", () => {
   });
 
   it("stores and confirms a preview email-change request without sending real mail", async () => {
-    const { requestEmailChange, confirmEmailChange, EMAIL_CHANGE_INVALID } = await import("@/lib/email-change");
+    const { requestEmailChange, confirmEmailChange, EMAIL_CHANGE_INVALID } = await import("@/lib/identity/email-change");
     const userId = randomUUID();
     const occupiedId = randomUUID();
     const originalEmail = `${userId}@example.test`;

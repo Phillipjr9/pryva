@@ -40,7 +40,7 @@ class FoxreloadErrorMock extends Error {
   }
 }
 
-vi.mock("@/lib/foxreload", () => ({
+vi.mock("@/lib/providers/foxreload", () => ({
   FoxreloadError: FoxreloadErrorMock,
   isFoxreloadConfigured: () => true,
   resolveFoxreloadProductId: async () => "item-steam-10",
@@ -51,10 +51,18 @@ vi.mock("@/lib/foxreload", () => ({
   pollFoxreloadOrderCodes: async () => state.codes,
 }));
 
-vi.mock("@/lib/auth", () => ({ getCurrentUser: async () => ({ id: "u1", email: "buyer@example.com" }) }));
-vi.mock("@/lib/net", () => ({ isSameOriginMutation: () => true }));
-vi.mock("@/lib/rate-limit", () => ({ purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }) }));
-vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.scheduleWalletEmails }));
+vi.mock("@/lib/identity/auth", () => ({
+  getCurrentUser: async () => ({ id: "u1", email: "buyer@example.com" }),
+  requireAuthApi: async () => ({ id: "u1", email: "buyer@example.com" }),
+}));
+vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => true }));
+vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
+  // Keep the real module: other limiters are constructed when a route imports
+  // a money module, and a factory that omits them fails at import time.
+  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
+  return { ...actual, purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }) };
+});
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.scheduleWalletEmails }));
 
 vi.mock("@/db", () => {
   const dialect = new PgDialect();

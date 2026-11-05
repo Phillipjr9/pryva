@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clearWithdrawalIntent, clearTrackedWithdrawalIntent, readWithdrawalIntent, readWithdrawalIntents, saveWithdrawalIntent, saveTrackedWithdrawalIntent } from "@/lib/withdrawal-intent";
+import { clearWithdrawalIntent, clearTrackedWithdrawalIntent, readWithdrawalIntent, readWithdrawalIntents, saveWithdrawalIntent, saveTrackedWithdrawalIntent } from "@/lib/payments/withdrawal-intent";
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>();

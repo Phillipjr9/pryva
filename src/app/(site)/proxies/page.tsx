@@ -1,10 +1,10 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { serviceMap, plansFor, formatNaira } from "@/lib/catalog";
-import { isPlanFulfillable } from "@/lib/fulfillment";
+import { serviceMap, plansFor, formatNaira } from "@/lib/services/catalog";
+import { isPlanFulfillable } from "@/lib/services/fulfillment";
 import { ArrowRight } from "@/components/icons";
 import { CountryFlag } from "@/components/CountryFlag";
-import { hasCountryFlag } from "@/lib/countries";
+import { hasCountryFlag } from "@/lib/platform/countries";
 import { ServiceIcon } from "@/components/ServiceIcon";
 
 export const metadata: Metadata = {

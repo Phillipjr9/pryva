@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/identity/auth";
 import { AccessLevel } from "./AccessLevel";
 import { db } from "@/db";
 import { users, orders } from "@/db/schema";

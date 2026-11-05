@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boostingReadiness, readinessHeadline } from "@/lib/boosting-readiness";
+import { boostingReadiness, readinessHeadline } from "@/lib/services/boosts/boosting-readiness";
 
 /**
  * The checklist that decides whether boosting can take money. Its whole value is

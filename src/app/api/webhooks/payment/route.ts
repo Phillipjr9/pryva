@@ -1,12 +1,12 @@
-import { paystackKeyUsable } from "@/lib/paystack-policy";
+import { paystackKeyUsable } from "@/lib/payments/paystack-policy";
 import { NextRequest, NextResponse } from "next/server";
-import { financialActionsUnavailable } from "@/lib/financial-environment";
-import { verifyPaystackSignature } from "@/lib/paystack-webhook";
-import { completeTopUp } from "@/lib/topups";
-import { isTransferEvent, settleTransferEvent } from "@/lib/paystack-transfer-settlement";
-import { logger } from "@/lib/logger";
-import { recordWebhookEvent } from "@/lib/webhook-events";
-import { readTextWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
+import { verifyPaystackSignature } from "@/lib/payments/paystack-webhook";
+import { completeTopUp } from "@/lib/payments/topups";
+import { isTransferEvent, settleTransferEvent } from "@/lib/payments/paystack-transfer-settlement";
+import { logger } from "@/lib/platform/logger";
+import { recordWebhookEvent } from "@/lib/payments/webhook-events";
+import { readTextWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  *
  * The body is untrusted until the HMAC over the raw bytes checks out, and every
  * event is applied against a row we already have. See
- * `src/lib/paystack-transfer-settlement.ts` for why a `transfer.success` only
+ * `src/lib/payments/paystack-transfer-settlement.ts` for why a `transfer.success` only
  * completes an in-flight row and a `transfer.failed` refunds the wallet.
  *
  * Every delivery that gets this far is recorded afterwards, including a refused

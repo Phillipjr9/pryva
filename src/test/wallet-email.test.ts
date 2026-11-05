@@ -5,12 +5,12 @@ import { drizzle } from "drizzle-orm/pglite";
 import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 import * as schema from "@/db/schema";
-import { makeWalletEmail } from "@/lib/wallet-email-template";
+import { makeWalletEmail } from "@/lib/email/wallet-email-template";
 
 const mocks = vi.hoisted(() => ({ db: undefined as unknown }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
 
-import { dispatchWalletEmails } from "@/lib/wallet-email-outbox";
+import { dispatchWalletEmails } from "@/lib/email/wallet-email-outbox";
 import { GET as cron } from "@/app/api/cron/wallet-emails/route";
 
 const USER = "72e85c0a-9d4a-4d38-a5d0-2a839e05d250";

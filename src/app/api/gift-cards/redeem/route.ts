@@ -1,11 +1,11 @@
-import { financialActionsUnavailable } from "@/lib/financial-environment";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import { NextRequest, NextResponse } from "next/server";
-import { redeemGiftCard } from "@/lib/gift-cards";
-import { requireAuthApi } from "@/lib/auth";
-import { isSameOriginMutation } from "@/lib/net";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { giftCardAttemptLimit, normalizeGiftCardCode } from "@/lib/gift-card-requests";
-import { giftCardVelocity, recordFraudEvent } from "@/lib/fraud";
+import { redeemGiftCard } from "@/lib/services/gift-cards/credit";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { giftCardAttemptLimit, normalizeGiftCardCode } from "@/lib/services/gift-cards/credit-requests";
+import { giftCardVelocity, recordFraudEvent } from "@/lib/admin/fraud";
 
 export const dynamic = "force-dynamic";
 

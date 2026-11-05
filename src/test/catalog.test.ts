@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatNaira, findPlan, findService, plansFor } from "@/lib/catalog";
+import { formatNaira, findPlan, findService, plansFor } from "@/lib/services/catalog";
 
 describe("Catalog", () => {
   describe("formatNaira", () => {

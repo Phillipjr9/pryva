@@ -30,7 +30,7 @@ vi.mock("@/db", () => ({
   },
 }));
 
-import { issueEmailVerification } from "@/lib/email-verification";
+import { issueEmailVerification } from "@/lib/identity/email-verification";
 
 function stubProvider(status: number, body: unknown) {
   const fetchMock = vi.fn().mockResolvedValue(new Response(

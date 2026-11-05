@@ -1,4 +1,4 @@
-import { isVercelPreview } from "@/lib/financial-environment";
+import { isVercelPreview } from "@/lib/platform/financial-environment";
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -31,7 +31,7 @@ import {
   hashPassword,
   requireAuthApi,
   verifyPassword,
-} from "@/lib/auth";
+} from "@/lib/identity/auth";
 import {
   DELETION_TERMS,
   TOMBSTONE_NAME,
@@ -41,15 +41,15 @@ import {
   retentionSummary,
   sessionIsFresh,
   tombstoneEmail,
-} from "@/lib/account-deletion";
-import { debitWalletInTx, makeReference } from "@/lib/wallet";
-import { clientIp } from "@/lib/auth-rate-limit";
-import { hashSignal } from "@/lib/fraud";
-import { isSameOriginMutation } from "@/lib/net";
-import { accountDeletionRateLimiter } from "@/lib/rate-limit";
-import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
-import { logger } from "@/lib/logger";
-import { scheduleAccountClosedEmail, type AccountClosedNotice } from "@/lib/account-closed-email";
+} from "@/lib/identity/account-deletion";
+import { debitWalletInTx, makeReference } from "@/lib/payments/wallet";
+import { clientIp } from "@/lib/identity/auth-rate-limit";
+import { hashSignal } from "@/lib/admin/fraud";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { accountDeletionRateLimiter } from "@/lib/platform/rate-limit";
+import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { logger } from "@/lib/platform/logger";
+import { scheduleAccountClosedEmail, type AccountClosedNotice } from "@/lib/email/account-closed-email";
 
 export const dynamic = "force-dynamic";
 

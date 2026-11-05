@@ -6,9 +6,9 @@ import { TopUpForm } from "@/components/dashboard/TopUpForm";
 import { TopUpReturn } from "@/app/dashboard/wallet/TopUpReturn";
 import { WithdrawalReviewDialog, type WithdrawalReview } from "@/components/dashboard/WithdrawalReviewDialog";
 import { WithdrawalDashboard } from "@/app/dashboard/wallet/WithdrawalDashboard";
-import { readPendingPaystackTopUps, rememberPaystackTopUp } from "@/lib/paystack-topup-intent";
-import { readWithdrawalIntents } from "@/lib/withdrawal-intent";
-import type { WithdrawalReceipt } from "@/lib/withdrawal-receipt";
+import { readPendingPaystackTopUps, rememberPaystackTopUp } from "@/lib/payments/paystack-topup-intent";
+import { readWithdrawalIntents } from "@/lib/payments/withdrawal-intent";
+import type { WithdrawalReceipt } from "@/lib/payments/withdrawal-receipt";
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(), confetti: vi.fn(), addToast: vi.fn(),
@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => mocks.router }));
 vi.mock("next/link", () => ({ default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={href} {...props}>{children}</a> }));
-vi.mock("@/lib/paystack-navigate", () => ({ navigateToPaystack: mocks.navigate }));
+vi.mock("@/lib/payments/paystack-navigate", () => ({ navigateToPaystack: mocks.navigate }));
 vi.mock("@/components/ui/Confetti", () => ({ fireConfetti: mocks.confetti }));
 vi.mock("@/components/ui/Toast", () => ({ useToast: () => ({ addToast: mocks.addToast }) }));
 

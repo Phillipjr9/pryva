@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { AlertTriangle, CheckCircle, Loader2, Logout, Shield, Trash2, XCircle } from "@/components/icons";
-import { DELETION_TERMS, forfeitureWarning } from "@/lib/account-deletion";
+import { DELETION_TERMS, forfeitureWarning } from "@/lib/identity/account-deletion";
 
 /**
  * Closing the account, on the customer's own terms.

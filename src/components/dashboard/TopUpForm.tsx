@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Lock } from "@/components/icons";
-import { formatNaira } from "@/lib/catalog";
-import { PAYSTACK_TOPUP_UPDATED, forgetPaystackTopUp, notifyPaystackTopUpsChanged, readPendingPaystackTopUps, type PendingPaystackTopUp } from "@/lib/paystack-topup-intent";
+import { formatNaira } from "@/lib/services/catalog";
+import { PAYSTACK_TOPUP_UPDATED, forgetPaystackTopUp, notifyPaystackTopUpsChanged, readPendingPaystackTopUps, type PendingPaystackTopUp } from "@/lib/payments/paystack-topup-intent";
 import { PaystackTopUpFlow } from "@/components/dashboard/PaystackTopUpFlow";
 
 export function TopUpForm({ balance, userId, testMode = false }: { balance: number; userId: string; testMode?: boolean }) {

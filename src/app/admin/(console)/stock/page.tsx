@@ -1,8 +1,8 @@
 import Link from "next/link";
 
-import { requireAdmin } from "@/lib/auth";
-import { buildStockReport } from "@/lib/stock-live";
-import { laneHeadline, type StockLane, type StockState } from "@/lib/stock-report";
+import { requireAdmin } from "@/lib/identity/auth";
+import { buildStockReport } from "@/lib/admin/stock-live";
+import { laneHeadline, type StockLane, type StockState } from "@/lib/admin/stock-report";
 
 export const dynamic = "force-dynamic";
 

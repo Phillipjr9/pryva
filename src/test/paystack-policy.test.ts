@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { paystackKeyUsable } from "@/lib/paystack-policy";
+import { paystackKeyUsable } from "@/lib/payments/paystack-policy";
 
 describe("Paystack production key policy", () => {
   it("allows only a nonempty live key in production", () => {

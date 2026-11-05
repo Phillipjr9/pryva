@@ -5,8 +5,8 @@ const runtime = vi.hoisted(() => ({
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock("@/lib/rate-limit", () => ({ createRateLimiter: () => runtime.limit }));
-vi.mock("@/lib/logger", () => ({ logger: runtime.log }));
+vi.mock("@/lib/platform/rate-limit", () => ({ createRateLimiter: () => runtime.limit }));
+vi.mock("@/lib/platform/logger", () => ({ logger: runtime.log }));
 
 import {
   clearBulkaccCache,
@@ -21,8 +21,8 @@ import {
   normalizeProduct,
   productPriceUsd,
   salvageOrderCode,
-} from "@/lib/bulkacc";
-import { usdCents, usdMicros, usdStringFromMicros } from "@/lib/supplier-money";
+} from "@/lib/providers/bulkacc";
+import { usdCents, usdMicros, usdStringFromMicros } from "@/lib/payments/supplier-money";
 
 const API_KEY = "test-key-abcdef1234";
 

@@ -12,15 +12,15 @@ import { NextRequest } from "next/server";
 const gate = vi.hoisted(() => ({ allow: true, list: vi.fn(), buy: vi.fn(), cancel: vi.fn() }));
 const fleexa = vi.hoisted(() => ({ configured: true, list: vi.fn(), buy: vi.fn() }));
 
-vi.mock("@/lib/admin-auth", () => ({
+vi.mock("@/lib/identity/admin-auth", () => ({
   authorizeAdminApi: async () =>
     gate.allow
       ? { user: { id: "admin" }, response: null }
       : { user: null, response: Response.json({ ok: false, error: "Unauthorized" }, { status: 401 }) },
 }));
 
-vi.mock("@/lib/bitcall", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/bitcall")>();
+vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/bitcall")>();
   return {
     ...actual,
     isBitcallConfigured: () => true,
@@ -32,8 +32,8 @@ vi.mock("@/lib/bitcall", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/fleexa", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/fleexa")>();
+vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/fleexa")>();
   return {
     ...actual,
     isFleexaConfigured: () => fleexa.configured,
@@ -42,13 +42,13 @@ vi.mock("@/lib/fleexa", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/exchange-rate", () => ({
+vi.mock("@/lib/payments/exchange-rate", () => ({
   getUsdToNgnRate: async () => ({ rate: 1500, source: "override", fetchedAt: new Date().toISOString() }),
 }));
 
 const { GET } = await import("@/app/api/admin/suppliers/route");
-const { FleexaError } = await import("@/lib/fleexa");
-const { clearOtpCatalogueCache } = await import("@/lib/otp-suppliers");
+const { FleexaError } = await import("@/lib/providers/fleexa");
+const { clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");
 
 function report(query = "") {
   return GET(new NextRequest(`https://pryva.test/api/admin/suppliers${query}`));

@@ -4,11 +4,11 @@ import { eq } from "drizzle-orm";
 
 let database: typeof import("@/db");
 let schema: typeof import("@/db/schema");
-let wallet: typeof import("@/lib/wallet");
+let wallet: typeof import("@/lib/payments/wallet");
 
 beforeAll(async () => {
   vi.stubEnv("DATABASE_URL", "");
-  [database, schema, wallet] = await Promise.all([import("@/db"), import("@/db/schema"), import("@/lib/wallet")]);
+  [database, schema, wallet] = await Promise.all([import("@/db"), import("@/db/schema"), import("@/lib/payments/wallet")]);
 });
 
 async function createUser(balance: number) {

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { BrandLockup } from "@/components/brand/BrandLockup";
 import { ChevronDown, Logout, Menu, Close } from "@/components/icons";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/platform/utils";
 
 type Item = { href: string; label: string };
 type Section = { label: string; items: Item[] };

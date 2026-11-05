@@ -4,10 +4,10 @@ import { describe, expect, it } from "vitest";
 const settings = readFileSync("src/app/dashboard/settings/page.tsx", "utf8");
 const section = readFileSync("src/app/dashboard/settings/SecuritySection.tsx", "utf8");
 const redirectPage = readFileSync("src/app/dashboard/security/page.tsx", "utf8");
-const targets = readFileSync("src/lib/legacy-redirects.ts", "utf8");
+const targets = readFileSync("src/lib/content/legacy-redirects.ts", "utf8");
 const shell = readFileSync("src/components/dashboard/DashboardShell.tsx", "utf8");
 const palette = readFileSync("src/components/command/CommandPalette.tsx", "utf8");
-const auth = readFileSync("src/lib/auth.ts", "utf8");
+const auth = readFileSync("src/lib/identity/auth.ts", "utf8");
 
 /**
  * Security is part of Settings.

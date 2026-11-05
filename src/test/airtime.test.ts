@@ -8,7 +8,7 @@ import {
   getAirtimePlansByProvider,
   findAirtimePlan,
   type AirtimeProvider,
-} from "@/lib/airtime";
+} from "@/lib/services/data/airtime";
 
 describe("Airtime & Mobile Data", () => {
   describe("dataPlans", () => {

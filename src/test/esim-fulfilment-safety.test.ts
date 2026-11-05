@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { EsimOffer } from "@/lib/esim-catalog";
+import type { EsimOffer } from "@/lib/services/esim/esim-catalog";
 
 const provider = vi.hoisted(() => ({ buy: vi.fn(), order: vi.fn(), profile: vi.fn(), ambiguous: vi.fn() }));
-vi.mock("@/lib/bitcall", () => ({
+vi.mock("@/lib/providers/bitcall", () => ({
   buyBitcallEsimPlan: provider.buy,
   getBitcallEsimOrder: provider.order,
   getBitcallEsimProfile: provider.profile,
@@ -10,7 +10,7 @@ vi.mock("@/lib/bitcall", () => ({
 }));
 vi.mock("@/db", () => ({ db: {} }));
 
-import { purchaseEsim, waitForEsimDelivery } from "@/lib/esim-fulfilment";
+import { purchaseEsim, waitForEsimDelivery } from "@/lib/services/esim/esim-fulfilment";
 
 const offer = { id: "live-esim-0123456789abcdef0123", planId: "pln_fixture" } as EsimOffer;
 const delivered = { orderId: "ord_accepted", status: "delivered", iccids: ["8901234567890123456"] };

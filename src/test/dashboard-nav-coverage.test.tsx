@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ServiceIcon, type ServiceType } from "@/components/ServiceIcon";
-import { EXPLORER_CATEGORIES } from "@/lib/service-explorer";
+import { EXPLORER_CATEGORIES } from "@/lib/services/service-explorer";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/dashboard",

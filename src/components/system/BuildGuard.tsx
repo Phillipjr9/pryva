@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { useServerInsertedHTML } from "next/navigation";
-import { staleBuildScript } from "@/lib/build-id";
+import { staleBuildScript } from "@/lib/platform/build-id";
 
 /**
  * Injects the stale-build check into the server HTML without React ever

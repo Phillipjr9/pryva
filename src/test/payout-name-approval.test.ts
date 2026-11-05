@@ -29,9 +29,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
-vi.mock("@/lib/logger", () => ({ logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
-vi.mock("@/lib/net", () => ({ isSameOriginMutation: () => mocks.sameOrigin }));
-vi.mock("@/lib/admin-auth", () => ({
+vi.mock("@/lib/platform/logger", () => ({ logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => mocks.sameOrigin }));
+vi.mock("@/lib/identity/admin-auth", () => ({
   authorizeAdminApi: async () =>
     mocks.admin
       ? { user: mocks.admin, response: null }
@@ -44,7 +44,7 @@ const ADMIN = "5c9d0b1a-2e3f-4a5b-8c6d-7e8f9a0b1c2d";
 
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
-let nameCheck: typeof import("@/lib/withdrawal-name-check");
+let nameCheck: typeof import("@/lib/payments/withdrawal-name-check");
 let route: typeof import("@/app/api/admin/payout-names/route");
 
 function request(method: string, body?: unknown) {
@@ -88,7 +88,7 @@ beforeAll(async () => {
   for (const file of files) await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
-  nameCheck = await import("@/lib/withdrawal-name-check");
+  nameCheck = await import("@/lib/payments/withdrawal-name-check");
   route = await import("@/app/api/admin/payout-names/route");
 }, 30_000);
 

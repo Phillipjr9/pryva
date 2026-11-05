@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { beginAuthentication, relyingPartyFor } from "@/lib/passkeys";
-import { isSameOriginMutation } from "@/lib/net";
-import { logger } from "@/lib/logger";
-import { passkeyRateLimiter } from "@/lib/rate-limit";
-import { clientIp } from "@/lib/auth-rate-limit";
+import { beginAuthentication, relyingPartyFor } from "@/lib/identity/passkeys";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { logger } from "@/lib/platform/logger";
+import { passkeyRateLimiter } from "@/lib/platform/rate-limit";
+import { clientIp } from "@/lib/identity/auth-rate-limit";
 
 export const dynamic = "force-dynamic";
 

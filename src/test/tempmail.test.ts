@@ -5,7 +5,7 @@ import {
   createTempMailInbox,
   extractVerificationCode,
   isTempMailConfigured,
-} from "@/lib/tempmail";
+} from "@/lib/providers/tempmail";
 import {
   activateInbox,
   createFreeInbox,
@@ -13,9 +13,9 @@ import {
   getInboxProvider,
   isInboxConfigured,
   pollInbox,
-} from "@/lib/disposable-inbox";
+} from "@/lib/services/email-otp/disposable-inbox";
 
-vi.mock("@/lib/logger", () => ({
+vi.mock("@/lib/platform/logger", () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 

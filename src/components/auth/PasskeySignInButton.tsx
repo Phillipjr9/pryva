@@ -3,13 +3,13 @@
 import { useState } from "react";
 
 import { ArrowRight, Loader2, Lock } from "@/components/icons";
-import { safeRedirectPath } from "@/lib/safe-redirect";
+import { safeRedirectPath } from "@/lib/platform/safe-redirect";
 import {
   authenticationResponseToJson,
   encodeRequestOptions,
   isCancellation,
-} from "@/lib/webauthn-browser";
-import { usePasskeysSupported } from "@/lib/use-passkeys-supported";
+} from "@/lib/identity/webauthn-browser";
+import { usePasskeysSupported } from "@/lib/identity/use-passkeys-supported";
 
 /**
  * "Sign in with a passkey".

@@ -7,7 +7,7 @@ import {
   sha256Hex,
   verifyManifest,
   type BackupManifest,
-} from "@/lib/backup";
+} from "@/lib/platform/backup";
 
 const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
   scripts: Record<string, string>;

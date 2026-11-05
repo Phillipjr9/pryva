@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { requireAuthApi } from "@/lib/auth";
-import { logger } from "@/lib/logger";
-import { isSameOriginMutation } from "@/lib/net";
-import { deleteCredential, listCredentialSummaries } from "@/lib/passkeys";
-import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
+import { requireAuthApi } from "@/lib/identity/auth";
+import { logger } from "@/lib/platform/logger";
+import { isSameOriginMutation } from "@/lib/platform/net";
+import { deleteCredential, listCredentialSummaries } from "@/lib/identity/passkeys";
+import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
 
 export const dynamic = "force-dynamic";
 
