@@ -12,6 +12,11 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    environmentMatchGlobs: [
+      ["src/test/**/*.tsx", "jsdom"],
+      ["src/test/**/*.jsx", "jsdom"],
+    ],
+    setupFiles: ["./src/test/setup.ts"],
     clearMocks: true,
   },
 });

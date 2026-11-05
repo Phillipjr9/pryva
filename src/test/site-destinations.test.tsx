@@ -8,7 +8,7 @@ import sitemap from "@/app/sitemap";
 import robots from "@/app/robots";
 import { blogPosts } from "@/lib/content/blog";
 
-const root = fileURLToPath(new URL("..", import.meta.url));
+const root = join(process.cwd(), "src");
 const read = (relative: string) => readFileSync(join(root, relative), "utf8");
 
 function footerHrefs(): string[] {
@@ -92,5 +92,28 @@ describe("public site destinations", () => {
 
   it("routes the help centre's wallet link through sign-in for signed-out visitors", () => {
     expect(read("app/(site)/help/page.tsx")).toContain("/login?next=%2Fdashboard%2Fwallet");
+  });
+
+  it("keeps the three footer columns readable on small screens by stacking them vertically", () => {
+    const markup = renderToStaticMarkup(<SiteFooter />);
+    expect(markup).toContain("grid-cols-1");
+    expect(markup).toContain("sm:grid-cols-2");
+    expect(markup).toContain("lg:grid-cols-3");
+  });
+
+  it("keeps the policy tables readable on mobile without forcing oversized widths", () => {
+    const refund = read("app/(site)/refund-policy/page.tsx");
+    const cookie = read("app/(site)/cookie-policy/page.tsx");
+    expect(refund).not.toContain("min-w-[32rem]");
+    expect(cookie).not.toContain("min-w-[34rem]");
+    expect(refund).toContain("overflow-x-auto");
+    expect(cookie).toContain("overflow-x-auto");
+  });
+
+  it("keeps the pricing cards readable on mobile by stacking them vertically", () => {
+    const pricing = read("app/(site)/pricing/page.tsx");
+    expect(pricing).toContain("grid-cols-1");
+    expect(pricing).toContain("sm:grid-cols-2");
+    expect(pricing).toContain("lg:grid-cols-3");
   });
 });

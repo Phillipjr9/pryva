@@ -63,10 +63,10 @@ export default function RefundPolicyPage() {
     <div>
       <section className="border-b border-line/70 bg-gradient-to-b from-cream to-white">
         <div className="shell py-14 sm:py-16">
-          <h1 className="text-[2.2rem] font-semibold tracking-tight text-ink sm:text-[2.6rem]">
+          <h1 className="text-[1.9rem] font-semibold tracking-tight text-ink sm:text-[2.5rem]">
             Refund Policy
           </h1>
-          <p className="mt-3 max-w-2xl text-[0.98rem] leading-relaxed text-ink-2">
+          <p className="mt-3 max-w-2xl text-[0.94rem] leading-relaxed text-ink-2 sm:text-[0.98rem]">
             Automatic refunds are processed for failed or cancelled deliveries.
             Contact support with your order reference if you need assistance.
           </p>
@@ -75,21 +75,21 @@ export default function RefundPolicyPage() {
 
       <section className="shell py-10">
         <div className="overflow-x-auto rounded-2xl border border-line bg-white">
-          <table className="w-full min-w-[32rem] text-left">
-            <thead className="bg-cream/70 text-meta uppercase tracking-[0.12em] text-ink-3">
+          <table className="w-full min-w-0 text-left">
+            <thead className="bg-cream/70 text-[0.68rem] uppercase tracking-[0.12em] text-ink-3 sm:text-meta">
               <tr>
-                <th className="px-4 py-3 font-semibold">Product</th>
-                <th className="px-4 py-3 font-semibold">Refund</th>
-                <th className="hidden px-4 py-3 font-semibold md:table-cell">How it works</th>
+                <th className="px-3 py-3 font-semibold sm:px-4">Product</th>
+                <th className="px-3 py-3 font-semibold sm:px-4">Refund</th>
+                <th className="hidden px-3 py-3 font-semibold md:table-cell sm:px-4">How it works</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line/70">
               {rows.map((row) => (
                 <tr key={row.product} className="align-top">
-                  <td className="px-4 py-4 text-[0.88rem] font-medium text-ink">{row.product}</td>
-                  <td className="px-4 py-4">
+                  <td className="px-3 py-4 text-[0.8rem] font-medium text-ink sm:px-4 sm:text-[0.88rem]">{row.product}</td>
+                  <td className="px-3 py-4 sm:px-4">
                     <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-meta font-semibold ${
+                      className={`inline-flex rounded-full px-2.5 py-1 text-[0.72rem] font-semibold sm:text-meta ${
                         row.refund === "Not refundable"
                           ? "bg-red-50 text-red-700"
                           : row.refund === "Automatic"
@@ -100,7 +100,7 @@ export default function RefundPolicyPage() {
                       {row.refund}
                     </span>
                   </td>
-                  <td className="px-4 py-4 text-[0.84rem] leading-relaxed text-ink-2 md:table-cell">
+                  <td className="hidden px-3 py-4 text-[0.8rem] leading-relaxed text-ink-2 md:table-cell sm:px-4 sm:text-[0.84rem]">
                     {row.detail}
                   </td>
                 </tr>

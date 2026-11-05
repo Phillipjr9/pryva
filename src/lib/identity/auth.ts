@@ -157,11 +157,12 @@ export async function createSession(userId: string, request?: Request): Promise<
   }
 
   if (process.env.NODE_ENV !== "production") {
+    const rawHost = request?.headers.get("x-forwarded-host") ?? request?.headers.get("host") ?? "-";
     console.info("[auth] session issued", {
       embedded,
       secure,
       proto,
-      host: request?.headers.get("x-forwarded-host") ?? request?.headers.get("host") ?? "-",
+      host: /^[a-zA-Z0-9._:[-\]]+$/.test(rawHost) ? rawHost : "[invalid-host]",
       dest: request?.headers.get("sec-fetch-dest") ?? "-",
       site: request?.headers.get("sec-fetch-site") ?? "-",
     });

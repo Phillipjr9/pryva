@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const root = fileURLToPath(new URL("..", import.meta.url));
+const root = join(process.cwd(), "src");
 const globals = readFileSync(join(root, "app/globals.css"), "utf8");
 
 /** The `--color-*` scale declared in `@theme`, which every utility class reads from. */

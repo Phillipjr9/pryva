@@ -30,12 +30,9 @@ const columns = [
       { href: "/about", label: "About Pryva" },
       { href: "/how-it-works", label: "How it works" },
       { href: "/pricing", label: "Pricing" },
-      // Wallet credit is a product of its own, not one of the services above.
       { href: "/gift-cards", label: "Gift cards" },
+      { href: "/referrals", label: "Referral program" },
       { href: "/faq", label: "FAQ" },
-      // The blog, help centre, status page and customer-feedback page all
-      // existed but nothing on the site linked to them — they were reachable
-      // only by typing the URL.
       { href: "/blog", label: "Guides & blog" },
       { href: "/reviews", label: "Customer reviews" },
       { href: "/testimonials", label: "Customer feedback" },
@@ -153,7 +150,7 @@ export function SiteFooter() {
             </div>
           </div>
 
-          <div className="mt-8 grid grid-cols-2 gap-8 sm:grid-cols-3">
+          <div className="mt-8 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {columns.map((column) => (
               <div key={column.title}>
                 <p className="text-meta font-semibold uppercase tracking-[0.18em] text-ink-3">

@@ -19,7 +19,7 @@ const { CommandPalette, CommandPaletteTrigger } = await import("@/components/com
 const { AccountDataPanel } = await import("@/app/dashboard/settings/AccountDataPanel");
 const { MessageStatusControl } = await import("@/app/admin/(console)/messages/MessageStatusControl");
 
-const root = fileURLToPath(new URL("..", import.meta.url));
+const root = join(process.cwd(), "src");
 const read = (relative: string) => readFileSync(join(root, relative), "utf8");
 
 describe("plan links keep their destination", () => {

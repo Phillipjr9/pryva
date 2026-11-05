@@ -24,14 +24,31 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-cream">
       {/* Hero */}
-      <section className="py-16">
+      <section className="py-8 sm:py-16">
         <div className="shell text-center">
-          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem]">
+          <h1 className="text-[1.7rem] font-medium tracking-tight text-ink sm:text-[3rem]">
             Simple, transparent pricing
           </h1>
-          <p className="mt-4 text-[1.1rem] text-ink-2 max-w-2xl mx-auto">
+          <p className="mx-auto mt-3 max-w-2xl text-[0.88rem] text-ink-2 sm:mt-4 sm:text-[1.1rem]">
             Compare catalog prices in Naira. Availability varies, so review the final amount and terms before confirming an order.
           </p>
+        </div>
+      </section>
+
+      <section className="pb-6 sm:pb-10">
+        <div className="shell">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+            {serviceGroups.map((group) => {
+              const count = plans.filter((plan) => plan.service === group.slug).length;
+              return (
+                <div key={group.slug} className="rounded-xl border border-line bg-white/85 p-2.5 text-left shadow-[var(--shadow-card)] sm:rounded-2xl sm:p-3">
+                  <p className="text-[0.54rem] font-semibold uppercase tracking-[0.12em] text-ink-3 sm:text-[0.62rem]">{group.name}</p>
+                  <p className="mt-1.5 text-[0.95rem] font-semibold text-ink sm:mt-2 sm:text-[1.1rem]">{count}</p>
+                  <p className="text-[0.62rem] text-ink-2 sm:text-[0.7rem]">plans</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
@@ -42,7 +59,7 @@ export default function PricingPage() {
           return (
             <section key={group.slug} className="pb-16">
               <div className="shell">
-                <div className="mb-8 flex items-center gap-4"><ServiceIcon service="esim" size="lg" /><h2 className="text-[1.75rem] font-semibold text-ink">eSIM</h2></div>
+                <div className="mb-6 flex items-center gap-3 sm:mb-8 sm:gap-4"><ServiceIcon service="esim" size="lg" /><h2 className="text-[1.35rem] font-semibold text-ink sm:text-[1.75rem]">eSIM</h2></div>
                 <div className="rounded-2xl border border-line bg-white p-6">
                   <p className="text-ink-2">{live ? "Current eSIM plans, prices and coverage are listed in the dashboard." : "eSIM ordering is currently unavailable; prices and coverage cannot be confirmed."}</p>
                   {live && <Link href="/dashboard/esim" className="mt-4 inline-flex font-semibold text-lav-700 underline underline-offset-2">Browse current eSIM plans</Link>}
@@ -55,15 +72,15 @@ export default function PricingPage() {
         if (servicePlans.length === 0) return null;
 
         return (
-          <section key={group.slug} className="pb-16">
+          <section key={group.slug} className="pb-10 sm:pb-16">
             <div className="shell">
-              <div className="flex items-center gap-4 mb-8">
+              <div className="mb-4 flex items-center gap-3 sm:mb-8 sm:gap-4">
                 <ServiceIcon service={group.slug as any} size="lg" />
-                <h2 className="text-[1.75rem] font-semibold text-ink">
+                <h2 className="text-[1.2rem] font-semibold text-ink sm:text-[1.75rem]">
                   {group.name}
                 </h2>
               </div>
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
                 {servicePlans.map((plan) => {
                   // The fulfilment allowlist is the single source of truth for
                   // what can be sold: the plan page offers no way to pay for a
@@ -77,48 +94,49 @@ export default function PricingPage() {
                   return (
                   <div
                     key={plan.slug}
-                    className={`rounded-xl border p-3 sm:rounded-2xl sm:p-6 ${
+                    className={`rounded-xl border p-3 sm:rounded-2xl sm:p-5 ${
                       plan.popular
                         ? "border-lav-600 bg-white shadow-[var(--shadow-card)]"
                         : "border-line bg-white"
                     }`}
                   >
                     {plan.popular && (
-                      <div className="mb-4">
-                        <span className="inline-block rounded-full bg-lav-100 px-3 py-1 text-meta font-semibold text-lav-700">
+                      <div className="mb-3 sm:mb-4">
+                        <span className="inline-block rounded-full bg-lav-100 px-2.5 py-1 text-[0.56rem] font-semibold text-lav-700 sm:text-meta">
                           Most Popular
                         </span>
                       </div>
                     )}
-                    <h3 className="mb-1.5 flex items-center gap-1.5 text-[0.84rem] font-semibold text-ink sm:mb-2 sm:gap-2 sm:text-[1.1rem]">
-                      {hasCountryFlag(plan.region) && <CountryFlag region={plan.region} size={20} decorative />}
-                      {plan.name}
-                    </h3>
-                    <p className="text-meta text-ink-2 mb-2 sm:text-[0.86rem] sm:mb-4">
+                    <div className="mb-1.5 flex items-start justify-between gap-2 sm:mb-3">
+                      <h3 className="flex items-center gap-1.5 text-[0.7rem] font-semibold text-ink sm:gap-2 sm:text-[1.05rem]">
+                        {hasCountryFlag(plan.region) && <CountryFlag region={plan.region} size={15} decorative />}
+                        {plan.name}
+                      </h3>
+                      <span className="rounded-full bg-cream px-2 py-1 text-[0.53rem] font-semibold text-ink-3 sm:text-[0.7rem]">
+                        {plan.duration}
+                      </span>
+                    </div>
+                    <p className="mb-2 text-[0.63rem] text-ink-2 sm:mb-4 sm:text-[0.86rem]">
                       {plan.planLabel}
                     </p>
-                    <div className="mb-4">
-                      <span className="text-[1.1rem] font-bold text-ink sm:text-[2rem]">
+                    <div className="mb-2 sm:mb-4">
+                      <span className="text-[0.96rem] font-bold leading-none text-ink sm:text-[1.9rem]">
                         {formatNaira(plan.price)}
                       </span>
                       {plan.compareAt && (
-                        <span className="ml-1.5 text-meta text-ink-3 line-through sm:ml-2 sm:text-[1rem]">
+                        <span className="ml-1.5 text-[0.56rem] text-ink-3 line-through sm:ml-2 sm:text-[0.9rem]">
                           {formatNaira(plan.compareAt)}
                         </span>
                       )}
                     </div>
-                    <p className="text-meta text-ink-2 mb-3 sm:text-[0.86rem] sm:mb-6">
-                      {plan.duration}
-                    </p>
-                    <ul className="space-y-1 mb-3 sm:space-y-2 sm:mb-6">
-                      {/* Past two, the list is detail: on a phone it is most of
-                          what makes each card taller than the product deserves. */}
+                    <ul className="mb-3 space-y-1.5 sm:mb-5 sm:space-y-2">
+                      {/* Keep the list compact enough to feel portable on a phone. */}
                       {plan.features.map((feature, index) => (
                         <li
                           key={index}
-                          className={`${index >= 2 ? "hidden sm:flex" : "flex"} items-start gap-1.5 text-meta text-ink-2 sm:gap-2 sm:text-[0.86rem]`}
+                          className={`${index >= 1 ? "hidden sm:flex" : "flex"} items-start gap-1.5 text-[0.64rem] leading-relaxed text-ink-2 sm:gap-2 sm:text-[0.86rem]`}
                         >
-                          <Check className="h-3 w-3 text-lav-600 shrink-0 mt-0.5 sm:h-4 sm:w-4" />
+                          <Check className="mt-0.5 h-3 w-3 shrink-0 text-lav-600 sm:h-4 sm:w-4" />
                           {feature}
                         </li>
                       ))}
@@ -126,7 +144,7 @@ export default function PricingPage() {
                     {deliverable ? (
                       <Link
                         href={`/signup?plan=${plan.slug}`}
-                        className={`block w-full rounded-lg px-3 py-2 text-center text-meta font-semibold transition-colors sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.9rem] ${
+                        className={`block w-full rounded-lg px-3 py-2 text-center text-[0.72rem] font-semibold transition-colors sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.9rem] ${
                           plan.popular
                             ? "bg-lav-700 text-white hover:bg-lav-800"
                             : "border border-line bg-white text-ink hover:bg-cream"
@@ -135,8 +153,8 @@ export default function PricingPage() {
                         Get Started
                       </Link>
                     ) : (
-                      <p className="block w-full rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-center text-meta font-semibold leading-relaxed text-amber-900 sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.78rem]">
-                        This plan cannot be delivered yet, so it cannot be ordered or charged.
+                      <p className="block w-full rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-center text-[0.66rem] font-semibold leading-relaxed text-amber-900 sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.78rem]">
+                        Not deliverable yet
                       </p>
                     )}
                   </div>

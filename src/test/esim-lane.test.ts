@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   NOT_FOR_SALE,
   SERVICE_LANES,
@@ -27,7 +26,7 @@ import { LANES } from "@/lib/services/registry";
  * These assertions pin the fix on the data shape, not on the rendered copy.
  */
 
-const root = fileURLToPath(new URL("..", import.meta.url));
+const root = join(process.cwd(), "src");
 const read = (path: string) => readFileSync(join(root, path), "utf8");
 
 const esimLane = SERVICE_LANES.find((lane) => lane.id === "esim");

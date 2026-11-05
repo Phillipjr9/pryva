@@ -85,7 +85,7 @@ export async function POST(request: Request) {
             return lockedResponse(LOCKOUT_DURATION_MS);
           }
         } catch (error) {
-          console.error("[auth] failed to record a failed sign-in", error);
+          console.error("[auth] failed to record a failed sign-in", error instanceof Error ? error.message : String(error));
         }
       }
       return Response.json({ ok: false, error: "Those details don't match an account." }, { status: 401 });
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
     // factor is enrolled. It is best-effort — a bookkeeping failure must not
     // block a legitimate sign-in — and the lockout check above has already run.
     await clearFailedLogins(user.id).catch((error) => {
-      console.error("[auth] failed to clear failed sign-ins", error);
+      console.error("[auth] failed to clear failed sign-ins", error instanceof Error ? error.message : String(error));
     });
 
     // A correct password is only the first factor for an account that enabled a

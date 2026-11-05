@@ -42,10 +42,12 @@ export async function SecuritySection({ user }: { user: PublicUser }) {
   const headerList = await headers();
   const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
   const proto = headerList.get("x-forwarded-proto") ?? "https";
-  const passkeysAvailableHere = host
+  // Validate host to prevent SSRF: only allow safe hostname characters
+  const safeHost = /^[a-zA-Z0-9._:[-\]]+$/.test(host) ? host : "";
+  const passkeysAvailableHere = safeHost
     ? relyingPartyFor(
-        new Request(`${proto}://${host}/`, {
-          headers: { host, "x-forwarded-host": host, "x-forwarded-proto": proto },
+        new Request(`${proto}://${safeHost}/`, {
+          headers: { host: safeHost, "x-forwarded-host": safeHost, "x-forwarded-proto": proto },
         }),
       ) !== null
     : false;

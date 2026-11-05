@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -203,7 +202,7 @@ describe("what follows a purchase", () => {
 });
 
 describe("every money route walks the pipeline", () => {
-  const root = fileURLToPath(new URL("..", import.meta.url));
+  const root = join(process.cwd(), "src");
   const read = (path: string) => readFileSync(join(root, path), "utf8");
 
   const ROUTES = [

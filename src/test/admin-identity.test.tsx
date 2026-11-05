@@ -30,7 +30,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
 }));
 
-const root = fileURLToPath(new URL("..", import.meta.url));
+const root = join(process.cwd(), "src");
 const read = (path: string) => readFileSync(join(root, path), "utf8");
 
 const render = () =>

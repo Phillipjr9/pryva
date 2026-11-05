@@ -39,7 +39,7 @@ export function SecurityDashboard() {
         }
       })
       .catch((error) => {
-        if (!controller.signal.aborted) console.error("Failed to fetch security data:", error);
+        if (!controller.signal.aborted) console.error("Failed to fetch security data:", error instanceof Error ? error.message : String(error));
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);

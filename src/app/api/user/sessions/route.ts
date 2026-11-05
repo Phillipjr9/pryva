@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { sessions } from "@/db/schema";
 import { and, eq, gt, ne, desc } from "drizzle-orm";
 import { cookies } from "next/headers";
+import { timingSafeEqual } from "node:crypto";
 import { SESSION_COOKIE, SESSION_COOKIE_EMBEDDED, getCurrentUser } from "@/lib/identity/auth";
 import { isSameOriginMutation } from "@/lib/platform/net";
 import { isPreviewDatabase } from "@/lib/platform/demo-policy";
@@ -42,7 +43,16 @@ export async function GET(request: NextRequest) {
         id: s.id,
         createdAt: s.createdAt,
         expiresAt: s.expiresAt,
-        isCurrent: Boolean(currentToken) && s.token === currentToken,
+        isCurrent: currentToken !== null && (() => {
+          try {
+            return timingSafeEqual(
+              Buffer.from(s.token),
+              Buffer.from(currentToken as string),
+            );
+          } catch {
+            return false;
+          }
+        })(),
       })),
       count: activeSessions.length,
     }, { headers: { "Cache-Control": "private, no-store" } });

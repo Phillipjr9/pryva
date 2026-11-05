@@ -105,7 +105,7 @@ export async function GET(request: Request) {
       const referralCode = readReferralCodeFrom(request);
       if (referralCode) {
         await attributeReferral({ refereeId: created.id, code: referralCode }).catch((error) => {
-          console.error("[referrals] attribution failed", error);
+          console.error("[referrals] attribution failed", error instanceof Error ? error.message : String(error));
         });
       }
     }
@@ -115,7 +115,7 @@ export async function GET(request: Request) {
     await createSession(user.id, request);
     return clearCookies(relativeRedirect(next, 302));
   } catch (oauthError) {
-    console.error("Google sign-in failed:", oauthError);
+    console.error("Google sign-in failed:", oauthError instanceof Error ? oauthError.message : String(oauthError));
     return clearCookies(goToLogin("google-exchange"));
   }
 }

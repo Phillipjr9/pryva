@@ -20,10 +20,10 @@ export default function CookiePolicyPage() {
     <div>
       <section className="border-b border-line/70 bg-gradient-to-b from-cream to-white">
         <div className="shell py-14 sm:py-16">
-          <h1 className="text-[2.2rem] font-semibold tracking-tight text-ink sm:text-[2.6rem]">
+          <h1 className="text-[1.9rem] font-semibold tracking-tight text-ink sm:text-[2.5rem]">
             Cookie Policy
           </h1>
-          <p className="mt-3 max-w-2xl text-[0.98rem] leading-relaxed text-ink-2">
+          <p className="mt-3 max-w-2xl text-[0.94rem] leading-relaxed text-ink-2 sm:text-[0.98rem]">
             Pryva uses session and sign-in cookies. Third-party services may use their own cookies under their policies.
           </p>
         </div>
@@ -31,26 +31,26 @@ export default function CookiePolicyPage() {
 
       <section className="shell py-10">
         <div className="overflow-x-auto rounded-2xl border border-line bg-white">
-          <table className="w-full min-w-[34rem] text-left">
-            <thead className="bg-cream/70 text-meta uppercase tracking-[0.12em] text-ink-3">
+          <table className="w-full min-w-0 text-left">
+            <thead className="bg-cream/70 text-[0.68rem] uppercase tracking-[0.12em] text-ink-3 sm:text-meta">
               <tr>
-                <th className="px-4 py-3 font-semibold">Cookie</th>
-                <th className="px-4 py-3 font-semibold">Type</th>
-                <th className="px-4 py-3 font-semibold">Duration</th>
-                <th className="hidden px-4 py-3 font-semibold md:table-cell">Why</th>
+                <th className="px-3 py-3 font-semibold sm:px-4">Cookie</th>
+                <th className="px-3 py-3 font-semibold sm:px-4">Type</th>
+                <th className="px-3 py-3 font-semibold sm:px-4">Duration</th>
+                <th className="hidden px-3 py-3 font-semibold md:table-cell sm:px-4">Why</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line/70">
               {cookies.map((cookie) => (
                 <tr key={cookie.name} className="align-top">
-                  <td className="px-4 py-4 font-mono text-[0.8rem] text-ink">{cookie.name}</td>
-                  <td className="px-4 py-4">
-                    <span className="inline-flex rounded-full bg-lav-50 px-2.5 py-1 text-meta font-semibold text-lav-700">
+                  <td className="px-3 py-4 font-mono text-[0.72rem] text-ink sm:px-4 sm:text-[0.8rem]">{cookie.name}</td>
+                  <td className="px-3 py-4 sm:px-4">
+                    <span className="inline-flex rounded-full bg-lav-50 px-2.5 py-1 text-[0.72rem] font-semibold text-lav-700 sm:text-meta">
                       {cookie.type}
                     </span>
                   </td>
-                  <td className="px-4 py-4 text-[0.84rem] text-ink-2">{cookie.duration}</td>
-                  <td className="hidden px-4 py-4 text-[0.84rem] leading-relaxed text-ink-2 md:table-cell">
+                  <td className="px-3 py-4 text-[0.78rem] text-ink-2 sm:px-4 sm:text-[0.84rem]">{cookie.duration}</td>
+                  <td className="hidden px-3 py-4 text-[0.8rem] leading-relaxed text-ink-2 md:table-cell sm:px-4 sm:text-[0.84rem]">
                     {cookie.purpose}
                   </td>
                 </tr>

@@ -20,8 +20,11 @@ export const dynamic = "force-dynamic";
 export default async function ReferralsPage() {
   const user = await requireUser("/dashboard/referrals");
   const headerList = await headers();
+  const rawHost = headerList.get("host") ?? "localhost";
+  // Validate host to prevent SSRF: only allow safe hostname characters
+  const safeHost = /^[a-zA-Z0-9._:[-\]]+$/.test(rawHost) ? rawHost : "localhost";
   const origin = publicOrigin(
-    new Request(`https://${headerList.get("host") ?? "localhost"}/`, { headers: headerList }),
+    new Request(`https://${safeHost}/`, { headers: headerList }),
   );
   const overview = await referralOverview(user.id);
 

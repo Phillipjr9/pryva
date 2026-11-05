@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     const referralCode = readReferralCodeFrom(request, fields.ref);
     if (referralCode) {
       await attributeReferral({ refereeId: created.id, code: referralCode }).catch((error) => {
-        console.error("[referrals] attribution failed", error);
+        console.error("[referrals] attribution failed", error instanceof Error ? error.message : String(error));
       });
     }
     // Best effort: the account exists whether or not mail is configured, and the
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
     // Resend is down.
     // `created` returns only the id; `email` is the normalized address in scope.
     if (!operatorBootstrap) await issueEmailVerification(created.id, email, name).catch((error) => {
-      console.error("[auth] signup verification email failed", error);
+      console.error("[auth] signup verification email failed", error instanceof Error ? error.message : String(error));
     });
     return Response.json({ ok: true });
   } catch {

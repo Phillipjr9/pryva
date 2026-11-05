@@ -68,9 +68,14 @@ export function PaystackTopUpFlow({ balance, userId, onClose, testMode = false }
       });
       const data: unknown = await response.json();
       const result = data && typeof data === "object" && !Array.isArray(data) ? data as Record<string, unknown> : {};
-      if (!response.ok || result.ok !== true || !isSafePaystackCheckoutUrl(result.authorizationUrl) || typeof result.reference !== "string") {
+      if (!response.ok || result.ok !== true || typeof result.reference !== "string") {
         const message = typeof result.error === "string" && result.error.length <= 240 ? result.error : "Could not prepare a secure Paystack checkout.";
         throw new Error(message);
+      }
+      if (!isSafePaystackCheckoutUrl(result.authorizationUrl)) {
+        setStage("review");
+        setError("Could not prepare a secure Paystack checkout. No payment was opened here. Check your wallet history before trying again.");
+        return;
       }
       // A user never leaves for payment until their non-secret reference is
       // saved. Each reference has its own key; concurrent tabs cannot erase it.

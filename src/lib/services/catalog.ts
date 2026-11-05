@@ -101,20 +101,20 @@ const serviceDefinitions: Service[] = [
   {
     slug: "esim", name: "eSIM", shortName: "eSIM", href: "/esim", eyebrow: "Travel data",
     tagline: "Explore eSIM data plans.",
-    description: "Explore eSIM plans by region and data allowance. Availability varies by destination.",
-    intro: "Browse eSIM plans by region and data allowance, and check current availability before ordering.",
+    description: "Explore current eSIM plans by region and data allowance. Availability and delivery vary by destination and provider status.",
+    intro: "Browse eSIM plans by region and data allowance, then check live coverage and delivery status before ordering.",
     unit: "per data bundle", icon: "sim",
     highlights: [
       { title: "Check your device", body: "Confirm eSIM compatibility and carrier unlock requirements with your device and carrier." },
-      { title: "Review coverage", body: "Coverage and availability need provider confirmation before a live purchase." },
-      { title: "Not available yet", body: "eSIM plans cannot be delivered yet, so nothing here can be ordered or charged." },
+      { title: "Buy and install", body: "Pick a plan for your destination, pay from your wallet, and install from the activation code on the order." },
+      { title: "Current plans", body: "Review the live plans, data allowance and pricing shown in the dashboard for the destination you need." },
     ],
-    included: ["Catalog plan comparisons", "Naira pricing", "Coverage research"],
+    included: ["Live plan comparisons", "Naira pricing", "Coverage and delivery status"],
     goodFor: ["Travel planning", "Device compatibility", "Coverage research"],
     faqs: [
       { q: "Does my phone support eSIM?", a: "Compatibility depends on the model, region and carrier. Check your device and carrier documentation." },
       { q: "Can I choose a phone number with my eSIM?", a: "No. You choose a plan, but you cannot select a specific phone number. Check the plan details and contact support before buying if you need a number, calls or SMS." },
-      { q: "Can I activate an eSIM now?", a: "No. eSIM plans are not available for purchase yet." },
+      { q: "Can I activate an eSIM now?", a: "If a plan is available for your destination, you can order it from your wallet. Check the order for its delivery status and activation code once it is issued." },
     ],
   },
   {

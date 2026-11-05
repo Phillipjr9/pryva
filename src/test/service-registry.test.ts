@@ -1,6 +1,5 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { plans } from "@/lib/services/catalog";
@@ -28,7 +27,7 @@ import { SERVICE_LANES } from "@/lib/services/service-coverage";
  * reporting "nothing has ever been bought" for a product that is selling.
  */
 
-const root = fileURLToPath(new URL("..", import.meta.url));
+const root = join(process.cwd(), "src");
 
 function walk(dir: string): string[] {
   const files: string[] = [];

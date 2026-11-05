@@ -12,12 +12,10 @@ const routes = [
   "/gift-cards",
   "/digital-services",
   "/blog",
-  // These were published pages that no route list mentioned: the help centre
-  // was only linked from transactional email, and customer feedback from
-  // nowhere at all.
   "/help",
   "/testimonials",
   "/reviews",
+  "/referrals",
   "/status",
   "/terms",
   "/privacy",
