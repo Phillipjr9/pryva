@@ -25,6 +25,8 @@ export const ORDER_PROVIDERS = {
   accounts: "accounts",
   /** Digital gift cards and game vouchers delivered via FoxReload. */
   foxreload: "foxreload",
+  /** Social boosts placed on the configured SMM panel. */
+  smm: "smm",
   /** Hand-prepared item waiting on the admin fulfilment queue. */
   manual: "manual",
   /** eSIM profile bought through the gateway and installed from a QR code. */
@@ -69,3 +71,4 @@ export const ACCOUNTS_PROVIDER = ORDER_PROVIDERS.accounts;
 export const FOXRELOAD_PROVIDER = ORDER_PROVIDERS.foxreload;
 export const MANUAL_PROVIDER = ORDER_PROVIDERS.manual;
 export const ESIM_PROVIDER = ORDER_PROVIDERS.bitcall;
+export const SMM_PROVIDER = ORDER_PROVIDERS.smm;

@@ -9,7 +9,7 @@ import { refundRateLimiter } from "@/lib/platform/rate-limit";
 import { cancelUpstream } from "@/lib/services/fulfillment";
 import { flagReconciliation } from "@/lib/services/reconciliation";
 import { isUndeliveredSingleNumber, SINGLE_NUMBER_WINDOW } from "@/lib/services/refund-policy";
-import { SERVICE_TIMEOUTS } from "@/lib/services/service-timeouts";
+import { deliveryWindowMs } from "@/lib/services/registry";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +51,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return Response.json({ ok: false, error: "This order is already complete or refunded." }, { status: 409 });
     }
 
-    const cutoff = new Date(Date.now() - SERVICE_TIMEOUTS.numbers.delivery);
+    const cutoff = new Date(Date.now() - deliveryWindowMs("numbers"));
     const createdAt = new Date(order.createdAt).getTime();
     if (!isUndeliveredSingleNumber(order) || !Number.isFinite(createdAt) || createdAt > cutoff.getTime()) {
       // Rentals land here too: no upstream cancel exists for them, so a human

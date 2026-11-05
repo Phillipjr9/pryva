@@ -8,6 +8,7 @@ import {
   summariseLane,
   type OrderTally,
 } from "@/lib/services/service-coverage";
+import { LANES } from "@/lib/services/registry";
 
 /**
  * "The eSIM listing is empty" has to be answerable from the console.
@@ -103,12 +104,17 @@ describe("eSIM is a lane the console is accountable for", () => {
   });
 
   it("treats the gateway key as the gate, on the page as well as in the lane", () => {
+    // The page used to hold its own `switch` over lane ids, so the credential
+    // that decided a verdict lived in a second place. It now asks the lane's
+    // declared service, and `service-config.ts` is the only module that reads
+    // supplier keys. The intent is unchanged: eSIM's gate is the gateway key.
     const page = read("app/admin/(console)/services/page.tsx");
-    expect(page).toContain("isBitcallConfigured");
-    // Whitespace-normalised so a comment added inside the case does not fail it.
-    const compressed = page.replace(/\s+/g, " ");
-    expect(compressed).toContain('case "esim":');
-    expect(compressed).toMatch(/case "esim":[^}]*return isBitcallConfigured\(\)/);
+    expect(page).toContain("laneConfigured(spec.id)");
+    expect(page).not.toContain("isBitcallConfigured");
+
+    const config = read("lib/services/service-config.ts");
+    expect(config).toMatch(/bitcall: isBitcallConfigured/);
+    expect(LANES.find((lane) => lane.id === "esim")?.configuredBy).toBe("esim");
   });
 
   it("filters the stuck-order sweep by service too", () => {

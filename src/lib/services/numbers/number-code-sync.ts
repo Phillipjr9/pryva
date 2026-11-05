@@ -8,7 +8,7 @@ import { checkFleexaSms } from "@/lib/providers/fleexa";
 import { logger } from "@/lib/platform/logger";
 import { NUMBER_PROVIDERS } from "@/lib/services/order-providers";
 import { SINGLE_NUMBER_WINDOW } from "@/lib/services/refund-policy";
-import { SERVICE_TIMEOUTS } from "@/lib/services/service-timeouts";
+import { deliveryWindowMs } from "@/lib/services/registry";
 
 /**
  * Reading a number's code, and sweeping for ones nobody is watching.
@@ -81,7 +81,7 @@ export async function readNumberCode(order: {
 export async function sweepPendingNumberCodes(
   limit = 25,
 ): Promise<{ checked: number; delivered: number; pending: number; failed: number }> {
-  const cutoff = new Date(Date.now() - SERVICE_TIMEOUTS.numbers.delivery);
+  const cutoff = new Date(Date.now() - deliveryWindowMs("numbers"));
   const candidates = await db
     .select()
     .from(orders)

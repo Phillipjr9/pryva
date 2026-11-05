@@ -37,7 +37,7 @@ beforeAll(async () => {
       productName: "Nigeria Starter", planLabel: "1GB", region: "Nigeria",
       duration: "30 days", amount: 4500, status: "refunded",
     },
-  ];
+  ] as const;
   for (const row of orderRows) {
     await database.db.insert(schema.orders).values({ ...row, userId, provider: "preview" });
   }

@@ -1,3 +1,5 @@
+import type { ServiceId } from "@/lib/services/registry";
+
 /**
  * What a service can actually do right now.
  *
@@ -49,17 +51,8 @@ export const SERVICE_STATE_DOT: Record<ServiceState, string> = {
 };
 
 export type ServiceReadinessEntry = {
-  id:
-    | "verification"
-    | "social"
-    | "numbers"
-    | "esim"
-    | "proxies"
-    | "email"
-    | "accounts"
-    | "subscriptions"
-    | "data"
-    | "tools";
+  /** The registry is the vocabulary; this file must not keep a second copy. */
+  id: ServiceId;
   label: string;
   state: ServiceState;
   /** One sentence a customer can act on, shown beside the category. */

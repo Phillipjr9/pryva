@@ -39,7 +39,7 @@ async function seedOrder(userId: string, amount: number, status = "active", refu
   await database.insert(orders).values({
     reference,
     userId,
-    service: "virtual-numbers",
+    service: "numbers",
     productSlug: "netflix-otp",
     productName: "Netflix",
     planLabel: "One code",

@@ -1,5 +1,15 @@
 import "server-only";
-import { ESIM_PROVIDER, NUMBER_PROVIDERS } from "@/lib/services/order-providers";
+
+import {
+  ACCOUNTS_PROVIDER,
+  ESIM_PROVIDER,
+  MANUAL_PROVIDER,
+  NUMBER_PROVIDERS,
+  SMM_PROVIDER,
+} from "@/lib/services/order-providers";
+import { LANES, LANE_IDS, SERVICES, type LaneId, type OrderServiceTag } from "@/lib/services/registry";
+
+export type { LaneId };
 
 /**
  * Can a customer actually receive what this shop sells?
@@ -24,8 +34,6 @@ import { ESIM_PROVIDER, NUMBER_PROVIDERS } from "@/lib/services/order-providers"
  * The summarising is pure so it can be pinned by tests without a database.
  */
 
-export type LaneId = "numbers" | "esim" | "accounts" | "boosts" | "scheduled";
-
 export type LaneSpec = {
   id: LaneId;
   label: string;
@@ -35,12 +43,12 @@ export type LaneSpec = {
    * The `orders.service` values this lane owns, when a provider is shared.
    *
    * eSIM and virtual numbers are both delivered through the same gateway, so
-   * `orders.provider` cannot tell them apart. Without this, an eSIM order would
-   * be counted as a number and the eSIM lane would read "nothing has ever been
-   * bought" forever — the exact shape of the bug where the console said eSIM was
-   * not for sale while customers were buying it.
+   * `orders.provider` cannot tell them apart. Deriving the filter from the
+   * registry means the lane that owns a service is decided in one place, and a
+   * second family on the same gateway cannot silently inherit the first one's
+   * delivery history.
    */
-  services?: string[];
+  services?: OrderServiceTag[];
   /**
    * How long an order may sit in `processing`/`active`/`review` before it is
    * stale. A number should resolve in minutes; a boost of ten thousand followers
@@ -53,57 +61,49 @@ export type LaneSpec = {
   recovery: string;
 };
 
-export const SERVICE_LANES: LaneSpec[] = [
-  {
-    id: "numbers",
-    label: "Virtual numbers & rentals",
-    // Every supplier that can sell a number: an order delivered from the second
-    // one is still this lane's responsibility, and leaving it out would let it
-    // go stale with no page saying so.
-    providers: [...NUMBER_PROVIDERS],
-    staleHours: 2,
-    delivery: "The number is issued at purchase and the code is polled onto the order page.",
-    recovery: "A number that never delivers is refunded by the nightly sweep and released upstream.",
-  },
-  {
-    id: "esim",
-    label: "eSIM data",
-    // eSIM is bought through the same gateway that sells numbers, so
-    // `provider === "bitcall"` alone would attribute every eSIM order to the
-    // numbers lane and every number to this one. The provider list here is
-    // therefore filtered by `services` below: the two lanes share a provider and
-    // are told apart by what was actually bought.
-    providers: [ESIM_PROVIDER],
-    services: ["esim"],
-    staleHours: 1,
-    delivery: "The profile is issued at purchase and the activation code renders on the order page, with the QR emailed.",
-    recovery: "A purchase whose supplier call is ambiguous is parked for review rather than charged twice; a refusal is refunded.",
-  },
-  {
-    id: "accounts",
-    label: "Accounts marketplace",
-    providers: ["accounts", "manual"],
-    staleHours: 48,
-    delivery: "Credentials are written onto the order page the moment the supplier returns them.",
-    recovery: "An ambiguous supplier call parks the order for review instead of charging twice; a refusal is refunded.",
-  },
-  {
-    id: "boosts",
-    label: "Social boosting",
-    providers: ["smm"],
-    staleHours: 168,
-    delivery: "Opening the order reads the panel's status back; progress is shown on the order page.",
-    recovery: "A partial or cancelled boost goes to review for a manual refund — never an automatic one.",
-  },
-  {
-    id: "scheduled",
-    label: "Scheduled purchases",
-    providers: ["scheduled"],
-    staleHours: 48,
-    delivery: "The schedule buys the same plan when it runs.",
-    recovery: "Disabled outside the preview database; nothing is charged while it is off.",
-  },
-];
+/**
+ * Which supplier credentials feed each lane.
+ *
+ * The provider strings stay here, next to the rest of the server-only supplier
+ * knowledge, rather than in the registry — the registry is imported by client
+ * components, and a provider name is the one thing that must never reach them.
+ */
+const LANE_PROVIDERS: Record<LaneId, readonly string[]> = {
+  numbers: NUMBER_PROVIDERS,
+  esim: [ESIM_PROVIDER],
+  accounts: [ACCOUNTS_PROVIDER, MANUAL_PROVIDER],
+  boosts: [SMM_PROVIDER],
+};
+
+/** Providers this lane shares with another, which is why it needs a service filter. */
+function sharedProviders(id: LaneId): string[] {
+  return LANE_PROVIDERS[id].filter((provider) =>
+    LANE_IDS.some((other) => other !== id && LANE_PROVIDERS[other].includes(provider)),
+  );
+}
+
+/**
+ * The lanes the console scores, built from the registry.
+ *
+ * Scheduled purchases are deliberately not a lane. They do not have a supplier
+ * of their own: a run buys the real plan and writes the real provider, so its
+ * order is counted by whichever lane sold it. The old `scheduled` lane keyed on
+ * provider `scheduled`, which no order has written since scheduled runs started
+ * buying through `fulfillPlan` — a lane that could only ever report "nothing has
+ * ever been bought", on a page whose entire purpose is not to say that.
+ */
+export const SERVICE_LANES: LaneSpec[] = LANES.map((lane) => ({
+  id: lane.id,
+  label: lane.label,
+  providers: [...LANE_PROVIDERS[lane.id]],
+  services:
+    sharedProviders(lane.id).length > 0
+      ? SERVICES.filter((service) => service.lane === lane.id).flatMap((service) => [...service.orderServices])
+      : undefined,
+  staleHours: lane.staleHours,
+  delivery: lane.delivery,
+  recovery: lane.recovery,
+}));
 
 /**
  * What the shop deliberately does not sell, and why.
@@ -197,7 +197,7 @@ export function summariseLane(args: {
 
   for (const tally of tallies) {
     if (!spec.providers.includes(tally.provider)) continue;
-    if (spec.services && tally.service !== undefined && !spec.services.includes(tally.service)) continue;
+    if (spec.services && tally.service !== undefined && !spec.services.some((tag) => tag === tally.service)) continue;
     orders += tally.total;
     const latest = toDate(tally.latest);
     if (tally.status === "delivered") {

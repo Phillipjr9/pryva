@@ -242,7 +242,7 @@ describe("velocity ceilings", () => {
       database.insert(orders).values({
         reference: `ORD-${index}`,
         userId: USER,
-        service: "virtual-numbers",
+        service: "numbers",
         productSlug: "netflix-otp",
         productName: "Netflix",
         planLabel: "One code",
@@ -265,7 +265,7 @@ describe("velocity ceilings", () => {
     await database.insert(orders).values({
       reference: "ORD-OLD",
       userId: USER,
-      service: "virtual-numbers",
+      service: "numbers",
       productSlug: "netflix-otp",
       productName: "Netflix",
       planLabel: "One code",
@@ -356,7 +356,7 @@ describe("referral abuse", () => {
     await database.insert(orders).values({
       reference: "ORD-REF",
       userId: REFEREE,
-      service: "virtual-numbers",
+      service: "numbers",
       productSlug: "netflix-otp",
       productName: "Netflix",
       planLabel: "One code",
