@@ -50,9 +50,14 @@ legacy migrations are excluded because they assume a different old schema. Back
 up the database first. The production build is configured to run migrations before
 building; preview builds do not. Migrations must therefore be reviewed for
 compatibility with the old application, which may still be serving traffic.
-Migration 0034 leaves existing closed-account snapshots, passkeys and pending
-email-change requests untouched. The current email worker skips closed accounts;
-old sensitive records require a separately authorized privacy review.
+The current version of migration 0034 leaves existing closed-account snapshots,
+passkeys and pending email-change requests untouched. An earlier version was
+already applied in production and contained deletes for those closed-account
+records; deployment logs do not report how many rows matched. The migration
+ledger does not re-run an edited file, and this change cannot restore deleted
+rows. Any investigation or restoration needs separate owner authorization.
+The current email worker skips closed accounts; remaining historical sensitive
+records also require a separately authorized privacy review.
 
 Pricing
 -------

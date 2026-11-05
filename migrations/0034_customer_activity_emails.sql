@@ -66,7 +66,9 @@ DROP TRIGGER IF EXISTS email_change_request_active_owner ON email_change_request
 CREATE TRIGGER email_change_request_active_owner BEFORE INSERT OR UPDATE OF user_id ON email_change_requests
   FOR EACH ROW EXECUTE FUNCTION security_record_owner_must_be_active();
 
--- Historical closed-account rows are deliberately left unchanged. The new
+-- An earlier version containing historical deletions was already applied in
+-- production. Editing this file does not rerun it or restore any deleted rows.
+-- This version leaves historical closed-account rows unchanged. The new
 -- worker skips their queued mail; reviewing or removing old snapshots and
 -- credentials requires separate owner authorization. New closures still remove
 -- their own sensitive records in the account-closure transaction.
