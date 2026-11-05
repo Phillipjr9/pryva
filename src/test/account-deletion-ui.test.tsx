@@ -41,10 +41,13 @@ describe("closing an account from settings", () => {
     open();
 
     expect(screen.getByText("Removed")).toBeTruthy();
-    expect(screen.getAllByText(/kept, without your name/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/records kept/i)).toBeTruthy();
+    expect(screen.getByText(/may still contain information that identifies you/i)).toBeTruthy();
     expect(screen.getByText(/your name, email address and password/i)).toBeTruthy();
     expect(screen.getByText(/orders, wallet history, deposits and withdrawals/i)).toBeTruthy();
     expect(screen.getAllByText(/cannot be undone/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/one attempt to email a closure confirmation/i)).toBeTruthy();
+    expect(screen.getByText(/delivery is not guaranteed/i)).toBeTruthy();
   });
 
   it("keeps the button disabled until the address is typed and understood", () => {
@@ -90,6 +93,18 @@ describe("closing an account from settings", () => {
     expect(refresh).toHaveBeenCalled();
   });
 
+  it("does not claim nothing changed after an ambiguous connection failure", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("connection dropped")));
+    render(<DangerZone email={EMAIL} walletBalance={0} hasPassword />);
+    open();
+    fireEvent.change(screen.getByLabelText(/type .* to confirm/i), { target: { value: EMAIL } });
+    fireEvent.change(screen.getByLabelText(/your password/i), { target: { value: "pw" } });
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: /delete my account permanently/i }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/couldn't confirm whether/i));
+    expect(screen.getByRole("alert").textContent).not.toMatch(/nothing was changed/i);
+  });
+
   it("does not ask a Google account for a password it never had", () => {
     render(<DangerZone email={EMAIL} walletBalance={0} hasPassword={false} />);
     open();
@@ -122,6 +137,31 @@ describe("closing an account from settings", () => {
     expect(submit.disabled).toBe(false);
   });
 
+  it("requires a fresh acknowledgement when the displayed balance changes", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ ok: true, deleted: true, retained: {}, forfeited: 6000 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { rerender } = render(<DangerZone email={EMAIL} walletBalance={4500} hasPassword />);
+    open();
+    fireEvent.change(screen.getByLabelText(/type .* to confirm/i), { target: { value: EMAIL } });
+    fireEvent.change(screen.getByLabelText(/your password/i), { target: { value: "pw" } });
+    for (const box of screen.getAllByRole("checkbox")) fireEvent.click(box);
+    const submit = screen.getByRole("button", { name: /delete my account permanently/i }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(false);
+
+    rerender(<DangerZone email={EMAIL} walletBalance={6000} hasPassword />);
+    const newAmount = screen.getByRole("checkbox", { name: /i understand my ₦6,000/i }) as HTMLInputElement;
+    expect(newAmount.checked).toBe(false);
+    expect(submit.disabled).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+    fireEvent.click(newAmount);
+    expect(submit.disabled).toBe(false);
+    fireEvent.click(submit);
+    await waitFor(() => expect(screen.getByText(/your account is closed/i)).toBeTruthy());
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({ forfeitAcknowledged: true, forfeitAmount: 6000 });
+    expect(screen.getByText(/may still contain identifying information/i)).toBeTruthy();
+  });
+
   it("sends the forfeiture acknowledgement, and only when there is something to forfeit", async () => {
     const fetchMock = vi.fn(async () =>
       jsonResponse({ ok: true, deleted: true, retained: {}, forfeited: 4500 }),
@@ -141,6 +181,7 @@ describe("closing an account from settings", () => {
       confirm: EMAIL,
       password: "pw",
       forfeitAcknowledged: true,
+      forfeitAmount: 4500,
     });
     expect(screen.getByText("Balance forfeited")).toBeTruthy();
     expect(screen.getByText("₦4,500")).toBeTruthy();
@@ -198,11 +239,20 @@ describe("closing an account from settings", () => {
     await waitFor(() => expect(screen.getByRole("link", { name: /sign in again/i })).toBeTruthy());
   });
 
-  it("lets the customer back out without doing anything", () => {
-    render(<DangerZone email={EMAIL} walletBalance={0} hasPassword />);
+  it("clears the password and consent when the customer backs out", () => {
+    render(<DangerZone email={EMAIL} walletBalance={4500} hasPassword />);
     open();
+    fireEvent.change(screen.getByLabelText(/type .* to confirm/i), { target: { value: EMAIL } });
+    fireEvent.change(screen.getByLabelText(/your password/i), { target: { value: "pw" } });
+    for (const box of screen.getAllByRole("checkbox")) fireEvent.click(box);
+    expect((screen.getByRole("button", { name: /delete my account permanently/i }) as HTMLButtonElement).disabled).toBe(false);
+
     fireEvent.click(screen.getByRole("button", { name: /keep my account/i }));
     expect(screen.queryByText(/delete my account permanently/i)).toBeNull();
-    expect(screen.getByRole("button", { name: /show me what happens/i })).toBeTruthy();
+    open();
+    expect((screen.getByLabelText(/type .* to confirm/i) as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText(/your password/i) as HTMLInputElement).value).toBe("");
+    for (const box of screen.getAllByRole("checkbox")) expect((box as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByRole("button", { name: /delete my account permanently/i }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

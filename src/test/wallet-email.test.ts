@@ -217,6 +217,26 @@ describe("wallet email outbox on embedded PostgreSQL", () => {
 });
 
 describe("wallet email privacy", () => {
+  it("sends one gift-redemption wallet receipt with distinct art and no bearer code", async () => {
+    const code = "PRYVA-ABCD-EFGH-JKLM";
+    await entry("credit", `GIFT-${code}`, `Gift card redemption: ${code}`);
+    const fetchMock = vi.fn().mockResolvedValue(accepted());
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await dispatchWalletEmails(2)).toMatchObject({ sent: 1 });
+    const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
+    expect(body.subject).toMatch(/gift card redeemed/i);
+    expect(body.html).toContain("hero-gift-redeemed.jpg");
+    expect(body.text).toMatch(/credited to your wallet/i);
+    expect(body.text + body.html + body.subject).not.toContain(code);
+    expect(await database.select().from(schema.walletEmailOutbox)).toHaveLength(1);
+  });
+
+  it("does not call an arbitrary credit a gift redemption based on its description alone", () => {
+    const mail = makeWalletEmail({ kind: "wallet", type: "credit", amount: 1000, reference: "TOP-random", description: "Gift card redemption: PRYVA-ABCD-EFGH-JKLM", createdAt: new Date() }, "buyer@example.test", "Pryva <mail@pryva.test>");
+    expect(mail.subject).toMatch(/wallet credit/i);
+    expect(mail.html).toContain("hero-wallet-credit.jpg");
+    expect(mail.text + mail.html).not.toContain("PRYVA-ABCD-EFGH-JKLM");
+  });
   it("does not leak arbitrary references or bank details in wallet notifications", () => {
     const event = { kind: "wallet" as const, type: "withdrawal", amount: 5000, description: "Withdrawal to Bank (1234567890)", reference: "BANK-1234567890", createdAt: new Date("2026-01-01T00:00:00Z") };
     const mail = makeWalletEmail(event, "buyer@example.test", "Pryva <mail@pryva.test>");
@@ -229,7 +249,7 @@ describe("wallet email privacy", () => {
     const mail = makeWalletEmail(event, "buyer@example.test", "Pryva <mail@pryva.test>");
     expect(mail.subject).not.toContain("[TEST]");
     expect(mail.text).not.toContain("TEST MODE");
-    expect(mail.html).toContain("/images/email/hero-wallet.jpg");
+    expect(mail.html).toContain("/images/email/hero-wallet-debit.jpg");
     expect(mail.text).toContain("wallet movement only");
     expect(mail.text + mail.html).not.toContain("PRYVA-SECRET-CODE");
   });

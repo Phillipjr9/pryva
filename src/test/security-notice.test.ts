@@ -49,6 +49,8 @@ describe("the four things worth an email", () => {
     expect(notice.subject).toMatch(/sign-in email was changed/i);
     expect(notice.text).toMatch(/no longer the one used to sign in/i);
     expect(notice.text).toMatch(/contact support immediately/i);
+    expect(notice.html).toContain('/contact"');
+    expect(notice.html).not.toContain('/forgot-password');
   });
 
   it("distinguishes two-factor being switched on from switched off", () => {
@@ -62,7 +64,7 @@ describe("the four things worth an email", () => {
   it("uses different artwork for each security event", () => {
     const at = new Date("2026-03-04T09:05:00Z");
     const expected = {
-      password_changed: "password",
+      password_changed: "password-changed",
       email_changed: "email-changed",
       two_factor_enabled: "two-factor-on",
       two_factor_disabled: "two-factor-off",

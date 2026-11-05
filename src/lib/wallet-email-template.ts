@@ -1,4 +1,4 @@
-import { brandedNotificationEmail } from "@/lib/email-templates";
+import { brandedNotificationEmail, type NotificationHero } from "@/lib/email-templates";
 
 export type WalletEmailEvent =
   | { kind: "wallet"; type: string; amount: number; reference: string; description: string; createdAt: Date }
@@ -61,7 +61,7 @@ export function makeWalletEmail(event: WalletEmailEvent, recipient: string, send
   let title: string;
   let intro: string;
   let eyebrow = "Wallet activity";
-  let hero: "wallet" | "withdrawal" | "order" | "refund" | "purchase-receipt" = "wallet";
+  let hero: NotificationHero = "wallet";
   let amountLabel = "Amount";
   let ctaPath = "/dashboard/wallet";
   let ctaLabel = "View my wallet";
@@ -73,6 +73,16 @@ export function makeWalletEmail(event: WalletEmailEvent, recipient: string, send
       intro = "Your wallet top-up was confirmed and credited. This confirms the wallet credit, not a bank or card statement.";
       eyebrow = "Top-up successful";
       amountLabel = "Amount added";
+    } else if (event.type === "credit" && /^GIFT-(PRYVA-[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){2})$/.test(event.reference)
+      && event.description === `Gift card redemption: ${event.reference.slice(5)}`) {
+      // This is the existing, transactional wallet credit, not a second email.
+      // Neither its bearer code nor an arbitrary ledger description is exposed.
+      subject = "Gift card redeemed";
+      title = "Your gift card was redeemed";
+      intro = "The gift card amount was credited to your wallet. The card's code is not included in this email.";
+      eyebrow = "Gift card redeemed";
+      hero = "gift-redeemed";
+      amountLabel = "Amount credited";
     } else if (event.type === "refund") {
       subject = "Wallet refund credited";
       title = "A refund reached your wallet";
@@ -91,11 +101,13 @@ export function makeWalletEmail(event: WalletEmailEvent, recipient: string, send
       subject = "Wallet debit recorded";
       title = "A wallet debit was recorded";
       intro = "This confirms the wallet movement only; check your order for delivery or review status.";
+      hero = "wallet-debit";
       amountLabel = "Amount debited";
     } else if (event.type === "credit") {
       subject = "Wallet credit recorded";
       title = "A credit reached your wallet";
       intro = "A credit was recorded on your wallet. Check your transaction history for the latest details.";
+      hero = "wallet-credit";
       amountLabel = "Amount credited";
     } else {
       subject = "Wallet activity recorded";
@@ -107,7 +119,7 @@ export function makeWalletEmail(event: WalletEmailEvent, recipient: string, send
     title = "Your first Pryva purchase";
     intro = "Thank you for choosing Pryva. Your purchase has been recorded; open your account for its current status and details.";
     eyebrow = "A first worth celebrating";
-    hero = "order";
+    hero = "first-purchase";
     amountLabel = "Purchase amount";
     ctaPath = "/dashboard";
     ctaLabel = "Open my account";
@@ -137,18 +149,22 @@ export function makeWalletEmail(event: WalletEmailEvent, recipient: string, send
       subject = "Withdrawal under review";
       title = "Your withdrawal is being processed";
       intro = "This is not confirmation of a bank payout. Check your requests for updates.";
+      hero = "withdrawal-processing";
     } else if (event.kind === "withdrawal_completed") {
       subject = "Withdrawal marked complete";
       title = "Your withdrawal was marked complete";
       intro = "Your withdrawal was marked complete. Check your bank for the final receipt. This email is not a bank statement.";
+      hero = "withdrawal-completed";
     } else if (event.kind === "withdrawal_failed") {
       subject = "Withdrawal could not be completed";
       title = "Your withdrawal could not be completed";
       intro = "The withdrawal did not complete. The amount and fee were returned to your wallet; check your wallet and withdrawal history for details.";
+      hero = "withdrawal-failed";
     } else {
       subject = "Withdrawal request rejected";
       title = "Your withdrawal request was rejected";
       intro = "Check your wallet and withdrawal history for details. Any wallet refund is recorded separately.";
+      hero = "withdrawal-rejected";
     }
   }
 

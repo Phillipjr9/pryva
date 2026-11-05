@@ -32,7 +32,7 @@ const COPY: Record<SecurityEvent, { subject: string; heading: string; body: stri
     subject: "Your Pryva password was changed",
     heading: "Your password was changed",
     body: "Every other session was signed out. If this wasn't you, reset your password immediately and contact support.",
-    hero: "password",
+    hero: "password-changed",
   },
   email_changed: {
     subject: "Your Pryva sign-in email was changed",
@@ -78,8 +78,10 @@ export function buildSecurityNotice(event: SecurityEvent, name: string, when: Da
     hero: copy.hero,
     heroAlt: copy.heading,
     rows: [{ label: "Recorded", value: at }],
-    ctaPath: event === "password_changed" || event === "email_changed" ? "/forgot-password" : "/dashboard/security",
-    ctaLabel: event === "password_changed" || event === "email_changed" ? "Secure my account" : "Review security",
+    // Email-change notices go to the former address, which can no longer reset
+    // the account. The public contact route works even if the owner cannot sign in.
+    ctaPath: event === "email_changed" ? "/contact" : event === "password_changed" ? "/forgot-password" : "/dashboard/security",
+    ctaLabel: event === "email_changed" ? "Contact support" : event === "password_changed" ? "Secure my account" : "Review security",
     note: "Pryva will never ask for your password or security codes by email. If you didn't make this change, contact support immediately.",
   });
 }
