@@ -9,7 +9,7 @@ import {
   type SmmService,
 } from "@/lib/providers/smm-panel";
 import { PROMOTION_EXAMPLES, type ExplorerItem } from "@/lib/services/service-explorer";
-import { normalizeCurrency, retailPerThousand, totalForQuantity } from "@/lib/services/boosts/smm-pricing";
+import { boostRetailIsSane, normalizeCurrency, retailPerThousand, totalForQuantity } from "@/lib/services/boosts/smm-pricing";
 
 export type BoostSnapshot = {
   services: SmmService[];
@@ -186,6 +186,11 @@ export type BoostListing = {
   currency: string | null;
 };
 
+/** A retail price only survives if it is plausible; see `boostRetailIsSane`. */
+function sane(perThousand: number | null): number | null {
+  return boostRetailIsSane(perThousand) ? perThousand : null;
+}
+
 export function describeBoost(service: SmmService, snapshotCurrency: string | null): BoostListing {
   const platform = PROMOTION_EXAMPLES.find((candidate) =>
     matchesPlatform(`${service.name ?? ""} ${service.category ?? ""}`, candidate.name));
@@ -206,7 +211,10 @@ export function describeBoost(service: SmmService, snapshotCurrency: string | nu
     tag,
     platform: platform?.name ?? null,
     artwork: platform ? { kind: "brand", name: platform.brand } : { kind: "service", name: "bulk" },
-    perThousand: retailPerThousand({ wholesaleRatePerThousand: service.ratePer1000, currency }),
+    // Out-of-band prices are treated exactly like unpriceable ones. A price that
+    // is wrong by a factor of a thousand is worse than no price: it is a Buy
+    // button that charges it.
+    perThousand: sane(retailPerThousand({ wholesaleRatePerThousand: service.ratePer1000, currency })),
     min: service.min,
     max: service.max,
     currency: normalizeCurrency(currency),

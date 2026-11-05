@@ -77,6 +77,33 @@ export function retailPerThousand(input: {
   return Math.max(1, Math.ceil(naira * (1 + markup / 100)));
 }
 
+/**
+ * The most a thousand units of anything here may retail for, in naira.
+ *
+ * A sanity rail, not a business rule. Every price on this page is derived from a
+ * wholesale rate times a markup times an exchange rate, and each of those is
+ * configuration. One wrong digit in any of them — a naira rate read as dollars, an
+ * fx figure applied twice, a slug of extra zeroes — produces a number that is not
+ * merely high but wrong by a factor of a thousand, and it would otherwise be shown
+ * as a price with a Buy button and charged to a wallet.
+ *
+ * A genuinely expensive premium service at ~$40 per thousand costs about ₦75,000
+ * at ₦1,400/$, so a million naira per thousand is far outside anything real.
+ */
+export const BOOST_RETAIL_CEILING_PER_THOUSAND = 1_000_000;
+
+/**
+ * Is this retail price plausible enough to show?
+ *
+ * Null (unpriceable) is handled by the caller. Out-of-band prices are treated the
+ * same way: a listing with no price is read-only and honest, wheras a listing with
+ * a wrong price takes money for something the shop did not mean to sell.
+ */
+export function boostRetailIsSane(perThousand: number | null): boolean {
+  if (perThousand === null || !Number.isFinite(perThousand)) return false;
+  return perThousand >= 1 && perThousand <= BOOST_RETAIL_CEILING_PER_THOUSAND;
+}
+
 /** What a specific quantity costs at a given retail price per 1,000. */
 export function totalForQuantity(perThousand: number, quantity: number): number {
   if (!Number.isSafeInteger(quantity) || quantity <= 0) return 0;

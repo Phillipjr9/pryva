@@ -104,6 +104,32 @@ export function isFundingFailure(error: unknown): boolean {
 }
 
 /**
+ * Codes that mean "this supplier was never usable, because it is set up wrong".
+ *
+ * Distinct from both an outage and a funding gap: an invalid key or endpoint does
+ * not heal, so a customer retrying will get the same answer forever.
+ */
+const CONFIGURATION_CODES: ReadonlySet<string> = new Set([
+  "NO_API_KEY", "NO_KEY_ID", "NO_API_SECRET", "MALFORMED_SECRET",
+  "INVALID_API_KEY", "AUTHENTICATION_REQUIRED", "FORBIDDEN",
+  "NO_API_URL", "NO_BASE_URL", "INVALID_API_URL", "INVALID_BASE_URL",
+]);
+
+/**
+ * Did this failure mean "nobody configured this supplier correctly"?
+ *
+ * The third member of the family, and the last one that was still being rendered
+ * as a transient error. A rejected credential is an operator's afternoon, not a
+ * customer's retry: the same request will fail identically until the key is
+ * replaced.
+ */
+export function isConfigurationFailure(error: unknown): boolean {
+  if (!isProviderError(error)) return false;
+  if (error.status === 401 || error.status === 403) return true;
+  return CONFIGURATION_CODES.has(error.code);
+}
+
+/**
  * Does an upstream refusal say, in its own words, that the account cannot pay?
  *
  * Suppliers refuse in prose far more often than in status codes — an unfunded

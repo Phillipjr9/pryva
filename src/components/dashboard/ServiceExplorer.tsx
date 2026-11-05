@@ -182,9 +182,20 @@ type LiveState = {
   live: boolean;
   partial: boolean;
   failed: boolean;
-  reason: "environment" | "unconfigured" | "funding" | "throttled" | "error" | null;
+  reason: "environment" | "unconfigured" | "funding" | "configuration" | "throttled" | "error" | null;
   fetchedAt: string | null;
 };
+
+/**
+ * Can this failure be cleared by asking again?
+ *
+ * Outages and throttles can. A closed environment, a missing supplier, an empty
+ * balance and a rejected credential cannot — those are the shop's to fix, and a
+ * Retry button on them is a button that lies.
+ */
+function retryCanHelp(reason: LiveState["reason"]): boolean {
+  return reason !== "funding" && reason !== "configuration" && reason !== "environment" && reason !== "unconfigured";
+}
 
 type CatalogPayload = {
   ok?: boolean; country?: string; live?: boolean; partial?: boolean;
@@ -208,6 +219,12 @@ function liveUnavailableCopy(reason: LiveState["reason"]) {
     // Out of stock at the source, not out of order. Nothing here is the
     // customer's to fix, and no amount of retrying restocks it.
     lead: "Live listings are paused while we restock.",
+    rest: "Nothing is wrong with your account or your orders; check back soon.",
+  };
+  if (reason === "configuration") return {
+    // A credential the shop has to replace. Retrying is not a customer action,
+    // and saying "couldn't be loaded" would blame their connection for it.
+    lead: "Live listings are paused while we finish setup.",
     rest: "Nothing is wrong with your account or your orders; check back soon.",
   };
   return {
@@ -298,7 +315,8 @@ export function ServiceExplorer({
         // `live !== false` keeps older payloads (which predate the flag) working.
         // "partial" travels as `partial: true`; `reason` names why, in the
         // customer's terms: closed environment, no supplier, or out of funds.
-        const reason = data.reason === "environment" || data.reason === "unconfigured" || data.reason === "funding"
+        const reason = data.reason === "environment" || data.reason === "unconfigured"
+          || data.reason === "funding" || data.reason === "configuration"
           ? data.reason
           : null;
         if (!controller.signal.aborted) {
@@ -470,7 +488,7 @@ export function ServiceExplorer({
 
           <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-meta leading-relaxed border-amber-200 bg-amber-50/70 text-amber-900`}>
             <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-            {liveState?.country === country && liveState.live && liveState.reason !== "funding" && !liveState.failed ? <p><strong>Live listings are current.</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. {liveState.partial && "Some listings may be missing. "}<Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).lead}</strong>{" "}{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).rest} <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
+            {liveState?.country === country && liveState.live && retryCanHelp(liveState.reason) && !liveState.failed ? <p><strong>Live listings are current.</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. {liveState.partial && "Some listings may be missing. "}<Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).lead}</strong>{" "}{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).rest} <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
           </div>
 
           <section aria-labelledby="services-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-3.5 sm:p-6">
@@ -496,9 +514,12 @@ export function ServiceExplorer({
 
             {liveState?.country === country && (liveState.failed || (liveState.live && liveState.partial)) && (
               <p role="status" className="mt-4 text-meta text-amber-800">
-                {liveState.reason === "throttled" ? "Live listings were refreshed too quickly." : liveState.reason === "funding" ? "Some live listings are paused while we restock." : "Some live listings couldn&apos;t be loaded."}{" "}
-                {/* No Retry on a funding gap: retrying cannot restock it. */}
-                {liveState.reason !== "funding" && <button type="button" className="font-semibold underline" onClick={() => setLiveRevision((value) => value + 1)}>Retry</button>}
+                {liveState.reason === "throttled" ? "Live listings were refreshed too quickly."
+                  : liveState.reason === "funding" ? "Some live listings are paused while we restock."
+                  : liveState.reason === "configuration" ? "Some live listings are paused while we finish setup."
+                  : "Some live listings couldn&apos;t be loaded."}{" "}
+                {/* No Retry on a gap that retrying cannot close. */}
+                {retryCanHelp(liveState.reason) && <button type="button" className="font-semibold underline" onClick={() => setLiveRevision((value) => value + 1)}>Retry</button>}
               </p>
             )}
             <div className="mt-3 grid grid-cols-1 gap-2 sm:mt-4 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">

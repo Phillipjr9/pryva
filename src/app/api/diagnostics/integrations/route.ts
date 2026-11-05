@@ -11,7 +11,9 @@ import {
 import { isBitcallConfigured, getBitcallBalance } from "@/lib/providers/bitcall";
 import { esimItemsForCountry, readEsimCatalog } from "@/lib/services/esim/esim-catalog";
 import { explorerCountry } from "@/lib/services/service-explorer";
-import { isSmmPanelConfigured } from "@/lib/providers/smm-panel";
+import { getSmmBalance, isSmmPanelConfigured } from "@/lib/providers/smm-panel";
+import { LISTED_TAGS, describeBoost, readBoostSnapshot, selectBoostServices } from "@/lib/services/boosts/smm-catalog";
+import { smmMarkupPercent, smmUsdNgnRate, totalForQuantity } from "@/lib/services/boosts/smm-pricing";
 import { resendConfigured } from "@/lib/email/resend-config";
 import { emailQueueStatus, recentEmailActivity } from "@/lib/email/email-delivery-events";
 import { isPaystackConfigured, paystackKeyMode, getBanks } from "@/lib/payments/paystack";
@@ -135,6 +137,8 @@ export async function GET(request: NextRequest) {
   // buyable, so it is reported whether or not it currently matters.
   const manualFulfilmentReachable = await isManualFulfilmentReachable();
 
+  const boostingConfigured = isSmmPanelConfigured();
+
   return NextResponse.json(
     {
       database: { persistent: persistentDatabaseConfigured() },
@@ -153,7 +157,51 @@ export async function GET(request: NextRequest) {
       fallbackAccounts: { configured: isAccsZoneConfigured() },
       numbers,
       gateway,
-      boosting: { configured: isSmmPanelConfigured() },
+      boosting: boostingConfigured
+        ? await (async () => {
+            /**
+             * "The boosting price looks wrong" was unanswerable from outside: the
+             * shop shows a naira figure derived from a wholesale rate times a
+             * markup times an exchange rate, and all three are configuration. This
+             * reports the derivation per listed service, plus how many offers the
+             * price rules dropped, so a wrong digit is visible instead of inferred.
+             */
+            const pricing = await probe("boost-pricing", async () => {
+              const snapshot = await readBoostSnapshot();
+              const selection = selectBoostServices(snapshot.services, snapshot.currency);
+              const rows = snapshot.services.map((service) => describeBoost(service, snapshot.currency));
+              const onShop = rows.filter((row) => row.platform !== null && LISTED_TAGS.has(row.tag));
+              return {
+                currency: snapshot.currency,
+                markupPercent: smmMarkupPercent(),
+                fxConfigured: smmUsdNgnRate() !== null,
+                considered: snapshot.services.length,
+                listed: selection.listed,
+                // Offers on a shop platform and intent that produced no price at
+                // all: either the panel quoted no rate, the currency was unknown,
+                // or the computed price fell outside the plausible band.
+                droppedForPrice: onShop.filter((row) => row.perThousand === null).length,
+                listings: rows
+                  .filter((row) => row.perThousand !== null && row.platform !== null)
+                  .slice(0, 25)
+                  .map((row) => ({
+                    platform: row.platform,
+                    tag: row.tag,
+                    currency: row.currency,
+                    retailPerThousand: row.perThousand,
+                    min: row.min,
+                    fromPrice: row.perThousand !== null && row.min !== null ? totalForQuantity(row.perThousand, row.min) : null,
+                  })),
+              };
+            });
+            return {
+              configured: true as const,
+              keyTail: keyTail("SMM_PANEL_API_KEY"),
+              balance: await probe("smm-balance", getSmmBalance),
+              pricing,
+            };
+          })()
+        : { configured: false as const },
       payments: isPaystackConfigured()
         ? {
             configured: true as const,

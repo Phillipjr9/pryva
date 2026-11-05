@@ -8,7 +8,7 @@ import { FleexaError } from "@/lib/providers/fleexa";
 import { FoxreloadError } from "@/lib/providers/foxreload";
 import { SmmPanelError } from "@/lib/providers/smm-panel";
 import { TempMailError } from "@/lib/providers/tempmail";
-import { PROVIDER_IDS, ProviderError, isFundingFailure, isProviderError, isRefusal, looksLikeFundingRefusal } from "@/lib/providers/types";
+import { PROVIDER_IDS, ProviderError, isConfigurationFailure, isFundingFailure, isProviderError, isRefusal, looksLikeFundingRefusal } from "@/lib/providers/types";
 
 /**
  * The supplier boundary.
@@ -120,6 +120,20 @@ describe("one error type across the boundary", () => {
       "Unauthorized",
     ]) expect(looksLikeFundingRefusal(text), text).toBe(false);
     expect(looksLikeFundingRefusal(undefined)).toBe(false);
+  });
+
+  it("tells a setup mistake apart from an outage too", () => {
+    // A rejected credential does not heal. Retrying it is as pointless as
+    // retrying an empty balance, and just as misleading.
+    expect(isConfigurationFailure(new FleexaError("x", 503, "NO_API_KEY"))).toBe(true);
+    expect(isConfigurationFailure(new SmmPanelError("x", 503, "INVALID_API_URL"))).toBe(true);
+    expect(isConfigurationFailure(new BitcallError("x", 401, "AUTHENTICATION_REQUIRED"))).toBe(true);
+    expect(isConfigurationFailure(new FleexaError("x", 403, "FORBIDDEN"))).toBe(true);
+    expect(isConfigurationFailure(new FleexaError("x", 502, "UPSTREAM_ERROR"))).toBe(false);
+    expect(isConfigurationFailure(new FleexaError("x", 429, "RATE_LIMITED"))).toBe(false);
+    // Funding is its own answer: the key is fine, the account is empty.
+    expect(isConfigurationFailure(new FleexaError("x", 402, "INSUFFICIENT_BALANCE"))).toBe(false);
+    expect(isConfigurationFailure(new Error("boom"))).toBe(false);
   });
 
   it("separates a refusal from an unknown outcome", () => {

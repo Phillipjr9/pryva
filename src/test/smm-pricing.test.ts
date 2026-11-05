@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { retailPerThousand, smmMarkupPercent, totalForQuantity, normalizeCurrency } from "@/lib/services/boosts/smm-pricing";
+import { BOOST_RETAIL_CEILING_PER_THOUSAND, boostRetailIsSane, retailPerThousand, smmMarkupPercent, totalForQuantity, normalizeCurrency } from "@/lib/services/boosts/smm-pricing";
 
 /**
  * Retail pricing for boosting.
@@ -51,6 +51,30 @@ describe("retail price per 1,000", () => {
     expect(retailPerThousand({ wholesaleRatePerThousand: null, currency: "NGN", env: env() })).toBeNull();
     expect(retailPerThousand({ wholesaleRatePerThousand: 0, currency: "NGN", env: env() })).toBeNull();
     expect(retailPerThousand({ wholesaleRatePerThousand: 100, currency: null, env: env() })).toBeNull();
+  });
+});
+
+describe("the plausibility band", () => {
+  it("rejects a price that is wrong by an order of magnitude", () => {
+    // The realistic mistakes: a naira rate read as dollars (1400x high), or the
+    // fx figure applied twice. Both land far above the ceiling.
+    expect(boostRetailIsSane(1_399)).toBe(true);
+    expect(boostRetailIsSane(75_000)).toBe(true);
+    expect(boostRetailIsSane(BOOST_RETAIL_CEILING_PER_THOUSAND)).toBe(true);
+    expect(boostRetailIsSane(BOOST_RETAIL_CEILING_PER_THOUSAND + 1)).toBe(false);
+    expect(boostRetailIsSane(0)).toBe(false);
+    expect(boostRetailIsSane(-5)).toBe(false);
+    expect(boostRetailIsSane(null)).toBe(false);
+    expect(boostRetailIsSane(Number.NaN)).toBe(false);
+  });
+
+  it("catches the two-currency mix-ups that produce a wrong price", () => {
+    // A $0.74 rate at ₦1,400/$ and a 35% margin is ₦1,399 per thousand: fine.
+    expect(boostRetailIsSane(retailPerThousand({ wholesaleRatePerThousand: 0.74, currency: "USD", env: env({ SMM_USD_NGN_RATE: "1400" }) }))).toBe(true);
+    // The same panel read as if it billed naira per unit, then converted anyway.
+    const nairaRate = retailPerThousand({ wholesaleRatePerThousand: 1_200, currency: "USD", env: env({ SMM_USD_NGN_RATE: "1400" }) });
+    expect(nairaRate).toBe(2_268_000);
+    expect(boostRetailIsSane(nairaRate)).toBe(false);
   });
 });
 

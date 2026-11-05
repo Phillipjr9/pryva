@@ -203,6 +203,32 @@ describe("supplier catalog endpoint", () => {
     expect(await (await GET(request())).json()).toMatchObject({ partial: true, reason: "partial" });
   });
 
+  it("calls a rejected credential a setup problem, not an outage to retry", async () => {
+    // A configured-but-invalid key fails identically forever. Rendering it as
+    // "couldn't be loaded, Retry" is the same mistake the empty balance made.
+    state.boostConfigured = true; state.bitcallConfigured = true;
+    state.snapshot.mockRejectedValue(new ProviderError("key", { provider: "fleexa", status: 503, code: "NO_API_KEY" }));
+    state.boostSnapshot.mockRejectedValue(new ProviderError("url", { provider: "smm", status: 503, code: "INVALID_API_URL" }));
+    state.esimSnapshot.mockRejectedValue(new ProviderError("auth", { provider: "bitcall", status: 401, code: "AUTHENTICATION_REQUIRED" }));
+
+    const response = await GET(request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, live: false, reason: "configuration", items: [] });
+  });
+
+  it("keeps a real outage retryable even when something else is misconfigured", async () => {
+    state.boostConfigured = true;
+    state.snapshot.mockRejectedValue(new ProviderError("key", { provider: "fleexa", status: 503, code: "NO_API_KEY" }));
+    state.boostSnapshot.mockRejectedValue(new ProviderError("down", { provider: "smm", status: 502, code: "UPSTREAM_ERROR" }));
+    // One gap might clear on its own, so the retry stays.
+    expect((await GET(request())).status).toBe(503);
+
+    // A partial catalogue with a mixed set is still labelled "partial".
+    state.bitcallConfigured = true;
+    state.esimSnapshot.mockResolvedValue({ partial: false, fetchedAt: "2026-01-03T00:00:00Z", offers: [], listings: [] });
+    expect(await (await GET(request())).json()).toMatchObject({ live: true, partial: true, reason: "partial" });
+  });
+
   it("passes the refresh flag through to every configured supplier", async () => {
     state.boostConfigured = true; state.bitcallConfigured = true;
     await GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&refresh=1"));

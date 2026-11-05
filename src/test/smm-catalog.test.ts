@@ -249,6 +249,27 @@ describe("boosting snapshot", () => {
     });
   });
 
+  it("drops a listing whose price a configuration slip made absurd", async () => {
+    // A naira rate converted as if it were dollars: 1,200 × 1,400 × 1.35 is
+    // ₦2.27m per thousand. That is not a price, it is a typo with a Buy button,
+    // so the listing goes read-only instead of selling at the wrong amount.
+    const { boostItems, describeBoost } = await import("@/lib/services/boosts/smm-catalog");
+    process.env.SMM_USD_NGN_RATE = "1400";
+    try {
+      const absurd = service({ currency: "USD", ratePer1000: 1_200, min: 100 });
+      expect(describeBoost(absurd, "USD").perThousand).toBeNull();
+      expect(boostItems(snapshot([absurd]))).toHaveLength(0);
+
+      // A genuinely expensive premium service stays on sale.
+      const premium = service({ id: "svc-p", currency: "USD", ratePer1000: 40, min: 100 });
+      // 40 × 1400 × 1.35 = ₦75,600 per thousand — expensive, not impossible.
+      expect(describeBoost(premium, "USD").perThousand).toBe(75_600);
+      expect(boostItems(snapshot([premium]))[0].price).toBe(7_560);
+    } finally {
+      delete process.env.SMM_USD_NGN_RATE;
+    }
+  });
+
   it("caps the catalog, caches briefly and deduplicates concurrent reads", async () => {
     panel.services.mockResolvedValue(Array.from({ length: 2500 }, (_, index) => service({ id: `svc-${index}` })));
     panel.balance.mockResolvedValue({ balance: 10, currency: "NGN" });

@@ -122,6 +122,29 @@ describe("service explorer live listings", () => {
     expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   });
 
+  it("does not blame the customer for a rejected credential", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+      ok: true, country: "us", live: false, reason: "configuration", partial: false, fetchedAt: null, items: [],
+    }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
+    expect(await screen.findByText(/paused while we finish setup/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("keeps a mixed gap retryable", async () => {
+    // Configuration plus a real outage: the outage might clear, so the button stays.
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+      ok: true, country: "us", live: false, reason: "configuration", partial: false, fetchedAt: null, items: [],
+    }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
+    expect(await screen.findByText(/finish setup/)).toBeTruthy();
+    // Nothing is failing *transiently* in this payload, so no warning row either.
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
   it("names a throttle as a throttle and still offers the retry", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 429, json: async () => ({ error: "slow down", reason: "throttled" }) });
     vi.stubGlobal("fetch", fetchMock);
