@@ -84,8 +84,8 @@ async function queueEvent(overrides: Partial<typeof fraudEvents.$inferInsert> = 
 
 function mailConfigured() {
   process.env.RESEND_API_KEY = "re_test";
-  process.env.RESEND_FROM_EMAIL = "Pryva <no-reply@pryva.ng>";
-  process.env.FRAUD_ALERT_EMAIL = "security@pryva.ng";
+  process.env.RESEND_FROM_EMAIL = "Pryva <no-reply@example.test>";
+  process.env.FRAUD_ALERT_EMAIL = "security@example.test";
 }
 
 describe("fraud alert template", () => {
@@ -181,21 +181,21 @@ describe("fraud alert recipients", () => {
   it("prefers the dedicated security inbox", () => {
     expect(
       alerts.fraudAlertRecipients({
-        FRAUD_ALERT_EMAIL: "security@pryva.ng, ops@pryva.ng",
-        ADMIN_EMAILS: "owner@pryva.ng",
+        FRAUD_ALERT_EMAIL: "security@example.test, ops@example.test",
+        ADMIN_EMAILS: "owner@example.test",
       } as unknown as NodeJS.ProcessEnv),
-    ).toEqual(["security@pryva.ng", "ops@pryva.ng"]);
+    ).toEqual(["security@example.test", "ops@example.test"]);
   });
 
   it("falls back to the admin gate's list", () => {
     expect(
-      alerts.fraudAlertRecipients({ ADMIN_EMAILS: "Owner@Pryva.ng; owner@pryva.ng" } as unknown as NodeJS.ProcessEnv),
-    ).toEqual(["owner@pryva.ng"]);
+      alerts.fraudAlertRecipients({ ADMIN_EMAILS: "Owner@example.test; owner@example.test" } as unknown as NodeJS.ProcessEnv),
+    ).toEqual(["owner@example.test"]);
   });
 
   it("drops junk and caps the list", () => {
     const list = alerts.fraudAlertRecipients({
-      FRAUD_ALERT_EMAIL: ["not-an-address", "a@b.co", "a@b.co", ...Array.from({ length: 9 }, (_, i) => `op${i}@pryva.ng`)].join(","),
+      FRAUD_ALERT_EMAIL: ["not-an-address", "a@b.co", "a@b.co", ...Array.from({ length: 9 }, (_, i) => `op${i}@example.test`)].join(","),
     } as unknown as NodeJS.ProcessEnv);
     expect(list).toHaveLength(alerts.FRAUD_ALERT_MAX_RECIPIENTS);
     expect(list[0]).toBe("a@b.co");
@@ -241,8 +241,8 @@ describe("fraud alert delivery", () => {
       text: string;
       from: string;
     };
-    expect(body.to).toEqual(["security@pryva.ng"]);
-    expect(body.from).toContain("no-reply@pryva.ng");
+    expect(body.to).toEqual(["security@example.test"]);
+    expect(body.from).toContain("no-reply@example.test");
     expect(body.subject.toLowerCase()).toContain("withdrawal");
     expect(body.html).toContain("hero-fraud.jpg");
     expect(body.html).toContain("ada@example.com");
@@ -296,7 +296,7 @@ describe("fraud alert delivery", () => {
 
   it("sends nothing when there is nobody to mail", async () => {
     process.env.RESEND_API_KEY = "re_test";
-    process.env.RESEND_FROM_EMAIL = "Pryva <no-reply@pryva.ng>";
+    process.env.RESEND_FROM_EMAIL = "Pryva <no-reply@example.test>";
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const id = await queueEvent();

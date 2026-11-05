@@ -1,3 +1,4 @@
+import { isVercelPreview } from "@/lib/financial-environment";
 import { randomBytes } from "node:crypto";
 import { and, eq, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -29,6 +30,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const user = await getCurrentUser();
   if (!user) return Response.json({ ok: false, error: "Please sign in first." }, { status: 401 });
   if (!isSameOriginMutation(request)) return Response.json({ ok: false, error: "Cross-origin request denied." }, { status: 403 });
+  if (isVercelPreview()) return Response.json({ ok: false, error: "Refunds are unavailable in preview" }, { status: 503 });
 
   // Before any order lookup: a refund triggers a provider call and a wallet
   // credit, so the throttle has to sit ahead of the work it protects.

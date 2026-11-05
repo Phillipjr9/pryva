@@ -22,7 +22,7 @@ const USER = "3f1c6a2b-9d4e-4a7c-8b1f-2e5d6c7b8a90";
 
 const base = {
   recipient: "ada@example.com",
-  sender: "Pryva <hello@pryva.ng>",
+  sender: "Pryva <hello@example.test>",
   orderReference: "PRI-8F2K1",
   productName: "Vietnam number",
   planLabel: "1 verification",
@@ -30,7 +30,7 @@ const base = {
   phoneNumber: "+84912345678",
   code: "481920",
   expiresAt: new Date("2026-03-04T10:20:00Z"),
-  orderUrl: "https://pryva.ng/dashboard/orders/abc",
+  orderUrl: "https://pryvalogs.com/dashboard/orders/abc",
 };
 
 let pg: PGlite;

@@ -32,7 +32,7 @@ beforeEach(() => {
   state.fetch.mockImplementation(async () => new Response(JSON.stringify({ id: "message-1" }), { status: 200 }));
   vi.stubGlobal("fetch", state.fetch);
   process.env.RESEND_API_KEY = "re_test";
-  process.env.RESEND_FROM_EMAIL = "Pryva <hello@pryva.ng>";
+  process.env.RESEND_FROM_EMAIL = "Pryva <hello@example.test>";
 });
 
 describe("the four things worth an email", () => {

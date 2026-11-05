@@ -91,7 +91,7 @@ const serviceDefinitions: Service[] = [
     tagline: "Explore eSIM data plans.",
     description: "Explore eSIM plans by region and data allowance. Availability varies by destination.",
     intro: "Browse eSIM plans by region and data allowance, and check current availability before ordering.",
-    fromPrice: 4700, unit: "per data bundle", icon: "sim",
+    unit: "per data bundle", icon: "sim",
     highlights: [
       { title: "Check your device", body: "Confirm eSIM compatibility and carrier unlock requirements with your device and carrier." },
       { title: "Review coverage", body: "Coverage and availability need provider confirmation before a live purchase." },
@@ -283,39 +283,6 @@ const planDefinitions: PlanDefinition[] = [
     region: "Nigeria", flag: "🇳🇬", duration: "Rent for 90 days",
     compareAt: 22500, badge: "Save 13%",
     features: ["Reusable for many codes", "Quarterly business line", "Priority replacement"]
-  },
-  // eSIM
-  {
-    slug: "esim-ng-1", service: "esim", name: "Nigeria Lite", planLabel: "1GB · 7 days",
-    region: "Nigeria", flag: "🇳🇬", duration: "Valid 7 days",
-    highlight: "Quick local data when you land in Lagos",
-    features: ["1GB high-speed data", "QR + manual activation", "Data-only"],
-  },
-  {
-    slug: "esim-ng-5", service: "esim", name: "Nigeria Plus", planLabel: "5GB · 30 days",
-    region: "Nigeria", flag: "🇳🇬", duration: "Valid 30 days", popular: true,
-    features: ["5GB high-speed data", "QR + manual activation", "Data-only"],
-  },
-  {
-    slug: "esim-africa", service: "esim", name: "Africa Regional", planLabel: "3GB · 15 days",
-    region: "Africa (12 countries)", flag: "🌍", duration: "Valid 15 days",
-    badge: "Regional", highlight: "One plan across 12 African countries",
-    features: ["3GB across the region", "Covers 12 countries", "QR + manual activation"],
-  },
-  {
-    slug: "esim-europe", service: "esim", name: "Europe Regional", planLabel: "5GB · 30 days",
-    region: "Europe (38 countries)", flag: "🇪🇺", duration: "Valid 30 days",
-    features: ["5GB across 38 countries", "Keep your WhatsApp", "QR + manual activation"],
-  },
-  {
-    slug: "esim-us", service: "esim", name: "United States", planLabel: "10GB · 30 days",
-    region: "United States", flag: "🇺🇸", duration: "Valid 30 days",
-    badge: "Heavy use", features: ["10GB high-speed data", "Works on 5G", "QR + manual activation"],
-  },
-  {
-    slug: "esim-global", service: "esim", name: "Global", planLabel: "20GB · 30 days",
-    region: "Global (120+ countries)", flag: "🌐", duration: "Valid 30 days",
-    features: ["20GB across the world", "120+ destinations", "QR + manual activation"],
   },
   // Proxies
   {

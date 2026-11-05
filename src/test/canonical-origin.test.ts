@@ -55,7 +55,7 @@ describe("the canonical site URL", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
     vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "");
-    expect(canonicalSiteUrl()).not.toMatch(/pryva\.ng/);
+    expect(canonicalSiteUrl()).toBe("https://pryvalogs.com");
   });
 });
 

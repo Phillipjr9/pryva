@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users, walletEmailOutbox, walletTransactions, withdrawals } from "@/db/schema";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { logger } from "@/lib/logger";
 import { readJsonWithLimit } from "@/lib/request-body";
 import { createRateLimiter } from "@/lib/rate-limit";
@@ -82,12 +82,13 @@ function validPayload(value: unknown): value is ResendPayload {
  */
 async function expireUncertainJobs(): Promise<number> {
   const result = await db.execute(sql`
-    UPDATE wallet_email_outbox SET status = 'review', last_error = 'idempotency_window_elapsed', locked_until = NULL, notification_locked_until = NULL, lock_token = NULL
+    UPDATE wallet_email_outbox AS job SET status = 'review', last_error = 'idempotency_window_elapsed', locked_until = NULL, notification_locked_until = NULL, lock_token = NULL
     WHERE first_attempt_at < now() - interval '23 hours'
       AND (status = 'pending' OR (status = 'sending' AND (
         (event_kind IN (${protectedKinds}) AND (notification_locked_until IS NULL OR notification_locked_until <= now()))
         OR (event_kind NOT IN (${protectedKinds}) AND (locked_until IS NULL OR locked_until <= now()))
       )))
+      AND EXISTS (SELECT 1 FROM users AS owner WHERE owner.id = job.user_id AND owner.deleted_at IS NULL)
     RETURNING id
   `);
   return result.rows.length;
@@ -113,6 +114,7 @@ async function claim(): Promise<Claimed | null> {
           OR (event_kind NOT IN (${protectedKinds}) AND (locked_until IS NULL OR locked_until <= now()))
         )))
         AND (first_attempt_at IS NULL OR first_attempt_at >= now() - interval '23 hours')
+        AND EXISTS (SELECT 1 FROM users AS owner WHERE owner.id = wallet_email_outbox.user_id AND owner.deleted_at IS NULL)
       ORDER BY COALESCE(notification_due_at, available_at), created_at
       LIMIT 1 FOR UPDATE SKIP LOCKED
     )
@@ -372,7 +374,7 @@ async function dispatchOne(): Promise<DispatchResult> {
 /** Best-effort dispatch; ledger commits and customer responses never depend on email delivery. */
 export async function dispatchWalletEmails(limit = 4): Promise<{ sent: number; retry: number; review: number; throttled: boolean }> {
   const counts = { sent: 0, retry: 0, review: 0, throttled: false };
-  if (isPreviewDatabase() || !walletEmailConfigured()) return counts;
+  if (financialActionsUnavailable() || !walletEmailConfigured()) return counts;
   counts.review += await expireUncertainJobs();
   for (let index = 0; index < Math.min(Math.max(limit, 1), 8); index++) {
     const result = await dispatchOne();

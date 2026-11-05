@@ -84,7 +84,7 @@ export default function PrivacyPage() {
 
             <h2>10. Contact Us</h2>
             <p>
-              If you have questions about this Privacy Policy, please contact us at privacy@pryva.ng or through our contact page.
+              If you have questions about this Privacy Policy, please use our <Link href="/contact">contact form</Link>.
             </p>
           </div>
         </div>

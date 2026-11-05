@@ -199,12 +199,13 @@ describe("no public page says eSIM cannot be bought while it is being bought", (
     expect(planPage).not.toContain("esimCategoryOrderable");
   });
 
-  it("sends a visitor from a dead sample card to the plans that are live", () => {
+  it("points to the live eSIM catalogue without showing dead sample cards", () => {
     // The card keeps its note -- it genuinely cannot be ordered -- but "cannot be
     // delivered yet" alone reads as a broken product while the dashboard sells
     // eSIM, so it points at the live catalogue.
     const pricing = read("app/(site)/pricing/page.tsx");
-    expect(pricing).toContain("liveEsim");
-    expect(pricing).toContain('href="/esim"');
+    expect(pricing).toContain("isEsimOrderingAvailable()");
+    expect(pricing).toContain('href="/dashboard/esim"');
+    expect(pricing).not.toContain("Example only");
   });
 });

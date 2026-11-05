@@ -75,7 +75,7 @@ describe("admin authorization", () => {
     expect(isAdminUser(account("ADMIN@pryva.test"))).toBe(true);
     expect(isAdminUser(account("customer@example.com"))).toBe(false);
     vi.stubEnv("ADMIN_EMAILS", "");
-    expect(isAdminUser(account("admin@pryva.ng"))).toBe(false);
+    expect(isAdminUser(account("admin@example.test"))).toBe(false);
     expect(isAdminUser(account("ADMIN@pryva.test"))).toBe(false);
   });
 

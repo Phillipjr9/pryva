@@ -101,6 +101,15 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("order refund safety", () => {
+  it("does not refund or cancel upstream from a Vercel preview using a persistent database", async () => {
+    vi.stubEnv("DATABASE_URL", "postgres://mock.invalid/db");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    fakeDatabase();
+    expect((await POST(request(), context)).status).toBe(503);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.cancelUpstream).not.toHaveBeenCalled();
+  });
+
   it("rejects cross-origin refund attempts", async () => {
     expect((await POST(request("https://attacker.test"), context)).status).toBe(403);
     expect(mocks.transaction).not.toHaveBeenCalled();

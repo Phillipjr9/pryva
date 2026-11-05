@@ -21,7 +21,7 @@ vi.mock("@/lib/auth", async (importOriginal) => {
     ...actual,
     requireAdmin: vi.fn().mockResolvedValue({
       id: "e6601368-4eef-45e7-a562-f8621c4239f2",
-      email: "owner@pryva.ng",
+      email: "owner@example.test",
       name: "Owner",
       walletBalance: 0,
       emailVerifiedAt: new Date("2026-01-02T00:00:00Z"),

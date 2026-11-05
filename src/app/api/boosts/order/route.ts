@@ -1,3 +1,4 @@
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { placeBoostOrder } from "@/lib/boost-orders";
 import { getCurrentUser } from "@/lib/auth";
 import { purchaseVelocity, recordFraudEvent } from "@/lib/fraud";
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "Cross-origin request denied." }, { status: 403 });
   }
   if (!isJsonRequest(request)) return Response.json({ ok: false, error: "Expected JSON." }, { status: 415 });
+  if (financialActionsUnavailable()) return Response.json({ ok: false, error: "Purchases are unavailable in this environment." }, { status: 503 });
 
   const limit = await purchaseRateLimiter(`boost-create:${user.id}`);
   if (limit.unavailable) return Response.json({ ok: false, error: "Purchases are temporarily unavailable." }, { status: 503 });

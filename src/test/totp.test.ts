@@ -80,7 +80,7 @@ describe("TOTP (RFC 6238)", () => {
     const secret = generateTotpSecret();
     expect(secret).toHaveLength(32);
     expect(secret).toMatch(/^[A-Z2-7]+$/);
-    const uri = totpUri(secret, "ada@pryva.ng");
+    const uri = totpUri(secret, "ada@example.test");
     expect(uri.startsWith("otpauth://totp/")).toBe(true);
     expect(uri).toContain(`secret=${secret}`);
     expect(uri).toContain("issuer=Pryva");

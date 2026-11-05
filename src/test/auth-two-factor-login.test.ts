@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => {
   const user = {
     id: "user-1",
-    email: "ada@pryva.ng",
+    email: "ada@example.test",
     passwordHash: "stored-hash",
   };
   return {
@@ -69,7 +69,7 @@ function request() {
       origin: "https://pryva.test",
       "content-type": "application/json",
     },
-    body: JSON.stringify({ email: "ada@pryva.ng", password: "correct horse battery staple" }),
+    body: JSON.stringify({ email: "ada@example.test", password: "correct horse battery staple" }),
   });
 }
 

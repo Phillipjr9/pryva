@@ -66,12 +66,10 @@ DROP TRIGGER IF EXISTS email_change_request_active_owner ON email_change_request
 CREATE TRIGGER email_change_request_active_owner BEFORE INSERT OR UPDATE OF user_id ON email_change_requests
   FOR EACH ROW EXECUTE FUNCTION security_record_owner_must_be_active();
 
--- Older closures anonymized users but could leave delivery snapshots, passkeys,
--- and pending email-change links behind. These are not the financial record and
--- can contain addresses or credentials. Remove them without touching the ledger.
-DELETE FROM wallet_email_outbox WHERE user_id IN (SELECT id FROM users WHERE deleted_at IS NOT NULL);
-DELETE FROM email_change_requests WHERE user_id IN (SELECT id FROM users WHERE deleted_at IS NOT NULL);
-DELETE FROM webauthn_credentials WHERE user_id IN (SELECT id FROM users WHERE deleted_at IS NOT NULL);
+-- Historical closed-account rows are deliberately left unchanged. The new
+-- worker skips their queued mail; reviewing or removing old snapshots and
+-- credentials requires separate owner authorization. New closures still remove
+-- their own sensitive records in the account-closure transaction.
 
 -- The account row is locked while looking up its address. Closure takes an
 -- exclusive lock on the same row and marks it deleted before removing passkeys;

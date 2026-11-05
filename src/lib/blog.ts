@@ -59,7 +59,7 @@ export const blogPosts: BlogPost[] = [
     excerpt: "Considerations for issuing and protecting wallet gift-card codes.",
     category: "Business",
     sections: [
-      { heading: "Before purchasing", paragraphs: ["Choose the amount and intended recipient carefully, and review the terms and expiry displayed at checkout. Gift cards are non-refundable once purchased. A preview gift card represents simulated credit, not real money."] },
+      { heading: "Before purchasing", paragraphs: ["Choose the amount and intended recipient carefully, and review the terms and expiry displayed at checkout. Gift cards are non-refundable once purchased."] },
       { heading: "Handle codes securely", paragraphs: ["Treat each code like cash: anyone who has it may be able to redeem it. Share it only through a trusted channel, avoid publishing it in screenshots or documents, and keep the purchase reference for support."] },
       { heading: "Redeeming a card", paragraphs: ["The recipient signs in and enters the code in the gift-card section. Check the result and transaction history; do not rely on a message claiming that credit was added without checking the wallet."] },
     ],

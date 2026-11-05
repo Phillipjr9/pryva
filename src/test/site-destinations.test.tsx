@@ -51,8 +51,7 @@ describe("public site destinations", () => {
   it("lists the help centre, feedback page and every blog post in the sitemap", () => {
     const urls = sitemap().map((entry) => entry.url);
     // Host-agnostic on purpose: the origin is configuration, the paths are the
-    // contract. Pinning `https://pryva.ng` here made this guard fail the moment
-    // the site moved to a domain it actually owns.
+    // contract. A path contract must not depend on an environment-specific host.
     expect(urls.some((url) => url.endsWith("/help"))).toBe(true);
     expect(urls.some((url) => url.endsWith("/testimonials"))).toBe(true);
     for (const post of blogPosts) expect(urls.some((url) => url.endsWith(`/blog/${post.slug}`))).toBe(true);

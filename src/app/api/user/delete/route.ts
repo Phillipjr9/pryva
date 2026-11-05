@@ -1,3 +1,4 @@
+import { isVercelPreview } from "@/lib/financial-environment";
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -83,6 +84,7 @@ export async function POST(request: NextRequest) {
   if (!isSameOriginMutation(request)) {
     return NextResponse.json({ ok: false, error: "Cross-origin request denied" }, { status: 403 });
   }
+  if (isVercelPreview()) return NextResponse.json({ ok: false, error: "Account closure is unavailable in preview." }, { status: 503 });
 
   // Per account rather than per IP: the account is the thing being destroyed, and
   // a shared network must not let one person's attempts block another's.

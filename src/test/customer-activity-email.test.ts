@@ -166,7 +166,14 @@ describe("passkey security notifications", () => {
     await database.update(schema.users).set({ deletedAt: new Date() }).where(eq(schema.users.id, USER));
     await database.delete(schema.webauthnCredentials).where(eq(schema.webauthnCredentials.id, key.id));
     expect(await jobs("passkey_removed")).toHaveLength(0);
-    expect(await dispatchWalletEmails(1)).toMatchObject({ review: 1, sent: 0 });
+    // Even an expired legacy attempt stays untouched and is not sent.
+    await pg.exec("UPDATE wallet_email_outbox SET first_attempt_at = now() - interval '24 hours'");
+    const [before] = await jobs("passkey_added");
+    expect(await dispatchWalletEmails(1)).toMatchObject({ review: 0, sent: 0, retry: 0 });
+    const [after] = await jobs("passkey_added");
+    expect(after.status).toBe(before.status);
+    expect(after.attempts).toBe(before.attempts);
+    expect(after.firstAttemptAt).toEqual(before.firstAttemptAt);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
@@ -269,16 +276,28 @@ describe("migration and deletion privacy", () => {
       await old.exec(migration);
       await old.exec(migration);
       const result = await old.query<{ count: number }>("SELECT count(*)::int AS count FROM wallet_email_outbox");
-      expect(result.rows[0].count).toBe(0);
-      // Historical closed-account snapshots, address changes and passkeys are
-      // gone; active passkeys and financial evidence are not deleted.
-      expect((await old.query<{ count: number }>("SELECT count(*)::int AS count FROM email_change_requests")).rows[0].count).toBe(0);
-      expect((await old.query<{ credential_id: string }>("SELECT credential_id FROM webauthn_credentials")).rows).toEqual([{ credential_id: "old-key" }]);
+      // The old closed-account row stays exactly as it was; no historical
+      // mail is created, and existing sensitive records are not removed.
+      expect(result.rows[0].count).toBe(1);
+      expect((await old.query<{ payload: string }>("SELECT payload FROM wallet_email_outbox")).rows).toEqual([{ payload: "OLD PRIVATE DELIVERY" }]);
+      expect((await old.query<{ count: number }>("SELECT count(*)::int AS count FROM email_change_requests")).rows[0].count).toBe(1);
+      expect((await old.query<{ credential_id: string }>("SELECT credential_id FROM webauthn_credentials ORDER BY credential_id")).rows).toEqual([{ credential_id: "closed-key" }, { credential_id: "old-key" }]);
       expect((await old.query<{ count: number }>("SELECT count(*)::int AS count FROM wallet_transactions")).rows[0].count).toBe(1);
       await old.exec(`INSERT INTO support_messages (ticket_id,author_role,body) VALUES ('${ADMIN}','admin','new reply')`);
       expect((await old.query<{ count: number }>("SELECT count(*)::int AS count FROM wallet_email_outbox WHERE event_kind = 'support_reply'")).rows[0].count).toBe(1);
     } finally { await old.close(); }
   }, 60_000);
+
+  it("skips preserved closed-account jobs without blocking active customers", async () => {
+    await database.insert(schema.webauthnCredentials).values({ userId: USER, credentialId: "closed-owner-key", publicKey: "AQID", counter: 0 });
+    await database.insert(schema.webauthnCredentials).values({ userId: ADMIN, credentialId: "active-owner-key", publicKey: "AQID", counter: 0 });
+    await database.update(schema.users).set({ deletedAt: new Date() }).where(eq(schema.users.id, USER));
+    expect(await dispatchWalletEmails(1)).toMatchObject({ sent: 1, retry: 0, review: 0 });
+    const entries = await jobs("passkey_added");
+    expect(entries.find((row) => row.userId === USER)).toMatchObject({ status: "pending", attempts: 0 });
+    expect(entries.find((row) => row.userId === ADMIN)).toMatchObject({ status: "sent" });
+    expect(bodyAt(0).to).toEqual(["support@example.test"]);
+  });
 
   it("never queues an outbox job for an already closed account", async () => {
     await database.update(schema.users).set({ deletedAt: new Date() }).where(eq(schema.users.id, USER));

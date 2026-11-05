@@ -208,6 +208,10 @@ describe("wallet email outbox on embedded PostgreSQL", () => {
     expect(await dispatchWalletEmails()).toEqual({ sent: 0, retry: 0, review: 0, throttled: false });
     expect(fetchMock).not.toHaveBeenCalled();
     vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(await dispatchWalletEmails()).toEqual({ sent: 0, retry: 0, review: 0, throttled: false });
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.stubEnv("VERCEL_ENV", "");
     vi.stubEnv("CRON_SECRET", "long-worker-secret");
     expect((await cron(new NextRequest("https://pryva.test/api/cron/wallet-emails"))).status).toBe(401);
     const result = await cron(new NextRequest("https://pryva.test/api/cron/wallet-emails", { headers: { authorization: "Bearer long-worker-secret" } }));

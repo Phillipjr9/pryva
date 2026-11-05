@@ -1,3 +1,4 @@
+import { isVercelPreview } from "@/lib/financial-environment";
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { lagosDay, runDailyReconciliation } from "@/lib/daily-reconciliation";
@@ -80,6 +81,7 @@ async function handler(request: NextRequest) {
     logger.warn("Unauthorized nightly cron attempt");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (isVercelPreview()) return NextResponse.json({ error: "Scheduled jobs are unavailable in preview" }, { status: 503 });
 
   const day = request.nextUrl.searchParams.get("day") ?? lagosDayBack();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {

@@ -13,22 +13,32 @@ Keep production database credentials and provider keys out of preview and
 local environments. Verify the host's actual environment-variable scopes; a
 preview build that skips migrations can still read or write a production database
 if production credentials are present at runtime. A preview without persistent
-database credentials uses in-memory data, and is not an integration test.
+database credentials uses empty in-memory data, and is not an integration test.
+Purchase, payment, refund and cron paths have preview guards, but a preview is
+not globally read-only: other authenticated routes can still access or change a
+shared database. Isolate both the database and provider credentials regardless.
 
 Set NEXT_PUBLIC_SITE_URL to https://pryvalogs.com in production. Check the
 approved Google callback in the Google Console matches the app callback at
-https://pryvalogs.com/api/auth/google/callback. Do not change DNS, registrar,
-Vercel domain settings or other infrastructure without owner authorization.
+https://pryvalogs.com/api/auth/google/callback. Inspect the legacy
+NEXT_PUBLIC_APP_URL and the WEBAUTHN_ORIGIN and WEBAUTHN_RP_ID settings as well;
+stale overrides can still select a retired host. Check the Paystack return URL
+and any provider-side allowlists. These external settings have not been verified.
+Do not change DNS, registrar, Vercel domain settings or other infrastructure
+without owner authorization.
 
 Back up before migrations. npm run db:migrate applies all top-level numbered SQL
 files in order and stops on failure. Production builds apply migrations before
 building, while previews do not. Migrations therefore need to be compatible with
 the old live application as well as the new application. Apply all outstanding
 migrations, including 0032, 0033 and 0034 where applicable. Migration 0034
-removes old email-delivery snapshots, email-change requests and passkeys for
-accounts already closed; it preserves their ledger and orders. It rejects late
-passkey or email-change inserts for closed owners, including from an old app
-instance. During mixed-version rollout, an old passkey removal concurrent with
+preserves pre-existing closed-account snapshots, email-change requests and
+passkeys; the current worker skips their queued email. Those historical records
+may still contain sensitive data and need a separately authorized privacy review.
+The older worker does not have the new skip rule and could still process an old
+queued message during a mixed-version rollout; coordinate the scheduler with the
+owner before production promotion. The migration rejects late passkey or
+email-change inserts for closed owners, including from an old app instance. During mixed-version rollout, an old passkey removal concurrent with
 closure can deadlock; PostgreSQL aborts one transaction, which should be retried
 after checking its result. Verify the backup and schema before allowing traffic.
 Never manually replay historical migrations or the legacy directory against an
@@ -136,8 +146,18 @@ change a status just because a response or webhook was missing: an earlier actio
 may have succeeded. First investigate provider references and ledger history.
 Use the existing idempotency and review paths, with operator authorization.
 
-A configured eSIM catalogue is not a guarantee of stock. Example cards must
-remain non-orderable; preview databases must not make live catalogue, purchase or
+Production rejects Paystack and gateway test or unrecognised keys. Use live keys only
+with an authorized launch plan. Switching keys does not erase earlier test-funded
+wallet credits or reverse transactions. Whether previous tests shared the current
+live database is unknown, and historical top-ups do not reliably identify test
+versus live. Before allowing live withdrawals, an authorized operator must
+reconcile Paystack's test and live records against wallet and bank-transfer history,
+including downstream spending, refunds and payouts. Preserve evidence; do not
+automatically delete, reset or adjust customer records. Escalate uncertain cases
+for review rather than inferring that a balance is safe from a key change.
+
+A configured eSIM catalogue is not a guarantee of stock. Unverified sample plans
+are not shown; preview environments must not make live catalogue, purchase or
 completion calls. Keep provider and sourcing details out of customer copy. Check
 service availability and costs with an isolated account before taking real money.
 

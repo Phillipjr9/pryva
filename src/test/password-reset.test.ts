@@ -29,7 +29,7 @@ function build(path: string, init: { body?: unknown; origin?: string; site?: str
 describe("password reset endpoints", () => {
   it("refuses a cross-origin request before doing any work", async () => {
     const response = await forgot(build("/api/auth/forgot", {
-      body: { email: "victim@pryva.ng" },
+      body: { email: "victim@example.test" },
       origin: "https://evil.example",
       site: "cross-site",
     }));
@@ -60,7 +60,7 @@ describe("password reset endpoints", () => {
     // This file sets no RESEND_API_KEY / RESEND_FROM_EMAIL, so the gate must fire
     // before the rate limiter is touched and before any reset token is written.
     const response = await forgot(build("/api/auth/forgot", {
-      body: { email: "customer@pryva.ng" },
+      body: { email: "customer@example.test" },
       origin: "https://pryva.test",
       site: "same-origin",
     }));

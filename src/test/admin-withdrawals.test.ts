@@ -97,6 +97,14 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("admin withdrawal processing", () => {
+  it.each(["approve", "reject", "complete"])("does not %s a withdrawal from a Vercel preview", async (action) => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect((await PUT(request(action))).status).toBe(503);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.initiateTransfer).not.toHaveBeenCalled();
+  });
+
   it("cannot initiate a Paystack transfer backed by preview balances", async () => {
     vi.stubEnv("DATABASE_URL", "");
     expect((await PUT(request("approve"))).status).toBe(503);

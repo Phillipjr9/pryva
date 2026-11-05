@@ -24,7 +24,7 @@ import { adminAuditLog, bankAccounts, paymentTopups, payoutNameApprovals, users 
 
 const mocks = vi.hoisted(() => ({
   db: undefined as unknown,
-  admin: { id: "5c9d0b1a-2e3f-4a5b-8c6d-7e8f9a0b1c2d", email: "admin@pryva.ng" } as { id: string; email: string } | null,
+  admin: { id: "5c9d0b1a-2e3f-4a5b-8c6d-7e8f9a0b1c2d", email: "admin@example.test" } as { id: string; email: string } | null,
   sameOrigin: true,
 }));
 
@@ -48,9 +48,9 @@ let nameCheck: typeof import("@/lib/withdrawal-name-check");
 let route: typeof import("@/app/api/admin/payout-names/route");
 
 function request(method: string, body?: unknown) {
-  return new NextRequest("https://pryva.ng/api/admin/payout-names", {
+  return new NextRequest("https://pryvalogs.com/api/admin/payout-names", {
     method,
-    headers: { origin: "https://pryva.ng", "content-type": "application/json" },
+    headers: { origin: "https://pryvalogs.com", "content-type": "application/json" },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 }
@@ -98,14 +98,14 @@ afterAll(async () => {
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  mocks.admin = { id: ADMIN, email: "admin@pryva.ng" };
+  mocks.admin = { id: ADMIN, email: "admin@example.test" };
   mocks.sameOrigin = true;
   await database.execute(sql`TRUNCATE TABLE admin_audit_log, payout_name_approvals, bank_accounts, payment_topups, users CASCADE`);
   await database.insert(users).values([
     { id: EMeka, name: "Emeka", email: "emeka@example.com", passwordHash: "x", walletBalance: 10_000 },
     { id: OTHER, name: "Bola", email: "bola@example.com", passwordHash: "x", walletBalance: 0 },
     // The audit log records the acting administrator by id, so the actor is a real row.
-    { id: ADMIN, name: "Operator", email: "admin@pryva.ng", passwordHash: "x", walletBalance: 0 },
+    { id: ADMIN, name: "Operator", email: "admin@example.test", passwordHash: "x", walletBalance: 0 },
   ]);
 });
 
@@ -125,7 +125,7 @@ describe("what decides whether a payout is allowed", () => {
       approvedName: "EMEKA CHUKWUEMEKA OKAFOR",
       depositorName: "Emeka",
       reason: "Bank statement supplied in ticket 412",
-      approvedByEmail: "admin@pryva.ng",
+      approvedByEmail: "admin@example.test",
     });
 
     await expect(nameCheck.checkPayoutDestination(EMeka, "EMEKA CHUKWUEMEKA OKAFOR")).resolves.toEqual({
@@ -143,7 +143,7 @@ describe("what decides whether a payout is allowed", () => {
       approvedName: "EMEKA CHUKWUEMEKA OKAFOR",
       depositorName: "Emeka",
       reason: "Bank statement supplied in ticket 412",
-      approvedByEmail: "admin@pryva.ng",
+      approvedByEmail: "admin@example.test",
     });
 
     await expect(nameCheck.checkPayoutDestination(EMeka, "BOLA ADEYEMI")).resolves.toEqual({ ok: false, reason: "mismatch" });
@@ -155,7 +155,7 @@ describe("what decides whether a payout is allowed", () => {
       userId: OTHER,
       approvedName: "EMEKA CHUKWUEMEKA OKAFOR",
       reason: "Another account entirely",
-      approvedByEmail: "admin@pryva.ng",
+      approvedByEmail: "admin@example.test",
     });
 
     await expect(nameCheck.checkPayoutDestination(EMeka, "EMEKA CHUKWUEMEKA OKAFOR")).resolves.toMatchObject({ ok: false });
@@ -167,9 +167,9 @@ describe("what decides whether a payout is allowed", () => {
       userId: EMeka,
       approvedName: "EMEKA CHUKWUEMEKA OKAFOR",
       reason: "Approved then withdrawn",
-      approvedByEmail: "admin@pryva.ng",
+      approvedByEmail: "admin@example.test",
       revokedAt: new Date(),
-      revokedByEmail: "admin@pryva.ng",
+      revokedByEmail: "admin@example.test",
     });
 
     await expect(nameCheck.checkPayoutDestination(EMeka, "EMEKA CHUKWUEMEKA OKAFOR")).resolves.toMatchObject({ ok: false });
@@ -182,7 +182,7 @@ describe("what decides whether a payout is allowed", () => {
       userId: EMeka,
       approvedName: "EMEKA CHUKWUEMEKA OKAFOR",
       reason: "Funded by gift card; identity checked at support",
-      approvedByEmail: "admin@pryva.ng",
+      approvedByEmail: "admin@example.test",
     });
 
     await expect(nameCheck.checkPayoutDestination(EMeka, "EMEKA CHUKWUEMEKA OKAFOR")).resolves.toEqual({
@@ -230,7 +230,7 @@ describe("the administrator's review endpoint", () => {
       approvedName: "EMEKA CHUKWUEMEKA OKAFOR",
       depositorName: "Emeka",
       reason: "Bank statement supplied in ticket 412",
-      approvedByEmail: "admin@pryva.ng",
+      approvedByEmail: "admin@example.test",
       revokedAt: null,
     });
 
@@ -268,7 +268,7 @@ describe("the administrator's review endpoint", () => {
     expect((await route.POST(request("POST", { userId: EMeka, approvedName: "EMEKA OKAFOR", reason: "Bank statement checked" }))).status).toBe(403);
     expect((await route.GET(request("GET"))).status).toBe(403);
 
-    mocks.admin = { id: ADMIN, email: "admin@pryva.ng" };
+    mocks.admin = { id: ADMIN, email: "admin@example.test" };
     mocks.sameOrigin = false;
     expect((await route.POST(request("POST", { userId: EMeka, approvedName: "EMEKA OKAFOR", reason: "Bank statement checked" }))).status).toBe(403);
     expect(await database.select().from(payoutNameApprovals)).toHaveLength(0);
@@ -284,7 +284,7 @@ describe("the administrator's review endpoint", () => {
     await expect(nameCheck.checkPayoutDestination(EMeka, "EMEKA CHUKWUEMEKA OKAFOR")).resolves.toMatchObject({ ok: false });
     const [approval] = await database.select().from(payoutNameApprovals);
     expect(approval.revokedAt).toBeInstanceOf(Date);
-    expect(approval.revokedByEmail).toBe("admin@pryva.ng");
+    expect(approval.revokedByEmail).toBe("admin@example.test");
 
     const audit = await database.select().from(adminAuditLog);
     expect(audit.map((entry) => entry.action)).toEqual(["user.payout_name", "user.payout_name_revoke"]);

@@ -1,5 +1,6 @@
+import { paystackKeyUsable } from "@/lib/paystack-policy";
 import { NextRequest, NextResponse } from "next/server";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { verifyPaystackSignature } from "@/lib/paystack-webhook";
 import { completeTopUp } from "@/lib/topups";
 import { isTransferEvent, settleTransferEvent } from "@/lib/paystack-transfer-settlement";
@@ -24,7 +25,7 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: NextRequest) {
   const secret = process.env.PAYSTACK_SECRET_KEY?.trim();
-  if (!secret || isPreviewDatabase()) {
+  if (!paystackKeyUsable(secret) || !secret || financialActionsUnavailable()) {
     return NextResponse.json({ error: "Payment webhook is not configured" }, { status: 503 });
   }
 

@@ -1,3 +1,4 @@
+import { financialActionsUnavailable, isVercelPreview } from "@/lib/financial-environment";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuthApi } from "@/lib/auth";
@@ -46,6 +47,7 @@ export async function POST(request: NextRequest) {
 
     if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
     if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
+    if (financialActionsUnavailable()) return NextResponse.json({ error: "Scheduled purchases are unavailable in this environment." }, { status: 503 });
     const limit = await purchaseRateLimiter(`scheduled-create:${user.id}`);
     if (limit.unavailable) return NextResponse.json({ error: "Scheduled purchases are temporarily unavailable." }, { status: 503 });
     if (!limit.allowed) return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
@@ -86,6 +88,7 @@ export async function PATCH(request: NextRequest) {
 
     if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
     if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
+    if (isVercelPreview()) return NextResponse.json({ error: "Schedule changes are unavailable in preview." }, { status: 503 });
     let body: unknown;
     try {
       body = await readJsonWithLimit(request, 2_048);

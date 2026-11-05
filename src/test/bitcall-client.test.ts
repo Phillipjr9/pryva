@@ -60,6 +60,21 @@ describe("gateway configuration", () => {
     expect(isBitcallConfigured()).toBe(false);
   });
 
+  it("refuses test and unknown gateway keys in production before any request", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("VERCEL_ENV", "production");
+    for (const id of ["ak_test_example", "unknown", "ak_live_"]) {
+      vi.stubEnv("BITCALL_KEY_ID", id);
+      expect(isBitcallConfigured()).toBe(false);
+      const error = await listBitcallEsimPlans().catch((caught: unknown) => caught) as BitcallError;
+      expect(error.code).toBe("INVALID_KEY_ENVIRONMENT");
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.stubEnv("BITCALL_KEY_ID", "ak_live_example");
+    expect(isBitcallConfigured()).toBe(true);
+  });
+
   it("reports the key environment from the prefix instead of trusting a label", () => {
     expect(bitcallKeyEnvironment()).toBe("test");
     vi.stubEnv("BITCALL_KEY_ID", "ak_live_9z8y");

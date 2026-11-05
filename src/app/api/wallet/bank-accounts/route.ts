@@ -5,7 +5,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { requireAuthApi } from "@/lib/auth";
 import { resolveBankAccount, createTransferRecipient, getBanks, isPaystackConfigured } from "@/lib/paystack";
 import { FALLBACK_BANKS } from "@/lib/banks";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { isSameOriginMutation } from "@/lib/net";
 import { logger } from "@/lib/logger";
 import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get("content-type") ?? "")) {
       return NextResponse.json({ error: "Content-Type must be application/json" }, { status: 415 });
     }
-    if (isPreviewDatabase() || !isPaystackConfigured()) {
+    if (financialActionsUnavailable() || !isPaystackConfigured()) {
       return NextResponse.json({ error: "Bank transfers are unavailable in this environment." }, { status: 503 });
     }
 

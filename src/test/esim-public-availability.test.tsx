@@ -13,12 +13,13 @@ function connected() {
 }
 
 describe("eSIM availability shown to customers", () => {
-  it("shows unavailable plans as examples, never as purchase links", () => {
+  it("shows an unavailable state rather than invented plans", () => {
     vi.stubEnv("BITCALL_KEY_ID", "");
     vi.stubEnv("BITCALL_API_SECRET", "");
     const html = renderToStaticMarkup(<EsimPage />);
-    expect(html).toContain("Ordering is not connected yet.");
-    expect(html).toContain("Example only — this plan cannot be ordered.");
+    expect(html).toContain("eSIM ordering is not connected yet.");
+    expect(html).not.toContain("Example only");
+    expect(html).not.toContain("Nigeria Lite");
     expect(html).not.toContain("/signup?plan=esim-");
   });
 
@@ -37,7 +38,7 @@ describe("eSIM availability shown to customers", () => {
     connected();
     const html = renderToStaticMarkup(<StatusPage />);
     expect(html).toContain("eSIM ordering is connected.");
-    expect(html).toContain("example plans are not orderable");
+    expect(html).not.toContain("example plans are not orderable");
     expect(html).not.toContain("6 of 6 plans in this category can be ordered");
   });
 
@@ -46,7 +47,7 @@ describe("eSIM availability shown to customers", () => {
     vi.stubEnv("DATABASE_URL", "");
     vi.stubEnv("PGHOST", "");
     const html = renderToStaticMarkup(<EsimPage />);
-    expect(html).toContain("Ordering is not connected yet.");
+    expect(html).toContain("eSIM ordering is not connected yet.");
     expect(html).not.toContain("eSIM ordering is connected.");
   });
 });

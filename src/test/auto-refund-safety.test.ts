@@ -18,6 +18,22 @@ beforeAll(async () => {
   vi.stubEnv("CRON_SECRET", "test-cron-secret");
   ({ db } = await import("@/db"));
   schema = await import("@/db/schema");
+  // Only this test owns these records; previews no longer seed customer data.
+  await db.insert(schema.users).values({
+    id: "refund-fixture-user", name: "Refund fixture", email: "refund@example.test",
+    passwordHash: "test-hash", walletBalance: 25_000,
+  });
+  const base = {
+    userId: "refund-fixture-user", service: "numbers", productSlug: "vn-ng",
+    productName: "Fixture", planLabel: "Single", region: "Nigeria", amount: 1000,
+    status: "active", provider: "fleexa", createdAt: new Date(Date.now() - 60 * 60_000),
+    refundedAt: null,
+  };
+  await db.insert(schema.orders).values([
+    { ...base, id: "refund-fixture-code", reference: "FIX-CODE", duration: SINGLE_NUMBER_WINDOW, otpCode: "123456" },
+    { ...base, id: "refund-fixture-rental", reference: "FIX-RENTAL", duration: "30 days", otpCode: null },
+    { ...base, id: "refund-fixture-esim", reference: "FIX-ESIM", service: "esim", duration: "7 days", otpCode: null },
+  ]);
   ({ processAutoRefunds } = await import("@/lib/auto-refund"));
   ({ POST: cronPost } = await import("@/app/api/cron/auto-refund/route"));
 });
@@ -32,7 +48,7 @@ const old = () => new Date(Date.now() - 60 * 60_000);
 
 async function insertUndelivered(overrides: Record<string, unknown> = {}) {
   await db.insert(schema.orders).values({
-    id: "refund-eligible", reference: "REFUND-TEST", userId: "demo-user", service: "numbers",
+    id: "refund-eligible", reference: "REFUND-TEST", userId: "refund-fixture-user", service: "numbers",
     productSlug: "vn-ng", productName: "Test number", planLabel: "Single", region: "Nigeria",
     duration: SINGLE_NUMBER_WINDOW, amount: 1000, status: "active", provider: "fleexa",
     providerRequestId: "req-123", createdAt: old(), refundedAt: null, otpCode: null,
@@ -42,26 +58,25 @@ async function insertUndelivered(overrides: Record<string, unknown> = {}) {
 
 describe("automatic refunds for undelivered number orders", () => {
   it("refunds an expired live single number with no code, once, and releases it upstream", async () => {
-    // The seeded number already has a code; age it to expose any bug that
-    // ignores the code. Rentals and eSIMs in the seed are already old.
-    await db.update(schema.orders).set({ createdAt: old() }).where(eq(schema.orders.id, "demo-order-live"));
+    // Age the explicit test number with a code; the rental and eSIM are already old.
+    await db.update(schema.orders).set({ createdAt: old() }).where(eq(schema.orders.id, "refund-fixture-code"));
     await insertUndelivered();
 
-    const [before] = await db.select().from(schema.users).where(eq(schema.users.id, "demo-user"));
+    const [before] = await db.select().from(schema.users).where(eq(schema.users.id, "refund-fixture-user"));
     expect(await processAutoRefunds()).toEqual({ refunded: 1, cancelled: 1 });
     // Idempotent: a second sweep must not credit the same order again.
     expect(await processAutoRefunds()).toEqual({ refunded: 0, cancelled: 0 });
 
-    const all = await db.select().from(schema.orders).where(eq(schema.orders.userId, "demo-user"));
+    const all = await db.select().from(schema.orders).where(eq(schema.orders.userId, "refund-fixture-user"));
     expect(all.find((order) => order.id === "refund-eligible")?.status).toBe("refunded");
     // Released cleanly, so there is nothing for a human to chase.
     expect(all.find((order) => order.id === "refund-eligible")?.reconciliationNote).toBeFalsy();
-    expect(all.find((order) => order.id === "demo-order-live")?.status).toBe("active");
+    expect(all.find((order) => order.id === "refund-fixture-code")?.status).toBe("active");
     // A rental has no upstream cancel, so it must never be swept automatically.
-    expect(all.find((order) => order.id === "demo-order-rental")?.status).toBe("active");
-    expect(all.find((order) => order.id === "demo-order-esim")?.status).toBe("active");
+    expect(all.find((order) => order.id === "refund-fixture-rental")?.status).toBe("active");
+    expect(all.find((order) => order.id === "refund-fixture-esim")?.status).toBe("active");
 
-    const [after] = await db.select().from(schema.users).where(eq(schema.users.id, "demo-user"));
+    const [after] = await db.select().from(schema.users).where(eq(schema.users.id, "refund-fixture-user"));
     expect(after.walletBalance).toBe(before.walletBalance + 1000);
 
     const ledger = await db.select().from(schema.walletTransactions).where(eq(schema.walletTransactions.orderId, "refund-eligible"));

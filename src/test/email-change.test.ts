@@ -68,8 +68,8 @@ beforeEach(async () => {
   mocks.fetch.mockImplementation(async () => new Response(JSON.stringify({ id: "message-1" }), { status: 200 }));
   vi.stubGlobal("fetch", mocks.fetch);
   process.env.RESEND_API_KEY = "re_test";
-  process.env.RESEND_FROM_EMAIL = "Pryva <hello@pryva.ng>";
-  process.env.NEXT_PUBLIC_APP_URL = "https://pryva.ng";
+  process.env.RESEND_FROM_EMAIL = "Pryva <hello@example.test>";
+  process.env.NEXT_PUBLIC_APP_URL = "https://pryvalogs.com";
 
   await database.execute(sql`TRUNCATE TABLE email_change_requests, users CASCADE`);
   await database.insert(users).values([

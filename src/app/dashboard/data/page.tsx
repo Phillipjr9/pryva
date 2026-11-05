@@ -17,7 +17,7 @@ export default async function DataPlansPage({ searchParams }: { searchParams: Pr
       <div>
         <ServiceTitle service="data">Data Plans</ServiceTitle>
         <p className="mt-1 text-[0.86rem] text-ink-2">
-          Browse data plans and pricing. Data plans cannot be delivered yet.
+          Mobile data purchases are not available yet. No wallet charge will be made.
         </p>
       </div>
       <DataPlansForm key={initialPlan?.id ?? "all"} user={user} initialPlanId={initialPlan?.id} />

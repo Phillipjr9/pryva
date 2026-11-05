@@ -50,9 +50,9 @@ legacy migrations are excluded because they assume a different old schema. Back
 up the database first. The production build is configured to run migrations before
 building; preview builds do not. Migrations must therefore be reviewed for
 compatibility with the old application, which may still be serving traffic.
-Migration 0034 deliberately removes delivery snapshots, passkeys and pending
-email-change requests associated with already closed accounts; financial ledger
-rows remain.
+Migration 0034 leaves existing closed-account snapshots, passkeys and pending
+email-change requests untouched. The current email worker skips closed accounts;
+old sensitive records require a separately authorized privacy review.
 
 Pricing
 -------

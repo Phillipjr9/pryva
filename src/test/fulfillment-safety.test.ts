@@ -70,13 +70,18 @@ const DELIVERABLE: Array<[slug: string, args: unknown]> = [
  * see the dedicated test below.
  */
 const UNDELIVERABLE = [
-  "esim-ng-1", "esim-ng-5", "esim-africa", "esim-europe", "esim-us", "esim-global",
   "proxy-ng-1", "proxy-ng-5", "proxy-us-5", "proxy-eu-10", "proxy-ng-25",
   "vn-otp-5",
   "rent-ng-7",
 ];
 
 describe("fulfilment", () => {
+  it("does not expose written eSIM samples as catalogue plans", () => {
+    for (const slug of ["esim-ng-1", "esim-ng-5", "esim-africa", "esim-europe", "esim-us", "esim-global"]) {
+      expect(findPlan(slug)).toBeUndefined();
+      expect(isPlanFulfillable(slug)).toBe(false);
+    }
+  });
   it("refuses everything when no provider key is configured", async () => {
     provider.configured = false;
     await expect(fulfillPlan(findPlan("vn-ng")!)).rejects.toMatchObject({ code: "NO_API_KEY" });

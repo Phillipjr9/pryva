@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BitcallEsimPlan } from "@/lib/bitcall";
 
 /**
@@ -70,7 +70,18 @@ async function catalog(plans: BitcallEsimPlan[]) {
   return readEsimCatalog(true);
 }
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe("eSIM offers", () => {
+  it("does not load the live catalogue from a Vercel preview with a persistent database", async () => {
+    vi.stubEnv("DATABASE_URL", "postgres://mock.invalid/db");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    const { readEsimCatalog } = await import("@/lib/esim-catalog");
+    await expect(readEsimCatalog()).rejects.toThrow(/unavailable in this environment/i);
+    expect(gateway.plans).not.toHaveBeenCalled();
+    expect(gateway.countries).not.toHaveBeenCalled();
+  });
+
   it("never loads the live catalogue in an in-memory preview", async () => {
     gateway.preview = true;
     const { readEsimCatalog } = await import("@/lib/esim-catalog");
