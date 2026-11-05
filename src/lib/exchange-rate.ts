@@ -14,6 +14,7 @@
 
 import "server-only";
 import { logger } from "@/lib/logger";
+import { readJsonWithLimit } from "@/lib/request-body";
 
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const FALLBACK_RATE = Number(process.env.USD_NGN_FALLBACK || 1600);
@@ -93,4 +94,87 @@ export async function getUsdToNgnRate(): Promise<RateInfo> {
 
 export function clearRateCache(): void {
   cache = null;
+  quoteCache.clear();
+  quoteFailureUntil.clear();
+}
+
+/**
+ * A purchase-sensitive quote needs a current rate, not the legacy display
+ * fallback above. These are the account currencies the eSIM catalog supports.
+ * An operator can pin their actual funding rate; otherwise use the same public
+ * source as the rest of the app, but validate its base and publication time.
+ */
+export type NgnQuoteCurrency = "USD" | "EUR";
+export type NgnQuoteRate = { rate: number; source: "override" | "live"; fetchedAt: string };
+const QUOTE_RATE_MAX_AGE_MS = 36 * 60 * 60 * 1000;
+const QUOTE_RATE_FUTURE_SKEW_MS = 5 * 60 * 1000;
+const QUOTE_RATE_FAILURE_TTL_MS = 60 * 1000;
+const quoteCache = new Map<NgnQuoteCurrency, { rate: NgnQuoteRate; checkedAt: number }>();
+const quoteInFlight = new Map<NgnQuoteCurrency, Promise<NgnQuoteRate | null>>();
+const quoteFailureUntil = new Map<NgnQuoteCurrency, number>();
+
+async function fetchFreshNgnRate(currency: NgnQuoteCurrency): Promise<NgnQuoteRate | null> {
+  try {
+    const response = await fetch(`https://open.er-api.com/v6/latest/${currency}`, {
+      cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) return null;
+    const payload = await readJsonWithLimit(response, 256_000) as {
+      result?: unknown;
+      base_code?: unknown;
+      time_last_update_unix?: unknown;
+      rates?: { NGN?: unknown };
+    };
+    const rate = payload.rates?.NGN;
+    const published = typeof payload.time_last_update_unix === "number" ? payload.time_last_update_unix * 1000 : NaN;
+    const age = Date.now() - published;
+    if (payload.result !== "success" || payload.base_code !== currency ||
+        typeof rate !== "number" || !Number.isFinite(rate) || rate <= 100 ||
+        !Number.isFinite(published) || age < -QUOTE_RATE_FUTURE_SKEW_MS || age > QUOTE_RATE_MAX_AGE_MS) {
+      return null;
+    }
+    return { rate, source: "live", fetchedAt: new Date(published).toISOString() };
+  } catch (error) {
+    logger.warn("Current currency rate unavailable", {
+      currency,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+/**
+ * NGN per unit of the named currency, or null if it cannot be established.
+ * No hard-coded or stale fallback is ever used for an eSIM purchase quote.
+ */
+export async function getFreshNgnRate(currency: NgnQuoteCurrency): Promise<NgnQuoteRate | null> {
+  const raw = process.env[`${currency}_NGN_RATE`]?.trim();
+  if (raw) {
+    const rate = Number(raw);
+    return Number.isFinite(rate) && rate > 100
+      ? { rate, source: "override", fetchedAt: new Date().toISOString() }
+      : null;
+  }
+  const now = Date.now();
+  const cached = quoteCache.get(currency);
+  if (cached && now - cached.checkedAt < CACHE_TTL_MS &&
+      now - Date.parse(cached.rate.fetchedAt) <= QUOTE_RATE_MAX_AGE_MS) return cached.rate;
+  if ((quoteFailureUntil.get(currency) ?? 0) > now) return null;
+
+  let inProgress = quoteInFlight.get(currency);
+  if (!inProgress) {
+    inProgress = fetchFreshNgnRate(currency).then((rate) => {
+      if (rate) {
+        quoteCache.set(currency, { rate, checkedAt: Date.now() });
+        quoteFailureUntil.delete(currency);
+      } else {
+        quoteFailureUntil.set(currency, Date.now() + QUOTE_RATE_FAILURE_TTL_MS);
+      }
+      return rate;
+    }).finally(() => { quoteInFlight.delete(currency); });
+    quoteInFlight.set(currency, inProgress);
+  }
+  return inProgress;
 }
