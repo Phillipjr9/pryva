@@ -1,6 +1,7 @@
 import "server-only";
 import { createRateLimiter, resetRateLimit } from "@/lib/platform/rate-limit";
 import { readJsonWithLimit } from "@/lib/platform/request-body";
+import { ProviderError } from "@/lib/providers/types";
 
 const DEFAULT_BASE_URL = "https://public-api.foxreload.com";
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -16,15 +17,13 @@ export async function resetFoxreloadRateBudget(): Promise<void> {
   await resetRateLimit("foxreload:edge");
 }
 
-export class FoxreloadError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly code?: string,
-    public readonly details?: unknown,
-  ) {
-    super(message);
+export class FoxreloadError extends ProviderError {
+  readonly details?: unknown;
+
+  constructor(message: string, status: number, code?: string, details?: unknown) {
+    super(message, { provider: "foxreload", status, code: code ?? "FOXRELOAD_ERROR" });
     this.name = "FoxreloadError";
+    this.details = details;
   }
 }
 

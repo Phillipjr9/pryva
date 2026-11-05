@@ -39,21 +39,20 @@ import "server-only";
 import { createRateLimiter } from "@/lib/platform/rate-limit";
 import { logger } from "@/lib/platform/logger";
 import { usdMicros, usdStringFromMicros, SupplierMoneyError } from "@/lib/payments/supplier-money";
+import { ProviderError } from "@/lib/providers/types";
 
 const DEFAULT_BASE_URL = "https://bulkacc.com";
 const REQUEST_TIMEOUT_MS = 20_000;
 /** The supplier publishes no rate limit; stay conservative and cache catalogs. */
 const supplierBudget = createRateLimiter({ windowMs: 60_000, maxRequests: 30 });
 
-export class BulkaccError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly status: number,
-    public readonly retryAfterSeconds?: number,
-  ) {
-    super(message);
+export class BulkaccError extends ProviderError {
+  readonly retryAfterSeconds?: number;
+
+  constructor(message: string, code: string, status: number, retryAfterSeconds?: number) {
+    super(message, { provider: "bulkacc", status, code });
     this.name = "BulkaccError";
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 

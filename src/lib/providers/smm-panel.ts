@@ -32,6 +32,7 @@
 import "server-only";
 import { createRateLimiter } from "@/lib/platform/rate-limit";
 import { readJsonWithLimit } from "@/lib/platform/request-body";
+import { ProviderError } from "@/lib/providers/types";
 
 const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_CATALOG_ENTRIES = 5_000;
@@ -40,13 +41,9 @@ const MAX_CATALOG_ENTRIES = 5_000;
 // refreshes and status polling without inviting a block.
 const panelBudget = createRateLimiter({ windowMs: 60_000, maxRequests: 30 });
 
-export class SmmPanelError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly code?: string,
-  ) {
-    super(message);
+export class SmmPanelError extends ProviderError {
+  constructor(message: string, status: number = 502, code: string = "SMM_PANEL_ERROR") {
+    super(message, { provider: "smm", status, code });
     this.name = "SmmPanelError";
   }
 }

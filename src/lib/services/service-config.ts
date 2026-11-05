@@ -1,9 +1,7 @@
 import "server-only";
 
 import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
-import { isBitcallConfigured } from "@/lib/providers/bitcall";
-import { isFleexaConfigured } from "@/lib/providers/fleexa";
-import { isSmmPanelConfigured } from "@/lib/providers/smm-panel";
+import { PROVIDERS } from "@/lib/providers";
 import { isMarketplaceCheckoutConfigured } from "@/lib/services/accounts/marketplace-policy";
 import {
   laneById,
@@ -26,10 +24,15 @@ import {
  */
 
 const SUPPLIERS: Record<SupplierSource, () => boolean> = {
-  fleexa: isFleexaConfigured,
-  smm: isSmmPanelConfigured,
+  fleexa: PROVIDERS.fleexa.configured,
+  smm: PROVIDERS.smm.configured,
+  bitcall: PROVIDERS.bitcall.configured,
+  /**
+   * Not a single adapter: the marketplace is a policy over two feeds and the
+   * hand-prepared queue, and the gate is the policy rather than either feed. It
+   * stays explicit for that reason.
+   */
   marketplace: isMarketplaceCheckoutConfigured,
-  bitcall: isBitcallConfigured,
 };
 
 /** Is the credential for this supplier present? No preview logic, no copy. */

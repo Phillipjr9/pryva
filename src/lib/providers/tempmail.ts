@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { logger } from "@/lib/platform/logger";
+import { ProviderError } from "@/lib/providers/types";
 
 /**
  * Public Disposable Mailbox Provider.
@@ -26,13 +27,9 @@ export type TempMailMessage = {
   receivedAt: string | null;
 };
 
-export class TempMailError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number = 502,
-    public readonly code: string = "TEMPMAIL_ERROR",
-  ) {
-    super(message);
+export class TempMailError extends ProviderError {
+  constructor(message: string, status: number = 502, code: string = "TEMPMAIL_ERROR") {
+    super(message, { provider: "tempmail", status, code });
     this.name = "TempMailError";
   }
 }
