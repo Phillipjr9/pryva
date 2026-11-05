@@ -111,6 +111,15 @@ export const demoRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests
 export const authRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 5 });
 export const purchaseRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 10 });
 /**
+ * Reading the live catalogue is not a purchase.
+ *
+ * The hub re-reads it whenever the customer picks a country, and the read fans
+ * out to three suppliers, so it needs its own budget: ten a minute (the purchase
+ * bucket) throttled a customer browsing four countries and then pressing Retry,
+ * and the throttled answer looked identical to a supplier outage.
+ */
+export const catalogRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 30 });
+/**
  * Give one slot back.
  *
  * Rate limits here count *attempts*, which is right when an attempt is the thing

@@ -21,7 +21,9 @@ vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
   // Keep the real module: other limiters are constructed when a route imports
   // a money module, and a factory that omits them fails at import time.
   const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
-  return { ...actual, purchaseRateLimiter: state.limit };
+  // The catalogue reads through its own bucket: browsing must not spend the
+  // budget that purchases depend on, and vice versa.
+  return { ...actual, catalogRateLimiter: state.limit };
 });
 vi.mock("@/lib/services/numbers/fleexa-catalog", () => ({ readSupplierSnapshot: state.snapshot, supplierItemsForCountry: state.items }));
 // Mocked so the real clients never load: each calls createRateLimiter at import
@@ -59,7 +61,11 @@ describe("supplier catalog endpoint", () => {
   it("does not query live catalogues from a Vercel preview with a persistent database", async () => {
     vi.stubEnv("DATABASE_URL", "postgres://mock.invalid/db");
     vi.stubEnv("VERCEL_ENV", "preview");
-    expect((await GET(request())).status).toBe(404);
+    const response = await GET(request());
+    // Not an error: the environment is closed, so it reports that instead of a
+    // retryable failure the hub could only render as breakage.
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, live: false, reason: "environment", partial: false, fetchedAt: null, items: [] });
     expect(state.snapshot).not.toHaveBeenCalled();
     expect(state.boostSnapshot).not.toHaveBeenCalled();
     expect(state.esimSnapshot).not.toHaveBeenCalled();
@@ -67,18 +73,28 @@ describe("supplier catalog endpoint", () => {
 
   it("never reaches the provider from the public preview or without authentication", async () => {
     state.preview = true;
-    expect((await GET(request())).status).toBe(404);
+    const preview = await GET(request());
+    expect(preview.status).toBe(200);
+    expect(await preview.json()).toMatchObject({ ok: true, live: false, reason: "environment", items: [] });
     state.preview = false; state.user = null;
+    // Signed out is still a real 401: the customer needs to sign in, not retry.
     expect((await GET(request())).status).toBe(401);
     expect(state.snapshot).not.toHaveBeenCalled();
     expect(state.boostSnapshot).not.toHaveBeenCalled();
+    expect(state.esimSnapshot).not.toHaveBeenCalled();
   });
 
   it("validates country, fails closed on the limiter and keeps the result sanitized", async () => {
     expect((await GET(request("not-real"))).status).toBe(400);
     state.limit.mockResolvedValueOnce({ allowed: false, unavailable: true }).mockResolvedValueOnce({ allowed: false });
-    expect((await GET(request())).status).toBe(503);
-    expect((await GET(request())).status).toBe(429);
+    const down = await GET(request());
+    expect(down.status).toBe(503);
+    expect(await down.json()).toMatchObject({ reason: "unavailable" });
+    const throttled = await GET(request());
+    expect(throttled.status).toBe(429);
+    // The hub shows different copy for a throttle than for an outage.
+    expect(await throttled.json()).toMatchObject({ reason: "throttled" });
+    expect(state.limit).toHaveBeenCalledWith("supplier-catalog:buyer");
     const response = await GET(request());
     const body = await response.text();
     expect(response.status).toBe(200);
@@ -90,7 +106,7 @@ describe("supplier catalog endpoint", () => {
   it("does not read an unconfigured supplier, and does not call that partial", async () => {
     const body = await (await GET(request())).json();
     expect(state.boostSnapshot).not.toHaveBeenCalled();
-    expect(body).toMatchObject({ ok: true, partial: false, items: [SIGNAL] });
+    expect(body).toMatchObject({ ok: true, live: true, partial: false, items: [SIGNAL] });
   });
 
   it("serves boosting listings on their own when no other supplier is configured", async () => {
@@ -100,13 +116,13 @@ describe("supplier catalog endpoint", () => {
     expect(state.snapshot).not.toHaveBeenCalled();
     expect(response.status).toBe(200);
     // A single configured supplier is the steady state, not a degraded read.
-    expect(body).toMatchObject({ ok: true, partial: false, fetchedAt: "2026-01-02T00:00:00Z", items: [BOOST] });
+    expect(body).toMatchObject({ ok: true, live: true, partial: false, fetchedAt: "2026-01-02T00:00:00Z", items: [BOOST] });
   });
 
   it("merges both suppliers and reports the later fetch time", async () => {
     state.boostConfigured = true;
     const body = await (await GET(request())).json();
-    expect(body).toMatchObject({ ok: true, partial: false, fetchedAt: "2026-01-02T00:00:00Z", items: [SIGNAL, BOOST] });
+    expect(body).toMatchObject({ ok: true, live: true, partial: false, fetchedAt: "2026-01-02T00:00:00Z", items: [SIGNAL, BOOST] });
   });
 
   it("degrades to a partial catalog when one configured supplier fails", async () => {
@@ -114,7 +130,7 @@ describe("supplier catalog endpoint", () => {
     state.boostSnapshot.mockRejectedValue(new Error("Boosting catalog unavailable"));
     const response = await GET(request());
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ ok: true, partial: true, items: [SIGNAL] });
+    expect(await response.json()).toMatchObject({ ok: true, live: true, partial: true, reason: "partial", items: [SIGNAL] });
   });
 
   it("serves eSIM listings on their own when no other supplier is configured", async () => {
@@ -124,7 +140,7 @@ describe("supplier catalog endpoint", () => {
     expect(state.snapshot).not.toHaveBeenCalled();
     expect(state.boostSnapshot).not.toHaveBeenCalled();
     expect(response.status).toBe(200);
-    expect(body).toMatchObject({ ok: true, partial: false, fetchedAt: "2026-01-03T00:00:00Z", items: [ESIM] });
+    expect(body).toMatchObject({ ok: true, live: true, partial: false, fetchedAt: "2026-01-03T00:00:00Z", items: [ESIM] });
   });
 
   it("is unavailable only when every configured supplier fails", async () => {
@@ -134,9 +150,14 @@ describe("supplier catalog endpoint", () => {
     state.esimSnapshot.mockRejectedValue(new Error("eSIM catalog unavailable"));
     expect((await GET(request())).status).toBe(503);
 
-    // With nothing configured at all there is no catalog to serve either.
+  });
+
+  it("treats a deployment with no supplier connected as a steady state, not an outage", async () => {
     state.fleexaConfigured = false; state.boostConfigured = false; state.bitcallConfigured = false;
-    expect((await GET(request())).status).toBe(503);
+    const response = await GET(request());
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(await response.json()).toMatchObject({ ok: true, live: false, reason: "unconfigured", partial: false, fetchedAt: null, items: [] });
   });
 
   it("passes the refresh flag through to every configured supplier", async () => {
