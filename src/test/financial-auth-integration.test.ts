@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   rentalSms: vi.fn(),
   otpActivation: vi.fn(),
   destroySession: vi.fn(),
+  scheduleClosed: vi.fn(),
   googleProfile: vi.fn(),
   exchange: vi.fn(),
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -44,6 +45,7 @@ vi.mock("@/lib/admin-auth", () => ({
   authorizeAdminApi: async () => ({ user: { id: "admin-id" }, response: null }),
 }));
 vi.mock("@/lib/logger", () => ({ logger: mocks.log }));
+vi.mock("@/lib/account-closed-email", () => ({ scheduleAccountClosedEmail: mocks.scheduleClosed }));
 vi.mock("next/headers", () => ({ cookies: mocks.cookies }));
 vi.mock("@/lib/google", () => ({
   googleConfigured: () => true, exchangeGoogleCode: mocks.exchange, fetchGoogleUser: mocks.googleProfile,
@@ -764,7 +766,7 @@ describe("Google subject binding and account protection", () => {
     await database.insert(schema.emailChangeRequests).values({ userId: USER, newEmail: "new-address@example.com", tokenHash: "changehash", expiresAt: new Date(Date.now() + 60_000) });
     await database.insert(schema.webauthnCredentials).values({ userId: USER, credentialId: "sensitive-credential", publicKey: "AQID", counter: 0 });
     expect(await database.select().from(schema.walletEmailOutbox)).not.toHaveLength(0);
-    await database.update(schema.users).set({ walletBalance: 0 }).where(eq(schema.users.id, USER));
+    await database.update(schema.users).set({ walletBalance: 0, emailVerifiedAt: new Date() }).where(eq(schema.users.id, USER));
     mocks.user.mockResolvedValue({ id: USER, email: "buyer@example.com", name: "Buyer", walletBalance: 0 });
     mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session" ? { value: "current-token" } : undefined });
 
@@ -776,6 +778,8 @@ describe("Google subject binding and account protection", () => {
     const response = await deleteRoute.POST(request);
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ ok: true, deleted: true, retained: { orders: 1, walletTransactions: 1 } });
+    expect(mocks.scheduleClosed).toHaveBeenCalledOnce();
+    expect(mocks.scheduleClosed).toHaveBeenCalledWith({ to: "buyer@example.com", when: expect.any(Date) });
 
     // The row survives — 20+ tables point at it — but it is no longer a person.
     const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
@@ -807,6 +811,7 @@ describe("Google subject binding and account protection", () => {
     expect(receipt.userId).toBe(USER);
     expect(receipt.reason).toBe("self_service");
     expect(receipt.retained).toMatchObject({ orders: 1, walletTransactions: 1 });
+    expect(JSON.stringify(receipt)).not.toContain("buyer@example.com");
 
     // Closing twice is not a second deletion. In production the session row is
     // gone, so this is a 401; here the auth helper is mocked, so the typed address
@@ -815,6 +820,7 @@ describe("Google subject binding and account protection", () => {
     const again = await deleteRoute.POST(request);
     expect([400, 401, 409]).toContain(again.status);
     expect(await database.select().from(schema.accountDeletions)).toHaveLength(1);
+    expect(mocks.scheduleClosed).toHaveBeenCalledOnce();
   });
 
   it("closes with a balance only when the forfeiture is acknowledged, and writes it down", async () => {
@@ -836,8 +842,14 @@ describe("Google subject binding and account protection", () => {
     expect(untouched.deletedAt).toBeNull();
     expect(untouched.walletBalance).toBe(10_000);
 
-    // With it, the account closes and the balance is forfeited — in the ledger.
-    const closed = await post({ confirm: "buyer@example.com", password: "hash", forfeitAcknowledged: true });
+    // Consent to a different or unspecified amount cannot forfeit this balance.
+    expect((await post({ confirm: "buyer@example.com", password: "hash", forfeitAcknowledged: true })).status).toBe(409);
+    const staleAmount = await post({ confirm: "buyer@example.com", password: "hash", forfeitAcknowledged: true, forfeitAmount: 9000 });
+    expect(staleAmount.status).toBe(409);
+    expect((await staleAmount.json()).error).toMatch(/refresh this page/i);
+
+    // With the precise acknowledgement, the amount is forfeited in the ledger.
+    const closed = await post({ confirm: "buyer@example.com", password: "hash", forfeitAcknowledged: true, forfeitAmount: 10_000 });
     expect(closed.status).toBe(200);
     expect(await closed.json()).toMatchObject({ ok: true, deleted: true, forfeited: 10_000 });
 
@@ -859,6 +871,8 @@ describe("Google subject binding and account protection", () => {
 
     const [receipt] = await database.select().from(schema.accountDeletions);
     expect(receipt.forfeited).toBe(10_000);
+    // The default fixture has not verified its address, so no email is queued.
+    expect(mocks.scheduleClosed).not.toHaveBeenCalled();
   });
 
   it("holds a closure while a payout is still moving", async () => {
@@ -878,6 +892,155 @@ describe("Google subject binding and account protection", () => {
     expect((await response.json()).code).toBe("WITHDRAWAL_IN_FLIGHT");
     const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
     expect(user.deletedAt).toBeNull();
+  });
+
+  it("does not send a closure notice to a stale email after an identity change", async () => {
+    await database.insert(schema.sessions).values({ userId: USER, token: "current-token", expiresAt: new Date(Date.now() + 60_000), createdAt: new Date() });
+    await database.update(schema.users).set({ walletBalance: 0, emailVerifiedAt: new Date() }).where(eq(schema.users.id, USER));
+    mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session" ? { value: "current-token" } : undefined });
+    const original = database.transaction.bind(database);
+    const transaction = vi.spyOn(database, "transaction").mockImplementationOnce(async (callback, config) => {
+      // The address changes after the pre-check but before the closure lock.
+      await database.update(schema.users).set({ email: "changed@example.com" }).where(eq(schema.users.id, USER));
+      return original(callback, config);
+    });
+    try {
+      const response = await deleteRoute.POST(new NextRequest("https://pryva.test/api/user/delete", {
+        method: "POST", headers: { origin: "https://pryva.test", "content-type": "application/json" },
+        body: JSON.stringify({ confirm: "buyer@example.com", password: "hash" }),
+      }));
+      expect(response.status).toBe(409);
+      expect(mocks.scheduleClosed).not.toHaveBeenCalled();
+      expect((await database.select().from(schema.users).where(eq(schema.users.id, USER)))[0].deletedAt).toBeNull();
+    } finally { transaction.mockRestore(); }
+  });
+
+  it.each([
+    ["password", { passwordHash: "new-password-hash" }],
+    ["Google identity", { googleSubject: "new-google-subject" }],
+  ])("refuses closure if the %s changes after the initial proof", async (_name, change) => {
+    await database.insert(schema.sessions).values({ userId: USER, token: "current-token", expiresAt: new Date(Date.now() + 60_000), createdAt: new Date() });
+    await database.update(schema.users).set({ walletBalance: 0, emailVerifiedAt: new Date() }).where(eq(schema.users.id, USER));
+    mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session" ? { value: "current-token" } : undefined });
+    const original = database.transaction.bind(database);
+    const transaction = vi.spyOn(database, "transaction").mockImplementationOnce(async (callback, config) => {
+      // Simulate the committed identity update between the pre-check and lock.
+      // PGlite does not prove the outcome of concurrent production transactions.
+      await database.update(schema.users).set(change).where(eq(schema.users.id, USER));
+      return original(callback, config);
+    });
+    try {
+      const response = await deleteRoute.POST(new NextRequest("https://pryva.test/api/user/delete", {
+        method: "POST", headers: { origin: "https://pryva.test", "content-type": "application/json" },
+        body: JSON.stringify({ confirm: "buyer@example.com", password: "hash" }),
+      }));
+      expect(response.status).toBe(409);
+      expect(mocks.scheduleClosed).not.toHaveBeenCalled();
+      expect((await database.select().from(schema.users).where(eq(schema.users.id, USER)))[0].deletedAt).toBeNull();
+    } finally { transaction.mockRestore(); }
+  });
+
+  it("does not schedule a notice or retain partial closure work if the transaction rolls back", async () => {
+    await database.insert(schema.sessions).values({ userId: USER, token: "current-token", expiresAt: new Date(Date.now() + 60_000), createdAt: new Date() });
+    await database.update(schema.users).set({ emailVerifiedAt: new Date() }).where(eq(schema.users.id, USER));
+    await database.insert(schema.walletTransactions).values({
+      userId: USER, type: "credit", amount: 1000, balanceAfter: 10_000,
+      description: "Existing credit", reference: "EXISTING-CREDIT",
+    });
+    const beforeOutbox = await database.select().from(schema.walletEmailOutbox);
+    expect(beforeOutbox.length).toBeGreaterThan(0);
+    mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session" ? { value: "current-token" } : undefined });
+    const original = database.transaction.bind(database);
+    const transaction = vi.spyOn(database, "transaction").mockImplementationOnce(async (callback, config) =>
+      original(async (tx) => {
+        await callback(tx);
+        // Fail after every mutation, but before the actual transaction commit.
+        throw new Error("database failure involving buyer@example.com");
+      }, config),
+    );
+    try {
+      const response = await deleteRoute.POST(new NextRequest("https://pryva.test/api/user/delete", {
+        method: "POST", headers: { origin: "https://pryva.test", "content-type": "application/json" },
+        body: JSON.stringify({ confirm: "buyer@example.com", password: "hash", forfeitAcknowledged: true, forfeitAmount: 10_000 }),
+      }));
+      expect(response.status).toBe(500);
+      expect((await response.json()).error).toMatch(/couldn't confirm whether/i);
+      const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+      expect(user).toMatchObject({ deletedAt: null, email: "buyer@example.com", walletBalance: 10_000 });
+      expect(await database.select().from(schema.sessions)).toHaveLength(1);
+      expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+      expect(await database.select().from(schema.accountDeletions)).toHaveLength(0);
+      expect(await database.select().from(schema.walletEmailOutbox)).toHaveLength(beforeOutbox.length);
+      expect(mocks.scheduleClosed).not.toHaveBeenCalled();
+      expect(JSON.stringify(mocks.log.error.mock.calls)).not.toContain("buyer@example.com");
+    } finally { transaction.mockRestore(); }
+  });
+
+  it("rechecks withdrawals and the acknowledged amount under the owner lock", async () => {
+    await database.insert(schema.sessions).values({ userId: USER, token: "current-token", expiresAt: new Date(Date.now() + 60_000), createdAt: new Date() });
+    mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session" ? { value: "current-token" } : undefined });
+    const original = database.transaction.bind(database);
+    const request = () => new NextRequest("https://pryva.test/api/user/delete", {
+      method: "POST", headers: { origin: "https://pryva.test", "content-type": "application/json" },
+      body: JSON.stringify({ confirm: "buyer@example.com", password: "hash", forfeitAcknowledged: true, forfeitAmount: 10_000 }),
+    });
+    const transaction = vi.spyOn(database, "transaction").mockImplementationOnce(async (callback, config) => {
+      await database.insert(schema.withdrawals).values({ userId: USER, amount: 100, bankName: "Test", accountNumber: "1234567890", accountName: "Buyer", reference: "WD-late", status: "processing" });
+      return original(callback, config);
+    });
+    try {
+      const response = await deleteRoute.POST(request());
+      expect(response.status).toBe(409);
+      expect((await response.json()).code).toBe("WITHDRAWAL_IN_FLIGHT");
+    } finally { transaction.mockRestore(); }
+    expect(mocks.scheduleClosed).not.toHaveBeenCalled();
+    await database.delete(schema.withdrawals).where(eq(schema.withdrawals.userId, USER));
+    const balanceRace = vi.spyOn(database, "transaction").mockImplementationOnce(async (callback, config) => {
+      await database.update(schema.users).set({ walletBalance: 11_000 }).where(eq(schema.users.id, USER));
+      return original(callback, config);
+    });
+    try {
+      const response = await deleteRoute.POST(request());
+      expect(response.status).toBe(409);
+      const refusal = await response.json();
+      expect(refusal.code).toBe("FORFEITURE_NOT_ACKNOWLEDGED");
+      expect(refusal.error).toMatch(/refresh this page/i);
+      const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+      expect(user.walletBalance).toBe(11_000);
+      expect(user.deletedAt).toBeNull();
+    } finally { balanceRace.mockRestore(); }
+    expect(mocks.scheduleClosed).not.toHaveBeenCalled();
+  });
+
+  it("reports committed closure even if scheduling its notice unexpectedly throws", async () => {
+    await database.insert(schema.sessions).values({ userId: USER, token: "current-token", expiresAt: new Date(Date.now() + 60_000), createdAt: new Date() });
+    await database.update(schema.users).set({ walletBalance: 0, emailVerifiedAt: new Date() }).where(eq(schema.users.id, USER));
+    mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session" ? { value: "current-token" } : undefined });
+    mocks.scheduleClosed.mockImplementationOnce(() => { throw new Error("recipient buyer@example.com"); });
+    const response = await deleteRoute.POST(new NextRequest("https://pryva.test/api/user/delete", {
+      method: "POST", headers: { origin: "https://pryva.test", "content-type": "application/json" },
+      body: JSON.stringify({ confirm: "buyer@example.com", password: "hash" }),
+    }));
+    expect(response.status).toBe(200);
+    expect((await response.json()).deleted).toBe(true);
+    expect(await database.select().from(schema.sessions)).toHaveLength(0);
+    expect((await database.select().from(schema.users).where(eq(schema.users.id, USER)))[0].deletedAt).not.toBeNull();
+    expect(JSON.stringify(mocks.log.warn.mock.calls)).not.toContain("buyer@example.com");
+  });
+
+  it("reports committed closure even if clearing the browser cookie fails", async () => {
+    await database.insert(schema.sessions).values({ userId: USER, token: "current-token", expiresAt: new Date(Date.now() + 60_000), createdAt: new Date() });
+    await database.update(schema.users).set({ walletBalance: 0, emailVerifiedAt: new Date() }).where(eq(schema.users.id, USER));
+    mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session" ? { value: "current-token" } : undefined });
+    mocks.destroySession.mockRejectedValueOnce(new Error("cookie error"));
+    const response = await deleteRoute.POST(new NextRequest("https://pryva.test/api/user/delete", {
+      method: "POST", headers: { origin: "https://pryva.test", "content-type": "application/json" },
+      body: JSON.stringify({ confirm: "buyer@example.com", password: "hash" }),
+    }));
+    expect(response.status).toBe(200);
+    expect((await response.json()).deleted).toBe(true);
+    expect(await database.select().from(schema.sessions)).toHaveLength(0);
+    expect(mocks.scheduleClosed).toHaveBeenCalledOnce();
   });
 
   it("refuses a session that has been open too long, and a wrong password", async () => {

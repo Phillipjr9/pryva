@@ -180,7 +180,7 @@ describe("account activity emails", () => {
     expect(body.to).toEqual([EMAIL]);
     expect(body.subject).toContain("password was changed");
     expect(body.text).toContain("Every other session was signed out");
-    expect(body.html).toContain("hero-password.jpg");
+    expect(body.html).toContain("hero-password-changed.jpg");
     expect(body.html + body.text).not.toContain("NewPassword123!");
   });
 
@@ -204,7 +204,7 @@ describe("account activity emails", () => {
     const body = mailBodies().find((mail) => /first purchase/i.test(mail.subject));
     expect(body).toBeDefined();
     expect(body!.text).toContain("₦2,500");
-    expect(body!.html).toContain("hero-order.jpg");
+    expect(body!.html).toContain("hero-first-purchase.jpg");
     expect(body!.html).toContain("&lt;script&gt;eSIM&lt;/script&gt;");
     expect(body!.html).not.toContain("<script>eSIM</script>");
     expect(body!.html + body!.text).not.toContain("SENSITIVE-CREDENTIAL");
@@ -266,7 +266,7 @@ describe("account activity emails", () => {
     const body = mailBodies().find((mail) => mail.subject.includes("Withdrawal could not"))!;
     expect(body).toBeDefined();
     expect(body.text).toContain("amount and fee were returned to your wallet");
-    expect(body.html).toContain("hero-withdrawal.jpg");
+    expect(body.html).toContain("hero-withdrawal-failed.jpg");
     expect(body.html + body.text).not.toContain("1234567890");
   });
 

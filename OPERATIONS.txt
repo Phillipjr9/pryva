@@ -109,8 +109,13 @@ and investigate reports rather than promising a retry where none exists.
 
 When an account closes, its saved outbox snapshots and email-change requests are
 removed with its identity, without erasing financial history. An email already in
-flight to the provider cannot be recalled. A new closure-confirmation email is
-not currently sent; do not keep a former address indefinitely to implement one.
+flight to the provider cannot be recalled. After commit, the app makes at most one
+best-effort closure-confirmation attempt to the previously verified address. The
+address exists briefly in process memory and at the email provider, not in an app
+retry queue; a lost callback or failed send is not retried. No closure email is
+sent to an unverified address or from the in-memory preview database. Monitor mail
+errors without logging addresses. Old clients that cannot submit the exact balance
+acknowledgement must refresh before forfeiting a positive balance.
 
 The owner chose a ten-year retention horizon after account closure (31 Oct 2026).
 It is an internal policy, not a number to add to customer-facing promises. The

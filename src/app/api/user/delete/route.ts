@@ -48,6 +48,7 @@ import { isSameOriginMutation } from "@/lib/net";
 import { accountDeletionRateLimiter } from "@/lib/rate-limit";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { logger } from "@/lib/logger";
+import { scheduleAccountClosedEmail, type AccountClosedNotice } from "@/lib/account-closed-email";
 
 export const dynamic = "force-dynamic";
 
@@ -109,7 +110,9 @@ export async function POST(request: NextRequest) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json({ ok: false, error: "Invalid request body" }, { status: 400 });
   }
-  const fields = body as { confirm?: unknown; password?: unknown; forfeitAcknowledged?: unknown };
+  const fields = body as { confirm?: unknown; password?: unknown; forfeitAcknowledged?: unknown; forfeitAmount?: unknown };
+  const acknowledgedBalance = (balance: number) =>
+    fields.forfeitAcknowledged === true && Number.isSafeInteger(fields.forfeitAmount) && fields.forfeitAmount === balance;
 
   try {
     const jar = await cookies();
@@ -187,21 +190,20 @@ export async function POST(request: NextRequest) {
     }
 
     const forfeiture = forfeitureWarning(account.walletBalance);
-    if (forfeiture && fields.forfeitAcknowledged !== true) {
+    if (forfeiture && !acknowledgedBalance(forfeiture.amount)) {
       // The amount is named, and the request is refused until it is acknowledged:
       // a client that never rendered the warning cannot lose money because of it.
       return NextResponse.json(
         {
           ok: false,
           code: "FORFEITURE_NOT_ACKNOWLEDGED",
-          error: forfeiture.message,
+          error: `${forfeiture.message} Refresh this page to review the current amount.`,
           detail: { balance: forfeiture.amount },
         },
         { status: 409 },
       );
     }
 
-    const now = new Date();
     // A password nobody knows, stored in the normal format: the column stays a
     // real hash (so no future "is this account passwordless?" check misfires) and
     // nothing can ever verify against it.
@@ -210,36 +212,55 @@ export async function POST(request: NextRequest) {
     type Result =
       | { kind: "missing" }
       | { kind: "already" }
+      | { kind: "identity-changed" }
       | { kind: "blocked"; block: NonNullable<ReturnType<typeof deletionBlock>> }
-      | { kind: "done"; retained: Record<string, number>; forfeited: number };
+      | { kind: "done"; retained: Record<string, number>; forfeited: number; notice: AccountClosedNotice | null };
 
     const receipt = await db.transaction(async (tx): Promise<Result> => {
       // The lock is the point: a purchase that read the balance a moment ago must
       // not be able to spend out of an account that is being closed underneath it.
       const [locked] = await tx
-        .select({ walletBalance: users.walletBalance, deletedAt: users.deletedAt })
+        .select({
+          walletBalance: users.walletBalance, deletedAt: users.deletedAt,
+          email: users.email, emailVerifiedAt: users.emailVerifiedAt,
+          passwordHash: users.passwordHash, googleSubject: users.googleSubject,
+        })
         .from(users)
         .where(eq(users.id, user.id))
         .for("update");
       if (!locked) return { kind: "missing" };
       if (locked.deletedAt) return { kind: "already" };
+      // The typed address and authentication proof were checked before the
+      // lock. If either identity changed while waiting, start again instead of
+      // closing a different state or notifying an obsolete address.
+      if (locked.email !== account.email || locked.passwordHash !== account.passwordHash || locked.googleSubject !== account.googleSubject) {
+        return { kind: "identity-changed" };
+      }
 
-      // The balance is re-read under the lock: money that arrived after the
-      // pre-check must not be destroyed by a request that acknowledged a different
-      // figure, so it is refused rather than silently forfeited.
+      // A payout may have started after the first check. Withdrawals insert a
+      // user-referencing row before debiting the owner, so recheck after locking
+      // the owner rather than closing while a committed payout is in flight.
+      const [pendingNow] = await tx.select({ total: count() }).from(withdrawals)
+        .where(and(eq(withdrawals.userId, user.id), notInArray(withdrawals.status, FINISHED_WITHDRAWALS)));
+      const lateBlock = deletionBlock({ pendingWithdrawals: Number(pendingNow?.total ?? 0) });
+      if (lateBlock) return { kind: "blocked", block: lateBlock };
+
+      // Acknowledgement names an amount, not just a boolean: an intervening
+      // credit must not be forfeited under consent for a smaller balance.
       const lateForfeiture = forfeitureWarning(locked.walletBalance);
-      if (lateForfeiture && fields.forfeitAcknowledged !== true) {
+      if (lateForfeiture && !acknowledgedBalance(lateForfeiture.amount)) {
         return {
           kind: "blocked",
           block: {
             code: "FORFEITURE_NOT_ACKNOWLEDGED",
-            error: lateForfeiture.message,
+            error: `${lateForfeiture.message} Refresh this page to review the current amount.`,
             action: { label: "Go to wallet", href: "/dashboard/wallet" },
             detail: { withdrawals: 0 },
           },
         };
       }
 
+      const now = new Date();
       // The forfeiture is written into the ledger, not just the receipt: a wallet
       // that drops to zero without a row explaining why would break the invariant
       // the nightly close checks (`previous ± amount = balance_after`).
@@ -297,7 +318,7 @@ export async function POST(request: NextRequest) {
           email: tombstoneEmail(user.id),
           // The fingerprint is taken of the *old* address before it is replaced,
           // so a person who writes in later can still be matched to these rows.
-          deletedEmailHash: hashSignal(`email:${account.email}`),
+          deletedEmailHash: hashSignal(`email:${locked.email}`),
           passwordHash: sealedPassword,
           googleSubject: null,
           emailVerifiedAt: null,
@@ -330,7 +351,10 @@ export async function POST(request: NextRequest) {
         ipHash: hashSignal(clientIp(request)),
       });
 
-      return { kind: "done", retained, forfeited };
+      // The verified address is handed back only in memory after commit; it is
+      // not added to the database receipt or the durable mail outbox.
+      const notice = locked.emailVerifiedAt ? { to: locked.email, when: now } : null;
+      return { kind: "done", retained, forfeited, notice };
     });
 
     if (receipt.kind === "missing") {
@@ -339,12 +363,21 @@ export async function POST(request: NextRequest) {
     if (receipt.kind === "already") {
       return NextResponse.json({ ok: false, error: "This account is already closed." }, { status: 409 });
     }
+    if (receipt.kind === "identity-changed") {
+      return NextResponse.json({ ok: false, error: "Your account details changed. Sign in again before closing it." }, { status: 409 });
+    }
     if (receipt.kind === "blocked") {
       return NextResponse.json({ ok: false, ...receipt.block }, { status: 409 });
     }
 
-    // The browser stops being signed in here, not at the next request.
-    await destroySession();
+    // No email is sent for an unverified address. This is one in-memory,
+    // post-commit attempt; the deletion remains successful if scheduling fails.
+    if (receipt.notice) {
+      try { scheduleAccountClosedEmail(receipt.notice); } catch { logger.warn("Account closure notice could not be scheduled"); }
+    }
+    // Session rows are already deleted in the transaction. A cookie-clearing
+    // failure must not turn a completed closure into a false failure response.
+    try { await destroySession(); } catch { logger.warn("Closed account cookie could not be cleared"); }
     logger.info("Account closed by its owner", {
       userId: user.id,
       retained: receipt.retained,
@@ -360,10 +393,12 @@ export async function POST(request: NextRequest) {
       retained: receipt.retained,
       forfeited: receipt.forfeited,
     });
-  } catch (error) {
-    logger.error("Account deletion failed", { userId: user.id, error });
+  } catch {
+    // Database errors can include query parameters or addresses. Keep the
+    // operator alert, but never copy the exception into retained logs.
+    logger.error("Account deletion could not be confirmed", { userId: user.id });
     return NextResponse.json(
-      { ok: false, error: "The account could not be closed just now. Nothing was changed — please try again." },
+      { ok: false, error: "We couldn't confirm whether your account closed. Try signing in or contact support before trying again." },
       { status: 500 },
     );
   }

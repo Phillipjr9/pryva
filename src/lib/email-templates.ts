@@ -63,11 +63,9 @@ function emailWrapper(content: string, preheader: string = ""): string {
     <td align="center" style="padding:30px 24px 36px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.7;color:${config.textSecondary};">
       Questions? Visit the
       <a href="${config.siteUrl}/help" style="color:${config.accentColor};font-weight:600;text-decoration:none;">help center</a>
-      or contact support from the app.
+      or <a href="${config.siteUrl}/contact" style="color:${config.accentColor};font-weight:600;text-decoration:none;">contact support</a>.
       <br><br>
-      <a href="${config.siteUrl}/dashboard/settings" style="color:${config.accentColor};font-weight:600;text-decoration:none;">Account settings</a>
-      <br><br>
-      You're receiving this email because you have a Pryva account.
+      This is a transactional message about activity involving Pryva.
       <br><br>
       Pryva Technologies &#183; Lagos, Nigeria
       <br><br>
@@ -81,7 +79,10 @@ function emailWrapper(content: string, preheader: string = ""): string {
 }
 
 export type NotificationHero =
-  | "wallet" | "bank" | "withdrawal" | "order" | "password" | "refund"
+  | "wallet" | "wallet-credit" | "wallet-debit" | "gift-redeemed"
+  | "bank" | "withdrawal" | "withdrawal-processing" | "withdrawal-completed"
+  | "withdrawal-rejected" | "withdrawal-failed" | "order" | "first-purchase"
+  | "password" | "password-changed" | "refund" | "account-closed"
   | "support-reply" | "purchase-receipt" | "passkey-added" | "passkey-removed"
   | "two-factor-on" | "two-factor-off" | "email-changed";
 
