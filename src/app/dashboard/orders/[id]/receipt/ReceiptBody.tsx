@@ -59,7 +59,11 @@ export function ReceiptBody({ receipt }: { receipt: ReceiptData }) {
         </p>
       </section>
 
-      <div className="mt-6 overflow-x-auto">
+      {/* `relative` keeps the `sr-only` caption inside this scroll container.
+          An absolutely positioned element with no positioned ancestor resolves
+          against the page instead, and a caption laid out at the table's
+          full width pushed the document wider than the phone screen. */}
+      <div className="relative mt-6 overflow-x-auto">
       <table className="w-full border-collapse text-[0.86rem]">
         <caption className="sr-only">Order details</caption>
         <tbody>
