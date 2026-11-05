@@ -28,6 +28,25 @@ export const dynamic = "force-dynamic";
  * Returning a non-2xx makes Resend retry, so this answers 200 for anything it has
  * accepted or deliberately dropped, and 5xx only when the write genuinely failed.
  */
+/**
+ * A probe, not a delivery.
+ *
+ * Resend's dashboard "send test event" and the endpoint setup flow both open the
+ * URL in a browser, and a route with no GET answers that with a 405 -- which reads
+ * as "the endpoint is broken" while it is working perfectly for the sender. This
+ * says plainly that the URL is live and that unsigned requests are refused, so the
+ * question "did I paste the right URL?" is answerable without sending anything.
+ *
+ * It deliberately reveals no configuration: whether the secret is set is an
+ * operator fact, not a public one.
+ */
+export async function GET() {
+  return NextResponse.json(
+    { ok: true, endpoint: "resend-delivery-events", accepts: "POST with a valid Svix signature" },
+    { headers: { "Cache-Control": "no-store" } },
+  );
+}
+
 export async function POST(request: NextRequest) {
   const secret = process.env.RESEND_WEBHOOK_SECRET?.trim();
   if (!secret || isPreviewDatabase()) {
