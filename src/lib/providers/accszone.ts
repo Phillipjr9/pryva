@@ -21,6 +21,7 @@
 
 import "server-only";
 import { logger } from "@/lib/platform/logger";
+import { ProviderError } from "@/lib/providers/types";
 
 const BASE_URL = process.env.ACCSZONE_API_URL || "https://accszone.com/api/v1";
 const API_KEY = process.env.ACCSZONE_API_KEY?.trim() ?? "";
@@ -61,16 +62,21 @@ export type AccsZoneMeta = {
 };
 
 /** Error carrying the machine-readable code so callers can map it to a user message. */
-export class AccsZoneError extends Error {
+export class AccsZoneError extends ProviderError {
+  readonly retryAfterSeconds?: number;
+  readonly requestId?: string;
+
   constructor(
     message: string,
-    public readonly code: string,
-    public readonly status: number,
-    public readonly retryAfterSeconds?: number,
-    public readonly requestId?: string,
+    code: string,
+    status: number,
+    retryAfterSeconds?: number,
+    requestId?: string,
   ) {
-    super(message);
+    super(message, { provider: "accszone", status, code });
     this.name = "AccsZoneError";
+    this.retryAfterSeconds = retryAfterSeconds;
+    this.requestId = requestId;
   }
 }
 

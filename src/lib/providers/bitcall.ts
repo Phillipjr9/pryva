@@ -44,6 +44,7 @@ import "server-only";
 import { createRateLimiter } from "@/lib/platform/rate-limit";
 import { readJsonWithLimit } from "@/lib/platform/request-body";
 import { logger } from "@/lib/platform/logger";
+import { ProviderError } from "@/lib/providers/types";
 
 const API_HOST = "api.bitcall.io";
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -133,20 +134,27 @@ export function isAmbiguousBitcallOutcome(error: unknown): boolean {
   return !DEFINITIVELY_NOT_EXECUTED.has(error.code);
 }
 
-export class BitcallError extends Error {
+export class BitcallError extends ProviderError {
+  /** Equal to the `x-request-id` header. Quote it to their support. */
+  readonly requestId: string | null;
+  /** Offending field paths on VALIDATION_ERROR. Never carries their values. */
+  readonly fields: string[];
+  readonly retryAfterSeconds: number | null;
+
   constructor(
     message: string,
-    public readonly status: number,
+    status: number,
     /** The gateway's own code where it supplied one; otherwise a local one. */
-    public readonly code: string,
-    /** Equal to the `x-request-id` header. Quote it to their support. */
-    public readonly requestId: string | null = null,
-    /** Offending field paths on VALIDATION_ERROR. Never carries their values. */
-    public readonly fields: string[] = [],
-    public readonly retryAfterSeconds: number | null = null,
+    code: string,
+    requestId: string | null = null,
+    fields: string[] = [],
+    retryAfterSeconds: number | null = null,
   ) {
-    super(message);
+    super(message, { provider: "bitcall", status, code });
     this.name = "BitcallError";
+    this.requestId = requestId;
+    this.fields = fields;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 

@@ -112,8 +112,11 @@ describe("eSIM is a lane the console is accountable for", () => {
     expect(page).toContain("laneConfigured(spec.id)");
     expect(page).not.toContain("isBitcallConfigured");
 
+    // …and that module asks the provider table, which is the one place that
+    // maps a supplier id to its credential check.
     const config = read("lib/services/service-config.ts");
-    expect(config).toMatch(/bitcall: isBitcallConfigured/);
+    expect(config).toMatch(/bitcall: PROVIDERS\.bitcall\.configured/);
+    expect(read("lib/providers/index.ts")).toMatch(/configured: isBitcallConfigured/);
     expect(LANES.find((lane) => lane.id === "esim")?.configuredBy).toBe("esim");
   });
 

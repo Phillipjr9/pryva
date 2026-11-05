@@ -20,6 +20,7 @@
 import "server-only";
 import { createRateLimiter } from "@/lib/platform/rate-limit";
 import { readJsonWithLimit } from "@/lib/platform/request-body";
+import { ProviderError } from "@/lib/providers/types";
 
 const DEFAULT_BASE_URL = "https://fleexa.com.ng/developer";
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -27,13 +28,9 @@ const REQUEST_TIMEOUT_MS = 20_000;
 // leaves boundary headroom, but cannot account for manual calls or network delay.
 const supplierBudget = createRateLimiter({ windowMs: 60_000, maxRequests: 25 });
 
-export class FleexaError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly code?: string,
-  ) {
-    super(message);
+export class FleexaError extends ProviderError {
+  constructor(message: string, status: number = 502, code: string = "FLEEXA_ERROR") {
+    super(message, { provider: "fleexa", status, code });
     this.name = "FleexaError";
   }
 }
