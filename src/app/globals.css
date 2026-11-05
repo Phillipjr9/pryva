@@ -57,6 +57,20 @@
     color: var(--color-ink);
     font-family: var(--font-sans);
     /*
+     * The second half of the sideways guard above, and the one that actually
+     * fixes the phone zoom. Clipping on `html` alone is not enough: `html`'s
+     * overflow propagates to the viewport, which leaves the *document* free to
+     * report a width three times the screen. Mobile browsers read that width
+     * and zoom out to fit it, so the whole dashboard rendered at about a third
+     * of the screen. Clipping the body keeps `documentElement.scrollWidth`
+     * equal to the viewport, which is the number the browser acts on.
+     *
+     * `clip`, not `hidden`, for the same reason as above: it does not create a
+     * scroll container, so the sticky header, the fixed tab bar and the
+     * horizontal chip strips all keep working.
+     */
+    overflow-x: clip;
+    /*
      * `break-word`, not `anywhere`. Both let a long reference number or email
      * split rather than push the page sideways; `anywhere` additionally lets
      * that break count towards intrinsic min-content sizing, so a grid column
