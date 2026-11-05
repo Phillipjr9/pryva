@@ -7,7 +7,7 @@ import { NextRequest } from "next/server";
  * The supplier charges our balance on every purchase and provisions
  * asynchronously, so the route has four honest outcomes and these tests pin all
  * of them: delivered (record + charge once), provisioning (record, charge
- * nothing), refused (charge nothing, record nothing) and unknown (park it for a
+ * nothing), refused (cancelled without a charge) and unknown (park it for a
  * human, charge nothing). A replay must never buy a second profile.
  */
 
@@ -20,6 +20,9 @@ const state = vi.hoisted(() => ({
   existing: null as Record<string, unknown> | null,
   balance: 50_000,
   inserts: [] as any[],
+  updates: [] as any[],
+  recheck: vi.fn(),
+  purchaseWait: null as Promise<void> | null,
   debits: [] as any[],
   purchased: [] as any[],
   txError: null as Error | null,
@@ -36,11 +39,16 @@ vi.mock("@/lib/fraud", () => ({
 vi.mock("@/lib/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
 vi.mock("@/lib/referrals", () => ({ settleReferralRewards: async () => ({ credited: 0 }) }));
 
-vi.mock("@/lib/esim-catalog", () => ({ findEsimOffer: async () => state.offer }));
+vi.mock("@/lib/esim-catalog", () => ({
+  findEsimOffer: async () => state.offer,
+  recheckEsimOffer: state.recheck,
+  esimOfferTerms: (value: { includesPhoneNumber?: boolean }) => (value.includesPhoneNumber ? "b" : "a").repeat(24),
+}));
 
 vi.mock("@/lib/esim-fulfilment", () => ({
   purchaseEsim: async (offer: unknown) => {
     state.purchased.push(offer);
+    if (state.purchaseWait) await state.purchaseWait;
     return state.outcome;
   },
 }));
@@ -57,29 +65,59 @@ vi.mock("@/lib/wallet", async (importOriginal) => {
   };
 });
 
-function chain(result: unknown) {
+function selectChain(result: unknown) {
   const api: Record<string, unknown> = {
     from: () => api,
     where: () => api,
     limit: () => Promise.resolve(result),
-    values: (value: unknown) => {
-      state.inserts.push(value);
-      return { onConflictDoNothing: () => Promise.resolve() };
-    },
   };
   return api;
 }
 
+function insertChain() {
+  return {
+    values: (value: Record<string, unknown>) => ({
+      onConflictDoNothing: () => ({
+        returning: async () => {
+          if (state.existing) return [];
+          state.inserts.push({ ...value });
+          state.existing = { ...value };
+          return [{ id: value.id }];
+        },
+      }),
+    }),
+  };
+}
+
+function updateChain() {
+  return {
+    set: (values: Record<string, unknown>) => ({
+      where: () => {
+        state.updates.push({ ...values });
+        if (state.existing) Object.assign(state.existing, values);
+        const result = state.existing ? [{ id: state.existing.id }] : [];
+        return Object.assign(Promise.resolve(result), { returning: async () => result });
+      },
+    }),
+  };
+}
+
 vi.mock("@/db", () => ({
   db: {
-    // A projected select is the balance read; an unprojected one is an order
-    // lookup. Conflating them makes every request look like a replay.
-    select: (fields?: unknown) => chain(fields ? [{ balance: state.balance }] : state.existing ? [state.existing] : []),
-    insert: () => chain(null),
+    // Snapshot the select at call time, as two racing requests can both observe
+    // no order before either reaches the unique-index claim.
+    select: (fields?: unknown) => selectChain(fields ? [{ balance: state.balance }] : state.existing ? [{ ...state.existing }] : []),
+    insert: () => insertChain(),
+    update: () => updateChain(),
     transaction: async (callback: (tx: unknown) => Promise<unknown>) => {
       if (state.txError) throw state.txError;
-      const tx = { select: () => chain([]), insert: () => chain(null) };
-      return callback(tx);
+      const before = state.existing ? { ...state.existing } : null;
+      try {
+        return await callback({ update: () => updateChain() });
+      } catch (error) {
+        state.existing = before;
+        throw error;
+      }
     },
   },
 }));
@@ -111,7 +149,7 @@ function request(body: unknown, origin = "https://pryva.test") {
   });
 }
 
-const valid = { offerId: "live-esim-0123456789abcdef0123", requestId: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d" };
+const valid = { offerId: "live-esim-0123456789abcdef0123", requestId: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", expectedPriceNgn: 9_800, expectedTerms: "a".repeat(24) };
 
 beforeEach(() => {
   state.preview = false;
@@ -122,6 +160,10 @@ beforeEach(() => {
   state.existing = null;
   state.balance = 50_000;
   state.inserts = [];
+  state.updates = [];
+  state.recheck.mockReset();
+  state.recheck.mockImplementation(async () => state.offer);
+  state.purchaseWait = null;
   state.debits = [];
   state.purchased = [];
   state.txError = null;
@@ -149,6 +191,31 @@ describe("POST /api/esim/purchase", () => {
     expect((await POST(request({ offerId: valid.offerId, requestId: "nope" }))).status).toBe(400);
   });
 
+  it("rejects a requested phone number or any other unsupported option before buying", async () => {
+    for (const extra of [
+      { phoneNumber: "+15551234567" },
+      { selectedNumber: "+15551234567" },
+      { price: 1 },
+    ]) {
+      const response = await POST(request({ ...valid, ...extra }));
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toMatch(/options are not supported/i);
+    }
+    expect(state.purchased).toEqual([]);
+    expect(state.inserts).toEqual([]);
+    expect(state.debits).toEqual([]);
+  });
+
+  it("does not claim a selected number was honoured when replaying an existing order", async () => {
+    state.existing = { id: "o1", reference: "PRY1", status: "active" };
+    const response = await POST(request({ ...valid, phoneNumber: "+15551234567" }));
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/check your orders/i);
+    expect(state.purchased).toEqual([]);
+    expect(state.inserts).toEqual([]);
+    expect(state.debits).toEqual([]);
+  });
+
   it("replays a duplicate request without buying anything", async () => {
     state.existing = { id: "o1", reference: "PRY1", productName: "Nigeria Lite", planLabel: "1GB · 7 days", service: "esim", amount: 9_800, provider: "bitcall", status: "active" };
     const response = await POST(request(valid));
@@ -158,6 +225,87 @@ describe("POST /api/esim/purchase", () => {
     expect(JSON.stringify(body)).not.toMatch(/bitcall|supplier/i);
     expect(state.purchased).toEqual([]);
     expect(state.debits).toEqual([]);
+  });
+
+  it("requires a valid displayed price for a new purchase, but can replay old requests", async () => {
+    for (const expectedPriceNgn of [undefined, null, 0, -1, 9.5, "9800"]) {
+      const response = await POST(request({ ...valid, expectedPriceNgn }));
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toMatch(/reload.*price/i);
+    }
+    expect(state.purchased).toEqual([]);
+    expect(state.inserts).toEqual([]);
+    state.existing = { id: "o1", reference: "PRY1", status: "active", amount: 9_800 };
+    expect((await POST(request({ offerId: valid.offerId, requestId: valid.requestId }))).status).toBe(200);
+    expect(state.purchased).toEqual([]);
+  });
+
+  it("requires confirmed plan details, and stops if they change even at the same price", async () => {
+    for (const expectedTerms of [undefined, "", "not-a-fingerprint", "x".repeat(24)]) {
+      expect((await POST(request({ ...valid, expectedTerms }))).status).toBe(400);
+    }
+    state.recheck.mockResolvedValue(offer({ includesPhoneNumber: true }));
+    const response = await POST(request(valid));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toMatch(/plan details changed/i);
+    expect(state.purchased).toEqual([]);
+    expect(state.inserts).toEqual([]);
+  });
+
+  it("rechecks price before spending and requires the customer to confirm a change", async () => {
+    state.recheck.mockResolvedValue(offer({ priceNgn: 10_200 }));
+    const response = await POST(request(valid));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toMatch(/price changed/i);
+    expect(state.purchased).toEqual([]);
+    expect(state.inserts).toEqual([]);
+    expect(state.debits).toEqual([]);
+  });
+
+  it("fails closed when the current quote is missing, unprofitable or unavailable", async () => {
+    for (const fresh of [null, offer({ purchasable: false })]) {
+      state.recheck.mockResolvedValue(fresh);
+      expect((await POST(request(valid))).status).toBe(503);
+    }
+    state.recheck.mockRejectedValue(new Error("down"));
+    expect((await POST(request(valid))).status).toBe(503);
+    expect(state.purchased).toEqual([]);
+    expect(state.inserts).toEqual([]);
+  });
+
+  it("claims a request before spending, so simultaneous duplicate submits buy only once", async () => {
+    let releaseRecheck!: () => void;
+    let releasePurchase!: () => void;
+    const recheckWait = new Promise<void>((resolve) => { releaseRecheck = resolve; });
+    state.purchaseWait = new Promise<void>((resolve) => { releasePurchase = resolve; });
+    state.recheck.mockImplementation(async () => { await recheckWait; return state.offer; });
+    const first = POST(request(valid));
+    const second = POST(request(valid));
+    await vi.waitFor(() => expect(state.recheck).toHaveBeenCalledTimes(2));
+    releaseRecheck();
+    await vi.waitFor(() => expect(state.purchased).toHaveLength(1));
+    const replay = await Promise.race([first, second]);
+    expect((await replay.json()).replayed).toBe(true);
+    expect(state.inserts).toHaveLength(1);
+    expect(state.inserts[0].status).toBe("review");
+    releasePurchase();
+    await Promise.all([first, second]);
+    expect(state.purchased).toHaveLength(1);
+  });
+
+  it("retains an uncharged review claim when recording a delivered profile fails", async () => {
+    state.outcome = {
+      kind: "delivered",
+      delivery: { provider: "bitcall", providerRequestId: "prov-2", iccid: "8944000000000000001", activationCode: "LPA:1$rsp.example$ABC", installUrl: null },
+    };
+    state.txError = new Error("database down");
+    const response = await POST(request(valid));
+    expect(response.status).toBe(409);
+    expect(state.existing).toMatchObject({ status: "review", providerRequestId: "prov-2" });
+    expect(state.existing).not.toHaveProperty("esimActivationCode");
+    expect(state.debits).toEqual([]);
+    expect((await POST(request(valid))).status).toBe(200);
+    expect(state.purchased).toHaveLength(1);
   });
 
   it("refuses a plan that is no longer listed", async () => {
@@ -185,7 +333,8 @@ describe("POST /api/esim/purchase", () => {
     const response = await POST(request(valid));
     expect(response.status).toBe(502);
     expect((await response.json()).error).toMatch(/nothing was charged/i);
-    expect(state.inserts).toEqual([]);
+    expect(state.inserts[0]).toMatchObject({ status: "review" });
+    expect(state.updates[0]).toMatchObject({ status: "cancelled" });
     expect(state.debits).toEqual([]);
   });
 
@@ -197,7 +346,8 @@ describe("POST /api/esim/purchase", () => {
     expect(body.pending).toBe(true);
     expect(body.order.status).toBe("processing");
     expect(JSON.stringify(body)).not.toMatch(/bitcall|supplier/i);
-    expect(state.inserts[0]).toMatchObject({ status: "processing", provider: "bitcall", providerRequestId: "prov-1", amount: 9_800 });
+    expect(state.inserts[0]).toMatchObject({ status: "review", provider: "bitcall", amount: 9_800 });
+    expect(state.updates[0]).toMatchObject({ status: "processing", providerRequestId: "prov-1" });
     expect(state.debits).toEqual([]);
   });
 
@@ -211,13 +361,13 @@ describe("POST /api/esim/purchase", () => {
     const body = await response.json();
     expect(body.order.status).toBe("active");
     expect(JSON.stringify(body)).not.toMatch(/bitcall|supplier/i);
-    expect(state.inserts[0]).toMatchObject({
+    expect(state.inserts[0]).toMatchObject({ status: "review", amount: 9_800, provider: "bitcall" });
+    expect(state.updates[0]).toMatchObject({
       status: "active",
       esimIccid: "8944000000000000001",
       esimActivationCode: "LPA:1$rsp.example$ABC",
       esimInstallUrl: "https://esim.example/install",
       referenceCode: "8944000000000000001",
-      amount: 9_800,
       provider: "bitcall",
     });
     expect(state.debits).toHaveLength(1);
@@ -233,7 +383,7 @@ describe("POST /api/esim/purchase", () => {
     expect(body.order.status).toBe("review");
     expect(JSON.stringify(body)).not.toMatch(/bitcall|supplier/i);
     expect(state.inserts[0]).toMatchObject({ status: "review", provider: "bitcall" });
-    expect(state.inserts[0].reconciliationNote).toMatch(/unknown/i);
+    expect(state.updates[0].reconciliationNote).toMatch(/unknown/i);
     expect(state.debits).toEqual([]);
     // An unknown outcome is never retried: exactly one purchase attempt happened.
     expect(state.purchased).toHaveLength(1);

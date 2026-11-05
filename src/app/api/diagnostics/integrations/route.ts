@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
             ...catalog.stats,
             partial: catalog.partial,
             ...(esimCountry
-              ? { country: esimCountry.code, listedForCountry: esimItemsForCountry(catalog.offers, esimCountry.code).length }
+              ? { country: esimCountry.code, listedForCountry: esimItemsForCountry(catalog.listings, esimCountry.code).length }
               : {}),
           };
         }),

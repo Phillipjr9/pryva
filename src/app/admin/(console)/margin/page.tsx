@@ -11,7 +11,8 @@ export const dynamic = "force-dynamic";
  *
  * Selling prices are a markup on planned wholesale costs, so the honest question
  * is not "what margin did we set" but "what margin did we actually make". Each
- * order records what its unit really cost, and this page aggregates that.
+ * records a supplier amount when available, though some services use quotes.
+ * eSIM costs are pre-purchase estimates and are excluded from realised margin.
  *
  * Refunded orders are treated asymmetrically on purpose: their revenue is
  * excluded but their cost is kept, because we really did buy that unit and then
@@ -44,6 +45,7 @@ export default async function AdminMarginPage() {
   const recent = await db
     .select({
       slug: orders.productSlug,
+      service: orders.service,
       name: orders.productName,
       amount: orders.amount,
       cost: orders.providerCostNgn,
@@ -66,7 +68,9 @@ export default async function AdminMarginPage() {
       unknownCost: 0,
     };
     if (order.status === "refunded") row.refunds += 1;
-    if (typeof order.cost === "number") {
+    // The eSIM amount is a quote converted before purchase, not a confirmed
+    // charge or verified funding cost. Do not present it as realised margin.
+    if (typeof order.cost === "number" && order.service !== "esim") {
       row.units += 1;
       row.cost += order.cost;
       if (order.status !== "refunded") row.revenue += order.amount;
@@ -102,8 +106,8 @@ export default async function AdminMarginPage() {
       <div>
         <h1 className="text-xl font-semibold text-ink">Realised margin</h1>
         <p className="mt-1 text-sm text-ink-2">
-          What each product actually earned, from the cost recorded at purchase. The floor every
-          sale must clear is {(floor * 100).toFixed(0)}%.
+          Recorded costs can include supplier quotes. eSIM estimates are excluded until actual costs
+          can be verified. The floor every sale must clear is {(floor * 100).toFixed(0)}%.
         </p>
       </div>
 
@@ -111,11 +115,10 @@ export default async function AdminMarginPage() {
         <div className="rounded-xl border border-line bg-white/70 p-5 text-sm text-ink-2">
           <p className="font-semibold text-ink">No measured margin yet.</p>
           <p className="mt-1.5 leading-relaxed">
-            Cost is recorded when a purchase completes against a live provider. Until orders carry a
-            recorded cost there is nothing to measure — planned prices from the cost sheet are not a
-            substitute, which is the point of this page.
+            Orders need a usable cost record before they can be measured here. eSIM pre-purchase
+            estimates are excluded because the final supplier and funding costs are unverified.
             {recent.length > 0
-              ? ` ${recent.length} recent order(s) have no recorded cost.`
+              ? ` ${recent.length} recent order(s) have no usable cost in this report.`
               : " No orders yet."}
           </p>
         </div>
@@ -187,7 +190,7 @@ export default async function AdminMarginPage() {
 
           {unmeasurable.length > 0 && (
             <p className="text-meta text-ink-3">
-              {unmeasurable.length} product(s) have orders but no recorded cost yet:{" "}
+              {unmeasurable.length} product(s) have orders but no usable cost in this report:{" "}
               {unmeasurable.map((row) => row.slug).join(", ")}.
             </p>
           )}

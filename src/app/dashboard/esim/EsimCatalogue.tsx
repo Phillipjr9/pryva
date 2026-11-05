@@ -31,7 +31,7 @@ export function EsimCatalogue({ items, truncated }: { items: EsimCatalogueItem[]
     return items.filter((item) => {
       if (region !== "all" && item.region !== region) return false;
       if (!needle) return true;
-      return `${item.name} ${item.region} ${item.dataLabel} ${item.validityLabel}`.toLowerCase().includes(needle);
+      return `${item.name} ${item.region} ${item.dataLabel} ${item.validityLabel} ${item.countrySearch.join(" ")}`.toLowerCase().includes(needle);
     });
   }, [items, region, search]);
 
@@ -108,12 +108,14 @@ export function EsimCatalogue({ items, truncated }: { items: EsimCatalogueItem[]
                 <p className="mt-1 text-[0.9rem] font-semibold text-ink">{item.name}</p>
                 <p className="mt-1 text-meta text-ink-2">
                   {item.dataLabel} · {item.validityLabel} ·{" "}
-                  {item.global ? "works in most countries" : `${item.destinations} destination${item.destinations === 1 ? "" : "s"}`}
+                  {item.global ? "Global plan" : item.destinations > 0 ? `${item.destinations} destination${item.destinations === 1 ? "" : "s"}` : "Coverage not listed"}
                 </p>
               </div>
               <div className="mt-3 flex items-center justify-between gap-3">
-                <p className="text-[1rem] font-semibold tabular-nums text-ink">{formatNaira(item.priceNgn)}</p>
-                {item.purchasable ? (
+                <p className="text-[1rem] font-semibold tabular-nums text-ink">
+                  {item.priceNgn === null ? "Price unavailable" : formatNaira(item.priceNgn)}
+                </p>
+                {item.purchasable && item.priceNgn !== null ? (
                   <Link
                     href={`/dashboard/esim/${encodeURIComponent(item.id)}`}
                     className="rounded-lg bg-lav-700 px-3 py-2 text-meta font-semibold text-white hover:bg-lav-800"
@@ -122,7 +124,7 @@ export function EsimCatalogue({ items, truncated }: { items: EsimCatalogueItem[]
                   </Link>
                 ) : (
                   <span className="text-right text-micro font-semibold leading-snug text-ink-3">
-                    Not sellable at this price
+                    {item.priceNgn === null ? "Not available to buy" : "Not sellable at this price"}
                   </span>
                 )}
               </div>

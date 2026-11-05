@@ -2,8 +2,8 @@ import "server-only";
 import { createHash } from "node:crypto";
 
 import { financialActionsUnavailable } from "@/lib/financial-environment";
-import { isBitcallConfigured, listBitcallEsimCountries, listBitcallEsimPlans, type BitcallEsimPlan } from "@/lib/bitcall";
-import { getUsdToNgnRate } from "@/lib/exchange-rate";
+import { getBitcallEsimPlan, isBitcallConfigured, listBitcallEsimCountries, listBitcallEsimPlans, type BitcallEsimPlan } from "@/lib/bitcall";
+import { getFreshNgnRate, type NgnQuoteCurrency } from "@/lib/exchange-rate";
 import { logger } from "@/lib/logger";
 import { checkMargin } from "@/lib/margin-guard";
 import { priceFromCost } from "@/lib/pricing";
@@ -30,10 +30,20 @@ export type EsimOffer = {
   dataLabel: string;
   validityLabel: string;
   coverage: "catalog-country" | "not-country-specific";
+  /** Plan-listing information, not a guarantee that a number is delivered by this integration. */
+  includesPhoneNumber: boolean | null;
+  supportsVoice: boolean | null;
+  supportsSms: boolean | null;
   /** Wholesale cost in naira. Never rendered to a customer. */
   costNgn: number;
   priceNgn: number;
   /** False when the margin guard would refuse the sale at this price. */
+  purchasable: boolean;
+};
+
+/** The read-only listing stays visible even when a safe quote is unavailable. */
+export type EsimListing = Omit<EsimOffer, "costNgn" | "priceNgn" | "purchasable"> & {
+  priceNgn: number | null;
   purchasable: boolean;
 };
 
@@ -50,15 +60,17 @@ export type EsimCatalogStats = {
   returned: number;
   /** Plans that became an offer. */
   priced: number;
-  /** Rows dropped before pricing. */
+  /** Rows with no usable plan reference. */
   skippedNoPlanId: number;
-  /** Rows with no usable price. */
+  /** Listings with no usable supplier price. */
   skippedNoPrice: number;
-  /** Rows priced in a currency this deployment cannot convert. */
+  /** Listings with an absent or unsupported currency. */
   skippedCurrency: number;
+  /** Listings whose supported currency has no current conversion rate. */
+  skippedRate: number;
   /** Offers that share a hashed id with an earlier one. */
   duplicates: number;
-  /** Offers with a named destination; the rest are global or unreadable. */
+  /** Listings with a named destination; the rest are global or unreadable. */
   withCoverage: number;
   /** Offers shown under every destination because the catalog calls them global. */
   global: number;
@@ -67,7 +79,10 @@ export type EsimCatalogStats = {
 };
 
 export type EsimCatalog = {
+  /** Only priced offers are usable for checkout. */
   offers: EsimOffer[];
+  /** Includes real plans that cannot currently be priced, without a buy action. */
+  listings: EsimListing[];
   partial: boolean;
   fetchedAt: string;
   stats: EsimCatalogStats;
@@ -75,15 +90,18 @@ export type EsimCatalog = {
 
 type PriceOutcome =
   | { costNgn: number }
-  | { skip: "no-price" | "unsupported-currency" };
+  | { skip: "no-price" | "unsupported-currency" | "rate-unavailable" };
 
 type EsimSnapshot = {
   plans: BitcallEsimPlan[];
   countries: string[];
+  returned: number;
+  unreadable: number;
   partial: boolean;
   fetchedAt: string;
 };
 
+const CATALOG_TTL_MS = 2 * 60_000;
 let snapshotCache: { expires: number; snapshot: EsimSnapshot } | null = null;
 let snapshotInFlight: Promise<EsimSnapshot> | null = null;
 let catalogCache: { expires: number; catalog: EsimCatalog } | null = null;
@@ -100,12 +118,14 @@ async function readEsimSnapshot(refresh = false): Promise<EsimSnapshot> {
     // The country list only annotates coverage, so it degrades instead.
     if (plans.status === "rejected") throw new Error("eSIM catalog unavailable");
     const snapshot: EsimSnapshot = {
-      plans: plans.value.slice(0, 2000),
+      plans: plans.value.plans,
       countries: countries.status === "fulfilled" ? countries.value.slice(0, 400) : [],
-      partial: countries.status === "rejected",
+      returned: plans.value.returned,
+      unreadable: plans.value.unreadable,
+      partial: plans.value.partial || countries.status === "rejected",
       fetchedAt: new Date().toISOString(),
     };
-    snapshotCache = { snapshot, expires: Date.now() + 30_000 };
+    snapshotCache = { snapshot, expires: Date.now() + CATALOG_TTL_MS };
     return snapshot;
   })();
   try {
@@ -129,74 +149,107 @@ export function esimOfferId(planId: string): string {
   return `live-esim-${createHash("sha256").update(`esim\0${planId}`).digest("hex").slice(0, 20)}`;
 }
 
+/** A public, non-secret fingerprint of the plan terms shown at checkout. */
+export function esimOfferTerms(offer: EsimOffer): string {
+  return createHash("sha256").update(JSON.stringify({
+    id: offer.id,
+    name: offer.name,
+    region: offer.region,
+    dataLabel: offer.dataLabel,
+    validityLabel: offer.validityLabel,
+    coverage: offer.coverage,
+    countries: [...offer.countries].sort(),
+    includesPhoneNumber: offer.includesPhoneNumber,
+    supportsVoice: offer.supportsVoice,
+    supportsSms: offer.supportsSms,
+  })).digest("hex").slice(0, 24);
+}
+
 function dataLabel(plan: BitcallEsimPlan): string {
-  if (plan.allowance && plan.allowanceUnit) return `${plan.allowance}${plan.allowanceUnit} of data`;
+  if (plan.unlimitedData === true) return "Unlimited data";
+  const unit = readable(plan.allowanceUnit, 12);
+  if (plan.allowance && unit) return `${plan.allowance}${unit} of data`;
   return "Travel data";
 }
 
 function validityLabel(plan: BitcallEsimPlan): string {
-  if (plan.validity && plan.validityUnit) return `${plan.validity} ${plan.validityUnit}`;
+  const unit = readable(plan.validityUnit, 16);
+  if (plan.validity && unit) return `${plan.validity} ${unit}`;
   if (plan.validity) return `${plan.validity} days`;
-  return "Validity as stated by the supplier";
+  return "Validity not listed";
 }
 
-/**
- * The supplier bills in its own currency; we sell in naira.
- *
- * Only the currencies we can convert honestly are sold: a plan priced in
- * something this deployment has no rate for is listed as unavailable-to-buy
- * rather than guessed at. An absent currency is read as USD, which is what the
- * supplier quotes in.
- */
-async function costNgnFor(plan: BitcallEsimPlan): Promise<PriceOutcome> {
+/** A quote is unavailable, not zero, when a currency rate is missing or stale. */
+type ConversionRates = Partial<Record<NgnQuoteCurrency, number | null>>;
+
+async function ratesFor(plans: BitcallEsimPlan[]): Promise<ConversionRates> {
+  const needed = new Set(plans.map((plan) => plan.currency?.trim().toUpperCase()));
+  const rates: ConversionRates = {};
+  await Promise.all((["USD", "EUR"] as const).map(async (currency) => {
+    if (!needed.has(currency)) return;
+    rates[currency] = (await getFreshNgnRate(currency))?.rate ?? null;
+  }));
+  return rates;
+}
+
+/** The documented catalog amount is what the account pays, in its own currency. */
+function costNgnFor(plan: BitcallEsimPlan, rates: ConversionRates): PriceOutcome {
   if (plan.price === null || !Number.isFinite(plan.price) || plan.price <= 0) return { skip: "no-price" };
-  const currency = (plan.currency ?? "USD").toUpperCase();
-  if (currency === "NGN") return { costNgn: Math.round(plan.price) };
-  if (currency !== "USD") return { skip: "unsupported-currency" };
-  const { rate } = await getUsdToNgnRate();
-  const converted = Math.round(plan.price * rate);
-  return converted > 0 ? { costNgn: converted } : { skip: "no-price" };
+  const currency = plan.currency?.trim().toUpperCase();
+  if (!currency || !["NGN", "USD", "EUR"].includes(currency)) return { skip: "unsupported-currency" };
+  const rate = currency === "NGN" ? 1 : rates[currency as NgnQuoteCurrency];
+  if (typeof rate !== "number" || !Number.isFinite(rate) || rate <= 0) return { skip: "rate-unavailable" };
+  // A fractional naira of cost must never be rounded down before the margin check.
+  const converted = Math.ceil(plan.price * rate);
+  return Number.isSafeInteger(converted) && converted > 0 && converted <= 2_147_483_647
+    ? { costNgn: converted }
+    : { skip: "no-price" };
 }
 
-type OfferOutcome =
-  | { offer: EsimOffer }
-  | { skip: "no-plan-id" | "no-price" | "unsupported-currency" };
+type ListingFields = Omit<EsimListing, "priceNgn" | "purchasable">;
 
-async function offerFromPlan(plan: BitcallEsimPlan): Promise<OfferOutcome> {
-  // The client already refuses anything without its `pln_` prefix, but the
-  // catalogue re-checks: a plan that cannot be bought must not be listed with a
-  // price, whatever upstream let through.
-  if (!plan.planId || !plan.planId.startsWith("pln_")) return { skip: "no-plan-id" };
-  const priced = await costNgnFor(plan);
-  if ("skip" in priced) return priced;
-
-  const quote = priceFromCost(priced.costNgn, { service: "esim" });
-  const margin = checkMargin(quote.priceNgn, quote.costNgn);
-
+function listingFromPlan(plan: BitcallEsimPlan): ListingFields | null {
+  if (!plan.planId || !/^pln_[A-Za-z0-9_-]{1,128}$/.test(plan.planId)) return null;
   return {
-    offer: {
     id: esimOfferId(plan.planId),
     planId: plan.planId,
     name: readable(plan.name) ?? "eSIM data plan",
     region: readable(plan.region, 40) ?? "Travel",
-    countries: plan.countries,
+    countries: plan.countries.map((country) => readable(country, 70)).filter((country): country is string => country !== null),
     dataLabel: dataLabel(plan),
     validityLabel: validityLabel(plan),
     coverage: /\b(?:global|world|worldwide)\b/i.test(`${plan.region ?? ""} ${plan.name ?? ""}`)
       ? "not-country-specific"
       : "catalog-country",
-    costNgn: quote.costNgn,
-    priceNgn: quote.priceNgn,
-    purchasable: margin.ok,
-    },
+    includesPhoneNumber: plan.includesPhoneNumber ?? null,
+    supportsVoice: plan.supportsVoice ?? null,
+    supportsSms: plan.supportsSms ?? null,
   };
 }
 
+type OfferOutcome =
+  | { offer: EsimOffer; listing: EsimListing }
+  | { listing: EsimListing; skip: "no-price" | "unsupported-currency" | "rate-unavailable" }
+  | { skip: "no-plan-id" };
+
+function offerFromPlan(plan: BitcallEsimPlan, rates: ConversionRates): OfferOutcome {
+  const listing = listingFromPlan(plan);
+  if (!listing) return { skip: "no-plan-id" };
+  const priced = costNgnFor(plan, rates);
+  if ("skip" in priced) return { listing: { ...listing, priceNgn: null, purchasable: false }, skip: priced.skip };
+
+  const quote = priceFromCost(priced.costNgn, { service: "esim" });
+  if (!Number.isSafeInteger(quote.priceNgn) || quote.priceNgn <= 0 || quote.priceNgn > 2_147_483_647) {
+    return { listing: { ...listing, priceNgn: null, purchasable: false }, skip: "no-price" };
+  }
+  const margin = checkMargin(quote.priceNgn, quote.costNgn);
+  const offer: EsimOffer = { ...listing, costNgn: quote.costNgn, priceNgn: quote.priceNgn, purchasable: margin.ok };
+  return { offer, listing: offer };
+}
+
 /**
- * Every plan the catalogue can sell, priced once and reused for 30 seconds.
- *
- * A single unconvertible plan must not take the catalogue down with it: each
- * plan is priced independently and one that cannot be is left out.
+ * Read a bounded catalogue. Priced offers are distinct from read-only listings:
+ * an unknown price or exchange rate must never create a buyable offer.
  */
 export async function readEsimCatalog(refresh = false): Promise<EsimCatalog> {
   if (financialActionsUnavailable()) throw new Error("eSIM ordering is unavailable in this environment");
@@ -204,56 +257,49 @@ export async function readEsimCatalog(refresh = false): Promise<EsimCatalog> {
   if (catalogInFlight) return catalogInFlight;
   catalogInFlight = (async () => {
     const snapshot = await readEsimSnapshot(refresh);
+    const rates = await ratesFor(snapshot.plans);
     const offers: EsimOffer[] = [];
+    const listings: EsimListing[] = [];
     const seen = new Set<string>();
     const stats: EsimCatalogStats = {
-      returned: snapshot.plans.length,
+      returned: snapshot.returned,
       priced: 0,
-      skippedNoPlanId: 0,
+      skippedNoPlanId: snapshot.unreadable,
       skippedNoPrice: 0,
       skippedCurrency: 0,
+      skippedRate: 0,
       duplicates: 0,
       withCoverage: 0,
       global: 0,
       purchasable: 0,
     };
     for (const plan of snapshot.plans) {
-      let outcome: OfferOutcome | null = null;
-      try {
-        outcome = await offerFromPlan(plan);
-      } catch (error) {
-        stats.skippedNoPrice += 1;
-        logger.warn("eSIM plan could not be priced", {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-      if (!outcome) continue;
-      if ("skip" in outcome) {
-        if (outcome.skip === "no-plan-id") stats.skippedNoPlanId += 1;
-        else if (outcome.skip === "no-price") stats.skippedNoPrice += 1;
-        else stats.skippedCurrency += 1;
+      const outcome = offerFromPlan(plan, rates);
+      if (!("listing" in outcome)) {
+        stats.skippedNoPlanId += 1;
         continue;
       }
-      const offer = outcome.offer;
-      if (seen.has(offer.id)) {
+      const listing = outcome.listing;
+      if (seen.has(listing.id)) {
         stats.duplicates += 1;
         continue;
       }
-      seen.add(offer.id);
-      offers.push(offer);
+      seen.add(listing.id);
+      listings.push(listing);
+      if ("offer" in outcome) offers.push(outcome.offer);
+      else if (outcome.skip === "no-price") stats.skippedNoPrice += 1;
+      else if (outcome.skip === "rate-unavailable") stats.skippedRate += 1;
+      else stats.skippedCurrency += 1;
     }
-    // Cheapest first: the catalogue is browsed by price, and a page of plans
-    // sorted by whatever order the supplier returned is unreadable.
     offers.sort((a, b) => a.priceNgn - b.priceNgn || a.name.localeCompare(b.name));
+    listings.sort((a, b) => (a.priceNgn ?? Infinity) - (b.priceNgn ?? Infinity) || a.name.localeCompare(b.name));
     stats.priced = offers.length;
-    stats.withCoverage = offers.filter((offer) => offer.countries.length > 0).length;
-    stats.global = offers.filter((offer) => offer.coverage === "not-country-specific").length;
+    stats.withCoverage = listings.filter((listing) => listing.countries.length > 0).length;
+    stats.global = listings.filter((listing) => listing.coverage === "not-country-specific").length;
     stats.purchasable = offers.filter((offer) => offer.purchasable).length;
-    // One structured line per read: the answer to "why is the list short" is in
-    // the deployment's log even when nobody is looking at diagnostics.
     logger.debug("eSIM catalogue read", { ...stats, partial: snapshot.partial });
-    const catalog: EsimCatalog = { offers, partial: snapshot.partial, fetchedAt: snapshot.fetchedAt, stats };
-    catalogCache = { catalog, expires: Date.now() + 30_000 };
+    const catalog: EsimCatalog = { offers, listings, partial: snapshot.partial, fetchedAt: snapshot.fetchedAt, stats };
+    catalogCache = { catalog, expires: Date.now() + CATALOG_TTL_MS };
     return catalog;
   })();
   try {
@@ -263,21 +309,23 @@ export async function readEsimCatalog(refresh = false): Promise<EsimCatalog> {
   }
 }
 
-/**
- * Resolve a hashed reference back to the live offer.
- *
- * This is the only way a checkout learns a plan id: ids come from the catalogue
- * above, so a client cannot name a plan that is not currently listed, and the
- * price is the one this module computed — never one supplied with the request.
- */
+/** Resolve a public hash only against a currently listed, priced offer. */
 export async function findEsimOffer(id: string): Promise<EsimOffer | null> {
   if (typeof id !== "string" || !/^live-esim-[a-f0-9]{20}$/.test(id)) return null;
   const { offers } = await readEsimCatalog();
   return offers.find((offer) => offer.id === id) ?? null;
 }
 
+/** A fresh per-plan read and margin check immediately before any purchase. */
+export async function recheckEsimOffer(offer: EsimOffer, options: { browse?: boolean } = {}): Promise<EsimOffer | null> {
+  const plan = await getBitcallEsimPlan(offer.planId, options);
+  if (!plan || plan.planId !== offer.planId) return null;
+  const outcome = offerFromPlan(plan, await ratesFor([plan]));
+  return "offer" in outcome && outcome.offer.id === offer.id ? outcome.offer : null;
+}
+
 /** A plan covers a country only when the catalog says so explicitly. */
-function coversCountry(plan: EsimOffer, code: string, name: string): boolean {
+function coversCountry(plan: EsimListing, code: string, name: string): boolean {
   const wanted = [
     code.toLowerCase(),
     name.toLowerCase(),
@@ -308,17 +356,19 @@ export type EsimCatalogueItem = {
   region: string;
   dataLabel: string;
   validityLabel: string;
-  /** How many destinations the plan names. Zero only for a global plan. */
+  /** How many destinations the plan names; zero can also mean unknown. */
   destinations: number;
+  /** Supplier-reported country codes/names, expanded for destination search. */
+  countrySearch: string[];
   global: boolean;
-  priceNgn: number;
+  priceNgn: number | null;
   purchasable: boolean;
 };
 
 /** A page cannot render ten thousand cards, and a price-sorted slice is the honest cut. */
 export const ESIM_CATALOGUE_LIMIT = 1_000;
 
-export function catalogueItems(offers: EsimOffer[], limit = ESIM_CATALOGUE_LIMIT): EsimCatalogueItem[] {
+export function catalogueItems(offers: EsimListing[], limit = ESIM_CATALOGUE_LIMIT): EsimCatalogueItem[] {
   return offers.slice(0, limit).map((offer) => ({
     id: offer.id,
     name: offer.name,
@@ -326,6 +376,12 @@ export function catalogueItems(offers: EsimOffer[], limit = ESIM_CATALOGUE_LIMIT
     dataLabel: offer.dataLabel,
     validityLabel: offer.validityLabel,
     destinations: offer.countries.length,
+    countrySearch: offer.countries.flatMap((country) => {
+      const code = country.trim().toLowerCase();
+      const canonical = code === "uk" ? "gb" : code === "usa" ? "us" : code === "uae" ? "ae" : code;
+      const name = explorerCountry(canonical)?.name;
+      return name ? [country, name] : [country];
+    }),
     global: offer.coverage === "not-country-specific",
     priceNgn: offer.priceNgn,
     purchasable: offer.purchasable,
@@ -336,20 +392,23 @@ export function catalogueItems(offers: EsimOffer[], limit = ESIM_CATALOGUE_LIMIT
  * Listings for one destination.
  *
  * A regional plan is never shown against a country it does not name: guessing
- * coverage advertises service that may not exist there. Global plans are shown
- * everywhere, labelled as such.
+ * coverage advertises service that may not exist there. A global-labelled plan
+ * without a country list may be shown, but its country coverage is unconfirmed.
  *
  * Stock is null because eSIM plans report no inventory; availability is answered
  * at purchase time, and an unknown must not render as zero.
  */
-export function esimItemsForCountry(offers: EsimOffer[], countryCode: string): ExplorerItem[] {
+export function esimItemsForCountry(offers: EsimListing[], countryCode: string): ExplorerItem[] {
   const country = explorerCountry(countryCode);
   if (!country) return [];
   const items: ExplorerItem[] = [];
 
   for (const offer of offers) {
     const covered = coversCountry(offer, country.code, country.name);
-    const global = !covered && offer.coverage === "not-country-specific";
+    // A named country list is authoritative even for a "global" plan. If no
+    // destinations are supplied, show it with unconfirmed coverage, not as a
+    // promise that it works in every country.
+    const global = !covered && offer.coverage === "not-country-specific" && offer.countries.length === 0;
     if (!covered && !global) continue;
 
     items.push({
@@ -360,13 +419,13 @@ export function esimItemsForCountry(offers: EsimOffer[], countryCode: string): E
       tag: offer.region,
       artwork: { kind: "service", name: "esim" },
       source: "live",
-      coverage: covered ? "catalog-country" : "not-country-specific",
+      coverage: covered ? "catalog-country" : "unconfirmed",
       stock: null,
       myUnits: null,
       price: offer.priceNgn,
       // An unpurchasable plan is still worth listing — it is a real destination —
       // but it gets no button rather than a button that fails.
-      action: offer.purchasable
+      action: offer.purchasable && offer.priceNgn !== null
         ? { label: "Buy eSIM", href: `/dashboard/esim/${encodeURIComponent(offer.id)}` }
         : null,
     });
