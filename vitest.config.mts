@@ -11,11 +11,9 @@ export default defineConfig({
     },
   },
   test: {
+    // Keep the default test environment as Node. Browser-like tests can opt into
+    // jsdom explicitly at the file level when they need DOM globals.
     environment: "node",
-    environmentMatchGlobs: [
-      ["src/test/**/*.tsx", "jsdom"],
-      ["src/test/**/*.jsx", "jsdom"],
-    ],
     setupFiles: ["./src/test/setup.ts"],
     clearMocks: true,
   },
