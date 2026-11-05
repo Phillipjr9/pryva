@@ -606,9 +606,31 @@ function EmailContentViewer({ body }: { body: string }) {
   const isHtml = /<\/?[a-z][\s\S]*>/i.test(body);
 
   const preparedHtml = isHtml
-    ? body.includes("<head>")
-      ? body.replace("<head>", '<head><base target="_blank">')
-      : `<!DOCTYPE html><html><head><base target="_blank"><style>body{margin:0;padding:12px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#1e293b;}</style></head><body>${body}</body></html>`
+    ? (() => {
+        const sanitized = body
+          .replace(/<base\s+[^>]*>/gi, "")
+          .replace(/<head\s*>/i, '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">')
+          .replace(/<body\s*/i, '<body style="margin:0;padding:0;background:#ffffff;" ');
+
+        const normalized = sanitized.includes("<html")
+          ? sanitized
+          : `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"></head><body style="margin:0;padding:0;background:#ffffff;">${sanitized}</body></html>`;
+
+        return normalized.replace(
+          /<head>/i,
+          `<head><base target="_blank"><style>
+            html, body { margin: 0; padding: 0; background: #ffffff; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+            * { box-sizing: border-box; }
+            body { line-height: 1.55; }
+            img, video, svg, iframe, table, td, th { max-width: 100%; }
+            img, video, svg { height: auto; display: block; }
+            a { color: #2563eb; text-decoration: underline; }
+            table { border-collapse: collapse; width: 100% !important; }
+            pre, code { white-space: pre-wrap; word-break: break-word; }
+            p, ul, ol, li { margin-top: 0; }
+          </style>`,
+        );
+      })()
     : "";
 
   const handleIframeLoad = () => {
@@ -677,10 +699,10 @@ function EmailContentViewer({ body }: { body: string }) {
           <iframe
             ref={iframeRef}
             srcDoc={preparedHtml}
-            sandbox="allow-same-origin allow-popups"
+            sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
             onLoad={handleIframeLoad}
             style={{ height: `${iframeHeight}px` }}
-            className="w-full border-0 transition-[height]"
+            className="w-full border-0 bg-white transition-[height]"
             title="Email template design"
           />
         </div>
