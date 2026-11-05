@@ -268,9 +268,12 @@ export async function otpOffersForSupplier(
   } catch (error) {
     // A catalogue that cannot be read is skipped, not fatal: the other supplier
     // may still serve the same country.
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const code = error instanceof Error && "code" in error ? (error as any).code : undefined;
     logger.warn("Number catalogue unavailable", {
       supplier,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorMessage,
+      code: code ?? "UNKNOWN",
     });
     return [];
   }

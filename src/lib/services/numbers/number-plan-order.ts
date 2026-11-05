@@ -24,7 +24,7 @@ const TTL_MS = 5 * 60_000;
  * A page is not worth waiting on: if a supplier cannot quote within this window
  * the list falls back to catalogue order rather than hanging the render.
  */
-const DISPLAY_BUDGET_MS = 1_500;
+const DISPLAY_BUDGET_MS = 3_000;
 
 let cache: { at: number; costs: Map<string, number> } | null = null;
 
