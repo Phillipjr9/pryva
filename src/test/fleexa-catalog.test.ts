@@ -12,7 +12,7 @@ vi.mock("@/lib/providers/fleexa", () => ({
 }));
 
 const snapshot: SupplierSnapshot = {
-  fetchedAt: "2026-01-01T00:00:00Z", partial: false,
+  fetchedAt: "2026-01-01T00:00:00Z", partial: false, degraded: null,
   sms: [
     { id: "secret-sms-id", name: "WhatsApp", country: "US", priceNgn: 1234, stock: 7 },
     { id: "gb-id", name: "Telegram", country: "GB", priceNgn: 1000, stock: 5 },

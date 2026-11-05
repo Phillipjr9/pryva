@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 
 import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import { getBitcallEsimPlan, isBitcallConfigured, listBitcallEsimCountries, listBitcallEsimPlans, type BitcallEsimPlan } from "@/lib/providers/bitcall";
+import { isFundingFailure } from "@/lib/providers/types";
 import { getFreshNgnRate, type NgnQuoteCurrency } from "@/lib/payments/exchange-rate";
 import { logger } from "@/lib/platform/logger";
 import { checkMargin } from "@/lib/services/margin-guard";
@@ -84,6 +85,8 @@ export type EsimCatalog = {
   /** Includes real plans that cannot currently be priced, without a buy action. */
   listings: EsimListing[];
   partial: boolean;
+  /** Why the catalogue is incomplete, when it is; null when it is whole. */
+  degraded?: "funding" | "outage" | null;
   fetchedAt: string;
   stats: EsimCatalogStats;
 };
@@ -98,6 +101,8 @@ type EsimSnapshot = {
   returned: number;
   unreadable: number;
   partial: boolean;
+  /** "funding" cannot be retried away; "outage" can. Null when the read is whole. */
+  degraded: "funding" | "outage" | null;
   fetchedAt: string;
 };
 
@@ -116,13 +121,20 @@ async function readEsimSnapshot(refresh = false): Promise<EsimSnapshot> {
     const [plans, countries] = await Promise.allSettled([listBitcallEsimPlans(), listBitcallEsimCountries()]);
     // The plan catalog is the product; without it there is nothing to show.
     // The country list only annotates coverage, so it degrades instead.
-    if (plans.status === "rejected") throw new Error("eSIM catalog unavailable");
+    // Keep an unfunded-account refusal intact: it is not an outage.
+    if (plans.status === "rejected") {
+      if (isFundingFailure(plans.reason)) throw plans.reason;
+      throw new Error("eSIM catalog unavailable");
+    }
     const snapshot: EsimSnapshot = {
       plans: plans.value.plans,
       countries: countries.status === "fulfilled" ? countries.value.slice(0, 400) : [],
       returned: plans.value.returned,
       unreadable: plans.value.unreadable,
       partial: plans.value.partial || countries.status === "rejected",
+      degraded: countries.status === "fulfilled" && !plans.value.partial
+        ? null
+        : countries.status === "rejected" && isFundingFailure(countries.reason) ? "funding" : "outage",
       fetchedAt: new Date().toISOString(),
     };
     snapshotCache = { snapshot, expires: Date.now() + CATALOG_TTL_MS };
@@ -298,7 +310,7 @@ export async function readEsimCatalog(refresh = false): Promise<EsimCatalog> {
     stats.global = listings.filter((listing) => listing.coverage === "not-country-specific").length;
     stats.purchasable = offers.filter((offer) => offer.purchasable).length;
     logger.debug("eSIM catalogue read", { ...stats, partial: snapshot.partial });
-    const catalog: EsimCatalog = { offers, listings, partial: snapshot.partial, fetchedAt: snapshot.fetchedAt, stats };
+    const catalog: EsimCatalog = { offers, listings, partial: snapshot.partial, degraded: snapshot.degraded, fetchedAt: snapshot.fetchedAt, stats };
     catalogCache = { catalog, expires: Date.now() + CATALOG_TTL_MS };
     return catalog;
   })();

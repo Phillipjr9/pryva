@@ -20,7 +20,7 @@
 import "server-only";
 import { createRateLimiter } from "@/lib/platform/rate-limit";
 import { readJsonWithLimit } from "@/lib/platform/request-body";
-import { ProviderError } from "@/lib/providers/types";
+import { ProviderError, looksLikeFundingRefusal } from "@/lib/providers/types";
 
 const DEFAULT_BASE_URL = "https://fleexa.com.ng/developer";
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -65,6 +65,20 @@ type Envelope = {
   [key: string]: unknown;
 };
 
+/**
+ * The parts of a refusal that may say "not enough balance": message, code, and
+ * details rendered flat. Joined only so one regex can read them.
+ */
+function refusalText(payload: unknown): string {
+  if (typeof payload === "string") return payload;
+  if (!payload || typeof payload !== "object") return "";
+  const record = payload as Record<string, unknown>;
+  const parts = [record.message, record.error, record.error_code, record.detail, record.details]
+    .map((value) => (typeof value === "string" ? value : value && typeof value === "object" ? JSON.stringify(value) : ""))
+    .filter(Boolean);
+  return parts.join(" | ").slice(0, 2_000);
+}
+
 async function fleexaFetch(
   path: string,
   init: { method?: "GET" | "POST"; body?: Record<string, unknown> } = {},
@@ -105,8 +119,18 @@ async function fleexaFetch(
   }
 
   if (!response.ok) {
-    await response.body?.cancel().catch(() => {});
-    throw new FleexaError("Provider request failed", response.status === 429 ? 429 : 502, response.status === 429 ? "RATE_LIMITED" : "UPSTREAM_ERROR");
+    if (response.status === 429) {
+      await response.body?.cancel().catch(() => {});
+      throw new FleexaError("Provider request failed", 429, "RATE_LIMITED");
+    }
+    // Read the refusal before discarding it: an unfunded account is refused with
+    // a 4xx and a sentence, and that sentence is the difference between "retry
+    // later" and "top the account up". The text is classified, never forwarded.
+    const detail = await readJsonWithLimit(response, 16_384).catch(() => null);
+    if (response.status === 402 || looksLikeFundingRefusal(refusalText(detail))) {
+      throw new FleexaError("Provider balance is insufficient", 402, "INSUFFICIENT_BALANCE");
+    }
+    throw new FleexaError("Provider request failed", 502, "UPSTREAM_ERROR");
   }
   let payload: unknown;
   try {
@@ -118,6 +142,10 @@ async function fleexaFetch(
   const envelope = payload as Envelope;
   // Never expose arbitrary upstream error text, keys, or account details.
   if (envelope.success === false) {
+    // ...but do read it far enough to tell a refusal from an outage.
+    if (looksLikeFundingRefusal(refusalText(envelope))) {
+      throw new FleexaError("Provider balance is insufficient", 402, "INSUFFICIENT_BALANCE");
+    }
     throw new FleexaError("Provider request failed", 502, "UPSTREAM_ERROR");
   }
 

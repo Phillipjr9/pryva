@@ -92,6 +92,36 @@ describe("service explorer live listings", () => {
     expect(screen.getByText(/Live availability is not shown yet/)).toBeTruthy();
   });
 
+  it("says we are restocking when the balance is the reason, and drops the retry", async () => {
+    // Connected suppliers with an empty balance: there is nothing for the
+    // customer to retry, and telling them to would be a promise we cannot keep.
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+      ok: true, country: "us", live: false, reason: "funding", partial: false, fetchedAt: null, items: [],
+    }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
+    expect(await screen.findByText(/paused while we restock/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByText(/couldn't be loaded/)).toBeNull();
+  });
+
+  it("shows a funding gap as restocking even when some listings loaded", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+      ok: true, country: "us", live: true, reason: "funding", partial: true, fetchedAt: "2026-01-01T00:00:00Z", items: [
+        { id: "live-sms-test", category: "verification", name: "Example live app", description: "SMS verification listing", tag: "Other",
+          artwork: { kind: "service", name: "numbers" }, source: "live", coverage: "catalog-country", stock: 3, myUnits: null, price: null, action: null },
+      ],
+    }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
+    const note = await screen.findByRole("status");
+    expect(note.textContent).toMatch(/paused while we restock/);
+    // The row still renders, and no Retry is offered for a money gap.
+    expect(await screen.findByRole("heading", { name: "Example live app" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
   it("names a throttle as a throttle and still offers the retry", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 429, json: async () => ({ error: "slow down", reason: "throttled" }) });
     vi.stubGlobal("fetch", fetchMock);

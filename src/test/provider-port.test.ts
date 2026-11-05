@@ -8,7 +8,7 @@ import { FleexaError } from "@/lib/providers/fleexa";
 import { FoxreloadError } from "@/lib/providers/foxreload";
 import { SmmPanelError } from "@/lib/providers/smm-panel";
 import { TempMailError } from "@/lib/providers/tempmail";
-import { PROVIDER_IDS, ProviderError, isProviderError, isRefusal } from "@/lib/providers/types";
+import { PROVIDER_IDS, ProviderError, isFundingFailure, isProviderError, isRefusal, looksLikeFundingRefusal } from "@/lib/providers/types";
 
 /**
  * The supplier boundary.
@@ -89,6 +89,37 @@ describe("one error type across the boundary", () => {
     expect(bitcall.fields).toEqual(["link"]);
     expect(bitcall.retryAfterSeconds).toBe(12);
     expect(new AccsZoneError("x", "C", 429, 30).retryAfterSeconds).toBe(30);
+  });
+
+  it("tells 'we cannot pay' apart from 'they are down'", () => {
+    // An outage is worth retrying; an unfunded account is not. Folding the two
+    // together is what made an empty balance look like a broken catalogue.
+    expect(isFundingFailure(new FleexaError("x", 402, "INSUFFICIENT_BALANCE"))).toBe(true);
+    expect(isFundingFailure(new BitcallError("x", 402, "INSUFFICIENT_BALANCE"))).toBe(true);
+    expect(isFundingFailure(new SmmPanelError("x", 502, "PAYMENT_REQUIRED"))).toBe(true);
+    expect(isFundingFailure(new FleexaError("x", 502, "UPSTREAM_ERROR"))).toBe(false);
+    expect(isFundingFailure(new FleexaError("x", 429, "RATE_LIMITED"))).toBe(false);
+    expect(isFundingFailure(new Error("boom"))).toBe(false);
+  });
+
+  it("reads an upstream refusal only far enough to classify it", () => {
+    for (const text of [
+      "Insufficient balance",
+      "not enough funds to process this order",
+      "Your wallet balance is low",
+      "Account unfunded, please top up",
+      "You are out of credit",
+    ]) expect(looksLikeFundingRefusal(text), text).toBe(true);
+
+    for (const text of [
+      "",
+      "Service temporarily unavailable",
+      "Rate limit exceeded",
+      // A credential problem stays a credential problem.
+      "Invalid API key. Balance: 999",
+      "Unauthorized",
+    ]) expect(looksLikeFundingRefusal(text), text).toBe(false);
+    expect(looksLikeFundingRefusal(undefined)).toBe(false);
   });
 
   it("separates a refusal from an unknown outcome", () => {
