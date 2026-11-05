@@ -1,3 +1,4 @@
+import { isVercelPreview } from "@/lib/financial-environment";
 import { NextRequest, NextResponse } from "next/server";
 import { lagosDay, runDailyReconciliation } from "@/lib/daily-reconciliation";
 import { logger } from "@/lib/logger";
@@ -20,6 +21,7 @@ async function handler(request: NextRequest) {
     logger.warn("Unauthorized daily reconciliation attempt");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (isVercelPreview()) return NextResponse.json({ error: "Scheduled jobs are unavailable in preview" }, { status: 503 });
 
   const requested = request.nextUrl.searchParams.get("day");
   const day = requested ?? previousLagosDay();

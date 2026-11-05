@@ -1,12 +1,10 @@
 import { plans, type Plan } from "@/lib/catalog";
 import { EXPLORER_COUNTRIES, type ExplorerCountry } from "@/lib/explorer-countries";
-import { dataPlans, type AirtimeProvider } from "@/lib/airtime";
-import { digitalServices } from "@/lib/digital-services";
+import type { AirtimeProvider } from "@/lib/airtime";
 import type { BrandSlug } from "@/lib/brand-marks";
 
 /**
- * Example platforms and illustrative plans remain distinct from supplier
- * listings. Examples must never imply a working mapping, stock, or coverage.
+ * Platform vocabularies below classify supplier listings. They are not offerings.
  */
 export const EXPLORER_CATEGORIES = [
   { id: "verification", label: "App verification", description: "SMS codes for apps" },
@@ -36,8 +34,8 @@ export type ExplorerItem = {
   /** Platform identity is separate from the selected promotion type. */
   platform?: string;
   artwork: ExplorerArtwork;
-  /** A sample is only a type of service, not an offering from a supplier. */
-  source: "example" | "catalog" | "tool" | "live";
+  /** Only real catalogue, tool or supplier entries are shown. */
+  source: "catalog" | "tool" | "live";
   coverage: "catalog-country" | "unconfirmed" | "not-country-specific";
   /** Unknown counts must stay null, never become zero or an invented figure. */
   stock: number | null;
@@ -202,8 +200,8 @@ const ambiguousPlanRegions = new Set([
 
 /**
  * The legacy plan-details route only offers exact-country, single-unit plans.
- * Bundle checkout is modeled separately by the explicitly simulated demo hub;
- * neither path claims verified live supplier coverage.
+ * Bundle plans are not mapped to a purchasable detail page, and a country name
+ * alone does not establish live coverage.
  */
 const noPreviewCheckout = new Set(["vn-otp-5"]);
 
@@ -232,8 +230,7 @@ function planItems(country: ExplorerCountry): ExplorerItem[] {
     const category = planCategories[plan.service];
     if (!category) return [];
     // eSIM plans come from the supplier catalogue and are sold from there. The
-    // six in `catalog.ts` are written samples with no deliverable behind them,
-    // so they are not listed for sale next to the real ones.
+    // static builder has no supplier reference, so only live offers are listed.
     if (plan.service === "esim") return [];
     const matches = planMatchesCountry(plan, country.code);
     const ambiguous = ambiguousPlanRegions.has(plan.region);
@@ -261,91 +258,7 @@ function planItems(country: ExplorerCountry): ExplorerItem[] {
   });
 }
 
-function exampleItems(): ExplorerItem[] {
-  const verification: ExplorerItem[] = VERIFICATION_EXAMPLES.map((platform) => ({
-    id: `verification-${platform.brand}`,
-    category: "verification",
-    name: platform.name,
-    description: "SMS verification",
-    tag: platform.tag,
-    platform: platform.name,
-    artwork: { kind: "brand", name: platform.brand },
-    source: "example",
-    coverage: "unconfirmed",
-    stock: null,
-    myUnits: null,
-    price: null,
-    action: null,
-  }));
-  const social: ExplorerItem[] = PROMOTION_EXAMPLES.flatMap((platform) =>
-    platform.types.map((type): ExplorerItem => ({
-      id: `social-${platform.brand}-${type.toLowerCase().replace(/\s+/g, "-")}`,
-      category: "social",
-      name: `${platform.name} ${type.toLowerCase()}`,
-      description: "Social promotion",
-      tag: type,
-      platform: platform.name,
-      artwork: { kind: "brand", name: platform.brand },
-      source: "example",
-      coverage: "unconfirmed",
-      stock: null,
-      myUnits: null,
-      price: null,
-      action: null,
-    })),
-  );
-  return [...verification, ...social];
-}
-
-const PROVIDER_LABELS: Record<AirtimeProvider, string> = {
-  mtn: "MTN",
-  airtel: "Airtel",
-  glo: "Glo",
-  "9mobile": "9mobile",
-};
-
-function additionalItems(country: ExplorerCountry): ExplorerItem[] {
-  const digitalBrands: Record<string, BrandSlug | "disney-plus"> = {
-    netflix: "netflix", spotify: "spotify", youtube: "youtube", disney: "disney-plus", chatgpt: "chatgpt", canva: "canva",
-  };
-  const subscriptions: ExplorerItem[] = digitalServices.flatMap((service): ExplorerItem[] => {
-    const brand = digitalBrands[service.slug];
-    if (!brand || service.plans.length === 0) return [];
-    return [{
-      id: `subscription-${service.slug}`,
-      category: "subscriptions",
-      name: service.name,
-      description: `${service.plans.length} catalog plan${service.plans.length === 1 ? "" : "s"}`,
-      tag: service.category,
-      artwork: { kind: "brand", name: brand },
-      source: "catalog",
-      coverage: "unconfirmed",
-      stock: null,
-      myUnits: null,
-      price: Math.min(...service.plans.map((plan) => plan.price)),
-      priceFrom: true,
-      action: { label: "View plans", href: `/dashboard/digital?service=${encodeURIComponent(service.slug)}&country=${country.code}` },
-    }];
-  });
-
-  // The existing data catalog and checkout support Nigeria only.
-  const data: ExplorerItem[] = country.code === "ng"
-    ? dataPlans.map((plan) => ({
-        id: `data-${plan.id}`,
-        category: "data",
-        name: plan.name,
-        description: `${plan.size} · ${plan.duration}`,
-        tag: PROVIDER_LABELS[plan.provider] ?? "Mobile data",
-        artwork: { kind: "network", name: plan.provider },
-        source: "catalog",
-        coverage: "catalog-country",
-        stock: null,
-        myUnits: null,
-        price: plan.price,
-        action: { label: "View plan", href: `/dashboard/data?plan=${encodeURIComponent(plan.id)}` },
-      }))
-    : [];
-
+function additionalItems(_country: ExplorerCountry): ExplorerItem[] {
   const other: ExplorerItem[] = [
     {
       // A free tool rather than a product, shaped like the order tools below for
@@ -379,7 +292,7 @@ function additionalItems(country: ExplorerCountry): ExplorerItem[] {
       action: { label: "Open schedules", href: "/dashboard/scheduled" },
     },
   ];
-  return [...subscriptions, ...data, ...other];
+  return other;
 }
 
 /** Interleave categories so the All view doesn't bury whole service families. */
@@ -395,7 +308,7 @@ export function interleaveExplorerItems(items: ExplorerItem[]): ExplorerItem[] {
 export function buildServiceExplorer(countryCode: string | null): ExplorerItem[] {
   const country = explorerCountry(countryCode);
   if (!country) return [];
-  return interleaveExplorerItems([...exampleItems(), ...planItems(country), ...additionalItems(country)]);
+  return interleaveExplorerItems([...planItems(country), ...additionalItems(country)]);
 }
 
 export function filterExplorerItems(items: ExplorerItem[], category: ExplorerFilter, search: string, tag = "all"): ExplorerItem[] {

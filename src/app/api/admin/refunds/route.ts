@@ -1,3 +1,4 @@
+import { isVercelPreview } from "@/lib/financial-environment";
 import { randomBytes } from "node:crypto";
 import { authorizeAdminApi } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
@@ -69,6 +70,7 @@ export async function POST(request: NextRequest) {
   try {
     const access = await authorizeAdminApi(request);
     if (access.response) return access.response;
+    if (isVercelPreview()) return NextResponse.json({ error: "Refunds are unavailable in preview" }, { status: 503 });
 
     if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
     let body: unknown;

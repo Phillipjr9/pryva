@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import type { Frequency } from "@/lib/scheduled-orders";
 
@@ -128,6 +128,9 @@ function dueRow(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  // These tests exercise a mocked live database; no external database is contacted.
+  vi.stubEnv("DATABASE_URL", "postgres://test.invalid/db");
+  vi.stubEnv("VERCEL_ENV", "");
   state.balance = 20000;
   state.schedule = dueRow();
   state.scheduleUnderLock = null;
@@ -139,6 +142,8 @@ beforeEach(() => {
   state.fulfilError = null;
   state.txError = null;
 });
+
+afterEach(() => vi.unstubAllEnvs());
 
 describe("Scheduled Orders", () => {
   describe("calculateNextRun", () => {

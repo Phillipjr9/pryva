@@ -56,9 +56,8 @@ describe("homepage structure", () => {
     expect(html).toContain("In your dashboard");
   });
 
-  it("links the orphaned subscriptions catalogue", () => {
-    expect(html).toContain('href="/digital-services"');
-    expect(html).toContain("plans, priced in Naira");
+  it("does not advertise unavailable subscription sample prices", () => {
+    expect(html).not.toContain("plans, priced in Naira");
   });
 
   it("shows a real accounts marketplace entry", () => {
@@ -70,7 +69,8 @@ describe("homepage structure", () => {
 
   it("gives the dashboard section something to look at", () => {
     expect(html).toContain("Order support");
-    expect(html).toContain("Order PV-2291");
+    expect(html).toContain("Keep track in one place");
+    expect(html).not.toContain("Order PV-2291");
   });
 });
 

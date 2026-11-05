@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const state = vi.hoisted(() => ({
@@ -48,7 +48,18 @@ beforeEach(() => {
   state.esimItems.mockReturnValue([ESIM]);
 });
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe("supplier catalog endpoint", () => {
+  it("does not query live catalogues from a Vercel preview with a persistent database", async () => {
+    vi.stubEnv("DATABASE_URL", "postgres://mock.invalid/db");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect((await GET(request())).status).toBe(404);
+    expect(state.snapshot).not.toHaveBeenCalled();
+    expect(state.boostSnapshot).not.toHaveBeenCalled();
+    expect(state.esimSnapshot).not.toHaveBeenCalled();
+  });
+
   it("never reaches the provider from the public preview or without authentication", async () => {
     state.preview = true;
     expect((await GET(request())).status).toBe(404);

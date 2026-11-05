@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuthApi } from "@/lib/auth";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { logger } from "@/lib/logger";
 import { isSameOriginMutation } from "@/lib/net";
 import { isPaystackConfigured } from "@/lib/paystack";
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin." }, { status: 403 });
   if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON." }, { status: 415 });
-  if (isPreviewDatabase() || !isPaystackConfigured()) {
+  if (financialActionsUnavailable() || !isPaystackConfigured()) {
     return NextResponse.json({ error: "Payments are not configured yet." }, { status: 503 });
   }
   const limit = await purchaseRateLimiter(`topup-verify:${user.id}`);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuthApi } from "@/lib/auth";
 import { clientIp } from "@/lib/auth-rate-limit";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import {
   createFreeInbox,
   InboxError,
@@ -40,7 +40,7 @@ export async function GET() {
     // tell them apart: a preview deployment with no database behind it, and a
     // deployment whose inbox feed has no credential. They need different fixes, so
     // the response names the one that applies.
-    const reason = isPreviewDatabase()
+    const reason = financialActionsUnavailable()
       ? ("preview" as const)
       : !isInboxConfigured()
         ? ("not_configured" as const)
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     // deployment has no database behind it, and a deployment without the inbox
     // credential has nothing to buy from. One shared message made both look like
     // "the feature is off".
-    if (isPreviewDatabase()) {
+    if (financialActionsUnavailable()) {
       return NextResponse.json(
         { error: "Temporary inboxes are unavailable on this deployment.", code: "PREVIEW" },
         { status: 503 },

@@ -124,7 +124,7 @@ describe("embedded preview detection", () => {
   it("does not match look-alike hosts", () => {
     expect(isEmbeddedPreviewHost("e2b.app.evil.com")).toBe(false);
     expect(isEmbeddedPreviewHost("evil-e2b.app")).toBe(false);
-    expect(isEmbeddedPreviewHost("pryva.ng")).toBe(false);
+    expect(isEmbeddedPreviewHost("pryvalogs.com")).toBe(false);
     expect(isEmbeddedPreviewHost("")).toBe(false);
   });
 });

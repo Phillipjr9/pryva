@@ -24,7 +24,7 @@ import {
 
 const buyer = "11111111-1111-4111-8111-111111111111";
 const stranger = "22222222-2222-4222-8222-222222222222";
-const admin = { id: "33333333-3333-4333-8333-333333333333", email: "owner@pryva.ng" };
+const admin = { id: "33333333-3333-4333-8333-333333333333", email: "owner@example.test" };
 
 let counter = 0;
 
@@ -69,8 +69,8 @@ async function seedOrder(params: {
 beforeEach(async () => {
   await db.delete(productReviews).where(eq(productReviews.userId, buyer));
   await db.delete(productReviews).where(eq(productReviews.userId, stranger));
-  await seedUser(buyer, "buyer@pryva.ng");
-  await seedUser(stranger, "stranger@pryva.ng");
+  await seedUser(buyer, "buyer@example.test");
+  await seedUser(stranger, "stranger@example.test");
 });
 
 describe("review input validation", () => {
@@ -301,7 +301,7 @@ describe("nothing is public without a decision", () => {
 
     const queue = await listReviewsForModeration("pending");
     expect(queue).toHaveLength(1);
-    expect(queue[0].customerEmail).toBe("buyer@pryva.ng");
+    expect(queue[0].customerEmail).toBe("buyer@example.test");
     expect(await pendingReviewCount()).toBeGreaterThanOrEqual(1);
 
     const published = await listReviewsForModeration("published");

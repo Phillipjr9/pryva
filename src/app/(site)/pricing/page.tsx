@@ -30,13 +30,27 @@ export default function PricingPage() {
             Simple, transparent pricing
           </h1>
           <p className="mt-4 text-[1.1rem] text-ink-2 max-w-2xl mx-auto">
-            Compare example prices in Naira. Availability varies, so review the final amount and terms before confirming an order.
+            Compare catalog prices in Naira. Availability varies, so review the final amount and terms before confirming an order.
           </p>
         </div>
       </section>
 
       {/* Pricing by Service */}
       {serviceGroups.map((group) => {
+        if (group.slug === "esim") {
+          const live = isEsimOrderingAvailable();
+          return (
+            <section key={group.slug} className="pb-16">
+              <div className="shell">
+                <div className="mb-8 flex items-center gap-4"><ServiceIcon service="esim" size="lg" /><h2 className="text-[1.75rem] font-semibold text-ink">eSIM</h2></div>
+                <div className="rounded-2xl border border-line bg-white p-6">
+                  <p className="text-ink-2">{live ? "Current eSIM plans, prices and coverage are listed in the dashboard." : "eSIM ordering is currently unavailable; prices and coverage cannot be confirmed."}</p>
+                  {live && <Link href="/dashboard/esim" className="mt-4 inline-flex font-semibold text-lav-700 underline underline-offset-2">Browse current eSIM plans</Link>}
+                </div>
+              </div>
+            </section>
+          );
+        }
         const servicePlans = plans.filter((p) => p.service === group.slug);
         if (servicePlans.length === 0) return null;
 
@@ -60,13 +74,6 @@ export default function PricingPage() {
                   // price and details -- what is withdrawn is the promise to sell,
                   // using the same wording the plan page already uses.
                   const deliverable = isPlanFulfillable(plan.slug);
-                  // These written cards are not what a customer buys once a live
-                  // catalogue exists. They are still not deliverable -- there is
-                  // no provider reference to order -- so the note stays, but
-                  // "cannot be delivered yet" would read as "the product is
-                  // broken" while the dashboard is selling plans. Point at the
-                  // ones that can be bought instead.
-                  const liveEsim = plan.service === "esim" && isEsimOrderingAvailable();
                   return (
                   <div
                     key={plan.slug}
@@ -126,13 +133,6 @@ export default function PricingPage() {
                         }`}
                       >
                         Get Started
-                      </Link>
-                    ) : liveEsim ? (
-                      <Link
-                        href="/esim"
-                        className="block w-full rounded-lg border border-lav-200 bg-lav-50 px-3 py-2 text-center text-meta font-semibold leading-relaxed text-lav-800 transition-colors hover:bg-lav-100 sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.9rem]"
-                      >
-                        Example only — not orderable. See current eSIM plans
                       </Link>
                     ) : (
                       <p className="block w-full rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-center text-meta font-semibold leading-relaxed text-amber-900 sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.78rem]">

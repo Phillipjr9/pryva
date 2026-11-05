@@ -54,9 +54,9 @@ const LIVE_ESIM_LINK = "/esim";
 
 describe("/pricing only offers to sell what can be delivered", () => {
   it("covers both kinds of plan, so the assertions below are not vacuous", () => {
-    expect(priced.length).toBe(23);
+    expect(priced.length).toBe(17);
     expect(deliverable.length).toBe(10);
-    expect(undeliverable.length).toBe(13);
+    expect(undeliverable.length).toBe(7);
   });
 
   it("links a signup funnel only for plans that can be delivered", () => {

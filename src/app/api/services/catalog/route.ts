@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { isFleexaConfigured } from "@/lib/fleexa";
 import { readSupplierSnapshot, supplierItemsForCountry } from "@/lib/fleexa-catalog";
 import { isSmmPanelConfigured } from "@/lib/smm-panel";
@@ -35,7 +35,7 @@ async function attempt<T>(configured: boolean, read: () => Promise<T>): Promise<
  * every configured supplier fails is the catalog unavailable.
  */
 export async function GET(request: NextRequest) {
-  if (isPreviewDatabase()) return NextResponse.json({ error: "Live catalog unavailable" }, { status: 404 });
+  if (financialActionsUnavailable()) return NextResponse.json({ error: "Live catalog unavailable" }, { status: 404 });
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Please sign in" }, { status: 401 });
   const country = explorerCountry(request.nextUrl.searchParams.get("country"));

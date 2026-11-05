@@ -22,6 +22,7 @@ afterEach(() => {
   config.boosting = false;
   config.accounts = false;
   config.preview = true;
+  vi.unstubAllEnvs();
 });
 
 describe("service readiness", () => {
@@ -36,6 +37,7 @@ describe("service readiness", () => {
   });
 
   it("puts what a customer can actually do first", () => {
+    config.preview = false;
     config.fleexa = true;
     config.boosting = true;
     config.accounts = true;
@@ -47,6 +49,7 @@ describe("service readiness", () => {
   });
 
   it("says ordering is paused when a supplier key is missing, not that the category is gone", () => {
+    config.preview = false;
     const readiness = readServiceReadiness();
     const numbers = readiness.find((entry) => entry.id === "numbers")!;
     expect(numbers.state).toBe("paused");
@@ -55,6 +58,16 @@ describe("service readiness", () => {
     config.fleexa = true;
     const live = readServiceReadiness().find((entry) => entry.id === "numbers")!;
     expect(live.state).toBe("buy");
+  });
+
+  it("does not advertise purchases or inboxes from a Vercel preview with live configuration", () => {
+    config.preview = false;
+    config.fleexa = true;
+    config.boosting = true;
+    config.accounts = true;
+    vi.stubEnv("VERCEL_ENV", "preview");
+    const states = new Map(readServiceReadiness().map((entry) => [entry.id, entry.state]));
+    for (const id of ["social", "numbers", "esim", "accounts", "tools", "email"] as const) expect(states.get(id)).toBe("paused");
   });
 
   it("keeps the free inbox free on a persistent database and unavailable in the preview", () => {

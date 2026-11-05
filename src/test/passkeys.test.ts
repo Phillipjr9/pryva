@@ -40,7 +40,7 @@ const USER = "3f1c6a2b-9d4e-4a7c-8b1f-2e5d6c7b8a90";
 const OTHER = "7a2b3c4d-5e6f-4a8b-9c0d-1e2f3a4b5c6d";
 const CHALLENGE = "challenge-value-that-the-device-signs-0001";
 
-const RP = { rpID: "pryva.ng", origin: "https://pryva.ng" };
+const RP = { rpID: "pryvalogs.com", origin: "https://pryvalogs.com" };
 
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
@@ -147,12 +147,12 @@ describe("the relying party", () => {
 
   it("refuses plain http on a real host", () => {
     const env = {} as unknown as NodeJS.ProcessEnv;
-    expect(passkeys.relyingPartyFor(request("http://pryva.ng/"), env)).toBeNull();
+    expect(passkeys.relyingPartyFor(request("http://pryvalogs.com/"), env)).toBeNull();
   });
 
   it("refuses an RP ID that is not a suffix of the origin", () => {
-    const env = { WEBAUTHN_ORIGIN: "https://pryva.ng", WEBAUTHN_RP_ID: "example.com" } as unknown as NodeJS.ProcessEnv;
-    expect(passkeys.relyingPartyFor(request("https://pryva.ng/"), env)).toBeNull();
+    const env = { WEBAUTHN_ORIGIN: "https://pryvalogs.com", WEBAUTHN_RP_ID: "example.com" } as unknown as NodeJS.ProcessEnv;
+    expect(passkeys.relyingPartyFor(request("https://pryvalogs.com/"), env)).toBeNull();
   });
 
   it("accepts the arena preview host over https", () => {

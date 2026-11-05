@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { orders } from "@/db/schema";
 
@@ -69,7 +69,17 @@ beforeEach(() => {
   mocks.flagReconciliation.mockResolvedValue(undefined);
 });
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe("admin refund reconciliation", () => {
+  it("does not refund shared production records from a Vercel preview", async () => {
+    vi.stubEnv("DATABASE_URL", "postgres://mock.invalid/db");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect((await POST(request({ orderId: ORDER_ID }))).status).toBe(503);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.scheduleWalletEmails).not.toHaveBeenCalled();
+  });
+
   it("flags a refund that was confirmed past review, because the unit is never released", async () => {
     fakeTransaction(true);
 

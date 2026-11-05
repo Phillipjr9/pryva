@@ -21,7 +21,7 @@ beforeEach(() => {
   sent = [];
   respond = () => ({ ok: true, status: 200 }) as Response;
   vi.stubEnv("RESEND_API_KEY", "re_test");
-  vi.stubEnv("RESEND_FROM_EMAIL", "Pryva <hello@pryva.ng>");
+  vi.stubEnv("RESEND_FROM_EMAIL", "Pryva <hello@example.test>");
   vi.stubGlobal("fetch", vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
     sent.push({ url: String(url), body: JSON.parse(String(init?.body)) });
     return respond();

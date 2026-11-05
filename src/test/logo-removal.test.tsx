@@ -119,8 +119,8 @@ describe("brand presentation", () => {
       walletTopupEmail(1000, 1000, "T1"),
       giftCardEmail({ code: "CODE", amount: 1000, senderName: "Ada" }),
       refundEmail({ reference: "R1", productName: "Number", amount: 1000, reason: "Cancelled" }),
-      passwordResetEmail("Ada", "https://pryva.ng/reset"),
-      emailVerificationEmail("Ada", "https://pryva.ng/verify-email?token=t"),
+      passwordResetEmail("Ada", "https://pryvalogs.com/reset"),
+      emailVerificationEmail("Ada", "https://pryvalogs.com/verify-email?token=t"),
     ];
     for (const template of templates) {
       expect(template.html).toContain("pryva-mark.png");
@@ -134,8 +134,8 @@ describe("brand presentation", () => {
     // two routes were sending bare <p> tags while this template library sat
     // unused, so the assertions are on the rendered output rather than on intent.
     for (const template of [
-      emailVerificationEmail("Ada", "https://pryva.ng/verify-email?token=t"),
-      passwordResetEmail("Ada", "https://pryva.ng/reset"),
+      emailVerificationEmail("Ada", "https://pryvalogs.com/verify-email?token=t"),
+      passwordResetEmail("Ada", "https://pryvalogs.com/reset"),
       // The two onboarding emails follow the same card: same gradient bar, same
       // hero-image treatment, same type stack. A welcome that arrived in a plainer
       // skin than the receipt before it would read as a different sender.

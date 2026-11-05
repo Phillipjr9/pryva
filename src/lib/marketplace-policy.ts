@@ -1,4 +1,4 @@
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { isBulkaccConfigured } from "@/lib/bulkacc";
 import { isAccsZoneConfigured } from "@/lib/accszone";
 import { isMarketplaceCatalogAvailable } from "@/lib/marketplace-suppliers";
@@ -15,11 +15,11 @@ import { isMarketplaceCatalogAvailable } from "@/lib/marketplace-suppliers";
  *  • The legacy source keeps its original explicit opt-in flag, because its
  *    behaviour in staging was never confirmed.
  *
- * The preview/demo database is always refused first: demo funds must never reach
+ * In-memory and Vercel-preview environments are always refused first: preview funds must never reach
  * a real supplier, even if a live key is set by accident.
  */
 export function isMarketplacePurchaseEnabled(): boolean {
-  if (isPreviewDatabase()) return false;
+  if (financialActionsUnavailable()) return false;
   if (isBulkaccConfigured()) return true;
   return process.env.MARKETPLACE_LIVE_PURCHASES === "true" && isAccsZoneConfigured();
 }

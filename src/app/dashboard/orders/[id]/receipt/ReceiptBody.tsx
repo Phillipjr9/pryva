@@ -42,7 +42,7 @@ export function ReceiptBody({ receipt }: { receipt: ReceiptData }) {
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5">
         <div>
           <p className="text-[1.1rem] font-semibold tracking-tight text-ink">Pryva</p>
-          <p className="mt-0.5 text-meta text-ink-3">pryva.ng</p>
+          <p className="mt-0.5 text-meta text-ink-3">pryvalogs.com</p>
         </div>
         <div className="text-right">
           <p className="text-micro font-semibold uppercase tracking-[0.14em] text-ink-3">Receipt</p>

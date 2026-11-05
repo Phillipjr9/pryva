@@ -101,6 +101,31 @@ beforeEach(async () => {
   await database.update(schema.users).set({ walletBalance: 500_000 }).where(eq(schema.users.id, USER));
 });
 
+describe("purchase isolation", () => {
+  it("refuses supplier purchases in Vercel preview even with a persistent database and funded wallet", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    try {
+      const response = await POST(purchase({ planSlug: SLUG, requestId: crypto.randomUUID() }));
+      expect(response.status).toBe(503);
+      expect(mocks.fulfillPlan).not.toHaveBeenCalled();
+      expect(await walletBalance()).toBe(500_000);
+      expect(await ledgerCount()).toBe(0);
+    } finally { vi.stubEnv("VERCEL_ENV", ""); }
+  });
+
+  it("refuses purchases when only the in-memory database exists", async () => {
+    vi.stubEnv("DATABASE_URL", "");
+    vi.stubEnv("PGHOST", "");
+    try {
+      const response = await POST(purchase({ planSlug: SLUG, requestId: crypto.randomUUID() }));
+      expect(response.status).toBe(503);
+      expect(mocks.fulfillPlan).not.toHaveBeenCalled();
+      expect(await walletBalance()).toBe(500_000);
+      expect(await ledgerCount()).toBe(0);
+    } finally { vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db"); }
+  });
+});
+
 describe("recorded unit cost", () => {
   it("persists what the unit actually cost so real margin is measurable", async () => {
     const requestId = crypto.randomUUID();

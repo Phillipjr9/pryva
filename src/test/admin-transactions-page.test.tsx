@@ -18,7 +18,7 @@ import { users, walletTransactions } from "@/db/schema";
 
 vi.mock("@/lib/auth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/auth")>();
-  return { ...actual, requireAdmin: vi.fn().mockResolvedValue({ id: "admin-1", email: "owner@pryva.ng" }) };
+  return { ...actual, requireAdmin: vi.fn().mockResolvedValue({ id: "admin-1", email: "owner@example.test" }) };
 });
 
 const USER = "22222222-2222-4222-8222-222222222222";

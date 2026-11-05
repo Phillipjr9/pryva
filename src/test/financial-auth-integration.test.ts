@@ -758,6 +758,19 @@ describe("Google subject binding and account protection", () => {
     expect(user.email).toBe("buyer@example.com");
   });
 
+  it("does not close or alter an account from a Vercel preview", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    const request = new NextRequest("https://pryva.test/api/user/delete", {
+      method: "POST", headers: { origin: "https://pryva.test", "content-type": "application/json" },
+      body: JSON.stringify({ confirm: "buyer@example.com", password: "hash" }),
+    });
+    expect((await deleteRoute.POST(request)).status).toBe(503);
+    const [user] = await database.select().from(schema.users).where(eq(schema.users.id, USER));
+    expect(user.deletedAt).toBeNull();
+    expect(user.email).toBe("buyer@example.com");
+    expect(mocks.scheduleClosed).not.toHaveBeenCalled();
+  });
+
   it("closes the account, scrubs the identity, and keeps the financial record", async () => {
     await database.insert(schema.orders).values({ reference: "ORDER-1", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "NG", duration: "20 min", amount: 1000, provider: "fleexa" });
     await database.insert(schema.walletTransactions).values({ userId: USER, type: "debit", amount: 1000, balanceAfter: 9000, description: "Order ORDER-1", reference: "LEDGER-1" });
@@ -1153,6 +1166,27 @@ describe("Paystack top-up safety", () => {
     expect(mocks.initializePayment).not.toHaveBeenCalled();
     expect(mocks.verifyPayment).not.toHaveBeenCalled();
     expect(await database.select().from(schema.paymentTopups)).toHaveLength(0);
+  });
+
+  it("does not initiate test-key top-ups on production or any top-ups in preview", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("PAYSTACK_SECRET_KEY", "sk_test_fixture");
+    expect((await topUpRoute.POST(request("", { amount: 2500 }))).status).toBe(503);
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("PAYSTACK_SECRET_KEY", "sk_live_fixture");
+    expect((await topUpRoute.POST(request("", { amount: 2500 }))).status).toBe(503);
+    expect(mocks.initializePayment).not.toHaveBeenCalled();
+    expect(await database.select().from(schema.paymentTopups)).toHaveLength(0);
+  });
+
+  it("prefers the canonical site URL for the Paystack callback over the legacy app override", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://pryvalogs.com");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://retired.example.test");
+    mocks.initializePayment.mockImplementation(async (payload: { reference: string }) => ({
+      status: true, data: { reference: payload.reference, authorization_url: "https://checkout.paystack.com/safe" },
+    }));
+    expect((await topUpRoute.POST(request("", { amount: 2500 }))).status).toBe(200);
+    expect(mocks.initializePayment).toHaveBeenCalledWith(expect.objectContaining({ callback_url: "https://pryvalogs.com/dashboard/wallet?topup=return" }));
   });
 
   it("does not create a checkout when the configured return origin is unsafe", async () => {
@@ -1740,6 +1774,15 @@ describe("profile and notification mutation guards", () => {
 });
 
 describe("order sync and scheduler safety", () => {
+  it("does not poll or change an order from a Vercel preview with a database configured", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    const response = await syncRoute.GET(new Request("https://pryva.test/api/orders/example/sync"), { params: Promise.resolve({ id: "example" }) });
+    expect(response.status).toBe(503);
+    expect(mocks.checkSms).not.toHaveBeenCalled();
+    expect(mocks.rentalSms).not.toHaveBeenCalled();
+    expect(mocks.otpActivation).not.toHaveBeenCalled();
+  });
+
   it("does not overwrite a refunded order with a stale provider poll", async () => {
     const [order] = await database.insert(schema.orders).values({
       reference: "OLD-LIVE-ORDER", userId: USER, service: "numbers", productSlug: "vn-ng", productName: "Number",
@@ -1835,12 +1878,18 @@ describe("order sync and scheduler safety", () => {
     });
     vi.stubEnv("DATABASE_URL", "");
     expect((await scheduledRoute.POST(request("POST", { service: "numbers", productSlug: "vn-ng", frequency: "daily" }, "https://evil.pryva.test"))).status).toBe(403);
+    expect((await scheduledRoute.POST(request("POST", { service: "numbers", productSlug: "vn-ng", frequency: "daily" }))).status).toBe(503);
+    vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db");
     expect((await scheduledRoute.POST(request("POST", { service: "numbers", productSlug: "vn-ng", frequency: "immediate" }))).status).toBe(400);
     expect((await scheduledRoute.POST(request("POST", { service: "esim", productSlug: "vn-ng", frequency: "daily" }))).status).toBe(400);
     const created = await scheduledRoute.POST(request("POST", { service: "numbers", productSlug: "vn-ng", frequency: "daily" }));
     expect(created.status).toBe(200);
     const { id } = await created.json();
     expect((await scheduledRoute.PATCH(request("PATCH", { orderId: id, action: "pause" }, "https://evil.pryva.test"))).status).toBe(403);
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect((await scheduledRoute.PATCH(request("PATCH", { orderId: id, action: "pause" }))).status).toBe(503);
+    expect((await database.select().from(schema.scheduledOrders))[0].status).toBe("active");
+    vi.stubEnv("VERCEL_ENV", "");
     expect((await scheduledRoute.PATCH(request("PATCH", { orderId: id, action: "pause" }))).status).toBe(200);
     vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db");
     expect((await scheduledRoute.PATCH(request("PATCH", { orderId: id, action: "resume" }))).status).toBe(200);

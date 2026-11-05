@@ -1,3 +1,4 @@
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { randomUUID } from "node:crypto";
 import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 import { db } from "@/db";
@@ -115,6 +116,7 @@ class RunDeclinedError extends Error {
  * to go back, or the business pays a supplier for a number nobody holds.
  */
 export async function processScheduledOrder(scheduled: typeof scheduledOrders.$inferSelect): Promise<boolean> {
+  if (financialActionsUnavailable()) return false;
   const now = new Date();
   const plan = typeof scheduled.productSlug === "string" ? findPlan(scheduled.productSlug) : undefined;
   if (!plan || scheduled.service !== plan.service) throw new Error("Invalid scheduled product");

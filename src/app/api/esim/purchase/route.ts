@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { orders, users, type Order } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { findEsimOffer, type EsimOffer } from "@/lib/esim-catalog";
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
   if (!user) return Response.json({ ok: false, error: "Please sign in to complete this order." }, { status: 401 });
 
   // Never spend against the live network from an in-memory preview database.
-  if (isPreviewDatabase()) return Response.json({ ok: false, error: "eSIM ordering is unavailable in this environment." }, { status: 503 });
+  if (financialActionsUnavailable()) return Response.json({ ok: false, error: "eSIM ordering is unavailable in this environment." }, { status: 503 });
 
   if (!isSameOriginMutation(request)) {
     return Response.json({ ok: false, error: "Cross-origin request denied." }, { status: 403 });

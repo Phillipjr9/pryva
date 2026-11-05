@@ -1,7 +1,9 @@
+import { paystackKeyUsable } from "@/lib/paystack-policy";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { plans } from "@/lib/catalog";
-import { isPlanFulfillable } from "@/lib/fulfillment";
+import { isNumberPlanOrderingConfigured } from "@/lib/number-availability";
 import { isMarketplaceCheckoutConfigured } from "@/lib/marketplace-policy";
 import { esimCategoryOrderable } from "@/lib/esim-availability";
 
@@ -29,9 +31,7 @@ function catalogAvailability() {
   for (const plan of plans) {
     const entry = grouped.get(plan.service) ?? { total: 0, deliverable: 0 };
     entry.total += 1;
-    // Written eSIM examples are never sellable, even if the separate live
-    // ordering path is configured. Do not count the examples as live offers.
-    if (isPlanFulfillable(plan.slug)) entry.deliverable += 1;
+    if (isNumberPlanOrderingConfigured(plan.slug)) entry.deliverable += 1;
     grouped.set(plan.service, entry);
   }
   return [...grouped.entries()].map(([service, { total, deliverable }]) => ({
@@ -45,50 +45,58 @@ function catalogAvailability() {
 
 export default function StatusPage() {
   const marketplaceEnabled = isMarketplaceCheckoutConfigured();
-  const paystackEnabled = Boolean(process.env.PAYSTACK_SECRET_KEY?.trim());
+  const paystackEnabled = !financialActionsUnavailable() && paystackKeyUsable(process.env.PAYSTACK_SECRET_KEY);
   const catalog = catalogAvailability();
+  const availableNumbers = catalog.some((entry) => entry.service === "numbers" && entry.available);
+  const giftCardsAvailable = !financialActionsUnavailable();
 
   const rows = [
-    ...catalog.map((entry) => entry.service === "esim" ? ({
-      name: entry.name,
-      status: esimCategoryOrderable() ? "Ordering configured" : "Not available",
-      detail: esimCategoryOrderable()
-        ? "eSIM ordering is connected. Check current plans and coverage in your dashboard; example plans are not orderable."
-        : "eSIM ordering is not connected. The listed example plans cannot be ordered.",
-    }) : ({
+    ...catalog.map((entry) => ({
       name: entry.name,
       status: entry.available ? "Available" : "Not available",
       detail: entry.available
-        ? `${entry.deliverable} of ${entry.total} plans in this category can be ordered and delivered automatically.`
-        : `None of the ${entry.total} plans in this category can be delivered yet, so they cannot be ordered or charged.`,
+        ? `${entry.deliverable} of ${entry.total} plans have a configured ordering path. Confirm current stock and terms before buying.`
+        : `No ordering path is currently configured for the ${entry.total} plans in this category, so they cannot be ordered or charged.`,
     })),
+    {
+      name: SERVICE_LABELS.esim,
+      status: esimCategoryOrderable() ? "Ordering configured" : "Not available",
+      detail: esimCategoryOrderable()
+        ? "eSIM ordering is connected. Check current plans and coverage in your dashboard."
+        : "eSIM ordering is unavailable here. Coverage and prices are not currently available.",
+    },
     {
       name: "Account marketplace checkout",
       status: marketplaceEnabled ? "Available" : "Not available",
       detail: marketplaceEnabled
         ? "Listings can be purchased from your wallet. Live stock is shown per listing."
-        : "Checkout is not configured, so listings cannot be purchased yet.",
+        : "Checkout is unavailable here, so listings cannot be purchased yet.",
     },
     {
       name: "Wallet top-ups and withdrawals",
       status: paystackEnabled ? "Available" : "Not available",
       detail: paystackEnabled
         ? "Top-ups are taken through Paystack. Your wallet is credited only after payment is confirmed."
-        : "Payments are not configured, so the wallet cannot be funded yet.",
+        : "Payments are unavailable here, so the wallet cannot be funded yet.",
     },
     {
-      // Gift cards were previously listed here with the categories that have no
-      // live fulfilment, which told visitors they could not be bought while the
-      // dashboard was selling them. A gift card is issued by Pryva from the
-      // buyer's own wallet, so it has no supplier feed to wait for.
       name: "Gift cards",
-      status: "Available",
-      detail: "Gift cards are issued by Pryva from your wallet balance the moment you buy one, so they do not depend on a third-party catalogue.",
+      status: giftCardsAvailable ? "Available" : "Not available",
+      detail: giftCardsAvailable
+        ? "Gift cards are issued by Pryva from your wallet balance. Review the amount before confirming."
+        : "Gift-card purchases and redemption are unavailable in this environment.",
     },
     {
-      name: "Digital subscriptions, data, bulk and scheduled orders",
-      status: "Available",
-      detail: "Orders are processed automatically through verified provider integration.",
+      name: "Digital subscriptions and mobile data",
+      status: "Not available",
+      detail: "Ordering is not connected for these categories, so no wallet charge can be made.",
+    },
+    {
+      name: "Bulk and scheduled number orders",
+      status: availableNumbers ? "Ordering configured" : "Not available",
+      detail: availableNumbers
+        ? "Eligible number plans can be ordered in bulk or scheduled. Schedules are checked nightly."
+        : "These tools need an available number ordering path before they can place an order.",
     },
     {
       name: "Automatic refunds",

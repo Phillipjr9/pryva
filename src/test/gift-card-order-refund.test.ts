@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 import { NextRequest } from "next/server";
@@ -171,6 +171,9 @@ function request() {
 }
 
 beforeEach(() => {
+  // These tests exercise a mocked live database; no external database is contacted.
+  vi.stubEnv("DATABASE_URL", "postgres://test.invalid/db");
+  vi.stubEnv("VERCEL_ENV", "");
   state.balances = { u1: 20_000 };
   state.orderRows = [];
   state.ledger = [];
@@ -181,7 +184,17 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe("POST /api/gift-cards/order refund", () => {
+  it("refuses the legacy mock setting before a debit or supplier call", async () => {
+    vi.stubEnv("FOXRELOAD_IS_MOCK", "true");
+    expect((await POST(request())).status).toBe(503);
+    expect(state.orderRows).toEqual([]);
+    expect(state.ledger).toEqual([]);
+    expect(state.balances.u1).toBe(20_000);
+  });
+
   it("hands the money back and records the refund together", async () => {
     const response = await POST(request());
 

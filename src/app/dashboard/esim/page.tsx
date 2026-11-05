@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { ServiceTitle } from "@/components/ServiceTitle";
 import { formatDateNigerian } from "@/lib/date-utils";
 import { catalogueItems, ESIM_CATALOGUE_LIMIT, readEsimCatalog, type EsimCatalogStats } from "@/lib/esim-catalog";
@@ -46,7 +46,7 @@ export default async function EsimCataloguePage() {
   } catch (error) {
     // "Not configured" and "the supplier is down" are different, and only one of
     // them is the owner's to fix, so they are not collapsed into one message.
-    failure = isPreviewDatabase()
+    failure = financialActionsUnavailable()
       ? "eSIM ordering is unavailable in this environment."
       : error instanceof Error && /not configured/i.test(error.message)
         ? "eSIM ordering is not connected yet, so no plan can be bought."

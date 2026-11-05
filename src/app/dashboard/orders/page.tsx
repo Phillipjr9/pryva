@@ -4,7 +4,6 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
-import { isPreviewDatabase } from "@/lib/demo-policy";
 import { formatNaira } from "@/lib/catalog";
 import { ArrowRight, ArrowUpRight, Clock, Receipt, Search, Sparkle } from "@/components/icons";
 import { EmptyState } from "@/components/dashboard/EmptyState";
@@ -102,7 +101,7 @@ export default async function OrdersPage({
             Every number, eSIM, proxy pack and inbox you&apos;ve bought — with codes kept safe.
           </p>
         </div>
-        <Link href={isPreviewDatabase() ? "/dashboard/services" : "/pricing"} className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.78rem]">
+        <Link href="/pricing" className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.78rem]">
           <Sparkle className="h-3.5 w-3.5" /> New order
         </Link>
       </div>
@@ -147,8 +146,8 @@ export default async function OrdersPage({
         <EmptyState
           icon={Receipt}
           title="No orders yet"
-          body={isPreviewDatabase() ? "Your simulated orders and demo codes will appear here." : "Orders and their references appear here. Temporary inboxes are free and never create an order, so they do not appear in this list."}
-          action={isPreviewDatabase() ? { label: "Explore demo services", href: "/dashboard/services" } : { label: "Browse pricing", href: "/pricing" }}
+          body="Orders and their references appear here. Temporary inboxes are free and never create an order, so they do not appear in this list."
+          action={{ label: "Browse pricing", href: "/pricing" }}
         />
       ) : matches.length === 0 ? (
         <EmptyState

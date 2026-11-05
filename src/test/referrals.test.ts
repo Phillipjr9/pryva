@@ -173,12 +173,12 @@ describe("attribution", () => {
 
   it("reads the code from the cookie when the body has none", async () => {
     const code = await lib.codeForUser(REFERRER);
-    const request = new Request("https://pryva.ng/api/auth/signup", {
+    const request = new Request("https://pryvalogs.com/api/auth/signup", {
       headers: { cookie: `theme=dark; pryva_ref=${code}` },
     });
     expect(lib.readReferralCodeFrom(request)).toBe(code);
     expect(lib.readReferralCodeFrom(request, "wrong")).toBe(code);
-    expect(lib.readReferralCodeFrom(new Request("https://pryva.ng/"))).toBeNull();
+    expect(lib.readReferralCodeFrom(new Request("https://pryvalogs.com/"))).toBeNull();
   });
 });
 

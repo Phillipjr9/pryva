@@ -113,7 +113,7 @@ describe("signup signals", () => {
 
   it("record the network without the address", async () => {
     await seedUser(USER, "ada@example.com");
-    const request = new Request("https://pryva.ng/api/auth/signup", {
+    const request = new Request("https://pryvalogs.com/api/auth/signup", {
       headers: { "x-forwarded-for": "203.0.113.9", "user-agent": "Mozilla/5.0 Test" },
     });
     await fraud.recordSignupSignal(request, USER);
@@ -126,9 +126,9 @@ describe("signup signals", () => {
 
   it("are written once, not on every sign-in", async () => {
     await seedUser(USER, "ada@example.com");
-    const request = new Request("https://pryva.ng/", { headers: { "x-forwarded-for": "203.0.113.9" } });
+    const request = new Request("https://pryvalogs.com/", { headers: { "x-forwarded-for": "203.0.113.9" } });
     await fraud.recordSignupSignal(request, USER);
-    await fraud.recordSignupSignal(new Request("https://pryva.ng/", { headers: { "x-forwarded-for": "198.51.100.7" } }), USER);
+    await fraud.recordSignupSignal(new Request("https://pryvalogs.com/", { headers: { "x-forwarded-for": "198.51.100.7" } }), USER);
     const rows = await database.select().from(accountSignals).where(eq(accountSignals.userId, USER));
     expect(rows).toHaveLength(1);
     expect(rows[0].ipHash).toBe(fraud.hashSignal("203.0.113.9"));

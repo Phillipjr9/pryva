@@ -162,9 +162,15 @@ export function bitcallApiSecret(): string | null {
   return value ? value : null;
 }
 
-/** Both halves are required; one without the other cannot authenticate. */
+/** Both halves are required, and production must never fulfill using a test key. */
 export function isBitcallConfigured(): boolean {
-  return bitcallKeyId() !== null && bitcallApiSecret() !== null;
+  const id = bitcallKeyId();
+  if (!id || !bitcallApiSecret()) return false;
+  return !productionGateway() || (id.startsWith("ak_live_") && id.length > "ak_live_".length);
+}
+
+function productionGateway(): boolean {
+  return process.env.VERCEL_ENV === "production" || (!process.env.VERCEL_ENV && process.env.NODE_ENV === "production");
 }
 
 /**
@@ -268,6 +274,9 @@ async function gatewayFetch(
   const secret = bitcallApiSecret();
   if (!keyId) throw new BitcallError("BITCALL_KEY_ID is not configured", 503, "NO_KEY_ID");
   if (!secret) throw new BitcallError("BITCALL_API_SECRET is not configured", 503, "NO_API_SECRET");
+  if (productionGateway() && (!keyId.startsWith("ak_live_") || keyId.length <= "ak_live_".length)) {
+    throw new BitcallError("A live gateway key is required in production", 503, "INVALID_KEY_ENVIRONMENT");
+  }
   // Fail on a malformed secret here rather than as an opaque 401 later: the
   // gateway answers INVALID_API_KEY identically for a wrong secret, a revoked
   // key, an unknown key and a disallowed IP, so it cannot tell you which.

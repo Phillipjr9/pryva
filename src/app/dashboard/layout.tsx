@@ -67,7 +67,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       )}
       {isPreviewDatabase() && (
         <div role="status" className="mb-5 rounded-xl border border-lav-200 bg-lav-50 px-4 py-3 text-sm text-lav-800">
-          Demo mode · Payments, balances and services are simulated. This account is shared, so use fictional details only.
+          This deployment has no persistent database. Purchases and payments are unavailable, and any data entered here will not persist.
         </div>
       )}
       {children}

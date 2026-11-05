@@ -75,7 +75,7 @@ describe("two-factor encryption", () => {
 
 describe("enrolment lifecycle (in-memory database)", () => {
   async function enrol() {
-    const started = await beginEnrolment(userId, "ada@pryva.ng");
+    const started = await beginEnrolment(userId, "ada@example.test");
     if (!started.ok) throw new Error("enrolment refused");
     const code = totpAt(started.secret, currentStep());
     const confirmed = await confirmEnrolment(userId, code);
@@ -84,7 +84,7 @@ describe("enrolment lifecycle (in-memory database)", () => {
   }
 
   it("stores the secret encrypted and only enables after a correct code", async () => {
-    const started = await beginEnrolment(userId, "ada@pryva.ng");
+    const started = await beginEnrolment(userId, "ada@example.test");
     expect(started.ok).toBe(true);
 
     const [stored] = await db
@@ -113,7 +113,7 @@ describe("enrolment lifecycle (in-memory database)", () => {
 
   it("does not let a second attempt replace an enabled enrolment", async () => {
     await enrol();
-    const again = await beginEnrolment(userId, "ada@pryva.ng");
+    const again = await beginEnrolment(userId, "ada@example.test");
     expect(again).toEqual({ ok: false, reason: "already-enabled" });
   });
 

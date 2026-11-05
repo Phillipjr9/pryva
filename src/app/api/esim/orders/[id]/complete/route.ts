@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { orders } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { completeEsimOrder } from "@/lib/esim-fulfilment";
@@ -23,7 +23,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return Response.json({ ok: false, error: "Please sign in." }, { status: 401 });
-  if (isPreviewDatabase()) return Response.json({ ok: false, error: "eSIM ordering is unavailable in this environment." }, { status: 503 });
+  if (financialActionsUnavailable()) return Response.json({ ok: false, error: "eSIM ordering is unavailable in this environment." }, { status: 503 });
   if (!isSameOriginMutation(request)) return Response.json({ ok: false, error: "Cross-origin request denied." }, { status: 403 });
 
   const limit = await purchaseRateLimiter(`esim-complete:${user.id}`);

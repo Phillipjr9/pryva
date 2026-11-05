@@ -56,7 +56,7 @@ describe("disposable email addresses cannot create an account", () => {
       "someone@gmx.com",
       "someone@yandex.com",
       "someone@aol.com",
-      "someone@pryva.ng",
+      "someone@example.test",
       "someone@company.com.ng",
       "someone@lagosbusiness.example",
     ];
@@ -114,7 +114,7 @@ describe("disposable email addresses cannot create an account", () => {
       "aol.com",
       "gmx.com",
       "mail.com",
-      "pryva.ng",
+      "pryvalogs.com",
     ];
     const list = new Set<string>(DISPOSABLE_EMAIL_DOMAINS as readonly string[]);
     for (const domain of forbidden) {

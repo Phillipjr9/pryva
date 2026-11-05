@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { paymentTopups, walletTransactions } from "@/db/schema";
-import { isPreviewDatabase } from "@/lib/demo-policy";
+import { financialActionsUnavailable } from "@/lib/financial-environment";
 import { logger } from "@/lib/logger";
 import { isPaystackConfigured, verifyPayment } from "@/lib/paystack";
 import { completeTopUp } from "@/lib/topups";
@@ -70,7 +70,7 @@ export async function reconcileTopUpPayment(input: {
 }): Promise<TopUpReconciliation> {
   const { reference, userId, userEmail } = input;
 
-  if (isPreviewDatabase() || !isPaystackConfigured()) {
+  if (financialActionsUnavailable() || !isPaystackConfigured()) {
     return { outcome: "not_configured" };
   }
 

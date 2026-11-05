@@ -16,30 +16,6 @@ export type GeneratedPrice = {
 };
 
 export const CATALOG_PRICES: Record<string, GeneratedPrice> = {
-  "esim-africa": {
-    "price": 12500,
-    "maxDiscountPercent": 4
-  },
-  "esim-europe": {
-    "price": 19250,
-    "maxDiscountPercent": 3
-  },
-  "esim-global": {
-    "price": 49850,
-    "maxDiscountPercent": 3
-  },
-  "esim-ng-1": {
-    "price": 4700,
-    "maxDiscountPercent": 4
-  },
-  "esim-ng-5": {
-    "price": 15100,
-    "maxDiscountPercent": 4
-  },
-  "esim-us": {
-    "price": 24950,
-    "maxDiscountPercent": 3
-  },
   "proxy-eu-10": {
     "price": 33250,
     "maxDiscountPercent": 3

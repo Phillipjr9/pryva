@@ -27,7 +27,7 @@ function createWorker() {
   // The Cache API resolves a string against the worker's origin; the fake one
   // must too, or `cache.match("/offline")` misses an entry stored as a full URL.
   const keyFor = (request: Request | string) =>
-    new URL(typeof request === "string" ? request : request.url, "https://pryva.ng").toString();
+    new URL(typeof request === "string" ? request : request.url, "https://pryvalogs.com").toString();
 
   const open = async (name: string) => {
     if (!stores.has(name)) stores.set(name, new Map());
@@ -42,8 +42,8 @@ function createWorker() {
       },
       async addAll(urls: string[]) {
         for (const url of urls) {
-          const response = await fetchImpl(new Request(new URL(url, "https://pryva.ng").toString()));
-          store.set(new URL(url, "https://pryva.ng").toString(), response.clone());
+          const response = await fetchImpl(new Request(new URL(url, "https://pryvalogs.com").toString()));
+          store.set(new URL(url, "https://pryvalogs.com").toString(), response.clone());
         }
       },
       async keys() {
@@ -64,7 +64,7 @@ function createWorker() {
 
   const sandbox = {
     self: {
-      location: { origin: "https://pryva.ng" },
+      location: { origin: "https://pryvalogs.com" },
       addEventListener: (name: string, handler: (event: unknown) => void) => listeners.set(name, handler),
       skipWaiting: async () => {},
       clients: { claim: async () => {} },
@@ -110,7 +110,7 @@ function createWorker() {
   return { stores, fetchCalls, network, fireInstall, fireActivate, dispatch };
 }
 
-const get = (path: string) => new Request(`https://pryva.ng${path}`);
+const get = (path: string) => new Request(`https://pryvalogs.com${path}`);
 const navigate = (path: string) => {
   const request = get(path);
   Object.defineProperty(request, "mode", { value: "navigate" });
@@ -156,9 +156,9 @@ describe("service worker", () => {
 
     const store = worker.stores.get("pryva-v1-static")!;
     expect([...store.keys()]).toEqual([
-      "https://pryva.ng/offline",
-      "https://pryva.ng/icons/icon-192.png",
-      "https://pryva.ng/icons/icon-512.png",
+      "https://pryvalogs.com/offline",
+      "https://pryvalogs.com/icons/icon-192.png",
+      "https://pryvalogs.com/icons/icon-512.png",
     ]);
   });
 
@@ -166,7 +166,7 @@ describe("service worker", () => {
     const worker = createWorker();
     await worker.fireInstall();
 
-    const post = new Request("https://pryva.ng/api/auth/login", { method: "POST" });
+    const post = new Request("https://pryvalogs.com/api/auth/login", { method: "POST" });
     expect(worker.dispatch(post)).toBeUndefined();
     expect(worker.dispatch(get("/api/wallet"))).toBeUndefined();
     expect(worker.dispatch(new Request("https://elsewhere.test/app.js"))).toBeUndefined();
@@ -178,7 +178,7 @@ describe("service worker", () => {
     const worker = createWorker();
     await worker.fireInstall();
 
-    const post = new Request("https://pryva.ng/_next/static/app.js", { method: "POST" });
+    const post = new Request("https://pryvalogs.com/_next/static/app.js", { method: "POST" });
     expect(worker.dispatch(post)).toBeUndefined();
   });
 
@@ -191,7 +191,7 @@ describe("service worker", () => {
     expect(await live!.text()).toContain("wallet");
 
     const store = worker.stores.get("pryva-v1-static")!;
-    expect(store.has("https://pryva.ng/dashboard")).toBe(false);
+    expect(store.has("https://pryvalogs.com/dashboard")).toBe(false);
 
     worker.network.delete("/dashboard");
     const offline = await worker.dispatch(navigate("/dashboard"));
@@ -221,13 +221,13 @@ describe("service worker", () => {
     expect(response!.status).toBe(500);
 
     const store = worker.stores.get("pryva-v1-static")!;
-    expect(store.has("https://pryva.ng/_next/static/broken.js")).toBe(false);
+    expect(store.has("https://pryvalogs.com/_next/static/broken.js")).toBe(false);
   });
 
   it("deletes caches from an older version on activate", async () => {
     const worker = createWorker();
     await worker.fireInstall();
-    worker.stores.set("pryva-v0-static", new Map([["https://pryva.ng/old", new Response("old")]]));
+    worker.stores.set("pryva-v0-static", new Map([["https://pryvalogs.com/old", new Response("old")]]));
 
     await worker.fireActivate();
 

@@ -166,7 +166,7 @@ describe("the saved accounts list", () => {
       approvedName: "EMEKA CHUKWUEMEKA OKAFOR",
       depositorName: "Emeka",
       reason: "Bank statement supplied in ticket 412",
-      approvedByEmail: "admin@pryva.ng",
+      approvedByEmail: "admin@example.test",
     });
     await database.insert(bankAccounts).values({
       userId: ADA, bankName: "Access Bank", bankCode: "044", accountNumber: "0123456789", accountName: "EMEKA CHUKWUEMEKA OKAFOR", recipientCode: "RCP-1", isDefault: 1,
