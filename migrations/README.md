@@ -43,7 +43,8 @@ WebAuthn credentials and challenges (`0020`), referrals and fraud signals
 (`0024`-`0025`), webhook delivery receipts (`0026`), eSIM credentials and delivery
 email state (`0027`-`0028`), notification gaps (`0029`), payout name approvals
 (`0030`), the Resend delivery-event receipts (`0031`) and the once-only
-onboarding email log (`0032`).
+onboarding email log (`0032`), and bank, first-purchase, withdrawal-failure and
+password-change email notifications (`0033`).
 Back up existing databases before applying migrations and verify the schema before routing traffic.
 
 ## Existing databases
@@ -75,11 +76,10 @@ That gate is load-bearing, and it is now a second line of defence rather than th
 only one. The Vercel RDS integration sets the `PG*` and `AWS_*` variables to
 development, preview *and* production by default, and for a while that meant
 every PR preview both applied its migrations to production **and served the
-preview against live customer data at runtime**. The nine variables are now
-scoped to `production` only, so a preview has no database and falls back to the
-in-memory shim. The build gate stays: if the targets are ever widened again by a
-re-run of the integration, it is what still stops an unreviewed branch altering
-the schema.
+preview against live customer data at runtime**. Check the deployment's actual
+`PG*`, `AWS_*` and `DATABASE_URL` scopes before allowing previews: production
+credentials must not be exposed to preview deployments. The build gate stops
+preview builds from applying migrations, but it does not isolate runtime traffic.
 
 Two consequences when adding a migration here:
 
@@ -90,9 +90,9 @@ Two consequences when adding a migration here:
   fails until the branch is merged. That is the intended trade-off: a visible
   preview failure beats an invisible production change.
 
-Previews still read and write production data at runtime. Isolating them means
-removing `preview` from the `PG*` targets, which is an operator decision, not a
-code change.
+A preview with production database credentials can still read and write production
+data at runtime even though it does not migrate. Verify isolation in the hosting
+environment; changing those settings is an operator decision, not a code change.
 
 ## `legacy/`
 

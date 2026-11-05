@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
       // message the provider had already refused.
       return NextResponse.json(
         {
-          error: `A new link was created, but ${delivery.detail ?? "the mail service refused the message"}. Nothing will arrive until that is fixed.`,
+          error: `A new link was created, but ${delivery.detail ?? "the mail service could not confirm it"}. Check your inbox; if nothing arrives, try again or contact support.`,
           delivered: false,
         },
         { status: 502 },

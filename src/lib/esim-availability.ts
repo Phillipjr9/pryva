@@ -1,6 +1,7 @@
 import "server-only";
 
 import { isBitcallConfigured } from "@/lib/bitcall";
+import { isPreviewDatabase } from "@/lib/demo-policy";
 
 /**
  * Whether eSIM ordering is available on this deployment.
@@ -10,7 +11,7 @@ import { isBitcallConfigured } from "@/lib/bitcall";
  * secrecy scan — and rightly so, the import path is the leak.
  */
 export function isEsimOrderingAvailable(): boolean {
-  return isBitcallConfigured();
+  return !isPreviewDatabase() && isBitcallConfigured();
 }
 
 /**

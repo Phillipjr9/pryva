@@ -35,14 +35,20 @@ describe("the canonical site URL", () => {
     expect(canonicalSiteUrl()).toBe("https://example.test");
   });
 
-  it("falls back to the project's own production host, not a guess", () => {
-    // A deployment with nothing configured should still name itself rather than
-    // invent a domain. This is the case that produced sitemap entries for a site
-    // that does not exist.
+  it("never falls back to a Vercel deployment hostname", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
     vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "pryva-prod.vercel.app");
-    expect(canonicalSiteUrl()).toBe("https://pryva-prod.vercel.app");
+    expect(canonicalSiteUrl()).toBe("https://pryvalogs.com");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://pryva-prod.vercel.app");
+    expect(canonicalSiteUrl()).toBe("https://pryvalogs.com");
+  });
+
+  it("uses a real custom production domain if no explicit origin is configured", () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "example.test");
+    expect(canonicalSiteUrl()).toBe("https://example.test");
   });
 
   it("never falls back to a domain the project does not own", () => {
@@ -84,9 +90,11 @@ describe("a pinned origin steps aside on the canonical host", () => {
     expect(publicOrigin(request("example.test.evil.test"))).toBe("https://example.test.evil.test");
   });
 
-  it("says nothing about a domain when none is pinned", () => {
+  it("does not return a Vercel address even when no origin is pinned", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
-    expect(publicOrigin(request("pryva-abc123.vercel.app"))).toBe("https://pryva-abc123.vercel.app");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "pryva-abc123.vercel.app");
+    expect(publicOrigin(request("pryva-abc123.vercel.app"))).toBe("https://pryvalogs.com");
   });
 });
 

@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 
+import { isPreviewDatabase } from "@/lib/demo-policy";
 import { isBitcallConfigured, listBitcallEsimCountries, listBitcallEsimPlans, type BitcallEsimPlan } from "@/lib/bitcall";
 import { getUsdToNgnRate } from "@/lib/exchange-rate";
 import { logger } from "@/lib/logger";
@@ -198,6 +199,7 @@ async function offerFromPlan(plan: BitcallEsimPlan): Promise<OfferOutcome> {
  * plan is priced independently and one that cannot be is left out.
  */
 export async function readEsimCatalog(refresh = false): Promise<EsimCatalog> {
+  if (isPreviewDatabase()) throw new Error("eSIM ordering is unavailable in this environment");
   if (!refresh && catalogCache && catalogCache.expires > Date.now()) return catalogCache.catalog;
   if (catalogInFlight) return catalogInFlight;
   catalogInFlight = (async () => {

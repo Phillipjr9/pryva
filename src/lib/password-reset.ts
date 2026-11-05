@@ -9,6 +9,10 @@ import { passwordResetEmail } from "@/lib/email-templates";
 import { authRateLimiter } from "@/lib/rate-limit";
 import { validatePassword } from "@/lib/validation";
 import { canonicalSiteUrl } from "@/lib/net";
+import { logger } from "@/lib/logger";
+import { readJsonWithLimit } from "@/lib/request-body";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
+import { queuePasswordChangeEmail } from "@/lib/password-change-email";
 
 /** A reset link stays usable for 30 minutes. */
 export const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
@@ -21,7 +25,7 @@ export const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 export const RESET_INVALID_MESSAGE = "That link is no longer valid. Request a new one.";
 
 export const GENERIC_REQUEST_MESSAGE =
-  "If that email has an account, a reset link is on its way.";
+  "If that email has an account, we'll try to send a reset link. If it doesn't arrive, try again or contact support.";
 
 export function rateLimitPasswordReset(key: string) {
   // authRateLimiter was exported but unused; this gives it the job it was sized
@@ -50,7 +54,7 @@ async function sendResetEmail(to: string, name: string, token: string): Promise<
   const key = process.env.RESEND_API_KEY?.trim();
   const from = process.env.RESEND_FROM_EMAIL?.trim();
   if (!key || !from) {
-    console.error("[auth] reset email not sent: Resend is not configured");
+    logger.error("Password reset email not sent: mail is not configured");
     return;
   }
   // The variables the rest of the app already uses for absolute URLs. SITE_URL was
@@ -62,8 +66,8 @@ async function sendResetEmail(to: string, name: string, token: string): Promise<
   // The shared branded template, which already existed and was never called.
   const template = passwordResetEmail(name, link);
   try {
-    await fetch("https://api.resend.com/emails", {
-      method: "POST",
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(8_000),
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         from,
@@ -73,8 +77,16 @@ async function sendResetEmail(to: string, name: string, token: string): Promise<
         text: template.text,
       }),
     });
-  } catch (error) {
-    console.error("[auth] reset email failed", error);
+    if (!response.ok) {
+      logger.error("Password reset email refused by provider", { status: response.status });
+    } else {
+      const reply = await readJsonWithLimit(response, 32_768).catch(() => null) as { id?: unknown } | null;
+      if (typeof reply?.id !== "string" || !reply.id || reply.id.length > 100) {
+        logger.error("Password reset email acceptance was not confirmed");
+      }
+    }
+  } catch {
+    logger.error("Password reset email could not be sent");
   }
 }
 
@@ -135,19 +147,23 @@ export async function resetPassword(
     .limit(1);
   if (!row) return { ok: false, error: RESET_INVALID_MESSAGE };
 
-  await db.transaction(async (tx) => {
-    // A completed reset also releases an account lockout: the token proves
-    // control of the mailbox, which is a stronger signal than a forgotten
-    // password, and leaving the lock on would refuse the sign-in the customer
-    // just earned.
-    await tx
-      .update(users)
+  const changed = await db.transaction(async (tx) => {
+    // Claim the still-live token inside the transaction. Two concurrent reset
+    // requests must not both change the password or queue duplicate notices.
+    const [claimed] = await tx.update(passwordResetTokens).set({ usedAt: new Date() })
+      .where(and(eq(passwordResetTokens.id, row.id), isNull(passwordResetTokens.usedAt), gt(passwordResetTokens.expiresAt, new Date())))
+      .returning({ id: passwordResetTokens.id });
+    if (!claimed) return false;
+    const [updated] = await tx.update(users)
       .set({ passwordHash: hashPassword(newPassword), failedLoginAttempts: 0, lockedUntil: null })
-      .where(eq(users.id, row.userId));
-    await tx.update(passwordResetTokens).set({ usedAt: new Date() }).where(eq(passwordResetTokens.id, row.id));
-    // Every existing session dies. If someone else had already got in, this is
-    // what locks them out — resetting the password alone would not.
+      .where(and(eq(users.id, row.userId), isNull(users.deletedAt)))
+      .returning({ id: users.id, email: users.email, name: users.name });
+    if (!updated) return false;
     await tx.delete(sessions).where(eq(sessions.userId, row.userId));
+    await queuePasswordChangeEmail(tx, updated);
+    return true;
   });
+  if (!changed) return { ok: false, error: RESET_INVALID_MESSAGE };
+  scheduleWalletEmails();
   return { ok: true };
 }

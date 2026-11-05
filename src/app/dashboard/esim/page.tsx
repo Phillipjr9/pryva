@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth";
+import { isPreviewDatabase } from "@/lib/demo-policy";
 import { ServiceTitle } from "@/components/ServiceTitle";
 import { formatDateNigerian } from "@/lib/date-utils";
 import { catalogueItems, ESIM_CATALOGUE_LIMIT, readEsimCatalog, type EsimCatalogStats } from "@/lib/esim-catalog";
@@ -45,9 +46,11 @@ export default async function EsimCataloguePage() {
   } catch (error) {
     // "Not configured" and "the supplier is down" are different, and only one of
     // them is the owner's to fix, so they are not collapsed into one message.
-    failure = error instanceof Error && /not configured/i.test(error.message)
-      ? "eSIM ordering is not connected yet, so no plan can be bought."
-      : "The eSIM catalogue could not be read just now.";
+    failure = isPreviewDatabase()
+      ? "eSIM ordering is unavailable in this environment."
+      : error instanceof Error && /not configured/i.test(error.message)
+        ? "eSIM ordering is not connected yet, so no plan can be bought."
+        : "The eSIM catalogue could not be read just now.";
   }
 
   return (
@@ -55,8 +58,8 @@ export default async function EsimCataloguePage() {
       <div>
         <ServiceTitle service="esim">eSIM plans</ServiceTitle>
         <p className="mt-1 text-[0.86rem] leading-relaxed text-ink-2">
-          Every plan the network is offering right now, cheapest first — data allowance, validity and the
-          naira price. You are charged when the profile is issued.
+          Browse current plans by data allowance, validity and naira price. Availability can change;
+          your wallet is charged when the profile is issued.
         </p>
       </div>
 
@@ -71,9 +74,7 @@ export default async function EsimCataloguePage() {
         <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.86rem] leading-relaxed text-amber-900">
           <p className="font-semibold">No eSIM plan is on sale right now.</p>
           <p className="mt-1">
-            Nothing is available to buy at the moment. That is a shortage on our side, not a
-            destination we do not cover — you have not been charged, and trying again in a few
-            minutes is safe.
+            No plans are currently listed. Coverage and availability can change; you have not been charged.
             {partial ? " The plan list was also incomplete when it was read, so this may be temporary." : ""}
           </p>
         </div>

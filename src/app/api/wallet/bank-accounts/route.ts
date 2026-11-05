@@ -10,6 +10,7 @@ import { isSameOriginMutation } from "@/lib/net";
 import { logger } from "@/lib/logger";
 import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/request-body";
 import { purchaseRateLimiter } from "@/lib/rate-limit";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 import {
   checkPayoutDestination,
   depositorNameFor,
@@ -140,6 +141,8 @@ export async function POST(request: NextRequest) {
       if (!saved) throw new Error("Bank account insert failed");
       return saved;
     });
+    // The trigger snapshots only the bank name and last four digits atomically.
+    scheduleWalletEmails();
     logger.info("Bank account added", { userId: user.id, accountId: newAccount.id });
     return NextResponse.json({
       ok: true,

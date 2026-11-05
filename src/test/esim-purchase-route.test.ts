@@ -14,6 +14,7 @@ import { NextRequest } from "next/server";
 const state = vi.hoisted(() => ({
   user: { id: "u1", email: "user@example.com", walletBalance: 50_000 } as { id: string; walletBalance: number } | null,
   sameOrigin: true,
+  preview: false,
   offer: null as null | { id: string; planId: string; name: string; region: string; dataLabel: string; validityLabel: string; countries: string[]; coverage: "catalog-country"; costNgn: number; priceNgn: number; purchasable: boolean },
   outcome: { kind: "refused", message: "nope" } as Record<string, unknown>,
   existing: null as Record<string, unknown> | null,
@@ -25,6 +26,7 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth", () => ({ getCurrentUser: async () => state.user }));
+vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => state.preview }));
 vi.mock("@/lib/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
 vi.mock("@/lib/rate-limit", () => ({ purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }) }));
 vi.mock("@/lib/fraud", () => ({
@@ -112,6 +114,7 @@ function request(body: unknown, origin = "https://pryva.test") {
 const valid = { offerId: "live-esim-0123456789abcdef0123", requestId: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d" };
 
 beforeEach(() => {
+  state.preview = false;
   state.user = { id: "u1", walletBalance: 50_000 };
   state.sameOrigin = true;
   state.offer = offer();
@@ -133,6 +136,14 @@ describe("POST /api/esim/purchase", () => {
     expect((await POST(request(valid))).status).toBe(403);
   });
 
+  it("never buys from the network in an in-memory preview", async () => {
+    state.preview = true;
+    const response = await POST(request(valid));
+    expect(response.status).toBe(503);
+    expect(state.purchased).toEqual([]);
+    expect(state.debits).toEqual([]);
+  });
+
   it("rejects a malformed plan reference or request key", async () => {
     expect((await POST(request({ offerId: "", requestId: valid.requestId }))).status).toBe(400);
     expect((await POST(request({ offerId: valid.offerId, requestId: "nope" }))).status).toBe(400);
@@ -142,7 +153,9 @@ describe("POST /api/esim/purchase", () => {
     state.existing = { id: "o1", reference: "PRY1", productName: "Nigeria Lite", planLabel: "1GB · 7 days", service: "esim", amount: 9_800, provider: "bitcall", status: "active" };
     const response = await POST(request(valid));
     expect(response.status).toBe(200);
-    expect((await response.json()).replayed).toBe(true);
+    const body = await response.json();
+    expect(body.replayed).toBe(true);
+    expect(JSON.stringify(body)).not.toMatch(/bitcall|supplier/i);
     expect(state.purchased).toEqual([]);
     expect(state.debits).toEqual([]);
   });
@@ -183,6 +196,7 @@ describe("POST /api/esim/purchase", () => {
     const body = await response.json();
     expect(body.pending).toBe(true);
     expect(body.order.status).toBe("processing");
+    expect(JSON.stringify(body)).not.toMatch(/bitcall|supplier/i);
     expect(state.inserts[0]).toMatchObject({ status: "processing", provider: "bitcall", providerRequestId: "prov-1", amount: 9_800 });
     expect(state.debits).toEqual([]);
   });
@@ -196,6 +210,7 @@ describe("POST /api/esim/purchase", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.order.status).toBe("active");
+    expect(JSON.stringify(body)).not.toMatch(/bitcall|supplier/i);
     expect(state.inserts[0]).toMatchObject({
       status: "active",
       esimIccid: "8944000000000000001",
@@ -216,6 +231,7 @@ describe("POST /api/esim/purchase", () => {
     const body = await response.json();
     expect(body.pending).toBe(true);
     expect(body.order.status).toBe("review");
+    expect(JSON.stringify(body)).not.toMatch(/bitcall|supplier/i);
     expect(state.inserts[0]).toMatchObject({ status: "review", provider: "bitcall" });
     expect(state.inserts[0].reconciliationNote).toMatch(/unknown/i);
     expect(state.debits).toEqual([]);

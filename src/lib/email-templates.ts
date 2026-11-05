@@ -1,4 +1,5 @@
 import { canonicalSiteUrl } from "@/lib/net";
+import { emailBrandLockup } from "@/lib/email-brand";
 export interface EmailTemplate {
   subject: string;
   html: string;
@@ -24,7 +25,7 @@ const config = {
   // deployment has ever served; it now comes from the shared resolver, which
   // prefers the configured canonical site and falls back to the project's own
   // production host rather than a guess.
-  siteUrl: canonicalSiteUrl(),
+  get siteUrl() { return canonicalSiteUrl(); },
 };
 
 function emailWrapper(content: string, preheader: string = ""): string {
@@ -51,12 +52,7 @@ function emailWrapper(content: string, preheader: string = ""): string {
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;" class="email-container">
   <tr>
     <td style="padding:0 0 22px;">
-      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-        <td style="padding-right:9px;vertical-align:middle;">
-          <img src="${config.siteUrl}/images/brand/pryva-mark.png" width="30" height="30" alt="Pryva" style="display:block;width:30px;height:30px;border:0;outline:none;text-decoration:none;">
-        </td>
-        <td style="font-family:'Manrope', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:22px;font-weight:700;letter-spacing:-1.3px;color:${config.darkColor};vertical-align:middle;">Pryva</td>
-      </tr></table>
+      ${emailBrandLockup(config.siteUrl)}
     </td>
   </tr>
 </table></td></tr>
@@ -65,11 +61,11 @@ function emailWrapper(content: string, preheader: string = ""): string {
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;" class="email-container">
   <tr>
     <td align="center" style="padding:30px 24px 36px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.7;color:${config.textSecondary};">
-      Questions? Our team is available 24/7 in the
+      Questions? Visit the
       <a href="${config.siteUrl}/help" style="color:${config.accentColor};font-weight:600;text-decoration:none;">help center</a>
-      or right from the app.
+      or contact support from the app.
       <br><br>
-      <a href="${config.siteUrl}/dashboard/settings" style="color:${config.accentColor};font-weight:600;text-decoration:none;">Manage notification settings</a>
+      <a href="${config.siteUrl}/dashboard/settings" style="color:${config.accentColor};font-weight:600;text-decoration:none;">Account settings</a>
       <br><br>
       You're receiving this email because you have a Pryva account.
       <br><br>
@@ -82,6 +78,51 @@ function emailWrapper(content: string, preheader: string = ""): string {
   </table>
 </body>
 </html>`;
+}
+
+/** A single email-client-friendly card for account and money notifications. */
+export function brandedNotificationEmail(input: {
+  subject: string;
+  eyebrow: string;
+  title: string;
+  intro: string;
+  hero: "wallet" | "bank" | "withdrawal" | "order" | "password" | "refund";
+  heroAlt: string;
+  rows: Array<{ label: string; value: string }>;
+  ctaPath: string;
+  ctaLabel: string;
+  note: string;
+}): EmailTemplate {
+  // Callers choose an internal path, never a URL supplied by the customer.
+  if (!/^\/(?!\/)[a-z0-9\/\-#]*$/i.test(input.ctaPath)) throw new Error("Invalid email destination");
+  const url = `${config.siteUrl}${input.ctaPath}`;
+  const rows = input.rows.map(({ label, value }, index) => `
+    <tr>
+      <td style="padding:11px 0;${index < input.rows.length - 1 ? `border-bottom:1px solid ${config.cardBorder};` : ""}font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12.5px;line-height:1.4;color:${config.textSecondary};">${escapeEmailText(label)}</td>
+      <td align="right" style="padding:11px 0 11px 12px;${index < input.rows.length - 1 ? `border-bottom:1px solid ${config.cardBorder};` : ""}font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13.5px;line-height:1.4;font-weight:700;color:${config.darkColor};word-break:${label === "Reference" ? "break-all" : "break-word"};">${escapeEmailText(value)}</td>
+    </tr>`).join("");
+  const content = `
+    <tr><td align="center" style="padding:0 16px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" class="email-container" style="width:600px;max-width:100%;">
+        <tr><td style="background:${config.cardBackground};border:1px solid ${config.cardBorder};border-radius:18px;overflow:hidden;box-shadow:0 22px 48px -30px rgba(45,30,80,.55);">
+          <div style="height:5px;line-height:5px;font-size:0;background-color:${config.primaryColor};background-image:${config.primaryGradient};"> </div>
+          <img src="${config.siteUrl}/images/email/hero-${input.hero}.jpg" width="600" alt="${escapeEmailText(input.heroAlt)}" style="display:block;width:100%;max-width:600px;height:auto;border:0;outline:none;text-decoration:none;">
+          <div class="email-padding" style="padding:32px 36px 30px;">
+            <div style="margin:0 0 12px;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${config.accentColor};">${escapeEmailText(input.eyebrow)}</div>
+            <h1 style="margin:0 0 14px;font-family:'Manrope',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:27px;line-height:1.16;font-weight:600;letter-spacing:-.6px;color:${config.darkColor};">${escapeEmailText(input.title)}</h1>
+            <p style="margin:0 0 14px;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.65;color:${config.textColor};">${escapeEmailText(input.intro)}</p>
+            ${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;background:${config.infoBackground};border:1px solid ${config.infoBorder};border-radius:12px;"><tr><td style="padding:4px 18px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr></table>` : ""}
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0 0;"><tr><td bgcolor="${config.darkColor}" style="border-radius:12px;"><a href="${escapeEmailText(url)}" style="display:inline-block;padding:14px 30px;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;color:#ffffff;text-decoration:none;">${escapeEmailText(input.ctaLabel)}</a></td></tr></table>
+            <p style="margin:24px 0 0;padding:14px 16px;background:${config.infoBackground};border:1px solid ${config.infoBorder};border-radius:12px;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:${config.textSecondary};">${escapeEmailText(input.note)}</p>
+          </div>
+        </td></tr>
+      </table>
+    </td></tr>`;
+  return {
+    subject: input.subject,
+    html: emailWrapper(content, escapeEmailText(input.intro)),
+    text: [input.title, "", input.intro, "", ...input.rows.map((row) => `${row.label}: ${row.value}`), "", `${input.ctaLabel}: ${url}`, "", input.note, "", "Pryva Technologies · Lagos, Nigeria"].join("\n"),
+  };
 }
 
 /**
@@ -106,7 +147,7 @@ function emailWrapper(content: string, preheader: string = ""): string {
  * reachable from the dashboard; nobody should have to hunt for what they bought.
  */
 export function customerWelcomeEmail(name: string): EmailTemplate {
-  const preheader = "Welcome to Pryva. Virtual numbers, eSIMs and more — all paid in Naira, delivered instantly.";
+  const preheader = "Welcome to Pryva. Explore virtual numbers, eSIMs and more with your Naira wallet.";
 
   const infoRow = (label: string, value: string, last = false) => `
       <tr>
@@ -115,10 +156,10 @@ export function customerWelcomeEmail(name: string): EmailTemplate {
       </tr>`;
 
   const rows = [
-    infoRow("Virtual numbers", "40+ countries"),
-    infoRow("eSIM data", "190+ destinations"),
+    infoRow("Virtual numbers", "Explore available countries"),
+    infoRow("eSIM data", "Check current availability"),
     infoRow("Digital accounts", "Streaming, AI, socials"),
-    infoRow("Gift cards", "Sent instantly by email"),
+    infoRow("Gift cards", "Explore available cards"),
     infoRow("Payment", "Naira (₦), no dollar card", true),
   ].join("");
 
@@ -143,7 +184,7 @@ export function customerWelcomeEmail(name: string): EmailTemplate {
               <div style="padding:32px 36px 30px;" class="email-padding">
       <div style="margin:0 0 12px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${config.accentColor};">Welcome aboard</div>
       <h1 style="margin:0 0 14px;font-family:'Manrope', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:27px;line-height:1.16;font-weight:600;letter-spacing:-.6px;color:${config.darkColor};">Your account is ready, ${escapeEmailText(name)}</h1>
-      <p style="margin:0 0 14px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:15px;line-height:1.65;font-weight:400;color:${config.textColor};text-align:left;">Thanks for confirming your email &mdash; that is the last setup step. Pryva is a single wallet for the things that usually need a foreign card: phone numbers for verification, travel data, streaming accounts and gift cards. Everything is priced in Naira and delivered to your dashboard the moment you buy.</p>
+      <p style="margin:0 0 14px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:15px;line-height:1.65;font-weight:400;color:${config.textColor};text-align:left;">Thanks for confirming your email &mdash; that is the last setup step. Pryva is a single wallet for the things that usually need a foreign card: phone numbers for verification, travel data, streaming accounts and gift cards. Everything is priced in Naira. Follow your order and delivery status in your dashboard.</p>
 
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;background:${config.infoBackground};border:1px solid ${config.infoBorder};border-radius:12px;">
     <tr><td style="padding:4px 18px;">
@@ -153,9 +194,9 @@ export function customerWelcomeEmail(name: string): EmailTemplate {
 
       <div style="margin:22px 0 6px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:${config.textSecondary};">Getting started</div>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-        ${step("1", "Fund your wallet", "Paystack handles the payment. A top-up lands immediately and is itemised in your history.")}
-        ${step("2", "Buy what you need", "Numbers, data and accounts are delivered on the order page &mdash; codes and eSIM details included.")}
-        ${step("3", "Keep the receipt", "Every purchase emails you the details, so a code is never only on a screen you closed.")}
+        ${step("1", "Fund your wallet", "Paystack handles the payment. A confirmed top-up appears in your wallet history.")}
+        ${step("2", "Buy what you need", "Check the order page for delivery, codes and eSIM details as they become available.")}
+        ${step("3", "Keep the receipt", "Wallet and eligible order updates are emailed; your dashboard shows the latest status.")}
       </table>
 
   <table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;">
@@ -166,7 +207,7 @@ export function customerWelcomeEmail(name: string): EmailTemplate {
     </tr>
   </table>
 
-      <p style="margin:18px 0 2px;padding:13px 16px;border-radius:11px;background:${config.infoBackground};border:1px solid ${config.infoBorder};font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.6;color:${config.textSecondary};">A balance you have not spent is yours: unspent funds stay in the wallet, and a purchase that cannot be fulfilled is refunded to it automatically. Questions go to the help centre, or straight back to this email.</p>
+      <p style="margin:18px 0 2px;padding:13px 16px;border-radius:11px;background:${config.infoBackground};border:1px solid ${config.infoBorder};font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.6;color:${config.textSecondary};">Unspent funds stay in your wallet. If an order cannot be fulfilled, check its status and contact support about a refund. Questions? Visit the help centre for support.</p>
     </div>
             </td>
           </tr>
@@ -183,20 +224,20 @@ export function customerWelcomeEmail(name: string): EmailTemplate {
       "Your email is confirmed and your account is ready to use.",
       "",
       "What you can buy:",
-      "- Virtual numbers, 40+ countries",
-      "- eSIM data, 190+ destinations",
+      "- Virtual numbers: explore available countries",
+      "- eSIM data: check current availability",
       "- Digital accounts: streaming, AI, socials",
-      "- Gift cards, sent instantly by email",
+      "- Gift cards: explore available cards",
       "Everything is priced in Naira. No dollar card needed.",
       "",
       "Getting started:",
       "1. Fund your wallet from the dashboard.",
-      "2. Buy what you need - it is delivered on the order page.",
-      "3. Every purchase emails you the details.",
+      "2. Check the order page for delivery and current status.",
+      "3. Look for wallet and eligible order updates by email.",
       "",
       `Open your dashboard: ${config.siteUrl}/dashboard`,
       "",
-      "Unspent balance stays in your wallet, and anything that cannot be fulfilled is refunded automatically.",
+      "Unspent balance stays in your wallet. If an order cannot be fulfilled, check its status and contact support about a refund.",
     ].join("\n"),
     preheader,
   };
@@ -260,7 +301,7 @@ export function emailVerifiedEmail(
               <div style="padding:32px 36px 30px;" class="email-padding">
       <div style="margin:0 0 12px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${config.accentColor};">Email Verified</div>
       <h1 style="margin:0 0 14px;font-family:'Manrope', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:27px;line-height:1.16;font-weight:600;letter-spacing:-.6px;color:${config.darkColor};">You're all set</h1>
-      <p style="margin:0 0 14px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:15px;line-height:1.65;font-weight:400;color:${config.textColor};text-align:left;">Hi ${escapeEmailText(name)}, your email address is confirmed. This message is your receipt &mdash; you do not need to click anything else. Withdrawals, password recovery and every security notice now reach the right inbox.</p>
+      <p style="margin:0 0 14px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:15px;line-height:1.65;font-weight:400;color:${config.textColor};text-align:left;">Hi ${escapeEmailText(name)}, your email address is confirmed. This message is your receipt &mdash; you do not need to click anything else. We will use this address for account notices and password recovery.</p>
 
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;background:${config.infoBackground};border:1px solid ${config.infoBorder};border-radius:12px;">
     <tr><td style="padding:4px 18px;">
@@ -292,7 +333,7 @@ export function emailVerifiedEmail(
       "",
       `Hi ${name}, ${email} is confirmed as of ${when}. Nothing else is needed from you.`,
       "",
-      "Withdrawals, password recovery and security notices now reach this inbox.",
+      "We will use this address for account notices and password recovery.",
       "",
       `Fund your wallet: ${config.siteUrl}/dashboard/wallet`,
       "",
@@ -579,12 +620,12 @@ export function passwordResetEmail(name: string, resetLink: string): EmailTempla
               <div style="padding:32px 36px 30px;" class="email-padding">
       <div style="margin:0 0 12px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${config.darkColor};">Security</div>
       <h1 style="margin:0 0 14px;font-family:'Manrope', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:27px;line-height:1.16;font-weight:600;letter-spacing:-.6px;color:${config.darkColor};">Reset your password</h1>
-      <p style="margin:0 0 14px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:15px;line-height:1.65;font-weight:400;color:${config.textColor};text-align:left;">Hi ${name}, we received a request to reset your password. Click the button below to create a new password.</p>
+      <p style="margin:0 0 14px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:15px;line-height:1.65;font-weight:400;color:${config.textColor};text-align:left;">Hi ${escapeEmailText(name)}, we received a request to reset your password. Click the button below to create a new password.</p>
       
   <table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0 4px;">
     <tr>
       <td align="center" bgcolor="${config.darkColor}" style="border-radius:12px;">
-        <a href="${resetLink}" style="display:inline-block;padding:14px 30px;border-radius:12px;background:${config.darkColor};font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:14px;font-weight:600;line-height:1;color:#ffffff;text-decoration:none;white-space:nowrap;">Reset Password  &#8594;</a>
+        <a href="${escapeEmailText(resetLink)}" style="display:inline-block;padding:14px 30px;border-radius:12px;background:${config.darkColor};font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:14px;font-weight:600;line-height:1;color:#ffffff;text-decoration:none;white-space:nowrap;">Reset Password  &#8594;</a>
       </td>
     </tr>
   </table>
@@ -593,7 +634,7 @@ export function passwordResetEmail(name: string, resetLink: string): EmailTempla
         <strong>⚠️ Security Notice:</strong> This link expires in 30 minutes. If you didn't request this, please ignore this email or contact support if you're concerned about your account security.
       </p>
       
-      <p style="margin:18px 0 2px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.6;color:${config.textSecondary};">If the button doesn't work, copy and paste this link:<br><a href="${resetLink}" style="color:${config.accentColor};word-break:break-all;">${resetLink}</a></p>
+      <p style="margin:18px 0 2px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.6;color:${config.textSecondary};">If the button doesn't work, copy and paste this link:<br><a href="${escapeEmailText(resetLink)}" style="color:${config.accentColor};word-break:break-all;">${escapeEmailText(resetLink)}</a></p>
     </div>
             </td>
           </tr>
@@ -623,12 +664,12 @@ export function emailVerificationEmail(name: string, verifyLink: string): EmailT
               <div style="padding:32px 36px 30px;" class="email-padding">
       <div style="margin:0 0 12px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${config.accentColor};">Confirm Your Email</div>
       <h1 style="margin:0 0 14px;font-family:'Manrope', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:27px;line-height:1.16;font-weight:600;letter-spacing:-.6px;color:${config.darkColor};">One last step</h1>
-      <p style="margin:0 0 14px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:15px;line-height:1.65;font-weight:400;color:${config.textColor};text-align:left;">Hi ${name}, confirm your email address to finish setting up your Pryva account. This also proves you control the address, which is what keeps your account recoverable.</p>
+      <p style="margin:0 0 14px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:15px;line-height:1.65;font-weight:400;color:${config.textColor};text-align:left;">Hi ${escapeEmailText(name)}, confirm your email address to finish setting up your Pryva account. This also proves you control the address, which is what keeps your account recoverable.</p>
 
   <table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0 4px;">
     <tr>
       <td align="center" bgcolor="${config.primaryColor}" style="border-radius:12px;">
-        <a href="${verifyLink}" style="display:inline-block;padding:14px 30px;border-radius:12px;background:${config.primaryGradient};font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:14px;font-weight:600;line-height:1;color:#ffffff;text-decoration:none;white-space:nowrap;">Confirm Email  &#8594;</a>
+        <a href="${escapeEmailText(verifyLink)}" style="display:inline-block;padding:14px 30px;border-radius:12px;background:${config.primaryGradient};font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:14px;font-weight:600;line-height:1;color:#ffffff;text-decoration:none;white-space:nowrap;">Confirm Email  &#8594;</a>
       </td>
     </tr>
   </table>
@@ -637,7 +678,7 @@ export function emailVerificationEmail(name: string, verifyLink: string): EmailT
         This link expires in 24 hours and can only be used once. If you did not create a Pryva account, you can ignore this email.
       </p>
 
-      <p style="margin:18px 0 2px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.6;color:${config.textSecondary};">If the button doesn't work, copy and paste this link:<br><a href="${verifyLink}" style="color:${config.accentColor};word-break:break-all;">${verifyLink}</a></p>
+      <p style="margin:18px 0 2px;font-family:'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.6;color:${config.textSecondary};">If the button doesn't work, copy and paste this link:<br><a href="${escapeEmailText(verifyLink)}" style="color:${config.accentColor};word-break:break-all;">${escapeEmailText(verifyLink)}</a></p>
     </div>
             </td>
           </tr>

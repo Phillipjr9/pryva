@@ -29,15 +29,13 @@ function catalogAvailability() {
   for (const plan of plans) {
     const entry = grouped.get(plan.service) ?? { total: 0, deliverable: 0 };
     entry.total += 1;
-    // eSIM is sold from a live catalogue once a supplier key is configured; the
-    // written sample cards are not what a customer buys, and counting only them
-    // made this page say "None of the 6 plans can be delivered" while the
-    // dashboard was selling plans.
-    if (plan.service === "esim" && esimCategoryOrderable()) entry.deliverable += 1;
-    else if (isPlanFulfillable(plan.slug)) entry.deliverable += 1;
+    // Written eSIM examples are never sellable, even if the separate live
+    // ordering path is configured. Do not count the examples as live offers.
+    if (isPlanFulfillable(plan.slug)) entry.deliverable += 1;
     grouped.set(plan.service, entry);
   }
   return [...grouped.entries()].map(([service, { total, deliverable }]) => ({
+    service,
     name: SERVICE_LABELS[service] ?? service,
     deliverable,
     total,
@@ -51,7 +49,13 @@ export default function StatusPage() {
   const catalog = catalogAvailability();
 
   const rows = [
-    ...catalog.map((entry) => ({
+    ...catalog.map((entry) => entry.service === "esim" ? ({
+      name: entry.name,
+      status: esimCategoryOrderable() ? "Ordering configured" : "Not available",
+      detail: esimCategoryOrderable()
+        ? "eSIM ordering is connected. Check current plans and coverage in your dashboard; example plans are not orderable."
+        : "eSIM ordering is not connected. The listed example plans cannot be ordered.",
+    }) : ({
       name: entry.name,
       status: entry.available ? "Available" : "Not available",
       detail: entry.available

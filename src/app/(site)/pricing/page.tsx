@@ -30,7 +30,7 @@ export default function PricingPage() {
             Simple, transparent pricing
           </h1>
           <p className="mt-4 text-[1.1rem] text-ink-2 max-w-2xl mx-auto">
-            Compare catalog prices in Naira. Every price is fixed before checkout, and your wallet is only debited once delivery succeeds.
+            Compare example prices in Naira. Availability varies, so review the final amount and terms before confirming an order.
           </p>
         </div>
       </section>
@@ -132,7 +132,7 @@ export default function PricingPage() {
                         href="/esim"
                         className="block w-full rounded-lg border border-lav-200 bg-lav-50 px-3 py-2 text-center text-meta font-semibold leading-relaxed text-lav-800 transition-colors hover:bg-lav-100 sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.9rem]"
                       >
-                        Live eSIM plans are priced per destination — see them
+                        Example only — not orderable. See current eSIM plans
                       </Link>
                     ) : (
                       <p className="block w-full rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-center text-meta font-semibold leading-relaxed text-amber-900 sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.78rem]">

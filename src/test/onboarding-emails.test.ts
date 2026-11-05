@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import * as schema from "@/db/schema";
-import { customerWelcomeEmail, emailVerifiedEmail } from "@/lib/email-templates";
+import { customerWelcomeEmail, emailVerifiedEmail, emailVerificationEmail, passwordResetEmail } from "@/lib/email-templates";
 
 /**
  * The receipt for the click, and the welcome.
@@ -32,6 +32,7 @@ vi.mock("next/server", () => ({
 vi.mock("server-only", () => ({}));
 
 import { sendOnboardingEmails, backfillOnboardingEmails } from "@/lib/onboarding-emails";
+import { emailQueueStatus } from "@/lib/email-delivery-events";
 
 const USER = "b1a6f0e2-3c4d-4e5f-8a9b-0c1d2e3f4a5b";
 let pg: PGlite;
@@ -50,7 +51,7 @@ beforeAll(async () => {
     "0020_webauthn.sql", "0021_referrals.sql", "0022_fraud.sql", "0023_boost_orders.sql",
     "0024_account_deletions.sql", "0025_account_deletion_forfeiture.sql", "0026_webhook_events.sql",
     "0027_esim_credentials.sql", "0028_esim_delivery_email.sql", "0029_notification_gaps.sql",
-    "0030_payout_name_approvals.sql", "0031_email_delivery_events.sql", "0032_welcome_verified_emails.sql",
+    "0030_payout_name_approvals.sql", "0031_email_delivery_events.sql", "0032_welcome_verified_emails.sql", "0033_account_activity_emails.sql",
   ]) {
     await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   }
@@ -155,6 +156,15 @@ describe("sendOnboardingEmails", () => {
     expect(row.detail).toContain("not configured");
   });
 
+  it("can retry skipped messages once mail configuration is fixed", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+    await sendOnboardingEmails(USER);
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    const result = await sendOnboardingEmails(USER);
+    expect(result).toEqual({ verified: "accepted", welcome: "accepted" });
+    expect(sent).toHaveLength(2);
+  });
+
   it("records a refusal instead of throwing it, so verification still stands", async () => {
     respond = () => new Response(JSON.stringify({ message: "domain is not verified" }), { status: 403 });
     await expect(sendOnboardingEmails(USER)).resolves.toEqual({
@@ -166,27 +176,43 @@ describe("sendOnboardingEmails", () => {
     // The operator can see what happened without a customer complaint.
     expect(rows[0].detail).toContain("403");
     expect(rows[0].sentAt).toBeNull();
+    const health = await emailQueueStatus();
+    expect(health.onboarding).toEqual(expect.arrayContaining([
+      { status: "refused", kind: "verified", total: 1 },
+      { status: "refused", kind: "welcome", total: 1 },
+    ]));
+    expect(JSON.stringify(health)).not.toContain("ada@example.test");
   });
 
   it("keeps going when the provider cannot be reached at all", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("network down"); }));
     const outcome = await sendOnboardingEmails(USER);
-    expect(outcome).toEqual({ verified: "refused", welcome: "refused" });
+    expect(outcome).toEqual({ verified: "review", welcome: "review" });
     const rows = await database.select().from(schema.onboardingEmailLog);
     expect(rows).toHaveLength(2);
     expect(rows[0].detail).toContain("could not be reached");
+    await sendOnboardingEmails(USER);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
   });
 
-  it("leaves a stale refusal retryable rather than permanently silent", async () => {
-    // A refusal is a fact about one attempt, not about the account: once the
-    // sender domain is fixed the next call must be allowed to try again.
+  it("retries definite provider refusals without manually deleting the log", async () => {
+    respond = () => new Response("{}", { status: 403 });
+    await sendOnboardingEmails(USER);
+    respond = () => accepted();
+    sent = [];
+    await Promise.all([sendOnboardingEmails(USER), sendOnboardingEmails(USER)]);
+    expect(sent).toHaveLength(2);
+    expect((await database.select().from(schema.onboardingEmailLog)).map((row) => row.status)).toEqual(["accepted", "accepted"]);
+  });
+
+  it("does not automatically retry an ambiguous provider failure", async () => {
     respond = () => new Response("{}", { status: 500 });
     await sendOnboardingEmails(USER);
-    await pg.exec(`DELETE FROM onboarding_email_log WHERE status <> 'accepted'`);
     respond = () => accepted();
     sent = [];
     await sendOnboardingEmails(USER);
-    expect(sent).toHaveLength(2);
+    expect(sent).toHaveLength(0);
+    expect((await database.select().from(schema.onboardingEmailLog)).map((row) => row.status)).toEqual(["review", "review"]);
   });
 });
 
@@ -203,6 +229,22 @@ describe("backfillOnboardingEmails", () => {
       considered: 0,
       sent: 0,
     });
+  });
+
+  it("finds a refused receipt even when the welcome was accepted", async () => {
+    let calls = 0;
+    respond = () => ++calls === 1 ? new Response("{}", { status: 403 }) : accepted();
+    await sendOnboardingEmails(USER);
+    sent = [];
+    respond = () => accepted();
+    expect(await backfillOnboardingEmails()).toEqual({ considered: 1, sent: 1 });
+    expect(sent.map((mail) => mail.subject)).toEqual(["Your Pryva email is confirmed"]);
+  });
+
+  it("does not repeatedly select accounts waiting on ambiguous sends", async () => {
+    respond = () => new Response("{}", { status: 500 });
+    await sendOnboardingEmails(USER);
+    expect(await backfillOnboardingEmails()).toEqual({ considered: 0, sent: 0 });
   });
 
   it("will not welcome somebody who signed up long ago", async () => {
@@ -246,6 +288,23 @@ describe("the two templates", () => {
     const html = customerWelcomeEmail('<script>alert("x")</script>').html;
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;script&gt;");
+  });
+
+  it("escapes account names and links in verification and reset HTML", () => {
+    const name = `<img src=x onerror=alert(1)>`;
+    const link = `https://pryvalogs.com/reset?token=a&next="x"`;
+    for (const template of [emailVerificationEmail(name, link), passwordResetEmail(name, link)]) {
+      expect(template.html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+      expect(template.html).not.toContain(name);
+      expect(template.html).toContain("token=a&amp;next=&quot;x&quot;");
+      expect(template.text).toContain(link);
+    }
+  });
+
+  it("does not promise instant fulfillment, automatic refunds or guaranteed delivery", () => {
+    for (const template of [customerWelcomeEmail("Ada"), emailVerifiedEmail("Ada", "ada@example.test")]) {
+      expect(template.html + template.text).not.toMatch(/delivered instantly|the moment you buy|every purchase emails|refunded automatically|every security notice now reach/i);
+    }
   });
 
   it("reports the confirmed address in the receipt", () => {

@@ -1,25 +1,11 @@
 /**
- * The OAuth `state` parameter, carried both in a cookie and in the parameter
- * itself.
+ * Google OAuth state must be bound to the initiating browser. A signature on a
+ * state value by itself is not that binding: an attacker can obtain a signed
+ * state in their own browser and send their callback to someone else (login CSRF).
  *
- * The cookie alone is not reliable. Google sends the browser back with a
- * cross-site request, and `SameSite=Lax` cookies are not guaranteed to accompany
- * it: Chrome's `Lax+POST` exemption covers a top-level POST, and this return is a
- * redirect GET. When the cookie is withheld, the callback fails its equality
- * check and redirects to `/login?error=google-state` — which reads like a
- * misconfigured redirect URI but is not, and is close to undiagnosable from the
- * console.
- *
- * So the state is signed and travels in the URL, where no cookie policy can drop
- * it. The cookie is still written and still read first, so a same-site or
- * browser-compatible return keeps the tighter check; the signature is what makes
- * the parameter trustworthy when the cookie is absent.
- *
- * The signature needs a secret. `GOOGLE_CLIENT_SECRET` is used because it is
- * already required for OAuth to work at all and is never sent to a browser — a
- * separate key would be one more thing to set, and its absence would be another
- * way for sign-in to break silently. Nothing is signed at all while that secret
- * is unset, because `googleConfigured()` already refuses the flow in that case.
+ * The start route stores the random state in an HttpOnly, SameSite=Lax cookie on
+ * the same host as the callback. The signature supplies an additional expiry and
+ * integrity check; a matching browser cookie is mandatory for every return.
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 
@@ -57,9 +43,8 @@ export function signState(nonce: string, now = Date.now()): string | null {
 /**
  * True when the state is authentic and fresh.
  *
- * Expiry is checked here rather than trusted from the cookie, because the whole
- * point of this path is that the cookie may be missing. A signed state that
- * outlives its window is a replay, not a login.
+ * Expiry is also checked server-side, even though the browser cookie expires. A
+ * signed state that outlives its window is a replay, not a login.
  */
 export function verifyState(value: string | null | undefined, now = Date.now()): boolean {
   if (!value) return false;
@@ -81,18 +66,15 @@ export function verifyState(value: string | null | undefined, now = Date.now()):
 }
 
 /**
- * Whether the returning request may proceed.
- *
- * A cookie that is present must match exactly — if one was sent, it is the
- * stronger evidence and a disagreement means something is wrong. When it is
- * absent, a valid signature carries the request instead.
+ * A matching cookie is mandatory, including for a correctly signed state. Bare
+ * forty-character nonces from the previous release remain valid only with their
+ * matching cookie, so an OAuth flow already in flight can finish during rollout.
  */
 export function stateAccepted(
   returned: string | null | undefined,
   cookieValue: string | null | undefined,
   now = Date.now(),
 ): boolean {
-  if (!returned) return false;
-  if (cookieValue) return constantTimeEqual(cookieValue, returned);
-  return verifyState(returned, now);
+  if (!returned || !cookieValue || !constantTimeEqual(cookieValue, returned)) return false;
+  return /^[a-f0-9]{40}$/i.test(returned) || verifyState(returned, now);
 }

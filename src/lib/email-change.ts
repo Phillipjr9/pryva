@@ -7,6 +7,7 @@ import { emailChangeRequests, users } from "@/db/schema";
 import { logger } from "@/lib/logger";
 import { resendConfigured } from "@/lib/resend-config";
 import { canonicalSiteUrl } from "@/lib/net";
+import { emailBrandLockup } from "@/lib/email-brand";
 
 /**
  * Changing the sign-in address, with proof of control of the new one.
@@ -50,7 +51,7 @@ async function sendConfirmation(to: string, link: string, name: string): Promise
   const html = `<!doctype html><html lang="en"><body style="margin:0;padding:28px 16px;background:#faf7f1;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
     <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="width:520px;max-width:100%;">
-      <tr><td style="padding-bottom:16px;font-family:'Manrope',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:20px;font-weight:800;letter-spacing:-1.2px;color:#241b3a;">Pryva</td></tr>
+      <tr><td style="padding-bottom:16px;">${emailBrandLockup(siteUrl())}</td></tr>
       <tr><td style="border-radius:22px;background:#fffdfa;border:1px solid #e7e0ee;box-shadow:0 22px 40px -26px rgba(45,30,80,0.55);padding:26px 24px;">
         <h1 style="margin:0 0 12px;font-family:'Manrope',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:22px;font-weight:800;color:#241b3a;">Confirm your new email</h1>
         <p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#5b4f6b;">Hi ${safeName}, confirm this address to use it for signing in to Pryva. The link works for two hours.</p>

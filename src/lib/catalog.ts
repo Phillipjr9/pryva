@@ -89,8 +89,8 @@ const serviceDefinitions: Service[] = [
   {
     slug: "esim", name: "eSIM", shortName: "eSIM", href: "/esim", eyebrow: "Travel data",
     tagline: "Explore eSIM data plans.",
-    description: "Compare catalog eSIM plans by region and data allowance. eSIM plans are not available for purchase yet.",
-    intro: "Browse eSIM plans by region and data allowance. eSIM plans cannot be delivered yet, so they cannot be ordered or charged.",
+    description: "Explore eSIM plans by region and data allowance. Availability varies by destination.",
+    intro: "Browse eSIM plans by region and data allowance, and check current availability before ordering.",
     fromPrice: 4700, unit: "per data bundle", icon: "sim",
     highlights: [
       { title: "Check your device", body: "Confirm eSIM compatibility and carrier unlock requirements with your device and carrier." },

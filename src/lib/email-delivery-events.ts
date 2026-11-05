@@ -1,8 +1,8 @@
 import "server-only";
-import { and, desc, eq, gt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { emailDeliveryEvents } from "@/db/schema";
+import { emailDeliveryEvents, onboardingEmailLog, walletEmailOutbox } from "@/db/schema";
 import { logger } from "@/lib/logger";
 import type { EmailOutcome } from "@/lib/resend-webhook";
 
@@ -148,4 +148,37 @@ async function countRefused(since: Date): Promise<number> {
   } catch {
     return 0;
   }
+}
+
+/**
+ * Aggregate the durable queue for operators without exposing addresses, order
+ * details or saved message bodies. Review jobs require a human decision; pending
+ * failures may recover on the next worker retry. Both must be visible even when
+ * no Resend webhook was ever delivered.
+ */
+export async function emailQueueStatus() {
+  const groups = await db.select({
+    status: walletEmailOutbox.status,
+    eventKind: walletEmailOutbox.eventKind,
+    reason: walletEmailOutbox.lastError,
+    total: sql<number>`count(*)::int`,
+  }).from(walletEmailOutbox)
+    .where(inArray(walletEmailOutbox.status, ["pending", "sending", "review"]))
+    .groupBy(walletEmailOutbox.status, walletEmailOutbox.eventKind, walletEmailOutbox.lastError);
+  const counts = { pending: 0, sending: 0, review: 0 };
+  for (const group of groups) {
+    if (group.status in counts) counts[group.status as keyof typeof counts] += Number(group.total);
+  }
+  const onboarding = await db.select({
+    status: onboardingEmailLog.status,
+    kind: onboardingEmailLog.kind,
+    total: sql<number>`count(*)::int`,
+  }).from(onboardingEmailLog)
+    .where(inArray(onboardingEmailLog.status, ["pending", "refused", "skipped", "review"]))
+    .groupBy(onboardingEmailLog.status, onboardingEmailLog.kind);
+  return {
+    ...counts,
+    groups: groups.map((group) => ({ ...group, total: Number(group.total) })),
+    onboarding: onboarding.map((group) => ({ ...group, total: Number(group.total) })),
+  };
 }

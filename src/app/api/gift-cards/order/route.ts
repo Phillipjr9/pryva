@@ -231,6 +231,8 @@ export async function POST(request: Request) {
         referenceCode: voucherCode,
       })
       .where(eq(orders.id, orderId));
+    // Delivery can trigger the first-purchase milestone after the debit.
+    scheduleWalletEmails();
 
     return Response.json({
       ok: true,

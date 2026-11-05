@@ -231,7 +231,7 @@ export async function runSupportRemedy(input: {
           remedy,
           label,
           status: "skipped",
-          note: "A verification link was requested too recently; the newest one already sent is still valid.",
+          note: "Please wait a moment before requesting another verification link.",
         };
       }
       const delivery = await issueEmailVerification(userId, userEmail, userName);
@@ -244,7 +244,7 @@ export async function runSupportRemedy(input: {
           remedy,
           label,
           status: "failed",
-          note: `A fresh link was created for ${userEmail}, but ${delivery.detail ?? "it could not be delivered"}. Earlier links stop working; nothing will arrive until delivery is fixed.`,
+          note: `A fresh link was created for ${userEmail}, but ${delivery.detail ?? "it could not be delivered"}. Earlier links stop working; check your inbox and try again or contact support if nothing arrives.`,
         };
       }
       return {

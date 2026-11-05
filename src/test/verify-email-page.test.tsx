@@ -50,6 +50,20 @@ describe("pressing 'Email me a link'", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/auth/verify-email", { method: "POST" });
   });
 
+  it("recognizes an already verified account without claiming a link was sent", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ ok: true, alreadyVerified: true })));
+    pressEmailButton();
+    await waitFor(() => expect(screen.getByText("Email confirmed")).toBeTruthy());
+    expect(screen.queryByText("Link sent")).toBeNull();
+  });
+
+  it("does not say a link was sent without provider acceptance", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ ok: true })));
+    pressEmailButton();
+    await waitFor(() => expect(screen.getByText("We could not send that email")).toBeTruthy());
+    expect(screen.queryByText("Link sent")).toBeNull();
+  });
+
   it("shows the server's reason when the mail was refused, instead of silence", async () => {
     const message = "A new link was created, but the mail service refused the message (403).";
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ error: message }, 502)));

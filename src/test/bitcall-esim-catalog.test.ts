@@ -14,12 +14,14 @@ import type { BitcallEsimPlan } from "@/lib/bitcall";
 
 const gateway = vi.hoisted(() => ({
   configured: vi.fn(),
+  preview: false,
   plans: vi.fn(),
   countries: vi.fn(),
   rate: 1600,
   marginOk: true,
 }));
 
+vi.mock("@/lib/demo-policy", () => ({ isPreviewDatabase: () => gateway.preview }));
 vi.mock("@/lib/bitcall", () => ({
   isBitcallConfigured: gateway.configured,
   listBitcallEsimPlans: gateway.plans,
@@ -55,6 +57,7 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   gateway.configured.mockReturnValue(true);
+  gateway.preview = false;
   gateway.rate = 1600;
   gateway.marginOk = true;
   gateway.countries.mockResolvedValue(["Nigeria"]);
@@ -68,6 +71,13 @@ async function catalog(plans: BitcallEsimPlan[]) {
 }
 
 describe("eSIM offers", () => {
+  it("never loads the live catalogue in an in-memory preview", async () => {
+    gateway.preview = true;
+    const { readEsimCatalog } = await import("@/lib/esim-catalog");
+    await expect(readEsimCatalog()).rejects.toThrow(/unavailable in this environment/i);
+    expect(gateway.plans).not.toHaveBeenCalled();
+  });
+
   it("turns the supplier's dollar price into a naira price inside the margin band", async () => {
     const { offers } = await catalog([plan({ price: 4.5 })]);
     expect(offers).toHaveLength(1);

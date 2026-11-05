@@ -57,25 +57,35 @@ export function requestProto(request: Request): "https" | "http" {
   }
 }
 
-/**
- * The site's canonical origin, for anything that must be an absolute URL
- * without a request to build it from: search-engine metadata, robots, sitemaps,
- * and links inside email.
- *
- * Resolution order is deliberate. `NEXT_PUBLIC_SITE_URL` first, because a
- * deployment host must hand out the real domain. `VERCEL_PROJECT_PRODUCTION_URL`
- * second, so a project with no explicit configuration still names its own
- * production host instead of a guess. The last resort is the domain this project
- * actually owns: it used to be `https://pryva.ng`, which no deployment has ever
- * served, so every sitemap entry, canonical tag and verification link pointed at
- * a site that was not this one.
- */
+/** A deployment hostname must never be handed out as a customer-facing URL. */
+function isVercelHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return host === "vercel.app" || host.endsWith(".vercel.app");
+}
+
+function configuredOrigin(value: string | undefined): string | null {
+  if (!value?.trim()) return null;
+  try {
+    const url = new URL(value.trim());
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
+        url.pathname !== '/' || url.search || url.hash || isVercelHost(url.hostname)) return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+/** The canonical origin for customer-facing absolute links and email imagery. */
 export function canonicalSiteUrl(env: NodeJS.ProcessEnv = process.env): string {
-  const configured = env.NEXT_PUBLIC_SITE_URL?.trim() || env.NEXT_PUBLIC_APP_URL?.trim();
-  if (configured) return configured.replace(/\/+$/, "");
-  const production = env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-  if (production) return `https://${production.replace(/^https?:\/\//, "").replace(/\/+$/, "")}`;
-  return "https://pryvalogs.com";
+  const explicit = configuredOrigin(env.NEXT_PUBLIC_SITE_URL) ?? configuredOrigin(env.NEXT_PUBLIC_APP_URL);
+  if (explicit) return explicit;
+  const productionHost = env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  const production = productionHost
+    ? configuredOrigin(/^https?:\/\//i.test(productionHost) ? productionHost : `https://${productionHost}`)
+    : null;
+  // Vercel often supplies a *.vercel.app hostname here even for a site with a
+  // custom domain. Do not leak that deployment address when the pin is absent.
+  return production ?? "https://pryvalogs.com";
 }
 
 /** Hosts that are a deployment's plumbing, never the address a customer should be handed. */
@@ -116,7 +126,7 @@ function isDeploymentHost(host: string): boolean {
  *     serves, and a host outside the canonical family is not ours to rewrite.
  */
 function pinnedOriginApplies(host: string | null, env: NodeJS.ProcessEnv): boolean {
-  const pinned = env.NEXT_PUBLIC_SITE_URL?.trim();
+  const pinned = configuredOrigin(env.NEXT_PUBLIC_SITE_URL);
   if (!pinned) return false;
   if (!host) return true;
   let pinnedHost: string;
@@ -137,10 +147,13 @@ export function publicOrigin(request: Request, env: NodeJS.ProcessEnv = process.
   // parameter exists so callers that resolve configuration themselves — the
   // passkey relying party, which must use the same environment it validated —
   // are not quietly handed a different answer.
-  const pinned = env.NEXT_PUBLIC_SITE_URL?.trim();
+  const pinned = configuredOrigin(env.NEXT_PUBLIC_SITE_URL);
   const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-  if (pinned && pinnedOriginApplies(host, env)) return pinned.replace(/\/+$/, "");
+  if (pinned && pinnedOriginApplies(host, env)) return pinned;
 
+  // Even without a pin, never mint a public callback or referral URL on Vercel's
+  // deployment domain. In-memory preview hosts continue to describe themselves.
+  if (host && isVercelHost(host.split(":")[0])) return canonicalSiteUrl(env);
   if (host) return `${requestProto(request)}://${host}`;
   try {
     return new URL(request.url).origin;

@@ -1,17 +1,18 @@
 import "server-only";
 
 import { after } from "next/server";
-import { and, eq, isNotNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { onboardingEmailLog, users } from "@/db/schema";
 import { customerWelcomeEmail, emailVerifiedEmail } from "@/lib/email-templates";
 import { logger } from "@/lib/logger";
+import { readJsonWithLimit } from "@/lib/request-body";
 import { resendConfigured } from "@/lib/resend-config";
 
 /**
- * The two emails a new account receives exactly once: a receipt for the
- * verification, and a welcome.
+ * The two onboarding emails for a newly verified account: a verification
+ * receipt and a welcome. Provider acceptance is not proof of delivery.
  *
  * Both used to be missing. Confirming an address ended in silence, and
  * `welcomeEmail()` sat in the template library with no caller. Nothing failed and
@@ -24,10 +25,9 @@ import { resendConfigured } from "@/lib/resend-config";
  *     a courtesy on top of a completed action. A mail outage must not roll back a
  *     verification, and a slow provider must not hold a database lock while the
  *     customer waits for a page that has already done its job.
- *   • **Exactly once, enforced by a unique index.** Two callers can reach the
- *     moment of verification together -- the token confirm route and the resend
- *     route's already-verified branch. Both may try to send; the database decides
- *     which one is first, and the loser is a no-op rather than a second email.
+ *   • **One claim per account and kind.** A unique index serializes concurrent
+ *     callers. Definite refusals can retry; ambiguous sends remain in review
+ *     instead of risking a duplicate.
  *   • **Never for an account that is gone.** The address is read from `users` at
  *     send time, and a closed account has neither a real address nor any reason to
  *     be written to.
@@ -43,12 +43,11 @@ export type OnboardingEmailKind = (typeof ONBOARDING_EMAIL_KINDS)[number];
 /**
  * What became of one email.
  *
- * `duplicate` is a success, not a skip: it means this account already has that
- * mail, which is the guarantee the unique index exists to provide. `ineligible`
- * means there was nothing to send -- the address was never confirmed, or the
- * account is closed.
+ * `duplicate` means another caller has already claimed the notification. Its
+ * state may be accepted, in-flight, or held for review; it is not proof that
+ * the recipient received it. `ineligible` means the account is not eligible.
  */
-export type OnboardingEmailOutcome = "accepted" | "refused" | "skipped" | "duplicate" | "ineligible";
+export type OnboardingEmailOutcome = "accepted" | "refused" | "skipped" | "review" | "duplicate" | "ineligible";
 
 type Recipient = {
   id: string;
@@ -67,33 +66,24 @@ function templateFor(kind: OnboardingEmailKind, recipient: Recipient): Template 
     : customerWelcomeEmail(recipient.name);
 }
 
-/** The provider's own words, bounded -- never the whole body, which can echo the address. */
-function refusalDetail(status: number, body: string): string {
-  let message = "";
-  try {
-    const parsed = JSON.parse(body) as { message?: unknown };
-    if (typeof parsed?.message === "string") message = parsed.message;
-  } catch {
-    message = "";
-  }
-  const readable = message.replace(/\s+/g, " ").trim().slice(0, 150);
-  return readable ? `${status}: ${readable}` : `provider refused the message (${status})`;
-}
-
 /**
  * Claim the right to send one kind to one account.
  *
- * An insert into a table with a unique `(user_id, kind)` index is the lock: the
- * winner gets a row back and sends, every loser gets nothing back and sends
- * nothing. `onConflictDoNothing().returning()` therefore returns `[]` on a
- * duplicate, which is exactly the signal wanted -- no read-then-write race.
+ * A unique `(user_id, kind)` row is the lock. A definite refusal or a skipped
+ * unconfigured send can be claimed again after the operator fixes the sender.
+ * Ambiguous timeouts/5xx remain in review: without a frozen payload and a
+ * provider idempotency key, automatically retrying them could duplicate mail.
  */
 async function claim(userId: string, kind: OnboardingEmailKind): Promise<string | null> {
   try {
     const [row] = await db
       .insert(onboardingEmailLog)
       .values({ userId, kind, status: "pending" })
-      .onConflictDoNothing()
+      .onConflictDoUpdate({
+        target: [onboardingEmailLog.userId, onboardingEmailLog.kind],
+        set: { status: "pending", detail: null },
+        setWhere: inArray(onboardingEmailLog.status, ["refused", "skipped"]),
+      })
       .returning({ id: onboardingEmailLog.id });
     return row?.id ?? null;
   } catch (error) {
@@ -108,7 +98,7 @@ async function claim(userId: string, kind: OnboardingEmailKind): Promise<string 
 
 async function settle(
   logId: string,
-  result: { status: "accepted" | "refused" | "skipped"; messageId?: string | null; detail?: string | null },
+  result: { status: "accepted" | "refused" | "skipped" | "review"; messageId?: string | null; detail?: string | null },
 ): Promise<void> {
   try {
     await db
@@ -131,7 +121,7 @@ async function settle(
 async function deliver(
   kind: OnboardingEmailKind,
   recipient: Recipient,
-): Promise<{ status: "accepted" | "refused" | "skipped"; messageId?: string | null; detail?: string | null }> {
+): Promise<{ status: "accepted" | "refused" | "skipped" | "review"; messageId?: string | null; detail?: string | null }> {
   if (!resendConfigured()) {
     // Reported rather than sent-and-failed: without a key nothing can leave, and
     // pretending otherwise would leave the log claiming an attempt was made.
@@ -143,7 +133,7 @@ async function deliver(
 
   try {
     const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
+      method: "POST", redirect: "error", cache: "no-store",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         from,
@@ -158,24 +148,24 @@ async function deliver(
     });
 
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      logger.error("Onboarding email refused by the provider", {
-        kind,
-        status: response.status,
-        detail: body.slice(0, 200),
-      });
-      return { status: "refused", detail: refusalDetail(response.status, body) };
+      // Provider bodies can echo addresses or other private data. The status is
+      // sufficient for operators to investigate without copying the response.
+      logger.error("Onboarding email refused by the provider", { kind, status: response.status });
+      // Only an explicit 4xx refusal is safe to retry without risking a second
+      // copy. A 5xx may occur after acceptance, so hold it for an operator.
+      return { status: response.status >= 400 && response.status < 500 ? "refused" : "review", detail: `provider refused the message (${response.status})` };
     }
-    const payload = (await response.json().catch(() => null)) as { id?: unknown } | null;
-    const messageId = typeof payload?.id === "string" ? payload.id : null;
+    const payload = await readJsonWithLimit(response, 32_768).catch(() => null) as { id?: unknown } | null;
+    const messageId = typeof payload?.id === "string" && payload.id.length > 0 && payload.id.length <= 100 ? payload.id : null;
+    if (!messageId) {
+      logger.error("Onboarding email response was unconfirmed", { kind });
+      return { status: "review", detail: "provider response did not confirm acceptance" };
+    }
     logger.info("Onboarding email accepted by the provider", { kind, messageId });
     return { status: "accepted", messageId };
-  } catch (error) {
-    logger.error("Onboarding email could not be sent", {
-      kind,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return { status: "refused", detail: "the mail service could not be reached" };
+  } catch {
+    logger.error("Onboarding email could not be sent", { kind });
+    return { status: "review", detail: "the mail service could not be reached; delivery is unconfirmed" };
   }
 }
 
@@ -298,12 +288,15 @@ export async function backfillOnboardingEmails(options: {
         isNotNull(users.emailVerifiedAt),
         sql`${users.deletedAt} IS NULL`,
         sql`${users.createdAt} > now() - ${sql.raw(`interval '${sinceDays} days'`)}`,
-        // Only rows that are missing at least one of the two, so a completed
-        // account is never re-read on every run.
-        sql`NOT EXISTS (
+        // A welcome can succeed even if its receipt was refused. Check both;
+        // ambiguous/in-flight rows are not retryable and must not starve others.
+        sql`(NOT EXISTS (
           SELECT 1 FROM onboarding_email_log l
-          WHERE l.user_id = ${users.id} AND l.kind = 'welcome' AND l.status = 'accepted'
-        )`,
+          WHERE l.user_id = ${users.id} AND l.kind = 'welcome' AND l.status NOT IN ('refused', 'skipped')
+        ) OR NOT EXISTS (
+          SELECT 1 FROM onboarding_email_log l
+          WHERE l.user_id = ${users.id} AND l.kind = 'verified' AND l.status NOT IN ('refused', 'skipped')
+        ))`,
       ),
     )
     .limit(limit);
