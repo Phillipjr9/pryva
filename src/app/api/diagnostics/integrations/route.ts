@@ -13,7 +13,7 @@ import { esimItemsForCountry, readEsimCatalog } from "@/lib/esim-catalog";
 import { explorerCountry } from "@/lib/service-explorer";
 import { isSmmPanelConfigured } from "@/lib/smm-panel";
 import { resendConfigured } from "@/lib/resend-config";
-import { recentEmailActivity } from "@/lib/email-delivery-events";
+import { emailQueueStatus, recentEmailActivity } from "@/lib/email-delivery-events";
 import { isPaystackConfigured, paystackKeyMode, getBanks } from "@/lib/paystack";
 import { persistentDatabaseConfigured } from "@/lib/database-config";
 import {
@@ -173,6 +173,8 @@ export async function GET(request: NextRequest) {
         // mail path from one that bounces everything.
         webhookConfigured: Boolean(process.env.RESEND_WEBHOOK_SECRET?.trim()),
         delivery: await probe("email-delivery", () => recentEmailActivity()),
+        // Includes retry/review failures even when Resend never accepted a send.
+        queue: await probe("email-queue", () => emailQueueStatus()),
       },
       manualFulfilmentReachable,
     },

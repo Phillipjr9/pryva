@@ -73,7 +73,7 @@ describe("POST /api/auth/verify-email", () => {
     expect(response.status).toBe(502);
     expect(body.delivered).toBe(false);
     expect(body.error).toContain("403");
-    expect(body.error).toMatch(/nothing will arrive/i);
+    expect(body.error).toMatch(/check your inbox/i);
   });
 
   it("says mail is not configured before it issues anything", async () => {

@@ -161,7 +161,7 @@ describe("the public eSIM page agrees with itself", () => {
     const page = read("app/(site)/esim/page.tsx");
     expect(page).toContain("const highlights = live");
     expect(page).toContain("const faqs = live");
-    expect(page).toContain("Available now");
+    expect(page).toContain("Check current plans");
     // The pre-launch strings must survive for the no-supplier case.
     expect(read("lib/catalog.ts")).toContain("not available for purchase yet");
   });
@@ -170,6 +170,7 @@ describe("the public eSIM page agrees with itself", () => {
 describe("no public page says eSIM cannot be bought while it is being bought", () => {
   it("reports the category as orderable once a live catalogue exists", async () => {
     vi.resetModules();
+    vi.stubEnv("DATABASE_URL", "postgres://configured.test/database");
     vi.stubEnv("BITCALL_KEY_ID", "ak_live_abc");
     vi.stubEnv("BITCALL_API_SECRET", "a".repeat(128));
     const { esimCategoryOrderable } = await import("@/lib/esim-availability");

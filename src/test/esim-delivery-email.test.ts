@@ -112,7 +112,8 @@ describe("queueing the email when an eSIM is handed over", () => {
       "0017_login_lockout.sql", "0018_reconciliation_runs.sql", "0019_support_tickets.sql", "0020_webauthn.sql",
       "0021_referrals.sql", "0022_fraud.sql", "0023_boost_orders.sql", "0024_account_deletions.sql",
       "0025_account_deletion_forfeiture.sql", "0026_webhook_events.sql", "0027_esim_credentials.sql",
-      "0028_esim_delivery_email.sql",
+      "0028_esim_delivery_email.sql", "0029_notification_gaps.sql", "0030_payout_name_approvals.sql",
+      "0031_email_delivery_events.sql", "0032_welcome_verified_emails.sql", "0033_account_activity_emails.sql",
     ]) {
       await pg.exec(await readFile(`migrations/${file}`, "utf8"));
     }

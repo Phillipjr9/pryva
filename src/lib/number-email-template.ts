@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { ResendPayload } from "@/lib/wallet-email-template";
+import { emailBrandLockup } from "@/lib/email-brand";
 
 /**
  * "Your code arrived."
@@ -95,7 +96,7 @@ export function makeNumberCodeEmail(input: NumberCodeInput): ResendPayload {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#f4efe6 0%,#faf7f1 50%,#f6f2ec 100%);">
 <tr><td align="center" style="padding:34px 14px 10px;">
 <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:100%;">
-  <tr><td style="padding:0 8px 18px;font-family:'Manrope',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:20px;font-weight:800;letter-spacing:-1.2px;color:${C.ink};">Pryva</td></tr>
+  <tr><td style="padding:0 8px 18px;">${emailBrandLockup(input.orderUrl.replace(/\/dashboard.*$/, ""))}</td></tr>
 
   <tr><td style="padding:0 8px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:26px;background:linear-gradient(155deg,#3a2b63 0%,#241b3a 55%,#4b3480 100%);box-shadow:0 28px 52px -24px rgba(30,20,55,0.8),inset 0 1px 0 rgba(255,255,255,0.22);">

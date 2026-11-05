@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS "onboarding_email_log" (
   "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE cascade,
   -- 'verified' (the receipt) or 'welcome' (the introduction).
   "kind" varchar(24) NOT NULL,
-  -- What the provider said. 'accepted' is all Resend can promise; anything else
-  -- is a refusal worth looking at, and it is recorded rather than swallowed.
+  -- 'accepted' means provider acceptance. A definite refusal or unconfigured
+  -- send can retry; an ambiguous outcome is 'review' to avoid duplicates.
   "status" varchar(24) NOT NULL DEFAULT 'pending',
   -- The provider's message id, so a later delivery event can be joined to this row.
   "provider_message_id" varchar(100),

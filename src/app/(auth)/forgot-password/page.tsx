@@ -32,7 +32,7 @@ export default function ForgotPasswordPage() {
       }
       // Shown for every address, so this confirms nothing about whether the
       // account exists.
-      setState({ busy: false, message: data.message ?? "If that email has an account, a reset link is on its way.", error: null });
+      setState({ busy: false, message: data.message ?? "If that email has an account, we'll try to send a reset link. If it doesn't arrive, try again or contact support.", error: null });
     } catch {
       setState({ busy: false, message: null, error: "Could not reach the server. Try again." });
     }

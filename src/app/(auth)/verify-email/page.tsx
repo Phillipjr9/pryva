@@ -58,7 +58,7 @@ function VerifyEmail() {
     setNeedsSignIn(false);
     try {
       const response = await fetch("/api/auth/verify-email", { method: "POST" });
-      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      const data = (await response.json().catch(() => ({}))) as { error?: string; delivered?: boolean; alreadyVerified?: boolean };
       if (response.status === 401) {
         // The link is sent to the address on the account, so an anonymous visitor
         // cannot use this button. Saying "sign in" is the only useful answer.
@@ -66,9 +66,11 @@ function VerifyEmail() {
         setOutcome({ status: "sendFailed", message: data.error || "Sign in to request a link." });
       } else {
         setOutcome(
-          response.ok
-            ? { status: "sent" }
-            : { status: "sendFailed", message: data.error || "Could not send that email." },
+          response.ok && data.alreadyVerified
+            ? { status: "verified" }
+            : response.ok && data.delivered
+              ? { status: "sent" }
+              : { status: "sendFailed", message: data.error || "Could not confirm that email was sent." },
         );
       }
     } catch {
@@ -126,7 +128,7 @@ function VerifyEmail() {
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
             {needsSignIn
               ? "The confirmation link goes to the address on your account, so we need you signed in first."
-              : "Nothing is wrong with your account, and no link was used up. Try again shortly, or contact support if it keeps happening."}
+              : "Try again shortly, or contact support if it keeps happening. A new request may replace earlier links."}
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             {needsSignIn ? (
@@ -146,12 +148,12 @@ function VerifyEmail() {
       );
     }
 
-    if (!token) {
+    if (!token && outcome?.status !== "verified") {
       return (
         <>
           <h1 className="text-xl font-semibold text-slate-900">Confirm your email</h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            Sign in and we will send a fresh confirmation link to the address on your account.
+            Sign in to request a fresh confirmation link for the address on your account.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link className={button} href="/login?next=%2Fverify-email">
@@ -170,8 +172,8 @@ function VerifyEmail() {
         <>
           <h1 className="text-xl font-semibold text-slate-900">Email confirmed</h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            Your address is verified. We have emailed you a receipt, and a welcome with everything
-            your account can do. You can close this tab.
+            Your address is verified. A confirmation and welcome may arrive by email.
+            You can close this tab.
           </p>
           <div className="mt-5">
             <Link className={button} href="/dashboard">

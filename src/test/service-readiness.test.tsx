@@ -50,7 +50,7 @@ describe("service readiness", () => {
     const readiness = readServiceReadiness();
     const numbers = readiness.find((entry) => entry.id === "numbers")!;
     expect(numbers.state).toBe("paused");
-    expect(numbers.detail).toMatch(/supplier/i);
+    expect(numbers.detail).toMatch(/not connected/i);
 
     config.fleexa = true;
     const live = readServiceReadiness().find((entry) => entry.id === "numbers")!;

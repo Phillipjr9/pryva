@@ -138,7 +138,7 @@ export const onboardingEmailLog = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     /** `verified` (the receipt) or `welcome` (the introduction). */
     kind: varchar("kind", { length: 24 }).notNull(),
-    /** `pending`, `accepted`, or `refused`. */
+    /** `pending`, `accepted`, `refused`, `skipped`, or `review`. */
     status: varchar("status", { length: 24 }).notNull().default("pending"),
     providerMessageId: varchar("provider_message_id", { length: 100 }),
     detail: varchar("detail", { length: 200 }),
@@ -453,6 +453,13 @@ export const walletEmailOutbox = pgTable("wallet_email_outbox", {
   walletTransactionId: uuid("wallet_transaction_id").references(() => walletTransactions.id, { onDelete: "cascade" }),
   withdrawalId: uuid("withdrawal_id").references(() => withdrawals.id, { onDelete: "cascade" }),
   orderId: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }),
+  // Snapshot, not a foreign key: deleting a bank must not erase its security alert.
+  bankAccountId: uuid("bank_account_id"),
+  bankNameSnapshot: varchar("bank_name_snapshot", { length: 100 }),
+  bankLastFour: varchar("bank_last_four", { length: 4 }),
+  recipientName: varchar("recipient_name", { length: 120 }),
+  notificationDueAt: timestamp("notification_due_at", { withTimezone: true }),
+  notificationLockedUntil: timestamp("notification_locked_until", { withTimezone: true }),
   eventKind: varchar("event_kind", { length: 40 }).notNull(),
   recipient: varchar("recipient", { length: 200 }).notNull(),
   payload: text("payload"),
@@ -467,11 +474,20 @@ export const walletEmailOutbox = pgTable("wallet_email_outbox", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   sentAt: timestamp("sent_at", { withTimezone: true }),
 }, (table) => [
-  uniqueIndex("wallet_email_outbox_transaction_idx").on(table.walletTransactionId),
+  uniqueIndex("wallet_email_outbox_transaction_idx").on(table.walletTransactionId).where(sql`event_kind = 'wallet'`),
+  uniqueIndex("wallet_email_outbox_bank_link_idx").on(table.bankAccountId).where(sql`event_kind = 'bank_linked'`),
   uniqueIndex("wallet_email_outbox_withdrawal_event_idx").on(table.withdrawalId, table.eventKind),
-  uniqueIndex("wallet_email_outbox_order_event_idx").on(table.orderId, table.eventKind),
+  uniqueIndex("wallet_email_outbox_order_event_idx").on(table.orderId, table.eventKind).where(sql`event_kind <> 'number_code'`),
   index("wallet_email_outbox_due_idx").on(table.status, table.availableAt),
+  index("wallet_email_outbox_notification_due_idx").on(table.status, table.notificationDueAt).where(sql`notification_due_at IS NOT NULL`),
 ]);
+
+/** Once-per-account milestone; historical buyers are marked without sending mail. */
+export const firstPurchaseEmailClaims = pgTable("first_purchase_email_claims", {
+  userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  source: varchar("source", { length: 16 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const contactMessages = pgTable("contact_messages", {
   id: uuid("id").primaryKey().defaultRandom(),

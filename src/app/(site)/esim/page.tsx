@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "eSIM",
-  description: "Explore eSIM data plans for instant travel and local connectivity.",
+  description: "Explore eSIM data plans and check current travel and local coverage.",
 };
 
 export default function ESIMPage() {
@@ -38,7 +38,7 @@ export default function ESIMPage() {
   const faqs = live
     ? service.faqs.map((faq) =>
         faq.q === "Can I activate an eSIM now?"
-          ? { q: faq.q, a: "Yes. Choose a plan for your destination, pay from your wallet, and the activation code appears on the order the moment the profile is issued." }
+          ? { q: faq.q, a: "If a plan is available for your destination, you can order it from your wallet. Check the order for its status and activation code once issued." }
           : faq,
       )
     : service.faqs;
@@ -47,7 +47,7 @@ export default function ESIMPage() {
     ? [
         { title: "Check your device", body: "Confirm eSIM compatibility and carrier unlock requirements with your device and carrier." },
         { title: "Buy and install", body: "Pick a plan for your destination, pay from your wallet, and install from the activation code on the order." },
-        { title: "Available now", body: "Live plans are listed with their data allowance, validity and naira price. You are charged when the profile is issued." },
+        { title: "Check current plans", body: "Browse current plans, data allowances and naira prices. Availability can change by destination." },
       ]
     : service.highlights;
 
@@ -63,11 +63,11 @@ export default function ESIMPage() {
             <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3.5rem]">{service.tagline}</h1>
             <p className="mt-6 text-[1.1rem] text-ink-2 leading-relaxed">
               {live
-                ? "Live eSIM data plans, priced in naira and issued as an activation code the moment you buy."
-                : service.description}
+                ? "eSIM ordering is connected. Browse current plans, prices and availability in your dashboard."
+                : "Compare example eSIM plans by region and data allowance. Ordering is not connected yet."}
             </p>
             <div className="mt-8 flex flex-wrap gap-3 sm:gap-4">
-              <Link href="/signup" className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-800">Get Started <ArrowRight className="h-4 w-4" /></Link>
+              <Link href={live ? "/dashboard/esim" : "/signup"} className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-800">{live ? "Browse eSIM plans" : "Create an account"} <ArrowRight className="h-4 w-4" /></Link>
               <Link href="/pricing" className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-6 py-3 text-[0.95rem] font-semibold text-ink hover:bg-cream">View Pricing</Link>
             </div>
           </div>
@@ -91,7 +91,7 @@ export default function ESIMPage() {
         <div className="shell">
           <h2 className="mb-3 text-[1.75rem] font-semibold text-ink">Destinations</h2>
           <p className="mb-6 max-w-2xl text-[0.95rem] text-ink-2">
-            The catalog lists plans for these regions with high-speed global and local data coverage.
+            These are example destinations to explore. Check the current catalog for actual coverage and availability.
           </p>
           <CountryChips
             codes={[
@@ -104,12 +104,12 @@ export default function ESIMPage() {
 
       <section className="pb-16">
         <div className="shell">
-          <h2 className="text-[1.75rem] font-semibold text-ink mb-8">{live ? "Live pricing" : "Pricing"}</h2>
+          <h2 className="text-[1.75rem] font-semibold text-ink mb-8">{live ? "Current plans" : "Example plans"}</h2>
           {live ? (
             <div className="mb-6 rounded-2xl border border-line bg-white p-6">
               <p className="text-[0.95rem] leading-relaxed text-ink-2">
-                Plans are read live: coverage, data allowance, validity and the naira price for your destination. You
-                are charged when the profile is issued, and it installs from an activation code on the order.
+                Browse current plans for your destination, including their data allowance, validity and price.
+                Availability can change; check your order status and activation code once issued.
               </p>
               <Link
                 href="/dashboard/esim"
@@ -162,16 +162,9 @@ export default function ESIMPage() {
                     ))}
                   </ul>
                 </div>
-                <Link
-                  href={`/signup?plan=${plan.slug}`}
-                  className={`block w-full rounded-xl px-4 py-3 text-center text-[0.9rem] font-semibold transition-colors ${
-                    plan.popular
-                      ? "bg-lav-700 text-white hover:bg-lav-800"
-                      : "border border-line bg-white text-ink hover:bg-cream"
-                  }`}
-                >
-                  Get Started
-                </Link>
+                <p className="block w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-[0.9rem] font-semibold text-amber-900">
+                  Example only — this plan cannot be ordered.
+                </p>
               </div>
             ))}
           </div>

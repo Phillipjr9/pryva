@@ -2,6 +2,7 @@ import "server-only";
 
 import { resendConfigured } from "@/lib/resend-config";
 import { logger } from "@/lib/logger";
+import { brandedNotificationEmail } from "@/lib/email-templates";
 
 /**
  * "Something changed on your account."
@@ -27,7 +28,7 @@ const COPY: Record<SecurityEvent, { subject: string; heading: string; body: stri
   password_changed: {
     subject: "Your Pryva password was changed",
     heading: "Your password was changed",
-    body: "Every other session was signed out. If this wasn't you, reset your password immediately and reply to this email.",
+    body: "Every other session was signed out. If this wasn't you, reset your password immediately and contact support.",
   },
   email_changed: {
     subject: "Your Pryva sign-in email was changed",
@@ -37,7 +38,7 @@ const COPY: Record<SecurityEvent, { subject: string; heading: string; body: stri
   two_factor_enabled: {
     subject: "Two-factor authentication is on",
     heading: "Two-factor authentication was turned on",
-    body: "From now on, signing in needs a code from your authenticator app. If this wasn't you, change your password and reply to this email.",
+    body: "From now on, signing in needs a code from your authenticator app. If this wasn't you, change your password and contact support.",
   },
   two_factor_disabled: {
     subject: "Two-factor authentication was turned off",
@@ -46,37 +47,22 @@ const COPY: Record<SecurityEvent, { subject: string; heading: string; body: stri
   },
 };
 
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
-}
-
 export function buildSecurityNotice(event: SecurityEvent, name: string, when: Date) {
   const copy = COPY[event];
-  const safeName = escapeHtml(name.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 80) || "there");
+  const displayName = name.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 80) || "there";
   const at = when.toISOString().replace("T", " ").slice(0, 16) + " UTC";
-
-  const html = `<!doctype html><html lang="en"><body style="margin:0;padding:28px 16px;background:#faf7f1;font-family:'DM Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
-    <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="width:520px;max-width:100%;">
-      <tr><td style="padding-bottom:16px;font-family:'Manrope',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:20px;font-weight:800;letter-spacing:-1.2px;color:#241b3a;">Pryva</td></tr>
-      <tr><td style="border-radius:22px;background:#fffdfa;border:1px solid #e7e0ee;box-shadow:0 22px 40px -26px rgba(45,30,80,0.55);padding:26px 24px;">
-        <h1 style="margin:0 0 12px;font-family:'Manrope',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:22px;font-weight:800;color:#241b3a;">${escapeHtml(copy.heading)}</h1>
-        <p style="margin:0 0 14px;font-size:14px;line-height:1.7;color:#5b4f6b;">Hi ${safeName}, ${escapeHtml(copy.body)}</p>
-        <p style="margin:0;font-size:12px;color:#8a7f97;">${escapeHtml(at)} · Pryva Technologies, Lagos</p>
-      </td></tr>
-    </table>
-  </td></tr></table></body></html>`;
-
-  const text = [
-    copy.heading,
-    "",
-    `Hi ${safeName}, ${copy.body}`,
-    "",
-    at,
-    "Pryva Technologies · Lagos, Nigeria",
-  ].join("\n");
-
-  return { subject: copy.subject, html, text };
+  return brandedNotificationEmail({
+    subject: copy.subject,
+    eyebrow: "Account security",
+    title: copy.heading,
+    intro: `Hi ${displayName}, ${copy.body}`,
+    hero: "password",
+    heroAlt: "Account security",
+    rows: [{ label: "Recorded", value: at }],
+    ctaPath: event === "password_changed" || event === "email_changed" ? "/forgot-password" : "/dashboard/security",
+    ctaLabel: event === "password_changed" || event === "email_changed" ? "Secure my account" : "Review security",
+    note: "Pryva will never ask for your password or security codes by email. If you didn't make this change, contact support immediately.",
+  });
 }
 
 export type SecurityNoticeResult = { sent: boolean; detail: string | null };

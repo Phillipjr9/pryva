@@ -2,6 +2,7 @@ import "server-only";
 
 import type { EmailAttachment } from "@/lib/esim-qr";
 import type { ResendPayload } from "@/lib/wallet-email-template";
+import { emailBrandLockup } from "@/lib/email-brand";
 
 /**
  * The eSIM handover email.
@@ -149,10 +150,7 @@ export function makeEsimDeliveryEmail(input: EsimDeliveryInput): ResendPayload {
 
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" class="shell" style="width:600px;max-width:100%;">
   <tr><td class="pad" style="padding:0 8px 20px;">
-    <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-      <td style="padding-right:10px;vertical-align:middle;"><img src="${esc(input.orderUrl.replace(/\/dashboard.*$/, ""))}/images/brand/pryva-mark.png" width="30" height="30" alt="Pryva" style="display:block;border:0;border-radius:9px;"></td>
-      <td style="font-family:'Manrope',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:21px;font-weight:800;letter-spacing:-1.2px;color:${C.ink};vertical-align:middle;">Pryva</td>
-    </tr></table>
+    ${emailBrandLockup(input.orderUrl.replace(/\/dashboard.*$/, ""))}
   </td></tr>
 
   <tr><td class="pad" style="padding:0 8px;">

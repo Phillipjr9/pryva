@@ -142,7 +142,7 @@ function bankRequest(origin = "https://pryva.test", type = "application/json") {
   });
 }
 function googleRequest() {
-  return new Request("https://pryva.test/api/auth/google/callback?code=test&state=valid");
+  return new Request("https://pryva.test/api/auth/google/callback?code=test&state=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 }
 
 beforeAll(async () => {
@@ -180,6 +180,7 @@ beforeAll(async () => {
   await pg.exec(await readFile("migrations/0030_payout_name_approvals.sql", "utf8"));
   await pg.exec(await readFile("migrations/0031_email_delivery_events.sql", "utf8"));
   await pg.exec(await readFile("migrations/0032_welcome_verified_emails.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0033_account_activity_emails.sql", "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
   [purchaseRoute, refundRoute, bankRoute, verifyBankRoute, googleRoute, contactRoute, deleteRoute, passwordRoute, sessionsRoute, autoRefund, giftPurchaseRoute, giftCheckRoute, giftRedeemRoute, topUpRoute, verifyTopUpRoute, webhookRoute, profileRoute, notificationsRoute, markReadRoute, logoutRoute, syncRoute, scheduledRoute, promoRoute, withdrawalRoute, adminWithdrawalRoute, integrity] = await Promise.all([
@@ -230,7 +231,7 @@ beforeEach(async () => {
   mocks.getBanks.mockResolvedValue([{ code: "044", name: "Access Bank" }]);
   mocks.resolveBank.mockResolvedValue({ status: true, data: { account_name: "Verified Person", account_number: "1234567890", bank_id: 1 } });
   mocks.createRecipient.mockResolvedValue({ status: true, data: { recipient_code: "RCP-test" } });
-  mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_google_state" ? { value: "valid" } : undefined });
+  mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_google_state" ? { value: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } : undefined });
   mocks.exchange.mockResolvedValue("access-token");
   mocks.googleProfile.mockResolvedValue({ sub: "google-subject-1", email: "new@example.com", name: "Google User", emailVerified: true });
   mocks.session.mockResolvedValue("session");
@@ -499,12 +500,14 @@ describe("marketplace money safety", () => {
     expect(order.providerRequestId).toMatch(/^[0-9a-f-]{36}$/);
     expect(user.walletBalance).toBe(8000);
     expect(ledger).toMatchObject({ orderId: order.id, amount: 2000, type: "debit", balanceAfter: 8000 });
+    expect(await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "first_purchase"))).toMatchObject([{ userId: USER, walletTransactionId: ledger.id }]);
     const replay = await purchaseRoute.POST(purchaseRequest());
     expect(replay.status).toBe(200);
     expect((await replay.json()).order.reference).toBe(receipt.order.reference);
     expect(mocks.getListing).toHaveBeenCalledTimes(1);
     expect(mocks.purchase).toHaveBeenCalledTimes(1);
     expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+    expect(await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "first_purchase"))).toHaveLength(1);
   });
 
   it("does not retry or refund an uncertain purchase, and blocks refunds while it is in flight", async () => {
@@ -526,6 +529,7 @@ describe("marketplace money safety", () => {
     expect(mocks.purchase).toHaveBeenCalledTimes(1);
     const [review] = await database.select().from(schema.orders);
     expect(review.status).toBe("review");
+    expect(await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "first_purchase"))).toHaveLength(0);
     expect((await database.select().from(schema.users))[0].walletBalance).toBe(8000);
     expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
     expect((await refundRoute.POST(adminRefund(review.id))).status).toBe(409);
@@ -637,6 +641,8 @@ describe("bank recipients", () => {
     expect(response.status).toBe(200);
     const [bank] = await database.select().from(schema.bankAccounts);
     expect(bank).toMatchObject({ userId: USER, bankName: "Access Bank", accountName: "Verified Person", recipientCode: "RCP-test", isDefault: 1 });
+    const [notice] = await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "bank_linked"));
+    expect(notice).toMatchObject({ userId: USER, bankAccountId: bank.id, bankNameSnapshot: "Access Bank", bankLastFour: "7890", recipient: "buyer@example.com" });
     expect(mocks.createRecipient).toHaveBeenCalledWith({ name: "Verified Person", accountNumber: "1234567890", bankCode: "044" });
   });
 
@@ -696,7 +702,7 @@ describe("Google subject binding and account protection", () => {
   });
 
   it("rejects a malicious next cookie even after successful Google authentication", async () => {
-    mocks.cookies.mockResolvedValueOnce({ get: (name: string) => ({ value: name === "pryva_google_state" ? "valid" : "%2F%2Fevil.example" }) });
+    mocks.cookies.mockResolvedValueOnce({ get: (name: string) => ({ value: name === "pryva_google_state" ? "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" : "%2F%2Fevil.example" }) });
     expect((await googleRoute.GET(googleRequest())).headers.get("location")).toBe("/dashboard");
   });
 
@@ -715,6 +721,11 @@ describe("Google subject binding and account protection", () => {
     expect((await passwordRoute.POST(request("https://pryva.test"))).status).toBe(200);
     expect((await database.select().from(schema.users))[0].passwordHash).toBe("test-password-hash");
     expect((await database.select().from(schema.sessions)).map((session) => session.token)).toEqual(["current-token"]);
+    const notices = await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "password_changed"));
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toMatchObject({ recipient: "buyer@example.com", recipientName: "Buyer", status: "pending" });
+    expect((await passwordRoute.POST(request("https://pryva.test"))).status).toBe(400);
+    expect(await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "password_changed"))).toHaveLength(1);
   });
 
   it("prevents cross-origin session revocation and preserves the embedded current session", async () => {
@@ -928,6 +939,7 @@ describe("gift-card SQL and bearer-code safety", () => {
     expect(purchase.headers.get("cache-control")).toContain("no-store");
     const { code } = await purchase.json();
     expect(code).toMatch(/^PRYVA-/);
+    expect(await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "first_purchase"))).toMatchObject([{ userId: USER }]);
     expect((await giftCheckRoute.GET()).status).toBe(405);
     const checked = await giftCheckRoute.POST(giftRequest("check", { code }));
     expect(checked.status).toBe(200);

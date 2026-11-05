@@ -51,7 +51,7 @@ export default async function EsimPlanPage({ params }: { params: Promise<{ id: s
             <li>• {offer.dataLabel} on arrival, valid for {offer.validityLabel.toLowerCase()}.</li>
             <li>• Installed from an activation code or the one-tap install link on your order — no shop visit.</li>
             <li>• Data-only: your usual number stays active for calls and messages.</li>
-            <li>• The profile is issued the moment you buy; if issuing takes a moment, you are charged only once it arrives.</li>
+            <li>• The activation code appears on your order once issued; your wallet is charged when it arrives.</li>
           </ul>
 
           <h2 className="mt-6 text-[1.05rem] font-semibold text-ink">

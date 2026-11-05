@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { googleAuthorizeUrl, googleConfigured, makeState } from "@/lib/google";
 import { signState } from "@/lib/google-state";
 import { safeRedirectPath } from "@/lib/safe-redirect";
+import { publicOrigin, requestProto } from "@/lib/net";
 
 export const dynamic = "force-dynamic";
 
@@ -16,14 +17,22 @@ export async function GET(request: Request) {
     redirect("/login?error=google-not-configured");
   }
 
+  // Store the browser-binding cookie on exactly the callback host. In particular,
+  // a user starting on www or a deployment URL must reach the canonical domain
+  // before Google is opened, or a host-only cookie will be missing on return.
+  const origin = publicOrigin(request);
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? url.host;
+  const incomingOrigin = new URL(`${requestProto(request)}://${host}`).origin;
+  if (incomingOrigin !== origin) {
+    const canonicalStart = new URL("/api/auth/google", origin);
+    canonicalStart.searchParams.set("next", next);
+    return Response.redirect(canonicalStart, 302);
+  }
+
   const nonce = makeState();
-  // Signed so the callback can authenticate it without the cookie: Google's
-  // cross-site return is not guaranteed to carry a SameSite=Lax cookie.
   const state = signState(nonce) ?? nonce;
   const authorizeUrl = googleAuthorizeUrl(request, state);
-
-  const proto = request.headers.get("x-forwarded-proto");
-  const secure = proto ? proto.startsWith("https") : process.env.NODE_ENV === "production";
+  const secure = new URL(origin).protocol === "https:";
 
   const response = new Response(null, { status: 302, headers: { Location: authorizeUrl } });
   const cookieBase = `Path=/; HttpOnly; SameSite=Lax; Max-Age=600${secure ? "; Secure" : ""}`;

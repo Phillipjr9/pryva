@@ -47,9 +47,8 @@ export async function GET(request: Request) {
 
   if (error) return clearCookies(goToLogin("google-canceled"));
   if (!googleConfigured()) return clearCookies(goToLogin("google-not-configured"));
-  // The cookie is preferred when present, but its absence is not proof of an
-  // attack: a cross-site redirect may withhold a SameSite=Lax cookie. In that
-  // case a correctly signed and unexpired state carries the request.
+  // A signed state alone is not bound to this browser. Require the cookie too,
+  // or an attacker can attach their own Google account to someone else's login.
   if (!code || !stateAccepted(state, expectedState)) {
     return clearCookies(goToLogin("google-state"));
   }

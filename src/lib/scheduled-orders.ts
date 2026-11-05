@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 import { db } from "@/db";
 import { scheduledOrders, orders, users } from "@/db/schema";
 import { eq, and, lte, ne } from "drizzle-orm";
@@ -276,8 +277,10 @@ export async function runScheduledOrders(
       break;
     }
     try {
-      if (await processScheduledOrder(scheduled)) counts.processed++;
-      else counts.skipped++;
+      if (await processScheduledOrder(scheduled)) {
+        counts.processed++;
+        scheduleWalletEmails();
+      } else counts.skipped++;
     } catch (error) {
       counts.failed++;
       logger.error("Failed to process scheduled order", {

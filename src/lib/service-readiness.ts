@@ -25,7 +25,7 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
   const fleexa = isFleexaConfigured();
   const boosting = isSmmPanelConfigured();
   const accounts = isMarketplaceCheckoutConfigured();
-  const esim = isBitcallConfigured();
+  const esim = !preview && isBitcallConfigured();
 
   const entries: ServiceReadinessEntry[] = [
     {
@@ -33,8 +33,8 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
       label: "App verification",
       state: "preview",
       detail: fleexa
-        ? "Supplier listings are readable, but each app still needs its own mapping before a code can be bought."
-        : "Platform examples only. Per-app ordering needs a supplier key and a service mapping.",
+        ? "Listings are readable, but each app still needs its own mapping before a code can be bought."
+        : "Platform examples only. Ordering for each app is not connected yet.",
     },
     {
       id: "social",
@@ -50,21 +50,23 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
       state: fleexa ? "buy" : "paused",
       detail: fleexa
         ? "Single-use numbers and rentals are delivered automatically, and bulk orders buy the same units."
-        : "Plans are catalogued with prices; ordering opens when the number supplier is connected.",
+        : "Plans are catalogued with prices; ordering is not connected yet.",
     },
     {
       id: "esim",
       label: "eSIM",
       state: esim ? "buy" : "paused",
-      detail: esim
-        ? "Travel data plans are read live from the network, priced in naira and issued as an activation code."
-        : "Live travel plans need the eSIM network key; nothing can be ordered until it is set.",
+      detail: preview
+        ? "eSIM ordering is unavailable in this environment."
+        : esim
+          ? "Travel data plans are read live from the network, priced in naira and issued as an activation code."
+          : "eSIM ordering is not connected yet, so no plans can be ordered.",
     },
     {
       id: "proxies",
       label: "Proxies",
       state: "unavailable",
-      detail: "No proxy supplier is connected, so no proxy plan can be ordered or charged.",
+      detail: "Proxy ordering is not connected, so no proxy plan can be ordered or charged.",
     },
     {
       id: "email",
@@ -80,19 +82,19 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
       state: accounts ? "buy" : "paused",
       detail: accounts
         ? "Live marketplace listings can be bought from your wallet."
-        : "The marketplace is browsable when a supplier key is set; without one it has nothing to show.",
+        : "Marketplace ordering is not connected, so there are no available listings to buy.",
     },
     {
       id: "subscriptions",
       label: "Subscriptions",
       state: "unavailable",
-      detail: "No subscription supplier is connected. Prices here are examples, not offers.",
+      detail: "Subscriptions cannot be ordered yet. Prices here are examples, not offers.",
     },
     {
       id: "data",
       label: "Mobile data",
       state: "unavailable",
-      detail: "Data plans are catalogued, but no supplier is connected to deliver them.",
+      detail: "Data plans are catalogued, but ordering is not connected yet.",
     },
     {
       id: "tools",
@@ -113,7 +115,7 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
         id: category.id,
         label: category.label,
         state: "unavailable",
-        detail: "No supplier integration exists for this category yet.",
+        detail: "Ordering is not available for this category yet.",
       });
     }
   }

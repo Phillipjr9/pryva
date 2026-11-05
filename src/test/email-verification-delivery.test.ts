@@ -33,11 +33,9 @@ vi.mock("@/db", () => ({
 import { issueEmailVerification } from "@/lib/email-verification";
 
 function stubProvider(status: number, body: unknown) {
-  const fetchMock = vi.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    text: async () => (typeof body === "string" ? body : JSON.stringify(body)),
-  } as Response);
+  const fetchMock = vi.fn().mockResolvedValue(new Response(
+    typeof body === "string" ? body : JSON.stringify(body), { status },
+  ));
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
@@ -63,6 +61,13 @@ describe("issuing a verification link", () => {
     });
   });
 
+  it("does not claim success for a malformed provider response", async () => {
+    stubProvider(200, {});
+    const result = await issueEmailVerification("u1", "ada@example.com", "Ada");
+    expect(result.delivered).toBe(false);
+    expect(result.detail).toContain("did not confirm");
+  });
+
   it("stores the token before it tries to send, so a failed send is retryable", async () => {
     stubProvider(500, {});
     await issueEmailVerification("u1", "ada@example.com", "Ada");
@@ -70,7 +75,7 @@ describe("issuing a verification link", () => {
     expect(writes.inserts).toBe(1); // the new one exists regardless
   });
 
-  it("surfaces the provider's own refusal instead of swallowing it", async () => {
+  it("surfaces the refusal without leaking the provider body", async () => {
     stubProvider(403, {
       statusCode: 403,
       message: "You can only send testing emails to your own email address.",
@@ -80,7 +85,7 @@ describe("issuing a verification link", () => {
 
     expect(result.delivered).toBe(false);
     expect(result.detail).toContain("403");
-    expect(result.detail).toContain("testing emails");
+    expect(result.detail).not.toContain("testing emails");
   });
 
   it("keeps a refusal readable when the provider answers with plain text", async () => {

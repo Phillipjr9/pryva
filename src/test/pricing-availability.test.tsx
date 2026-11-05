@@ -26,7 +26,7 @@ const NOTE = "This plan cannot be delivered yet, so it cannot be ordered or char
  * so the "one action or one note per card" rule below still holds; only the
  * wording of the eSIM dead end changes.
  */
-const LIVE_ESIM_NOTE = "Live eSIM plans are priced per destination";
+const LIVE_ESIM_NOTE = "Example only — not orderable. See current eSIM plans";
 // email-otp is absent: a temporary inbox is free, so it has no plans to price
 // and no group on this page. Pinned explicitly below.
 const PRICED_SERVICES = ["numbers", "esim", "proxies"];

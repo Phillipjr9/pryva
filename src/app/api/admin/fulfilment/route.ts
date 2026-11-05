@@ -7,6 +7,7 @@ import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/li
 import { manualWarrantyDays } from "@/lib/manual-catalog";
 import { MANUAL_PROVIDER, MAX_QUEUE_ITEMS, QUEUE_STATUSES, quantityFromPlanLabel } from "@/lib/fulfilment-queue";
 import { logger } from "@/lib/logger";
+import { scheduleWalletEmails } from "@/lib/schedule-wallet-emails";
 import { isSameOriginMutation } from "@/lib/net";
 import { recordAdminAction } from "@/lib/admin-audit";
 
@@ -196,6 +197,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "That order has already been fulfilled or changed" }, { status: 409 });
     }
 
+    // Delivery queues its customer email in the same update; nudge it after commit.
+    scheduleWalletEmails();
     // The count is logged; the credentials never are.
     logger.info("Hand-sourced order delivered", { reference: order.reference, items: credentials.length });
     await recordAdminAction({
