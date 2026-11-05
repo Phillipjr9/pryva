@@ -136,7 +136,7 @@ export async function issueEmailVerification(
 
 export async function confirmEmailVerification(
   token: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {
   if (typeof token !== "string" || token.length < 20 || token.length > 200) {
     return { ok: false, error: VERIFY_INVALID_MESSAGE };
   }
@@ -167,5 +167,9 @@ export async function confirmEmailVerification(
       .set({ usedAt: new Date() })
       .where(eq(emailVerificationTokens.id, row.id));
   });
-  return { ok: true };
+  // The user id is returned so the caller can send the receipt and the welcome
+  // without a second lookup. They are deliberately *not* sent from inside the
+  // transaction above: mail latency and provider failures have no business
+  // holding a row lock on the account that was just verified.
+  return { ok: true, userId: row.userId };
 }

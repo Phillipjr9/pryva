@@ -117,6 +117,40 @@ export const emailDeliveryEvents = pgTable(
   ],
 );
 
+/**
+ * The two emails a new account receives exactly once: the verification receipt
+ * and the welcome.
+ *
+ * The unique `(user_id, kind)` index is the duplicate guard, not the code around
+ * it. Both sends hang off `users.email_verified_at` becoming non-null, and two
+ * callers can reach that state at the same moment -- the token confirm route and
+ * the resend route's "already verified" branch. A race can therefore cost a
+ * duplicate insert attempt, never a duplicate email in somebody's inbox.
+ *
+ * See `migrations/0032_welcome_verified_emails.sql`.
+ */
+export const onboardingEmailLog = pgTable(
+  "onboarding_email_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** `verified` (the receipt) or `welcome` (the introduction). */
+    kind: varchar("kind", { length: 24 }).notNull(),
+    /** `pending`, `accepted`, or `refused`. */
+    status: varchar("status", { length: 24 }).notNull().default("pending"),
+    providerMessageId: varchar("provider_message_id", { length: 100 }),
+    detail: varchar("detail", { length: 200 }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("onboarding_email_log_user_kind_idx").on(table.userId, table.kind),
+    index("onboarding_email_log_created_idx").on(table.createdAt),
+  ],
+);
+
 export const accountDeletions = pgTable(
   "account_deletions",
   {

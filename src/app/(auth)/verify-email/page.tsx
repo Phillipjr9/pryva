@@ -170,7 +170,8 @@ function VerifyEmail() {
         <>
           <h1 className="text-xl font-semibold text-slate-900">Email confirmed</h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            Your address is verified. You can close this tab.
+            Your address is verified. We have emailed you a receipt, and a welcome with everything
+            your account can do. You can close this tab.
           </p>
           <div className="mt-5">
             <Link className={button} href="/dashboard">

@@ -179,6 +179,7 @@ beforeAll(async () => {
   await pg.exec(await readFile("migrations/0029_notification_gaps.sql", "utf8"));
   await pg.exec(await readFile("migrations/0030_payout_name_approvals.sql", "utf8"));
   await pg.exec(await readFile("migrations/0031_email_delivery_events.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0032_welcome_verified_emails.sql", "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
   [purchaseRoute, refundRoute, bankRoute, verifyBankRoute, googleRoute, contactRoute, deleteRoute, passwordRoute, sessionsRoute, autoRefund, giftPurchaseRoute, giftCheckRoute, giftRedeemRoute, topUpRoute, verifyTopUpRoute, webhookRoute, profileRoute, notificationsRoute, markReadRoute, logoutRoute, syncRoute, scheduledRoute, promoRoute, withdrawalRoute, adminWithdrawalRoute, integrity] = await Promise.all([

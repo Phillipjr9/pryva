@@ -7,6 +7,7 @@ import {
 } from "@/lib/email-verification";
 import { isSameOriginMutation } from "@/lib/net";
 import { resendConfigured } from "@/lib/resend-config";
+import { scheduleOnboardingEmails } from "@/lib/onboarding-emails";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (user.emailVerifiedAt) {
+      /*
+       * Already verified, so there is no link to send -- but this is also the one
+       * screen an unverified-looking customer returns to, which makes it the
+       * cheapest place to repair a sequence that never finished. Somebody whose
+       * receipt and welcome were lost to an outage or a missing table ends up
+       * here asking why they cannot withdraw; pressing the button now posts the
+       * two missing emails instead of a dead end.
+       *
+       * Duplicates are impossible: the send is keyed on `(user_id, kind)` with a
+       * unique index, so an account that already has both gets nothing at all.
+       * Scheduled after the response for the same reason the confirm route does.
+       */
+      scheduleOnboardingEmails(user.id);
       return NextResponse.json({ ok: true, alreadyVerified: true });
     }
 

@@ -78,7 +78,11 @@ describe("the nightly job calls the processor", () => {
   it("reports it in the run summary, so a failed step is visible in the cron response", () => {
     expect(source).toContain("scheduled.ok");
     expect(source).toContain("scheduled: scheduled.detail");
-    expect(source).toContain("steps: { close, emails, boosts, numberCodes, refunds, esim, scheduled, rentals, referrals, retention }");
+    // The `scheduled-orders` step must still be in the summary; the exact string is
+    // asserted around it so adding a step (onboarding-emails) does not read as a
+    // regression in the schedule wiring this file is about.
+    expect(source).toMatch(/steps: \{[^}]*scheduled[^}]*\}/);
+    expect(source).toContain("scheduled: scheduled.detail");
   });
 
   it("runs it after the refund sweep, so an order it creates is not swept by the same run", () => {
