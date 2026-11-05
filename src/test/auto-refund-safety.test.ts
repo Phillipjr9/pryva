@@ -24,7 +24,7 @@ beforeAll(async () => {
     passwordHash: "test-hash", walletBalance: 25_000,
   });
   const base = {
-    userId: "refund-fixture-user", service: "numbers", productSlug: "vn-ng",
+    userId: "refund-fixture-user", service: "numbers" as const, productSlug: "vn-ng",
     productName: "Fixture", planLabel: "Single", region: "Nigeria", amount: 1000,
     status: "active", provider: "fleexa", createdAt: new Date(Date.now() - 60 * 60_000),
     refundedAt: null,

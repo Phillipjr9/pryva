@@ -65,7 +65,7 @@ const post = (body: unknown, json = true) => new NextRequest(`${ORIGIN}/api/admi
 async function makeOrder(overrides: Record<string, unknown> = {}) {
   const id = randomUUID();
   await database.db.insert(schema.orders).values({
-    id, userId: customerId, reference: `PRYVA-${id.slice(0, 8).toUpperCase()}`, service: "digital",
+    id, userId: customerId, reference: `PRYVA-${id.slice(0, 8).toUpperCase()}`, service: "accounts",
     productSlug: NETFLIX_SLUG, productName: "Netflix Standard (1080p)", planLabel: "3 × account",
     region: "Global", duration: "120 days", amount: 15000, status: "processing", provider: "manual",
     ...overrides,

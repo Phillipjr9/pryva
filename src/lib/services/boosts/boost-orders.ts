@@ -5,6 +5,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
 import { orders, type Order } from "@/db/schema";
+import { SMM_PROVIDER } from "@/lib/services/order-providers";
 import { findBoostListing } from "@/lib/services/boosts/smm-catalog";
 import { addSmmOrder, isSmmPanelConfigured, SmmPanelError } from "@/lib/providers/smm-panel";
 import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
@@ -124,7 +125,7 @@ export async function placeBoostOrder(input: {
         // Nothing has been delivered yet: this is the state that says "the
         // supplier has not confirmed", not "the customer owns this".
         status: "processing",
-        provider: "smm",
+        provider: SMM_PROVIDER,
         targetLink: input.link,
         quantity: input.quantity,
       });

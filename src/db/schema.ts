@@ -1,4 +1,6 @@
 import { sql } from "drizzle-orm";
+
+import type { OrderServiceTag } from "@/lib/services/registry";
 import {
   bigint,
   boolean,
@@ -267,7 +269,7 @@ export const orders = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    service: varchar("service", { length: 40 }).notNull(),
+    service: varchar("service", { length: 40 }).$type<OrderServiceTag>().notNull(),
     productSlug: varchar("product_slug", { length: 80 }).notNull(),
     productName: varchar("product_name", { length: 160 }).notNull(),
     planLabel: varchar("plan_label", { length: 120 }).notNull(),
@@ -542,7 +544,7 @@ export const scheduledOrders = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    service: varchar("service", { length: 40 }).notNull(),
+    service: varchar("service", { length: 40 }).$type<OrderServiceTag>().notNull(),
     productSlug: varchar("product_slug", { length: 80 }).notNull(),
     frequency: varchar("frequency", { length: 24 }).notNull(),
     nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull(),
@@ -784,7 +786,7 @@ export const productReviews = pgTable(
     orderId: uuid("order_id")
       .notNull()
       .references(() => orders.id, { onDelete: "cascade" }),
-    service: varchar("service", { length: 40 }).notNull(),
+    service: varchar("service", { length: 40 }).$type<OrderServiceTag>().notNull(),
     productName: varchar("product_name", { length: 160 }).notNull(),
     rating: integer("rating").notNull(),
     headline: varchar("headline", { length: 80 }),

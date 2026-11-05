@@ -16,6 +16,7 @@ import { isMarketplaceCheckoutConfigured } from "@/lib/services/accounts/marketp
 import { isManualFulfilmentReachable } from "@/lib/services/accounts/manual-fulfilment";
 import { isManualSlug } from "@/lib/services/accounts/manual-catalog";
 import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
+import { ACCOUNTS_PROVIDER, MANUAL_PROVIDER } from "@/lib/services/order-providers";
 import { validatePromo } from "@/lib/providers/accszone";
 import { usdCents } from "@/lib/payments/supplier-money";
 import { fulfilmentLabel } from "@/lib/services/warranty";
@@ -258,7 +259,7 @@ export async function POST(request: NextRequest) {
         // A hand-sourced order makes no supplier call, so it carries its own
         // provider value: the unresolved-purchase guard above exists to stop a
         // second automated supplier request and must not block these.
-        provider: isManual ? "manual" : "accounts",
+        provider: isManual ? MANUAL_PROVIDER : ACCOUNTS_PROVIDER,
         providerRequestId: isManual ? null : clientReference,
       }).returning({ id: orders.id });
       if (!created) throw new Error("Order insert failed");

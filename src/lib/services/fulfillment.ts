@@ -16,7 +16,8 @@ import {
   otpSupplierOrder,
 } from "@/lib/services/numbers/otp-suppliers";
 import { checkMargin, MARGIN_BLOCKED_MESSAGE } from "@/lib/services/margin-guard";
-import { SERVICE_TIMEOUTS } from "@/lib/services/service-timeouts";
+import { deliveryWindowMs } from "@/lib/services/registry";
+import { LIVE_OTP_PROVIDER, type OrderProvider } from "@/lib/services/order-providers";
 
 export type FulfilledOrder = {
   /**
@@ -24,7 +25,7 @@ export type FulfilledOrder = {
    * caller must record this rather than assume: it is also what decides which
    * supplier a later cancel has to ask.
    */
-  provider: "fleexa" | "bitcall";
+  provider: OrderProvider;
   /** Charged cost where the provider reports one, else the pre-spend quote. */
   providerCostNgn: number | null;
   providerRequestId: string | null;
@@ -246,7 +247,7 @@ async function fulfillNumber(plan: Plan, intent: SmsIntent): Promise<FulfilledOr
         referenceCode: bought.number,
         // The code arrives later; the order page polls for it.
         otpCode: null,
-        expiresAt: providerExpiry(bought.expiresAt, SERVICE_TIMEOUTS.numbers.delivery),
+        expiresAt: providerExpiry(bought.expiresAt, deliveryWindowMs("numbers")),
         serviceLabel: bought.app,
       };
     } catch (error) {
@@ -298,7 +299,7 @@ async function fulfillRental(plan: Plan, intent: RentalIntent): Promise<Fulfille
   const rental = await buyFleexaRental({ area: area.id, months: intent.months });
   const quotedRentalCost = area.pricePerMonthNgn != null ? area.pricePerMonthNgn * intent.months : null;
   return {
-    provider: "fleexa",
+    provider: LIVE_OTP_PROVIDER,
     providerCostNgn: quotedRentalCost,
     providerRequestId: rental.rentalId,
     referenceCode: rental.number,

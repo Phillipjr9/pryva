@@ -92,7 +92,7 @@ describe("Catalog Extended", () => {
     });
 
     it("should have valid service references", () => {
-      const serviceSlugs = new Set(services.map((s) => s.slug));
+      const serviceSlugs = new Set<string>(services.map((s) => s.slug));
       plans.forEach((plan) => {
         expect(serviceSlugs.has(plan.service)).toBe(true);
       });

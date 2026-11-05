@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { cancelUpstream } from "@/lib/services/fulfillment";
 import { flagReconciliation } from "@/lib/services/reconciliation";
-import { SERVICE_TIMEOUTS } from "@/lib/services/service-timeouts";
+import { deliveryWindowMs } from "@/lib/services/registry";
 import { isUndeliveredSingleNumber, SINGLE_NUMBER_WINDOW } from "@/lib/services/refund-policy";
 
 /**
@@ -21,7 +21,7 @@ import { isUndeliveredSingleNumber, SINGLE_NUMBER_WINDOW } from "@/lib/services/
  * refund: recovering our cost is our problem, the customer's money is theirs.
  */
 export async function processAutoRefunds(): Promise<{ refunded: number; cancelled: number }> {
-  const cutoff = new Date(Date.now() - SERVICE_TIMEOUTS.numbers.delivery);
+  const cutoff = new Date(Date.now() - deliveryWindowMs("numbers"));
   const eligible = and(
     eq(orders.status, "active"),
     eq(orders.service, "numbers"),

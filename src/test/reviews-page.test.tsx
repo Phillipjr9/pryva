@@ -59,7 +59,7 @@ async function seed() {
 
   const base = {
     userId: buyer,
-    service: "numbers",
+    service: "numbers" as const,
     productName: "US virtual number",
     rating: 5,
     moderatorNote: null,

@@ -2,24 +2,22 @@ import { plans, type Plan } from "@/lib/services/catalog";
 import { EXPLORER_COUNTRIES, type ExplorerCountry } from "@/lib/content/explorer-countries";
 import type { AirtimeProvider } from "@/lib/services/data/airtime";
 import type { BrandSlug } from "@/lib/content/brand-marks";
+import { SERVICES, type ServiceId } from "@/lib/services/registry";
 
 /**
- * Platform vocabularies below classify supplier listings. They are not offerings.
+ * The hub's shelves, from the registry rather than a second list.
+ *
+ * A category that exists here but not in the registry (or the other way round)
+ * is a card nobody can open, so the order and the wording have exactly one home.
  */
-export const EXPLORER_CATEGORIES = [
-  { id: "verification", label: "App verification", description: "SMS codes for apps" },
-  { id: "social", label: "Social promotion", description: "Followers, likes & views" },
-  { id: "numbers", label: "Number plans", description: "Single-use & rentals" },
-  { id: "esim", label: "eSIM", description: "Travel data plans" },
-  { id: "proxies", label: "Proxies", description: "Residential traffic" },
-  { id: "email", label: "Email OTP", description: "Temporary inboxes" },
-  { id: "accounts", label: "Digital accounts", description: "Account marketplace" },
-  { id: "subscriptions", label: "Subscriptions", description: "Entertainment & tools" },
-  { id: "data", label: "Mobile data", description: "Local network plans" },
-  { id: "tools", label: "Order tools", description: "Bulk & scheduled orders" },
-] as const;
+export const EXPLORER_CATEGORIES: ReadonlyArray<{
+  id: ServiceId;
+  label: string;
+  description: string;
+}> = SERVICES.map(({ id, label, description }) => ({ id, label, description }));
 
-export type ExplorerCategory = (typeof EXPLORER_CATEGORIES)[number]["id"];
+export type ExplorerCategory = ServiceId;
+/** Platform vocabularies classify supplier listings. They are not offerings. */
 export type ExplorerFilter = ExplorerCategory | "all";
 export type ExplorerArtwork =
   | { kind: "brand"; name: BrandSlug | "disney-plus" }

@@ -1,5 +1,6 @@
 import { CATALOG_PRICES } from "@/lib/services/prices.generated";
 import { missingPriceError } from "@/lib/services/pricing-diagnostics";
+import type { OrderServiceTag } from "@/lib/services/registry";
 
 export type ServiceSlug =
   | "numbers"
@@ -16,7 +17,11 @@ export type ServiceKey = ServiceSlug;
 
 export type Plan = {
   slug: string;
-  service: ServiceSlug;
+  /**
+   * What an order for this plan records. Narrower than `ServiceSlug`, which is
+   * the price-book vocabulary and also names pages that sell no plan at all.
+   */
+  service: OrderServiceTag;
   name: string;
   planLabel: string;
   region: string;
