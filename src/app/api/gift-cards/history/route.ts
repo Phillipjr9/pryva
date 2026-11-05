@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserGiftCards } from "@/lib/services/gift-cards/gift-cards";
+import { getUserGiftCards } from "@/lib/services/gift-cards/credit";
 import { requireAuthApi } from "@/lib/identity/auth";
 
 export const dynamic = "force-dynamic";

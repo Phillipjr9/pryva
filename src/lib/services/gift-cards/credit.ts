@@ -1,3 +1,17 @@
+/**
+ * Pryva gift cards: wallet credit issued and redeemed by this application.
+ *
+ * This is one of *two* different products that are both called "gift cards".
+ * This one has no supplier: `createGiftCard` mints a code, debits the buyer and
+ * credits whoever redeems it. The other (`brand-catalog.ts`, sold through
+ * `/api/gift-cards/order`) is a third-party voucher bought from a supplier and
+ * delivered as a code. Keeping them in one namespace used to make a reader guess
+ * which money path a route belonged to, so each module now says which it is:
+ *
+ *   credit*  — Pryva-issued wallet credit   (`/api/gift-cards/purchase`)
+ *   brand*   — supplier vouchers            (`/api/gift-cards/order`)
+ */
+
 import { db } from "@/db";
 import { giftCards, users, walletTransactions } from "@/db/schema";
 import { eq, and, gte, gt, ne, sql } from "drizzle-orm";
@@ -7,7 +21,7 @@ import {
   GIFT_CARD_MAX_AMOUNT,
   GIFT_CARD_MIN_AMOUNT,
   GIFT_CARD_VALIDITY_MONTHS,
-} from "@/lib/services/gift-cards/gift-card-rules";
+} from "@/lib/services/gift-cards/credit-rules";
 
 export function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
