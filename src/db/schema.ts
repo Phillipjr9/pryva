@@ -92,6 +92,31 @@ export const webhookEvents = pgTable(
   ],
 );
 
+/**
+ * What Resend reported happened to a message after we handed it over.
+ *
+ * Mirrors `webhookEvents` on the payment side. See
+ * `migrations/0031_email_delivery_events.sql` for why "sent" is not "delivered".
+ */
+export const emailDeliveryEvents = pgTable(
+  "email_delivery_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    providerEventId: varchar("provider_event_id", { length: 100 }),
+    event: varchar("event", { length: 60 }).notNull(),
+    messageId: varchar("message_id", { length: 100 }),
+    recipientDomain: varchar("recipient_domain", { length: 200 }),
+    signatureValid: boolean("signature_valid").notNull(),
+    outcome: varchar("outcome", { length: 40 }).notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("email_delivery_events_provider_event_idx").on(table.providerEventId),
+    index("email_delivery_events_received_idx").on(table.receivedAt),
+    index("email_delivery_events_message_idx").on(table.messageId),
+  ],
+);
+
 export const accountDeletions = pgTable(
   "account_deletions",
   {
