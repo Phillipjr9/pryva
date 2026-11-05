@@ -42,6 +42,21 @@ function delivery(overrides: Partial<Parameters<typeof makeEsimDeliveryEmail>[0]
 }
 
 describe("the eSIM delivery email itself", () => {
+  it("does not claim a QR was attached when there is no attachment", () => {
+    const email = delivery({ attachment: null });
+    expect(email.text).not.toContain("QR code attached to this email");
+    expect(email.text).toContain("View the QR code on your order page");
+    expect(email.html).toContain("Open your order page to view the QR code");
+    expect(email.attachments).toBeUndefined();
+  });
+
+  it("points customers to help without assuming the sender inbox is monitored", () => {
+    const email = delivery();
+    expect(email.text).toContain("/help");
+    expect(email.html).toContain("/help");
+    expect(email.text + email.html).not.toMatch(/reply to this email/i);
+  });
+
   it("carries the QR, the code and the install steps", () => {
     const email = delivery();
 
@@ -54,9 +69,13 @@ describe("the eSIM delivery email itself", () => {
     expect(email.attachments).toEqual([
       { filename: "pryva-esim-qr.png", content: "iVBORw0KGgo=", content_id: "esim-qr" },
     ]);
-    // The design is dimensional, but still degradable: no scripts, no remote images.
+    // The separate decorative hero has alt text; the product QR is an attachment.
     expect(email.html).not.toContain("<script");
     expect(email.html).toContain("linear-gradient");
+    expect(email.html).toContain("/images/email/hero-esim-delivery.jpg");
+    expect(email.html).toContain('alt="An eSIM ready to install"');
+    expect(email.html).toContain("width:100%;max-width:600px;table-layout:fixed");
+    expect(email.html).toContain("width:100%;max-width:220px;height:auto");
   });
 
   it("stays inside what the outbox accepts, and escapes what it is given", () => {
@@ -113,7 +132,7 @@ describe("queueing the email when an eSIM is handed over", () => {
       "0021_referrals.sql", "0022_fraud.sql", "0023_boost_orders.sql", "0024_account_deletions.sql",
       "0025_account_deletion_forfeiture.sql", "0026_webhook_events.sql", "0027_esim_credentials.sql",
       "0028_esim_delivery_email.sql", "0029_notification_gaps.sql", "0030_payout_name_approvals.sql",
-      "0031_email_delivery_events.sql", "0032_welcome_verified_emails.sql", "0033_account_activity_emails.sql",
+      "0031_email_delivery_events.sql", "0032_welcome_verified_emails.sql", "0033_account_activity_emails.sql", "0034_customer_activity_emails.sql",
     ]) {
       await pg.exec(await readFile(`migrations/${file}`, "utf8"));
     }

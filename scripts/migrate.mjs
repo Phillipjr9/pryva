@@ -2,24 +2,18 @@
 // Applies every top-level migration in migrations/ to the configured database,
 // in filename order, stopping on the first error.
 //
-// Why this exists: the repository shipped eleven migrations and no way to run
-// them. migrations/README.md documented six, so a fresh production database
-// built by following the README was silently missing order idempotency, the
-// provider cost column, and the password reset token table -- each of which
-// fails at query time rather than at setup time, long after the operator
-// believes the deploy succeeded.
-//
+// The schema_migrations ledger records each successfully applied file. Back up
+// the database and review migrations for compatibility with the old live app.
 // Files under migrations/legacy/ are deliberately excluded: they assume tables
-// that no migration in this repository creates. See migrations/README.md.
+// that no migration in this repository creates. See OPERATIONS.txt.
 //
 // Usage:
 //   DATABASE_URL=postgres://... npm run db:migrate
 //
-// Without DATABASE_URL the connection is built from the standard libpq
-// variables (PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE, PGSSLMODE), which
-// is what the Vercel AWS integration provides. Note that IAM-authenticated RDS
-// has no PGPASSWORD and is not supported by this script or by src/db/index.ts;
-// a password-authenticated database role is required.
+// Without DATABASE_URL, use the standard libpq variables. For IAM-authenticated
+// RDS, when PGPASSWORD is absent and PGHOST, PGUSER, AWS_REGION and
+// AWS_ROLE_ARN are present, the runner mints a token through Vercel OIDC.
+// Running that path locally also requires a valid VERCEL_OIDC_TOKEN.
 
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";

@@ -80,8 +80,8 @@ describe("the number stays on the server", () => {
     expect(dangerZone).not.toContain("@/lib/retention");
   });
 
-  it("says in the docs that the horizon is a policy the owner set", () => {
+  it("records in the server-only policy that the horizon was chosen by the owner", () => {
     // The decision is dated so a future session knows it was chosen, not assumed.
-    expect(read("STATUS.md")).toContain("ten years");
+    expect(read("src/lib/retention.ts")).toContain("owner's decision (31 Oct 2026)");
   });
 });

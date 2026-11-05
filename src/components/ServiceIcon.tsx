@@ -34,8 +34,8 @@ interface ServiceIconProps {
  * generated illustration never can. Pryva's own catalogue below keeps the 3D
  * artwork, because there is no "real" logo for "virtual numbers" — and the
  * marks it could claim (Gmail, Outlook, the carriers) belong to services the
- * customer brings, not to the Pryva product being described. `STATUS.md` §17
- * records the audited list of which surface shows what, and why.
+ * customer brings, not to the Pryva product being described. The mapping and
+ * customer-facing surfaces are pinned by src/test/service-logos.test.tsx.
  */
 const digitalServiceBrands: Record<DigitalServiceType, BrandIconProps["brand"]> = {
   netflix: "netflix",

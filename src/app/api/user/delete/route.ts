@@ -6,6 +6,7 @@ import { db } from "@/db";
 import {
   accountDeletions,
   emailVerificationTokens,
+  emailChangeRequests,
   giftCards,
   orders,
   passwordResetTokens,
@@ -17,6 +18,7 @@ import {
   twoFactorRecoveryCodes,
   userTwoFactor,
   users,
+  walletEmailOutbox,
   walletTransactions,
   webauthnCredentials,
   withdrawals,
@@ -313,6 +315,11 @@ export async function POST(request: NextRequest) {
       await tx.delete(twoFactorChallenges).where(eq(twoFactorChallenges.userId, user.id));
       await tx.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, user.id));
       await tx.delete(emailVerificationTokens).where(eq(emailVerificationTokens.userId, user.id));
+      await tx.delete(emailChangeRequests).where(eq(emailChangeRequests.userId, user.id));
+      // Notification snapshots can contain the former address and, for service
+      // deliveries, credentials. Keep the financial ledger, not its mail copies.
+      // An already in-flight provider request cannot be recalled here.
+      await tx.delete(walletEmailOutbox).where(eq(walletEmailOutbox.userId, user.id));
 
       await tx.insert(accountDeletions).values({
         userId: user.id,

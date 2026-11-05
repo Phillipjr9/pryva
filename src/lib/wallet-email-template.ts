@@ -3,7 +3,7 @@ import { brandedNotificationEmail } from "@/lib/email-templates";
 export type WalletEmailEvent =
   | { kind: "wallet"; type: string; amount: number; reference: string; description: string; createdAt: Date }
   | { kind: "withdrawal_processing" | "withdrawal_completed" | "withdrawal_rejected" | "withdrawal_failed" | "purchase_completed"; amount: number; reference: string; createdAt: Date }
-  | { kind: "first_purchase"; amount: number; reference: string; description: string; productName: string | null; createdAt: Date }
+  | { kind: "first_purchase" | "purchase_recorded"; amount: number; reference: string; description: string; productName: string | null; createdAt: Date }
   | { kind: "bank_linked"; bankName: string; lastFour: string | null; createdAt: Date };
 
 /** Resend accepts inline attachments as base64 with a content ID. */
@@ -24,11 +24,11 @@ function clean(value: string, max: number): string {
 /** Only server-generated references can leave the app. Gift-card references are redeemable codes. */
 function safeReference(event: Exclude<WalletEmailEvent, { kind: "bank_linked" }>): string | null {
   const value = event.reference;
-  if ((event.kind === "wallet" || event.kind === "first_purchase") && /gift\s*card/i.test(event.description)) return null;
+  if ((event.kind === "wallet" || event.kind === "first_purchase" || event.kind === "purchase_recorded") && /gift\s*card/i.test(event.description)) return null;
   if (event.kind === "wallet" && event.type === "credit" && event.description === "Paystack wallet top-up" && /^TOP-[a-f0-9]{24}$/i.test(value)) return value;
   if ((event.kind.startsWith("withdrawal_") || (event.kind === "wallet" && event.type === "withdrawal")) && /^WD-[a-f0-9]{24}$/i.test(value)) return value;
-  if ((event.kind === "purchase_completed" || event.kind === "first_purchase") && /^MKT-[a-f0-9]{28}$/i.test(value)) return value;
-  if (event.kind === "first_purchase" && /^(?:PRY|GC|BLK)-[a-z0-9]{21}$/i.test(value)) return value;
+  if ((event.kind === "purchase_completed" || event.kind === "first_purchase" || event.kind === "purchase_recorded") && /^MKT-[a-f0-9]{28}$/i.test(value)) return value;
+  if ((event.kind === "first_purchase" || event.kind === "purchase_recorded") && /^(?:PRY|GC|BLK)-[a-z0-9]{21}$/i.test(value)) return value;
   if (event.kind === "wallet" && event.type === "refund" && /^(?:RFD|RWD|REF)-[a-f0-9]{24}$/i.test(value)) return value;
   return null;
 }
@@ -61,7 +61,7 @@ export function makeWalletEmail(event: WalletEmailEvent, recipient: string, send
   let title: string;
   let intro: string;
   let eyebrow = "Wallet activity";
-  let hero: "wallet" | "withdrawal" | "order" | "refund" = "wallet";
+  let hero: "wallet" | "withdrawal" | "order" | "refund" | "purchase-receipt" = "wallet";
   let amountLabel = "Amount";
   let ctaPath = "/dashboard/wallet";
   let ctaLabel = "View my wallet";
@@ -111,6 +111,15 @@ export function makeWalletEmail(event: WalletEmailEvent, recipient: string, send
     amountLabel = "Purchase amount";
     ctaPath = "/dashboard";
     ctaLabel = "Open my account";
+  } else if (event.kind === "purchase_recorded") {
+    subject = "Your purchase was recorded";
+    title = "Your purchase is recorded";
+    intro = "We recorded your paid purchase. Sign in for its current order and delivery status; this email does not confirm delivery.";
+    eyebrow = "Purchase receipt";
+    hero = "purchase-receipt";
+    amountLabel = "Purchase amount";
+    ctaPath = /^Gift card purchase:/i.test(event.description) ? "/dashboard/gift-cards" : "/dashboard/orders";
+    ctaLabel = /^Gift card purchase:/i.test(event.description) ? "View gift cards" : "View my orders";
   } else if (event.kind === "purchase_completed") {
     subject = "Purchase marked delivered";
     title = "Your purchase was marked delivered";
@@ -144,7 +153,7 @@ export function makeWalletEmail(event: WalletEmailEvent, recipient: string, send
   }
 
   const rows = [{ label: amountLabel, value: `₦${event.amount.toLocaleString("en-NG")}` }];
-  if (event.kind === "first_purchase" && event.productName) rows.unshift({ label: "Product", value: clean(event.productName, 120) });
+  if ((event.kind === "first_purchase" || event.kind === "purchase_recorded") && event.productName) rows.unshift({ label: "Product", value: clean(event.productName, 120) });
   const reference = safeReference(event);
   if (reference) rows.push({ label: "Reference", value: reference });
   rows.push({ label: "Recorded", value: recorded });

@@ -181,6 +181,7 @@ beforeAll(async () => {
   await pg.exec(await readFile("migrations/0031_email_delivery_events.sql", "utf8"));
   await pg.exec(await readFile("migrations/0032_welcome_verified_emails.sql", "utf8"));
   await pg.exec(await readFile("migrations/0033_account_activity_emails.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0034_customer_activity_emails.sql", "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
   [purchaseRoute, refundRoute, bankRoute, verifyBankRoute, googleRoute, contactRoute, deleteRoute, passwordRoute, sessionsRoute, autoRefund, giftPurchaseRoute, giftCheckRoute, giftRedeemRoute, topUpRoute, verifyTopUpRoute, webhookRoute, profileRoute, notificationsRoute, markReadRoute, logoutRoute, syncRoute, scheduledRoute, promoRoute, withdrawalRoute, adminWithdrawalRoute, integrity] = await Promise.all([
@@ -760,6 +761,9 @@ describe("Google subject binding and account protection", () => {
     await database.insert(schema.walletTransactions).values({ userId: USER, type: "debit", amount: 1000, balanceAfter: 9000, description: "Order ORDER-1", reference: "LEDGER-1" });
     await database.insert(schema.sessions).values({ userId: USER, token: "current-token", expiresAt: new Date(Date.now() + 60_000), createdAt: new Date() });
     await database.insert(schema.passwordResetTokens).values({ userId: USER, tokenHash: "deadbeef", expiresAt: new Date(Date.now() + 60_000) });
+    await database.insert(schema.emailChangeRequests).values({ userId: USER, newEmail: "new-address@example.com", tokenHash: "changehash", expiresAt: new Date(Date.now() + 60_000) });
+    await database.insert(schema.webauthnCredentials).values({ userId: USER, credentialId: "sensitive-credential", publicKey: "AQID", counter: 0 });
+    expect(await database.select().from(schema.walletEmailOutbox)).not.toHaveLength(0);
     await database.update(schema.users).set({ walletBalance: 0 }).where(eq(schema.users.id, USER));
     mocks.user.mockResolvedValue({ id: USER, email: "buyer@example.com", name: "Buyer", walletBalance: 0 });
     mocks.cookies.mockResolvedValue({ get: (name: string) => name === "pryva_session" ? { value: "current-token" } : undefined });
@@ -789,6 +793,10 @@ describe("Google subject binding and account protection", () => {
     // Credentials and devices are gone.
     expect(await database.select().from(schema.sessions)).toHaveLength(0);
     expect(await database.select().from(schema.passwordResetTokens)).toHaveLength(0);
+    expect(await database.select().from(schema.emailChangeRequests)).toHaveLength(0);
+    expect(await database.select().from(schema.webauthnCredentials)).toHaveLength(0);
+    // No false removal alert or retained delivery payload with the old address.
+    expect(await database.select().from(schema.walletEmailOutbox)).toHaveLength(0);
 
     // The record is not: this is the whole point of closing, not deleting.
     expect(await database.select().from(schema.orders)).toHaveLength(1);

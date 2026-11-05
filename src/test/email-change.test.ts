@@ -65,7 +65,7 @@ afterAll(async () => {
 beforeEach(async () => {
   vi.clearAllMocks();
   mocks.configured = true;
-  mocks.fetch.mockResolvedValue({ ok: true, status: 200 });
+  mocks.fetch.mockImplementation(async () => new Response(JSON.stringify({ id: "message-1" }), { status: 200 }));
   vi.stubGlobal("fetch", mocks.fetch);
   process.env.RESEND_API_KEY = "re_test";
   process.env.RESEND_FROM_EMAIL = "Pryva <hello@pryva.ng>";
@@ -84,6 +84,11 @@ describe("asking to change the address", () => {
 
     expect(result).toEqual({ ok: true, message: changes.EMAIL_CHANGE_SENT });
     expect(sentTo()).toEqual(["ada.new@example.com"]);
+    expect(mocks.fetch.mock.calls[0][1]).toMatchObject({ redirect: "error", cache: "no-store" });
+    const body = JSON.parse(mocks.fetch.mock.calls[0][1].body as string) as { html: string };
+    expect(body.html).toContain("/images/email/hero-email-confirm.jpg");
+    expect(body.html).toContain('alt="Confirm your new email address"');
+    expect(body.html).toContain("width:100%;max-width:520px;table-layout:fixed");
     const [ada] = await database.select().from(users).where(eq(users.id, ADA));
     expect(ada.email).toBe("ada@example.com");
     expect(ada.emailVerifiedAt).toBeNull();
@@ -136,6 +141,14 @@ describe("asking to change the address", () => {
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
+  it("rejects addresses that cannot fit the actual user record before sending", async () => {
+    const newEmail = `${"a".repeat(190)}@example.com`;
+    expect(newEmail.length).toBeGreaterThan(200);
+    expect(await changes.requestEmailChange({ userId: ADA, newEmail })).toMatchObject({ ok: false, status: 400 });
+    expect(mocks.fetch).not.toHaveBeenCalled();
+    expect(await database.select().from(schema.emailChangeRequests)).toHaveLength(0);
+  });
+
   it("refuses to switch without proof when mail is down", async () => {
     mocks.configured = false;
     const result = await changes.requestEmailChange({ userId: ADA, newEmail: "ada.new@example.com" });
@@ -148,6 +161,20 @@ describe("asking to change the address", () => {
     mocks.fetch.mockResolvedValue({ ok: false, status: 403 });
     const result = await changes.requestEmailChange({ userId: ADA, newEmail: "ada.new@example.com" });
     expect(result).toMatchObject({ ok: false, status: 502 });
+  });
+
+  it("does not claim acceptance without a provider message ID", async () => {
+    mocks.fetch.mockImplementation(async () => new Response("{}", { status: 200 }));
+    const result = await changes.requestEmailChange({ userId: ADA, newEmail: "ada.new@example.com" });
+    expect(result).toMatchObject({ ok: false, status: 502, error: expect.stringMatching(/couldn't confirm/i) });
+    expect(JSON.stringify(mocks.log.warn.mock.calls)).not.toContain("ada.new@example.com");
+  });
+
+  it("refuses a new request for a closed account", async () => {
+    await database.update(users).set({ deletedAt: new Date() }).where(eq(users.id, ADA));
+    const result = await changes.requestEmailChange({ userId: ADA, newEmail: "new@example.com" });
+    expect(result).toMatchObject({ ok: false, status: 404 });
+    expect(mocks.fetch).not.toHaveBeenCalled();
   });
 });
 
@@ -190,6 +217,40 @@ describe("confirming the change", () => {
 
     const [ada] = await database.select().from(users).where(eq(users.id, ADA));
     expect(ada.email).toBe("ada@example.com");
+  });
+
+  it("rolls back the address if the link is replaced between reading and spending it", async () => {
+    await changes.requestEmailChange({ userId: ADA, newEmail: "ada.new@example.com" });
+    const token = sentToken();
+    const original = database.transaction.bind(database);
+    const spy = vi.spyOn(database, "transaction").mockImplementationOnce(async (callback, config) => {
+      // Model a concurrent request replacing this link before the transaction
+      // obtains the account lock. The new request itself remains live.
+      await database.delete(schema.emailChangeRequests).where(eq(schema.emailChangeRequests.userId, ADA));
+      await database.insert(schema.emailChangeRequests).values({
+        userId: ADA, newEmail: "replacement@example.com", tokenHash: "replacement-hash",
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+      return original(callback, config);
+    });
+    try {
+      await expect(changes.confirmEmailChange(token)).resolves.toEqual({ ok: false, error: changes.EMAIL_CHANGE_INVALID });
+      const [ada] = await database.select().from(users).where(eq(users.id, ADA));
+      expect(ada.email).toBe("ada@example.com");
+      const [replacement] = await database.select().from(schema.emailChangeRequests);
+      expect(replacement.newEmail).toBe("replacement@example.com");
+      expect(replacement.consumedAt).toBeNull();
+      expect(JSON.stringify(mocks.log.warn.mock.calls)).not.toContain("ada.new@example.com");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("cannot change an account after it has been closed", async () => {
+    await changes.requestEmailChange({ userId: ADA, newEmail: "ada.new@example.com" });
+    const token = sentToken();
+    await database.update(users).set({ deletedAt: new Date() }).where(eq(users.id, ADA));
+    await expect(changes.confirmEmailChange(token)).resolves.toEqual({ ok: false, error: changes.EMAIL_CHANGE_INVALID });
   });
 
   it("refuses nonsense tokens without touching the database", async () => {

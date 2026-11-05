@@ -1,0 +1,91 @@
+PRYVA SECURITY
+==============
+
+No system is unhackable. This is a concise description of controls and known
+limits, not a penetration test or a guarantee. See OPERATIONS.txt for practical
+setup, backup, recovery, email and financial incident procedures.
+
+1. The threat model
+-------------------
+
+Protect customer identity, sessions, wallets, payout instructions, service
+credentials and support conversations against credential stuffing, stolen
+sessions, spoofed webhooks, duplicate payment or delivery requests, unsafe
+provider responses, malicious input and accidental cross-environment access.
+Operators and their sessions are high-value targets. A compromised provider key
+or production database can bypass protections that exist only in application
+code. Do not treat an unverified account or an attacker-controlled email address
+as proof of identity.
+
+2. What is implemented, and where
+---------------------------------
+
+- src/lib/account-lockout.ts and the shared rate limiter bound sign-in attempts;
+  neither alone stops a distributed attack.
+- src/lib/admin-two-factor.ts and admin authorization separate operators from
+  customers. Verified operator addresses and 2FA are required by default.
+- src/lib/security-headers.ts and src/proxy.ts apply browser security headers;
+  the CSP has deliberate limitations noted below.
+- src/lib/paystack-webhook.ts and webhook routes verify signatures; settlement,
+  refund and ledger paths use transaction and idempotency guards.
+- src/lib/daily-reconciliation.ts checks wallet history; a missing or failed
+  reconciliation is not a clean run.
+- The wallet-email outbox snapshots attempted payloads, limits retries with
+  provider idempotency, exposes failures for review and does not copy sensitive
+  support messages into notices. eSIM and number delivery emails intentionally
+  contain service secrets and must be treated as sensitive.
+- Account closure removes credentials, sessions and delivery snapshots while
+  retaining financial records. Requests already handed to a provider cannot be
+  recalled. src/lib/retention.ts describes the separately gated retention sweep.
+- scripts/backup-db.mjs and scripts/restore-db.mjs provide a second logical
+  backup/restore path; provider backups and recovery drills remain essential.
+
+3. What this pass changed
+-------------------------
+
+Actual human support replies, passkey changes and eligible later purchases now
+have event-triggered notifications and dedicated illustrations. Account closure
+clears email-change requests and delivery snapshots. Email-change confirmation
+and direct security notices distinguish a provider acceptance ID from an
+unconfirmed response. These controls do not verify production delivery.
+
+4. Known gaps
+-------------
+
+- There is no independent penetration test, comprehensive security review or
+  bug bounty. Do not interpret tests as proof against attackers.
+- Edge bot defence and a WAF are outside this repository; distributed abuse can
+  exceed per-IP controls. Review firewall and account-lockout telemetry.
+- The CSP permits unsafe-inline in places; replacing it requires a nonce-based
+  design and testing, not simply removing a directive.
+- SPF, DKIM and DMARC depend on the sending domain's DNS and provider settings;
+  verify them with the owner before making any change.
+- ADMIN_2FA_REQUIRED=false weakens operator access and should not be left set.
+  Plan recovery before changing TWO_FACTOR_KEY.
+- Verify preview database and secret isolation in the host. Skipping preview
+  migrations alone does not prevent runtime access to production data.
+- Direct 2FA, email-address-change, reset-link and gift-card emails include
+  best-effort paths. They are not covered by the outbox retry guarantee.
+- A single operator may approve sensitive operations; maker-checker approval
+  and out-of-band identity recovery require operational processes.
+- Dependencies and credentials change over time. Run the production dependency
+  audit, rotate leaked credentials, and verify provider configuration.
+
+5. The operator checklist
+-------------------------
+
+Use verified, limited operator accounts and 2FA. Protect and rotate secrets;
+never put credentials into the repository or logs. Isolate preview and live
+databases. Back up and rehearse restoration to a separate database. Configure
+and monitor cron, reconciliation, provider webhooks and delivery failures.
+Verify real provider results with a user-controlled account and mailbox before
+relying on a launch. Get authorization before production promotion or DNS work.
+
+6. Reporting a vulnerability
+----------------------------
+
+Contact https://pryvalogs.com/contact with enough detail to reproduce the issue.
+Do not test against a live account that is not yours, run automated scanners
+against the site, extract another customer's data, or send passwords, security
+codes or payment details in a report. /.well-known/security.txt is the public
+contact record; review its expiry date before it expires.

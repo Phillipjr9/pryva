@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { orders, walletEmailOutbox, walletTransactions, withdrawals } from "@/db/schema";
+import { orders, users, walletEmailOutbox, walletTransactions, withdrawals } from "@/db/schema";
 import { isPreviewDatabase } from "@/lib/demo-policy";
 import { logger } from "@/lib/logger";
 import { readJsonWithLimit } from "@/lib/request-body";
@@ -13,6 +13,7 @@ import { makeNumberCodeEmail } from "@/lib/number-email-template";
 import { esimQrAttachment } from "@/lib/esim-qr";
 import { makeWalletEmail, type ResendPayload, type WalletEmailEvent } from "@/lib/wallet-email-template";
 import { buildSecurityNotice } from "@/lib/security-notice";
+import { makeSupportReplyEmail } from "@/lib/support-reply-email";
 import { canonicalSiteUrl } from "@/lib/net";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
@@ -24,8 +25,14 @@ const resendBudget = createRateLimiter({ windowMs: 1_000, maxRequests: 4 });
 type Claimed = { id: string; lock_token: string; event_kind: string };
 // These were introduced by a build-time migration. Older live workers do not
 // understand them, so their available_at stays far in the future even on retry.
-const NEW_KINDS = new Set(["bank_linked", "password_changed", "first_purchase", "withdrawal_failed"]);
-const FINANCIAL_KINDS = new Set(["wallet", "first_purchase", "purchase_completed", "withdrawal_processing", "withdrawal_completed", "withdrawal_rejected", "withdrawal_failed"]);
+const NEW_KINDS = new Set([
+  "bank_linked", "password_changed", "first_purchase", "withdrawal_failed",
+  "passkey_added", "passkey_removed", "support_reply", "purchase_recorded",
+]);
+// A single list drives both claim and retry logic: old workers only understand
+// available_at/locked_until, so these events use the protected parallel fields.
+const protectedKinds = sql.join([...NEW_KINDS].map((kind) => sql`${kind}`), sql`, `);
+const FINANCIAL_KINDS = new Set(["wallet", "first_purchase", "purchase_recorded", "purchase_completed", "withdrawal_processing", "withdrawal_completed", "withdrawal_rejected", "withdrawal_failed"]);
 type DispatchResult = "sent" | "retry" | "review" | "empty" | "throttled";
 class InvalidNotificationData extends Error {}
 
@@ -78,8 +85,8 @@ async function expireUncertainJobs(): Promise<number> {
     UPDATE wallet_email_outbox SET status = 'review', last_error = 'idempotency_window_elapsed', locked_until = NULL, notification_locked_until = NULL, lock_token = NULL
     WHERE first_attempt_at < now() - interval '23 hours'
       AND (status = 'pending' OR (status = 'sending' AND (
-        (event_kind IN ('bank_linked', 'password_changed', 'first_purchase', 'withdrawal_failed') AND (notification_locked_until IS NULL OR notification_locked_until <= now()))
-        OR (event_kind NOT IN ('bank_linked', 'password_changed', 'first_purchase', 'withdrawal_failed') AND (locked_until IS NULL OR locked_until <= now()))
+        (event_kind IN (${protectedKinds}) AND (notification_locked_until IS NULL OR notification_locked_until <= now()))
+        OR (event_kind NOT IN (${protectedKinds}) AND (locked_until IS NULL OR locked_until <= now()))
       )))
     RETURNING id
   `);
@@ -91,19 +98,19 @@ async function claim(): Promise<Claimed | null> {
   const result = await db.execute(sql`
     UPDATE wallet_email_outbox AS job
       SET status = 'sending', lock_token = ${token}::uuid,
-          locked_until = CASE WHEN event_kind IN ('bank_linked', 'password_changed', 'first_purchase', 'withdrawal_failed')
+          locked_until = CASE WHEN event_kind IN (${protectedKinds})
             THEN now() + interval '10 years' ELSE now() + interval '2 minutes' END,
-          notification_locked_until = CASE WHEN event_kind IN ('bank_linked', 'password_changed', 'first_purchase', 'withdrawal_failed')
+          notification_locked_until = CASE WHEN event_kind IN (${protectedKinds})
             THEN now() + interval '2 minutes' ELSE NULL END,
           attempts = attempts + 1, first_attempt_at = COALESCE(first_attempt_at, now())
     WHERE job.id = (
       SELECT id FROM wallet_email_outbox
       WHERE ((status = 'pending' AND (
-          (event_kind IN ('bank_linked', 'password_changed', 'first_purchase', 'withdrawal_failed') AND notification_due_at <= now())
-          OR (event_kind NOT IN ('bank_linked', 'password_changed', 'first_purchase', 'withdrawal_failed') AND available_at <= now())
+          (event_kind IN (${protectedKinds}) AND notification_due_at <= now())
+          OR (event_kind NOT IN (${protectedKinds}) AND available_at <= now())
         )) OR (status = 'sending' AND (
-          (event_kind IN ('bank_linked', 'password_changed', 'first_purchase', 'withdrawal_failed') AND (notification_locked_until IS NULL OR notification_locked_until <= now()))
-          OR (event_kind NOT IN ('bank_linked', 'password_changed', 'first_purchase', 'withdrawal_failed') AND (locked_until IS NULL OR locked_until <= now()))
+          (event_kind IN (${protectedKinds}) AND (notification_locked_until IS NULL OR notification_locked_until <= now()))
+          OR (event_kind NOT IN (${protectedKinds}) AND (locked_until IS NULL OR locked_until <= now()))
         )))
         AND (first_attempt_at IS NULL OR first_attempt_at >= now() - interval '23 hours')
       ORDER BY COALESCE(notification_due_at, available_at), created_at
@@ -142,6 +149,8 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
     bankName: walletEmailOutbox.bankNameSnapshot,
     bankLastFour: walletEmailOutbox.bankLastFour,
     recipientName: walletEmailOutbox.recipientName,
+    supportTicketId: walletEmailOutbox.supportTicketId,
+    accountDeletedAt: users.deletedAt,
     txType: walletTransactions.type,
     txAmount: walletTransactions.amount,
     txReference: walletTransactions.reference,
@@ -163,12 +172,15 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
     orderPhoneNumber: orders.referenceCode,
     orderExpiresAt: orders.expiresAt,
   }).from(walletEmailOutbox)
+    .innerJoin(users, eq(walletEmailOutbox.userId, users.id))
     .leftJoin(walletTransactions, eq(walletEmailOutbox.walletTransactionId, walletTransactions.id))
     .leftJoin(withdrawals, eq(walletEmailOutbox.withdrawalId, withdrawals.id))
     .leftJoin(orders, sql`${orders.id} = COALESCE(${walletEmailOutbox.orderId}, ${walletTransactions.orderId})`)
     .where(and(eq(walletEmailOutbox.id, job.id), eq(walletEmailOutbox.status, "sending"), eq(walletEmailOutbox.lockToken, job.lock_token)))
     .limit(1);
   if (!row) throw new Error("Notification no longer available");
+  // Never deliberately send a queued message for an account already closed.
+  if (row.accountDeletedAt) throw new InvalidNotificationData();
   if (row.payload) {
     let saved: unknown;
     try { saved = JSON.parse(row.payload); } catch { throw new InvalidNotificationData(); }
@@ -176,11 +188,28 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
     return saved;
   }
 
-  if (row.eventKind === "password_changed") {
+  if (row.eventKind === "password_changed" || row.eventKind === "passkey_added" || row.eventKind === "passkey_removed") {
     const sender = process.env.RESEND_FROM_EMAIL?.trim();
     if (!sender || !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(row.recipient) || row.recipient.length > 200) throw new InvalidNotificationData();
-    const notice = buildSecurityNotice("password_changed", row.recipientName ?? "", new Date(row.eventTime));
+    const notice = buildSecurityNotice(row.eventKind, row.recipientName ?? "", new Date(row.eventTime));
     const payload: ResendPayload = { from: sender, to: [row.recipient], ...notice };
+    const [saved] = await db.update(walletEmailOutbox).set({ payload: JSON.stringify(payload) })
+      .where(and(eq(walletEmailOutbox.id, job.id), eq(walletEmailOutbox.status, "sending"), eq(walletEmailOutbox.lockToken, job.lock_token)))
+      .returning({ id: walletEmailOutbox.id });
+    if (!saved) throw new Error("Notification lease expired");
+    return payload;
+  }
+
+  if (row.eventKind === "support_reply") {
+    if (!row.supportTicketId) throw new InvalidNotificationData();
+    let payload: ResendPayload;
+    try {
+      payload = makeSupportReplyEmail({
+        ticketId: row.supportTicketId, recipient: row.recipient,
+        sender: process.env.RESEND_FROM_EMAIL?.trim() ?? "",
+        name: row.recipientName ?? "", createdAt: new Date(row.eventTime),
+      });
+    } catch { throw new InvalidNotificationData(); }
     const [saved] = await db.update(walletEmailOutbox).set({ payload: JSON.stringify(payload) })
       .where(and(eq(walletEmailOutbox.id, job.id), eq(walletEmailOutbox.status, "sending"), eq(walletEmailOutbox.lockToken, job.lock_token)))
       .returning({ id: walletEmailOutbox.id });
@@ -260,8 +289,8 @@ async function payloadFor(job: Claimed): Promise<ResendPayload> {
     event = { kind: row.eventKind, amount: row.withdrawalAmount, reference: row.withdrawalReference, createdAt: new Date(row.eventTime) };
   } else if (row.eventKind === "purchase_completed" && row.orderAmount != null && row.orderReference) {
     event = { kind: "purchase_completed", amount: row.orderAmount, reference: row.orderReference, createdAt: new Date(row.eventTime) };
-  } else if (row.eventKind === "first_purchase" && row.txAmount != null && row.txReference && row.txDescription != null) {
-    event = { kind: "first_purchase", amount: row.txAmount, reference: row.txReference, description: row.txDescription, productName: row.orderProductName, createdAt: new Date(row.eventTime) };
+  } else if ((row.eventKind === "first_purchase" || row.eventKind === "purchase_recorded") && row.txAmount != null && row.txReference && row.txDescription != null) {
+    event = { kind: row.eventKind, amount: row.txAmount, reference: row.txReference, description: row.txDescription, productName: row.orderProductName, createdAt: new Date(row.eventTime) };
   } else if (row.eventKind === "bank_linked" && row.bankName != null) {
     event = { kind: "bank_linked", bankName: row.bankName, lastFour: row.bankLastFour, createdAt: new Date(row.eventTime) };
   } else {

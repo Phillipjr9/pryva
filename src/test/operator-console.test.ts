@@ -156,13 +156,13 @@ describe("the console is its own place", () => {
   it("documents the way in, not just the way around", () => {
     // The console is unreachable unless three things line up, and an operator
     // who cannot get in on a Friday night will read the runbook, not the source.
-    const runbook = readFileSync(join(root, "../RUNBOOK.md"), "utf8");
-    expect(runbook).toContain("## 2a. Signing in as an operator");
+    const runbook = readFileSync(join(root, "../OPERATIONS.txt"), "utf8");
+    expect(runbook).toContain("2. Signing in as an operator");
     expect(runbook).toContain("/admin/login");
     // The two silent traps: set ADMIN_EMAILS before the account is verified and
     // there is no account to verify; require 2FA before enrolling and the only
     // operator is locked out.
-    expect(runbook).toMatch(/Set `ADMIN_EMAILS` \*\*after\*\* the account exists and is verified/);
+    expect(runbook).toContain("Set ADMIN_EMAILS after the account exists and is verified");
     expect(runbook).toContain("ADMIN_2FA_REQUIRED");
 
     const env = readFileSync(join(root, "../.env.example"), "utf8");

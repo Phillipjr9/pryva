@@ -455,6 +455,10 @@ export const walletEmailOutbox = pgTable("wallet_email_outbox", {
   orderId: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }),
   // Snapshot, not a foreign key: deleting a bank must not erase its security alert.
   bankAccountId: uuid("bank_account_id"),
+  // IDs only: neither support messages nor WebAuthn credential material is copied.
+  supportTicketId: uuid("support_ticket_id"),
+  supportMessageId: uuid("support_message_id"),
+  passkeyRowId: uuid("passkey_row_id"),
   bankNameSnapshot: varchar("bank_name_snapshot", { length: 100 }),
   bankLastFour: varchar("bank_last_four", { length: 4 }),
   recipientName: varchar("recipient_name", { length: 120 }),
@@ -476,8 +480,12 @@ export const walletEmailOutbox = pgTable("wallet_email_outbox", {
 }, (table) => [
   uniqueIndex("wallet_email_outbox_transaction_idx").on(table.walletTransactionId).where(sql`event_kind = 'wallet'`),
   uniqueIndex("wallet_email_outbox_bank_link_idx").on(table.bankAccountId).where(sql`event_kind = 'bank_linked'`),
+  uniqueIndex("wallet_email_outbox_support_reply_idx").on(table.supportMessageId).where(sql`event_kind = 'support_reply'`),
+  uniqueIndex("wallet_email_outbox_passkey_event_idx").on(table.passkeyRowId, table.eventKind).where(sql`event_kind IN ('passkey_added', 'passkey_removed')`),
+  uniqueIndex("wallet_email_outbox_purchase_recorded_idx").on(table.walletTransactionId).where(sql`event_kind = 'purchase_recorded'`),
   uniqueIndex("wallet_email_outbox_withdrawal_event_idx").on(table.withdrawalId, table.eventKind),
   uniqueIndex("wallet_email_outbox_order_event_idx").on(table.orderId, table.eventKind).where(sql`event_kind <> 'number_code'`),
+  index("wallet_email_outbox_user_idx").on(table.userId),
   index("wallet_email_outbox_due_idx").on(table.status, table.availableAt),
   index("wallet_email_outbox_notification_due_idx").on(table.status, table.notificationDueAt).where(sql`notification_due_at IS NOT NULL`),
 ]);

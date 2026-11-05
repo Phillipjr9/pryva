@@ -28,7 +28,7 @@ let pg: PGlite;
 let database: ReturnType<typeof drizzle<typeof schema>>;
 let fetchMock: ReturnType<typeof vi.fn>;
 
-async function applyMigrations(target: PGlite, through = "0033") {
+async function applyMigrations(target: PGlite, through = "0034") {
   const files = (await readdir("migrations")).filter((file) => /^\d{4}_.*\.sql$/.test(file) && file.slice(0, 4) <= through).sort();
   for (const file of files) await target.exec(await readFile(`migrations/${file}`, "utf8"));
 }
@@ -344,10 +344,10 @@ describe("the migration respects existing customers", () => {
       await prior.insert(schema.walletTransactions).values({ userId: USER, orderId: oldOrder.id, type: "debit", amount: 1000, balanceAfter: 4000, reference: "OLD", description: "Old order" });
       await older.exec(await readFile("migrations/0033_account_activity_emails.sql", "utf8"));
       expect(await prior.select().from(schema.firstPurchaseEmailClaims)).toMatchObject([{ userId: USER, source: "historical" }]);
-      expect(await prior.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "first_purchase"))).toHaveLength(0);
+      expect(await prior.select({ id: schema.walletEmailOutbox.id }).from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "first_purchase"))).toHaveLength(0);
       const [nextOrder] = await prior.insert(schema.orders).values({ userId: USER, reference: "NEW", service: "accounts", productSlug: "new", productName: "New order", planLabel: "One", region: "Global", duration: "One", amount: 1000, status: "active", provider: "accounts" }).returning();
       await prior.insert(schema.walletTransactions).values({ userId: USER, orderId: nextOrder.id, type: "debit", amount: 1000, balanceAfter: 3000, reference: "NEW", description: "New order" });
-      expect(await prior.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "first_purchase"))).toHaveLength(0);
+      expect(await prior.select({ id: schema.walletEmailOutbox.id }).from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "first_purchase"))).toHaveLength(0);
     } finally {
       await older.close();
     }
