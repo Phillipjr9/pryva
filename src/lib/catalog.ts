@@ -101,6 +101,7 @@ const serviceDefinitions: Service[] = [
     goodFor: ["Travel planning", "Device compatibility", "Coverage research"],
     faqs: [
       { q: "Does my phone support eSIM?", a: "Compatibility depends on the model, region and carrier. Check your device and carrier documentation." },
+      { q: "Can I choose a phone number with my eSIM?", a: "No. You choose a plan, but you cannot select a specific phone number. Check the plan details and contact support before buying if you need a number, calls or SMS." },
       { q: "Can I activate an eSIM now?", a: "No. eSIM plans are not available for purchase yet." },
     ],
   },

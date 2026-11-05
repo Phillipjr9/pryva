@@ -40,7 +40,7 @@ export default function ESIMPage() {
             <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3.5rem]">{service.tagline}</h1>
             <p className="mt-6 text-[1.1rem] leading-relaxed text-ink-2">
               {live
-                ? "eSIM ordering is connected. Browse current plans, prices and availability in your dashboard."
+                ? "eSIM ordering is configured. Check the dashboard for current plans, prices and availability."
                 : "eSIM ordering is not connected yet. Current plans and prices will appear when ordering is available."}
             </p>
             <div className="mt-8 flex flex-wrap gap-3 sm:gap-4">

@@ -28,12 +28,14 @@ export function EsimBuy({
   offerId,
   name,
   price,
+  expectedTerms,
   balance,
   purchasable,
 }: {
   offerId: string;
   name: string;
   price: number;
+  expectedTerms: string;
   balance: number;
   purchasable: boolean;
 }) {
@@ -57,7 +59,7 @@ export function EsimBuy({
       const response = await fetch("/api/esim/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ offerId, requestId: requestId() }),
+        body: JSON.stringify({ offerId, requestId: requestId(), expectedPriceNgn: price, expectedTerms }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
         ok?: boolean;

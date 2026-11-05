@@ -35,10 +35,9 @@
  *    known. When an eSIM purchase's outcome is unknown, the documented recovery
  *    is to read `GET /v1/esim/orders` back, never to resend.
  *
- * eSIM field names below are parsed defensively across aliases: the endpoint
- * inventory and the plan vocabulary (coverage, allowance, validity, price) are
- * documented, but the exact JSON keys were not obtainable here and must be
- * confirmed against a live key before customer money moves.
+ * eSIM plans use the documented nested money object and dataMb allowance. The
+ * live account's response and settlement still need operational verification;
+ * accepting legacy aliases is not evidence of what a particular account returns.
  */
 
 import "server-only";
@@ -52,6 +51,9 @@ const REQUEST_TIMEOUT_MS = 20_000;
 // not publish the quota here. A conservative shared budget leaves headroom;
 // a 429 is still handled rather than assumed away.
 const gatewayBudget = createRateLimiter({ windowMs: 60_000, maxRequests: 30 });
+// A paginated storefront must not exhaust the shared budget needed to buy or
+// poll orders. This separate, lower cap is shared across app instances too.
+const esimCatalogBudget = createRateLimiter({ windowMs: 60_000, maxRequests: 12 });
 
 /** The gateway's whole error vocabulary. Thirteen codes; nothing else is returned. */
 export type BitcallErrorCode =
@@ -245,6 +247,11 @@ function nonNegative(value: number | null): number | null {
   return value !== null && value >= 0 ? value : null;
 }
 
+/** Only an actual boolean is evidence of a capability; missing or malformed is unknown. */
+function booleanOrNull(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
 function currencyCode(value: string | null): string | null {
   if (!value) return null;
   const code = value.trim().toUpperCase();
@@ -268,7 +275,7 @@ function rowsFrom(payload: unknown, keys: string[] = ["data", "items", "plans", 
 async function gatewayFetch(
   method: "GET" | "POST",
   path: string,
-  options: { query?: Record<string, string | number | undefined>; body?: Record<string, unknown> } = {},
+  options: { query?: Record<string, string | number | undefined>; body?: Record<string, unknown>; catalogRead?: boolean } = {},
 ): Promise<unknown> {
   const keyId = bitcallKeyId();
   const secret = bitcallApiSecret();
@@ -285,6 +292,11 @@ async function gatewayFetch(
   }
   const base = gatewayBase();
 
+  if (method === "GET" && (options.catalogRead || path === "/v1/esim/plans" || path === "/v1/esim/countries")) {
+    const catalogBudget = await esimCatalogBudget("bitcall:esim-catalog-budget");
+    if (catalogBudget.unavailable) throw new BitcallError("Gateway rate limit is unavailable", 503, "RATE_LIMIT_UNAVAILABLE");
+    if (!catalogBudget.allowed) throw new BitcallError("eSIM catalog rate budget reached", 429, "LOCAL_RATE_BUDGET");
+  }
   const budget = await gatewayBudget("bitcall:shared-key-budget");
   if (budget.unavailable) throw new BitcallError("Gateway rate limit is unavailable", 503, "RATE_LIMIT_UNAVAILABLE");
   // Distinct from the gateway's own `RATE_LIMITED`: this refusal happens here,
@@ -401,16 +413,21 @@ export type BitcallEsimPlan = {
   /** Data allowance, as the catalog reports it. Units are not assumed. */
   allowance: number | null;
   allowanceUnit: string | null;
+  unlimitedData: boolean | null;
   /** Validity period, as the catalog reports it. Units are not assumed. */
   validity: number | null;
   validityUnit: string | null;
   /**
-   * The price the catalog returns. Their docs call it "your selling prices",
-   * which does not settle whether it is our cost or a suggested retail price —
-   * so it is surfaced raw and never marked up here.
+   * The account's price in its settlement currency. The gateway's money
+   * conventions say these prices are what the account pays, not its provider's
+   * internal cost. Conversion and retail pricing happen outside the client.
    */
   price: number | null;
   currency: string | null;
+  /** Supplier-reported plan features; null means the catalog did not specify them. */
+  includesPhoneNumber: boolean | null;
+  supportsVoice: boolean | null;
+  supportsSms: boolean | null;
 };
 
 function stringList(value: unknown): string[] {
@@ -434,7 +451,8 @@ function stringList(value: unknown): string[] {
  */
 function coverageList(row: Record<string, unknown>): string[] {
   for (const value of [row.countries, row.coveredCountries, row.countryList, row.coverage, row.destinations]) {
-    if (Array.isArray(value)) return stringList(value);
+    const entries = stringList(value);
+    if (entries.length > 0) return entries;
   }
   const parts: string[] = [];
   for (const key of [
@@ -451,51 +469,137 @@ function coverageList(row: Record<string, unknown>): string[] {
   return [...new Set(parts)].slice(0, 300);
 }
 
-export async function listBitcallEsimPlans(filter: { region?: string; country?: string } = {}): Promise<BitcallEsimPlan[]> {
-  const payload = await gatewayFetch("GET", "/v1/esim/plans", { query: { region: filter.region, country: filter.country } });
+/** Maximum 1,000 rows per read: preserve the shared gateway budget for orders. */
+export const ESIM_PLAN_PAGE_SIZE = 200;
+export const ESIM_PLAN_MAX_PAGES = 5;
+
+export type BitcallEsimPlans = {
+  plans: BitcallEsimPlan[];
+  /** A page failed, metadata was missing, or more pages remain beyond our cap. */
+  partial: boolean;
+  /** Raw rows encountered, including invalid or duplicate references. */
+  returned: number;
+  unreadable: number;
+};
+
+/** The same parser is used for list rows and the purchase-time single-plan read. */
+function parseEsimPlan(row: UnknownRecord): BitcallEsimPlan | null {
+  const planId = pickString(row, ["planId", "plan_id", "id"]);
+  if (!planId || !/^pln_[A-Za-z0-9_-]{1,128}$/.test(planId)) return null;
+
+  const capabilities = asRecord(row.capabilities);
+  const dataMb = nonNegative(pickNumber(row, ["dataMb"]));
+  // Only convert exact 1024 MB multiples. Otherwise report the original MB
+  // amount rather than rounding the allowance into something the plan lacks.
+  const wholeGb = dataMb !== null && dataMb >= 1024 && dataMb % 1024 === 0;
+  const days = nonNegative(pickNumber(row, ["validityDays"]));
+  const money = asRecord(row.price);
+  const hasMoneyObject = row.price !== null && typeof row.price === "object" && !Array.isArray(row.price);
+  // If an explicit legacy price is malformed, don't substitute a different
+  // top-level amount whose meaning may not match that price's currency.
+  const legacyAmount = row.price !== null && row.price !== undefined
+    ? pickNumber(row, ["price"])
+    : pickNumber(row, ["amount", "retailPrice", "sellingPrice"]);
+  return {
+    planId,
+    name: pickString(row, ["name", "title", "planName"]),
+    region: pickString(row, ["region", "regionName"]),
+    countries: coverageList(row),
+    allowance: dataMb !== null ? (wholeGb ? dataMb / 1024 : dataMb) : nonNegative(pickNumber(row, ["allowance", "data", "dataAllowance", "allowanceValue"])),
+    allowanceUnit: dataMb !== null ? (wholeGb ? "GB" : "MB") : pickString(row, ["allowanceUnit", "dataUnit", "unit"]),
+    unlimitedData: booleanOrNull(row.unlimitedData),
+    validity: days ?? nonNegative(pickNumber(row, ["validity", "days", "duration"])),
+    validityUnit: days !== null ? "days" : pickString(row, ["validityUnit", "durationUnit"]),
+    // Treat amount and currency as an inseparable pair. In particular, never
+    // attach a top-level currency to an incomplete nested price object.
+    price: nonNegative(hasMoneyObject ? pickNumber(money, ["amount"]) : legacyAmount),
+    currency: currencyCode(hasMoneyObject ? pickString(money, ["currency"]) : legacyAmount === null ? null : pickString(row, ["currency"])),
+    includesPhoneNumber: booleanOrNull(row.includesPhoneNumber),
+    supportsVoice: booleanOrNull(capabilities.voice),
+    supportsSms: booleanOrNull(capabilities.sms),
+  };
+}
+
+/**
+ * Bounded pagination. The default gateway page is only 50 rows. Fetch larger
+ * pages, stop at a conservative cap, and explicitly report incomplete reads.
+ * A later-page failure never discards rows already read; a first-page failure
+ * still fails the catalog. Nothing here retries a money-spending request.
+ */
+export async function listBitcallEsimPlans(filter: { region?: string } = {}): Promise<BitcallEsimPlans> {
   const plans: BitcallEsimPlan[] = [];
   const seen = new Set<string>();
-  const rows = rowsFrom(payload);
-  // A plan id that does not look like ours is dropped, because a plan we cannot
-  // name cannot be bought. Dropping it *silently* is what turns a supplier's
-  // schema change into an empty storefront with a green health check: the read
-  // succeeds, every row is discarded, and the page renders no plans and no
-  // error. Count them and say so — the ids are not logged, only how many of the
-  // rows survived.
-  let unreadableIds = 0;
+  let returned = 0;
+  let unreadable = 0;
+  let partial = false;
   let sampleKeys: string[] | null = null;
-  for (const row of rows.slice(0, 2000)) {
-    const planId = pickString(row, ["planId", "plan_id", "id"]);
-    // Without a `pln_` reference the plan cannot be bought, so it cannot be listed.
-    if (!planId || !planId.startsWith("pln_") || seen.has(planId)) {
-      unreadableIds += 1;
-      if (!sampleKeys) sampleKeys = Object.keys(row).slice(0, 12);
-      continue;
+
+  for (let page = 1; page <= ESIM_PLAN_MAX_PAGES; page++) {
+    let payload: unknown;
+    try {
+      payload = await gatewayFetch("GET", "/v1/esim/plans", {
+        query: { region: filter.region, page, pageSize: ESIM_PLAN_PAGE_SIZE, sort: "price_asc" },
+      });
+    } catch (error) {
+      if (page === 1) throw error;
+      logger.warn("eSIM catalog pagination incomplete", {
+        page,
+        code: error instanceof BitcallError ? error.code : "UNKNOWN",
+      });
+      partial = true;
+      break;
     }
-    seen.add(planId);
-    plans.push({
-      planId,
-      name: pickString(row, ["name", "title", "planName"]),
-      region: pickString(row, ["region", "regionName"]),
-      countries: coverageList(row),
-      allowance: nonNegative(pickNumber(row, ["allowance", "data", "dataAllowance", "allowanceValue"])),
-      allowanceUnit: pickString(row, ["allowanceUnit", "dataUnit", "unit"]),
-      validity: nonNegative(pickNumber(row, ["validity", "validityDays", "days", "duration"])),
-      validityUnit: pickString(row, ["validityUnit", "durationUnit"]),
-      price: nonNegative(pickNumber(row, ["price", "amount", "retailPrice", "sellingPrice"])),
-      currency: currencyCode(pickString(row, ["currency"])),
-    });
+
+    const envelope = asRecord(payload);
+    const hasRows = Array.isArray(payload) || ["data", "items", "plans"].some((key) => Array.isArray(envelope[key]));
+    if (!hasRows) {
+      if (page === 1) throw new BitcallError("Invalid eSIM catalog response", 502, "SERVICE_RESPONSE_INVALID");
+      partial = true;
+      break;
+    }
+    const rows = rowsFrom(payload);
+    returned += rows.length;
+    let added = 0;
+    for (const row of rows.slice(0, ESIM_PLAN_PAGE_SIZE)) {
+      const plan = parseEsimPlan(row);
+      if (!plan || !plan.planId) {
+        unreadable += 1;
+        if (!sampleKeys) sampleKeys = Object.keys(row).slice(0, 12);
+        continue;
+      }
+      if (seen.has(plan.planId)) continue;
+      seen.add(plan.planId);
+      plans.push(plan);
+      added += 1;
+    }
+    // A response exceeding the requested page size is not a complete read.
+    if (rows.length > ESIM_PLAN_PAGE_SIZE) { partial = true; break; }
+    const meta = asRecord(envelope.meta);
+    if (typeof meta.page === "number" && meta.page !== page) { partial = true; break; }
+    if (typeof meta.hasNext !== "boolean") { partial = true; break; }
+    if (!meta.hasNext) break;
+    // Stop repeated/empty pages and mark the cap instead of looping indefinitely.
+    if (added === 0 || page === ESIM_PLAN_MAX_PAGES) { partial = true; break; }
   }
-  if (rows.length > 0 && plans.length === 0) {
-    // Every row was unusable: not a quiet catalogue, a contract that moved.
-    logger.error("eSIM catalog returned rows but none were readable", {
-      rows: rows.length,
-      sampleKeys,
-    });
-  } else if (unreadableIds > 0) {
-    logger.warn("eSIM catalog rows skipped", { rows: rows.length, skipped: unreadableIds, sampleKeys });
+
+  if (returned > 0 && plans.length === 0) {
+    logger.error("eSIM catalog returned rows but none were readable", { rows: returned, sampleKeys });
+  } else if (unreadable > 0) {
+    logger.warn("eSIM catalog rows skipped", { rows: returned, skipped: unreadable, sampleKeys });
   }
-  return plans;
+  return { plans, partial, returned, unreadable };
+}
+
+/** Re-read the specific plan just before a purchase; the catalog itself is cached. */
+export async function getBitcallEsimPlan(planId: string, options: { browse?: boolean } = {}): Promise<BitcallEsimPlan | null> {
+  const id = planId.trim();
+  if (!/^pln_[A-Za-z0-9_-]{1,128}$/.test(id)) {
+    throw new BitcallError("Invalid plan reference", 400, "VALIDATION_ERROR", null, ["planId"]);
+  }
+  const payload = await gatewayFetch("GET", `/v1/esim/plans/${encodeURIComponent(id)}`, { catalogRead: options.browse });
+  const envelope = asRecord(payload);
+  const plan = parseEsimPlan(asRecord(envelope.data ?? envelope));
+  return plan?.planId === id ? plan : null;
 }
 
 export async function listBitcallEsimCountries(): Promise<string[]> {
@@ -543,7 +647,7 @@ function orderStatus(value: string | null): EsimOrderStatus {
  */
 export async function buyBitcallEsimPlan(planId: string): Promise<BitcallEsimOrder> {
   const id = planId.trim();
-  if (!id.startsWith("pln_") || id.length > 120) {
+  if (!/^pln_[A-Za-z0-9_-]{1,128}$/.test(id)) {
     throw new BitcallError("A plan reference must be the pln_ id from the catalog", 400, "VALIDATION_ERROR", null, ["body.planId"]);
   }
   // `planId` is the only accepted field; a stray property is rejected.

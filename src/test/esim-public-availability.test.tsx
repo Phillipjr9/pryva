@@ -26,8 +26,10 @@ describe("eSIM availability shown to customers", () => {
   it("points to the live catalog without claiming example cards are purchasable", () => {
     connected();
     const html = renderToStaticMarkup(<EsimPage />);
-    expect(html).toContain("eSIM ordering is connected.");
+    expect(html).toContain("eSIM ordering is configured.");
     expect(html).toContain("/dashboard/esim");
+    expect(html).toContain("Can I choose a phone number with my eSIM?");
+    expect(html).toContain("you cannot select a specific phone number");
     expect(html).not.toContain("eSIM plans are not available for purchase yet.");
     expect(html).not.toContain("/signup?plan=esim-");
     // Shared description is used on the home page even when ordering is connected.
@@ -37,7 +39,7 @@ describe("eSIM availability shown to customers", () => {
   it("reports the configured path, not a false count of sellable examples", () => {
     connected();
     const html = renderToStaticMarkup(<StatusPage />);
-    expect(html).toContain("eSIM ordering is connected.");
+    expect(html).toContain("eSIM ordering is configured.");
     expect(html).not.toContain("example plans are not orderable");
     expect(html).not.toContain("6 of 6 plans in this category can be ordered");
   });
@@ -48,6 +50,6 @@ describe("eSIM availability shown to customers", () => {
     vi.stubEnv("PGHOST", "");
     const html = renderToStaticMarkup(<EsimPage />);
     expect(html).toContain("eSIM ordering is not connected yet.");
-    expect(html).not.toContain("eSIM ordering is connected.");
+    expect(html).not.toContain("eSIM ordering is configured.");
   });
 });

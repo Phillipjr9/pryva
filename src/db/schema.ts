@@ -328,7 +328,8 @@ export const orders = pgTable(
      * quoted before we bought. Persisted because the cost sheet is a planning
      * document, not a source of truth: real margin per plan and per destination
      * can only be measured from what suppliers actually charged. Never shown to
-     * customers -- it is wholesale cost.
+     * customers -- it is wholesale cost. For eSIM this is a pre-purchase
+     * estimate, not a verified supplier charge or actual funding cost.
      */
     providerCostNgn: integer("provider_cost_ngn"),
     // Optional for legacy rows; every new purchase supplies a per-user key that

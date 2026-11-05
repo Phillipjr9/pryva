@@ -44,7 +44,7 @@ beforeEach(() => {
   state.items.mockReturnValue([SIGNAL]);
   state.boostSnapshot.mockResolvedValue({ partial: false, fetchedAt: "2026-01-02T00:00:00Z", currency: "USD", balance: 12.5 });
   state.boostItems.mockReturnValue([BOOST]);
-  state.esimSnapshot.mockResolvedValue({ partial: false, fetchedAt: "2026-01-03T00:00:00Z", offers: [] });
+  state.esimSnapshot.mockResolvedValue({ partial: false, fetchedAt: "2026-01-03T00:00:00Z", offers: [], listings: [] });
   state.esimItems.mockReturnValue([ESIM]);
 });
 
