@@ -99,6 +99,24 @@ describe("the ticket itself", () => {
     expect((await tickets.getThread(ticket.id)).length).toBe(2);
   });
 
+  it("alerts the admin inbox when a customer opens a support request", async () => {
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "Pryva <hello@pryva.test>");
+    vi.stubEnv("ADMIN_EMAILS", "ops@example.com, support@pryva.test");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "ticket_alert_123" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+
+    const { ticket } = await tickets.createTicket({ userId: USER, body: "I need help with my wallet balance" });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
+    expect(payload.to).toEqual(["ops@example.com", "support@pryva.test"]);
+    expect(payload.subject).toMatch(/new support request/i);
+    expect(payload.html).toContain(ticket.id);
+  });
+
   it("records who finished a ticket", async () => {
     const { ticket } = await tickets.createTicket({ userId: USER, body: "hello" });
     await tickets.addAdminMessage({ ticket, adminId: OTHER, body: "Fixed it for you.", status: "resolved" });

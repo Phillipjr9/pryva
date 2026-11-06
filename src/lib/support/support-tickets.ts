@@ -1,7 +1,9 @@
 import { and, count, desc, eq, ne, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { supportMessages, supportTickets } from "@/db/schema";
+import { supportMessages, supportTickets, users } from "@/db/schema";
+import { sendSupportAlertForTicket } from "@/lib/email/contact-message-email";
+import { logger } from "@/lib/platform/logger";
 
 import type { SupportCategory, SupportPriority, SupportStatus } from "./ai-support/types";
 
@@ -63,6 +65,25 @@ export async function createTicket(input: {
     .insert(supportMessages)
     .values({ ticketId: ticket.id, authorRole: "customer", authorUserId: input.userId, body })
     .returning();
+
+  try {
+    const [customer] = await db
+      .select({ name: users.name, email: users.email })
+      .from(users)
+      .where(eq(users.id, input.userId))
+      .limit(1);
+
+    await sendSupportAlertForTicket({
+      ticketId: ticket.id,
+      subject,
+      userName: customer?.name ?? "Customer",
+      userEmail: customer?.email ?? "unknown@example.com",
+      message: body,
+      createdAt: new Date(),
+    });
+  } catch (error) {
+    logger.warn("Support ticket alert email failed", { error, ticketId: ticket.id, userId: input.userId });
+  }
 
   return { ticket, message };
 }

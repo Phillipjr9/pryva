@@ -10,6 +10,7 @@ import { isSameOriginMutation } from "@/lib/platform/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 import { attributeReferral, readReferralCodeFrom } from "@/lib/content/referrals";
 import { recordSignupSignal } from "@/lib/admin/fraud";
+import { sendNewUserSignupAlert } from "@/lib/email/contact-message-email";
 import { previewOperatorBootstrapEnabled } from "@/lib/platform/preview-operator";
 
 export async function POST(request: Request) {
@@ -96,11 +97,22 @@ export async function POST(request: Request) {
     // link can be re-requested from /verify-email. Signup must not fail because
     // Resend is down.
     // `created` returns only the id; `email` is the normalized address in scope.
-    if (!operatorBootstrap) await issueEmailVerification(created.id, email, name).catch((error) => {
-      console.error("[auth] signup verification email failed", error instanceof Error ? error.message : String(error));
-    });
+    if (!operatorBootstrap) {
+      await sendNewUserSignupAlert({
+        name,
+        email,
+        createdAt: new Date(),
+        status: "pending_verification",
+      }).catch((error) => {
+        console.error("[auth] signup admin alert failed", error instanceof Error ? error.message : String(error));
+      });
+      await issueEmailVerification(created.id, email, name).catch((error) => {
+        console.error("[auth] signup verification email failed", error instanceof Error ? error.message : String(error));
+      });
+    }
     return Response.json({ ok: true });
-  } catch {
+  } catch (error) {
+    console.error("[auth] signup failed", error);
     return Response.json({ ok: false, error: "Something went wrong. Please try again." }, { status: 500 });
   }
 }

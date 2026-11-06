@@ -39,6 +39,12 @@ vi.mock("@/lib/identity/auth", () => ({
   requireAuthApi: mocks.user, getCurrentUser: mocks.user,
   createSession: mocks.session, destroySession: mocks.destroySession, hashPassword: () => "test-password-hash",
   verifyPassword: (password: string, hash: string) => password === hash,
+  normalizeEmail: (email: string) => email.trim().toLowerCase(),
+  isValidEmail: (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email),
+  isConfiguredAdminEmail: (email: string) => {
+    const normalized = email.trim().toLowerCase();
+    return (process.env.ADMIN_EMAILS ?? "").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean).includes(normalized);
+  },
   SESSION_COOKIE: "pryva_session", SESSION_COOKIE_EMBEDDED: "pryva_session_3p",
 }));
 vi.mock("@/lib/identity/admin-auth", () => ({
@@ -101,6 +107,7 @@ let refundRoute: typeof import("@/app/api/admin/refunds/route");
 let bankRoute: typeof import("@/app/api/wallet/bank-accounts/route");
 let verifyBankRoute: typeof import("@/app/api/wallet/verify-account/route");
 let googleRoute: typeof import("@/app/api/auth/google/callback/route");
+let signupRoute: typeof import("@/app/api/auth/signup/route");
 let contactRoute: typeof import("@/app/api/contact/route");
 let deleteRoute: typeof import("@/app/api/user/delete/route");
 let passwordRoute: typeof import("@/app/api/user/password/route");
@@ -186,10 +193,10 @@ beforeAll(async () => {
   await pg.exec(await readFile("migrations/0034_customer_activity_emails.sql", "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
-  [purchaseRoute, refundRoute, bankRoute, verifyBankRoute, googleRoute, contactRoute, deleteRoute, passwordRoute, sessionsRoute, autoRefund, giftPurchaseRoute, giftCheckRoute, giftRedeemRoute, topUpRoute, verifyTopUpRoute, webhookRoute, profileRoute, notificationsRoute, markReadRoute, logoutRoute, syncRoute, scheduledRoute, promoRoute, withdrawalRoute, adminWithdrawalRoute, integrity] = await Promise.all([
+  [purchaseRoute, refundRoute, bankRoute, verifyBankRoute, googleRoute, signupRoute, contactRoute, deleteRoute, passwordRoute, sessionsRoute, autoRefund, giftPurchaseRoute, giftCheckRoute, giftRedeemRoute, topUpRoute, verifyTopUpRoute, webhookRoute, profileRoute, notificationsRoute, markReadRoute, logoutRoute, syncRoute, scheduledRoute, promoRoute, withdrawalRoute, adminWithdrawalRoute, integrity] = await Promise.all([
     import("@/app/api/accounts/purchase/route"), import("@/app/api/admin/refunds/route"),
     import("@/app/api/wallet/bank-accounts/route"), import("@/app/api/wallet/verify-account/route"),
-    import("@/app/api/auth/google/callback/route"), import("@/app/api/contact/route"),
+    import("@/app/api/auth/google/callback/route"), import("@/app/api/auth/signup/route"), import("@/app/api/contact/route"),
     import("@/app/api/user/delete/route"), import("@/app/api/user/password/route"),
     import("@/app/api/user/sessions/route"), import("@/lib/services/auto-refund"),
     import("@/app/api/gift-cards/purchase/route"), import("@/app/api/gift-cards/check/route"), import("@/app/api/gift-cards/redeem/route"),
@@ -1099,9 +1106,37 @@ describe("Google subject binding and account protection", () => {
     expect(user.deletedAt).toBeNull();
   });
 
-  it("sends a confirmation email after storing a contact message", async () => {
+  it("alerts admins when a new customer signs up and includes the account details", async () => {
     vi.stubEnv("RESEND_API_KEY", "test-key");
     vi.stubEnv("RESEND_FROM_EMAIL", "Pryva <hello@pryva.test>");
+    vi.stubEnv("ADMIN_EMAILS", "ops@example.com, support@pryva.test");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "email_123" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+
+    const request = new Request("https://pryva.test/api/auth/signup", {
+      method: "POST",
+      headers: { origin: "https://pryva.test", "content-type": "application/json" },
+      body: JSON.stringify({ name: "New Buyer", email: "new-buyer@example.com", password: "securepassword123" }),
+    });
+
+    const response = await signupRoute.POST(request);
+    expect(response.status).toBe(200);
+    const payloads = fetchSpy.mock.calls
+      .map(([, init]) => JSON.parse((init as RequestInit).body as string) as { to: string[]; subject: string; html: string })
+      .filter((payload) => Array.isArray(payload.to));
+    const adminAlert = payloads.find((payload) => payload.subject.toLowerCase().includes("new customer signup"));
+    expect(adminAlert).toBeTruthy();
+    expect(adminAlert!.to).toEqual(["ops@example.com", "support@pryva.test"]);
+    expect(adminAlert!.html).toContain("New Buyer");
+    expect(adminAlert!.html).toContain("new-buyer@example.com");
+  });
+
+  it("sends a confirmation email after storing a contact message and alerts the admin inbox", async () => {
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "Pryva <hello@pryva.test>");
+    vi.stubEnv("ADMIN_EMAILS", "ops@example.com, support@pryva.test");
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "email_123" }), {
       status: 200,
       headers: { "content-type": "application/json" },
@@ -1116,10 +1151,13 @@ describe("Google subject binding and account protection", () => {
 
     const response = await contactRoute.POST(request);
     expect(response.status).toBe(200);
-    expect(fetchSpy).toHaveBeenCalledWith("https://api.resend.com/emails", expect.objectContaining({ method: "POST" }));
-    const payload = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
-    expect(payload.to).toEqual(["buyer@example.com"]);
-    expect(payload.subject).toContain("We received your message");
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const customerPayload = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
+    const adminPayload = JSON.parse(fetchSpy.mock.calls[1][1]!.body as string);
+    expect(customerPayload.to).toEqual(["buyer@example.com"]);
+    expect(customerPayload.subject).toContain("We received your message");
+    expect(adminPayload.to).toEqual(["ops@example.com", "support@pryva.test"]);
+    expect(adminPayload.subject).toMatch(/new contact message/i);
   });
 
   it("associates support messages with the authenticated user, not an asserted user ID", async () => {

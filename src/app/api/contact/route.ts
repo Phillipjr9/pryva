@@ -6,7 +6,7 @@ import { isSameOriginMutation } from "@/lib/platform/net";
 import { clientIp } from "@/lib/identity/auth-rate-limit";
 import { contactRateLimiter } from "@/lib/platform/rate-limit";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
-import { sendContactMessageConfirmation } from "@/lib/email/contact-message-email";
+import { sendContactMessageConfirmation, sendSupportAlertForContactMessage } from "@/lib/email/contact-message-email";
 
 export const dynamic = "force-dynamic";
 
@@ -63,17 +63,28 @@ export async function POST(request: NextRequest) {
     });
 
     if (saved) {
-      await sendContactMessageConfirmation({
-        to: saved.email,
-        name: saved.name,
-        topic: saved.topic,
-        receivedAt: saved.createdAt,
+      await Promise.allSettled([
+        sendContactMessageConfirmation({
+          to: saved.email,
+          name: saved.name,
+          topic: saved.topic,
+          receivedAt: saved.createdAt,
+        }),
+        sendSupportAlertForContactMessage({
+          name: saved.name,
+          email: saved.email,
+          topic: saved.topic,
+          message: message.trim(),
+          receivedAt: saved.createdAt,
+        }),
+      ]).catch((error) => {
+        console.error("Failed to notify about contact message", error);
       });
     }
 
     return NextResponse.json({ ok: true });
-  } catch {
-    console.error("Failed to submit contact form");
+  } catch (error) {
+    console.error("Failed to submit contact form", error);
     return NextResponse.json({ error: "Failed to submit message" }, { status: 500 });
   }
 }
