@@ -45,6 +45,14 @@ there while preserving the selected period. Integrity checks are read-only and
 must not be used as a payout or refund control. Operator authentication, admin
 authorization and 2FA remain the existing requireAdmin/authorizeAdminApi paths.
 
+To review the console in a preview pane, which otherwise opens the storefront,
+set PREVIEW_LANDING_PATH=/admin/overview alongside the preview bootstrap. It only
+applies with no persistent database and only redirects `/`, on every visit, so a
+pane reload keeps opening the console. The storefront stays reachable at
+/?storefront=1 (the console's "View storefront" link) and at every other path. It
+is a landing convenience, not an access control: /admin still runs requireAdmin on
+every request, so a signed-out visitor lands on the operator sign-in page.
+
 Useful checks (Node 22)
 -----------------------
 
