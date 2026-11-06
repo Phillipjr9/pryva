@@ -180,6 +180,22 @@ export default async function AdminOverviewPage() {
     orderCount: signupOrderCounts.get(row.id) ?? 0,
   }));
 
+  // Recent contact form messages — the “random emails” you’re getting.
+  // Newest first, open messages first so spam is visible at a glance.
+  const recentMessages = await db
+    .select({
+      id: contactMessages.id,
+      name: contactMessages.name,
+      email: contactMessages.email,
+      topic: contactMessages.topic,
+      message: contactMessages.message,
+      status: contactMessages.status,
+      createdAt: contactMessages.createdAt,
+    })
+    .from(contactMessages)
+    .orderBy(desc(contactMessages.createdAt))
+    .limit(6);
+
   const stats: StatCard[] = [
     {
       label: "Total Users",
@@ -358,7 +374,7 @@ export default async function AdminOverviewPage() {
       </div>
 
       {/* Widget grid */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-4">
         {/* Recent Activity — 2 columns */}
         <div className="lg:col-span-2 rounded-2xl border border-line bg-white p-6">
           <div className="flex items-center justify-between mb-5">
@@ -549,6 +565,73 @@ export default async function AdminOverviewPage() {
                 No orders yet.
               </p>
             )}
+          </div>
+        </div>
+
+        {/* Recent Messages — 1 column: the “random emails” you’re getting */}
+        <div className="rounded-2xl border border-line bg-white p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-[1rem] font-semibold text-ink">
+              Recent Messages
+            </h2>
+            <Link
+              href="/admin/messages"
+              className="text-[0.78rem] font-medium text-lav-700 underline underline-offset-2 hover:text-lav-800"
+            >
+              View all messages <ArrowRight className="h-3.5 w-3.5 ml-1" />
+            </Link>
+          </div>
+
+          <div className="space-y-3">
+            {recentMessages.length === 0 && (
+              <p className="text-[0.8rem] text-ink-2 text-center py-8">
+                No messages yet.
+              </p>
+            )}
+            {recentMessages.map((row) => (
+              <div
+                key={row.id}
+                className="flex items-start justify-between gap-3 border-b border-line/50 pb-2 last:border-0 last:pb-0"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-[0.8rem] font-medium text-ink truncate">
+                    {row.topic}
+                  </p>
+                  <p className="text-[0.7rem] text-ink-3 truncate">
+                    {row.name}
+                  </p>
+                  <p className="text-[0.7rem] font-mono text-ink-2 truncate" title={row.email}>
+                    {row.email}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[0.7rem] text-ink-2">
+                    {formatDateTime(row.createdAt)}
+                  </p>
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-meta font-semibold mt-1 inline-block",
+                      row.status === "open"
+                        ? "bg-amber-50 text-amber-700"
+                        : "bg-emerald-50 text-emerald-700"
+                    )}
+                  >
+                    {row.status.replace(/_/g, " ")}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 border-t border-line pt-4">
+            <p className="mb-2 text-[0.68rem] text-ink-3">
+              Getting emails from accounts that were never created? That&apos;s
+              the public contact form — anyone can send a message without
+              signing up. Use <Link
+                href="/admin/messages"
+                className="font-medium text-lav-700 underline underline-offset-2 hover:text-lav-800"
+              >the messages queue</Link> to reply or mark them as resolved.
+            </p>
           </div>
         </div>
       </div>
