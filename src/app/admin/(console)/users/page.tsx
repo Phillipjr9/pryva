@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/identity/auth";
-import { AccessLevel } from "./AccessLevel";
 import { db } from "@/db";
 import { users, orders, sessions, accountSignals } from "@/db/schema";
 import { count, desc, ilike, inArray, max, or, sql } from "drizzle-orm";
@@ -196,9 +195,7 @@ export default async function AdminUsersPage({
             {Number(total).toLocaleString("en-NG")} registered {Number(total) === 1 ? "account" : "accounts"}
             {query ? ` matching “${query}”` : ""}.
           </p>
-          <p className="mt-1 text-meta text-ink-3">
-            Administrator access is the address in <code className="font-mono text-micro">ADMIN_EMAILS</code> plus a verified email. Both are needed; neither is a role column.
-          </p>
+
         </div>
         <div className="rounded-xl border border-line bg-white px-4 py-2 text-right">
           <p className="text-meta uppercase tracking-wide text-ink-3">Wallet balance on this page</p>
@@ -268,10 +265,6 @@ export default async function AdminUsersPage({
                         ) : null}
                       </p>
                       <p className="text-meta text-ink-3">{row.email}</p>
-                      {/* Privilege is meaningless on a closed account: it can never sign in. */}
-                      {row.deletedAt ? null : (
-                        <AccessLevel email={row.email} emailVerifiedAt={row.emailVerifiedAt} />
-                      )}
                     </Link>
                   </td>
                   <td className="px-4 py-3 font-medium">{formatNaira(row.walletBalance)}</td>
