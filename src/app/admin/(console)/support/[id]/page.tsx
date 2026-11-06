@@ -49,7 +49,7 @@ export default async function AdminSupportTicketPage({ params }: { params: Promi
   const messages = await getThread(ticket.id);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6">
+    <div>
       <Link href="/admin/support" className="inline-flex items-center gap-1.5 text-meta text-ink-3 hover:text-lav-700">
         <ArrowLeft className="h-3.5 w-3.5" /> Support queue
       </Link>

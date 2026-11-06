@@ -87,7 +87,7 @@ export default async function AdminHealthPage() {
   const totalAttention = outstandingOrders.length + outstandingWithdrawals.length + pendingTopups.length + ledgerIssues.length + openFraudSignals.length;
 
   return (
-    <main className="space-y-6 p-6">
+    <div className="space-y-6">
       <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
         <p className="text-micro font-semibold uppercase tracking-[0.14em] text-lav-700">Operations health</p>
         <h1 className="mt-3 text-2xl font-semibold text-ink">Alert queue and operational watchlist</h1>
@@ -278,6 +278,6 @@ export default async function AdminHealthPage() {
           </div>
         </section>
       </div>
-    </main>
+    </div>
   );
 }

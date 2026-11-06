@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { isManualFulfilmentReachable } from "@/lib/services/accounts/manual-fulfilment";
 import { laneConfigured } from "@/lib/services/service-config";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
 import {
   NOT_FOR_SALE,
   SERVICE_LANES,
@@ -50,17 +51,32 @@ export default async function AdminServicesPage() {
 
   // One grouped read for the whole table: provider × status, with how many of
   // those rows already carry a reference code and when the newest one landed.
-  const tallyRows = await db
-    .select({
-      provider: orders.provider,
-      service: orders.service,
-      status: orders.status,
-      total: count(),
-      withCode: sql<number>`count(${orders.referenceCode})`,
-      latest: sql<Date>`max(${orders.createdAt})`,
-    })
-    .from(orders)
-    .groupBy(orders.provider, orders.service, orders.status);
+  let tallyRows: { provider: string; service: string; status: string; total: number; withCode: number; latest: Date | string | null }[];
+  if (isPreviewDatabase()) {
+    const rawOrders = await db.select({ provider: orders.provider, service: orders.service, status: orders.status, referenceCode: orders.referenceCode, createdAt: orders.createdAt }).from(orders);
+    const groupedTallies = new Map<string, typeof tallyRows[number]>();
+    for (const row of rawOrders) {
+      const key = `${row.provider}\u0000${row.service}\u0000${row.status}`;
+      const current = groupedTallies.get(key) ?? { provider: row.provider, service: row.service, status: row.status, total: 0, withCode: 0, latest: null };
+      current.total += 1;
+      if (row.referenceCode !== null) current.withCode += 1;
+      if (!current.latest || new Date(row.createdAt) > new Date(current.latest)) current.latest = row.createdAt;
+      groupedTallies.set(key, current);
+    }
+    tallyRows = [...groupedTallies.values()];
+  } else {
+    tallyRows = (await db
+      .select({
+        provider: orders.provider,
+        service: orders.service,
+        status: orders.status,
+        total: count(),
+        withCode: sql<number>`count(${orders.referenceCode})`,
+        latest: sql<Date>`max(${orders.createdAt})`,
+      })
+      .from(orders)
+      .groupBy(orders.provider, orders.service, orders.status)).map((row) => ({ ...row, total: Number(row.total), withCode: Number(row.withCode ?? 0) }));
+  }
 
   const tallies: OrderTally[] = tallyRows.map((row) => ({
     provider: row.provider,

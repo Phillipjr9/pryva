@@ -1,42 +1,44 @@
 import type { ReactNode } from "react";
+import type { Metadata } from "next";
+import { count, eq, isNull } from "drizzle-orm";
 import { requireAdmin } from "@/lib/identity/auth";
-import { OperatorNav, OperatorSignOut } from "./OperatorNav";
+import { db } from "@/db";
+import { contactMessages, fraudEvents, supportTickets, withdrawals } from "@/db/schema";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
+import { AdminShell, type AttentionItem } from "@/components/admin/AdminShell";
+import "@/styles/adminlte.generated.css";
+
+export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: { default: "Operator console", template: "%s · Pryva Console" },
+  robots: { index: false, follow: false, nocache: true },
+};
 
 /**
- * The operator console shell.
- *
- * Deliberately not the storefront: no cart, no wallet, no services menu, no
- * customer nav. An operator signing in here is working, and a page that offers to
- * sell them an eSIM while they read a refund queue is a page that has not decided
- * who it is for. The single link back to the customer account is labelled as such,
- * so leaving is a choice rather than an escape hatch.
- *
- * `requireAdmin` is the control. It redirects a signed-out visitor to `/login` and
- * a signed-in customer to `/dashboard` — the shell is a consequence of that check,
- * never a substitute for it.
+ * The operator workspace is separate from the customer storefront. AdminLTE's
+ * scoped stylesheet supplies the shell/components; React supplies its behavior.
+ * requireAdmin remains the authorization boundary for every page in this group.
  */
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const operator = await requireAdmin();
+  const [payouts, tickets, signals, messages] = await Promise.all([
+    db.select({ value: count() }).from(withdrawals).where(eq(withdrawals.status, "pending")),
+    db.select({ value: count() }).from(supportTickets).where(eq(supportTickets.status, "escalated")),
+    db.select({ value: count() }).from(fraudEvents).where(isNull(fraudEvents.reviewedAt)),
+    db.select({ value: count() }).from(contactMessages).where(eq(contactMessages.status, "open")),
+  ]);
+  const attention: AttentionItem[] = [
+    { label: "Withdrawals to review", description: "Pending payout requests", count: Number(payouts[0]?.value ?? 0), href: "/admin/withdrawals", kind: "payouts" },
+    { label: "Escalated tickets", description: "Customers waiting for a person", count: Number(tickets[0]?.value ?? 0), href: "/admin/support?status=escalated", kind: "support" },
+    { label: "Open risk signals", description: "Advisory flags for operator review", count: Number(signals[0]?.value ?? 0), href: "/admin/security", kind: "security" },
+    { label: "Open contact messages", description: "Messages from the public form", count: Number(messages[0]?.value ?? 0), href: "/admin/messages", kind: "messages" },
+  ];
 
   return (
-    <div className="min-h-screen bg-cream lg:flex">
-      <OperatorNav email={operator.email} />
-
-      <div className="min-w-0 flex-1">
-        {/* A quiet top strip: who you are signed in as, and the way out. */}
-        <div className="hidden items-center justify-between gap-4 border-b border-line bg-white px-6 py-2.5 lg:flex">
-          <p className="text-meta text-ink-3">
-            Signed in as <span className="font-medium text-ink-2">{operator.email}</span>
-          </p>
-          <OperatorSignOut />
-        </div>
-
-        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">{children}</main>
-
-        <div className="border-t border-line px-4 py-3 lg:hidden">
-          <OperatorSignOut variant="inline" />
-        </div>
-      </div>
-    </div>
+    <>
+      <AdminShell email={operator.email} name={operator.name} attention={attention} preview={isPreviewDatabase()}>
+        {children}
+      </AdminShell>
+    </>
   );
 }

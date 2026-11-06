@@ -4,6 +4,7 @@ import { AccessLevel } from "./AccessLevel";
 import { db } from "@/db";
 import { users, orders, sessions, accountSignals } from "@/db/schema";
 import { count, desc, ilike, inArray, max, or, sql } from "drizzle-orm";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -114,34 +115,54 @@ export default async function AdminUsersPage({
   const orderCounts = new Map<string, { orders: number; spent: number }>();
 
   if (pageIds.length > 0) {
-    const grouped = await db
-      .select({
-        userId: orders.userId,
-        orderCount: count(),
-        spent: sql<number>`coalesce(sum(${orders.amount}), 0)`,
-      })
-      .from(orders)
-      .where(inArray(orders.userId, pageIds))
-      .groupBy(orders.userId);
+    if (isPreviewDatabase()) {
+      // The process-local preview adapter has no SQL GROUP BY. Aggregate the
+      // bounded page of customers in memory instead of crashing the console.
+      const rowsForCounts = await db.select({ userId: orders.userId, amount: orders.amount }).from(orders).where(inArray(orders.userId, pageIds));
+      for (const row of rowsForCounts) {
+        const current = orderCounts.get(row.userId) ?? { orders: 0, spent: 0 };
+        current.orders += 1;
+        current.spent += Number(row.amount);
+        orderCounts.set(row.userId, current);
+      }
+    } else {
+      const grouped = await db
+        .select({
+          userId: orders.userId,
+          orderCount: count(),
+          spent: sql<number>`coalesce(sum(${orders.amount}), 0)`,
+        })
+        .from(orders)
+        .where(inArray(orders.userId, pageIds))
+        .groupBy(orders.userId);
 
-    for (const row of grouped) {
-      orderCounts.set(row.userId, { orders: Number(row.orderCount), spent: Number(row.spent) });
+      for (const row of grouped) {
+        orderCounts.set(row.userId, { orders: Number(row.orderCount), spent: Number(row.spent) });
+      }
     }
   }
 
   // Last sign-in per user on this page: the most recent session creation.
   const lastSignIn = new Map<string, Date>();
   if (pageIds.length > 0) {
-    const signed = await db
-      .select({
-        userId: sessions.userId,
-        lastAt: max(sessions.createdAt),
-      })
-      .from(sessions)
-      .where(inArray(sessions.userId, pageIds))
-      .groupBy(sessions.userId);
-    for (const row of signed) {
-      if (row.lastAt) lastSignIn.set(row.userId, row.lastAt);
+    if (isPreviewDatabase()) {
+      const signed = await db.select({ userId: sessions.userId, createdAt: sessions.createdAt }).from(sessions).where(inArray(sessions.userId, pageIds));
+      for (const row of signed) {
+        const current = lastSignIn.get(row.userId);
+        if (!current || row.createdAt > current) lastSignIn.set(row.userId, row.createdAt);
+      }
+    } else {
+      const signed = await db
+        .select({
+          userId: sessions.userId,
+          lastAt: max(sessions.createdAt),
+        })
+        .from(sessions)
+        .where(inArray(sessions.userId, pageIds))
+        .groupBy(sessions.userId);
+      for (const row of signed) {
+        if (row.lastAt) lastSignIn.set(row.userId, row.lastAt);
+      }
     }
   }
 

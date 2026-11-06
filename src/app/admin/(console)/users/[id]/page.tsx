@@ -80,7 +80,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
     .where(eq(withdrawals.userId, id));
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link href="/admin/users" className="text-meta text-ink-3 hover:text-lav-700">

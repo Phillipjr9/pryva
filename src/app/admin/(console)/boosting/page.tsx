@@ -46,7 +46,7 @@ export default async function AdminBoostingPage() {
   });
 
   return (
-    <div className="mx-auto grid max-w-5xl gap-5 px-4 py-6">
+    <div className="grid gap-5">
       <div>
         <p className="eyebrow">Social promotion</p>
         <h1 className="mt-1.5 text-[1.6rem] font-semibold text-ink">Boosting</h1>

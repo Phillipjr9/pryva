@@ -36,7 +36,7 @@ export default async function AdminReviewsPage({
   const items = await listReviewsForModeration(status as "pending" | "published" | "rejected" | "all");
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
+    <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[1.4rem] font-medium tracking-tight">Review moderation</h1>

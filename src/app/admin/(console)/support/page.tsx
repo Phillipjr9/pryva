@@ -76,7 +76,7 @@ export default async function AdminSupportPage({
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
+    <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[1.5rem] font-semibold text-ink">Support queue</h1>

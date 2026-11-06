@@ -23,7 +23,7 @@ export default async function AdminAnomaliesPage() {
   const anomalies = await listPayoutAnomalies(25);
 
   return (
-    <main className="space-y-6 p-6">
+    <div className="space-y-6">
       <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
         <p className="text-micro font-semibold uppercase tracking-[0.14em] text-lav-700">Money risk</p>
         <h1 className="mt-3 text-2xl font-semibold text-ink">Payout anomaly queue</h1>
@@ -119,6 +119,6 @@ export default async function AdminAnomaliesPage() {
           </div>
         )}
       </section>
-    </main>
+    </div>
   );
 }
