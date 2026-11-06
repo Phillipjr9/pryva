@@ -47,6 +47,8 @@ export const GIFT_CARDS_PER_DAY = 10;
 export const WITHDRAWALS_PER_DAY = 3;
 /** More than this many accounts on one network is a cluster worth reading. */
 export const SHARED_NETWORK_ACCOUNTS = 3;
+/** More than this many accounts from one network is a spam cluster worth flagging. */
+export const SPAM_NETWORK_ACCOUNTS = 5;
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -77,6 +79,44 @@ export async function recordSignupSignal(request: Request, userId: string): Prom
   } catch (error) {
     logger.warn("Could not record signup signal", { error: error instanceof Error ? error.message : "unknown" });
   }
+}
+
+/** Patterns that suggest an email address was machine-generated rather than
+ * chosen by a person. A real name is usually a word or two; a bot address is
+ * often an initial plus a surname, or two dictionary words joined by a hyphen.
+ */
+const SUSPICIOUS_LOCAL_PART = /^[a-z][a-z]{0,2}-[a-z]{3,}$/;
+
+/** True when the address's local part looks auto-generated. */
+export function suspiciousEmailLocalPart(email: string): boolean {
+  const at = email.lastIndexOf("@");
+  if (at < 0) return false;
+  const local = email.slice(0, at);
+  return SUSPICIOUS_LOCAL_PART.test(local);
+}
+
+/** Score a new signup for spam-like signals. Advisory only — never blocks. */
+export async function assessSignupRisk(request: Request, userId: string, email: string): Promise<{
+  level: RiskLevel;
+  reasons: string[];
+  ipHash: string | null;
+}> {
+  const reasons: string[] = [];
+
+  if (suspiciousEmailLocalPart(email)) {
+    reasons.push("email address looks auto-generated");
+  }
+
+  const ipHash = hashSignal(clientIp(request));
+  if (ipHash) {
+    const network = await sharedNetworkAccounts(userId).catch(() => ({ accounts: 0, ipHash: null }));
+    if (network.accounts >= SPAM_NETWORK_ACCOUNTS) {
+      reasons.push(`${network.accounts} accounts share this signup network`);
+    }
+  }
+
+  const level: RiskLevel = reasons.length >= 2 ? "high" : reasons.length === 1 ? "warn" : "low";
+  return { level, reasons, ipHash: ipHash ?? null };
 }
 
 /** How many accounts were created from the same network as this one. */
