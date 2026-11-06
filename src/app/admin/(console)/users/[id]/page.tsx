@@ -5,6 +5,7 @@ import { eq, desc, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users, walletTransactions, withdrawals } from "@/db/schema";
 import { requireAdmin } from "@/lib/identity/auth";
+import { BanAccountButton } from "../BanAccountButton";
 
 export const dynamic = "force-dynamic";
 
@@ -110,6 +111,10 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           </div>
         ))}
       </div>
+
+      {!user.deletedAt && (
+        <BanAccountButton userId={user.id} email={user.email} name={user.name} />
+      )}
 
       <div className="grid gap-6 xl:grid-cols-2">
         <section className="rounded-2xl border border-line bg-white p-5">

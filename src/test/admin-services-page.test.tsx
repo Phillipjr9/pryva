@@ -41,7 +41,7 @@ const recent = new Date(Date.now() - 3_600_000);
 
 function talliesForNumbers(delivered: number) {
   return [
-    { provider: "fleexa", status: "delivered", total: delivered, withCode: 0, latest: recent },
+    { provider: "fleexa", service: "numbers", status: "delivered", total: delivered, withCode: 0, latest: recent },
   ];
 }
 
@@ -85,8 +85,8 @@ describe("the service coverage page", () => {
     state.results = [[], [], [], [], []];
     render(await AdminServicesPage());
     expect(screen.getByText("Not for sale, on purpose")).toBeTruthy();
-    expect(screen.getByText(/eSIM data/)).toBeTruthy();
-    expect(screen.getByText(/Mobile data plans/)).toBeTruthy();
+    expect(screen.getByText(/Bulk baskets/)).toBeTruthy();
+    expect(screen.getByText(/Airtime/)).toBeTruthy();
   });
 
   it("states whether the hand-prepared queue can actually be worked", async () => {

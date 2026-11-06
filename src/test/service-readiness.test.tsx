@@ -45,7 +45,7 @@ describe("service readiness", () => {
     const ranks = readiness.map((entry) => SERVICE_STATE_RANK[entry.state]);
     expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
     expect(readiness[0].state).toBe("buy");
-    expect(readiness.at(-1)?.state).toBe("unavailable");
+    expect(readiness.at(-1)?.state).toBe("preview");
   });
 
   it("says ordering is paused when a supplier key is missing, not that the category is gone", () => {

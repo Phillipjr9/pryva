@@ -4,7 +4,8 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CommandPalette, CommandPaletteTrigger } from "@/components/command/CommandPalette";
-import { ArrowRight, Bell, Close, Logout, Menu, Wallet } from "@/components/icons";
+import { ArrowRight, Close, Logout, Menu, Wallet } from "@/components/icons";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { NavIcon, type NavArt } from "@/components/dashboard/NavIcon";
 import { ProfileAvatar } from "@/components/dashboard/ProfileAvatar";
@@ -306,22 +307,7 @@ export function DashboardShell({
                 <Wallet className="h-3.5 w-3.5 text-lav-600" />
                 {formatNaira(user.walletBalance)}
               </Link>
-              <Link
-                href="/dashboard/notifications"
-                className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-white text-ink-2 transition-colors hover:text-ink"
-                aria-label={
-                  unreadNotifications > 0
-                    ? `Notifications, ${unreadNotifications} unread`
-                    : "Notifications"
-                }
-              >
-                <Bell className="h-4 w-4" />
-                {unreadNotifications > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-lav-700 px-1 text-micro font-bold text-white">
-                    {unreadNotifications}
-                  </span>
-                )}
-              </Link>
+              <NotificationBell className="h-9 w-9 p-0" />
 
               <Link
                 href={`/dashboard/support#ask=${encodeURIComponent("I need help with my account, order or wallet")}`}

@@ -48,7 +48,12 @@ const DETAIL: Record<ServiceId, Copy> = {
       : supplier("bitcall")
         ? "Travel data plans are read live from the network, priced in naira and issued as an activation code."
         : "eSIM ordering is not connected yet, so no plans can be ordered.",
-  proxies: () => "Proxy ordering is not connected, so no proxy plan can be ordered or charged.",
+  proxies: ({ preview, supplier }) =>
+    supplier("fleexa")
+      ? "Proxy bandwidth plans are priced in naira and can be bought from your wallet."
+      : preview
+        ? "Ordering is unavailable in this environment."
+        : "Proxy ordering is not connected yet, so no proxy plan can be ordered or charged.",
   email: ({ preview }) =>
     preview
       ? "The temporary inbox is unavailable in this environment."
@@ -59,9 +64,18 @@ const DETAIL: Record<ServiceId, Copy> = {
       : preview
         ? "Ordering is unavailable in this environment."
         : "Marketplace ordering is not connected, so there are no available listings to buy.",
-  subscriptions: () =>
-    "Subscriptions cannot be ordered yet; plans and prices are not currently shown.",
-  data: () => "Mobile data ordering is not connected, so plans and prices are not currently shown.",
+  subscriptions: ({ preview, supplier }) =>
+    supplier("fleexa")
+      ? "Entertainment and tool subscriptions can be bought from your wallet."
+      : preview
+        ? "Ordering is unavailable in this environment."
+        : "Subscriptions are not connected yet, so plans and prices are not currently shown.",
+  data: ({ preview, supplier }) =>
+    supplier("fleexa")
+      ? "Mobile data plans for MTN, Airtel, Glo and 9mobile are priced in naira and can be bought from your wallet."
+      : preview
+        ? "Ordering is unavailable in this environment."
+        : "Mobile data ordering is not connected yet, so plans and prices are not currently shown.",
   tools: ({ preview, supplier }) =>
     supplier("fleexa")
       ? "Bulk orders buy the same units as a single order. Eligible schedules run nightly."

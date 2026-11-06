@@ -153,6 +153,30 @@ export const onboardingEmailLog = pgTable(
   ],
 );
 
+/**
+ * An operator-requested account closure awaiting email confirmation.
+ *
+ * The operator starts the ban; a confirmation link is mailed to the account's
+ * address, and the closure only takes effect when that link is clicked. The
+ * identity scrubbing and record retention follow the same rules as
+ * self-service closure (see `users.deleted_at` and `account_deletions`).
+ */
+export const adminBans = pgTable("admin_bans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  adminId: uuid("admin_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "set null" }),
+  adminEmail: varchar("admin_email", { length: 200 }).notNull(),
+  reason: varchar("reason", { length: 200 }),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const accountDeletions = pgTable(
   "account_deletions",
   {
