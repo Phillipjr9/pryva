@@ -2,8 +2,8 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/identity/auth";
 import { AccessLevel } from "./AccessLevel";
 import { db } from "@/db";
-import { users, orders } from "@/db/schema";
-import { count, desc, ilike, inArray, or, sql } from "drizzle-orm";
+import { users, orders, sessions, accountSignals } from "@/db/schema";
+import { count, desc, ilike, inArray, max, or, sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,22 @@ function formatNaira(amount: number) {
 function formatDate(value: Date | string) {
   const date = typeof value === "string" ? new Date(value) : value;
   return date.toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatDateTime(value: Date | string) {
+  const date = typeof value === "string" ? new Date(value) : value;
+  return date.toLocaleString("en-NG", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function shortenHash(hash: string | null) {
+  if (!hash) return "—";
+  return `${hash.slice(0, 8)}…`;
 }
 
 /**
@@ -113,6 +129,40 @@ export default async function AdminUsersPage({
     }
   }
 
+  // Last sign-in per user on this page: the most recent session creation.
+  const lastSignIn = new Map<string, Date>();
+  if (pageIds.length > 0) {
+    const signed = await db
+      .select({
+        userId: sessions.userId,
+        lastAt: max(sessions.createdAt),
+      })
+      .from(sessions)
+      .where(inArray(sessions.userId, pageIds))
+      .groupBy(sessions.userId);
+    for (const row of signed) {
+      if (row.lastAt) lastSignIn.set(row.userId, row.lastAt);
+    }
+  }
+
+  // Where they signed in from: hashed IP + device fingerprint. Hashed so the
+  // admin UI never reveals a real IP address, but identical hashes across
+  // accounts reveal shared devices or networks — the spam signal.
+  const signInFrom = new Map<string, { ipHash: string | null; userAgentHash: string | null }>();
+  if (pageIds.length > 0) {
+    const signals = await db
+      .select({
+        userId: accountSignals.userId,
+        ipHash: accountSignals.ipHash,
+        userAgentHash: accountSignals.userAgentHash,
+      })
+      .from(accountSignals)
+      .where(inArray(accountSignals.userId, pageIds));
+    for (const row of signals) {
+      signInFrom.set(row.userId, { ipHash: row.ipHash, userAgentHash: row.userAgentHash });
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil(Number(total) / PAGE_SIZE));
   const walletTotal = rows.reduce((sum, row) => sum + row.walletBalance, 0);
 
@@ -163,13 +213,15 @@ export default async function AdminUsersPage({
               <th className="px-4 py-3 font-semibold">Orders</th>
               <th className="px-4 py-3 font-semibold">Spent</th>
               <th className="px-4 py-3 font-semibold">Sign-in</th>
+              <th className="px-4 py-3 font-semibold">Last sign in</th>
+              <th className="px-4 py-3 font-semibold">From</th>
               <th className="px-4 py-3 font-semibold">Joined</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-ink-2">
+                <td colSpan={8} className="px-4 py-10 text-center text-ink-2">
                   No users match that search.
                 </td>
               </tr>
@@ -201,6 +253,12 @@ export default async function AdminUsersPage({
                   <td className="px-4 py-3">{formatNaira(stats?.spent ?? 0)}</td>
                   <td className="px-4 py-3">
                     <SignInState lockedUntil={row.lockedUntil} attempts={row.failedLoginAttempts} />
+                  </td>
+                  <td className="px-4 py-3 text-[0.8rem] text-ink-2">
+                    {lastSignIn.get(row.id) ? formatDateTime(lastSignIn.get(row.id)!) : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-[0.8rem] text-ink-2">
+                    {signInFrom.get(row.id) ? shortenHash(signInFrom.get(row.id)!.ipHash) : "—"}
                   </td>
                   <td className="px-4 py-3 text-ink-2">{formatDate(row.createdAt)}</td>
                 </tr>
