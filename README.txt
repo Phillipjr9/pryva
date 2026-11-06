@@ -30,6 +30,21 @@ other integrations and hosting credentials must also be isolated from production
 .env.example documents configuration names and contains placeholders only. Do not
 commit populated environment files.
 
+Admin console
+-------------
+
+The operator console at /admin uses an AdminLTE-inspired shell and dashboard.
+The stylesheet is built from the MIT-licensed admin-lte 4.10.0 package and scoped
+to .admin-app so it cannot restyle the customer storefront:
+
+  npm run admin:theme
+
+The rebuilt overview at /admin/overview reports database-derived totals, queues
+and delivered-order revenue for 7/30/90-day UTC windows; /admin/dashboard redirects
+there while preserving the selected period. Integrity checks are read-only and
+must not be used as a payout or refund control. Operator authentication, admin
+authorization and 2FA remain the existing requireAdmin/authorizeAdminApi paths.
+
 Useful checks (Node 22)
 -----------------------
 

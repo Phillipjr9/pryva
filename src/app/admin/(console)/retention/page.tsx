@@ -26,7 +26,7 @@ export default async function AdminRetentionPage() {
   const cutoff = retentionCutoff();
 
   return (
-    <main className="space-y-6 p-6">
+    <div className="space-y-6">
       <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
         <p className="text-micro font-semibold uppercase tracking-[0.14em] text-lav-700">Compliance</p>
         <h1 className="mt-3 text-2xl font-semibold text-ink">Retention and deletion controls</h1>
@@ -82,6 +82,6 @@ export default async function AdminRetentionPage() {
           </p>
         </div>
       </section>
-    </main>
+    </div>
   );
 }

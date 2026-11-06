@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { SupportChat } from "@/components/support/SupportChat";
 
 function ChatIcon() {
@@ -13,6 +14,7 @@ function ChatIcon() {
 }
 
 export function SupportFloatButton() {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(true);
   const [open, setOpen] = useState(false);
   const lastScrollY = useRef(0);
@@ -41,6 +43,10 @@ export function SupportFloatButton() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
+
+  // Operators have their own support and account queues; never mount the
+  // customer assistant inside the privileged console.
+  if (pathname?.startsWith("/admin")) return null;
 
   return (
     <>

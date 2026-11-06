@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ArrowRight } from "@/components/icons";
 import { formatCurrency } from "@/lib/platform/utils";
 import { cn } from "@/lib/platform/utils";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -133,16 +134,21 @@ export default async function AdminAnalyticsPage() {
   const signupIds = signupRows.map((row) => row.id);
   const orderCounts = new Map<string, number>();
   if (signupIds.length > 0) {
-    const grouped = await db
-      .select({
-        userId: orders.userId,
-        count: count(),
-      })
-      .from(orders)
-      .where(inArray(orders.userId, signupIds))
-      .groupBy(orders.userId);
-    for (const row of grouped) {
-      orderCounts.set(row.userId, Number(row.count));
+    if (isPreviewDatabase()) {
+      const rowsForCounts = await db.select({ userId: orders.userId }).from(orders).where(inArray(orders.userId, signupIds));
+      for (const row of rowsForCounts) orderCounts.set(row.userId, (orderCounts.get(row.userId) ?? 0) + 1);
+    } else {
+      const grouped = await db
+        .select({
+          userId: orders.userId,
+          count: count(),
+        })
+        .from(orders)
+        .where(inArray(orders.userId, signupIds))
+        .groupBy(orders.userId);
+      for (const row of grouped) {
+        orderCounts.set(row.userId, Number(row.count));
+      }
     }
   }
 
@@ -162,18 +168,32 @@ export default async function AdminAnalyticsPage() {
   const unverifiedUsers = totalUsers - verifiedUsers - closedUsers;
 
   // What customers are actually buying: top products by order count.
-  const productRows = await db
-    .select({
-      service: orders.service,
-      productName: orders.productName,
-      planLabel: orders.planLabel,
-      orders: count(),
-      revenue: sql<number>`coalesce(sum(${orders.amount}), 0)`,
-    })
-    .from(orders)
-    .groupBy(orders.service, orders.productName, orders.planLabel)
-    .orderBy(desc(count()))
-    .limit(10);
+  let productRows: { service: string; productName: string; planLabel: string; orders: number; revenue: number }[];
+  if (isPreviewDatabase()) {
+    const rawProducts = await db.select({ service: orders.service, productName: orders.productName, planLabel: orders.planLabel, amount: orders.amount }).from(orders);
+    const groupedProducts = new Map<string, typeof productRows[number]>();
+    for (const row of rawProducts) {
+      const key = `${row.service}\u0000${row.productName}\u0000${row.planLabel}`;
+      const current = groupedProducts.get(key) ?? { service: row.service, productName: row.productName, planLabel: row.planLabel, orders: 0, revenue: 0 };
+      current.orders += 1;
+      current.revenue += Number(row.amount);
+      groupedProducts.set(key, current);
+    }
+    productRows = [...groupedProducts.values()].sort((a, b) => b.orders - a.orders).slice(0, 10);
+  } else {
+    productRows = (await db
+      .select({
+        service: orders.service,
+        productName: orders.productName,
+        planLabel: orders.planLabel,
+        orders: count(),
+        revenue: sql<number>`coalesce(sum(${orders.amount}), 0)`,
+      })
+      .from(orders)
+      .groupBy(orders.service, orders.productName, orders.planLabel)
+      .orderBy(desc(count()))
+      .limit(10)).map((row) => ({ ...row, orders: Number(row.orders), revenue: Number(row.revenue) }));
+  }
 
   const products: ProductRow[] = productRows.map((row) => ({
     service: row.service,
@@ -190,8 +210,8 @@ export default async function AdminAnalyticsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-cream p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div>
+      <div className="space-y-6">
         <div>
           <h1 className="text-[2rem] font-medium tracking-tight text-ink">
             Admin Analytics

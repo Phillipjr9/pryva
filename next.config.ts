@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   // Security headers live in src/proxy.ts (they must know whether the request
   // is inside an embedded preview, so they cannot be static here).
   poweredByHeader: false,
+  // The console renders its own error boundary; keep the dev badge from
+  // covering the sidebar footer in embedded previews.
+  devIndicators: false,
   allowedDevOrigins: [
     "localhost",
     "127.0.0.1",

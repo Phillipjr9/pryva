@@ -152,13 +152,17 @@ describe("features that had an endpoint but no screen", () => {
   });
 
   it("replaces the invented growth metric with a count somebody has to act on", () => {
-    const source = read("app/admin/(console)/dashboard/page.tsx");
+    // The rebuilt console keeps one overview; the legacy URL only redirects.
+    const legacy = read("app/admin/(console)/dashboard/page.tsx");
+    expect(legacy).toContain('redirect(`/admin/overview?days=');
+    const source = read("app/admin/(console)/overview/page.tsx");
     expect(source).not.toContain('value: "+12%"');
     // Tickets the assistant could not settle, not form submissions nobody has
     // touched: the number on the dashboard is the work, not the inbox depth.
-    expect(source).toContain("Tickets needing a person");
+    expect(source).toContain("Escalated tickets");
+    expect(source).toContain("count: data.escalatedTickets");
     expect(source).toContain('href: "/admin/support?status=escalated"');
-    expect(source).toContain('eq(supportTickets.status, "escalated")');
+    expect(read("app/admin/(console)/layout.tsx")).toContain('eq(supportTickets.status, "escalated")');
   });
 });
 
