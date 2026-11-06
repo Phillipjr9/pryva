@@ -162,7 +162,10 @@ export async function createSession(userId: string, request?: Request): Promise<
       embedded,
       secure,
       proto,
-      host: /^[a-zA-Z0-9._:[-\]]+$/.test(rawHost) ? rawHost : "[invalid-host]",
+      // The hyphen must be escaped or last: `[-\]]` parses as a range from `[`
+      // to `]`, so every `3000-<sandbox>.e2b.app` preview host was logged as
+      // "[invalid-host]" — hiding the one field that explains a refused cookie.
+      host: /^[a-zA-Z0-9._:\[\]-]+$/.test(rawHost) ? rawHost : "[invalid-host]",
       dest: request?.headers.get("sec-fetch-dest") ?? "-",
       site: request?.headers.get("sec-fetch-site") ?? "-",
     });
@@ -268,7 +271,11 @@ export async function requireAdmin(nextPath = "/admin"): Promise<PublicUser> {
   // the same session; this only decides which page asks for it.
   const signedOut = await getCurrentUser();
   if (!signedOut) {
-    redirect(`/admin/login?next=${encodeURIComponent(nextPath)}`);
+    // `bounced` lets the operator door explain the failure that looks like a
+    // broken button: sign-in returns 200, the browser refuses the session cookie
+    // in an embedded preview, and the next request lands here again. The customer
+    // door already does this; without it the console just re-shows an empty form.
+    redirect(`/admin/login?next=${encodeURIComponent(nextPath)}&bounced=1`);
   }
   const user = signedOut;
 

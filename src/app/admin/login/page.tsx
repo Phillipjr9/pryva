@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { getCurrentUser, isAdminUser } from "@/lib/identity/auth";
 import { operatorHomeFor } from "@/lib/platform/operator";
+import { isArenaPreviewHost } from "@/lib/platform/net";
 import { safeRedirectPath } from "@/lib/platform/safe-redirect";
 import { Shield, Lock } from "@/components/icons";
 
@@ -38,11 +40,13 @@ function operatorNext(value: unknown): string {
 export default async function AdminLoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; error?: string; denied?: string }>;
+  searchParams: Promise<{ next?: string; error?: string; denied?: string; bounced?: string }>;
 }) {
-  const { next, error, denied } = await searchParams;
+  const { next, error, denied, bounced } = await searchParams;
   const target = operatorNext(next);
   const user = await getCurrentUser();
+  const headerList = await headers();
+  const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
 
   if (user) {
     if (isAdminUser(user)) redirect(target);
@@ -65,6 +69,38 @@ export default async function AdminLoginPage({
             This door is for administrators. Customers sign in from the main site.
           </p>
         </div>
+
+        {bounced === "1" && (
+          <div
+            role="alert"
+            className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.84rem] text-amber-900"
+          >
+            <strong className="font-semibold">Just signed in and landed back here?</strong>
+            <p className="mt-1 leading-relaxed">
+              {isArenaPreviewHost(host)
+                ? "This preview is embedded, and your browser will not let an embedded page keep the sign-in cookie. Refreshing will not help — open the console in its own tab and sign in there."
+                : "The browser may be blocking the session cookie in this embedded page. Try opening the console in its own tab."}
+            </p>
+            <p className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+              <a
+                href={`/admin/login?next=${encodeURIComponent(target)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold underline underline-offset-2"
+              >
+                Open the console in a new tab
+              </a>
+              <a
+                href="/api/auth/whoami"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold underline underline-offset-2"
+              >
+                Check what the server sees
+              </a>
+            </p>
+          </div>
+        )}
 
         {denied === "1" && (
           <div
