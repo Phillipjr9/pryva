@@ -6,23 +6,17 @@ import {
   isEmbeddedPreviewHost,
 } from "@/lib/platform/security-headers";
 import { FRAMEWORK_BANNERS } from "@/lib/platform/server-banner";
-import { previewLandingRedirect } from "@/lib/platform/preview-landing";
 
 export function proxy(request: NextRequest) {
-  // The isolated in-memory preview must be embeddable in the Arena viewer.
-  // Keep clickjacking protection for real databases and non-preview hosts.
-  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? request.nextUrl.host;
-  const embeddedPreview = !process.env.DATABASE_URL?.trim() && isEmbeddedPreviewHost(host);
-
-  // An opt-in preview opens on the operator console instead of the storefront.
-  // Off unless PREVIEW_LANDING_PATH names an /admin path and no database is
-  // configured; `/?storefront=1` and the console's own storefront link still
-  // reach the shop.
-  const response = previewLandingRedirect(request) ?? NextResponse.next();
+  const response = NextResponse.next();
 
   // Security headers
   response.headers.set("X-DNS-Prefetch-Control", "on");
   response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  // The isolated in-memory preview must be embeddable in the Arena viewer.
+  // Keep clickjacking protection for real databases and non-preview hosts.
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? request.nextUrl.host;
+  const embeddedPreview = !process.env.DATABASE_URL?.trim() && isEmbeddedPreviewHost(host);
   if (!embeddedPreview) response.headers.set("X-Frame-Options", "SAMEORIGIN");
   response.headers.set(
     CONTENT_SECURITY_POLICY_HEADER,

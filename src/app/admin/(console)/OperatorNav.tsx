@@ -141,9 +141,7 @@ export function OperatorNav({
         </nav>
       </div>
       <div className="sidebar-footer">
-        {/* `?storefront=1` asks for the shop explicitly: a review preview may be
-            configured to open `/` on this console, and the link must still leave. */}
-        <Link href="/?storefront=1" onClick={onNavigate}><Globe className="h-4 w-4" /> View storefront <ArrowUpRight className="ms-auto h-3 w-3" /></Link>
+        <Link href="/" onClick={onNavigate}><Globe className="h-4 w-4" /> View storefront <ArrowUpRight className="ms-auto h-3 w-3" /></Link>
         <p>Pryva operator workspace</p>
       </div>
     </aside>
