@@ -25,7 +25,10 @@ type Section = { label: string; items: Item[] };
 const SECTIONS: Section[] = [
   {
     label: "Overview",
-    items: [{ href: "/admin", label: "Console home" }],
+    items: [
+      { href: "/admin", label: "Console home" },
+      { href: "/admin/overview", label: "Dashboard overview" },
+    ],
   },
   {
     label: "Money out",
