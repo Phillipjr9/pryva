@@ -16,6 +16,9 @@ import {
   User,
   Users,
   Activity,
+  Card,
+  Monitor,
+  Clock,
 } from "@/components/icons";
 import { cn, formatCurrency } from "@/lib/platform/utils";
 
@@ -72,12 +75,12 @@ type StatCard = {
   sparkline: number[];
 };
 
-const STAT_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  lav: { bg: "bg-lav-50", text: "text-lav-700", border: "border-lav-100" },
-  peach: { bg: "bg-orange-50", text: "text-orange-600", border: "border-orange-100" },
-  mint: { bg: "bg-green-50", text: "text-green-600", border: "border-green-100" },
-  blue: { bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-100" },
-  rose: { bg: "bg-rose-50", text: "text-rose-600", border: "border-rose-100" },
+const STAT_COLORS: Record<string, { bg: string; text: string; border: string; gradient: string }> = {
+  lav: { bg: "bg-lav-50", text: "text-lav-700", border: "border-lav-100", gradient: "from-lav-400 to-lav-600" },
+  peach: { bg: "bg-orange-50", text: "text-orange-600", border: "border-orange-100", gradient: "from-orange-400 to-orange-600" },
+  mint: { bg: "bg-green-50", text: "text-green-600", border: "border-green-100", gradient: "from-emerald-400 to-emerald-600" },
+  blue: { bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-100", gradient: "from-blue-400 to-blue-600" },
+  rose: { bg: "bg-rose-50", text: "text-rose-600", border: "border-rose-100", gradient: "from-rose-400 to-rose-600" },
 };
 
 const TREND_STYLES: Record<string, string> = {
@@ -93,27 +96,33 @@ const TREND_ICONS: Record<string, React.ComponentType<{ className?: string }>> =
 };
 
 function sparkline(points: number[]) {
-  if (points.length === 0) return "";
+  if (points.length === 0) return null;
   const max = Math.max(...points);
   const min = Math.min(...points);
   const range = max === min ? 1 : max - min;
-  const width = 64;
-  const height = 20;
+  const width = 72;
+  const height = 24;
   const step = width / (points.length - 1 || 1);
 
   const coords = points.map((p, i) => {
     const x = i * step;
-    const y = height - ((p - min) / range) * (height - 4);
+    const y = height - ((p - min) / range) * (height - 6);
     return `${x},${y}`;
   });
 
   return (
-    <svg
-      width={width}
-      height={height}
-      className="block"
-      style={{ display: "block" }}
-    >
+    <svg width={width} height={height} className="block">
+      <defs>
+        <linearGradient id="spark-gradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="currentColor" stopOpacity={0.6} />
+          <stop offset="100%" stopColor="currentColor" stopOpacity={0.1} />
+        </linearGradient>
+      </defs>
+      <polyline
+        points={coords.join(" ")}
+        fill="url(#spark-gradient)"
+        stroke="none"
+      />
       <polyline
         points={coords.join(" ")}
         fill="none"
@@ -123,14 +132,14 @@ function sparkline(points: number[]) {
         strokeLinejoin="round"
         opacity={0.5}
       />
-      {points.length > 0 && (
-        <circle
-          cx={coords[points.length - 1].split(",")[0]}
-          cy={coords[points.length - 1].split(",")[1]}
-          r={2.5}
-          fill="currentColor"
-        />
-      )}
+      <circle
+        cx={coords[points.length - 1].split(",")[0]}
+        cy={coords[points.length - 1].split(",")[1]}
+        r={3}
+        fill="currentColor"
+        stroke="#fff"
+        strokeWidth="2"
+      />
     </svg>
   );
 }
@@ -197,18 +206,16 @@ export default async function AdminOverviewPage() {
   const sevenDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
   const dailyRevenue = await db
     .select({
-      day: sql<Date>`date(${orders.createdAt})`,
+      day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
       revenue: sql<number>`coalesce(sum(${orders.amount}), 0)`,
     })
     .from(orders)
     .where(eq(orders.status, "delivered"))
-    .groupBy(sql`date(${orders.createdAt})`);
+    .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`);
 
   const revenueByDay = new Map<string, number>();
   for (const row of dailyRevenue) {
-    // sql<Date> returns a string at runtime, not a Date object.
-    const dayStr = String(row.day).slice(0, 10);
-    revenueByDay.set(dayStr, Number(row.revenue));
+    revenueByDay.set(String(row.day).slice(0, 10), Number(row.revenue));
   }
 
   const chartData = Array.from({ length: 7 }, (_, i) => {
@@ -356,12 +363,13 @@ export default async function AdminOverviewPage() {
             <span className="font-medium text-ink">Data showing for</span>
             <button
               className={cn(
-                "flex items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-1.5 text-[0.8rem] font-medium text-ink-2 transition-colors hover:bg-cream hover:border-lav-300",
+                "flex items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-1.5 text-[0.8rem] font-medium text-ink-2 transition-all",
+                "hover:bg-cream hover:border-lav-300",
                 "focus-visible:outline-2 focus-visible:outline-lav-500 focus-visible:outline-offset-2"
               )}
             >
               Oct 7, 26 – Nov 5, 26
-              <ChevronDown className="h-3 w-3 text-ink-3 transition-transform" />
+              <ChevronDown className="h-3 w-3 text-ink-3 transition-transform duration-200" />
             </button>
           </div>
         </div>
@@ -383,7 +391,7 @@ export default async function AdminOverviewPage() {
           <Link
             href="/admin/messages"
             className={cn(
-              "flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-[0.8rem] font-medium text-ink transition-colors",
+              "flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-[0.8rem] font-medium text-ink transition-all",
               openMessageCount > 0 && "border-lav-400 bg-lav-50",
               "hover:bg-cream hover:border-lav-300"
             )}
@@ -399,7 +407,7 @@ export default async function AdminOverviewPage() {
 
           <Link
             href="/admin/account"
-            className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-[0.8rem] font-medium text-ink transition-colors hover:bg-cream hover:border-lav-300"
+            className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-[0.8rem] font-medium text-ink transition-all hover:bg-cream hover:border-lav-300"
           >
             <div
               className="h-7 w-7 rounded-full bg-lav-100 flex items-center justify-center text-lav-800 font-semibold text-[0.75rem]"
@@ -424,7 +432,8 @@ export default async function AdminOverviewPage() {
               key={stat.label}
               href={stat.href}
               className={cn(
-                "group relative flex flex-col rounded-2xl border border-line bg-white p-5 transition-all hover:border-lav-300 hover:shadow-card",
+                "group relative flex flex-col rounded-2xl border border-line bg-white p-5 transition-all",
+                "hover:border-lav-300 hover:shadow-card",
                 "focus-visible:outline-2 focus-visible:outline-lav-500 focus-visible:outline-offset-2"
               )}
             >
@@ -434,17 +443,17 @@ export default async function AdminOverviewPage() {
                     "grid h-11 w-11 place-items-center rounded-xl",
                     theme.bg,
                     theme.text,
-                    "group-hover:scale-105 transition-transform duration-200"
+                    "group-hover:scale-105 transition-transform duration-300"
                   )}
                 >
                   <Icon className="h-5 w-5" />
                 </div>
-                <TrendIcon className="h-3.5 w-3.5 text-ink-3 opacity-50 group-hover:opacity-100" />
+                <TrendIcon className="h-3.5 w-3.5 text-ink-3 opacity-40 group-hover:opacity-100 transition-opacity duration-300" />
               </div>
               <p className="text-[0.72rem] font-semibold uppercase tracking-wider text-ink-2 mb-1">
                 {stat.label}
               </p>
-              <p className="text-[1.75rem] font-bold text-ink group-hover:text-ink-2 transition-colors">
+              <p className="text-[1.75rem] font-bold text-ink group-hover:text-ink-2 transition-colors duration-200">
                 {stat.value}
               </p>
               <div className={cn("mt-auto mt-4 flex items-center gap-1.5", trendStyle)}>
@@ -471,7 +480,7 @@ export default async function AdminOverviewPage() {
             </div>
             <Link
               href="/admin/orders"
-              className="text-[0.78rem] font-medium text-lav-700 underline underline-offset-2 hover:text-lav-800 transition-colors"
+              className="text-[0.78rem] font-medium text-lav-700 underline underline-offset-2 hover:text-lav-800 transition-colors duration-200"
             >
               View all orders <ArrowRight className="h-3 w-3 ml-1 text-ink-3" />
             </Link>
@@ -498,7 +507,7 @@ export default async function AdminOverviewPage() {
                   </tr>
                 )}
                 {recentOrders.map((row) => (
-                  <tr key={row.id} className="hover:bg-cream/30 transition-colors">
+                  <tr key={row.id} className="hover:bg-cream/30 transition-colors duration-200">
                     <td className="px-4 py-3">
                       <div className="flex flex-col">
                         <p className="font-mono text-[0.72rem] text-ink-2">
@@ -562,7 +571,7 @@ export default async function AdminOverviewPage() {
               </div>
               <Link
                 href="/admin/users"
-                className="text-[0.78rem] font-medium text-lav-700 underline underline-offset-2 hover:text-lav-800 transition-colors"
+                className="text-[0.78rem] font-medium text-lav-700 underline underline-offset-2 hover:text-lav-800 transition-colors duration-200"
               >
                 View all <ArrowRight className="h-3 w-3 ml-1 text-ink-3" />
               </Link>
@@ -653,7 +662,7 @@ export default async function AdminOverviewPage() {
                       </div>
                       <span>{action.label}</span>
                     </div>
-                    <ArrowRight className="h-3 w-3 text-ink-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <ArrowRight className="h-3 w-3 text-ink-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                   </Link>
                 );
               })}
@@ -687,7 +696,7 @@ export default async function AdminOverviewPage() {
               </div>
               <Link
                 href="/admin/messages"
-                className="text-[0.78rem] font-medium text-lav-700 underline underline-offset-2 hover:text-lav-800 transition-colors"
+                className="text-[0.78rem] font-medium text-lav-700 underline underline-offset-2 hover:text-lav-800 transition-colors duration-200"
               >
                 View all <ArrowRight className="h-3 w-3 ml-1 text-ink-3" />
               </Link>
@@ -748,7 +757,7 @@ export default async function AdminOverviewPage() {
       <div className="rounded-2xl border border-line bg-white p-6">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-lav-600" />
+            <Card className="h-4 w-4 text-lav-600" />
             <h2 className="text-[1rem] font-semibold text-ink">Revenue Overview</h2>
           </div>
           <div className="flex items-center gap-2 text-right">
