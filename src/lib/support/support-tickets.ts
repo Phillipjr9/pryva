@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { supportMessages, supportTickets, users } from "@/db/schema";
 import { sendSupportAlertForTicket } from "@/lib/email/contact-message-email";
 import { logger } from "@/lib/platform/logger";
+import { notifyAdminsOfNewMessage, notifyUserOfChatReply } from "@/lib/notifications/chat-notifications";
 
 import type { SupportCategory, SupportPriority, SupportStatus } from "./ai-support/types";
 
@@ -130,6 +131,25 @@ export async function addCustomerMessage(input: {
     .values({ ticketId: input.ticket.id, authorRole: "customer", authorUserId: input.userId, body })
     .returning();
 
+  // Notify admins that the customer sent a message.
+  try {
+    const [customer] = await db
+      .select({ name: users.name, email: users.email })
+      .from(users)
+      .where(eq(users.id, input.userId))
+      .limit(1);
+    if (customer) {
+      await notifyAdminsOfNewMessage({
+        ticketId: input.ticket.id,
+        ticketSubject: input.ticket.subject,
+        customerName: customer.name ?? "Customer",
+        customerEmail: customer.email,
+      });
+    }
+  } catch (error) {
+    logger.error("Failed to notify admins of customer message", { error, ticketId: input.ticket.id });
+  }
+
   // A customer writing reopens a resolved thread rather than starting a second
   // one: the history is the context, and splitting it loses exactly that.
   //
@@ -207,6 +227,26 @@ export async function addAdminMessage(input: {
       assignedAdminId: input.ticket.assignedAdminId ?? input.adminId,
     })
     .where(eq(supportTickets.id, input.ticket.id));
+
+  // Notify the ticket owner that an admin replied.
+  try {
+    const [owner] = await db
+      .select({ id: users.id, email: users.email, name: users.name })
+      .from(users)
+      .where(eq(users.id, input.ticket.userId))
+      .limit(1);
+    if (owner) {
+      await notifyUserOfChatReply({
+        userId: owner.id,
+        ticketId: input.ticket.id,
+        ticketSubject: input.ticket.subject,
+        actorName: "Support team",
+        actorRole: "admin",
+      });
+    }
+  } catch (error) {
+    logger.error("Failed to notify user of admin reply", { error, ticketId: input.ticket.id });
+  }
 
   return message;
 }

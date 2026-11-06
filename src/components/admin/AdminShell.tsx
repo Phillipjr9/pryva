@@ -8,6 +8,7 @@ import {
   ArrowRight, Bell, ChevronDown, Close, Home,
   Menu, Monitor, Moon, Search, Shield, Sun, Users,
 } from "@/components/icons";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 export type AttentionItem = { label: string; description: string; count: number; href: string; kind: "payouts" | "support" | "security" | "messages" };
 type Theme = "light" | "dark" | "system";
@@ -203,6 +204,7 @@ export function AdminShell({
                   <Link href="/admin/health" className="popover-footer" onClick={() => setPopover(null)}>Open operational health</Link>
                 </div>}
               </div>
+              <NotificationBell className="ml-2" />
               <span className="header-divider" />
               <div className="position-relative">
                 <button type="button" className="header-profile" aria-label="Operator menu" aria-expanded={popover === "profile"} aria-controls="admin-profile" onClick={() => setPopover((value) => value === "profile" ? null : "profile")}><span className="header-avatar">{name.charAt(0).toUpperCase()}</span><span className="header-profile-copy"><span className="header-profile-name">{name}</span><span className="header-profile-role">Administrator</span></span><ChevronDown className="d-none d-sm-block" style={{ width: 13, height: 13 }} /></button>
