@@ -242,7 +242,11 @@ describe("a customer talking to the assistant", () => {
 
     expect(screen.getByText(/gift card will not redeem/i)).toBeTruthy();
     expect(screen.getByText(/the code was regenerated/i)).toBeTruthy();
-    expect(screen.getByText(/pryva support team/i)).toBeTruthy();
+    expect(screen.getByText(/pryvalogs support team/i)).toBeTruthy();
+
+    cleanup();
+    render(<SupportChat />);
+    expect(screen.getAllByText(/pryvalogs assistant/i).length).toBeGreaterThan(0);
 
     cleanup();
     render(<SupportChat ticketId="ticket-4" closed />);

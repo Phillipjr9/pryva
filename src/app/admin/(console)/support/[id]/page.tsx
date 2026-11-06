@@ -86,7 +86,7 @@ export default async function AdminSupportTicketPage({ params }: { params: Promi
                 {message.authorRole === "assistant" ? (
                   <>
                     <Sparkle className="h-3.5 w-3.5 text-lav-700" />
-                    <span className="text-micro font-semibold text-lav-800">Pryva assistant</span>
+                    <span className="text-micro font-semibold text-lav-800">PryvaLogs assistant</span>
                   </>
                 ) : message.authorRole === "admin" ? (
                   <>

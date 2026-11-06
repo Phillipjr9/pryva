@@ -139,7 +139,7 @@ export function AssistantPresence({ state = "idle" }: { state?: PresenceState })
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 text-[0.86rem] font-semibold text-ink">
           <Sparkle className="h-3.5 w-3.5 text-lav-700" aria-hidden="true" />
-          Pryva assistant
+          PryvaLogs assistant
         </p>
         <p className="text-meta text-ink-2" aria-live="polite">
           {state === "thinking" ? "Reading your message and checking the account…" : "Here, and ready when you are."}

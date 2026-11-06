@@ -293,7 +293,7 @@ export function SupportChat({
             <div className={`${BUBBLE_BASE} mr-auto rounded-bl-md border border-lav-200 bg-lav-50/60`}>
               <div className="flex items-center gap-1.5">
                 <Sparkle className="h-3.5 w-3.5 text-lav-700" />
-                <span className="text-micro font-semibold text-lav-800">Pryva assistant</span>
+                <span className="text-micro font-semibold text-lav-800">PryvaLogs assistant</span>
               </div>
               <p className="mt-1.5 text-[0.86rem] leading-relaxed text-ink-2">
                 Describe it the way you would to a person. I read your account and can settle most problems
