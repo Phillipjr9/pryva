@@ -82,6 +82,12 @@ describe("fulfilment", () => {
       expect(isPlanFulfillable(slug)).toBe(false);
     }
   });
+
+  it("refuses unsupported country slugs even when they look like a valid virtual-number pattern", () => {
+    for (const slug of ["vn-ke", "vn-za", "vn-in", "vn-ae", "vn-fr", "vn-nl", "vn-br", "vn-es", "vn-it", "vn-pl", "vn-id", "vn-ph", "vn-tr", "vn-mx"]) {
+      expect(isPlanFulfillable(slug)).toBe(false);
+    }
+  });
   it("refuses everything when no provider key is configured", async () => {
     provider.configured = false;
     await expect(fulfillPlan(findPlan("vn-ng")!)).rejects.toMatchObject({ code: "NO_API_KEY" });

@@ -164,29 +164,40 @@ async function fetchOffers(supplier: OtpSupplierId, country: string, regionName:
   return supplier === "fleexa" ? fleexaOffers(country, regionName) : bitcallOffers(country);
 }
 
+function mergeOtpOffer(existing: OtpOffer, next: OtpOffer): OtpOffer {
+  return {
+    ...existing,
+    app: existing.app ?? next.app,
+    costNgn:
+      existing.costNgn === null ? next.costNgn :
+      next.costNgn === null ? existing.costNgn :
+      Math.min(existing.costNgn, next.costNgn),
+    stock:
+      existing.stock === null || next.stock === null ? null :
+      existing.stock + next.stock,
+  };
+}
+
 async function fleexaOffers(country: string, regionName: string): Promise<OtpOffer[]> {
   if (!isFleexaConfigured()) return [];
   const services = await listFleexaSmsServices();
-  const offers: OtpOffer[] = [];
-  const seen = new Set<string>();
+  const offersByKey = new Map<string, OtpOffer>();
   for (const service of services) {
     if (!matchesCountry(service.country, country, regionName)) continue;
     const app = readableApp(service.name);
-    // A row with no app still works: the buyer passes only the country, so
-    // the country itself is the dedupe key for it.
     const key = app ?? country;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    offers.push({
+    const next: OtpOffer = {
       supplier: "fleexa",
       ref: country,
       country,
       app,
       costNgn: service.priceNgn,
       stock: service.stock,
-    });
+    };
+    const existing = offersByKey.get(key);
+    offersByKey.set(key, existing ? mergeOtpOffer(existing, next) : next);
   }
-  return offers;
+  return [...offersByKey.values()];
 }
 
 async function bitcallOffers(country: string): Promise<OtpOffer[]> {

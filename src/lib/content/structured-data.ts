@@ -9,7 +9,7 @@ import { canonicalSiteUrl } from "@/lib/platform/net";
  *
  * Everything here is built from constants and is already stated on a public
  * page. There is deliberately no `aggregateRating`, no `review`, no
- * `foundingDate`, no `address`, no `telephone` and no `sameAs`: PryvaLogs has no
+ * `foundingDate`, no `address`, no `telephone` and no `sameAs`: Pryva has no
  * published reviews yet, no published street address, and no social profiles
  * confirmed for this site. Inventing them to win a rich result would be the
  * same lie as a seeded testimonial, in a format crawlers believe.
@@ -30,7 +30,7 @@ export function organizationSchema(): StructuredDataNode {
     "@context": "https://schema.org",
     "@type": "Organization",
     "@id": `${SITE_URL}/#organization`,
-    name: "PryvaLogs",
+    name: "Pryva",
     url: SITE_URL,
     logo: {
       "@type": "ImageObject",
@@ -39,7 +39,7 @@ export function organizationSchema(): StructuredDataNode {
       height: 512,
     },
     description:
-      "PryvaLogs sells virtual numbers, eSIM data, residential proxies, temporary email inboxes and digital accounts, priced in Naira.",
+      "Pryva sells virtual numbers, eSIM data, residential proxies, temporary email inboxes and digital accounts, priced in Naira.",
     areaServed: { "@type": "Country", name: "Nigeria" },
   };
 }
@@ -53,7 +53,7 @@ export function websiteSchema(): StructuredDataNode {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "@id": `${SITE_URL}/#website`,
-    name: "PryvaLogs",
+    name: "Pryva",
     url: SITE_URL,
     inLanguage: "en-NG",
     publisher: { "@id": `${SITE_URL}/#organization` },

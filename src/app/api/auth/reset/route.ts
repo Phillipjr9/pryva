@@ -15,7 +15,9 @@ export async function POST(request: NextRequest) {
     return Response.json({ ok: false, error: "Invalid request body." }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
   }
   const fields = (body ?? {}) as { token?: unknown; password?: unknown };
-  if (typeof fields.token !== "string" || typeof fields.password !== "string") {
+  const token = typeof fields.token === "string" ? fields.token.trim() : "";
+  const password = typeof fields.password === "string" ? fields.password : "";
+  if (!token || token.length < 20 || token.length > 200 || password.length < 8 || password.length > 128) {
     return Response.json({ ok: false, error: "Invalid request body." }, { status: 400 });
   }
 
@@ -23,7 +25,7 @@ export async function POST(request: NextRequest) {
   if (limit.unavailable) return Response.json({ ok: false, error: "Password resets are temporarily unavailable." }, { status: 503 });
   if (!limit.allowed) return Response.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
 
-  const result = await resetPassword(fields.token, fields.password);
+  const result = await resetPassword(token, password);
   if (!result.ok) return Response.json({ ok: false, error: result.error }, { status: 400 });
   return Response.json({ ok: true });
 }

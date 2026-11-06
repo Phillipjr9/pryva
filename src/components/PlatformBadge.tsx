@@ -17,6 +17,7 @@ export type PlatformSlug =
   | "instagram"
   | "tiktok"
   | "gmail"
+  | "google"
   | "outlook"
   | "x"
   | "telegram"
@@ -37,6 +38,11 @@ export type PlatformSlug =
   | "threads"
   | "kick"
   | "soundcloud"
+  | "binance"
+  | "paypal"
+  | "uber"
+  | "okx"
+  | "tinder"
   | "generic";
 
 const LABELS: Record<PlatformSlug, string> = {
@@ -44,6 +50,7 @@ const LABELS: Record<PlatformSlug, string> = {
   instagram: "Instagram",
   tiktok: "TikTok",
   gmail: "Gmail",
+  google: "Google",
   outlook: "Outlook",
   x: "X (Twitter)",
   telegram: "Telegram",
@@ -64,6 +71,11 @@ const LABELS: Record<PlatformSlug, string> = {
   threads: "Threads",
   kick: "Kick",
   soundcloud: "SoundCloud",
+  binance: "Binance",
+  paypal: "PayPal",
+  uber: "Uber",
+  okx: "OKX",
+  tinder: "Tinder",
   generic: "Digital account",
 };
 
@@ -76,6 +88,7 @@ const MATCHERS: Array<[PlatformSlug, RegExp]> = [
   ["instagram", /\binstagram\b|\binsta\b|\big\b/i],
   ["tiktok", /\btik\s?tok\b/i],
   ["gmail", /\bgmail\b|\bgoogle mail\b/i],
+  ["google", /\bgoogle\b|\bgoogle account\b|\bgoogle play\b/i],
   ["outlook", /\boutlook\b|\bhotmail\b|\bmsn\b/i],
   ["x", /\btwitter\b|(^|\s)x(\s|$)|\bx\.com\b/i],
   ["telegram", /\btelegram\b/i],
@@ -96,6 +109,11 @@ const MATCHERS: Array<[PlatformSlug, RegExp]> = [
   ["threads", /\bthreads\b/i],
   ["kick", /\bkick\b/i],
   ["soundcloud", /\bsoundcloud\b/i],
+  ["binance", /\bbinance\b/i],
+  ["paypal", /\bpaypal\b/i],
+  ["uber", /\buber\b|\buber eats\b/i],
+  ["okx", /\bokx\b/i],
+  ["tinder", /\btinder\b/i],
 ];
 
 export function platformFor(...text: Array<string | null | undefined>): PlatformSlug {

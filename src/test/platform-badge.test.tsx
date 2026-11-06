@@ -24,6 +24,9 @@ describe("platform marks", () => {
     expect(platformFor("Instagram 5k followers")).toBe("instagram");
     expect(platformFor("Gmail accounts (PVA)")).toBe("gmail");
     expect(platformFor("Outlook / Hotmail combo")).toBe("outlook");
+    expect(platformFor("Google account verified")).toBe("google");
+    expect(platformFor("PayPal business verified")).toBe("paypal");
+    expect(platformFor("OKX wallet account")).toBe("okx");
     expect(platformFor("TikTok creator account")).toBe("tiktok");
     expect(platformFor("Twitter / X account 2012")).toBe("x");
     expect(platformFor("Netflix premium 1 month")).toBe("netflix");
@@ -53,6 +56,7 @@ describe("platform marks", () => {
       "instagram",
       "tiktok",
       "gmail",
+      "google",
       "outlook",
       "x",
       "telegram",
@@ -73,6 +77,11 @@ describe("platform marks", () => {
       "threads",
       "kick",
       "soundcloud",
+      "binance",
+      "paypal",
+      "uber",
+      "okx",
+      "tinder",
     ];
 
     const shapes = new Set<string>();

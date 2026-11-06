@@ -61,6 +61,13 @@ export type SmsIntent = { kind: "sms"; country: string };
 export type RentalIntent = { kind: "rental"; country: string; months: number };
 export type PlanIntent = SmsIntent | RentalIntent;
 
+/**
+ * The contract we can actually fulfil through the reseller APIs. This drives the
+ * storefront and the checkout gate together; anything else is intentionally not
+ * offered or sold.
+ */
+export const SUPPORTED_VIRTUAL_NUMBER_COUNTRIES = ["ng", "us", "gb", "ca", "de", "gh"] as const;
+
 const FULFILMENT_MAP: Record<string, PlanIntent> = {
   "vn-ng": { kind: "sms", country: "ng" },
   "vn-us": { kind: "sms", country: "us" },

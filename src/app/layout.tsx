@@ -26,12 +26,13 @@ import { canonicalSiteUrl } from "@/lib/platform/net";
 
 export const metadata: Metadata = {
   metadataBase: new URL(canonicalSiteUrl()),
+  alternates: { canonical: "/" },
   title: {
-    default: "PryvaLogs — Virtual numbers, eSIMs and proxies for Nigeria",
-    template: "%s · PryvaLogs",
+    default: "Pryva — Virtual numbers, eSIMs and proxies for Nigeria",
+    template: "%s · Pryva",
   },
   description:
-    "Explore PryvaLogs plans for virtual numbers, eSIM data, residential proxies and temporary email OTP, priced in Naira.",
+    "Explore Pryva plans for virtual numbers, eSIM data, residential proxies and temporary email OTP, priced in Naira.",
   keywords: [
     "virtual numbers Nigeria",
     "OTP verification Nigeria",
@@ -39,27 +40,35 @@ export const metadata: Metadata = {
     "residential proxies Nigeria",
     "temporary email OTP",
     "pay with Naira",
+    "Pryva",
   ],
+  applicationName: "Pryva",
+  authors: [{ name: "Pryva" }],
+  creator: "Pryva",
+  publisher: "Pryva",
+  category: "technology",
+  classification: "Business and consumer services",
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
   openGraph: {
-    title: "PryvaLogs — Virtual numbers, eSIMs and proxies for Nigeria",
+    title: "Pryva — Virtual numbers, eSIMs and proxies for Nigeria",
     description:
       "Virtual numbers, eSIMs, residential proxies, email OTP and digital accounts. Naira payments, instant delivery and built-in refunds.",
     url: "/",
     type: "website",
     locale: "en_NG",
-    siteName: "PryvaLogs",
+    siteName: "Pryva",
     images: [
       {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "PryvaLogs — numbers, eSIMs and proxies, priced in Naira",
+        alt: "Pryva — numbers, eSIMs and proxies, priced in Naira",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "PryvaLogs — Virtual numbers, eSIMs and proxies for Nigeria",
+    title: "Pryva — Virtual numbers, eSIMs and proxies for Nigeria",
     description:
       "Nigeria's calm way to buy virtual numbers, eSIMs, proxies, inboxes and accounts — in Naira.",
     images: ["/og.png"],

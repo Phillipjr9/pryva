@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { serviceMap, plansFor, formatNaira } from "@/lib/services/catalog";
-import { isPlanFulfillable } from "@/lib/services/fulfillment";
+import { isPlanFulfillable, SUPPORTED_VIRTUAL_NUMBER_COUNTRIES } from "@/lib/services/fulfillment";
 import { orderNumberPlansByCheapestCost } from "@/lib/services/numbers/number-plan-order";
 import { getCurrentUser } from "@/lib/identity/auth";
 import { PlanPurchase } from "@/components/purchase/PlanPurchase";
@@ -11,8 +11,23 @@ import { hasCountryFlag } from "@/lib/platform/countries";
 import { ServiceIcon } from "@/components/ServiceIcon";
 
 export const metadata: Metadata = {
-  title: "Virtual Numbers",
-  description: "Explore virtual-number plans for SMS verification, priced in Naira.",
+  title: "Virtual Numbers Nigeria",
+  description:
+    "Buy virtual numbers in Nigeria for SMS verification, OTP codes and account signups. Compare rental and one-time number plans with Naira pricing.",
+  keywords: [
+    "virtual numbers Nigeria",
+    "buy number for OTP",
+    "SMS verification number",
+    "virtual number for signup",
+    "Naira virtual numbers",
+  ],
+  alternates: { canonical: "/virtual-numbers" },
+  openGraph: {
+    title: "Virtual numbers for SMS verification in Nigeria",
+    description:
+      "Access virtual numbers for OTP and account verification with transparent Naira pricing and instant delivery.",
+    url: "/virtual-numbers",
+  },
 };
 
 export const dynamic = "force-dynamic";
@@ -95,15 +110,9 @@ export default async function VirtualNumbersPage() {
         <div className="shell">
           <h2 className="mb-3 text-[1.75rem] font-semibold text-ink">Countries</h2>
           <p className="mb-6 max-w-2xl text-[0.95rem] text-ink-2">
-            These regions appear in the catalog for instant virtual number verification and rentals.
+            These are the reseller-backed destinations currently available for instant virtual number verification and rentals.
           </p>
-          <CountryChips
-            codes={[
-              "ng", "us", "gb", "ca", "de", "gh", "ke", "za",
-              "in", "ae", "fr", "nl", "br", "es", "it", "pl",
-              "id", "ph", "tr", "mx",
-            ]}
-          />
+          <CountryChips codes={[...SUPPORTED_VIRTUAL_NUMBER_COUNTRIES]} />
         </div>
       </section>
 

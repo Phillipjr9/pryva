@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import ProxiesPage from "@/app/(site)/proxies/page";
 import FaqPage from "@/app/(site)/faq/page";
 import RefundPolicyPage from "@/app/(site)/refund-policy/page";
+import VirtualNumbersPage from "@/app/(site)/virtual-numbers/page";
 import { plans, plansFor } from "@/lib/services/catalog";
 import { isPlanFulfillable } from "@/lib/services/fulfillment";
 
@@ -79,6 +80,28 @@ describe("/refund-policy", () => {
 
   it("keeps the eSIM rule the checkout actually implements", () => {
     expect(markup).toContain("issued before you are charged");
+  });
+});
+
+describe("/virtual-numbers", () => {
+  const source = readFileSync(join(process.cwd(), "src/app/(site)/virtual-numbers/page.tsx"), "utf8");
+
+  it("only advertises the reseller-backed country set", () => {
+    expect(source).toContain("SUPPORTED_VIRTUAL_NUMBER_COUNTRIES");
+    expect(source).not.toContain('"ke"');
+    expect(source).not.toContain('"za"');
+    expect(source).not.toContain('"in"');
+    expect(source).not.toContain('"ae"');
+    expect(source).not.toContain('"fr"');
+    expect(source).not.toContain('"nl"');
+    expect(source).not.toContain('"br"');
+    expect(source).not.toContain('"es"');
+    expect(source).not.toContain('"it"');
+    expect(source).not.toContain('"pl"');
+    expect(source).not.toContain('"id"');
+    expect(source).not.toContain('"ph"');
+    expect(source).not.toContain('"tr"');
+    expect(source).not.toContain('"mx"');
   });
 });
 

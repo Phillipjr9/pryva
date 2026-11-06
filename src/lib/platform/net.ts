@@ -169,10 +169,15 @@ export function isSameOriginMutation(request: Request): boolean {
   const site = request.headers.get("sec-fetch-site");
   if (site === "cross-site" || site === "same-site") return false;
 
-  const origin = request.headers.get("origin");
-  if (!origin) return true; // Non-browser clients do not necessarily send Origin.
-
   const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const origin = request.headers.get("origin");
+
+  if (!origin) {
+    if (!host) return false;
+    const hostname = host.split(":")[0].toLowerCase();
+    return isLocalHost(hostname) || isArenaPreviewHost(host);
+  }
+
   try {
     const expectedOrigin = host
       ? new URL(`${requestProto(request)}://${host}`).origin

@@ -9,8 +9,22 @@ import { hasCountryFlag } from "@/lib/platform/countries";
 import { isEsimOrderingAvailable } from "@/lib/services/esim/esim-availability";
 
 export const metadata: Metadata = {
-  title: "Pricing",
-  description: "Explore catalog prices in Naira and review current service availability.",
+  title: "Pricing & Plans",
+  description:
+    "Compare PryvaLogs pricing for virtual numbers, eSIM, proxies and email OTP in Naira. See current availability and transparent plan costs.",
+  keywords: [
+    "PryvaLogs pricing",
+    "virtual number prices Nigeria",
+    "eSIM price Nigeria",
+    "proxy pricing",
+    "email OTP pricing",
+  ],
+  alternates: { canonical: "/pricing" },
+  openGraph: {
+    title: "PryvaLogs pricing and plans",
+    description: "Compare Naira pricing for virtual numbers, eSIM data, proxies and email OTP services.",
+    url: "/pricing",
+  },
 };
 
 export default function PricingPage() {

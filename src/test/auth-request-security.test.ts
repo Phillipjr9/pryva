@@ -22,8 +22,9 @@ function request(body: string, overrides: Record<string, string> = {}) {
 beforeEach(() => { mocks.check.mockResolvedValue(null); });
 
 describe.each([["login", login.POST], ["signup", signup.POST]] as const)("%s request boundaries", (_name, handler) => {
-  it("rejects cross-origin and non-JSON requests", async () => {
+  it("rejects cross-origin, origin-less and non-JSON requests", async () => {
     expect((await handler(request('{}', { origin: "https://sibling.pryva.test" }))).status).toBe(403);
+    expect((await handler(new Request("https://pryva.test/api/auth/signup", { method: "POST", headers: { host: "pryva.test", "x-forwarded-proto": "https", "content-type": "application/json" }, body: '{}' }))).status).toBe(403);
     expect((await handler(request('{}', { "content-type": "text/plain" }))).status).toBe(415);
   });
   it("rejects oversized, malformed and non-object JSON bodies", async () => {

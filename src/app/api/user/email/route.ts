@@ -4,6 +4,7 @@ import { requestEmailChange } from "@/lib/identity/email-change";
 import { isSameOriginMutation } from "@/lib/platform/net";
 import { authRateLimiter } from "@/lib/platform/rate-limit";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { validateEmail } from "@/lib/platform/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +36,10 @@ export async function POST(request: NextRequest) {
       { status: error instanceof RequestBodyTooLargeError ? 413 : 400 },
     );
   }
-  const email = body && typeof body === "object" && !Array.isArray(body) ? (body as { email?: unknown }).email : undefined;
-  if (typeof email !== "string") return Response.json({ ok: false, error: "Enter a valid email address." }, { status: 400 });
+  const rawEmail = body && typeof body === "object" && !Array.isArray(body) ? (body as { email?: unknown }).email : undefined;
+  const email = typeof rawEmail === "string" ? rawEmail.trim() : "";
+  const emailError = validateEmail(email);
+  if (emailError) return Response.json({ ok: false, error: emailError }, { status: 400 });
 
   const result = await requestEmailChange({ userId: user.id, newEmail: email });
   if (!result.ok) return Response.json({ ok: false, error: result.error }, { status: result.status });

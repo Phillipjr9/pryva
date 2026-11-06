@@ -4,6 +4,7 @@ import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/li
 import { clientIp } from "@/lib/identity/auth-rate-limit";
 import { GENERIC_REQUEST_MESSAGE, rateLimitPasswordReset, requestPasswordReset } from "@/lib/identity/password-reset";
 import { resendConfigured } from "@/lib/email/resend-config";
+import { validateEmail } from "@/lib/platform/validation";
 
 export async function POST(request: NextRequest) {
   if (!isSameOriginMutation(request)) return Response.json({ ok: false, error: "Invalid origin." }, { status: 403 });
@@ -16,8 +17,10 @@ export async function POST(request: NextRequest) {
     return Response.json({ ok: false, error: "Invalid request body." }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 });
   }
   const fields = (body ?? {}) as { email?: unknown };
-  if (typeof fields.email !== "string" || !fields.email.trim()) {
-    return Response.json({ ok: false, error: "Enter your email address." }, { status: 400 });
+  const email = typeof fields.email === "string" ? fields.email.trim() : "";
+  const emailError = validateEmail(email);
+  if (emailError) {
+    return Response.json({ ok: false, error: emailError }, { status: 400 });
   }
 
   // Without a mail provider nothing can be delivered, so this endpoint must not
@@ -38,7 +41,7 @@ export async function POST(request: NextRequest) {
   if (limit.unavailable) return Response.json({ ok: false, error: "Password resets are temporarily unavailable." }, { status: 503 });
   if (!limit.allowed) return Response.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
 
-  await requestPasswordReset(fields.email);
+  await requestPasswordReset(email);
   // The same answer either way: a different response for an unknown address
   // would turn this endpoint into a directory of who has an account.
   return Response.json({ ok: true, message: GENERIC_REQUEST_MESSAGE });

@@ -50,6 +50,23 @@ describe("read-only supplier catalog", () => {
     expect(supplierItemsForCountry(snapshot, "gb").map((item) => item.name)).toEqual(["Telegram", "Temporary inbox"]);
   });
 
+  it("uses real provider marks for live inbox listings", async () => {
+    const { supplierItemsForCountry } = await import("@/lib/services/numbers/fleexa-catalog");
+    const liveEmails = [
+      { id: "gmail-1", name: "Gmail inbox", domain: "gmail.com", stock: 8 },
+      { id: "outlook-1", name: "Outlook inbox", domain: "outlook.com", stock: 5 },
+      { id: "proton-1", name: "Proton Mail inbox", domain: "proton.me", stock: 3 },
+      { id: "mailru-1", name: "Mail.ru inbox", domain: "mail.ru", stock: 2 },
+    ];
+    const items = supplierItemsForCountry({ ...snapshot, email: liveEmails }, "us").filter((item) => item.category === "email");
+    expect(items.map((item) => item.artwork)).toEqual([
+      { kind: "brand", name: "gmail" },
+      { kind: "brand", name: "outlook" },
+      { kind: "brand", name: "protonmail" },
+      { kind: "brand", name: "maildotru" },
+    ]);
+  });
+
   it("coalesces requests and reports partial supplier outages without caching user data", async () => {
     supplier.sms.mockResolvedValue(snapshot.sms);
     supplier.email.mockRejectedValue(new Error("offline"));

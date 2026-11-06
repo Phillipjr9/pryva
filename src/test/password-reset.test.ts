@@ -56,6 +56,16 @@ describe("password reset endpoints", () => {
     expect(response.status).toBe(400);
   });
 
+  it("rejects a malformed email before it reaches the provider or reset logic", async () => {
+    const response = await forgot(build("/api/auth/forgot", {
+      body: { email: "not-an-email" },
+      origin: "https://pryva.test",
+      site: "same-origin",
+    }));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ ok: false, error: "Invalid email address" });
+  });
+
   it("reports 503 instead of a false promise when mail is not configured", async () => {
     // This file sets no RESEND_API_KEY / RESEND_FROM_EMAIL, so the gate must fire
     // before the rate limiter is touched and before any reset token is written.

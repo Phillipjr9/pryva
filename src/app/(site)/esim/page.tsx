@@ -8,8 +8,22 @@ import { isEsimOrderingAvailable } from "@/lib/services/esim/esim-availability";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "eSIM",
-  description: "Explore eSIM data plans and check current travel and local coverage.",
+  title: "Buy eSIM Data in Nigeria",
+  description:
+    "Buy eSIM data plans for travel and local use in Nigeria. Compare coverage, validity and pricing before activation.",
+  keywords: [
+    "buy eSIM Nigeria",
+    "travel eSIM",
+    "data eSIM Nigeria",
+    "cheap eSIM plan",
+    "international eSIM",
+  ],
+  alternates: { canonical: "/esim" },
+  openGraph: {
+    title: "Buy eSIM data plans in Nigeria",
+    description: "Compare current eSIM plans, validity and Naira pricing for travel and local data use.",
+    url: "/esim",
+  },
 };
 
 export default function ESIMPage() {
