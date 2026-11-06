@@ -525,6 +525,251 @@ export async function getFleexaRentalSms(rentalId: string): Promise<{
 }
 
 /* ------------------------------------------------------------------ */
+/* Proxies                                                              */
+/* ------------------------------------------------------------------ */
+
+/** A proxy plan listed by the supplier. Field names follow the same tolerant
+ *  pattern as the rest of this client: every field is read across known
+ *  aliases because the written contract has not been confirmed against a live
+ *  key. Smoke-test a single cheap purchase before taking customer money. */
+export type FleexaProxyPlan = {
+  id: string | null;
+  name: string | null;
+  region: string | null;
+  dataGb: number | null;
+  priceNgn: number | null;
+  durationDays: number | null;
+  stock: number | null;
+};
+
+export async function listFleexaProxyPlans(): Promise<FleexaProxyPlan[]> {
+  const res = await fleexaFetch("/proxy/plans");
+  return listFrom(res, undefined, true).map((item) => ({
+    id: pickString(item, [["id"], ["plan_id"], ["code"], ["slug"]]),
+    name: pickString(item, [["name"], ["plan_name"], ["title"]]),
+    region: pickString(item, [["region"], ["country"], ["location"]]),
+    dataGb: pickNumber(item, [["data_gb"], ["gb"], ["data"], ["allowance"]]),
+    priceNgn: pickNumber(item, [["price_ngn"], ["price"], ["rate"], ["amount"]]),
+    durationDays: pickNumber(item, [["duration_days"], ["days"], ["validity"]]),
+    stock: pickNumber(item, [["stock"], ["available"], ["count"]]),
+  }));
+}
+
+export type FleexaProxyOrder = {
+  requestId: string;
+  region: string | null;
+  dataGb: number | null;
+  priceNgn: number | null;
+  proxyType: string | null;
+  credentials: UnknownRecord | null;
+  expiresAt: string | null;
+  raw: UnknownRecord;
+};
+
+export async function buyFleexaProxy(params: {
+  planId?: string;
+  region?: string;
+  dataGb?: number;
+}): Promise<FleexaProxyOrder> {
+  const body: Record<string, unknown> = {};
+  if (params.planId) body.plan_id = params.planId;
+  if (params.region) body.region = params.region;
+  if (params.dataGb !== undefined) body.data_gb = params.dataGb;
+
+  const res = await fleexaFetch("/proxy/buy", { method: "POST", body });
+  const data = res.data ? asRecord(res.data) : res;
+
+  const requestId = pickString(data, [
+    ["request_id"], ["requestId"], ["order_id"], ["id"], ["reference"],
+  ]);
+
+  if (!requestId) throw new FleexaError("Provider receipt is incomplete and needs reconciliation", 502, "INCOMPLETE_RECEIPT");
+
+  return {
+    requestId,
+    region: pickString(data, [["region"], ["country"], ["location"]]),
+    dataGb: pickNumber(data, [["data_gb"], ["gb"], ["data"], ["allowance"]]),
+    priceNgn: pickNumber(data, [["price_ngn"], ["price"], ["rate"], ["amount"]]),
+    proxyType: pickString(data, [["proxy_type"], ["type"]]),
+    credentials: asRecord(data.credentials) ?? null,
+    expiresAt: pickString(data, [["expires_at"], ["valid_until"], ["deadline"]]),
+    raw: data,
+  };
+}
+
+export type FleexaProxyStatus = {
+  status: string;
+  raw: UnknownRecord;
+};
+
+export async function checkFleexaProxy(requestId: string): Promise<FleexaProxyStatus> {
+  const res = await fleexaFetch(`/proxy/check/${encodeURIComponent(requestId)}`);
+  const data = res.data ? asRecord(res.data) : res;
+  return {
+    status: pickString(data, [["status"], ["state"]]) ?? "pending",
+    raw: asRecord(data),
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Subscriptions                                                        */
+/* ------------------------------------------------------------------ */
+
+export type FleexaSubscriptionPlan = {
+  id: string | null;
+  name: string | null;
+  region: string | null;
+  priceNgn: number | null;
+  durationDays: number | null;
+  stock: number | null;
+};
+
+export async function listFleexaSubscriptionPlans(): Promise<FleexaSubscriptionPlan[]> {
+  const res = await fleexaFetch("/subscription/plans");
+  return listFrom(res, undefined, true).map((item) => ({
+    id: pickString(item, [["id"], ["plan_id"], ["code"], ["slug"]]),
+    name: pickString(item, [["name"], ["plan_name"], ["title"]]),
+    region: pickString(item, [["region"], ["country"], ["location"]]),
+    priceNgn: pickNumber(item, [["price_ngn"], ["price"], ["rate"], ["amount"]]),
+    durationDays: pickNumber(item, [["duration_days"], ["days"], ["validity"]]),
+    stock: pickNumber(item, [["stock"], ["available"], ["count"]]),
+  }));
+}
+
+export type FleexaSubscriptionOrder = {
+  requestId: string;
+  region: string | null;
+  priceNgn: number | null;
+  service: string | null;
+  expiresAt: string | null;
+  raw: UnknownRecord;
+};
+
+export async function buyFleexaSubscription(params: {
+  planId?: string;
+  region?: string;
+}): Promise<FleexaSubscriptionOrder> {
+  const body: Record<string, unknown> = {};
+  if (params.planId) body.plan_id = params.planId;
+  if (params.region) body.region = params.region;
+
+  const res = await fleexaFetch("/subscription/buy", { method: "POST", body });
+  const data = res.data ? asRecord(res.data) : res;
+
+  const requestId = pickString(data, [
+    ["request_id"], ["requestId"], ["order_id"], ["id"], ["reference"],
+  ]);
+
+  if (!requestId) throw new FleexaError("Provider receipt is incomplete and needs reconciliation", 502, "INCOMPLETE_RECEIPT");
+
+  return {
+    requestId,
+    region: pickString(data, [["region"], ["country"], ["location"]]),
+    priceNgn: pickNumber(data, [["price_ngn"], ["price"], ["rate"], ["amount"]]),
+    service: pickString(data, [["service"], ["product"], ["plan"]]),
+    expiresAt: pickString(data, [["expires_at"], ["valid_until"], ["deadline"]]),
+    raw: data,
+  };
+}
+
+export type FleexaSubscriptionStatus = {
+  status: string;
+  raw: UnknownRecord;
+};
+
+export async function checkFleexaSubscription(requestId: string): Promise<FleexaSubscriptionStatus> {
+  const res = await fleexaFetch(`/subscription/check/${encodeURIComponent(requestId)}`);
+  const data = res.data ? asRecord(res.data) : res;
+  return {
+    status: pickString(data, [["status"], ["state"]]) ?? "pending",
+    raw: asRecord(data),
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Mobile data                                                            */
+/* ------------------------------------------------------------------ */
+
+export type FleexaDataPlan = {
+  id: string | null;
+  name: string | null;
+  network: string | null;
+  dataGb: number | null;
+  priceNgn: number | null;
+  durationDays: number | null;
+  stock: number | null;
+};
+
+export async function listFleexaDataPlans(): Promise<FleexaDataPlan[]> {
+  const res = await fleexaFetch("/data/plans");
+  return listFrom(res, undefined, true).map((item) => ({
+    id: pickString(item, [["id"], ["plan_id"], ["code"], ["slug"]]),
+    name: pickString(item, [["name"], ["plan_name"], ["title"]]),
+    network: pickString(item, [["network"], ["carrier"], ["provider"]]),
+    dataGb: pickNumber(item, [["data_gb"], ["gb"], ["data"], ["allowance"]]),
+    priceNgn: pickNumber(item, [["price_ngn"], ["price"], ["rate"], ["amount"]]),
+    durationDays: pickNumber(item, [["duration_days"], ["days"], ["validity"]]),
+    stock: pickNumber(item, [["stock"], ["available"], ["count"]]),
+  }));
+}
+
+export type FleexaDataOrder = {
+  requestId: string;
+  network: string | null;
+  phoneNumber: string | null;
+  dataGb: number | null;
+  priceNgn: number | null;
+  expiresAt: string | null;
+  raw: UnknownRecord;
+};
+
+export async function buyFleexaData(params: {
+  planId?: string;
+  network?: string;
+  phoneNumber?: string;
+  dataGb?: number;
+}): Promise<FleexaDataOrder> {
+  const body: Record<string, unknown> = {};
+  if (params.planId) body.plan_id = params.planId;
+  if (params.network) body.network = params.network;
+  if (params.phoneNumber) body.phone_number = params.phoneNumber;
+  if (params.dataGb !== undefined) body.data_gb = params.dataGb;
+
+  const res = await fleexaFetch("/data/buy", { method: "POST", body });
+  const data = res.data ? asRecord(res.data) : res;
+
+  const requestId = pickString(data, [
+    ["request_id"], ["requestId"], ["order_id"], ["id"], ["reference"],
+  ]);
+
+  if (!requestId) throw new FleexaError("Provider receipt is incomplete and needs reconciliation", 502, "INCOMPLETE_RECEIPT");
+
+  return {
+    requestId,
+    network: pickString(data, [["network"], ["carrier"], ["provider"]]),
+    phoneNumber: pickString(data, [["phone_number"], ["phone"], ["msisdn"]]),
+    dataGb: pickNumber(data, [["data_gb"], ["gb"], ["data"], ["allowance"]]),
+    priceNgn: pickNumber(data, [["price_ngn"], ["price"], ["rate"], ["amount"]]),
+    expiresAt: pickString(data, [["expires_at"], ["valid_until"], ["deadline"]]),
+    raw: data,
+  };
+}
+
+export type FleexaDataStatus = {
+  status: string;
+  raw: UnknownRecord;
+};
+
+export async function checkFleexaData(requestId: string): Promise<FleexaDataStatus> {
+  const res = await fleexaFetch(`/data/check/${encodeURIComponent(requestId)}`);
+  const data = res.data ? asRecord(res.data) : res;
+  return {
+    status: pickString(data, [["status"], ["state"]]) ?? "pending",
+    raw: asRecord(data),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Status                                                              */
 /* ------------------------------------------------------------------ */
 
