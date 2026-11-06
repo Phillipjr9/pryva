@@ -77,7 +77,7 @@ export const SERVICE_IDS = [
 export type ServiceId = (typeof SERVICE_IDS)[number];
 
 /** Lanes are the units the coverage console is accountable for. */
-export const LANE_IDS = ["numbers", "esim", "accounts", "boosts"] as const;
+export const LANE_IDS = ["numbers", "esim", "accounts", "boosts", "proxies", "subscriptions", "data"] as const;
 
 export type LaneId = (typeof LANE_IDS)[number];
 
@@ -182,7 +182,7 @@ export const SERVICES: readonly ServiceDefinition[] = [
     label: "Proxies",
     description: "Residential traffic",
     sale: { kind: "supplier", source: "fleexa" },
-    lane: null,
+    lane: "proxies",
     orderServices: ["proxies"],
     deliveryMinutes: 60,
     retry: { attempts: 2, delayMs: 30_000 },
@@ -212,7 +212,7 @@ export const SERVICES: readonly ServiceDefinition[] = [
     label: "Subscriptions",
     description: "Entertainment & tools",
     sale: { kind: "supplier", source: "fleexa" },
-    lane: null,
+    lane: "subscriptions",
     orderServices: ["subscriptions"],
     deliveryMinutes: 1_440,
     retry: { attempts: 1, delayMs: 60_000 },
@@ -222,7 +222,7 @@ export const SERVICES: readonly ServiceDefinition[] = [
     label: "Mobile data",
     description: "Local network plans",
     sale: { kind: "supplier", source: "fleexa" },
-    lane: null,
+    lane: "data",
     orderServices: ["data", "airtime"],
     deliveryMinutes: 15,
     retry: { attempts: 2, delayMs: 60_000 },
@@ -305,6 +305,30 @@ export const LANES: readonly LaneDefinition[] = [
       "Opening the order reads the panel's status back; progress is shown on the order page.",
     recovery:
       "A partial or cancelled boost goes to review for a manual refund — never an automatic one.",
+  },
+  {
+    id: "proxies",
+    label: "Residential proxies",
+    configuredBy: "proxies",
+    staleHours: 24,
+    delivery: "Proxy credentials are issued on the order page once the purchase clears.",
+    recovery: "A proxy purchase that cannot be delivered is refunded to your wallet.",
+  },
+  {
+    id: "subscriptions",
+    label: "Subscriptions",
+    configuredBy: "subscriptions",
+    staleHours: 72,
+    delivery: "Subscription details are delivered to the order page when the supplier confirms.",
+    recovery: "A subscription that cannot be activated is refunded to your wallet.",
+  },
+  {
+    id: "data",
+    label: "Mobile data",
+    configuredBy: "data",
+    staleHours: 6,
+    delivery: "Data bundles are delivered to the phone number on the order page.",
+    recovery: "A data bundle that fails to deliver is refunded to your wallet.",
   },
 ];
 

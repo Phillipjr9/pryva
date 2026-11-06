@@ -5,6 +5,7 @@ import {
   ESIM_PROVIDER,
   MANUAL_PROVIDER,
   NUMBER_PROVIDERS,
+  ORDER_PROVIDERS,
   SMM_PROVIDER,
 } from "@/lib/services/order-providers";
 import { LANES, LANE_IDS, SERVICES, type LaneId, type OrderServiceTag } from "@/lib/services/registry";
@@ -73,6 +74,9 @@ const LANE_PROVIDERS: Record<LaneId, readonly string[]> = {
   esim: [ESIM_PROVIDER],
   accounts: [ACCOUNTS_PROVIDER, MANUAL_PROVIDER],
   boosts: [SMM_PROVIDER],
+  proxies: [ORDER_PROVIDERS.liveOtp],
+  subscriptions: [ORDER_PROVIDERS.liveOtp],
+  data: [ORDER_PROVIDERS.liveOtp],
 };
 
 /** Providers this lane shares with another, which is why it needs a service filter. */
@@ -117,9 +121,6 @@ export const SERVICE_LANES: LaneSpec[] = LANES.map((lane) => ({
  * storefront, which has been selling eSIM for several releases.
  */
 export const NOT_FOR_SALE: Array<{ label: string; reason: string }> = [
-  { label: "Mobile data plans", reason: "The purchase endpoint answers 503 by design; no data supplier is contracted." },
-  { label: "Residential proxies", reason: "Catalogue only — no supplier and no order path." },
-  { label: "Subscriptions", reason: "The purchase endpoint answers 503 until a supplier exists." },
   { label: "Bulk baskets", reason: "Not built: quoting a basket needs the per-item purchase path to be proven first." },
   { label: "Airtime", reason: "The purchase endpoint answers 503 by design; no VTU supplier is contracted." },
 ];
