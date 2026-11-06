@@ -13,6 +13,9 @@ vi.mock("next/navigation", () => ({
 const read = (path: string) => readFileSync(path, "utf8");
 const securityPage = read("src/app/admin/(console)/security/page.tsx");
 const queue = read("src/app/admin/(console)/security/FraudQueue.tsx");
+const ordersPage = read("src/app/admin/(console)/orders/page.tsx");
+const transactionsPage = read("src/app/admin/(console)/transactions/page.tsx");
+const usersPage = read("src/app/admin/(console)/users/page.tsx");
 const fraudApi = read("src/app/api/admin/security/fraud/route.ts");
 const withdrawalsApi = read("src/app/api/admin/withdrawals/route.ts");
 const withdrawalsUi = read("src/app/admin/(console)/withdrawals/WithdrawalsManager.tsx");
@@ -100,5 +103,23 @@ describe("where the signals come from", () => {
     expect(withdrawalsUi).toContain("Fraud signal:");
     expect(withdrawalsUi).toContain("Advisory only");
     expect(withdrawalsUi).toContain("the request has not been actioned");
+  });
+
+  it("gives the operator a direct user detail route from the users list", () => {
+    expect(usersPage).toContain("href={`/admin/users/${row.id}`}");
+    expect(usersPage).toContain("/admin/users/");
+  });
+
+  it("gives the operator a drill-down route from order and wallet lists", () => {
+    expect(ordersPage).toContain("href={`/admin/orders/${row.id}`}");
+    expect(transactionsPage).toContain("href={`/admin/orders/${row.orderId}`}");
+    expect(read("src/app/admin/(console)/orders/[id]/page.tsx")).toContain('await requireAdmin("/admin/orders")');
+    expect(read("src/app/admin/(console)/orders/[id]/page.tsx")).toContain("notFound()");
+  });
+
+  it("allows manual review decisions while a flagged withdrawal is still in flight", () => {
+    expect(withdrawalsUi).toContain('withdrawal.status === "pending" || withdrawal.status === "processing"');
+    expect(withdrawalsApi).toContain('"pending", "processing"');
+    expect(withdrawalsApi).toContain('manual review');
   });
 });

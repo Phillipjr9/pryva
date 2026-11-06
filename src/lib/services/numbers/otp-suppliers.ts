@@ -97,14 +97,47 @@ export function otpSupplierConfigured(supplier: OtpSupplierId): boolean {
   return supplier === "fleexa" ? isFleexaConfigured() : isBitcallConfigured();
 }
 
+/** Canonicalise country codes and common provider spellings to the ISO codes we sell. */
+export function normalizeCountryCode(value: string | null): string | null {
+  const raw = value?.trim();
+  if (!raw) return null;
+
+  const lower = raw.toLowerCase();
+  const aliases: Record<string, string> = {
+    ng: "ng",
+    nigeria: "ng",
+    us: "us",
+    usa: "us",
+    "united states": "us",
+    "united states of america": "us",
+    gb: "gb",
+    uk: "gb",
+    "great britain": "gb",
+    "united kingdom": "gb",
+    ca: "ca",
+    canada: "ca",
+    de: "de",
+    germany: "de",
+    deutschland: "de",
+    gh: "gh",
+    ghana: "gh",
+  };
+
+  const direct = aliases[lower] ?? aliases[lower.replace(/[^a-z]/g, "")];
+  if (direct) return direct;
+
+  const compact = lower.replace(/[^a-z]/g, "");
+  return compact.length === 2 ? compact : null;
+}
+
 /** A supplier country label matches our two-letter code, or the usual spellings. */
 export function matchesCountry(value: string | null, code: string, regionName: string): boolean {
-  const candidate = value?.trim().toLowerCase();
-  if (!candidate) return false;
-  if (candidate === code || candidate === regionName.trim().toLowerCase()) return true;
-  if (code === "gb") return candidate === "uk" || candidate === "united kingdom";
-  if (code === "us") return candidate === "usa" || candidate === "united states";
-  return false;
+  const candidate = normalizeCountryCode(value);
+  const target = normalizeCountryCode(code);
+  const region = normalizeCountryCode(regionName);
+
+  if (!candidate || !target || !region) return false;
+  return candidate === target || candidate === region || target === region;
 }
 
 function readableApp(value: string | null): string | null {

@@ -10,10 +10,18 @@ const bitcall = vi.hoisted(() => ({
   listServices: vi.fn(),
 }));
 
+const snapshot = vi.hoisted(() => ({
+  readSupplierSnapshot: vi.fn(async () => ({ sms: [], email: [], rentals: [] })),
+}));
+
 vi.mock("@/lib/providers/fleexa", () => ({
   isFleexaConfigured: fleexa.configured,
   listFleexaSmsServices: fleexa.listSms,
   FleexaError: class FleexaError extends Error {},
+}));
+
+vi.mock("@/lib/services/numbers/fleexa-catalog", () => ({
+  readSupplierSnapshot: snapshot.readSupplierSnapshot,
 }));
 
 vi.mock("@/lib/providers/bitcall", () => ({
@@ -46,5 +54,29 @@ describe("otp stock aggregation", () => {
       { app: "WhatsApp", stock: 10 },
       { app: "Telegram", stock: 2 },
     ]);
+  });
+
+  it("keeps Bitcall stock visible when the API returns uppercase ISO codes", async () => {
+    bitcall.configured.mockReturnValue(true);
+    bitcall.listServices.mockResolvedValue([
+      {
+        name: "WhatsApp",
+        slug: "ng-whatsapp",
+        countryCode: "NG",
+        offers: [{ serviceId: "svc-1", price: 0.5, currency: "USD", availableCount: 7, successRate: 87 }],
+      },
+    ]);
+
+    const { buildStockReport } = await import("@/lib/admin/stock-live");
+    const { isFleexaConfigured } = await import("@/lib/providers/fleexa");
+    const { isBitcallConfigured } = await import("@/lib/providers/bitcall");
+
+    expect(isFleexaConfigured()).toBe(true);
+    expect(isBitcallConfigured()).toBe(true);
+
+    const report = await buildStockReport();
+    const numbers = report.lanes.find((lane) => lane.lane === "numbers");
+
+    expect(numbers?.lines.some((line) => line.id === "vn-ng" && line.state === "in-stock")).toBe(true);
   });
 });

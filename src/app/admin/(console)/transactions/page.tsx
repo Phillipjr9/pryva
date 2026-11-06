@@ -247,10 +247,7 @@ export default async function AdminTransactionsPage({
               <tr key={row.id} className="border-t border-line/70">
                 <td className="whitespace-nowrap px-4 py-3 text-ink-2">{formatInstant(row.createdAt)}</td>
                 <td className="px-4 py-3">
-                  <Link
-                    href={`/admin/users?q=${encodeURIComponent(row.email)}`}
-                    className="text-ink underline-offset-2 hover:underline"
-                  >
+                  <Link href={`/admin/users/${row.userId}`} className="text-ink underline-offset-2 hover:underline">
                     {row.email}
                   </Link>
                 </td>
@@ -275,7 +272,7 @@ export default async function AdminTransactionsPage({
                 <td className="px-4 py-3 text-ink-2">{row.description}</td>
                 <td className="whitespace-nowrap px-4 py-3">
                   {row.orderId ? (
-                    <Link href="/admin/orders" className="text-lav-700 hover:underline">
+                    <Link href={`/admin/orders/${row.orderId}`} className="text-lav-700 hover:underline">
                       {row.reference}
                     </Link>
                   ) : (

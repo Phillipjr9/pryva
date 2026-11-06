@@ -3,6 +3,8 @@ import { requireAdmin } from "@/lib/identity/auth";
 import { db } from "@/db";
 import { contactMessages, orders, supportTickets, users } from "@/db/schema";
 import { count, desc, eq, sum, isNotNull, inArray, sql } from "drizzle-orm";
+import { listFraudEvents } from "@/lib/admin/fraud";
+import { countDueForPurge } from "@/lib/identity/retention";
 import {
   ArrowRight,
   Bell,
@@ -148,26 +150,22 @@ export default async function AdminOverviewPage() {
   const operator = await requireAdmin("/admin/overview");
 
   // Core counts
-  const [userStats] = await db.select({ count: count() }).from(users);
-  const [orderStats] = await db.select({ count: count() }).from(orders);
-  const [revenueStats] = await db
-    .select({ sum: sum(orders.amount) })
-    .from(orders)
-    .where(eq(orders.status, "delivered"));
-  const [openMessages] = await db
-    .select({ count: count() })
-    .from(contactMessages)
-    .where(eq(contactMessages.status, "open"));
-  const [escalatedRow] = await db
-    .select({ count: count() })
-    .from(supportTickets)
-    .where(eq(supportTickets.status, "escalated"));
+  const [userStats, orderStats, revenueStats, openMessages, escalatedRow, fraudSignals, dueForPurge] = await Promise.all([
+    db.select({ count: count() }).from(users),
+    db.select({ count: count() }).from(orders),
+    db.select({ sum: sum(orders.amount) }).from(orders).where(eq(orders.status, "delivered")),
+    db.select({ count: count() }).from(contactMessages).where(eq(contactMessages.status, "open")),
+    db.select({ count: count() }).from(supportTickets).where(eq(supportTickets.status, "escalated")),
+    listFraudEvents({ openOnly: true, limit: 100 }),
+    countDueForPurge(),
+  ]);
 
   const totalUsers = Number(userStats?.count ?? 0);
   const totalOrders = Number(orderStats?.count ?? 0);
   const revenue = Number(revenueStats?.sum ?? 0);
   const openMessageCount = Number(openMessages?.count ?? 0);
   const escalated = Number(escalatedRow?.count ?? 0);
+  const openFraudCount = fraudSignals.length;
 
   // Signup health
   const [verifiedCountRow] = await db
@@ -330,6 +328,19 @@ export default async function AdminOverviewPage() {
         direction: openMessageCount > 0 ? "down" : "neutral",
       },
       sparkline: [3, 5, 2, 8, 6, 12, openMessageCount],
+    },
+    {
+      label: "Risk Flags",
+      value: openFraudCount,
+      sub: `${dueForPurge} closed accounts due for purge`,
+      href: "/admin/health",
+      icon: Shield,
+      color: "rose",
+      trend: {
+        label: openFraudCount > 0 ? "review queue open" : "all clear",
+        direction: openFraudCount > 0 ? "down" : "neutral",
+      },
+      sparkline: [0, 1, 0, 2, 1, 3, openFraudCount],
     },
     {
       label: "Escalated Tickets",
@@ -624,6 +635,27 @@ export default async function AdminOverviewPage() {
                 Signup source and IP tracking coming soon — that will show you
                 <b className="text-ink">where</b> these signups are coming from.
               </p>
+            </div>
+          </div>
+
+          {/* Security snapshot */}
+          <div className="rounded-2xl border border-line bg-white p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-rose-600" />
+                <h2 className="text-[1rem] font-semibold text-ink">Security snapshot</h2>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-xl border border-line bg-rose-50/60 px-3 py-2">
+                <span className="text-[0.72rem] text-ink-2">Open fraud signals</span>
+                <strong className="text-[0.9rem] font-semibold text-rose-700">{openFraudCount}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-line bg-amber-50/60 px-3 py-2">
+                <span className="text-[0.72rem] text-ink-2">Due for purge</span>
+                <strong className="text-[0.9rem] font-semibold text-amber-700">{dueForPurge}</strong>
+              </div>
             </div>
           </div>
 

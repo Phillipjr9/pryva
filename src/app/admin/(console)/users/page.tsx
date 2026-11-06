@@ -229,24 +229,29 @@ export default async function AdminUsersPage({
             {rows.map((row) => {
               const stats = orderCounts.get(row.id);
               return (
-                <tr key={row.id} className="border-t border-line/70">
+                <tr key={row.id} className="border-t border-line/70 hover:bg-cream/50">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-ink">
-                      {row.name}
-                      {row.deletedAt ? (
-                        <span
-                          className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-micro font-semibold text-slate-600"
-                          title="Closed by its owner. Identity scrubbed; financial records retained."
-                        >
-                          Closed {formatDate(row.deletedAt)}
-                        </span>
-                      ) : null}
-                    </p>
-                    <p className="text-meta text-ink-3">{row.email}</p>
-                    {/* Privilege is meaningless on a closed account: it can never sign in. */}
-                    {row.deletedAt ? null : (
-                      <AccessLevel email={row.email} emailVerifiedAt={row.emailVerifiedAt} />
-                    )}
+                    <Link
+                      href={`/admin/users/${row.id}`}
+                      className="block rounded-lg transition-colors hover:text-lav-700"
+                    >
+                      <p className="font-medium text-ink">
+                        {row.name}
+                        {row.deletedAt ? (
+                          <span
+                            className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-micro font-semibold text-slate-600"
+                            title="Closed by its owner. Identity scrubbed; financial records retained."
+                          >
+                            Closed {formatDate(row.deletedAt)}
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="text-meta text-ink-3">{row.email}</p>
+                      {/* Privilege is meaningless on a closed account: it can never sign in. */}
+                      {row.deletedAt ? null : (
+                        <AccessLevel email={row.email} emailVerifiedAt={row.emailVerifiedAt} />
+                      )}
+                    </Link>
                   </td>
                   <td className="px-4 py-3 font-medium">{formatNaira(row.walletBalance)}</td>
                   <td className="px-4 py-3">{stats?.orders ?? 0}</td>

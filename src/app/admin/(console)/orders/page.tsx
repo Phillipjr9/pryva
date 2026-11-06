@@ -193,12 +193,18 @@ export default async function AdminOrdersPage({
             )}
             {rows.map((row) => (
               <tr key={row.id} className="border-t border-line/70">
-                <td className="px-4 py-3 font-mono text-meta text-ink-2">{row.reference}</td>
+                <td className="px-4 py-3 font-mono text-meta text-ink-2">
+                  <Link href={`/admin/orders/${row.id}`} className="text-lav-700 hover:underline">
+                    {row.reference}
+                  </Link>
+                </td>
                 <td className="px-4 py-3 text-[0.8rem] text-ink-2">
                   {emailById.get(row.userId) ?? "—"}
                 </td>
                 <td className="px-4 py-3">
-                  <p className="font-medium text-ink">{row.productName}</p>
+                  <Link href={`/admin/orders/${row.id}`} className="font-medium text-ink hover:text-lav-700 hover:underline">
+                    {row.productName}
+                  </Link>
                   <p className="text-meta text-ink-3">
                     {row.service} · {row.planLabel}
                   </p>

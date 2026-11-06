@@ -11,6 +11,7 @@ import type { FleexaEmailProduct, FleexaSmsService } from "@/lib/providers/fleex
 import { isFleexaConfigured } from "@/lib/providers/fleexa";
 import { logger } from "@/lib/platform/logger";
 import { readSupplierSnapshot } from "@/lib/services/numbers/fleexa-catalog";
+import { normalizeCountryCode } from "@/lib/services/numbers/otp-suppliers";
 import { supplierAmountToNgn } from "@/lib/payments/supplier-currency";
 import { fulfilablePlans } from "@/lib/services/fulfillment";
 import { availableManualProducts } from "@/lib/services/accounts/manual-catalog";
@@ -60,7 +61,7 @@ export async function buildStockReport(options: { refresh?: boolean } = {}): Pro
       const sellableSmsCountries = new Set(
         sellable
           .filter((entry) => entry.intent.kind === "sms")
-          .map((entry) => entry.intent.country),
+          .map((entry) => normalizeCountryCode(entry.intent.country) ?? ""),
       );
       let smsServices: FleexaSmsService[] = snapshot.sms;
       if (isBitcallConfigured()) {
@@ -68,14 +69,14 @@ export async function buildStockReport(options: { refresh?: boolean } = {}): Pro
           const bitcall = await listBitcallOtpServices();
           const converted: FleexaSmsService[] = [];
           for (const service of bitcall) {
-            if (!service.countryCode) continue;
-            if (!sellableSmsCountries.has(service.countryCode.toUpperCase())) continue;
+            const countryCode = normalizeCountryCode(service.countryCode);
+            if (!countryCode || !sellableSmsCountries.has(countryCode)) continue;
             for (const offer of service.offers) {
               if (!offer.serviceId) continue;
               converted.push({
                 id: offer.serviceId,
                 name: service.name ?? offer.serviceId,
-                country: service.countryCode,
+                country: countryCode,
                 priceNgn: await supplierAmountToNgn(offer.price, offer.currency),
                 stock: offer.availableCount,
               });

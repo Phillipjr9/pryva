@@ -70,8 +70,8 @@ export function WithdrawalsManager() {
 
   async function processWithdrawal(id: string, action: "approve" | "reject") {
     const confirmation = action === "approve"
-      ? "Send this queued request as a Paystack transfer now? Payouts are sent automatically on request, so this row predates that change or was left behind by an unconfirmed attempt. Initiation is not settlement — check Paystack for final status before retrying or refunding."
-      : "Reject this pending request and refund its reserved wallet amount?";
+      ? "Send this queued request as a Paystack transfer now? This is a manual review override for an in-flight or previously unconfirmed payout. Initiation is not settlement — check Paystack for the final status before retrying or refunding."
+      : "Reject this in-flight request and refund its reserved wallet amount?";
     if (!confirm(confirmation)) {
       return;
     }
@@ -320,7 +320,7 @@ export function WithdrawalsManager() {
 
               {/* Actions */}
               <div className="flex gap-2">
-                {withdrawal.status === "pending" && (
+                {(withdrawal.status === "pending" || withdrawal.status === "processing" && !withdrawal.transferReference) && (
                   <>
                     <Button
                       onClick={() => processWithdrawal(withdrawal.id, "approve")}
@@ -333,7 +333,9 @@ export function WithdrawalsManager() {
                       ) : (
                         <CheckCircle className="w-4 h-4" />
                       )}
-                      <span className="ml-2">Approve & Process</span>
+                      <span className="ml-2">
+                        {withdrawal.status === "processing" ? "manual review: approve" : "Approve & Process"}
+                      </span>
                     </Button>
                     <Button
                       onClick={() => processWithdrawal(withdrawal.id, "reject")}

@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { authorizeAdminApi } from "@/lib/identity/admin-auth";
 import { db } from "@/db";
 import { withdrawals, users, walletTransactions } from "@/db/schema";
@@ -95,6 +95,12 @@ export async function PUT(request: NextRequest) {
       const [existing] = await db.select().from(withdrawals).where(eq(withdrawals.id, id)).limit(1);
       if (!existing) return NextResponse.json({ error: "Withdrawal not found" }, { status: 404 });
       if (!existing.recipientCode) return NextResponse.json({ error: "Transfer recipient is missing" }, { status: 400 });
+      if (!["pending", "processing"].includes(existing.status)) {
+        return NextResponse.json({ error: "This withdrawal is already settled or has been resolved. Reconcile it before retrying." }, { status: 409 });
+      }
+      if (existing.status === "processing" && existing.transferReference) {
+        return NextResponse.json({ error: "This payout already has a transfer code and final status is already in progress; use completion or reconciliation instead." }, { status: 409 });
+      }
 
       // Persist a unique, Paystack-compatible lowercase reference in the same
       // claim as the status transition, before any external request. Legacy
@@ -102,9 +108,13 @@ export async function PUT(request: NextRequest) {
       const providerReference = paystackTransferReference(existing.id);
       const [claimed] = await db.update(withdrawals)
         .set({ status: "processing", paystackReference: providerReference, processedAt: new Date(), failureReason: null })
-        .where(and(eq(withdrawals.id, id), eq(withdrawals.status, "pending"), isNull(withdrawals.paystackReference)))
+        .where(and(
+          eq(withdrawals.id, id),
+          inArray(withdrawals.status, ["pending", "processing"]),
+          isNull(withdrawals.transferReference),
+        ))
         .returning();
-      if (!claimed) return NextResponse.json({ error: "Withdrawal is no longer pending or has an existing provider reference. Reconcile it before retrying." }, { status: 409 });
+      if (!claimed) return NextResponse.json({ error: "Withdrawal is no longer eligible for manual review; reconcile it before retrying." }, { status: 409 });
       scheduleWalletEmails();
 
       try {
@@ -171,7 +181,11 @@ export async function PUT(request: NextRequest) {
       const rejected = await db.transaction(async (tx) => {
         const [claimed] = await tx.update(withdrawals)
           .set({ status: "rejected", failureReason: typeof reason === "string" && reason.trim() ? reason.trim() : "Rejected by admin", processedAt: new Date() })
-          .where(and(eq(withdrawals.id, id), eq(withdrawals.status, "pending"), isNull(withdrawals.paystackReference)))
+          .where(and(
+            eq(withdrawals.id, id),
+            inArray(withdrawals.status, ["pending", "processing"]),
+            isNull(withdrawals.transferReference),
+          ))
           .returning();
         if (!claimed) return null;
 
