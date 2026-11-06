@@ -2,10 +2,16 @@ import "server-only";
 
 import { isAccsZoneConfigured } from "@/lib/providers/accszone";
 import { isBulkaccConfigured, listProducts } from "@/lib/providers/bulkacc";
-import { isBitcallConfigured } from "@/lib/providers/bitcall";
-import type { FleexaEmailProduct } from "@/lib/providers/fleexa";
+import {
+  isBitcallConfigured,
+  listBitcallOtpServices,
+  type BitcallOtpService,
+} from "@/lib/providers/bitcall";
+import type { FleexaEmailProduct, FleexaSmsService } from "@/lib/providers/fleexa";
 import { isFleexaConfigured } from "@/lib/providers/fleexa";
+import { logger } from "@/lib/platform/logger";
 import { readSupplierSnapshot } from "@/lib/services/numbers/fleexa-catalog";
+import { supplierAmountToNgn } from "@/lib/payments/supplier-currency";
 import { fulfilablePlans } from "@/lib/services/fulfillment";
 import { availableManualProducts } from "@/lib/services/accounts/manual-catalog";
 import { readBoostSnapshot } from "@/lib/services/boosts/smm-catalog";
@@ -47,7 +53,43 @@ export async function buildStockReport(options: { refresh?: boolean } = {}): Pro
   if (isFleexaConfigured()) {
     try {
       const snapshot = await readSupplierSnapshot(refresh);
-      const numbers = numberPlanLines(sellable, snapshot.sms);
+
+      // Bitcall OTP services are a second source for the same destinations:
+      // merge them into the numbers list so the stock page reflects coverage
+      // from either provider, not just Fleexa.
+      const sellableSmsCountries = new Set(
+        sellable
+          .filter((entry) => entry.intent.kind === "sms")
+          .map((entry) => entry.intent.country),
+      );
+      let smsServices: FleexaSmsService[] = snapshot.sms;
+      if (isBitcallConfigured()) {
+        try {
+          const bitcall = await listBitcallOtpServices();
+          const converted: FleexaSmsService[] = [];
+          for (const service of bitcall) {
+            if (!service.countryCode) continue;
+            if (!sellableSmsCountries.has(service.countryCode.toUpperCase())) continue;
+            for (const offer of service.offers) {
+              if (!offer.serviceId) continue;
+              converted.push({
+                id: offer.serviceId,
+                name: service.name ?? offer.serviceId,
+                country: service.countryCode,
+                priceNgn: await supplierAmountToNgn(offer.price, offer.currency),
+                stock: offer.availableCount,
+              });
+            }
+          }
+          if (converted.length > 0) smsServices = [...snapshot.sms, ...converted];
+        } catch (error) {
+          // Bitcall is additive: Fleexa may still serve these countries.
+          logger.warn("Bitcall catalog unavailable for stock report", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+      const numbers = numberPlanLines(sellable, smsServices);
       const rentals = rentalPlanLines(sellable, snapshot.rentals);
       const suffix = snapshot.partial ? " · one of the feed's listings did not answer" : "";
 
