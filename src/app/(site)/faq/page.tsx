@@ -4,7 +4,7 @@ import { Accordion, AccordionItem } from "@/components/ui/Accordion";
 
 export const metadata: Metadata = {
   title: "FAQ",
-  description: "Frequently asked questions about Pryva services.",
+  description: "Frequently asked questions about PryvaLogs services.",
 };
 
 const faqCategories = [
@@ -12,15 +12,15 @@ const faqCategories = [
     title: "General",
     questions: [
       {
-        q: "What is Pryva?",
-        a: "Pryva is a Naira wallet and digital-services application. Virtual numbers for SMS verification are delivered automatically; categories we cannot yet deliver reliably are marked unavailable rather than sold.",
+        q: "What is PryvaLogs?",
+        a: "PryvaLogs is a Naira wallet and digital-services application. Virtual numbers for SMS verification are delivered automatically; categories we cannot yet deliver reliably are marked unavailable rather than sold.",
       },
       {
         q: "How do I create an account?",
         a: "Choose Get Started and enter your name, email and password. Password signup does not currently verify email ownership, so use a unique password you do not reuse elsewhere.",
       },
       {
-        q: "Is Pryva safe to use?",
+        q: "Is PryvaLogs safe to use?",
         a: "Use a unique password and keep your verification codes and gift-card codes private. Passwords are stored as hashes. Contact support if you notice activity you do not recognize.",
       },
     ],
@@ -89,7 +89,7 @@ const faqCategories = [
     questions: [
       {
         q: "How do gift cards work?",
-        a: "You purchase a gift card with a specific amount, receive a unique code, and share it with the recipient. They enter the code in their Pryva account to redeem the credit.",
+        a: "You purchase a gift card with a specific amount, receive a unique code, and share it with the recipient. They enter the code in their PryvaLogs account to redeem the credit.",
       },
       {
         q: "Can I cancel or refund a gift card?",
@@ -113,7 +113,7 @@ export default function FAQPage() {
             Frequently Asked Questions
           </h1>
           <p className="mt-4 text-[1.1rem] text-ink-2 max-w-2xl mx-auto">
-            Find answers to common questions about Pryva and our services.
+            Find answers to common questions about PryvaLogs and our services.
           </p>
         </div>
       </section>

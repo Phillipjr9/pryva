@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
-  description: "Pryva Privacy Policy - Learn how we protect your data.",
+  description: "PryvaLogs Privacy Policy - Learn how we protect your data.",
 };
 
 export default function PrivacyPage() {

@@ -106,9 +106,6 @@ export default async function EsimCataloguePage() {
           <EsimCatalogue items={items} truncated={total > ESIM_CATALOGUE_LIMIT} />
         </>
       )}
-      <p className="text-micro text-ink-3">
-        <a href="https://www.exchangerate-api.com" className="underline underline-offset-2">Rates By Exchange Rate API</a>
-      </p>
     </div>
   );
 }

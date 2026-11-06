@@ -16,13 +16,13 @@ const MARK_SRC = "/images/brand/pryva-mark.png";
 
 type Size = "xs" | "sm" | "md" | "lg" | "xl";
 
-const MARK_PX: Record<Size, number> = { xs: 22, sm: 28, md: 34, lg: 44, xl: 64 };
+const MARK_PX: Record<Size, number> = { xs: 26, sm: 34, md: 42, lg: 52, xl: 72 };
 const TEXT_CLASS: Record<Size, string> = {
-  xs: "text-[0.86rem]",
-  sm: "text-[1rem]",
-  md: "text-[1.12rem]",
-  lg: "text-[1.35rem]",
-  xl: "text-[1.9rem]",
+  xs: "text-[0.92rem]",
+  sm: "text-[1.15rem]",
+  md: "text-[1.35rem]",
+  lg: "text-[1.7rem]",
+  xl: "text-[2.2rem]",
 };
 
 export function BrandMark({
@@ -77,7 +77,7 @@ export function BrandLockup({
             tone === "light" ? "text-white" : "text-ink",
           )}
         >
-          Pryva
+          PryvaLogs
         </span>
       )}
     </span>

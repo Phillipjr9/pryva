@@ -3,8 +3,8 @@ import Link from "next/link";
 import { Shield, Wallet, Globe } from "@/components/icons";
 
 export const metadata: Metadata = {
-  title: "About Pryva",
-  description: "Learn about the Pryva digital-services application.",
+  title: "About PryvaLogs",
+  description: "Learn about the PryvaLogs digital-services application.",
 };
 
 const values = [
@@ -18,9 +18,9 @@ export default function AboutPage() {
     <div className="min-h-screen bg-cream">
       <section className="py-16 sm:py-24">
         <div className="shell max-w-3xl text-center">
-          <h1 className="text-4xl font-medium tracking-tight text-ink sm:text-5xl">About <span className="text-lav-600">Pryva</span></h1>
+          <h1 className="text-4xl font-medium tracking-tight text-ink sm:text-5xl">About <span className="text-lav-600">PryvaLogs</span></h1>
           <p className="mt-6 text-lg leading-8 text-ink-2">
-            Pryva brings a wallet, order history and a digital-services catalog together in one application.
+            PryvaLogs brings a wallet, order history and a digital-services catalog together in one application.
             Virtual numbers for SMS verification are delivered automatically, and every order is paid for in
             Naira from a balance you control. Categories we cannot yet deliver reliably are marked unavailable
             rather than sold.

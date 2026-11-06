@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Customer feedback",
-  description: "What customers say about Pryva — verified reviews from real delivered orders.",
+  description: "What customers say about PryvaLogs — verified reviews from real delivered orders.",
   alternates: { canonical: "/testimonials" },
 };
 
@@ -46,7 +46,7 @@ export default async function TestimonialsPage() {
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-[1.05rem] leading-relaxed text-ink-2">
             Every review here is tied to a real delivered order. No names are published, and nothing
-            is written by Pryva.
+            is written by PryvaLogs.
           </p>
           {average !== null && (
             <p className="mt-5 flex flex-wrap items-center justify-center gap-3 text-[0.9rem] text-ink-2">

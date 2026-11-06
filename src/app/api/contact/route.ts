@@ -6,6 +6,7 @@ import { isSameOriginMutation } from "@/lib/platform/net";
 import { clientIp } from "@/lib/identity/auth-rate-limit";
 import { contactRateLimiter } from "@/lib/platform/rate-limit";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
+import { sendContactMessageConfirmation } from "@/lib/email/contact-message-email";
 
 export const dynamic = "force-dynamic";
 
@@ -46,14 +47,29 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await getCurrentUser();
-    await db.insert(contactMessages).values({
+    const [saved] = await db.insert(contactMessages).values({
       userId: user?.id ?? null,
       name: name.trim(),
       email: email.trim().toLowerCase(),
       topic: topic.trim(),
       message: message.trim(),
       status: "open",
+    }).returning({
+      id: contactMessages.id,
+      name: contactMessages.name,
+      email: contactMessages.email,
+      topic: contactMessages.topic,
+      createdAt: contactMessages.createdAt,
     });
+
+    if (saved) {
+      await sendContactMessageConfirmation({
+        to: saved.email,
+        name: saved.name,
+        topic: saved.topic,
+        receivedAt: saved.createdAt,
+      });
+    }
 
     return NextResponse.json({ ok: true });
   } catch {

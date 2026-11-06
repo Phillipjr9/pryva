@@ -8,6 +8,7 @@ import { logger } from "@/lib/platform/logger";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 import { isMessageStatus } from "@/lib/support/support-messages";
 import { isSameOriginMutation } from "@/lib/platform/net";
+import { sendContactStatusUpdate } from "@/lib/email/contact-message-email";
 
 export const dynamic = "force-dynamic";
 
@@ -93,10 +94,31 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
+    const [existing] = await db
+      .select({
+        status: contactMessages.status,
+        name: contactMessages.name,
+        email: contactMessages.email,
+        topic: contactMessages.topic,
+      })
+      .from(contactMessages)
+      .where(eq(contactMessages.id, messageId))
+      .limit(1);
+
     await db
       .update(contactMessages)
       .set({ status })
       .where(eq(contactMessages.id, messageId));
+
+    if (existing && existing.status !== status && status !== "open") {
+      await sendContactStatusUpdate({
+        to: existing.email,
+        name: existing.name,
+        topic: existing.topic,
+        status,
+        updatedAt: new Date(),
+      });
+    }
 
     logger.info("Message status updated", { messageId, status });
 

@@ -210,7 +210,7 @@ export function AuthForm({
         <h1 className="mt-3 text-[2rem] font-medium leading-[1.1] tracking-[-0.03em] sm:text-[2.3rem]">
           {mode === "signup" ? (
             <>
-              Start using Pryva
+              Start using PryvaLogs
               <br />
               <span className="text-display italic text-lav-700">in about a minute.</span>
             </>
@@ -218,7 +218,7 @@ export function AuthForm({
             <>
               Sign in to your
               <br />
-              <span className="text-display italic text-lav-700">Pryva dashboard.</span>
+              <span className="text-display italic text-lav-700">PryvaLogs dashboard.</span>
             </>
           )}
         </h1>

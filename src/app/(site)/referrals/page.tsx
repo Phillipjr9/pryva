@@ -6,10 +6,10 @@ import { formatNaira } from "@/lib/services/catalog";
 
 export const metadata: Metadata = {
   title: "Referral program — earn wallet credit",
-  description: `Invite friends to Pryva and earn ${DEFAULT_REWARD_PERCENT}% of their first order, up to ${formatNaira(DEFAULT_REWARD_CAP_NGN)}, paid straight into your wallet.`,
+  description: `Invite friends to PryvaLogs and earn ${DEFAULT_REWARD_PERCENT}% of their first order, up to ${formatNaira(DEFAULT_REWARD_CAP_NGN)}, paid straight into your wallet.`,
   alternates: { canonical: "/referrals" },
   openGraph: {
-    title: "Earn wallet credit by referring friends | Pryva",
+    title: "Earn wallet credit by referring friends | PryvaLogs",
     description: `Share your invite link. When a friend's first order is delivered, you earn ${DEFAULT_REWARD_PERCENT}% back — up to ${formatNaira(DEFAULT_REWARD_CAP_NGN)}.`,
     url: "/referrals",
   },
@@ -61,7 +61,7 @@ const faqs = [
   },
   {
     q: "Can I withdraw the reward as cash?",
-    a: "No. Referral rewards are wallet credit. You can spend them on any Pryva service, but they cannot be withdrawn to a bank account.",
+    a: "No. Referral rewards are wallet credit. You can spend them on any PryvaLogs service, but they cannot be withdrawn to a bank account.",
   },
   {
     q: "Is there a limit to how many friends I can invite?",
@@ -168,7 +168,7 @@ export default function ReferralsPage() {
                 "Inviting someone from the same network is flagged for review.",
                 "Rewards are wallet credit — they cannot be withdrawn as cash.",
                 "The reward rate and cap can change with a deployment update.",
-                "Pryva may void rewards that appear to abuse the program.",
+                "PryvaLogs may void rewards that appear to abuse the program.",
               ].map((rule) => (
                 <li key={rule} className="flex items-start gap-2 text-[0.86rem] text-ink-2">
                   <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />

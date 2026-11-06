@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Refund Policy",
   description:
-    "How Pryva reviews delivery issues and refund requests.",
+    "How PryvaLogs reviews delivery issues and refund requests.",
   alternates: { canonical: "/refund-policy" },
 };
 

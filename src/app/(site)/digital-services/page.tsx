@@ -3,8 +3,8 @@ import { ServiceIcon } from "@/components/ServiceIcon";
 import { ArrowRight, Bell, Check } from "@/components/icons";
 
 export const metadata = {
-  title: "Digital subscriptions | Pryva",
-  description: "Streaming and digital subscriptions are coming to Pryva. Check back soon or contact support.",
+  title: "Digital subscriptions | PryvaLogs",
+  description: "Streaming and digital subscriptions are coming to PryvaLogs. Check back soon or contact support.",
 };
 
 const planned = [

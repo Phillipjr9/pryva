@@ -9,7 +9,7 @@ import { normalizeReferralCode } from "@/lib/content/referral-code";
 export const metadata: Metadata = {
   title: "Create your account",
   description:
-    "Create a free Pryva account and start buying virtual numbers, eSIM data, residential proxies and email OTP in Naira.",
+    "Create a free PryvaLogs account and start buying virtual numbers, eSIM data, residential proxies and email OTP in Naira.",
 };
 
 export default async function SignupPage({

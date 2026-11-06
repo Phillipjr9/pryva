@@ -78,7 +78,20 @@ describe("with no bank account yet", () => {
   });
 });
 
-describe("with a saved account that cannot be paid", () => {
+describe("with a saved account", () => {
+  it("preselects the default or first account so the withdrawal flow is ready immediately", async () => {
+    vi.stubGlobal("fetch", fetchFor([
+      { id: "acc-2", bankName: "Zenith Bank", bankCode: "057", accountNumber: "0001234567", accountName: "Test User", isDefault: false, payoutWarning: null },
+      { id: "acc-1", bankName: "Access Bank", bankCode: "044", accountNumber: "0123456789", accountName: "Test User", isDefault: true, payoutWarning: null },
+    ]));
+
+    render(<WithdrawalDashboard balance={10000} userId={userId} />);
+
+    const picker = await screen.findByLabelText("Pay out to");
+    await waitFor(() => expect((picker as HTMLSelectElement).value).toBe("acc-1"));
+    expect((picker as HTMLSelectElement).value).toBe("acc-1");
+  });
+
   it("says so on the account and in the picker, before a withdrawal is attempted", async () => {
     const warning = "Withdrawals can only be paid to a bank account in the same name as the one that funded this wallet.";
     vi.stubGlobal("fetch", fetchFor([

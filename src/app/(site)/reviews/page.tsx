@@ -8,10 +8,10 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Customer reviews",
   description:
-    "Reviews from customers whose orders were delivered. Every review is tied to a real purchase and checked before it is published — nothing here is written by Pryva.",
+    "Reviews from customers whose orders were delivered. Every review is tied to a real purchase and checked before it is published — nothing here is written by PryvaLogs.",
   alternates: { canonical: "/reviews" },
   openGraph: {
-    title: "Customer reviews | Pryva",
+    title: "Customer reviews | PryvaLogs",
     description:
       "Verified-purchase reviews from delivered orders. No invented testimonials, and no customer names published.",
     url: "/reviews",

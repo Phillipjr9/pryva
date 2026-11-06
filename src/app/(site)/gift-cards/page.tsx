@@ -24,12 +24,12 @@ import {
 export const metadata: Metadata = {
   title: "Gift cards",
   description:
-    "Buy a Pryva gift card from your wallet balance, from ₦1,000 to ₦500,000, and let someone redeem it into their wallet. One year validity, one redemption.",
+    "Buy a PryvaLogs gift card from your wallet balance, from ₦1,000 to ₦500,000, and let someone redeem it into their wallet. One year validity, one redemption.",
   alternates: { canonical: "/gift-cards" },
   openGraph: {
-    title: "Pryva gift cards",
+    title: "PryvaLogs gift cards",
     description:
-      "Wallet credit as a gift: buy from your balance, share the code, and the recipient redeems it into their Pryva wallet.",
+      "Wallet credit as a gift: buy from your balance, share the code, and the recipient redeems it into their PryvaLogs wallet.",
     url: "/gift-cards",
     type: "website",
   },
@@ -41,7 +41,7 @@ const MAX = formatNaira(GIFT_CARD_MAX_AMOUNT);
 const facts: Array<{ term: string; detail: string }> = [
   {
     term: "Amount",
-    detail: `Any whole-naira amount from ${MIN} to ${MAX}. It is paid from your Pryva wallet, not from a card or a bank transfer.`,
+    detail: `Any whole-naira amount from ${MIN} to ${MAX}. It is paid from your PryvaLogs wallet, not from a card or a bank transfer.`,
   },
   {
     term: "Validity",
@@ -53,7 +53,7 @@ const facts: Array<{ term: string; detail: string }> = [
   },
   {
     term: "Who can redeem",
-    detail: "Any signed-in Pryva account except the one that bought it. The recipient needs an account before the credit can land.",
+    detail: "Any signed-in PryvaLogs account except the one that bought it. The recipient needs an account before the credit can land.",
   },
   {
     term: "Refunds",
@@ -99,7 +99,7 @@ const faqs = [
   },
   {
     q: "What does the recipient need?",
-    a: "A Pryva account and the code. Signing in is required, because the credit has to land in a wallet we can identify.",
+    a: "A PryvaLogs account and the code. Signing in is required, because the credit has to land in a wallet we can identify.",
   },
   {
     q: "Is there a limit on attempts?",
@@ -122,9 +122,9 @@ export default function GiftCardsPage() {
               Wallet credit, wrapped as a gift.
             </h1>
             <p className="mt-4 max-w-2xl text-[1rem] leading-relaxed text-ink-2">
-              A Pryva gift card is a code worth a fixed amount of wallet credit. You buy it from
+              A PryvaLogs gift card is a code worth a fixed amount of wallet credit. You buy it from
               your own balance, send the code to someone, and they redeem it into their wallet.
-              Pryva issues the card itself, so the code exists the moment you pay for it.
+              PryvaLogs issues the card itself, so the code exists the moment you pay for it.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href="/login?next=%2Fdashboard%2Fgift-cards" className="btn btn-primary">
@@ -179,7 +179,7 @@ export default function GiftCardsPage() {
           <p className="mt-2 text-[0.92rem] leading-relaxed text-ink-2">
             Whoever redeems it first keeps the value, and we cannot reverse a redemption once it has
             happened. Send it in a message to one person rather than posting it in a group, and do
-            not paste it into a support chat — nobody at Pryva needs it to help you, because your
+            not paste it into a support chat — nobody at PryvaLogs needs it to help you, because your
             history shows the card already.
           </p>
         </div>
@@ -219,7 +219,7 @@ export default function GiftCardsPage() {
           <div>
             <h3 className="text-[1.05rem] font-semibold">Ready when the balance is</h3>
             <p className="mt-1 text-[0.9rem] leading-relaxed text-ink-2">
-              Gift cards are bought from your Pryva wallet. Top up first if the balance is short.
+              Gift cards are bought from your PryvaLogs wallet. Top up first if the balance is short.
             </p>
           </div>
           <Link href="/login?next=%2Fdashboard%2Fwallet" className="btn btn-primary mt-4 sm:mt-0">

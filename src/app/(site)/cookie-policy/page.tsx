@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Cookie Policy",
   description:
-    "Learn about the cookies and browser storage used by Pryva.",
+    "Learn about the cookies and browser storage used by PryvaLogs.",
   alternates: { canonical: "/cookie-policy" },
 };
 
@@ -24,7 +24,7 @@ export default function CookiePolicyPage() {
             Cookie Policy
           </h1>
           <p className="mt-3 max-w-2xl text-[0.94rem] leading-relaxed text-ink-2 sm:text-[0.98rem]">
-            Pryva uses session and sign-in cookies. Third-party services may use their own cookies under their policies.
+            PryvaLogs uses session and sign-in cookies. Third-party services may use their own cookies under their policies.
           </p>
         </div>
       </section>

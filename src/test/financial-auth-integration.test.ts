@@ -1099,6 +1099,29 @@ describe("Google subject binding and account protection", () => {
     expect(user.deletedAt).toBeNull();
   });
 
+  it("sends a confirmation email after storing a contact message", async () => {
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "Pryva <hello@pryva.test>");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "email_123" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+    mocks.user.mockResolvedValue({ id: USER, email: "buyer@example.com", name: "Buyer" });
+
+    const request = new NextRequest("https://pryva.test/api/contact", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "https://pryva.test" },
+      body: JSON.stringify({ name: "Buyer", email: "buyer@example.com", topic: "Service", message: "I want a custom service and pricing for my business." }),
+    });
+
+    const response = await contactRoute.POST(request);
+    expect(response.status).toBe(200);
+    expect(fetchSpy).toHaveBeenCalledWith("https://api.resend.com/emails", expect.objectContaining({ method: "POST" }));
+    const payload = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
+    expect(payload.to).toEqual(["buyer@example.com"]);
+    expect(payload.subject).toContain("We received your message");
+  });
+
   it("associates support messages with the authenticated user, not an asserted user ID", async () => {
     const request = new NextRequest("https://pryva.test/api/contact", { method: "POST", headers: { "content-type": "application/json", origin: "https://pryva.test" }, body: JSON.stringify({ name: "Buyer", email: "buyer@example.com", topic: "Wallet", message: "Please review my purchase.", userId: "someone-else" }) });
     expect((await contactRoute.POST(request)).status).toBe(200);

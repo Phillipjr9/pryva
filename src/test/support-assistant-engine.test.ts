@@ -216,6 +216,14 @@ describe("asking instead of guessing", () => {
     expect(result.outcome).toBe("escalated");
     expect(result.reply).toContain("not going to guess");
   });
+
+  it("answers general product questions instead of stonewalling", async () => {
+    const result = await run("how do i buy a virtual number for Nigeria?");
+    expect(result.playbookId).toBe("general-guidance");
+    expect(result.outcome).toBe("answered");
+    expect(result.reply).toContain("Orders");
+    expect(result.reply).toContain("Wallet");
+  });
 });
 
 describe("what it will never do", () => {

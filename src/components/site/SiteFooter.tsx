@@ -27,7 +27,7 @@ const columns = [
   {
     title: "Company",
     links: [
-      { href: "/about", label: "About Pryva" },
+      { href: "/about", label: "About PryvaLogs" },
       { href: "/how-it-works", label: "How it works" },
       { href: "/pricing", label: "Pricing" },
       { href: "/gift-cards", label: "Gift cards" },
@@ -79,6 +79,9 @@ export function SiteFooter() {
                 Create free account
                 <ArrowRight className="h-4 w-4" />
               </Link>
+              <Link href="/contact" className="btn btn-ghost">
+                Need help?
+              </Link>
               <Link href="/pricing" className="btn btn-ghost">
                 View pricing
               </Link>
@@ -89,7 +92,7 @@ export function SiteFooter() {
         <div className="mt-14 grid gap-10 pb-12 md:grid-cols-[1.3fr_2fr]">
           <div>
             <p className="mt-4 max-w-xs text-[0.88rem] leading-relaxed text-ink-3">
-              Pryva is a Nigerian digital services platform for virtual numbers, eSIM data,
+              PryvaLogs is a Nigerian digital services platform for virtual numbers, eSIM data,
               residential proxies and email OTP. Built for people who value calm, reliable access.
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-2 text-meta font-semibold text-ink-2">
@@ -174,7 +177,7 @@ export function SiteFooter() {
         </div>
 
         <div className="flex flex-col gap-3 border-t border-line py-6 text-meta text-ink-3 sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} Pryva Technologies. Made in Lagos, for Nigeria.</p>
+          <p>© {new Date().getFullYear()} PryvaLogs Technologies. Made in Lagos, for Nigeria.</p>
           <div className="flex flex-wrap items-center gap-4">
             <span className="inline-flex items-center gap-1.5">
               <Check className="h-3.5 w-3.5 text-lav-500" />

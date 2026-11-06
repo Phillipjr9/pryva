@@ -4,7 +4,7 @@ import { ArrowRight, Card, Shield, Sparkle, Wallet } from "@/components/icons";
 
 export const metadata: Metadata = {
   title: "How it works",
-  description: "Explore the Pryva dashboard, wallet and automatic number delivery.",
+  description: "Explore the PryvaLogs dashboard, wallet and automatic number delivery.",
 };
 
 const steps = [
@@ -20,7 +20,7 @@ export default function HowItWorksPage() {
       <div className="shell max-w-3xl">
         <div className="text-center">
           <p className="eyebrow justify-center">How it works</p>
-          <h1 className="mt-4 text-4xl font-medium tracking-tight text-ink sm:text-5xl">Explore Pryva, step by step.</h1>
+          <h1 className="mt-4 text-4xl font-medium tracking-tight text-ink sm:text-5xl">Explore PryvaLogs, step by step.</h1>
           <p className="mx-auto mt-5 max-w-xl text-lg leading-7 text-ink-2">See how the dashboard, wallet and number delivery work, start to finish.</p>
         </div>
         <div className="mt-10 grid gap-4">

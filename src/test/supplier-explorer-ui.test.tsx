@@ -73,7 +73,7 @@ describe("service explorer live listings", () => {
     expect(screen.queryByText(/couldn't be loaded/)).toBeNull();
   });
 
-  it("separates a missing supplier connection from a failed read", async () => {
+  it("keeps the catalogue live when the live feed is temporarily unavailable", async () => {
     const unconfigured = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
       ok: true, country: "us", live: false, reason: "unconfigured", partial: false, fetchedAt: null, items: [],
     }) });
@@ -83,13 +83,15 @@ describe("service explorer live listings", () => {
     expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
     first.unmount();
 
-    // A genuine outage keeps the retry, because retrying is the right advice.
+    // A transient outage should not cover the catalog with a blocking warning
+    // while the fallback explorer listings still render.
     const broken = vi.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({ error: "nope", reason: "unavailable" }) });
     vi.stubGlobal("fetch", broken);
     render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
-    expect(await screen.findByRole("status")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
-    expect(screen.getByText(/Live availability is not shown yet/)).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: /Explore App verification/i })).toBeTruthy();
+    expect(screen.queryByText(/couldn&apos;t be loaded/)).toBeNull();
+    expect(screen.queryByText(/couldn't be loaded/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   });
 
   it("says we are restocking when the balance is the reason, and drops the retry", async () => {
@@ -100,9 +102,8 @@ describe("service explorer live listings", () => {
     }) });
     vi.stubGlobal("fetch", fetchMock);
     render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
-    expect(await screen.findByText(/paused while we restock/)).toBeTruthy();
+    expect((await screen.findAllByText(/Live listings are paused while we restock\./i)).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
-    expect(screen.queryByRole("status")).toBeNull();
     expect(screen.queryByText(/couldn't be loaded/)).toBeNull();
   });
 

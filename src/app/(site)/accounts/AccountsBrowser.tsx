@@ -802,7 +802,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                     <span className="font-semibold text-ink">{formatNaira(estimatedTotal)}</span>
                   </div>
                   <p className="mt-1 text-meta text-ink-3">
-                    Paid from your Pryva wallet. Volume discounts apply automatically at 5, 10 and 25
+                    Paid from your PryvaLogs wallet. Volume discounts apply automatically at 5, 10 and 25
                     accounts. Final total is confirmed by the server.
                   </p>
                   {promo && (

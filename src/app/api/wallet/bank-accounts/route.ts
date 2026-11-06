@@ -151,7 +151,9 @@ export async function POST(request: NextRequest) {
         accountNumber: newAccount.accountNumber, accountName: newAccount.accountName,
         isDefault: newAccount.isDefault === 1,
       },
-      message: payoutWarning ? "Bank account saved, but payouts to it are blocked." : "Bank account added successfully",
+      message: payoutWarning
+        ? "Bank account saved, but payouts to it are blocked until the name matches the original funding account or support reviews it."
+        : "Bank account added successfully",
       payoutWarning,
     });
   } catch {

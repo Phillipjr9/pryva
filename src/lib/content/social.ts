@@ -66,6 +66,6 @@ export function socialIsPlaceholder(link: SocialLink): boolean {
 /** What a screen reader hears, and what the hover text says. */
 export function socialLabel(link: SocialLink): string {
   return socialIsPlaceholder(link)
-    ? `Pryva on ${link.label} — profile coming soon`
-    : `Pryva on ${link.label}`;
+    ? `PryvaLogs on ${link.label} — profile coming soon`
+    : `PryvaLogs on ${link.label}`;
 }

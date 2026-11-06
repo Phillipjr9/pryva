@@ -11,7 +11,7 @@ import { operatorHomeFor } from "@/lib/platform/operator";
 
 export const metadata: Metadata = {
   title: "Sign in",
-  description: "Sign in to your Pryva dashboard to manage your wallet, orders, codes and refunds.",
+  description: "Sign in to your PryvaLogs dashboard to manage your wallet, orders, codes and refunds.",
 };
 
 /**

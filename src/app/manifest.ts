@@ -7,15 +7,15 @@ import type { MetadataRoute } from "next";
  * cannot drift from the site metadata, and so a type error catches a malformed
  * icon list before a browser silently refuses to install the app.
  *
- * `display: "standalone"` is deliberate: Pryva is a wallet, and a wallet in a
+ * `display: "standalone"` is deliberate: PryvaLogs is a wallet, and a wallet in a
  * browser tab with an address bar invites mistyped URLs. It is still the same
  * web app — no offline purchases, no background sync, no push.
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "Pryva",
-    short_name: "Pryva",
+    name: "PryvaLogs",
+    short_name: "PryvaLogs",
     description:
       "Virtual numbers, eSIM data, residential proxies and temporary email OTP, priced in Naira.",
     start_url: "/",

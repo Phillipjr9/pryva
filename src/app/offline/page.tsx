@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "You're offline",
-  description: "Pryva could not reach the network. Your balance and orders are unaffected.",
+  description: "PryvaLogs could not reach the network. Your balance and orders are unaffected.",
   robots: { index: false, follow: false },
 };
 

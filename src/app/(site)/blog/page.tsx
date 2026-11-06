@@ -12,7 +12,7 @@ export default function BlogPage() {
     <div className="min-h-screen bg-cream">
       <section className="py-16">
         <div className="shell text-center">
-          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem]">Pryva Blog</h1>
+          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem]">PryvaLogs Blog</h1>
           <p className="mx-auto mt-4 max-w-2xl text-[1.1rem] text-ink-2">
             Practical guides to digital services and account security.
           </p>

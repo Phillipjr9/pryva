@@ -5,9 +5,9 @@ import { getCurrentUser } from "@/lib/identity/auth";
 import { Clock, Mail, MessageCircle, Shield } from "@/components/icons";
 
 export const metadata: Metadata = {
-  title: "Contact support",
+  title: "Get in touch",
   description:
-    "Message the Pryva support team about an order, a wallet transaction or a service question.",
+    "Share feature ideas, service requests and feedback with PryvaLogs. Tell us what you want built or what service you want more of.",
   alternates: { canonical: "/contact" },
 };
 
@@ -30,8 +30,8 @@ export default async function ContactPage() {
             Get in touch
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-[1.1rem] text-ink-2">
-            Have a question or need help? Include your order or wallet reference and we can pick it
-            up faster.
+            Tell us what you want to see next, what service you would like more of, or what we can improve.
+            We want your advice.
           </p>
         </div>
       </section>
@@ -43,10 +43,10 @@ export default async function ContactPage() {
               <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-lav-100 text-lav-600">
                 <Mail className="h-6 w-6" />
               </div>
-              <h2 className="mb-2 text-[1rem] font-semibold text-ink">Contact support</h2>
+              <h2 className="mb-2 text-[1rem] font-semibold text-ink">Share an idea</h2>
               <p className="text-[0.86rem] text-ink-2">
                 <a href="#contact-form" className="text-lav-700 underline underline-offset-2">
-                  Open the contact form
+                  Send us feedback or a service request
                 </a>
               </p>
             </div>
@@ -54,9 +54,9 @@ export default async function ContactPage() {
               <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-green-100 text-green-600">
                 <MessageCircle className="h-6 w-6" />
               </div>
-              <h2 className="mb-2 text-[1rem] font-semibold text-ink">Message form</h2>
+              <h2 className="mb-2 text-[1rem] font-semibold text-ink">Tell us more</h2>
               <p className="text-[0.86rem] text-ink-2">
-                Send a message below
+                Add your idea, request, or improvement below
               </p>
             </div>
             <div className="rounded-2xl border border-line bg-white p-6 text-center">
@@ -75,13 +75,13 @@ export default async function ContactPage() {
               defaultEmail={user?.email ?? ""}
             />
 
-            <div className="mt-6 grid gap-3 rounded-2xl border border-line bg-white p-6 text-[0.86rem] text-ink-2 sm:grid-cols-2">
-              <p className="flex items-start gap-2">
-                <Shield className="mt-0.5 h-4 w-4 shrink-0 text-lav-600" />
+            <div className="mt-6 grid gap-3 rounded-2xl border border-line bg-white p-4 text-[0.75rem] text-ink-2 sm:grid-cols-2 sm:p-5">
+              <p className="flex items-start gap-2 leading-relaxed">
+                <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
                 Never send passwords, card details, bank logins or verification codes.
               </p>
-              <p className="flex items-start gap-2">
-                <Shield className="mt-0.5 h-4 w-4 shrink-0 text-lav-600" />
+              <p className="flex items-start gap-2 leading-relaxed">
+                <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
                 Looking for an answer first? Try the{" "}
                 <Link href="/faq" className="font-semibold text-lav-700 underline underline-offset-2">
                   FAQ

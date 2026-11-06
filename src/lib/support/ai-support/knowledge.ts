@@ -680,6 +680,34 @@ const pricingQuestion: Playbook = {
   },
 };
 
+const generalGuidance: Playbook = {
+  id: "general-guidance",
+  title: "A general how-to question",
+  category: "other",
+  priority: "low",
+  mixing: { intent: 1, evidence: 0 },
+  intents: [
+    { label: "how-to", pattern: /\b(how do i|how can i|where do i|where can i|what is the best way to|can you explain how to|tell me how to|how to)\b/, weight: 0.9 },
+    { label: "service word", pattern: /\b(virtual number|numbers?|e?sim|proxy|proxies|wallet|top\s+up|withdraw|refund|gift card|balance|login|sign in|verify|verification|security)\b/, weight: 0.35 },
+  ],
+  corroborate() {
+    return [];
+  },
+  ask: "Which part of Pryva are you trying to use — a number, an eSIM, a proxy, the wallet, or an order?",
+  answer({ facts }) {
+    return `Start from the part of Pryva you are using:
+• Orders — check the status of a purchase or an active service.
+• Wallet — top up, check the balance, or withdraw to your bank account.
+• Numbers / eSIMs / Proxies — choose the service from the main menu, pick the country and plan, and then complete checkout.
+• Settings — verify your email, change your password, and review security.
+
+If you tell me the exact thing you are trying to do — for example, "I want to buy a virtual number", "I need to withdraw my balance", or "my order will not activate" — I can guide you to the right step for this account. Right now I can see a wallet balance of ${formatCurrency(facts.account.walletBalance)} and ${facts.orders.length} recent order${facts.orders.length === 1 ? "" : "s"}.`;
+  },
+  needsHuman() {
+    return null;
+  },
+};
+
 const acknowledgement: Playbook = {
   id: "acknowledgement",
   title: "Confirming it is sorted",
@@ -747,6 +775,7 @@ export const PLAYBOOKS: Playbook[] = [
   signInTrouble,
   acknowledgement,
   pricingQuestion,
+  generalGuidance,
   FALLBACK_PLAYBOOK,
 ];
 

@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 export const metadata: Metadata = {
   title: "Terms of Service",
   description:
-    "The agreement between you and Pryva: your account, your wallet, how orders are delivered and refunded, what is not allowed, and how disputes are handled.",
+    "The agreement between you and PryvaLogs: your account, your wallet, how orders are delivered and refunded, what is not allowed, and how disputes are handled.",
   alternates: { canonical: "/terms" },
 };
 
@@ -41,7 +41,7 @@ const clauses: Clause[] = [
     body: (
       <>
         <p>
-          These terms are the agreement between you and Pryva (&ldquo;Pryva&rdquo;, &ldquo;we&rdquo;,
+          These terms are the agreement between you and PryvaLogs (&ldquo;PryvaLogs&rdquo;, &ldquo;we&rdquo;,
           &ldquo;us&rdquo;) for the use of this website and everything sold through it. By creating an
           account, topping up a wallet or placing an order, you accept them. If you do not accept
           them, do not use the service.
@@ -115,9 +115,9 @@ const clauses: Clause[] = [
     body: (
       <>
         <p>
-          Pryva runs on a prepaid wallet in Nigerian Naira. You top up through our payment provider
-          by bank transfer or card, and orders are paid from the balance. Wallet credit is a record
-          of what you have paid us for future orders. It is not a bank deposit, it earns no
+          PryvaLogs runs on a prepaid wallet in Nigerian Naira. You top up through our payment
+          provider by bank transfer or card, and orders are paid from the balance. Wallet credit is
+          a record of what you have paid us for future orders. It is not a bank deposit, it earns no
           interest, and it is not a stored-value instrument you can transfer to someone else —
           except through a gift card, which is ours to issue and which carries credit.
         </p>
@@ -127,6 +127,15 @@ const clauses: Clause[] = [
           your own name; withdrawals are settled by an operator, and we may ask for identification
           that matches the account name. We may refuse or reverse a credit that we later establish
           was not paid, was paid twice, or was the subject of a chargeback.
+        </p>
+        <p>
+          Payouts are only sent to a bank account in the same name as the account that funded the
+          wallet. We compare the destination against the first completed top-up name, ignoring
+          titles, accents and ordering differences, and allowing only a small difference such as a
+          fuller bank-record name or a middle name. If your bank spells your name differently, ask
+          support for a payout-name review with a bank statement or account screenshot. We may reject
+          a withdrawal to a different person, because preventing fraud and money-laundering risk is
+          more important than sending money to an account that looks similar but is not yours.
         </p>
         <p>
           Referral credit is a reward, not a top-up. When an account you invited places its first
@@ -144,7 +153,7 @@ const clauses: Clause[] = [
     body: (
       <>
         <p>
-          The catalogue lists what Pryva can currently sell: virtual numbers for receiving SMS
+          The catalogue lists what PryvaLogs can currently sell: virtual numbers for receiving SMS
           verification codes, number rentals, eSIM data, residential proxies, temporary inboxes,
           digital accounts, streaming subscriptions, data and airtime, bulk and scheduled orders,
           and gift cards. Prices are shown in Naira and include our margin; they may change at any
@@ -229,7 +238,7 @@ const clauses: Clause[] = [
     title: "8. What you may not do",
     body: (
       <>
-        <p>Using Pryva for any of the following is a breach of these terms:</p>
+        <p>Using PryvaLogs for any of the following is a breach of these terms:</p>
         <ul>
           <li>fraud, deception, impersonation, or taking over an account that is not yours;</li>
           <li>
@@ -390,7 +399,7 @@ export default function TermsPage() {
       <header className="border-b border-line bg-white">
         <div className="shell flex h-16 items-center justify-between">
           <Link href="/" className="text-[0.95rem] font-semibold tracking-tight text-ink">
-            Pryva
+            PryvaLogs
           </Link>
           <div className="flex items-center gap-3">
             <Link href="/login" className="text-[0.86rem] font-medium text-ink-2 hover:text-ink">
@@ -413,8 +422,8 @@ export default function TermsPage() {
             Terms of Service
           </h1>
           <p className="mt-3 max-w-2xl text-[0.95rem] leading-relaxed text-ink-2">
-            The agreement between you and Pryva. It is written to match what the product does today,
-            including the parts that are deliberately switched off.
+            The agreement between you and PryvaLogs. It is written to match what the product does
+            today, including the parts that are deliberately switched off.
           </p>
           <p className="mt-2 text-[0.8rem] text-ink-3">
             Version in force from <time dateTime="2026-10-30">{LAST_UPDATED}</time>

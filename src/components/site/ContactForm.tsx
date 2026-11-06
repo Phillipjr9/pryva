@@ -7,6 +7,8 @@ import { ArrowRight, Check, Shield } from "@/components/icons";
 
 const topics = [
   "General question",
+  "Feature idea",
+  "Service suggestion",
   "Virtual numbers",
   "eSIM",
   "Residential proxies",
@@ -26,7 +28,7 @@ export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = fa
   const [form, setForm] = useState({
     name: defaultName,
     email: defaultEmail,
-    topic: topics[0],
+    topic: "Feature idea",
     message: "",
   });
   const [pending, setPending] = useState(false);
@@ -66,7 +68,7 @@ export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = fa
         </span>
         <h3 className="mt-5 text-2xl font-medium">Message received.</h3>
         <p className="mt-2 max-w-md text-[0.92rem] leading-relaxed text-ink-2">
-          Your message was saved for support review. Response times may vary.
+          Thanks for the idea. We will review it and use it to improve PryvaLogs.
         </p>
         <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
           <button type="button" onClick={() => setSent(false)} className="btn btn-primary">
@@ -136,7 +138,7 @@ export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = fa
 
       <div className="mt-4">
         <label htmlFor="message" className="field-label">
-          How can we help?
+          Tell us what you want next
         </label>
         <textarea
           id="message"
@@ -144,7 +146,7 @@ export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = fa
           minLength={10}
           rows={5}
           className="field resize-none"
-          placeholder="Tell us what happened, and include your order reference if you have one."
+          placeholder="Share a feature you want, a service you want more of, or a gap you would like us to solve. Include any reference or context you think helps."
           value={form.message}
           onChange={(event) => setForm({ ...form, message: event.target.value })}
         />

@@ -323,6 +323,12 @@ export function DashboardShell({
                 )}
               </Link>
 
+              <Link
+                href={`/dashboard/support#ask=${encodeURIComponent("I need help with my account, order or wallet")}`}
+                className="btn btn-ghost !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.76rem] max-[374px]:!hidden"
+              >
+                Need help?
+              </Link>
               <Link href="/dashboard/services" className="btn btn-primary !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.76rem] max-[374px]:!hidden">
                 Services
                 <ArrowRight className="h-3 w-3" />

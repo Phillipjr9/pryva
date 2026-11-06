@@ -20,17 +20,18 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { BUILD_ID } from "@/lib/platform/build-id";
 import { BuildGuard } from "@/components/system/BuildGuard";
 import { ServiceWorkerRegistration } from "@/components/system/ServiceWorkerRegistration";
+import { SupportFloatButton } from "@/components/site/SupportFloatButton";
 import { serializeStructuredData, siteStructuredData } from "@/lib/content/structured-data";
 import { canonicalSiteUrl } from "@/lib/platform/net";
 
 export const metadata: Metadata = {
   metadataBase: new URL(canonicalSiteUrl()),
   title: {
-    default: "Pryva — Virtual numbers, eSIMs and proxies for Nigeria",
-    template: "%s · Pryva",
+    default: "PryvaLogs — Virtual numbers, eSIMs and proxies for Nigeria",
+    template: "%s · PryvaLogs",
   },
   description:
-    "Explore Pryva plans for virtual numbers, eSIM data, residential proxies and temporary email OTP, priced in Naira.",
+    "Explore PryvaLogs plans for virtual numbers, eSIM data, residential proxies and temporary email OTP, priced in Naira.",
   keywords: [
     "virtual numbers Nigeria",
     "OTP verification Nigeria",
@@ -40,25 +41,25 @@ export const metadata: Metadata = {
     "pay with Naira",
   ],
   openGraph: {
-    title: "Pryva — Virtual numbers, eSIMs and proxies for Nigeria",
+    title: "PryvaLogs — Virtual numbers, eSIMs and proxies for Nigeria",
     description:
       "Virtual numbers, eSIMs, residential proxies, email OTP and digital accounts. Naira payments, instant delivery and built-in refunds.",
     url: "/",
     type: "website",
     locale: "en_NG",
-    siteName: "Pryva",
+    siteName: "PryvaLogs",
     images: [
       {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "Pryva — numbers, eSIMs and proxies, priced in Naira",
+        alt: "PryvaLogs — numbers, eSIMs and proxies, priced in Naira",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Pryva — Virtual numbers, eSIMs and proxies for Nigeria",
+    title: "PryvaLogs — Virtual numbers, eSIMs and proxies for Nigeria",
     description:
       "Nigeria's calm way to buy virtual numbers, eSIMs, proxies, inboxes and accounts — in Naira.",
     images: ["/og.png"],
@@ -102,6 +103,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <BuildGuard buildId={BUILD_ID} />
         <ServiceWorkerRegistration />
         <ToastProvider>{children}</ToastProvider>
+        <SupportFloatButton />
       </body>
     </html>
   );

@@ -152,6 +152,18 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
     return () => window.removeEventListener("storage", onStorage);
   }, [intentKey]);
 
+  useEffect(() => {
+    if (bankAccounts.length === 0) {
+      setSelectedBankAccountId("");
+      return;
+    }
+    setSelectedBankAccountId((current) => {
+      if (current && bankAccounts.some((account) => account.id === current)) return current;
+      const fallback = bankAccounts.find((account) => account.isDefault) ?? bankAccounts[0];
+      return fallback?.id ?? "";
+    });
+  }, [bankAccounts]);
+
   async function fetchBankAccounts() {
     try {
       const response = await fetch("/api/wallet/bank-accounts");
@@ -580,6 +592,9 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                     </option>
                   ))}
                 </select>
+                <p className="mt-2 rounded-xl border border-lav-200 bg-lav-50 px-3 py-2.5 text-meta leading-relaxed text-lav-800">
+                  For fraud protection, withdrawals are only sent to a bank account that matches the name on the account that funded your wallet. If your bank shows a fuller or surname-first version of your name, contact support for a payout-name review before withdrawing.
+                </p>
               </div>
 
               {recoveryState === "unavailable" && <p role="alert" className="text-sm text-rose-700">Withdrawal recovery storage is unavailable or unreadable. Contact support before starting a new request.</p>}

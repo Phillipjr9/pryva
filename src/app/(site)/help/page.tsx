@@ -4,12 +4,12 @@ import { ArrowRight, Book, Mail, MessageCircle } from "@/components/icons";
 
 export const metadata: Metadata = {
   title: "Help Center",
-  description: "Get help with your Pryva account, orders, and services.",
+  description: "Get help with your PryvaLogs account, orders, and services.",
 };
 
 const categories = [
   { title: "Getting started", description: "Learn the basics and browse common questions.", icon: Book, links: [
-    { label: "How Pryva works", href: "/how-it-works" },
+    { label: "How PryvaLogs works", href: "/how-it-works" },
     { label: "Frequently asked questions", href: "/faq" },
     { label: "Service status", href: "/status" },
   ] },

@@ -210,6 +210,10 @@ function liveUnavailableCopy(reason: LiveState["reason"]) {
     lead: "Live listings are paused while we restock.",
     rest: "Nothing is wrong with your account or your orders; check back soon.",
   };
+  if (reason === "error") return {
+    lead: "Live listings are refreshing.",
+    rest: "Browse the catalogue below while the live feed syncs again.",
+  };
   return {
     lead: "Live availability is not shown yet.",
     rest: "Check each listing for availability; stock and country coverage may be unconfirmed.",
@@ -347,7 +351,7 @@ export function ServiceExplorer({
     <div className="grid gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Explore Pryva</p>
+          <p className="text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Explore PryvaLogs</p>
           <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">{selectedCategory?.label ?? "Your service hub"}</h1>
           <p className="mt-1.5 max-w-2xl text-[0.82rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Choose a country, then select a service below.` : "Choose a country, then browse categories and available services in one place."}</p>
         </div>
@@ -494,9 +498,9 @@ export function ServiceExplorer({
               </div>
             )}
 
-            {liveState?.country === country && (liveState.failed || (liveState.live && liveState.partial)) && (
+            {liveState?.country === country && (liveState.reason === "funding" || liveState.reason === "throttled") && (
               <p role="status" className="mt-4 text-meta text-amber-800">
-                {liveState.reason === "throttled" ? "Live listings were refreshed too quickly." : liveState.reason === "funding" ? "Some live listings are paused while we restock." : "Some live listings couldn&apos;t be loaded."}{" "}
+                {liveState.reason === "throttled" ? "Live listings were refreshed too quickly." : "Live listings are paused while we restock."}{" "}
                 {/* No Retry on a funding gap: retrying cannot restock it. */}
                 {liveState.reason !== "funding" && <button type="button" className="font-semibold underline" onClick={() => setLiveRevision((value) => value + 1)}>Retry</button>}
               </p>
@@ -516,7 +520,7 @@ export function ServiceExplorer({
                 <button type="button" onClick={() => setVisible((current) => current + PAGE_SIZE)} className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2.5 text-meta font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-lav-700">Show more <span className="text-ink-3">({filtered.length - visible} remaining)</span></button>
               </div>
             )}
-            <p className="mt-5 border-t border-line pt-4 text-micro leading-relaxed text-ink-3">Stock means available inventory. My units means your remaining purchased units. Unknown and not tracked are not the same as zero. Listings do not guarantee platform support or verified coverage. <a href="https://www.exchangerate-api.com" className="underline underline-offset-2">Rates By Exchange Rate API</a></p>
+            <p className="mt-5 border-t border-line pt-4 text-micro leading-relaxed text-ink-3">Stock means available inventory. My units means your remaining purchased units. Unknown and not tracked are not the same as zero. Listings do not guarantee platform support or verified coverage.</p>
           </section>
         </>
       )}

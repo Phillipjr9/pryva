@@ -133,9 +133,6 @@ export default async function EsimPlanPage({ params }: { params: Promise<{ id: s
           />
         </aside>
       </div>
-      <p className="text-micro text-ink-3">
-        <a href="https://www.exchangerate-api.com" className="underline underline-offset-2">Rates By Exchange Rate API</a>
-      </p>
     </div>
   );
 }

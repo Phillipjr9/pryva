@@ -30,12 +30,12 @@ import { StickyMobileCta } from "@/components/site/StickyMobileCta";
 import { getCurrentUser } from "@/lib/identity/auth";
 
 export const metadata: Metadata = {
-  title: "Pryva — Virtual numbers, eSIMs and proxies for Nigeria",
+  title: "PryvaLogs — Virtual numbers, eSIMs and proxies for Nigeria",
   description:
     "Explore plans for virtual numbers, eSIM data, residential proxies, email OTP and digital accounts, priced in Naira.",
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Pryva — Virtual numbers, eSIMs and proxies for Nigeria",
+    title: "PryvaLogs — Virtual numbers, eSIMs and proxies for Nigeria",
     description:
       "Explore numbers, eSIM data, residential proxies, inboxes and digital accounts, priced in Naira.",
     url: "/",
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "Pryva — numbers, eSIMs and proxies, priced in Naira",
+        alt: "PryvaLogs — numbers, eSIMs and proxies, priced in Naira",
       },
     ],
   },
@@ -132,7 +132,7 @@ const numberFulfilment = deliverableNumbers > 0
 
 const faqs = [
   {
-    q: "Do I need a dollar card to use Pryva?",
+    q: "Do I need a dollar card to use PryvaLogs?",
     a: "No. Prices are shown in Naira and you top up with Paystack by bank transfer or local card.",
   },
   {
@@ -152,7 +152,7 @@ const faqs = [
     a: "A number is provisioned immediately after payment. The code itself arrives when the platform sends it, and your order page keeps checking for it.",
   },
   {
-    q: "Which platforms work best with Pryva numbers?",
+    q: "Which platforms work best with PryvaLogs numbers?",
     a: "Compatibility varies by platform and cannot be guaranteed. Numbers are intended for receiving SMS verification codes.",
   },
 ];
@@ -198,7 +198,7 @@ export default async function HomePage() {
               <Reveal>
                 <span className="inline-flex items-center gap-2 rounded-full border border-lav-200 bg-white/75 py-1 pl-1 pr-3 text-micro font-semibold uppercase tracking-[0.12em] text-lav-700 backdrop-blur sm:text-[0.68rem]">
                   <BrandMark size="xs" />
-                  Pryva · Nigerian digital services
+                  PryvaLogs · Nigerian digital services
                 </span>
               </Reveal>
 
@@ -456,7 +456,7 @@ export default async function HomePage() {
         <div className="shell">
           <div className="max-w-2xl">
             <Reveal>
-              <span className="eyebrow">03 / Why Pryva</span>
+              <span className="eyebrow">03 / Why PryvaLogs</span>
             </Reveal>
             <Reveal delay={60}>
               <h2 className="mt-4 text-[2rem] font-medium leading-[1.08] sm:text-[2.65rem]">
@@ -468,7 +468,7 @@ export default async function HomePage() {
             <Reveal delay={120}>
               <p className="mt-4 max-w-xl text-[0.95rem] leading-relaxed text-ink-2">
                 Most verification platforms assume you have a dollar card and endless patience.
-                Pryva is Naira-first from the first screen to the refund.
+                PryvaLogs is Naira-first from the first screen to the refund.
               </p>
             </Reveal>
           </div>

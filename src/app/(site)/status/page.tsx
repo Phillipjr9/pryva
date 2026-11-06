@@ -83,7 +83,7 @@ export default function StatusPage() {
       name: "Gift cards",
       status: giftCardsAvailable ? "Available" : "Not available",
       detail: giftCardsAvailable
-        ? "Gift cards are issued by Pryva from your wallet balance. Review the amount before confirming."
+        ? "Gift cards are issued by PryvaLogs from your wallet balance. Review the amount before confirming."
         : "Gift-card purchases and redemption are unavailable in this environment.",
     },
     {

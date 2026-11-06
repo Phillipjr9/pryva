@@ -54,6 +54,15 @@ function pageExists(href: string): boolean {
 }
 
 describe("dashboard navigation", () => {
+  it("mounts a floating support button in the global app shell", () => {
+    const layout = readFileSync(join(root, "app/layout.tsx"), "utf8");
+    const widget = readFileSync(join(root, "components/site/SupportFloatButton.tsx"), "utf8");
+    expect(layout).toContain("SupportFloatButton");
+    expect(widget).toContain("floating");
+    expect(widget).toContain("useEffect");
+    expect(widget).toContain("scroll");
+  });
+
   it("only links to pages that exist", () => {
     const broken = navHrefs().filter((href) => !pageExists(href));
     expect(broken).toEqual([]);
@@ -98,6 +107,11 @@ describe("dashboard navigation", () => {
     const tabs = shell.slice(shell.indexOf("const mobileTabs"));
     const count = (tabs.match(/\{ href: "/g) ?? []).length;
     expect(count).toBe(5);
+  });
+
+  it("adds a quick-access help button for users who need support immediately", () => {
+    expect(shell).toContain('/dashboard/support#ask=');
+    expect(shell).toContain('Need help?');
   });
 });
 

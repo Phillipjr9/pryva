@@ -74,7 +74,7 @@ export function ReceiptBody({ receipt }: { receipt: ReceiptData }) {
         <div className="flex min-w-0 items-center gap-3">
           <BrandMark size="md" />
           <div className="min-w-0">
-            <p className="text-[1.05rem] font-semibold leading-tight tracking-tight text-ink">Pryva</p>
+            <p className="text-[1.05rem] font-semibold leading-tight tracking-tight text-ink">PryvaLogs</p>
             <p className="text-meta leading-tight text-ink-3">pryvalogs.com</p>
           </div>
         </div>
