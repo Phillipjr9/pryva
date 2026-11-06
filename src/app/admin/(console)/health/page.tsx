@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/identity/auth";
 import { db } from "@/db";
 import { orders, paymentTopups, withdrawals } from "@/db/schema";
 import { asc, eq, inArray } from "drizzle-orm";
+import { listFraudEvents } from "@/lib/admin/fraud";
 import { ledgerBreaks, recentReconciliationRuns } from "@/lib/payments/daily-reconciliation";
 
 export const dynamic = "force-dynamic";
@@ -29,10 +30,18 @@ const statusTone: Record<string, string> = {
   clean: "bg-emerald-50 text-emerald-700",
 };
 
+const FRAUD_KIND_LABEL: Record<string, string> = {
+  withdrawal_review: "Withdrawal flagged",
+  withdrawal_velocity: "Withdrawal velocity",
+  referral_same_network: "Referral from the same network",
+  purchase_velocity: "Too many purchases",
+  gift_card_velocity: "Too many gift cards",
+};
+
 export default async function AdminHealthPage() {
   await requireAdmin("/admin/health");
 
-  const [recentRuns, ledgerIssues, outstandingOrders, outstandingWithdrawals, pendingTopups] = await Promise.all([
+  const [recentRuns, ledgerIssues, outstandingOrders, outstandingWithdrawals, pendingTopups, openFraudSignals] = await Promise.all([
     recentReconciliationRuns(7),
     ledgerBreaks(8),
     db
@@ -72,9 +81,10 @@ export default async function AdminHealthPage() {
       .where(eq(paymentTopups.status, "pending"))
       .orderBy(asc(paymentTopups.createdAt))
       .limit(12),
+    listFraudEvents({ openOnly: true, limit: 6 }),
   ]);
 
-  const totalAttention = outstandingOrders.length + outstandingWithdrawals.length + pendingTopups.length + ledgerIssues.length;
+  const totalAttention = outstandingOrders.length + outstandingWithdrawals.length + pendingTopups.length + ledgerIssues.length + openFraudSignals.length;
 
   return (
     <main className="space-y-6 p-6">
@@ -86,7 +96,7 @@ export default async function AdminHealthPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
           <p className="text-sm text-ink-3">Unresolved orders</p>
           <p className="mt-3 text-3xl font-semibold text-ink">{outstandingOrders.length}</p>
@@ -107,6 +117,11 @@ export default async function AdminHealthPage() {
           <p className="mt-3 text-3xl font-semibold text-ink">{ledgerIssues.length}</p>
           <p className="mt-2 text-xs text-ink-3">Accounts needing reconciliation</p>
         </div>
+        <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+          <p className="text-sm text-ink-3">Open fraud signals</p>
+          <p className="mt-3 text-3xl font-semibold text-ink">{openFraudSignals.length}</p>
+          <p className="mt-2 text-xs text-ink-3">Awaiting operator review</p>
+        </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -122,7 +137,7 @@ export default async function AdminHealthPage() {
           </div>
 
           <div className="space-y-4">
-            {outstandingOrders.length === 0 && outstandingWithdrawals.length === 0 && pendingTopups.length === 0 && ledgerIssues.length === 0 ? (
+            {outstandingOrders.length === 0 && outstandingWithdrawals.length === 0 && pendingTopups.length === 0 && ledgerIssues.length === 0 && openFraudSignals.length === 0 ? (
               <div className="rounded-xl border border-dashed border-line bg-cream/40 p-5 text-sm text-ink-2">
                 No operator attention is currently required.
               </div>
@@ -182,6 +197,26 @@ export default async function AdminHealthPage() {
                             <div className="font-semibold text-ink">{formatNaira(row.amount)}</div>
                             <div className="text-ink-3">{formatDate(row.createdAt)}</div>
                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {openFraudSignals.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-ink-3">Fraud signals</p>
+                    <div className="space-y-2">
+                      {openFraudSignals.map((row) => (
+                        <div key={row.id} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="font-medium text-red-900">{FRAUD_KIND_LABEL[row.kind] ?? row.kind}</div>
+                            <span className={`rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${row.severity === "high" ? "bg-red-100 text-red-700" : row.severity === "warn" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-700"}`}>
+                              {row.severity}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-red-800">{row.reasons}</div>
+                          {row.amount ? <div className="mt-1 text-red-700">{formatNaira(row.amount)}</div> : null}
                         </div>
                       ))}
                     </div>
