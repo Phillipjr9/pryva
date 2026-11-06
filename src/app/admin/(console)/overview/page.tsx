@@ -206,7 +206,9 @@ export default async function AdminOverviewPage() {
 
   const revenueByDay = new Map<string, number>();
   for (const row of dailyRevenue) {
-    revenueByDay.set(row.day.toISOString().slice(0, 10), Number(row.revenue));
+    // sql<Date> returns a string at runtime, not a Date object.
+    const dayStr = String(row.day).slice(0, 10);
+    revenueByDay.set(dayStr, Number(row.revenue));
   }
 
   const chartData = Array.from({ length: 7 }, (_, i) => {
