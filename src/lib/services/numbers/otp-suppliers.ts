@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  BitcallError,
   buyBitcallOtpActivation,
   isAmbiguousBitcallOutcome,
   isBitcallConfigured,
@@ -340,6 +341,7 @@ export async function otpSupplierProbe(
 
 function errorCodeOf(error: unknown): string {
   if (error instanceof FleexaError) return error.code ?? "UPSTREAM_ERROR";
+  if (error instanceof BitcallError) return error.code ?? "BIT_CALL_ERROR";
   const name = error instanceof Error ? error.name : "";
   // A type name is not a message and cannot carry a response body, so it is the
   // most specific safe thing to report. A plain `Error` says nothing at all.
