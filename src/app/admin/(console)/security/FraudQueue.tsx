@@ -11,6 +11,7 @@ const KIND_LABEL: Record<string, string> = {
   referral_same_network: "Referral from the same network",
   purchase_velocity: "Too many purchases",
   gift_card_velocity: "Too many gift cards",
+  suspicious_signup: "Suspicious signup",
 };
 
 const SEVERITY_STYLE: Record<string, string> = {

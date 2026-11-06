@@ -9,7 +9,7 @@ import { DISPOSABLE_EMAIL_ERROR, isDisposableEmailAddress } from "@/lib/services
 import { isSameOriginMutation } from "@/lib/platform/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 import { attributeReferral, readReferralCodeFrom } from "@/lib/content/referrals";
-import { recordSignupSignal } from "@/lib/admin/fraud";
+import { assessSignupRisk, recordFraudEvent, recordSignupSignal } from "@/lib/admin/fraud";
 import { sendNewUserSignupAlert } from "@/lib/email/contact-message-email";
 import { previewOperatorBootstrapEnabled } from "@/lib/platform/preview-operator";
 
@@ -86,6 +86,25 @@ export async function POST(request: Request) {
     // Where this account came from, as salted hashes. Best effort and silent:
     // a missing signal costs one fraud check, never an account.
     await recordSignupSignal(request, created.id);
+
+    // Score the signup for spam-like signals and queue anything suspicious so
+    // an operator can judge it. Never blocks account creation.
+    const risk = await assessSignupRisk(request, created.id, email).catch(() => ({
+      level: "low" as const,
+      reasons: [] as string[],
+      ipHash: null as string | null,
+    }));
+    if (risk.level !== "low") {
+      await recordFraudEvent({
+        userId: created.id,
+        kind: "suspicious_signup",
+        severity: risk.level === "high" ? "high" : "warn",
+        reasons: risk.reasons,
+        ipHash: risk.ipHash ?? null,
+      }).catch((error) => {
+        console.error("[auth] fraud event recording failed", error instanceof Error ? error.message : String(error));
+      });
+    }
 
     const referralCode = readReferralCodeFrom(request, fields.ref);
     if (referralCode) {
