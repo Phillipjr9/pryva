@@ -34,6 +34,7 @@ const SECTIONS: Section[] = [
     label: "Money out",
     items: [
       { href: "/admin/withdrawals", label: "Withdrawals" },
+      { href: "/admin/anomalies", label: "Payout anomalies" },
       { href: "/admin/payout-names", label: "Payout names" },
       { href: "/admin/refunds", label: "Refunds" },
     ],
@@ -42,7 +43,9 @@ const SECTIONS: Section[] = [
     label: "The books",
     items: [
       { href: "/admin/transactions", label: "Wallet ledger" },
+      { href: "/admin/integrity", label: "Integrity" },
       { href: "/admin/reconciliation", label: "Reconciliation" },
+      { href: "/admin/health", label: "Health" },
       { href: "/admin/margin", label: "Margin" },
       { href: "/admin/analytics", label: "Analytics" },
     ],
@@ -53,6 +56,7 @@ const SECTIONS: Section[] = [
       { href: "/admin/orders", label: "Orders" },
       { href: "/admin/services", label: "Services" },
       { href: "/admin/stock", label: "Stock" },
+      { href: "/admin/suppliers", label: "Suppliers" },
       { href: "/admin/fulfilment", label: "Fulfilment" },
       { href: "/admin/boosting", label: "Boosting" },
     ],
@@ -70,6 +74,7 @@ const SECTIONS: Section[] = [
     label: "Trust",
     items: [
       { href: "/admin/security", label: "Security" },
+      { href: "/admin/retention", label: "Retention" },
       { href: "/admin/audit", label: "Audit log" },
       { href: "/admin/account", label: "Your account" },
     ],

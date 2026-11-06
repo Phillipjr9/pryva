@@ -26,7 +26,6 @@ import { isPlanFulfillable } from "@/lib/services/fulfillment";
 import { CountryFlag } from "@/components/CountryFlag";
 import { hasCountryFlag } from "@/lib/platform/countries";
 import { BrandMark } from "@/components/brand/BrandLockup";
-import { StickyMobileCta } from "@/components/site/StickyMobileCta";
 import { getCurrentUser } from "@/lib/identity/auth";
 
 export const metadata: Metadata = {
@@ -844,11 +843,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <StickyMobileCta
-        label="Explore plans · Naira pricing"
-        price={serviceMap["email-otp"].fromPrice}
-        targetId="final-cta"
-      />
     </>
   );
 }

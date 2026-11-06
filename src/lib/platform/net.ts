@@ -173,9 +173,37 @@ export function isSameOriginMutation(request: Request): boolean {
   const origin = request.headers.get("origin");
 
   if (!origin) {
-    if (!host) return false;
+    const requestHost = (() => {
+      try {
+        return new URL(request.url).hostname.toLowerCase();
+      } catch {
+        return "";
+      }
+    })();
+
+    if (!host) {
+      return !!requestHost;
+    }
+
     const hostname = host.split(":")[0].toLowerCase();
-    return isLocalHost(hostname) || isArenaPreviewHost(host);
+    if (isLocalHost(hostname) || isArenaPreviewHost(host)) return true;
+
+    try {
+      const expectedHost = new URL(`${requestProto(request)}://${host}`).hostname.toLowerCase();
+      if (requestHost === expectedHost) return true;
+    } catch {
+      // Fall through to the configured-site check below.
+    }
+
+    const pin = configuredOrigin(process.env.NEXT_PUBLIC_SITE_URL) ?? configuredOrigin(process.env.NEXT_PUBLIC_APP_URL);
+    if (pin) {
+      const pinnedHost = new URL(pin).hostname.toLowerCase();
+      const bareHost = hostname.replace(/^www\./, "");
+      const barePinned = pinnedHost.replace(/^www\./, "");
+      return bareHost === barePinned || `www.${bareHost}` === barePinned || bareHost === `www.${barePinned}`;
+    }
+
+    return false;
   }
 
   try {

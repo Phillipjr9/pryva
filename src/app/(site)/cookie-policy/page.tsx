@@ -24,7 +24,7 @@ export default function CookiePolicyPage() {
             Cookie Policy
           </h1>
           <p className="mt-3 max-w-2xl text-[0.94rem] leading-relaxed text-ink-2 sm:text-[0.98rem]">
-            PryvaLogs uses session and sign-in cookies. Third-party services may use their own cookies under their policies.
+            PryvaLogs uses essential session and sign-in cookies. We also remember your consent choice in a browser cookie so the website does not keep asking after you click “Yes, I accept.” Third-party services may use their own cookies under their policies.
           </p>
         </div>
       </section>
@@ -61,6 +61,13 @@ export default function CookiePolicyPage() {
 
         <div className="mt-8 space-y-6">
           <div className="rounded-2xl border border-line bg-white p-5">
+            <h2 className="text-[1rem] font-semibold text-ink">Consent tracking</h2>
+            <p className="mt-2 max-w-3xl text-[0.88rem] leading-relaxed text-ink-2">
+              When you click “Yes, I accept,” we save a consent record in your browser so the website remembers your choice. The record indicates whether you accepted cookies, and it is used only to suppress the consent prompt on later visits.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-line bg-white p-5">
             <h2 className="text-[1rem] font-semibold text-ink">Payments</h2>
             <p className="mt-2 max-w-3xl text-[0.88rem] leading-relaxed text-ink-2">
               Configured live wallet top-ups open a Paystack checkout. Paystack and other third-party services may use their own cookies; consult their policies for details.
@@ -70,7 +77,7 @@ export default function CookiePolicyPage() {
           <div className="rounded-2xl border border-line bg-white p-5">
             <h2 className="text-[1rem] font-semibold text-ink">Managing cookies</h2>
             <p className="mt-2 max-w-3xl text-[0.88rem] leading-relaxed text-ink-2">
-              You can clear or block cookies in your browser settings. Blocking session cookies can prevent sign-in and authenticated features. Browser local storage holds the “pryva-theme” preference and, during an unresolved withdrawal request, a user-scoped request ID, amount and internal bank-account ID to support safe retries. It does not store bank details there. Clearing this recovery record does not cancel a withdrawal; check your requests or contact support before submitting another.
+              You can clear or block cookies in your browser settings. Blocking session cookies can prevent sign-in and authenticated features. Browser local storage holds the “pryva-theme” preference and, during an unresolved withdrawal request, a user-scoped request ID, amount and internal bank-account ID to support safe retries. It does not store bank details there. Clearing this recovery record does not cancel a withdrawal; check your requests or contact support before submitting another. Clearing the consent record will cause the banner to reappear.
             </p>
           </div>
 

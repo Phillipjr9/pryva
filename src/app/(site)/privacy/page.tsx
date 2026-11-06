@@ -64,7 +64,7 @@ export default function PrivacyPage() {
 
             <h2>6. Cookies and Tracking</h2>
             <p>
-              Session and sign-in cookies support authentication. Browser local storage may hold a theme preference and an unresolved withdrawal request ID, amount and internal account ID for retry recovery. You can control these through your browser settings, but clearing recovery data does not cancel a withdrawal.
+              Essential session and sign-in cookies support authentication and keep you signed in. We also store your cookie-consent choice in the browser so we can remember whether you accepted the cookie notice. Browser local storage may hold a theme preference and an unresolved withdrawal request ID, amount and internal account ID for retry recovery. You can control these through your browser settings, but clearing recovery data does not cancel a withdrawal.
             </p>
 
             <h2>7. Your Rights</h2>

@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, Card, Shield, Check } from "@/components/icons";
 import { services } from "@/lib/services/catalog";
@@ -79,9 +81,13 @@ export function SiteFooter() {
                 Create free account
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href="/contact" className="btn btn-ghost">
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("open-support-chat"))}
+                className="btn btn-ghost"
+              >
                 Need help?
-              </Link>
+              </button>
               <Link href="/pricing" className="btn btn-ghost">
                 View pricing
               </Link>

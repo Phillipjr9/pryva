@@ -480,6 +480,18 @@ describe("ledger integrity", () => {
     ]);
     expect(await integrity.checkOrderIntegrity(order.id)).toEqual({ valid: true, issues: [] });
   });
+
+  it("exposes a verified-admin integrity report for the books", async () => {
+    const route = await import("@/app/api/admin/integrity/route");
+    const response = await route.GET(new NextRequest("https://pryva.test/api/admin/integrity?scope=all"));
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.ok).toBe(true);
+    expect(payload.summary).toMatchObject({
+      users: expect.objectContaining({ checked: expect.any(Number), issues: expect.any(Number) }),
+      orders: expect.objectContaining({ checked: expect.any(Number), issues: expect.any(Number) }),
+    });
+  });
 });
 
 describe("marketplace money safety", () => {

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
+import { CookieConsentBanner } from "@/components/site/CookieConsentBanner";
 
 export default function SiteLayout({ children }: { children: ReactNode }) {
   return (
@@ -20,6 +21,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
         {children}
       </main>
       <SiteFooter />
+      <CookieConsentBanner />
     </div>
   );
 }
