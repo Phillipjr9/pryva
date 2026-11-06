@@ -3,7 +3,7 @@ const px = (id: number, width: number, height: number, ext: "jpeg" | "png" = "jp
 
 export const PHOTOS = {
   hero: {
-    url: px(7971558, 1080, 1260),
+    url: px(7971558, 900, 1100),
     alt: "Young woman smiling while using her smartphone outside a modern building",
     credit: "Photo by Darlene Alderson on Pexels",
   },

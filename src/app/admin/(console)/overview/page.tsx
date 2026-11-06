@@ -150,7 +150,7 @@ export default async function AdminOverviewPage() {
   const operator = await requireAdmin("/admin/overview");
 
   // Core counts
-  const [userStats, orderStats, revenueStats, openMessages, escalatedRow, fraudSignals, dueForPurge] = await Promise.all([
+  const [userStatsRows, orderStatsRows, revenueStatsRows, openMessagesRows, escalatedRows, fraudSignals, dueForPurge] = await Promise.all([
     db.select({ count: count() }).from(users),
     db.select({ count: count() }).from(orders),
     db.select({ sum: sum(orders.amount) }).from(orders).where(eq(orders.status, "delivered")),
@@ -160,11 +160,17 @@ export default async function AdminOverviewPage() {
     countDueForPurge(),
   ]);
 
-  const totalUsers = Number(userStats?.count ?? 0);
-  const totalOrders = Number(orderStats?.count ?? 0);
-  const revenue = Number(revenueStats?.sum ?? 0);
-  const openMessageCount = Number(openMessages?.count ?? 0);
-  const escalated = Number(escalatedRow?.count ?? 0);
+  const userStats = userStatsRows[0] ?? { count: 0 };
+  const orderStats = orderStatsRows[0] ?? { count: 0 };
+  const revenueStats = revenueStatsRows[0] ?? { sum: 0 };
+  const openMessages = openMessagesRows[0] ?? { count: 0 };
+  const escalatedRow = escalatedRows[0] ?? { count: 0 };
+
+  const totalUsers = Number(userStats.count ?? 0);
+  const totalOrders = Number(orderStats.count ?? 0);
+  const revenue = Number(revenueStats.sum ?? 0);
+  const openMessageCount = Number(openMessages.count ?? 0);
+  const escalated = Number(escalatedRow.count ?? 0);
   const openFraudCount = fraudSignals.length;
 
   // Signup health

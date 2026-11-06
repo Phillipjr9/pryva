@@ -186,9 +186,9 @@ export default async function HomePage() {
 
       {/* ---------- HERO ---------- */}
       <section className="relative overflow-hidden pb-12 pt-4 sm:pb-16 sm:pt-10">
-        {/* soft brand glows, kept behind everything and cheap to paint on phones */}
-        <div className="pointer-events-none absolute -left-32 -top-24 h-[22rem] w-[22rem] rounded-full bg-lav-200/50 blur-[90px]" />
-        <div className="pointer-events-none absolute -right-24 top-56 h-[20rem] w-[20rem] rounded-full bg-peach/40 blur-[90px]" />
+        {/* keep the ambient glows light so the mobile first paint stays cheap */}
+        <div className="pointer-events-none absolute -left-20 -top-16 h-48 w-48 rounded-full bg-lav-200/40 blur-[60px] sm:h-[16rem] sm:w-[16rem]" />
+        <div className="pointer-events-none absolute -right-20 top-32 h-44 w-44 rounded-full bg-peach/30 blur-[60px] sm:h-[15rem] sm:w-[15rem]" />
 
         <div className="shell relative">
           <div className="grid items-center gap-8 sm:gap-10 lg:grid-cols-[1.03fr_0.97fr] lg:gap-x-14 lg:gap-y-7">
@@ -245,9 +245,10 @@ export default async function HomePage() {
                   <Image
                     src={PHOTOS.hero.url}
                     alt={PHOTOS.hero.alt}
-                    width={1080}
-                    height={1260}
+                    width={900}
+                    height={1100}
                     priority
+                    quality={72}
                     sizes="(max-width: 640px) 88vw, (max-width: 1024px) 26rem, 30rem"
                     className="aspect-[4/4.3] w-full object-cover sm:aspect-[4/4.25] lg:aspect-[4/4.6]"
                   />
