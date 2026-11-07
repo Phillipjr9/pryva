@@ -1,22 +1,29 @@
 "use client";
 
-import { artworkMaster, artworkSrcSet } from "@/lib/services/service-artwork";
+import type { ComponentType, SVGProps } from "react";
+import {
+  Bell,
+  Chat,
+  Grid,
+  Home,
+  Inbox,
+  Receipt,
+  Settings,
+  Star,
+  Users,
+  Wallet,
+} from "@/components/icons";
 
 /**
- * Image icons for the dashboard's own destinations.
+ * Icons for the dashboard's own destinations.
  *
- * Every row in the dashboard sidebar is a picture now, not a mixture of pictures
- * and line glyphs. The twelve service rows already carried 3D artwork; the ten
- * account and navigation rows (Overview, Orders, Wallet, Inbox, Referrals, All
- * services, Notifications, Reviews, Settings, Support) drew 16 px stroked SVGs,
- * so on the rendered page half the list looked like a different product. The
- * owner called that out: "real images icon that's missing".
+ * These rows used to load generated 3D tiles from `/images/nav`, one PNG plus
+ * three WebP derivatives per destination. They are now stroked glyphs from the
+ * same 24×24 set as the buttons and headings around them, so the sidebar is one
+ * visual family, ships no image bytes, and follows `currentColor` in dark mode.
  *
- * These are Pryva's own destinations, so the tiles are generated 3D objects in
- * the same lavender/indigo/peach set as `public/images/services` — no brand mark
- * is reproduced here, and nothing is borrowed from another row. The same
- * `artwork:*` pipeline writes the 64/128/192 WebP derivatives, so a 20 px sidebar
- * row downloads the 64 px copy rather than the 300 KB master.
+ * Nothing here reproduces a brand: these are Pryva's own pages. Third-party
+ * products keep their real logos via `BrandIcon`.
  */
 export type NavArt =
   | "overview"
@@ -30,17 +37,20 @@ export type NavArt =
   | "settings"
   | "support";
 
-const NAV_ART: Record<NavArt, string> = {
-  overview: "overview",
-  orders: "orders",
-  wallet: "wallet",
-  inbox: "inbox",
-  referrals: "referrals",
-  services: "services",
-  notifications: "notifications",
-  reviews: "reviews",
-  settings: "settings",
-  support: "support",
+type Glyph = ComponentType<SVGProps<SVGSVGElement>>;
+
+/** One distinct glyph per destination — no row borrows another's. */
+const NAV_GLYPHS: Record<NavArt, Glyph> = {
+  overview: Home,
+  orders: Receipt,
+  wallet: Wallet,
+  inbox: Inbox,
+  referrals: Users,
+  services: Grid,
+  notifications: Bell,
+  reviews: Star,
+  settings: Settings,
+  support: Chat,
 };
 
 export const NAV_ART_LABELS: Record<NavArt, string> = {
@@ -60,7 +70,7 @@ const sizeMap = { xs: 20, sm: 24, md: 32 } as const;
 
 /**
  * Always decorative: every call site puts the destination's name next to the
- * picture, so an alt text here would read the label twice.
+ * icon, so a label here would read it twice.
  */
 export function NavIcon({
   name,
@@ -72,22 +82,6 @@ export function NavIcon({
   className?: string;
 }) {
   const pixelSize = sizeMap[size];
-  const art = NAV_ART[name];
-  return (
-    // A plain <img>: the optimiser is off, and the srcSet is the point — a 20 px
-    // slot should take the 64 px derivative, not the master.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={artworkMaster("nav", art)}
-      srcSet={artworkSrcSet("nav", art)}
-      sizes={`${pixelSize}px`}
-      width={pixelSize}
-      height={pixelSize}
-      alt=""
-      aria-hidden="true"
-      loading="lazy"
-      decoding="async"
-      className={`shrink-0 rounded-[5px] object-cover ${className}`}
-    />
-  );
+  const Icon = NAV_GLYPHS[name];
+  return <Icon width={pixelSize} height={pixelSize} className={`shrink-0 ${className}`} />;
 }

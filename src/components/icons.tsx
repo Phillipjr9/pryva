@@ -620,13 +620,99 @@ export function Filter(props: IconProps) {
   );
 }
 
-export const serviceIconMap = {
-  phone: Phone,
-  sim: Sim,
-  globe: Globe,
-  mail: Mail,
-  accounts: Users,
-  gift: Gift,
-  package: ShoppingCart,
-  calendar: Calendar,
-} as const;
+/**
+ * The rest of the catalogue glyphs.
+ *
+ * These exist so every Pryva service, category and dashboard destination can be
+ * drawn from one stroked set instead of a picture file. They follow `base()`
+ * exactly — 24×24, 1.6 stroke, round caps — so a row mixing `Wallet` with
+ * `Inbox` reads as one family at 20 px.
+ */
+
+export function Music(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M9 18V5.8l10-2v12" />
+      <circle cx="6.5" cy="18" r="2.5" />
+      <circle cx="16.5" cy="15.8" r="2.5" />
+    </svg>
+  );
+}
+
+export function Gamepad(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M7.5 7.5h9a4.5 4.5 0 0 1 4.4 3.6l.7 4.2a2.6 2.6 0 0 1-4.6 2.1l-1.2-1.5H8.2L7 17.4a2.6 2.6 0 0 1-4.6-2.1l.7-4.2A4.5 4.5 0 0 1 7.5 7.5Z" />
+      <path d="M7 11v2.6M5.7 12.3h2.6" />
+      <path d="M15.6 11.6h.01M17.9 13.4h.01" />
+    </svg>
+  );
+}
+
+export function Layers(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="m12 3 8.5 4.5L12 12 3.5 7.5 12 3Z" />
+      <path d="m4 12 8 4.3 8-4.3" />
+      <path d="m4 16.4 8 4.3 8-4.3" />
+    </svg>
+  );
+}
+
+export function Inbox(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3.5 13.5h4l1.3 2.4h6.4l1.3-2.4h4" />
+      <path d="M6.2 4.5h11.6l2.7 9v4a2 2 0 0 1-2 2H5.5a2 2 0 0 1-2-2v-4l2.7-9Z" />
+    </svg>
+  );
+}
+
+export function ShieldCheck(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 2.8 4.8 5.6v6c0 4.3 3 8.2 7.2 9.6 4.2-1.4 7.2-5.3 7.2-9.6v-6L12 2.8Z" />
+      <path d="m8.9 11.9 2.2 2.2 4-4.2" />
+    </svg>
+  );
+}
+
+export function Signal(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 20v-3.2M9.3 20v-6.6M14.7 20v-10M20 20V6.4" />
+    </svg>
+  );
+}
+
+export function Megaphone(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 10.2v3.6a1.8 1.8 0 0 0 1.8 1.8h1.4L18 20V4L7.2 8.4H5.8A1.8 1.8 0 0 0 4 10.2Z" />
+      <path d="M7.2 8.4v7.2" />
+      <path d="M8.5 16.2 9.8 21h2.6l-1.1-4.4" />
+      <path d="M20.5 9.4a3.6 3.6 0 0 1 0 5.2" />
+    </svg>
+  );
+}
+
+export function IdCard(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="2.8" y="5" width="18.4" height="14" rx="3" />
+      <circle cx="8.6" cy="11" r="2.2" />
+      <path d="M5.4 16.2c0-1.6 1.4-2.7 3.2-2.7s3.2 1.1 3.2 2.7" />
+      <path d="M14.8 10.4h3.8M14.8 13.6h3.8" />
+    </svg>
+  );
+}
+
+export function MonitorPlay(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="2.8" y="4" width="18.4" height="12.4" rx="2.6" />
+      <path d="M9 20.2h6M12 16.4v3.8" />
+      <path d="m10.6 8.2 4.2 2.4-4.2 2.4V8.2Z" />
+    </svg>
+  );
+}

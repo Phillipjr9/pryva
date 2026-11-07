@@ -26,7 +26,7 @@ const COLOUR_ON_LIGHT = new Set<BrandSlug>(["gmail"]);
  */
 export const WORDMARK_BRANDS = {
   "disney-plus": { label: "Disney+", title: "Disney+", hex: "#0E1C6B", accent: "#3E5BDB", text: "#ffffff" },
-  outlook: { label: "Outlook", title: "Microsoft Outlook", hex: "#0F6CBD", accent: "#28A8EA", text: "#ffffff" },
+
   // Nigerian carriers with no redistributable logo: the wordmark in the brand's
   // own colours. Their real logos ARE wordmarks, so this reads correctly.
   mtn: { label: "MTN", title: "MTN", hex: "#FFCC00", accent: "#FFE066", text: "#111111" },
@@ -52,7 +52,19 @@ export function BrandIcon({
   className,
   decorative = false,
 }: BrandIconProps) {
-  const wordmark = (WORDMARK_BRANDS as Record<string, (typeof WORDMARK_BRANDS)[WordmarkSlug]>)[brand];
+  /*
+   * A real mark always wins.
+   *
+   * The wordmark table is the fallback for brands that publish no
+   * redistributable logo — it is not an override. Outlook sat in both tables
+   * for a while, and because the wordmark was consulted first the product was
+   * drawn as the text "Outlook" while its official mark shipped unused in
+   * BRAND_MARKS. Looking the real mark up first makes that impossible: adding a
+   * brand to the wordmark table can never hide a logo we already have.
+   */
+  const wordmark = BRAND_MARKS[brand as BrandSlug]
+    ? undefined
+    : (WORDMARK_BRANDS as Record<string, (typeof WORDMARK_BRANDS)[WordmarkSlug]>)[brand];
   if (wordmark) {
     return (
       <span
