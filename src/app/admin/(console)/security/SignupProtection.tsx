@@ -1,7 +1,7 @@
 import { ShieldCheck } from "@/components/icons";
 
 import { AdminCard, StatusBadge } from "@/components/admin/AdminUi";
-import { isTurnstileConfigured, turnstileSiteKey } from "@/lib/platform/turnstile";
+import { isTurnstileConfigured, turnstileBuildGap, turnstileSiteKey } from "@/lib/platform/turnstile";
 
 /**
  * Whether signup is actually defended, stated plainly.
@@ -16,23 +16,40 @@ import { isTurnstileConfigured, turnstileSiteKey } from "@/lib/platform/turnstil
 export function SignupProtection() {
   const configured = isTurnstileConfigured();
   const siteKeyOnly = !configured && Boolean(turnstileSiteKey());
+  // A build made before the site key existed renders no widget, and rebuilding
+  // is the only fix. Reported separately from "configured", because the tokens
+  // variable being present in the dashboard is not evidence the deployed page
+  // ever drew the challenge.
+  const buildGap = turnstileBuildGap();
+
+  const challengeDetail = siteKeyOnly
+    ? "A site key is set but TURNSTILE_SECRET_KEY is missing, so tokens are not being checked. Add the secret key."
+    : buildGap
+      ? buildGap
+      : configured
+        ? "Every signup must pass Cloudflare Turnstile — password form and Google signup alike. Refused and expired tokens are rejected."
+        : "Not configured. Set NEXT_PUBLIC_TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY to require a challenge.";
 
   const rows: Array<{ label: string; status: string; tone: string; detail: string }> = [
     {
       label: "Bot challenge (Turnstile)",
       status: configured ? "active" : siteKeyOnly ? "misconfigured" : "off",
-      tone: configured ? "verified" : siteKeyOnly ? "failed" : "pending",
-      detail: configured
-        ? "Every signup must pass Cloudflare Turnstile. Refused and expired tokens are rejected."
-        : siteKeyOnly
-          ? "A site key is set but TURNSTILE_SECRET_KEY is missing, so tokens are not being checked. Add the secret key."
-          : "Not configured. Set NEXT_PUBLIC_TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY to require a challenge.",
+      tone: configured ? (buildGap ? "pending" : "verified") : siteKeyOnly ? "failed" : "pending",
+      detail: challengeDetail,
     },
     {
       label: "Hidden honeypot field",
       status: "active",
       tone: "verified",
       detail: "Always on. A signup that fills the invisible field is refused before an account is created.",
+    },
+    {
+      label: "Google signup",
+      status: configured ? "challenged" : "signup limit only",
+      tone: configured ? "verified" : "pending",
+      detail: configured
+        ? "A new Google account must present a Turnstile token, and the return leg is limited per connection. Existing customers signing in are never asked."
+        : "Creating an account with Google skips the challenge while Turnstile is unconfigured; only the per-connection return limit applies.",
     },
     {
       label: "New-customer email alert",

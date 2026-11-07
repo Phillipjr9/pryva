@@ -28,6 +28,9 @@ import { logger } from "@/lib/platform/logger";
  * by making our verification call fail.
  */
 
+/** One warning per process is enough; a per-request log would bury everything else. */
+let warnedBuildGap = false;
+
 const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 const REQUEST_TIMEOUT_MS = 5_000;
 const MAX_TOKEN_LENGTH = 2_048;
@@ -45,9 +48,40 @@ export function turnstileSiteKey(env: TurnstileEnv = process.env): string | null
   return raw ? raw : null;
 }
 
-function secretKey(env: TurnstileEnv = process.env): string | null {
+export function turnstileSecretKey(env: TurnstileEnv = process.env): string | null {
   const raw = env.TURNSTILE_SECRET_KEY?.trim();
   return raw ? raw : null;
+}
+
+/**
+ * The state a *build* was in, which is not the same question as "are the keys
+ * set now".
+ *
+ * Next inlines `NEXT_PUBLIC_*` into the client bundle when it builds, so a
+ * deployment built without the site key ships a signup page that renders no
+ * widget — even after the variable is added — until it is rebuilt. The server
+ * half reads `process.env` at runtime, so the same deployment can verify tokens
+ * for a widget nobody is showing. That combination fails open on the one path
+ * this module exists to close, and nothing about it is visible from a dashboard
+ * that lists both variables as present.
+ *
+ * Returns null when there is nothing to complain about, or the sentence an
+ * operator needs to read.
+ */
+export function turnstileBuildGap(
+  env: TurnstileEnv = process.env,
+  buildSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+): string | null {
+  const site = turnstileSiteKey(env);
+  const secret = turnstileSecretKey(env);
+  if (!site && !secret) return null;
+  if (!secret) return "NEXT_PUBLIC_TURNSTILE_SITE_KEY is set but TURNSTILE_SECRET_KEY is not, so no token is ever checked.";
+  if (!site) return "TURNSTILE_SECRET_KEY is set but NEXT_PUBLIC_TURNSTILE_SITE_KEY is not, so no widget is rendered.";
+  const built = buildSiteKey?.trim();
+  if (!built) {
+    return "This build shipped without NEXT_PUBLIC_TURNSTILE_SITE_KEY, so the signup page renders no challenge until a new deployment is built with it.";
+  }
+  return null;
 }
 
 /**
@@ -55,7 +89,7 @@ function secretKey(env: TurnstileEnv = process.env): string | null {
  * never checks, which is worse than no widget because it looks protected.
  */
 export function isTurnstileConfigured(env: TurnstileEnv = process.env): boolean {
-  return Boolean(turnstileSiteKey(env) && secretKey(env));
+  return Boolean(turnstileSiteKey(env) && turnstileSecretKey(env));
 }
 
 export type TurnstileOutcome =
@@ -74,12 +108,21 @@ export async function verifyTurnstileToken(
   remoteIp?: string | null,
   env: TurnstileEnv = process.env,
 ): Promise<TurnstileOutcome> {
-  const secret = secretKey(env);
+  const secret = turnstileSecretKey(env);
   if (!isTurnstileConfigured(env) || !secret) {
     // Not configured is a deployment state, not a failed check. Say so once in
     // the server log so the gap is visible without failing anybody's signup.
     logger.debug("Turnstile not configured; signup challenge skipped", {});
     return { ok: true };
+  }
+  // Configured on the server but missing from the build: the token would never
+  // arrive because no widget was rendered. Logged at warn, once per process, so
+  // the state is discoverable from the deployment's own logs rather than only
+  // from /admin/security.
+  const gap = turnstileBuildGap(env);
+  if (gap && !warnedBuildGap) {
+    warnedBuildGap = true;
+    logger.warn("Turnstile challenge is configured but the deployed build may not render it", { detail: gap });
   }
 
   if (typeof token !== "string" || token.length === 0 || token.length > MAX_TOKEN_LENGTH) {

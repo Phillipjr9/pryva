@@ -3,15 +3,26 @@ import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { requireAuthApi } from "@/lib/identity/auth";
+import { accountReadRateLimiter, rateLimitRefusal } from "@/lib/platform/rate-limit";
 
 export const dynamic = "force-dynamic";
 
+/*
+ * The order list is the customer's main history read and the obvious thing for a
+ * client to poll. It is bounded at 100 rows, so it is not dangerous per request
+ * — but an account holding a session and a loop is the cheapest way to keep the
+ * database busy without ever touching a money path or a purchase limiter.
+ */
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuthApi();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const throttle = await accountReadRateLimiter(`orders-list:${user.id}`);
+    const refused = rateLimitRefusal(throttle, "You are loading orders too quickly. Please wait a moment.");
+    if (refused) return refused;
 
     const limitText = request.nextUrl.searchParams.get("limit") ?? "50";
     const offsetText = request.nextUrl.searchParams.get("offset") ?? "0";

@@ -23,6 +23,9 @@ const GOOGLE_ERRORS: Record<string, string> = {
   "google-state": "That Google sign-in link expired. Please start again.",
   "google-exchange": "Google couldn’t complete the sign-in. Please try again.",
   "google-account-exists": "An account already uses this email but is not linked to this Google identity. Sign in with your existing method or contact support for secure recovery.",
+  "google-challenge":
+    "We couldn’t finish creating that account because the verification check was not completed. Please try again from the sign-up page.",
+  "google-throttled": "Too many Google attempts from this connection. Please wait a few minutes and try again.",
 };
 
 /**
@@ -369,15 +372,47 @@ export function AuthForm({
         {/* A passkey only exists after an account does, so this is a sign-in
             control and never a sign-up one. */}
         {mode === "login" ? <PasskeySignInButton next={next} /> : null}
-        <a
-          href={`/api/auth/google?next=${encodeURIComponent(next)}`}
-          className="btn w-full border border-line bg-white !py-3.5 text-ink shadow-sm hover:bg-lav-50/60"
-        >
-          {/* Google's own four-colour G, from the same brand-mark table the
-              service pages use — never our mark, and never redrawn by hand. */}
-          <BrandIcon brand="google" variant="bare" size={18} decorative />
-          Continue with Google
-        </a>
+        {/*
+          * On the sign-up card the Google button carries the Turnstile token the
+          * visitor has already solved, because a Google signup creates the same
+          * account the form below it does — and the server asks for proof on
+          * both. `/api/auth/google` moves it into a short-lived HttpOnly cookie
+          * before leaving for Google, because Google returns the browser to a
+          * bare callback URL and a query parameter would not survive the trip.
+          *
+          * It is on this link's URL for one hop, which does mean it reaches the
+          * browser's history and our access log. That is accepted: the token is
+          * single-use, expires in minutes, is bound to this browser by the
+          * cookie, and proves nothing about who the person is — by the time
+          * anyone reads a log it is already dead.
+          *
+          * Without a token the button stays inert rather than starting a Google
+          * round trip that the callback can only refuse, which would look like a
+          * broken sign-in instead of an unfinished check.
+          */}
+        {mode === "signup" && captchaRequired && !captchaToken ? (
+          <span
+            aria-disabled="true"
+            className="btn w-full cursor-not-allowed border border-line bg-white !py-3.5 text-ink-3 opacity-60 shadow-sm"
+          >
+            <BrandIcon brand="google" variant="bare" size={18} decorative />
+            Continue with Google
+          </span>
+        ) : (
+          <a
+            href={`/api/auth/google?next=${encodeURIComponent(next)}${
+              mode === "signup" && captchaToken
+                ? `&captchaToken=${encodeURIComponent(captchaToken)}`
+                : ""
+            }`}
+            className="btn w-full border border-line bg-white !py-3.5 text-ink shadow-sm hover:bg-lav-50/60"
+          >
+            {/* Google's own four-colour G, from the same brand-mark table the
+                service pages use — never our mark, and never redrawn by hand. */}
+            <BrandIcon brand="google" variant="bare" size={18} decorative />
+            Continue with Google
+          </a>
+        )}
       </div>
 
       <p className="mt-6 text-center text-[0.85rem] text-ink-2">

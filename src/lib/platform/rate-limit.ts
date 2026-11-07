@@ -159,6 +159,36 @@ export async function releaseRateLimit(key: string): Promise<void> {
 }
 
 /**
+ * The refusal for an authenticated read that hit its budget.
+ *
+ * Money paths build their own copy through `beginPurchase()`, because a refused
+ * purchase has to explain itself to a paying customer. A refused list or search
+ * is background traffic: it needs a `Retry-After` a polling client can honour
+ * and a status a fetch loop will not mistake for success. `unavailable` is
+ * reported as 503 rather than quietly allowed, matching every other caller —
+ * a counter that cannot be read is not permission.
+ */
+export function rateLimitRefusal(
+  result: RateLimitResult,
+  message = "Too many requests. Please wait a moment and try again.",
+): Response | null {
+  if (!result.unavailable && result.allowed) return null;
+  if (result.unavailable) {
+    return Response.json(
+      { ok: false, error: "This is temporarily unavailable. Please try again shortly." },
+      { status: 503, headers: { "Retry-After": "30" } },
+    );
+  }
+  return Response.json(
+    { ok: false, error: message },
+    {
+      status: 429,
+      headers: { "Retry-After": String(Math.max(1, Math.ceil((result.resetTime - Date.now()) / 1000))) },
+    },
+  );
+}
+
+/**
  * Refunds are the one customer action that both calls a provider and credits a
  * wallet, so it is throttled per account rather than per minute: ten genuine
  * refund requests in fifteen minutes is already unusual, and the eligibility
@@ -228,6 +258,39 @@ export const supportMessageRateLimiter = createRateLimiter({ windowMs: 15 * 60_0
  * ceremony happens before anybody is known to be signed in.
  */
 export const passkeyRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 12 });
+
+/**
+ * Google signup and sign-in return.
+ *
+ * This had no limit at all, and it is the one path that both mints an account
+ * and emails the operator without any password, challenge or field the caller
+ * has to get right. A script with enough verified Google identities — bought,
+ * farmed, or its own — therefore never touched the turnstile-protected signup
+ * route. Sized well above a person (who completes this flow maybe twice ever)
+ * and per IP, because at this point in the flow nobody is known yet.
+ */
+export const oauthRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 20 });
+
+/**
+ * Creating a verification link is creating an outbound email.
+ *
+ * The signup route mints one per successful POST, so the signup IP limit bounds
+ * this — but the resend endpoint mints one outside signup entirely, and every
+ * message costs provider quota and sender reputation. An address a bot abandons
+ * is still an address Resend has to deliver to.
+ */
+export const verificationSendRateLimiter = createRateLimiter({ windowMs: 60 * 60_000, maxRequests: 5 });
+
+/**
+ * Authenticated reads that join on user-owned tables (`ilike` scans, joins).
+ *
+ * These are not money paths, so they never needed `beginPurchase()`, but they
+ * are the cheapest way for one stolen session to make the database do work:
+ * a search box refetched on every keystroke, or the order list polled. The
+ * budget is per account and generous enough that a fast-filtering dashboard
+ * never notices it.
+ */
+export const accountReadRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 60 });
 
 /** Drop one key's counter after successful authentication. */
 export async function resetRateLimit(key: string): Promise<void> {
