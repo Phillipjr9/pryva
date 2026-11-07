@@ -12,6 +12,7 @@ import { safeRedirectPath } from "@/lib/platform/safe-redirect";
 import { attributeReferral, readReferralCodeFrom } from "@/lib/content/referrals";
 import { recordSignupSignal } from "@/lib/admin/fraud";
 import { scheduleOnboardingEmails } from "@/lib/email/onboarding-emails";
+import { scheduleVerifiedSignupAlert } from "@/lib/email/signup-alert";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +100,12 @@ export async function GET(request: Request) {
       // receipt and welcome a password signup gets when it clicks the link --
       // otherwise the fastest route into the product would be the only silent one.
       scheduleOnboardingEmails(created.id);
+
+      // Google already proved the address, so this is the moment a Google
+      // signup becomes a customer -- the same trigger a password signup gets
+      // when it clicks its link. Without this, the operator would hear about
+      // every email signup and no Google ones.
+      scheduleVerifiedSignupAlert(created.id);
 
       // A Google signup is a signup: the invite cookie set on /signup counts
       // here too, or every customer who used Google would be unattributable.

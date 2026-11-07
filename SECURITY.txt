@@ -24,6 +24,15 @@ as proof of identity.
   neither alone stops a distributed attack.
 - src/lib/identity/admin-two-factor.ts and admin authorization separate operators from
   customers. Verified operator addresses and 2FA are required by default.
+- src/lib/platform/turnstile.ts challenges public signup with Cloudflare Turnstile,
+  and the signup route refuses a filled honeypot before it writes an account. The
+  challenge is enforced only when NEXT_PUBLIC_TURNSTILE_SITE_KEY and
+  TURNSTILE_SECRET_KEY are both set; /admin/security reports which state the
+  deployment is in. Once configured it fails closed: a refused token is a 400 and
+  a Cloudflare outage is a 503, never an unchecked signup.
+- src/lib/email/signup-alert.ts notifies operators when an address is confirmed, or
+  on a Google signup, and only on the first verification. Signup itself is silent,
+  so an unverified bot no longer generates mail to the operator inbox.
 - src/lib/platform/security-headers.ts and src/proxy.ts apply browser security headers;
   the CSP has deliberate limitations noted below.
 - src/lib/payments/paystack-webhook.ts and webhook routes verify signatures; settlement,
@@ -56,6 +65,13 @@ unconfirmed response. These controls do not verify production delivery.
   bug bounty. Do not interpret tests as proof against attackers.
 - Edge bot defence and a WAF are outside this repository; distributed abuse can
   exceed per-IP controls. Review firewall and account-lockout telemetry.
+- The signup challenge is off until both Turnstile keys are set. Until then the
+  honeypot and the 10-per-hour-per-IP limit are the only signup filters, and a
+  determined script defeats both. Setting only the site key is worse than setting
+  neither: the widget renders and nothing checks its token.
+- CAPTCHA raises the cost of an account; it does not verify a person. Signup risk
+  scoring (src/lib/admin/fraud.ts) remains advisory and queues suspicious accounts
+  for review rather than blocking them.
 - The CSP permits unsafe-inline in places; replacing it requires a nonce-based
   design and testing, not simply removing a directive.
 - SPF, DKIM and DMARC depend on the sending domain's DNS and provider settings;

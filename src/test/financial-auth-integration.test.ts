@@ -6,6 +6,7 @@ import { drizzle, type PgliteDatabase } from "drizzle-orm/pglite";
 import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 import * as schema from "@/db/schema";
+import { sendVerifiedSignupAlert } from "@/lib/email/signup-alert";
 
 // This runs real SQL in embedded PostgreSQL/WASM. Providers and authentication
 // are mocked; it is not a multi-server PostgreSQL or live-provider test.
@@ -1118,14 +1119,35 @@ describe("Google subject binding and account protection", () => {
     expect(user.deletedAt).toBeNull();
   });
 
-  it("alerts admins when a new customer signs up and includes the account details", async () => {
+  /**
+   * This suite used to assert the opposite: that signing up mailed the operator
+   * inbox immediately. That behaviour was the reported problem. Every bot that
+   * could fill three fields generated an email to the owner, so the owner's own
+   * application was the "spam" arriving in their inbox. The alert now waits for
+   * proof that a person controls the address.
+   */
+  function stubOperatorMail() {
     vi.stubEnv("RESEND_API_KEY", "test-key");
     vi.stubEnv("RESEND_FROM_EMAIL", "Pryva <hello@pryva.test>");
     vi.stubEnv("ADMIN_EMAILS", "ops@example.com, support@pryva.test");
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "email_123" }), {
+    return vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "email_123" }), {
       status: 200,
       headers: { "content-type": "application/json" },
     }));
+  }
+
+  function sentEmails(spy: ReturnType<typeof vi.spyOn>) {
+    // Resend takes `to` as either one address or a list; the customer emails use
+    // the string form and the operator alerts use the list.
+    return (spy.mock.calls as unknown as Array<[unknown, RequestInit]>)
+      .filter(([, init]) => typeof init?.body === "string")
+      .map(([, init]) => JSON.parse(init.body as string) as { to: string | string[]; subject: string; html: string })
+      .filter((payload) => Boolean(payload.to))
+      .map((payload) => ({ ...payload, to: Array.isArray(payload.to) ? payload.to : [payload.to] }));
+  }
+
+  it("does not mail the operator inbox for an unverified signup", async () => {
+    const fetchSpy = stubOperatorMail();
 
     const request = new Request("https://pryva.test/api/auth/signup", {
       method: "POST",
@@ -1133,16 +1155,59 @@ describe("Google subject binding and account protection", () => {
       body: JSON.stringify({ name: "New Buyer", email: "new-buyer@example.com", password: "securepassword123" }),
     });
 
-    const response = await signupRoute.POST(request);
-    expect(response.status).toBe(200);
-    const payloads = fetchSpy.mock.calls
-      .map(([, init]) => JSON.parse((init as RequestInit).body as string) as { to: string[]; subject: string; html: string })
-      .filter((payload) => Array.isArray(payload.to));
-    const adminAlert = payloads.find((payload) => payload.subject.toLowerCase().includes("new customer signup"));
-    expect(adminAlert).toBeTruthy();
-    expect(adminAlert!.to).toEqual(["ops@example.com", "support@pryva.test"]);
-    expect(adminAlert!.html).toContain("New Buyer");
-    expect(adminAlert!.html).toContain("new-buyer@example.com");
+    expect((await signupRoute.POST(request)).status).toBe(200);
+    const payloads = sentEmails(fetchSpy);
+    expect(payloads.find((payload) => payload.subject.toLowerCase().includes("new customer signup"))).toBeUndefined();
+    // The account is real and unverified; the customer still gets their link.
+    const [created] = await database.select().from(schema.users).where(eq(schema.users.email, "new-buyer@example.com"));
+    expect(created).toBeTruthy();
+    expect(created.emailVerifiedAt).toBeNull();
+    expect(payloads.some((payload) => payload.to.includes("new-buyer@example.com"))).toBe(true);
+  });
+
+  it("refuses a signup that fills the hidden honeypot, and creates nothing", async () => {
+    const fetchSpy = stubOperatorMail();
+    const request = new Request("https://pryva.test/api/auth/signup", {
+      method: "POST",
+      headers: { origin: "https://pryva.test", "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Bot Buyer", email: "bot-buyer@example.com", password: "securepassword123", fax: "http://spam.test",
+      }),
+    });
+
+    expect((await signupRoute.POST(request)).status).toBe(400);
+    expect(await database.select().from(schema.users).where(eq(schema.users.email, "bot-buyer@example.com"))).toHaveLength(0);
+    // Nothing at all is sent: no link to a bot, no notice to the owner.
+    expect(sentEmails(fetchSpy)).toHaveLength(0);
+  });
+
+  it("alerts admins once the address is verified, with the account details", async () => {
+    const fetchSpy = stubOperatorMail();
+    await database.insert(schema.users).values({
+      name: "Verified Buyer", email: "verified-buyer@example.com", passwordHash: "hash", walletBalance: 0,
+      emailVerifiedAt: new Date("2026-02-01T09:00:00Z"),
+    });
+    const [created] = await database.select().from(schema.users).where(eq(schema.users.email, "verified-buyer@example.com"));
+
+    await expect(sendVerifiedSignupAlert(created.id)).resolves.toBe(true);
+    const alert = sentEmails(fetchSpy).find((payload) => payload.subject.toLowerCase().includes("new customer signup"));
+    expect(alert).toBeTruthy();
+    expect(alert!.to).toEqual(["ops@example.com", "support@pryva.test"]);
+    expect(alert!.html).toContain("Verified Buyer");
+    expect(alert!.html).toContain("verified-buyer@example.com");
+    expect(alert!.html).toContain("Verified");
+    expect(alert!.html).not.toContain("Awaiting email verification");
+  });
+
+  it("stays silent for an account that never verified", async () => {
+    const fetchSpy = stubOperatorMail();
+    await database.insert(schema.users).values({
+      name: "Never Verified", email: "never-verified@example.com", passwordHash: "hash", walletBalance: 0,
+    });
+    const [created] = await database.select().from(schema.users).where(eq(schema.users.email, "never-verified@example.com"));
+
+    await expect(sendVerifiedSignupAlert(created.id)).resolves.toBe(false);
+    expect(sentEmails(fetchSpy)).toHaveLength(0);
   });
 
   it("sends a confirmation email after storing a contact message and alerts the admin inbox", async () => {
