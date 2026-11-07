@@ -207,29 +207,31 @@ describe("homepage hero", () => {
  * onto the page in a second place.
  */
 describe("homepage service list", () => {
-  it("draws each service's artwork exactly once", () => {
+  it("draws each service's icon exactly once, as a glyph and not a picture", () => {
     // Gift cards are deliberately not here: they left the catalogue, so their
-    // artwork belongs on /gift-cards and in the dashboard, not on this page.
-    const artwork = [
-      "virtual-numbers",
-      "esim",
-      "proxies",
-      "email-otp",
-      "digital-accounts",
-      "data",
-      "bulk",
-      "scheduled",
+    // icon belongs on /gift-cards and in the dashboard, not on this page.
+    const names = [
+      "Virtual Numbers",
+      "eSIM Data",
+      "Residential Proxies",
+      "Email OTP",
+      "Digital Accounts",
+      "Data Plans",
+      "Bulk Orders",
+      "Scheduled Purchases",
     ];
 
-    // Counted as <img> elements, not as string hits: outside a real Next build
-    // `next/image` emits `/_next/image?url=%2Fimages%2F...` in `src` AND in the
-    // 1x/2x entries of `srcSet`, so a substring count reports three.
-    const images = [...html.matchAll(/<img\b[^>]*>/g)].map((match) => match[0]);
-
-    for (const file of artwork) {
-      const hits = images.filter((tag) => tag.includes(`${file}.png`)).length;
-      expect(hits, `${file}.png appears ${hits} time(s) on the homepage`).toBe(1);
+    // The accessible name is the icon's identity now that it is inline SVG.
+    // Counting `aria-label` rather than a file name also proves the icon is
+    // actually labelled, which a bare <img src> never guaranteed.
+    for (const name of names) {
+      const hits = [...html.matchAll(new RegExp(`aria-label="${name}"`, "g"))].length;
+      expect(hits, `${name} appears ${hits} time(s) on the homepage`).toBe(1);
     }
+
+    // None of the generated 3D artwork may come back.
+    expect(html).not.toContain("/images/services/");
+    expect(html).not.toContain("/images/categories/");
   });
 
   it("numbers its sections without a gap", () => {

@@ -14,12 +14,12 @@ vi.mock("next/navigation", () => ({
 /**
  * The profile picture.
  *
- * The sidebar used to draw the customer's initials in a gradient circle. It now
- * shows one of four 3D avatars, picked from the account itself. What matters for
- * a picture that is derived rather than uploaded: it must be the SAME on every
- * render (otherwise it flicks between avatars on navigation and disagrees between
- * server and client), it must differ between accounts, and it must never claim to
- * be a photograph.
+ * The sidebar used to show one of four generated 3D characters. Those are gone
+ * with the rest of the 3D set: it now draws the interface's own flat `User` glyph
+ * on a tinted circle. What matters for a mark that is derived rather than
+ * uploaded: it must be the SAME on every render (otherwise it flicks between
+ * tints on navigation and disagrees between server and client), it must differ
+ * between accounts, and it must never claim to be a photograph.
  */
 
 const user = {
@@ -55,15 +55,26 @@ describe("avatar selection", () => {
     expect(picks.size).toBeGreaterThan(1);
   });
 
-  it("renders a real image with the small derivatives, and no accessible duplication", () => {
+  it("draws a flat glyph instead of loading a picture", () => {
     const html = renderToStaticMarkup(<ProfileAvatar seed="demo@example.test" />);
-    const n = avatarNumberFor("demo@example.test");
-    expect(html).toContain(`/images/avatars/avatar-${n}.png`);
-    expect(html).toContain(`/images/avatars/avatar-${n}-64.webp 64w`);
-    expect(html).toContain(`/images/avatars/avatar-${n}-192.webp 192w`);
-    // The name is always the text next to it, so the picture is decorative.
-    expect(html).toContain('alt=""');
+    expect(html).toContain("<svg");
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("/images/avatars/");
+    // The name is always the text next to it, so the icon is decorative.
     expect(html).toContain('aria-hidden="true"');
+    expect(html).not.toContain("aria-label=");
+  });
+
+  it("gives the same account the same tint, and different accounts different tints", () => {
+    const tintOf = (seed: string) =>
+      renderToStaticMarkup(<ProfileAvatar seed={seed} />).match(/background:(#[0-9A-Fa-f]{6})/)?.[1];
+
+    expect(tintOf("demo@example.test")).toBe(tintOf("demo@example.test"));
+    const tints = new Set(
+      ["ada@example.com", "bola@example.com", "chidi@example.com", "demo@example.test"].map(tintOf),
+    );
+    expect(tints.size).toBeGreaterThan(1);
+    for (const tint of tints) expect(tint).toMatch(/^#[0-9A-Fa-f]{6}$/);
   });
 });
 
@@ -74,13 +85,15 @@ describe("where the picture appears", () => {
         <p>content</p>
       </DashboardShell>,
     );
-    expect(html).toContain("/images/avatars/avatar-");
+    expect(html).not.toContain("/images/avatars/");
+    expect(html).toContain("ring-1 ring-black/5");
     expect(html).not.toContain(">AD<");
   });
 
   it("heads the Profile section in settings", () => {
     const html = renderToStaticMarkup(<SettingsForm user={user} canSendVerification={false} />);
-    expect(html).toContain("/images/avatars/avatar-");
+    expect(html).not.toContain("/images/avatars/");
+    expect(html).toContain("ring-1 ring-black/5");
     expect(html).toContain("Profile");
   });
 });

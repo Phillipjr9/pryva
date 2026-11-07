@@ -1,7 +1,25 @@
 "use client";
 
+import type { ComponentType, SVGProps } from "react";
 import { BrandIcon, type BrandIconProps } from "@/components/BrandIcon";
-import { artworkMaster, artworkSrcSet } from "@/lib/services/service-artwork";
+import {
+  Calendar,
+  Gamepad,
+  Gift,
+  Globe,
+  IdCard,
+  Layers,
+  Mail,
+  Megaphone,
+  MonitorPlay,
+  Music,
+  Phone,
+  Refresh,
+  ShieldCheck,
+  Signal,
+  Sim,
+  BarChart3,
+} from "@/components/icons";
 
 type DigitalServiceType = "netflix" | "spotify" | "youtube" | "disney" | "chatgpt" | "canva";
 type CoreServiceType = "numbers" | "esim" | "proxies" | "email-otp";
@@ -29,13 +47,21 @@ interface ServiceIconProps {
 }
 
 /**
- * Digital products are *third-party brands*, so they show their real logo
- * (`BrandIcon`) — a hand-drawn Netflix tile reads as Netflix at 20px in a way a
- * generated illustration never can. Pryva's own catalogue below keeps the 3D
- * artwork, because there is no "real" logo for "virtual numbers" — and the
- * marks it could claim (Gmail, Outlook, the carriers) belong to services the
- * customer brings, not to the Pryva product being described. The mapping and
- * customer-facing surfaces are pinned by src/test/service-logos.test.tsx.
+ * Two kinds of thing, two kinds of mark.
+ *
+ * Third-party products are *brands*, so they show the real logo (`BrandIcon`,
+ * path data from the official open icon sets). Netflix, Spotify, Canva and the
+ * rest are never drawn by hand and never generated.
+ *
+ * Pryva's own catalogue — virtual numbers, eSIM, proxies, an inbox — has no
+ * official logo to reproduce, so it is drawn from the same stroked 24×24 set as
+ * the rest of the interface (`@/components/icons`). It used to be a shelf of
+ * generated 3D renders; those are gone. A flat glyph stays legible at 20 px,
+ * costs no bytes over the wire, inherits `currentColor`, and cannot fall out of
+ * step with the icons beside it.
+ *
+ * The mapping and the customer-facing surfaces are pinned by
+ * src/test/service-logos.test.tsx.
  */
 const digitalServiceBrands: Record<DigitalServiceType, BrandIconProps["brand"]> = {
   netflix: "netflix",
@@ -46,28 +72,22 @@ const digitalServiceBrands: Record<DigitalServiceType, BrandIconProps["brand"]> 
   canva: "canva",
 };
 
-/** Artwork file stems, without size or extension — see `@/lib/service-artwork`. */
-const coreServiceArtwork: Record<CoreServiceType, string> = {
-  numbers: "virtual-numbers",
-  esim: "esim",
-  proxies: "proxies",
-  "email-otp": "email-otp",
-};
+type Glyph = ComponentType<SVGProps<SVGSVGElement>>;
 
-const additionalServiceArtwork: Record<AdditionalServiceType, string> = {
-  accounts: "digital-accounts",
-  data: "data",
-  "gift-cards": "gift-cards",
-  bulk: "bulk",
-  scheduled: "scheduled",
-  subscriptions: "subscriptions",
-  "app-verification": "app-verification",
-  "social-promotion": "social-promotion",
-};
-
-const serviceArtwork: Record<Exclude<ServiceType, DigitalServiceType>, string> = {
-  ...coreServiceArtwork,
-  ...additionalServiceArtwork,
+/** One flat glyph per Pryva product. No two share one. */
+const serviceGlyphs: Record<CoreServiceType | AdditionalServiceType, Glyph> = {
+  numbers: Phone,
+  esim: Sim,
+  proxies: Globe,
+  "email-otp": Mail,
+  accounts: IdCard,
+  data: Signal,
+  "gift-cards": Gift,
+  bulk: Layers,
+  scheduled: Calendar,
+  subscriptions: Refresh,
+  "app-verification": ShieldCheck,
+  "social-promotion": Megaphone,
 };
 
 const serviceNames: Record<ServiceType, string> = {
@@ -98,6 +118,41 @@ const sizeMap = {
   lg: 64,
 };
 
+/**
+ * The tile every Pryva glyph sits in.
+ *
+ * Kept at the same outer box as the old artwork so no layout moved when the
+ * pictures came out: a rounded lavender square, the glyph at 55% of the slot.
+ * `currentColor` means it follows the surrounding text in dark mode instead of
+ * staying a bright rectangle.
+ */
+function GlyphTile({
+  glyph: Icon,
+  label,
+  pixelSize,
+  className,
+  decorative,
+}: {
+  glyph: Glyph;
+  label: string;
+  pixelSize: number;
+  className: string;
+  decorative: boolean;
+}) {
+  return (
+    <span
+      role={decorative ? undefined : "img"}
+      aria-label={decorative ? undefined : label}
+      aria-hidden={decorative ? true : undefined}
+      title={decorative ? undefined : label}
+      className={`inline-flex shrink-0 items-center justify-center rounded-lg bg-lav-100 text-lav-700 ${className}`}
+      style={{ width: pixelSize, height: pixelSize }}
+    >
+      <Icon width={Math.round(pixelSize * 0.55)} height={Math.round(pixelSize * 0.55)} />
+    </span>
+  );
+}
+
 export function ServiceIcon({ service, size = "md", className = "", decorative = false }: ServiceIconProps) {
   const pixelSize = sizeMap[size];
 
@@ -113,7 +168,7 @@ export function ServiceIcon({ service, size = "md", className = "", decorative =
     );
   }
 
-  const art = (serviceArtwork as Record<string, string | undefined>)[service];
+  const Icon = (serviceGlyphs as Record<string, Glyph | undefined>)[service];
   const altText = decorative ? "" : serviceNames[service] || service;
 
   /*
@@ -125,48 +180,34 @@ export function ServiceIcon({ service, size = "md", className = "", decorative =
    * a call site casts past the type — and if it does, the honest answer is a
    * neutral tile that claims nothing rather than a wrong brand.
    */
-  if (!art) {
+  if (!Icon) {
     if (process.env.NODE_ENV !== "production") {
-      console.error(`ServiceIcon: no artwork mapped for "${service}"`);
+      console.error(`ServiceIcon: no glyph mapped for "${service}"`);
     }
     return (
-      <div
+      <span
         role={decorative ? undefined : "img"}
         aria-label={decorative ? undefined : altText}
         aria-hidden={decorative ? true : undefined}
         title={decorative ? undefined : altText}
-        className={`flex items-center justify-center rounded-lg bg-lav-100 text-lav-700 ${className}`}
+        className={`inline-flex shrink-0 items-center justify-center rounded-lg bg-lav-100 text-lav-700 ${className}`}
         style={{ width: pixelSize, height: pixelSize }}
       >
         <svg viewBox="0 0 24 24" width={Math.round(pixelSize * 0.55)} height={Math.round(pixelSize * 0.55)} aria-hidden="true">
           <path fill="currentColor" d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-13Zm2 .5v12h12V6H6Z" />
         </svg>
-      </div>
+      </span>
     );
   }
 
   return (
-    <div className={`relative ${className}`} style={{ width: pixelSize, height: pixelSize }}>
-      {/*
-        A plain <img> rather than next/image: with the optimiser turned off,
-        next/image cannot offer a srcSet, and this is the whole point — a 64 px
-        slot should download the 64 px file (836 bytes) instead of the 270 KB
-        master. `sizes` is the slot width in CSS pixels, so a 2× screen picks
-        128 px and a 3× screen 192 px. The master stays as `src`.
-      */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={artworkMaster("services", art)}
-        srcSet={artworkSrcSet("services", art)}
-        sizes={`${pixelSize}px`}
-        width={pixelSize}
-        height={pixelSize}
-        alt={altText}
-        loading="lazy"
-        decoding="async"
-        className="rounded-lg object-cover"
-      />
-    </div>
+    <GlyphTile
+      glyph={Icon}
+      label={altText}
+      pixelSize={pixelSize}
+      className={className}
+      decorative={decorative}
+    />
   );
 }
 
@@ -174,13 +215,15 @@ interface CategoryIconProps {
   category: CategoryType;
   size?: "xs" | "sm" | "md" | "lg";
   className?: string;
+  /** Set when the surrounding text already names the category. */
+  decorative?: boolean;
 }
 
-const categoryArtwork: Record<CategoryType, string> = {
-  streaming: "streaming",
-  music: "music",
-  gaming: "gaming",
-  productivity: "productivity",
+const categoryGlyphs: Record<CategoryType, Glyph> = {
+  streaming: MonitorPlay,
+  music: Music,
+  gaming: Gamepad,
+  productivity: BarChart3,
 };
 
 const categoryNames: Record<CategoryType, string> = {
@@ -190,24 +233,15 @@ const categoryNames: Record<CategoryType, string> = {
   productivity: "Productivity",
 };
 
-export function CategoryIcon({ category, size = "md", className = "" }: CategoryIconProps) {
-  const pixelSize = sizeMap[size];
-
+export function CategoryIcon({ category, size = "md", className = "", decorative = false }: CategoryIconProps) {
   return (
-    <div className={`relative ${className}`} style={{ width: pixelSize, height: pixelSize }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={artworkMaster("categories", categoryArtwork[category])}
-        srcSet={artworkSrcSet("categories", categoryArtwork[category])}
-        sizes={`${pixelSize}px`}
-        width={pixelSize}
-        height={pixelSize}
-        alt={categoryNames[category]}
-        loading="lazy"
-        decoding="async"
-        className="rounded-lg object-cover"
-      />
-    </div>
+    <GlyphTile
+      glyph={categoryGlyphs[category]}
+      label={categoryNames[category]}
+      pixelSize={sizeMap[size]}
+      className={className}
+      decorative={decorative}
+    />
   );
 }
 

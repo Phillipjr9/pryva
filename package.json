@@ -14,9 +14,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "admin:theme": "node scripts/build-admin-theme.mjs",
-    "artwork:build": "node scripts/build-service-artwork.mjs",
     "pricing:build": "node --experimental-strip-types scripts/build-prices.mjs",
-    "pricing:audit": "node --experimental-strip-types scripts/build-prices.mjs --audit"
+    "pricing:audit": "node --experimental-strip-types scripts/build-prices.mjs --audit",
+    "icons:extract": "node scripts/extract-catalogue-icons.mjs"
   },
   "dependencies": {
     "@aws-sdk/rds-signer": "^3.1163.0",
@@ -53,6 +53,7 @@
     "eslint-config-next": "16.4.3",
     "flag-icons": "^7.6.0",
     "jsdom": "^26.1.0",
+    "lucide-static": "1.70.0",
     "postcss": "8.5.32",
     "postcss-selector-parser": "7.1.0",
     "simple-icons": "^16.36.0",

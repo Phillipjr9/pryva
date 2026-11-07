@@ -24,7 +24,7 @@ type NavItem = {
   href: string;
   label: string;
   icon?: (props: { className?: string }) => ReactNode;
-  /** A real image tile for a dashboard destination (see `NavIcon`). */
+  /** A flat glyph for a dashboard destination (see `NavIcon`). */
   nav?: NavArt;
   art?:
     | "numbers"
@@ -248,8 +248,8 @@ export function DashboardShell({
 
       <div className="mt-auto border-t border-line pt-4">
         <div className="flex items-center gap-2.5">
-          {/* The profile picture: a 3D avatar chosen from the account itself,
-              instead of initials in a gradient circle. */}
+          {/* The profile mark: a flat glyph on a tint derived from the account
+              itself, so it is stable without pretending to be a photograph. */}
           <ProfileAvatar seed={user.email} size={36} />
           <div className="min-w-0">
             <p className="truncate text-[0.82rem] font-semibold text-ink">{user.name}</p>

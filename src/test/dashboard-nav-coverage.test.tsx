@@ -29,6 +29,11 @@ const render = () =>
     </DashboardShell>,
   );
 
+/** What an icon actually draws, so two rows can be compared by shape. */
+function glyphOf(html: string): string {
+  return [...html.matchAll(/<svg[^>]*>([\s\S]*?)<\/svg>/g)].map((m) => m[1]).join("|");
+}
+
 /** Every anchor in the sidebar, as `{ href, html }`. */
 function anchors(html: string): Array<{ href: string; html: string }> {
   const found: Array<{ href: string; html: string }> = [];
@@ -50,11 +55,12 @@ describe("dashboard sidebar coverage", () => {
     );
 
     for (const row of rows) {
-      expect(row.html, `${row.href} should draw an image`).toContain("<img");
+      expect(row.html, `${row.href} should draw a glyph`).toContain("<svg");
+      expect(row.html, `${row.href} still loads a picture`).not.toContain("<img");
     }
   });
 
-  it("does not dress two shelves in the same artwork", () => {
+  it("does not dress two shelves in the same glyph", () => {
     // "All services" is a signpost, not a shelf: it keeps the sparkle glyph.
     const rows = anchors(render()).filter(
       (anchor) => anchor.href.includes("/dashboard/services") && anchor.href !== "/dashboard/services",
@@ -64,9 +70,10 @@ describe("dashboard sidebar coverage", () => {
 
     expect(subscriptions, "Subscriptions row is missing").toBeTruthy();
     expect(accounts, "Accounts row is missing").toBeTruthy();
-    expect(subscriptions!.html).toContain("/images/services/subscriptions.png");
-    expect(accounts!.html).toContain("/images/services/digital-accounts.png");
-    expect(subscriptions!.html).not.toContain("digital-accounts");
+    // Distinct drawings, not just distinct file names: Subscriptions is the
+    // recurring-arrows glyph and Accounts is the ID card.
+    expect(glyphOf(subscriptions!.html)).not.toBe("");
+    expect(glyphOf(subscriptions!.html)).not.toBe(glyphOf(accounts!.html));
   });
 
   it("links the review page that used to have no entry point", () => {
@@ -96,7 +103,7 @@ describe("dashboard sidebar coverage", () => {
   });
 });
 
-describe("sidebar and tab artwork", () => {
+describe("sidebar and tab icons", () => {
   /** The markup between a nav's opening tag and its closing tag. */
   function navBlock(html: string, label: string): string {
     const start = html.indexOf(`aria-label="${label}"`);
@@ -104,7 +111,7 @@ describe("sidebar and tab artwork", () => {
     return html.slice(start, html.indexOf("</nav>", start));
   }
 
-  it("draws a real image on every sidebar row, including the account rows", () => {
+  it("draws a flat glyph on every sidebar row, including the account rows", () => {
     const html = render();
     const rows = anchors(navBlock(html, "Dashboard navigation"));
 
@@ -112,62 +119,75 @@ describe("sidebar and tab artwork", () => {
     // Notifications, Reviews, Settings, Support.
     expect(rows.length).toBeGreaterThanOrEqual(20);
     for (const row of rows) {
-      expect(row.html, `${row.href} still draws a line glyph`).toContain("<img");
+      expect(row.html, `${row.href} draws no icon`).toContain("<svg");
+      expect(row.html, `${row.href} still loads a picture`).not.toContain("<img");
     }
 
-    // The account rows specifically: these were the last ten on stroked SVGs.
-    for (const [href, file] of [
-      ["/dashboard", "overview"],
-      ["/dashboard/orders", "orders"],
-      ["/dashboard/wallet", "wallet"],
-      ["/dashboard/inbox", "inbox"],
-      ["/dashboard/referrals", "referrals"],
-      ["/dashboard/notifications", "notifications"],
-      ["/dashboard/reviews", "reviews"],
-      ["/dashboard/settings", "settings"],
-      ["/dashboard/support", "support"],
-    ] as const) {
+    // Every account row keeps its own destination and its own drawing.
+    const shapes = new Map<string, string>();
+    for (const href of [
+      "/dashboard",
+      "/dashboard/orders",
+      "/dashboard/wallet",
+      "/dashboard/inbox",
+      "/dashboard/referrals",
+      "/dashboard/notifications",
+      "/dashboard/reviews",
+      "/dashboard/settings",
+      "/dashboard/support",
+      "/dashboard/services",
+    ]) {
       const row = rows.find((anchor) => anchor.href === href);
       expect(row, `${href} is missing from the sidebar`).toBeTruthy();
-      expect(row!.html).toContain(`/images/nav/${file}.png`);
+      const shape = glyphOf(row!.html);
+      expect(shape, `${href} draws nothing`).not.toBe("");
+      shapes.set(href, shape);
     }
-
-    const allServices = rows.find((anchor) => anchor.href === "/dashboard/services");
-    expect(allServices!.html).toContain("/images/nav/services.png");
+    expect(new Set(shapes.values()).size, "two destinations share one glyph").toBe(shapes.size);
   });
 
-  it("draws images in the mobile tab bar too", () => {
+  it("draws glyphs in the mobile tab bar too", () => {
     const rows = anchors(navBlock(render(), "Dashboard sections"));
     expect(rows).toHaveLength(5);
     for (const row of rows) {
-      expect(row.html, `${row.href} still draws a line glyph`).toContain("/images/nav/");
+      expect(row.html, `${row.href} draws no icon`).toContain("<svg");
+      expect(row.html, `${row.href} still loads a picture`).not.toContain("/images/nav/");
     }
   });
 
-  it("serves a 64px derivative for a sidebar row", () => {
+  it("ships no image requests for the sidebar rows", () => {
     const html = render();
-    expect(html).toContain("/images/nav/wallet-64.webp 64w");
-    expect(html).toContain("/images/nav/wallet-192.webp 192w");
+    expect(html).not.toContain("/images/nav/");
+    expect(html).not.toContain("/images/services/");
+    // Scoped to the nav: the Pryva brand mark elsewhere on the page is a real
+    // logo and legitimately goes through next/image.
+    const nav = navBlock(html, "Dashboard navigation");
+    expect(nav).not.toContain("srcSet");
+    expect(nav).not.toContain("<img");
   });
 });
 
-describe("category artwork", () => {
-  it("resolves each shelf to its own file", () => {
+describe("category icons", () => {
+  it("gives each shelf its own glyph and an accessible name", () => {
     const expected: Array<[ServiceType, string]> = [
-      ["app-verification", "app-verification"],
-      ["social-promotion", "social-promotion"],
-      ["subscriptions", "subscriptions"],
+      ["app-verification", "App Verification"],
+      ["social-promotion", "Social Promotion"],
+      ["subscriptions", "Subscriptions"],
     ];
-    for (const [service, file] of expected) {
-      const html = decodeURIComponent(renderToStaticMarkup(<ServiceIcon service={service} size="sm" />));
-      expect(html, `${service} should use ${file}.png`).toContain(`/images/services/${file}.png`);
-      expect(html).toContain(`alt="${service === "app-verification" ? "App Verification" : service === "social-promotion" ? "Social Promotion" : "Subscriptions"}"`);
+    const shapes = new Set<string>();
+    for (const [service, name] of expected) {
+      const html = renderToStaticMarkup(<ServiceIcon service={service} size="sm" />);
+      expect(html, `${service} still loads a picture`).not.toContain("/images/services/");
+      expect(html).toContain(`aria-label="${name}"`);
+      shapes.add(glyphOf(html));
     }
+    expect(shapes.size).toBe(expected.length);
   });
 
-  it("serves a 64px derivative so a sidebar row is not a 300KB master", () => {
+  it("renders inline at the sidebar's size instead of downloading a tile", () => {
     const html = renderToStaticMarkup(<ServiceIcon service="subscriptions" size="xs" />);
-    expect(html).toContain("/images/services/subscriptions-64.webp 64w");
-    expect(html).toContain("/images/services/subscriptions-192.webp 192w");
+    expect(html).toContain("<svg");
+    expect(html).not.toContain("srcSet");
+    expect(html).toContain("width:20px");
   });
 });

@@ -100,15 +100,16 @@ describe("brand presentation", () => {
     expect(seen.size).toBe(6);
   });
 
-  it("keeps Pryva's own catalogue on its original artwork", () => {
-    // There is no official logo for "virtual numbers" — those keep the 3D set.
+  it("draws Pryva's own catalogue as flat icons, not generated artwork", () => {
+    // There is no official logo for "virtual numbers", so these are glyphs from
+    // the interface's own stroked set. They used to be generated 3D renders; the
+    // owner asked for those to go, and nothing may quietly reintroduce them.
     for (const service of ["numbers", "esim", "proxies", "email-otp", "data", "gift-cards"] as const) {
-      const html = decodeURIComponent(renderToStaticMarkup(<ServiceIcon service={service} />));
-      expect(html).toContain("/images/services/");
-      expect(
-        existsSync(`public/images/services/${service === "numbers" ? "virtual-numbers" : service}.png`),
-      ).toBe(true);
+      const html = renderToStaticMarkup(<ServiceIcon service={service} />);
+      expect(html, `${service} still loads a picture`).not.toContain("/images/services/");
+      expect(html, `${service} draws no icon`).toContain("<svg");
     }
+    expect(existsSync("public/images/services")).toBe(false);
   });
 
   it("puts the brand header in every email template", () => {

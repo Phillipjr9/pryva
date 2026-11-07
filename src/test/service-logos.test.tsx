@@ -1,52 +1,41 @@
 import React from "react";
-import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ServiceIcon, type ServiceType } from "@/components/ServiceIcon";
+import { ServiceIcon, CategoryIcon, type ServiceType } from "@/components/ServiceIcon";
 import { NetworkBadge } from "@/components/NetworkBadge";
 import { BRAND_MARKS } from "@/lib/content/brand-marks";
 import { BrandIcon, WORDMARK_BRANDS } from "@/components/BrandIcon";
-import { PlatformBadge, platformName, type PlatformSlug } from "@/components/PlatformBadge";
+import { PlatformBadge, type PlatformSlug } from "@/components/PlatformBadge";
 import { PROMOTION_EXAMPLES, VERIFICATION_EXAMPLES } from "@/lib/services/service-explorer";
 import { digitalServices } from "@/lib/services/digital/digital-services";
-import { ARTWORK_WIDTHS } from "@/lib/services/service-artwork";
 
 /**
- * Every service shows its own icon.
+ * Every service shows its own icon, and no icon is generated artwork.
  *
- * The owner reported that the Email OTP page — and, on inspection, every other
- * service page — rendered no icon at all, while the cards that linked to them
- * did. The audit that followed found three ways a service could end up with the
- * wrong mark, and this file locks all three down:
+ * Two rules, both asserted here so neither can drift:
  *
- *   1. a service page/dashboard section with no icon (`ServiceTitle`, and the
- *      direct `<ServiceIcon>` in each site hero);
- *   2. `ServiceIcon`'s old `FALLBACK_IMAGE`, which drew the *virtual numbers*
- *      artwork for any unmapped key;
- *   3. `NetworkBadge`'s old fallback, which drew *Airtel's* logo for any
- *      provider without a wordmark entry.
+ *   1. Third-party products (Netflix, Canva, Outlook…) show the REAL mark from
+ *      `BRAND_MARKS` — official path data from the open icon sets. Never
+ *      generated, never redrawn by eye, and never shadowed by a wordmark when a
+ *      real mark exists.
+ *   2. Pryva's own catalogue (virtual numbers, eSIM, proxies…) has no official
+ *      logo to reproduce, so it is drawn from the interface's own flat 24×24
+ *      stroked set. It used to be a shelf of generated 3D renders; the owner asked
+ *      for those to go, and `public/images/{services,categories,nav,avatars}` no
+ *      longer exists.
  *
- * Pryva's own services keep their generated 3D artwork on purpose: there is no
- * official logo for "virtual numbers", and the marks they could borrow (Gmail,
- * Outlook, the carriers) belong to services the customer supplies, not to the
- * Pryva product being described. Third-party products (Netflix, Canva…) use the
- * real mark from `BRAND_MARKS`. Both rules are asserted here so neither can
- * drift.
+ * The earlier audit's three failure modes are still pinned: a service page with
+ * no icon at all, `ServiceIcon`'s old `FALLBACK_IMAGE` that drew the virtual
+ * numbers art for any unmapped key, and `NetworkBadge`'s fallback that drew
+ * Airtel's logo for every unlisted provider.
  */
 
-/** Pryva's own catalogue: slug -> artwork file. */
-const CATALOGUE_ARTWORK: Record<string, string> = {
-  numbers: "virtual-numbers",
-  esim: "esim",
-  proxies: "proxies",
-  "email-otp": "email-otp",
-  accounts: "digital-accounts",
-  data: "data",
-  "gift-cards": "gift-cards",
-  bulk: "bulk",
-  scheduled: "scheduled",
-};
+/** Pryva's own catalogue. Each must render a distinct flat glyph. */
+const CATALOGUE_SERVICES = [
+  "numbers", "esim", "proxies", "email-otp", "accounts", "data", "gift-cards",
+  "bulk", "scheduled", "subscriptions", "app-verification", "social-promotion",
+] as const;
 
 /** Third-party products: slug -> the accessible name of the real mark. */
 const DIGITAL_MARKS: Record<string, string> = {
@@ -58,72 +47,94 @@ const DIGITAL_MARKS: Record<string, string> = {
   canva: "Canva",
 };
 
-function hash(path: string): string {
-  return createHash("sha256").update(readFileSync(path)).digest("hex");
-}
-
-function svgOf(html: string): string {
-  const start = html.indexOf("<g");
-  return start === -1 ? "" : html.slice(start, html.lastIndexOf("</g>") + 4);
+/**
+ * What a glyph actually draws — its identity, independent of size and label.
+ *
+ * The inner markup, not just `<path d>`: several glyphs in the house set are
+ * built from `<rect>` and `<circle>` (Calendar, Grid, IdCard), and a path-only
+ * reading called those "empty".
+ */
+function shapeOf(html: string): string {
+  return [...html.matchAll(/<svg[^>]*>([\s\S]*?)<\/svg>/g)].map((m) => m[1]).join("|");
 }
 
 describe("service logos", () => {
-  it("gives every catalogue service its own artwork, and no two share one", () => {
-    const sources = new Set<string>();
+  it("gives every catalogue service a flat glyph, and no two share one", () => {
+    const shapes = new Set<string>();
 
-    for (const [service, file] of Object.entries(CATALOGUE_ARTWORK)) {
-      const html = decodeURIComponent(renderToStaticMarkup(<ServiceIcon service={service as ServiceType} />));
-      expect(html, `${service} should use /images/services/${file}.png`).toContain(`/images/services/${file}.png`);
-      expect(existsSync(`public/images/services/${file}.png`), `${file}.png is missing`).toBe(true);
-      sources.add(html);
+    for (const service of CATALOGUE_SERVICES) {
+      const html = renderToStaticMarkup(<ServiceIcon service={service as ServiceType} />);
+      expect(html, `${service} must draw an svg`).toContain("<svg");
+      expect(html, `${service} must not load a picture`).not.toContain("<img");
+      expect(html, `${service} must not reference generated artwork`).not.toContain("/images/");
+
+      const shape = shapeOf(html);
+      expect(shape, `${service} draws nothing`).not.toBe("");
+      shapes.add(shape);
     }
 
-    expect(sources.size).toBe(Object.keys(CATALOGUE_ARTWORK).length);
+    expect(shapes.size).toBe(CATALOGUE_SERVICES.length);
   });
 
-  it("ships nine distinct artwork files", () => {
-    const hashes = new Set<string>();
-    for (const file of Object.values(CATALOGUE_ARTWORK)) {
-      const path = `public/images/services/${file}.png`;
-      expect(existsSync(path), `${path} is missing`).toBe(true);
-      hashes.add(hash(path));
+  it("gives every category a flat glyph, and no two share one", () => {
+    const shapes = new Set<string>();
+
+    for (const category of ["streaming", "music", "gaming", "productivity"] as const) {
+      const html = renderToStaticMarkup(<CategoryIcon category={category} />);
+      expect(html).toContain("<svg");
+      expect(html).not.toContain("<img");
+      expect(html).not.toContain("/images/");
+      shapes.add(shapeOf(html));
     }
-    // A copied file would render the wrong logo under the right name.
-    expect(hashes.size).toBe(Object.keys(CATALOGUE_ARTWORK).length);
+
+    expect(shapes.size).toBe(4);
+  });
+
+  it("ships no generated 3D artwork at all", () => {
+    // The owner asked for the 3D set to be removed, not swapped for another set
+    // of pictures. If a folder comes back, something is loading raster icons
+    // again and the byte cost comes back with it.
+    for (const folder of ["services", "categories", "nav", "avatars"]) {
+      expect(existsSync(`public/images/${folder}`), `public/images/${folder} is back`).toBe(false);
+    }
+    expect(existsSync("scripts/build-service-artwork.mjs")).toBe(false);
+    expect(existsSync("src/lib/services/service-artwork.ts")).toBe(false);
   });
 
   it("gives every third-party product its real mark, never generated art", () => {
     const shapes = new Set<string>();
 
     for (const [service, name] of Object.entries(DIGITAL_MARKS)) {
-      // No decodeURIComponent here: brand SVG path data is not URL-encoded and
-      // decoding it throws on a stray '%'.
       const html = renderToStaticMarkup(<ServiceIcon service={service as ServiceType} />);
       expect(html).toContain(`aria-label="${name}"`);
-      expect(html, `${service} must not fall back to artwork`).not.toContain("/images/services/");
-      shapes.add(svgOf(html));
+      expect(html, `${service} must not fall back to artwork`).not.toContain("/images/");
+      shapes.add(html.slice(html.indexOf("<svg"), html.lastIndexOf("</svg>") + 6) || html);
     }
 
     expect(shapes.size).toBe(Object.keys(DIGITAL_MARKS).length);
   });
 
-  it("never draws another service's logo for an unknown key", () => {
+  it("never draws another service's icon for an unknown key", () => {
     // The old FALLBACK_IMAGE made this render the virtual-numbers artwork, which
     // is how a typo in one page could ship the wrong logo for months.
-    const html = decodeURIComponent(
-      renderToStaticMarkup(<ServiceIcon service={"not-a-service" as ServiceType} />),
-    );
-    expect(html).not.toContain("/images/services/");
+    const html = renderToStaticMarkup(<ServiceIcon service={"not-a-service" as ServiceType} />);
+    expect(html).not.toContain("/images/");
     expect(html).toContain('aria-label="not-a-service"');
     expect(html).toContain("<svg");
+    // The neutral tile must not be any real service's glyph.
+    for (const service of CATALOGUE_SERVICES) {
+      expect(shapeOf(html)).not.toBe(shapeOf(renderToStaticMarkup(<ServiceIcon service={service} />)));
+    }
   });
 
   it("names the icon only when nothing else does", () => {
     const labelled = renderToStaticMarkup(<ServiceIcon service="email-otp" />);
-    expect(labelled).toContain('alt="Email OTP"');
+    expect(labelled).toContain('aria-label="Email OTP"');
+    expect(labelled).toContain('role="img"');
 
     const decorative = renderToStaticMarkup(<ServiceIcon service="email-otp" decorative />);
-    expect(decorative).toContain('alt=""');
+    expect(decorative).toContain('aria-hidden="true"');
+    expect(decorative).not.toContain("aria-label=");
   });
 
   it("puts a network's own mark on every network badge", () => {
@@ -153,9 +164,8 @@ describe("service logos", () => {
 
   it("renders a visible mark for every platform the explorer can list", () => {
     // These are platforms, not Pryva services: the explorer draws them with
-    // BrandIcon. A wordmark (Disney+, Outlook) is still a visible mark; an empty
-    // string is the failure mode — BrandIcon returns null for an unknown slug,
-    // which shows up as a blank tile nobody notices.
+    // BrandIcon. An empty string is the failure mode — BrandIcon returns null
+    // for an unknown slug, which shows up as a blank tile nobody notices.
     const brands = new Set<string>([
       ...VERIFICATION_EXAMPLES.map((item) => item.brand),
       ...PROMOTION_EXAMPLES.map((item) => item.brand),
@@ -165,6 +175,16 @@ describe("service logos", () => {
       const html = renderToStaticMarkup(<BrandIcon brand={brand as never} />);
       expect(html, `${brand} renders nothing`).not.toBe("");
       expect(html, `${brand} has no accessible name`).toContain("aria-label=");
+      expect(html, `${brand} must not load generated artwork`).not.toContain("/images/");
+    }
+  });
+
+  it("uses the real mark for every platform that has one, in every category", () => {
+    // The wordmark table is a fallback, not an override. Outlook sat in both
+    // tables and was drawn as text while its official mark shipped unused.
+    for (const slug of Object.keys(BRAND_MARKS)) {
+      const html = renderToStaticMarkup(<BrandIcon brand={slug as never} />);
+      expect(html, `${slug} has a real mark but rendered no svg`).toContain("<svg");
     }
   });
 
@@ -181,10 +201,10 @@ describe("service logos", () => {
       expect(label, `${platform} has no accessible name`).toBeTruthy();
     }
 
-    // Outlook is one of the brands with no redistributable mark, so its badge is
-    // the wordmark tile — still legible, still namable, just not the official
-    // lockup. That is the honest option the audit settled on.
-    expect(renderToStaticMarkup(<PlatformBadge platform="outlook" />)).toContain(">Outlook<");
+    // Outlook DOES ship an official mark, so it must be drawn, not spelled.
+    const outlook = renderToStaticMarkup(<PlatformBadge platform="outlook" />);
+    expect(outlook).toContain("<svg");
+    expect(outlook).not.toContain(">Outlook<");
 
     // The neutral fallback must not impersonate a real platform.
     const generic = renderToStaticMarkup(<PlatformBadge detectFrom="something unmapped" />);
@@ -198,7 +218,7 @@ describe("service logos", () => {
       expect(BRAND_MARKS, `${slug} has a real mark, so it must use it`).not.toHaveProperty(slug);
     }
     expect(Object.keys(WORDMARK_BRANDS).sort()).toEqual(
-      ["9mobile", "disney-plus", "glo", "mtn", "outlook"].sort(),
+      ["9mobile", "disney-plus", "glo", "mtn"].sort(),
     );
   });
 
@@ -238,66 +258,28 @@ describe("service logos", () => {
 });
 
 /**
- * The bytes behind the icons.
+ * Icons cost no image bytes.
  *
- * `next.config.ts` turns off Next's image optimiser, so every `<Image>` used to
- * hand the browser the 512×512 master: 220–270 KB per icon for a 20–64 px slot,
- * 2,197 KB of PNG to paint nine thumbnails on the homepage. `ServiceIcon` now
- * renders a plain `<img>` with a `srcSet` of generated WebP derivatives.
- *
- * These assertions are on sizes, not on intent, because the regression is
- * invisible: the page looks identical at 3,000 KB and at 6 KB, and only a byte
- * count notices.
+ * The 3D set was 9.5 MB on disk: a 512×512 master plus three WebP derivatives
+ * for every service, category, sidebar row and avatar. Inline glyphs are a few
+ * hundred bytes of markup that the page already has, so there is no request, no
+ * decode and nothing to regenerate.
  */
-describe("artwork weight", () => {
-  const SERVICES = [
-    "virtual-numbers", "esim", "proxies", "email-otp", "digital-accounts",
-    "data", "gift-cards", "bulk", "scheduled",
-  ];
-  const CATEGORIES = ["streaming", "music", "gaming", "productivity"];
-
-  it("ships a WebP derivative at every width the UI can ask for", () => {
-    for (const folder of ["services", "categories"] as const) {
-      const bases = folder === "services" ? SERVICES : CATEGORIES;
-      for (const base of bases) {
-        for (const width of ARTWORK_WIDTHS) {
-          const path = `public/images/${folder}/${base}-${width}.webp`;
-          expect(existsSync(path), `${path} is missing — run npm run artwork:build`).toBe(true);
-        }
-      }
+describe("icon weight", () => {
+  it("renders inline markup rather than an image request", () => {
+    for (const service of CATALOGUE_SERVICES) {
+      const html = renderToStaticMarkup(<ServiceIcon service={service} size="md" />);
+      expect(html).not.toContain("<img");
+      expect(html).not.toContain("srcSet");
+      expect(html).toContain("<svg");
     }
   });
 
-  it("keeps every derivative small enough to be worth having", () => {
-    for (const folder of ["services", "categories"] as const) {
-      const bases = folder === "services" ? SERVICES : CATEGORIES;
-      for (const base of bases) {
-        const width64 = statSync(`public/images/${folder}/${base}-64.webp`).size;
-        // The masters are ~250 KB; a 64 px tile that needs a chunk of that is a
-        // derivative that has quietly stopped being one.
-        expect(width64, `${base}-64.webp is ${width64} bytes`).toBeLessThan(20_000);
-      }
+  it("keeps the slot sizes the layout was built around", () => {
+    for (const [size, px] of [["xs", 20], ["sm", 32], ["md", 48], ["lg", 64]] as const) {
+      const html = renderToStaticMarkup(<ServiceIcon service="esim" size={size} />);
+      expect(html).toContain(`width:${px}px`);
+      expect(html).toContain(`height:${px}px`);
     }
-  });
-
-  it("serves one size per slot instead of the master", () => {
-    const html = renderToStaticMarkup(<ServiceIcon service="email-otp" size="md" />);
-
-    expect(html).toContain("srcSet=");
-    expect(html).toContain("/images/services/email-otp-64.webp 64w");
-    expect(html).toContain("/images/services/email-otp-192.webp 192w");
-    // `sizes` is what makes the browser pick 64 for a 48 px slot.
-    expect(html).toContain('sizes="48px"');
-    // The master stays as the fallback src, so a browser without WebP still works.
-    expect(html).toContain('src="/images/services/email-otp.png"');
-  });
-
-  it("keeps the nine homepage icons under 20 KB in total at 64 px", () => {
-    const total = SERVICES.reduce(
-      (sum, base) => sum + statSync(`public/images/services/${base}-64.webp`).size,
-      0,
-    );
-    // 2,197 KB of masters before this pass.
-    expect(total, `${total} bytes for nine icons`).toBeLessThan(20_000);
   });
 });
