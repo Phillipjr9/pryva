@@ -306,7 +306,23 @@ export async function requireUser(nextPath = "/dashboard"): Promise<PublicUser> 
   return requireAuth(nextPath);
 }
 
-export async function requireAdmin(nextPath = "/admin"): Promise<PublicUser> {
+export async function requireAdmin(
+  nextPath = "/admin",
+  /**
+   * Set by the one page that *resolves* a missing second factor.
+   *
+   * Without it that page is unreachable: `requireAdmin` redirects an unenrolled
+   * operator to `/admin/account`, and `/admin/account` calls `requireAdmin`,
+   * which redirects it to itself. The loop is invisible until `TWO_FACTOR_KEY`
+   * exists — before that the gate short-circuits to "not required" — and then it
+   * locks every operator out of the console, including the page that fixes it.
+   *
+   * Only the enrolment screen may pass this. It still requires a signed-in
+   * administrator; it only skips the second-factor test that the page exists to
+   * satisfy.
+   */
+  options?: { allowUnenrolled?: boolean },
+): Promise<PublicUser> {
   // Signed out. The console has its own door, so an operator who follows a console
   // link lands on the operator sign-in rather than on the storefront's. Both end at
   // the same session; this only decides which page asks for it.
@@ -319,6 +335,8 @@ export async function requireAdmin(nextPath = "/admin"): Promise<PublicUser> {
   if (!isAdminUser(user)) {
     redirect(`/dashboard?error=admin-required`);
   }
+
+  if (options?.allowUnenrolled) return user;
 
   // An administrator can approve withdrawals and issue refunds, so the account
   // that does it carries a second factor. Instead of an error, the redirect sends

@@ -114,3 +114,35 @@ describe("the message explains the wall instead of just refusing", () => {
     expect(SECOND_FACTOR_REQUIRED_MESSAGE).toMatch(/security settings/);
   });
 });
+
+describe("the operator enrolment page is reachable, which it was not", () => {
+  const layout = read("src/app/admin/(console)/layout.tsx");
+  const accountPage = read("src/app/admin/(console)/account/page.tsx");
+  const proxy = read("src/proxy.ts");
+
+  it("does not gate the page an unenrolled operator is sent to", () => {
+    // requireAdmin redirects to /admin/account; the layout wraps /admin/account.
+    // Gating it there sends the page to itself, forever.
+    expect(layout).toContain("allowUnenrolled: true");
+    expect(accountPage).toContain("allowUnenrolled: true");
+  });
+
+  it("takes the path from the proxy, not from the client", () => {
+    // The exemption must key on what the edge resolved, never on a header a
+    // caller supplied, or an unenrolled operator could exempt any page.
+    expect(proxy).toContain("requestHeaders.set(\"x-pryva-pathname\", request.nextUrl.pathname)");
+    expect(proxy).toContain("NextResponse.next({ request: { headers: requestHeaders } })");
+    expect(layout).toContain('headers()).get("x-pryva-pathname")');
+  });
+
+  it("keeps the gate closed when the path is unknown", () => {
+    // A null path must mean "not the enrolment screen". Any other reading opens
+    // the console to every unenrolled operator whenever the header is missing.
+    expect(layout).toMatch(/pathname !== null && \/\^\\\/admin\\\/account/);
+  });
+
+  it("still requires an administrator on that page", () => {
+    expect(accountPage).toContain('requireAdmin("/admin/account", { allowUnenrolled: true })');
+    expect(layout).toMatch(/requireAdmin\("\/admin", \{ allowUnenrolled: true \}\)/);
+  });
+});
