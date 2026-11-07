@@ -6,6 +6,11 @@ import { db } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
 import { isArenaPreviewHost, isLocalHost, requestProto } from "@/lib/platform/net";
 import { adminBlockedForMissingSecondFactor } from "@/lib/identity/admin-two-factor";
+import {
+  customerEnrolmentUrl,
+  isSecondFactorExemptPath,
+  secondFactorGateApplies,
+} from "@/lib/identity/require-second-factor";
 
 export const SESSION_COOKIE = "pryva_session";
 
@@ -212,8 +217,26 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
  * never the 401 JSON a client can act on. Every `/api/*` route must use this
  * instead and return its own 401.
  */
-export async function requireAuthApi(): Promise<PublicUser | null> {
-  return getCurrentUser();
+export async function requireAuthApi(options?: { allowUnenrolled?: boolean }): Promise<PublicUser | null> {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  if (options?.allowUnenrolled) return user;
+
+  /*
+   * The customer-wide second-factor rule, when an operator has turned it on.
+   *
+   * Refused as a null here — the caller answers 401 — rather than a redirect: a
+   * route handler that redirects returns HTML to a `fetch` caller, which the
+   * dashboard reads as a network failure instead of "enrol first".
+   *
+   * The enrolment routes pass `allowUnenrolled` rather than the gate sniffing the
+   * request path. There is no dependable way to read the pathname here (a route
+   * handler receives no `Request` in this signature, and `next/headers` does not
+   * carry it), and a gate that guessed would either refuse the calls that
+   * satisfy the rule or wave through the ones that should not.
+   */
+  if (!isAdminUser(user) && (await secondFactorGateApplies(user.id))) return null;
+  return user;
 }
 
 export async function requireAuth(
@@ -227,6 +250,27 @@ export async function requireAuth(
     // after a successful-looking sign-in means the browser refused the session
     // cookie (embedded previews do this), not that the button was broken.
     redirect(`/login?next=${encodeURIComponent(destination)}&bounced=1`);
+  }
+
+  /*
+   * The customer-wide second-factor rule, when enabled.
+   *
+   * Redirected to the one page that resolves it, carrying where they were going
+   * so the return trip is a single click -- the same shape `requireAdmin` uses
+   * for operators.
+   *
+   * `isSecondFactorExemptPath` is what stops this looping: the settings page
+   * calls `requireAuth` too, and without the exemption it would redirect to
+   * itself forever. Only the enrolment screens are exempt; they still require a
+   * session, and none of them can spend money or read an order.
+   */
+  // Administrators are exempt: `requireAdmin` already enforces their own rule
+  // and sends them to `/admin/account`. Applying the customer rule here would
+  // bounce an operator into the storefront to arm the console, which is exactly
+  // what the two-surface split exists to prevent.
+  if (!isAdminUser(user) && !isSecondFactorExemptPath(destination) &&
+      (await secondFactorGateApplies(user.id))) {
+    redirect(customerEnrolmentUrl(destination));
   }
   return user;
 }

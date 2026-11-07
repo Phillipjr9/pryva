@@ -24,6 +24,12 @@ as proof of identity.
   neither alone stops a distributed attack.
 - src/lib/identity/admin-two-factor.ts and admin authorization separate operators from
   customers. Verified operator addresses and 2FA are required by default.
+  src/lib/identity/two-factor.ts stores TOTP secrets encrypted under TWO_FACTOR_KEY
+  (AES-256-GCM, scrypt-derived) and refuses sign-in rather than skipping the second
+  factor when that key is missing. REQUIRE_2FA_FOR_ALL extends the rule to every
+  customer; it is off unless set to "true", and while it is on the only reachable
+  routes for an unenrolled account are its settings page, the enrolment endpoints,
+  sign-out and whoami.
 - src/lib/platform/turnstile.ts challenges public signup with Cloudflare Turnstile,
   and the signup route refuses a filled honeypot before it writes an account. The
   challenge is enforced only when NEXT_PUBLIC_TURNSTILE_SITE_KEY and

@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * 2FA must be an explicit authenticated action.
  */
 export async function POST(request: NextRequest) {
-  const user = await requireAuthApi();
+  const user = await requireAuthApi({ allowUnenrolled: true });
   if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
 

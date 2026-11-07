@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
  * is why the UI asks the customer to store them before continuing.
  */
 export async function POST(request: NextRequest) {
-  const user = await requireAuthApi();
+  const user = await requireAuthApi({ allowUnenrolled: true });
   if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
   if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });
