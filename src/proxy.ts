@@ -6,6 +6,11 @@ import {
   isEmbeddedPreviewHost,
 } from "@/lib/platform/security-headers";
 import { FRAMEWORK_BANNERS } from "@/lib/platform/server-banner";
+import {
+  SESSION_TOKENS_HEADER,
+  sessionCookieCopies,
+  sessionTokensForHeader,
+} from "@/lib/platform/session-cookies";
 
 /** The live environment, deliberately not the build-time-inlined spelling. */
 const runtimeEnv: Record<string, string | undefined> = process.env;
@@ -27,6 +32,27 @@ export function proxy(request: NextRequest) {
    */
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-pryva-pathname", request.nextUrl.pathname);
+
+  /*
+   * A browser can hold two cookies called `pryva_session` — a host-only one from
+   * before the site moved to its own domain, and one written with
+   * `Domain=pryvalogs.com` afterwards. Next keeps only one of them, and when it
+   * keeps the dead copy the visitor is signed in and treated as signed out.
+   * `lib/platform/session-cookies` explains the failure and the repair; all that
+   * happens here is handing the app every copy, because this is the last place
+   * both are still visible.
+   *
+   * The header is overwritten from the parsed `Cookie` header on every request,
+   * never read from the caller, so it cannot be forged: a client that sends one
+   * has it replaced here, and a request with no session cookie has it removed.
+   */
+  const copies = sessionCookieCopies(request.headers.get("cookie"));
+  if (copies.length) {
+    requestHeaders.set(SESSION_TOKENS_HEADER, sessionTokensForHeader(copies));
+  } else {
+    requestHeaders.delete(SESSION_TOKENS_HEADER);
+  }
+
   const response = NextResponse.next({ request: { headers: requestHeaders } });
 
   // Security headers
