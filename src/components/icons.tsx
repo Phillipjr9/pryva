@@ -621,98 +621,118 @@ export function Filter(props: IconProps) {
 }
 
 /**
- * The rest of the catalogue glyphs.
+ * Catalogue glyphs — official Lucide path data, not hand-drawn.
  *
- * These exist so every Pryva service, category and dashboard destination can be
- * drawn from one stroked set instead of a picture file. They follow `base()`
- * exactly — 24×24, 1.6 stroke, round caps — so a row mixing `Wallet` with
- * `Inbox` reads as one family at 20 px.
+ * Extracted verbatim from `lucide-static` v1.70.0 (ISC licence), the same
+ * lineage as the rest of this file. Do not edit the shape data by eye and do not
+ * generate it: re-extract it from the package so an upgrade stays reproducible.
+ *
+ * They render through `base()`, so the house keeps its 1.6 stroke weight while
+ * the geometry stays exactly what upstream ships.
+ *
+ * Source: https://lucide.dev — ISC, attribution-free for commercial use.
  */
 
+/** lucide `music` */
 export function Music(props: IconProps) {
   return (
     <svg {...base(props)}>
-      <path d="M9 18V5.8l10-2v12" />
-      <circle cx="6.5" cy="18" r="2.5" />
-      <circle cx="16.5" cy="15.8" r="2.5" />
+      <path d="M21 16V3a1 1 0 0 0-1.28-.96l-10 2.917a1 1 0 0 0-.72.96V19" />
+      <circle cx="18" cy="16" r="3" />
+      <circle cx="6" cy="19" r="3" />
     </svg>
   );
 }
 
+/** lucide `gamepad-2` */
 export function Gamepad(props: IconProps) {
   return (
     <svg {...base(props)}>
-      <path d="M7.5 7.5h9a4.5 4.5 0 0 1 4.4 3.6l.7 4.2a2.6 2.6 0 0 1-4.6 2.1l-1.2-1.5H8.2L7 17.4a2.6 2.6 0 0 1-4.6-2.1l.7-4.2A4.5 4.5 0 0 1 7.5 7.5Z" />
-      <path d="M7 11v2.6M5.7 12.3h2.6" />
-      <path d="M15.6 11.6h.01M17.9 13.4h.01" />
+      <line x1="6" x2="10" y1="11" y2="11" />
+      <line x1="8" x2="8" y1="9" y2="13" />
+      <line x1="15" x2="15.01" y1="12" y2="12" />
+      <line x1="18" x2="18.01" y1="10" y2="10" />
+      <path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z" />
     </svg>
   );
 }
 
+/** lucide `layers` */
 export function Layers(props: IconProps) {
   return (
     <svg {...base(props)}>
-      <path d="m12 3 8.5 4.5L12 12 3.5 7.5 12 3Z" />
-      <path d="m4 12 8 4.3 8-4.3" />
-      <path d="m4 16.4 8 4.3 8-4.3" />
+      <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" />
+      <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />
+      <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />
     </svg>
   );
 }
 
+/** lucide `inbox` */
 export function Inbox(props: IconProps) {
   return (
     <svg {...base(props)}>
-      <path d="M3.5 13.5h4l1.3 2.4h6.4l1.3-2.4h4" />
-      <path d="M6.2 4.5h11.6l2.7 9v4a2 2 0 0 1-2 2H5.5a2 2 0 0 1-2-2v-4l2.7-9Z" />
+      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
     </svg>
   );
 }
 
+/** lucide `shield-check` */
 export function ShieldCheck(props: IconProps) {
   return (
     <svg {...base(props)}>
-      <path d="M12 2.8 4.8 5.6v6c0 4.3 3 8.2 7.2 9.6 4.2-1.4 7.2-5.3 7.2-9.6v-6L12 2.8Z" />
-      <path d="m8.9 11.9 2.2 2.2 4-4.2" />
+      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+      <path d="m9 12 2 2 4-4" />
     </svg>
   );
 }
 
+/** lucide `signal` */
 export function Signal(props: IconProps) {
   return (
     <svg {...base(props)}>
-      <path d="M4 20v-3.2M9.3 20v-6.6M14.7 20v-10M20 20V6.4" />
+      <path d="M2 20h.01" />
+      <path d="M7 20v-4" />
+      <path d="M12 20v-8" />
+      <path d="M17 20V8" />
+      <path d="M22 4v16" />
     </svg>
   );
 }
 
+/** lucide `megaphone` */
 export function Megaphone(props: IconProps) {
   return (
     <svg {...base(props)}>
-      <path d="M4 10.2v3.6a1.8 1.8 0 0 0 1.8 1.8h1.4L18 20V4L7.2 8.4H5.8A1.8 1.8 0 0 0 4 10.2Z" />
-      <path d="M7.2 8.4v7.2" />
-      <path d="M8.5 16.2 9.8 21h2.6l-1.1-4.4" />
-      <path d="M20.5 9.4a3.6 3.6 0 0 1 0 5.2" />
+      <path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" />
+      <path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14" />
+      <path d="M8 6v8" />
     </svg>
   );
 }
 
+/** lucide `id-card` */
 export function IdCard(props: IconProps) {
   return (
     <svg {...base(props)}>
-      <rect x="2.8" y="5" width="18.4" height="14" rx="3" />
-      <circle cx="8.6" cy="11" r="2.2" />
-      <path d="M5.4 16.2c0-1.6 1.4-2.7 3.2-2.7s3.2 1.1 3.2 2.7" />
-      <path d="M14.8 10.4h3.8M14.8 13.6h3.8" />
+      <path d="M13 19a4 4 0 00-8 0" />
+      <path d="M16 10h2" />
+      <path d="M16 14h2" />
+      <circle cx="9" cy="12" r="3" />
+      <rect x="2" y="5" width="20" height="14" rx="2" />
     </svg>
   );
 }
 
+/** lucide `monitor-play` */
 export function MonitorPlay(props: IconProps) {
   return (
     <svg {...base(props)}>
-      <rect x="2.8" y="4" width="18.4" height="12.4" rx="2.6" />
-      <path d="M9 20.2h6M12 16.4v3.8" />
-      <path d="m10.6 8.2 4.2 2.4-4.2 2.4V8.2Z" />
+      <path d="M15.033 9.44a.647.647 0 0 1 0 1.12l-4.065 2.352a.645.645 0 0 1-.968-.56V7.648a.645.645 0 0 1 .967-.56z" />
+      <path d="M12 17v4" />
+      <path d="M8 21h8" />
+      <rect x="2" y="3" width="20" height="14" rx="2" />
     </svg>
   );
 }
