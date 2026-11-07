@@ -7,6 +7,7 @@ import { safeRedirectPath } from "@/lib/platform/safe-redirect";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { BrandIcon } from "@/components/BrandIcon";
 import { PasskeySignInButton } from "@/components/auth/PasskeySignInButton";
+import { TurnstileWidget } from "@/components/auth/TurnstileWidget";
 import {
   normalizeReferralCode,
   REFERRAL_COOKIE,
@@ -40,12 +41,19 @@ export function AuthForm({
   next,
   errorParam,
   refCode,
+  turnstileSiteKey,
 }: {
   mode: Mode;
   next: string;
   errorParam?: string | null;
   /** `?ref=` from an invite link. Sign-up only; ignored everywhere else. */
   refCode?: string | null;
+  /**
+   * Publishable Turnstile key, read on the server. Absent means the deployment
+   * has no widget yet, so no challenge is rendered or demanded — see
+   * `@/lib/platform/turnstile` for why that is not a silent security hole.
+   */
+  turnstileSiteKey?: string | null;
 }) {
   const invite = mode === "signup" ? normalizeReferralCode(refCode) : null;
   const [form, setForm] = useState({ name: "", email: "", password: "" });
@@ -57,6 +65,16 @@ export function AuthForm({
   // cookie the browser might replay later.
   const [challenge, setChallenge] = useState<string | null>(null);
   const [code, setCode] = useState("");
+  // A Turnstile token is single-use, so every refused submit asks for a new one.
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
+  /*
+   * Honeypot. A person never sees this field; a form-filling bot completes every
+   * input it finds. It is the one defence here that needs no vendor and no keys,
+   * so it protects signup from the moment this ships.
+   */
+  const [fax, setFax] = useState("");
+  const captchaRequired = mode === "signup" && Boolean(turnstileSiteKey);
 
   // Remember the invite for a while, because a visitor may leave for Google and
   // come back to this form — or finish with Google instead. The server reads the
@@ -75,7 +93,14 @@ export function AuthForm({
       const endpoint = mode === "signup" ? "/api/auth/signup" : "/api/auth/login";
       const payload =
         mode === "signup"
-          ? { name: form.name, email: form.email, password: form.password, ref: invite ?? undefined }
+          ? {
+              name: form.name,
+              email: form.email,
+              password: form.password,
+              ref: invite ?? undefined,
+              captchaToken: captchaToken ?? undefined,
+              fax,
+            }
           : { email: form.email, password: form.password };
 
       const response = await fetch(endpoint, {
@@ -92,6 +117,8 @@ export function AuthForm({
       if (!response.ok || !data.ok) {
         setError(data.error ?? "That didn't work. Please try again.");
         setPending(null);
+        // The token was consumed by that attempt whether it passed or not.
+        if (captchaRequired) setCaptchaReset((value) => value + 1);
         return;
       }
       if (data.twoFactorRequired && data.challengeToken) {
@@ -104,6 +131,7 @@ export function AuthForm({
     } catch {
       setError("Network hiccup. Please try again.");
       setPending(null);
+      if (captchaRequired) setCaptchaReset((value) => value + 1);
     }
   }
 
@@ -283,9 +311,39 @@ export function AuthForm({
           </p>
         )}
 
+        {mode === "signup" && (
+          <>
+            {/* Off-screen rather than display:none — some bots skip hidden
+                inputs, and a screen reader must never reach a field whose only
+                purpose is to catch automation. Named "fax", not "website":
+                password managers autofill a website field, and blocking a real
+                customer for their own browser's helpfulness is worse than
+                letting one naive bot through. */}
+            <div aria-hidden="true" className="absolute left-[-9999px] h-0 w-0 overflow-hidden">
+              <label htmlFor="pryva-fax">Fax</label>
+              <input
+                id="pryva-fax"
+                name="pryva_fax"
+                type="text"
+                tabIndex={-1}
+                autoComplete="off"
+                value={fax}
+                onChange={(event) => setFax(event.target.value)}
+              />
+            </div>
+            {turnstileSiteKey && (
+              <TurnstileWidget
+                siteKey={turnstileSiteKey}
+                onToken={setCaptchaToken}
+                resetSignal={captchaReset}
+              />
+            )}
+          </>
+        )}
+
         <button
           type="submit"
-          disabled={pending !== null}
+          disabled={pending !== null || (captchaRequired && !captchaToken)}
           className="btn btn-primary mt-1 w-full !py-3.5 disabled:opacity-60"
         >
           {pending === "form"

@@ -7,6 +7,9 @@ import {
 } from "@/lib/platform/security-headers";
 import { FRAMEWORK_BANNERS } from "@/lib/platform/server-banner";
 
+/** The live environment, deliberately not the build-time-inlined spelling. */
+const runtimeEnv: Record<string, string | undefined> = process.env;
+
 export function proxy(request: NextRequest) {
   const response = NextResponse.next();
 
@@ -23,6 +26,13 @@ export function proxy(request: NextRequest) {
     contentSecurityPolicy({
       embeddedPreview,
       development: process.env.NODE_ENV !== "production",
+      // Matches what the signup page renders: no key, no widget, no origin
+      // opened. Read through a variable rather than `process.env.NEXT_PUBLIC_…`
+      // directly, because Next inlines that spelling at build time — a build-time
+      // CSP and a runtime widget could disagree, and a disagreement blocks the
+      // challenge for every visitor. Reading the env here rather than importing
+      // the Turnstile module also keeps this file free of server-only imports.
+      turnstile: Boolean(runtimeEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim()),
     }),
   );
   response.headers.set("X-Content-Type-Options", "nosniff");

@@ -27,6 +27,7 @@ function directives(policy: string): Map<string, string> {
 const production = directives(contentSecurityPolicy());
 const preview = directives(contentSecurityPolicy({ embeddedPreview: true }));
 const development = directives(contentSecurityPolicy({ development: true }));
+const withTurnstile = directives(contentSecurityPolicy({ turnstile: true }));
 
 /** Every `.tsx` / `.ts` file under `src`, for source-scanning guards. */
 function sourceFiles(directory = "src"): string[] {
@@ -97,12 +98,41 @@ describe("content security policy", () => {
   });
 
   it("sends no empty directive and no empty value", () => {
-    for (const policy of [production, preview, development]) {
+    for (const policy of [production, preview, development, withTurnstile]) {
       for (const [name, values] of policy) {
         expect(name.length, "empty directive name").toBeGreaterThan(0);
         expect(values.length, `${name} has no value`).toBeGreaterThan(0);
       }
     }
+  });
+
+  it("opens Cloudflare's challenge origin only when the signup widget is configured", () => {
+    // Turnstile is a script plus a nested iframe. Without this the widget never
+    // appears, and with no widget no visitor can produce a token — so a policy
+    // that forgets it does not fail safe, it fails closed on real customers.
+    const origin = "https://challenges.cloudflare.com";
+    expect(withTurnstile.get("script-src")).toContain(origin);
+    expect(withTurnstile.get("frame-src")).toBe(origin);
+    expect(withTurnstile.get("connect-src")).toContain(origin);
+
+    // A deployment with no widget keeps the strict policy it had before.
+    expect(production.get("frame-src")).toBe("'none'");
+    expect(production.get("script-src")).not.toContain(origin);
+    expect(production.get("connect-src")).toBe("'self'");
+    expect(preview.get("frame-src")).toBe("'none'");
+  });
+
+  it("never widens the challenge to all of Cloudflare, or to a wildcard", () => {
+    for (const name of ["script-src", "frame-src", "connect-src"]) {
+      const value = withTurnstile.get(name) ?? "";
+      expect(value, name).not.toMatch(/(^|\s)\*(\s|$)/);
+      expect(value, name).not.toContain("https://*.cloudflare.com");
+      expect(value, name).not.toContain("https://cloudflare.com");
+    }
+    // Nothing else snuck in alongside the challenge.
+    expect(withTurnstile.get("default-src")).toBe("'self'");
+    expect(withTurnstile.get("object-src")).toBe("'none'");
+    expect(withTurnstile.get("frame-ancestors")).toBe("'self'");
   });
 
   it("only accepts same-origin form submissions", () => {

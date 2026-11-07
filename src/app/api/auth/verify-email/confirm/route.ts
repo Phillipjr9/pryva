@@ -5,6 +5,7 @@ import {
   rateLimitEmailVerification,
 } from "@/lib/identity/email-verification";
 import { scheduleOnboardingEmails } from "@/lib/email/onboarding-emails";
+import { scheduleVerifiedSignupAlert } from "@/lib/email/signup-alert";
 import { isSameOriginMutation } from "@/lib/platform/net";
 import { readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 
@@ -78,6 +79,12 @@ export async function POST(request: NextRequest) {
      * produce a second copy. See `@/lib/onboarding-emails`.
      */
     scheduleOnboardingEmails(result.userId);
+
+    // The operator hears about a customer here, at the click that proves the
+    // address is real -- not at signup, where most submissions were bots and
+    // every one of them mailed the owner's inbox. Only the first verification
+    // counts; a stray second token must not announce the same customer twice.
+    if (result.firstVerification) scheduleVerifiedSignupAlert(result.userId);
 
     return NextResponse.json({ ok: true });
   } catch (error) {

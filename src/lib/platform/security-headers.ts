@@ -28,6 +28,11 @@
  *   omitted there. A real deployment keeps `'self'`.
  * - `ws:`/`wss:` and `'unsafe-eval'` in development only, for the dev server's
  *   hot reload. They are absent from a production policy, and a test pins that.
+ * - `challenges.cloudflare.com` **only when the signup CAPTCHA is configured**.
+ *   Turnstile is a script plus a nested iframe, so the default `frame-src 'none'`
+ *   would silently break it: the widget would never appear, and with the widget
+ *   absent no visitor could produce a token. A deployment with no widget key
+ *   keeps `frame-src 'none'`, and a test pins both halves of that.
  */
 
 export type ContentSecurityPolicyOptions = {
@@ -35,12 +40,22 @@ export type ContentSecurityPolicyOptions = {
   embeddedPreview?: boolean;
   /** The process is a development server (hot reload needs eval + websockets). */
   development?: boolean;
+  /**
+   * A Turnstile site key is configured, so the signup page loads Cloudflare's
+   * challenge. Off by default: the origin is only opened for deployments that
+   * actually render the widget.
+   */
+  turnstile?: boolean;
 };
+
+/** The single origin Turnstile needs for its script, its iframe and its beacon. */
+const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
 
 export const CONTENT_SECURITY_POLICY_HEADER = "Content-Security-Policy";
 
 export function contentSecurityPolicy(options: ContentSecurityPolicyOptions = {}): string {
-  const { embeddedPreview = false, development = false } = options;
+  const { embeddedPreview = false, development = false, turnstile = false } = options;
+  const challenge = turnstile ? [TURNSTILE_ORIGIN] : [];
 
   const directives: Array<[string, string[]]> = [
     ["default-src", ["'self'"]],
@@ -48,15 +63,15 @@ export function contentSecurityPolicy(options: ContentSecurityPolicyOptions = {}
     ["object-src", ["'none'"]],
     ["frame-ancestors", [embeddedPreview ? "*" : "'self'"]],
     ["form-action", ["'self'"]],
-    ["script-src", ["'self'", "'unsafe-inline'", ...(development ? ["'unsafe-eval'"] : [])]],
+    ["script-src", ["'self'", "'unsafe-inline'", ...challenge, ...(development ? ["'unsafe-eval'"] : [])]],
     ["style-src", ["'self'", "'unsafe-inline'"]],
     ["font-src", ["'self'", "data:"]],
     ["img-src", ["'self'", "data:", "blob:", "https://images.pexels.com"]],
-    ["connect-src", ["'self'", ...(development ? ["ws:", "wss:"] : [])]],
+    ["connect-src", ["'self'", ...challenge, ...(development ? ["ws:", "wss:"] : [])]],
     ["media-src", ["'self'"]],
     ["worker-src", ["'self'", "blob:"]],
     ["manifest-src", ["'self'"]],
-    ["frame-src", ["'none'"]],
+    ["frame-src", turnstile ? [TURNSTILE_ORIGIN] : ["'none'"]],
   ];
 
   return directives.map(([name, values]) => `${name} ${values.join(" ")}`).join("; ");

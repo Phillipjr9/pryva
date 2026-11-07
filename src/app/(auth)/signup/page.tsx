@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { safeRedirectPath } from "@/lib/platform/safe-redirect";
 import { planDestination } from "@/lib/content/plan-destination";
 import { normalizeReferralCode } from "@/lib/content/referral-code";
+import { turnstileSiteKey } from "@/lib/platform/turnstile";
 
 export const metadata: Metadata = {
   title: "Create your account",
@@ -35,6 +36,7 @@ export default async function SignupPage({
         next={safeNext}
         errorParam={error ?? null}
         refCode={normalizeReferralCode(ref)}
+        turnstileSiteKey={turnstileSiteKey()}
       />
     </div>
   );

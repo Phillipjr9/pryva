@@ -134,7 +134,7 @@ export async function issueEmailVerification(
 
 export async function confirmEmailVerification(
   token: string,
-): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; userId: string; firstVerification: boolean } | { ok: false; error: string }> {
   if (typeof token !== "string" || token.length < 20 || token.length > 200) {
     return { ok: false, error: VERIFY_INVALID_MESSAGE };
   }
@@ -155,19 +155,25 @@ export async function confirmEmailVerification(
   // One transaction: marking the token used and recording the verification must
   // not be separable, or a crash between them leaves a live token for an account
   // that is already verified -- replayable forever.
-  await db.transaction(async (tx) => {
-    await tx
+  const verifiedNow = await db.transaction(async (tx) => {
+    // `returning` is what distinguishes a first verification from a no-op. A
+    // second live token (a resend the customer never used) still redeems here,
+    // but `isNull` means it updates no row -- and the operator must not get a
+    // second "new customer" email for an account they already know about.
+    const updated = await tx
       .update(users)
       .set({ emailVerifiedAt: new Date() })
-      .where(and(eq(users.id, row.userId), isNull(users.emailVerifiedAt)));
+      .where(and(eq(users.id, row.userId), isNull(users.emailVerifiedAt)))
+      .returning({ id: users.id });
     await tx
       .update(emailVerificationTokens)
       .set({ usedAt: new Date() })
       .where(eq(emailVerificationTokens.id, row.id));
+    return updated.length > 0;
   });
   // The user id is returned so the caller can send the receipt and the welcome
   // without a second lookup. They are deliberately *not* sent from inside the
   // transaction above: mail latency and provider failures have no business
   // holding a row lock on the account that was just verified.
-  return { ok: true, userId: row.userId };
+  return { ok: true, userId: row.userId, firstVerification: verifiedNow };
 }

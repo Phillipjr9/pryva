@@ -3,15 +3,15 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { createSession, hashPassword, isConfiguredAdminEmail, isValidEmail, normalizeEmail } from "@/lib/identity/auth";
 import { creditWallet } from "@/lib/payments/wallet";
-import { checkAuthRateLimit } from "@/lib/identity/auth-rate-limit";
+import { checkAuthRateLimit, clientIp } from "@/lib/identity/auth-rate-limit";
 import { issueEmailVerification } from "@/lib/identity/email-verification";
 import { DISPOSABLE_EMAIL_ERROR, isDisposableEmailAddress } from "@/lib/services/email-otp/disposable-domains";
 import { isSameOriginMutation } from "@/lib/platform/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 import { attributeReferral, readReferralCodeFrom } from "@/lib/content/referrals";
 import { assessSignupRisk, recordFraudEvent, recordSignupSignal } from "@/lib/admin/fraud";
-import { sendNewUserSignupAlert } from "@/lib/email/contact-message-email";
 import { previewOperatorBootstrapEnabled } from "@/lib/platform/preview-operator";
+import { TURNSTILE_MESSAGES, verifyTurnstileToken } from "@/lib/platform/turnstile";
 
 export async function POST(request: Request) {
   if (!isSameOriginMutation(request)) return Response.json({ ok: false, error: "Invalid origin." }, { status: 403 });
@@ -27,13 +27,26 @@ export async function POST(request: Request) {
   }
 
   try {
-    const fields = body as { name?: unknown; email?: unknown; password?: unknown; ref?: unknown };
+    const fields = body as {
+      name?: unknown;
+      email?: unknown;
+      password?: unknown;
+      ref?: unknown;
+      captchaToken?: unknown;
+      fax?: unknown;
+    };
     const name = typeof fields.name === "string" ? fields.name.trim() : "";
     const email = typeof fields.email === "string" ? normalizeEmail(fields.email) : "";
     const password = typeof fields.password === "string" ? fields.password : "";
 
     const limited = await checkAuthRateLimit(request, "signup");
     if (limited) return limited;
+    // The honeypot. A real browser leaves this empty because no person can see
+    // or tab to it. Answered with the same generic failure as any other bad
+    // body so a bot cannot learn which field gave it away.
+    if (typeof fields.fax === "string" && fields.fax.trim().length > 0) {
+      return Response.json({ ok: false, error: "Could not create that account." }, { status: 400 });
+    }
     if (name.length < 2 || name.length > 120) {
       return Response.json({ ok: false, error: "Enter a name between 2 and 120 characters." }, { status: 400 });
     }
@@ -52,6 +65,18 @@ export async function POST(request: Request) {
     }
     if (password.length < 8 || password.length > 128) {
       return Response.json({ ok: false, error: "Use a password between 8 and 128 characters." }, { status: 400 });
+    }
+
+    // The bot challenge, checked before the account is written. Deliberately
+    // after the cheap field validation so malformed posts never spend a
+    // Cloudflare call, and before the insert so a refused challenge cannot
+    // leave a half-created account behind.
+    const challenge = await verifyTurnstileToken(fields.captchaToken, clientIp(request));
+    if (!challenge.ok) {
+      return Response.json(
+        { ok: false, error: TURNSTILE_MESSAGES[challenge.reason] },
+        { status: challenge.reason === "unavailable" ? 503 : 400 },
+      );
     }
 
     const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
@@ -114,17 +139,13 @@ export async function POST(request: Request) {
     }
     // Best effort: the account exists whether or not mail is configured, and the
     // link can be re-requested from /verify-email. Signup must not fail because
-    // Resend is down.
-    // `created` returns only the id; `email` is the normalized address in scope.
+    // Resend is down. `created` returns only the id; `email` is the normalized
+    // address in scope.
+    // The operator alert no longer fires here. It moved to the moment the
+    // address is confirmed (/api/auth/verify-email/confirm), because an
+    // unverified signup is not a customer -- it is usually a bot, and mailing
+    // the owner one email per bot turned their own inbox into the spam.
     if (!operatorBootstrap) {
-      await sendNewUserSignupAlert({
-        name,
-        email,
-        createdAt: new Date(),
-        status: "pending_verification",
-      }).catch((error) => {
-        console.error("[auth] signup admin alert failed", error instanceof Error ? error.message : String(error));
-      });
       await issueEmailVerification(created.id, email, name).catch((error) => {
         console.error("[auth] signup verification email failed", error instanceof Error ? error.message : String(error));
       });
