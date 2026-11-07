@@ -11,6 +11,16 @@ import {
   isSecondFactorExemptPath,
   secondFactorGateApplies,
 } from "@/lib/identity/require-second-factor";
+import {
+  SESSION_COOKIE as SESSION_COOKIE_NAME,
+  SESSION_COOKIE_EMBEDDED as SESSION_COOKIE_EMBEDDED_NAME,
+  SESSION_TOKENS_HEADER,
+  cookieHeaderWithout,
+  copiesToClear,
+  expirySetCookies,
+  sessionCookieCopies,
+  type SessionCookieCopy,
+} from "@/lib/platform/session-cookies";
 
 export const SESSION_COOKIE = "pryva_session";
 
@@ -195,18 +205,165 @@ async function sessionUser(token: string): Promise<User | null> {
   return rows[0]?.user ?? null;
 }
 
-export async function getCurrentUser(): Promise<PublicUser | null> {
-  const jar = await cookies();
-  const cookieTokens = new Set([jar.get(SESSION_COOKIE)?.value, jar.get(SESSION_COOKIE_EMBEDDED)?.value].filter((value): value is string => Boolean(value)));
-  for (const token of cookieTokens) {
-    const user = await sessionUser(token);
-    if (user) return toPublicUser(user);
+/**
+ * Every session token this request carries, not just the one Next kept.
+ *
+ * `cookies().get()` and `cookies().getAll()` both collapse on name, so a browser
+ * holding two `pryva_session` cookies — a host-only one from before the domain
+ * move, and a `Domain=` one issued after it — shows this process only one of
+ * them, and which one is unspecified (RFC 6265 forbids relying on the order).
+ * When the dead copy is the one kept, a correctly signed-in visitor is treated
+ * as signed out on every request.
+ *
+ * `proxy.ts` parses the raw `Cookie` header, where both copies are still
+ * visible, and passes every candidate through `SESSION_TOKENS_HEADER`. This
+ * prefers those and falls back to the jar, which is what happens on any request
+ * the proxy does not run for.
+ *
+ * The header is proxy-written: a client-supplied copy is overwritten before it
+ * reaches this code, so it can only ever contain tokens the browser actually
+ * sent. A token still has to resolve to a live session row to mean anything.
+ */
+async function requestSessionTokens(): Promise<Set<string>> {
+  const tokens = new Set<string>();
+  try {
+    const headerList = await headers();
+    const forwarded = headerList.get(SESSION_TOKENS_HEADER) ?? "";
+    for (const token of forwarded.split(",")) {
+      const trimmed = token.trim();
+      if (trimmed) tokens.add(trimmed);
+    }
+  } catch {
+    /* `headers()` unavailable — fall back to the jar below */
   }
 
-  if (!cookieTokens.size && process.env.NODE_ENV !== "production") {
+  const jar = await cookies();
+  for (const cookie of [SESSION_COOKIE, SESSION_COOKIE_EMBEDDED]) {
+    const value = jar.get(cookie)?.value;
+    if (value) tokens.add(value);
+  }
+  return tokens;
+}
+
+const NO_TOKENS = { user: null, deadTokens: [] as string[], tokens: [] as string[] };
+
+/**
+ * Resolve the caller, and report which tokens turned out to be worthless.
+ *
+ * The second half is what lets a stale twin be removed instead of shadowing the
+ * live cookie forever: `expireDeadSessionCookies` below deletes exactly the
+ * copies that were checked and matched no session. Nothing that authenticated is
+ * ever reported as dead, so the repair cannot sign anyone out.
+ *
+ * When the session store cannot be reached, `resolved` is false and *nothing* is
+ * reported dead. "I could not check" must not be treated as "this is invalid",
+ * or a database blip would delete every visitor's cookies.
+ */
+async function resolveCurrentUser(): Promise<{
+  user: PublicUser | null;
+  deadTokens: string[];
+  tokens: string[];
+  resolved: boolean;
+}> {
+  let tokens: Set<string>;
+  try {
+    tokens = await requestSessionTokens();
+  } catch {
+    return { ...NO_TOKENS, resolved: false };
+  }
+
+  const dead: string[] = [];
+  for (const token of tokens) {
+    let user: User | null;
+    try {
+      user = await sessionUser(token);
+    } catch (error) {
+      console.error("[auth] could not check a session token", error instanceof Error ? error.message : String(error));
+      return { user: null, deadTokens: [], tokens: [...tokens], resolved: false };
+    }
+    if (user) return { user: toPublicUser(user), deadTokens: dead, tokens: [...tokens], resolved: true };
+    dead.push(token);
+  }
+  return { user: null, deadTokens: dead, tokens: [...tokens], resolved: true };
+}
+
+export async function getCurrentUser(): Promise<PublicUser | null> {
+  const { user, tokens } = await resolveCurrentUser();
+  if (!user && !tokens.length && process.env.NODE_ENV !== "production") {
     console.info("[auth] no session cookie on this request");
   }
-  return null;
+  return user;
+}
+
+/**
+ * Delete session cookies that a browser is holding but that authenticate nothing.
+ *
+ * ## The problem this solves
+ *
+ * A visitor who signed in before this site moved to `pryvalogs.com` holds a
+ * host-only `pryva_session`. Signing in afterwards writes a second one scoped to
+ * the domain. The old session row may be long gone, but the cookie is not: it
+ * sits beside the new one, every request carries both, and depending on which
+ * copy the framework keeps the visitor is either signed in or silently locked
+ * out. Signing in again does not help — it adds another cookie to the pile.
+ *
+ * ## Why deleting is safe here
+ *
+ * Only a token that was checked and matched no live session is expired. Nothing
+ * that authenticated is ever touched, so this cannot sign anybody out. When the
+ * session store is unreachable nothing is reported dead at all: a failure to
+ * check is not evidence of a bad cookie.
+ *
+ * Two cookies are cleared per response, not every one found — a page load that
+ * sets six expiries looks like an attack in a network tab, and the realistic
+ * case is a single stale twin. A visitor with more than two converges over the
+ * next couple of page loads.
+ *
+ * `cookieJar` is passed in so the caller reuses the jar it already read; this
+ * function must run in a Server Action or Route Handler context, where cookies
+ * may be written.
+ */
+export async function expireDeadSessionCookies(
+  jar: Awaited<ReturnType<typeof cookies>>,
+): Promise<void> {
+  const { deadTokens, resolved } = await resolveCurrentUser();
+  if (!resolved || !deadTokens.length) return;
+
+  /*
+   * Which copies are still on this request? `sessionCookieCopies` reads the raw
+   * header, because the jar has already collapsed them. Only a dead token that
+   * is *also* a cookie the browser sent can be expired — a token that came from
+   * somewhere else has no cookie to delete.
+   */
+  let copies: SessionCookieCopy[];
+  try {
+    copies = sessionCookieCopies((await headers()).get("cookie"));
+  } catch {
+    return;
+  }
+  const dead = new Set(deadTokens);
+  const doomed = copies.filter((copy) => dead.has(copy.value));
+  if (!doomed.length) return;
+
+  const host = (await headers()).get("x-forwarded-host") ?? (await headers()).get("host");
+  const domain = sessionCookieDomain(host);
+  for (const copy of copiesToClear(doomed)) {
+    /*
+     * A host-only cookie and a domain cookie are distinct to the browser and are
+     * removed by a `Set-Cookie` that matches the one it holds. The jar cannot key
+     * two entries on one name, so the domain form is written directly onto the
+     * response; the host-only form goes through the jar. A `Set-Cookie` for a
+     * cookie the browser does not hold is ignored, so sending both is free.
+     */
+    const [hostOnly] = expirySetCookies(copy, [undefined]);
+    if (domain) {
+      const withDomain = expirySetCookies(copy, [domain])[0];
+      if (withDomain) jar.set(copy.name, "", { path: "/", domain, maxAge: 0, httpOnly: true, sameSite: "lax", secure: true });
+    }
+    if (hostOnly) {
+      jar.set(copy.name, "", { path: "/", maxAge: 0, httpOnly: true, sameSite: "lax", secure: true });
+    }
+  }
 }
 
 /**
@@ -353,7 +510,27 @@ export async function requireAdmin(
 
 export async function destroySession(): Promise<void> {
   const jar = await cookies();
-  const tokens = new Set([jar.get(SESSION_COOKIE)?.value, jar.get(SESSION_COOKIE_EMBEDDED)?.value].filter((value): value is string => Boolean(value)));
+  /*
+   * Every copy, not just the one the jar kept.
+   *
+   * A browser holding two `pryva_session` cookies sends both; the jar collapses
+   * them to one. Signing out therefore deleted one session row and expired one
+   * cookie, leaving the twin alive — so the visitor could sign out and still
+   * arrive on a page as a signed-in ghost, or (the more common shape) sign out,
+   * sign in, and still be shadowed by the old copy. Reading the raw header is
+   * the only way to see both.
+   */
+  let rawCopies: SessionCookieCopy[] = [];
+  try {
+    rawCopies = sessionCookieCopies((await headers()).get("cookie"));
+  } catch {
+    /* no header context: fall back to the jar below */
+  }
+  const tokens = new Set<string>(rawCopies.map((copy) => copy.value));
+  for (const cookie of [SESSION_COOKIE, SESSION_COOKIE_EMBEDDED]) {
+    const value = jar.get(cookie)?.value;
+    if (value) tokens.add(value);
+  }
   for (const token of tokens) {
     await db.delete(sessions).where(eq(sessions.token, token));
   }
@@ -391,6 +568,26 @@ export async function destroySession(): Promise<void> {
     path: "/",
     maxAge: 0,
   });
+
+  /*
+   * Expire the twin of every copy that was on the request, in both the
+   * host-only and the domain spelling. The three `jar.set` calls above can only
+   * describe one cookie per name, so without this a browser that held two
+   * session cookies keeps one of them after signing out.
+   */
+  for (const copy of rawCopies) {
+    if (copy.name !== SESSION_COOKIE && copy.name !== SESSION_COOKIE_EMBEDDED) continue;
+    for (const domain of [undefined, clearDomain]) {
+      jar.set(copy.name, "", {
+        httpOnly: true,
+        sameSite: embedded ? "none" : "lax",
+        secure,
+        path: "/",
+        maxAge: 0,
+        ...(domain ? { domain } : {}),
+      });
+    }
+  }
 }
 
 export function normalizeEmail(email: string): string {
