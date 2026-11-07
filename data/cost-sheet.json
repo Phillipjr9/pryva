@@ -86,6 +86,138 @@
       "service": "numbers",
       "label": "US number",
       "cost": 1150
+    },
+    "sub-netflix-1m": {
+      "service": "subscriptions",
+      "label": "Netflix · 1 month",
+      "cost": 2000
+    },
+    "sub-spotify-1m": {
+      "service": "subscriptions",
+      "label": "Spotify Premium · 1 month",
+      "cost": 1200
+    },
+    "sub-apple-1m": {
+      "service": "subscriptions",
+      "label": "Apple Music · 1 month",
+      "cost": 1200
+    },
+    "sub-dstv-1m": {
+      "service": "subscriptions",
+      "label": "DStv · 1 month",
+      "cost": 3500
+    },
+    "data-mtn-1gb": {
+      "service": "data",
+      "label": "1GB · 30 days",
+      "cost": 1000
+    },
+    "data-mtn-2gb": {
+      "service": "data",
+      "label": "2GB · 30 days",
+      "cost": 1800
+    },
+    "data-airtel-1gb": {
+      "service": "data",
+      "label": "1GB · 30 days",
+      "cost": 1000
+    },
+    "data-airtel-2gb": {
+      "service": "data",
+      "label": "2GB · 30 days",
+      "cost": 1800
+    },
+    "data-glo-1gb": {
+      "service": "data",
+      "label": "1GB · 30 days",
+      "cost": 900
+    },
+    "data-glo-2gb": {
+      "service": "data",
+      "label": "2GB · 30 days",
+      "cost": 1600
+    },
+    "data-9mobile-1gb": {
+      "service": "data",
+      "label": "1GB · 30 days",
+      "cost": 950
+    },
+    "data-9mobile-2gb": {
+      "service": "data",
+      "label": "2GB · 30 days",
+      "cost": 1700
+    }
+  },
+  "digital": {
+    "canva-1month": {
+      "service": "digital",
+      "label": "Canva Pro - 1 Month",
+      "cost": 1920
+    },
+    "canva-3months": {
+      "service": "digital",
+      "label": "Canva Pro - 3 Months",
+      "cost": 5000
+    },
+    "chatgpt-1month": {
+      "service": "digital",
+      "label": "ChatGPT Plus - 1 Month",
+      "cost": 6150
+    },
+    "chatgpt-3months": {
+      "service": "digital",
+      "label": "ChatGPT Plus - 3 Months",
+      "cost": 16920
+    },
+    "disney-1month": {
+      "service": "digital",
+      "label": "Disney+ Premium - 1 Month",
+      "cost": 2310
+    },
+    "disney-3months": {
+      "service": "digital",
+      "label": "Disney+ Premium - 3 Months",
+      "cost": 6150
+    },
+    "netflix-1month": {
+      "service": "digital",
+      "label": "Netflix Premium - 1 Month",
+      "cost": 2690
+    },
+    "netflix-3months": {
+      "service": "digital",
+      "label": "Netflix Premium - 3 Months",
+      "cost": 7310
+    },
+    "netflix-6months": {
+      "service": "digital",
+      "label": "Netflix Premium - 6 Months",
+      "cost": 13460
+    },
+    "spotify-1month": {
+      "service": "digital",
+      "label": "Spotify Premium - 1 Month",
+      "cost": 1540
+    },
+    "spotify-3months": {
+      "service": "digital",
+      "label": "Spotify Premium - 3 Months",
+      "cost": 4230
+    },
+    "spotify-6months": {
+      "service": "digital",
+      "label": "Spotify Premium - 6 Months",
+      "cost": 7690
+    },
+    "youtube-1month": {
+      "service": "digital",
+      "label": "YouTube Premium - 1 Month",
+      "cost": 1920
+    },
+    "youtube-3months": {
+      "service": "digital",
+      "label": "YouTube Premium - 3 Months",
+      "cost": 5000
     }
   },
   "digital": {

@@ -6,9 +6,10 @@ import { ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
 import { formatUnitCount, safeUnitCount } from "@/lib/services/service-units";
 import { EXPLORER_COUNTRIES } from "@/lib/content/explorer-countries";
+import { BRAND_MARKS, type BrandSlug } from "@/lib/content/brand-marks";
 import {
   buildServiceExplorer, canPreviewPlan, EXPLORER_CATEGORIES, explorerCategory, explorerCountry,
-  filterExplorerItems, planMatchesCountry,
+  filterExplorerItems, matchBrand, planMatchesCountry, PROMOTION_EXAMPLES, VERIFICATION_EXAMPLES,
 } from "@/lib/services/service-explorer";
 
 describe("country-first service explorer", () => {
@@ -147,5 +148,45 @@ describe("unit counts", () => {
     const markup = renderToStaticMarkup(<UnitsStatus stock={0} owned={23} />);
     expect(markup).toContain("0 left");
     expect(markup).toContain("23 left");
+  });
+});
+
+describe("matchBrand", () => {
+  it("resolves exact brand names to their real mark slug", () => {
+    expect(matchBrand("Netflix")).toBe("netflix");
+    expect(matchBrand("spotify")).toBe("spotify");
+    expect(matchBrand("WhatsApp")).toBe("whatsapp");
+    expect(matchBrand("Telegram")).toBe("telegram");
+    expect(matchBrand("x")).toBe("x");
+  });
+
+  it("resolves brand names with plan tiers or modifiers to the brand mark", () => {
+    expect(matchBrand("Netflix Standard")).toBe("netflix");
+    expect(matchBrand("ChatGPT Plus")).toBe("chatgpt");
+    expect(matchBrand("Amazon Prime")).toBe("amazon");
+    expect(matchBrand("PlayStation Store")).toBe("playstation");
+    expect(matchBrand("WhatsApp Messenger")).not.toBeNull();
+  });
+
+  it("does not invent a mark for unrelated names", () => {
+    expect(matchBrand("Pineapple")).toBeNull();
+    expect(matchBrand("Random Service")).toBeNull();
+    expect(matchBrand(null)).toBeNull();
+    expect(matchBrand("")).toBeNull();
+  });
+
+  it("resolves every explorer brand's display name to its mark", () => {
+    // Supplier feeds carry the brand's display name ("Mail.ru", "Netflix"), not
+    // the internal slug ("maildotru", "netflix"), so matchBrand must resolve the
+    // name a supplier would actually send.
+    const brands = new Set([
+      ...VERIFICATION_EXAMPLES.map((item) => item.brand),
+      ...PROMOTION_EXAMPLES.map((item) => item.brand),
+    ]);
+    for (const brand of brands) {
+      const mark = BRAND_MARKS[brand as BrandSlug];
+      expect(mark, `${brand} is missing from BRAND_MARKS`).toBeTruthy();
+      expect(matchBrand(mark.title), `${brand} title "${mark.title}" should resolve`).toBe(brand);
+    }
   });
 });

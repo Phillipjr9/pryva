@@ -325,6 +325,68 @@ const planDefinitions: PlanDefinition[] = [
     region: "Nigeria", flag: "🇳🇬", duration: "30 days to use",
     badge: "Scale", features: ["25GB residential traffic", "Priority pool", "HTTP/SOCKS5"],
   },
+  // Subscriptions
+  {
+    slug: "sub-netflix-1m", service: "subscriptions", name: "Netflix", planLabel: "Netflix · 1 month",
+    region: "Nigeria", flag: "🇳🇬", duration: "30 days",
+    badge: "Entertainment", features: ["Standard plan", "Instant activation", "Renews monthly"],
+  },
+  {
+    slug: "sub-spotify-1m", service: "subscriptions", name: "Spotify", planLabel: "Spotify Premium · 1 month",
+    region: "Nigeria", flag: "🇳🇬", duration: "30 days",
+    features: ["Individual plan", "Instant activation", "Renews monthly"],
+  },
+  {
+    slug: "sub-apple-1m", service: "subscriptions", name: "Apple Music", planLabel: "Apple Music · 1 month",
+    region: "Nigeria", flag: "🇳🇬", duration: "30 days",
+    features: ["Individual plan", "Instant activation", "Renews monthly"],
+  },
+  {
+    slug: "sub-dstv-1m", service: "subscriptions", name: "DStv", planLabel: "DStv · 1 month",
+    region: "Nigeria", flag: "🇳🇬", duration: "30 days",
+    badge: "Entertainment", features: ["Compact package", "Instant activation", "Renews monthly"],
+  },
+  // Mobile data
+  {
+    slug: "data-mtn-1gb", service: "data", name: "MTN 1GB", planLabel: "1GB · 30 days",
+    region: "Nigeria", flag: "🇳🇬", duration: "30 days",
+    features: ["MTN network", "Instant delivery", "30 days validity"],
+  },
+  {
+    slug: "data-mtn-2gb", service: "data", name: "MTN 2GB", planLabel: "2GB · 30 days",
+    region: "Nigeria", flag: "🇳🇬", duration: "30 days",
+    popular: true, badge: "Best value", features: ["MTN network", "Instant delivery", "30 days validity"],
+  },
+  {
+    slug: "data-airtel-1gb", service: "data", name: "Airtel 1GB", planLabel: "1GB · 30 days",
+    region: "Nigeria", flag: "🇳🇬", duration: "30 days",
+    features: ["Airtel network", "Instant delivery", "30 days validity"],
+  },
+  {
+    slug: "data-airtel-2gb", service: "data", name: "Airtel 2GB", planLabel: "2GB · 30 days",
+    region: "Nigeria", flag: "🇳🇬", duration: "30 days",
+    features: ["Airtel network", "Instant delivery", "30 days validity"],
+  },
+  {
+    slug: "data-glo-1gb", service: "data", name: "Glo 1GB", planLabel: "1GB · 30 days",
+    region: "Nigeria", flag: "🇳🇬", duration: "30 days",
+    features: ["Glo network", "Instant delivery", "30 days validity"],
+  },
+  {
+    slug: "data-glo-2gb", service: "data", name: "Glo 2GB", planLabel: "2GB · 30 days",
+    region: "Nigeria", flag: "🇳🇬", duration: "30 days",
+    features: ["Glo network", "Instant delivery", "30 days validity"],
+  },
+  {
+    slug: "data-9mobile-1gb", service: "data", name: "9mobile 1GB", planLabel: "1GB · 30 days",
+    region: "Nigeria", flag: "🇳🇬", duration: "30 days",
+    features: ["9mobile network", "Instant delivery", "30 days validity"],
+  },
+  {
+    slug: "data-9mobile-2gb", service: "data", name: "9mobile 2GB", planLabel: "2GB · 30 days",
+    region: "Nigeria", flag: "🇳🇬", duration: "30 days",
+    features: ["9mobile network", "Instant delivery", "30 days validity"],
+  },
   // Email OTP has no plans, deliberately.
   //
   // It used to carry four duration tiers (email-24, email-30, email-bundle,

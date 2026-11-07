@@ -83,6 +83,54 @@ export const CATALOG_PRICES: Record<string, GeneratedPrice> = {
   "vn-us": {
     "price": 1670,
     "maxDiscountPercent": 10
+  },
+  "sub-netflix-1m": {
+    "price": 2800,
+    "maxDiscountPercent": 7
+  },
+  "sub-spotify-1m": {
+    "price": 1680,
+    "maxDiscountPercent": 7
+  },
+  "sub-apple-1m": {
+    "price": 1680,
+    "maxDiscountPercent": 7
+  },
+  "sub-dstv-1m": {
+    "price": 4900,
+    "maxDiscountPercent": 7
+  },
+  "data-mtn-1gb": {
+    "price": 1320,
+    "maxDiscountPercent": 1
+  },
+  "data-mtn-2gb": {
+    "price": 2380,
+    "maxDiscountPercent": 1
+  },
+  "data-airtel-1gb": {
+    "price": 1320,
+    "maxDiscountPercent": 1
+  },
+  "data-airtel-2gb": {
+    "price": 2380,
+    "maxDiscountPercent": 1
+  },
+  "data-glo-1gb": {
+    "price": 1190,
+    "maxDiscountPercent": 1
+  },
+  "data-glo-2gb": {
+    "price": 2120,
+    "maxDiscountPercent": 1
+  },
+  "data-9mobile-1gb": {
+    "price": 1260,
+    "maxDiscountPercent": 1
+  },
+  "data-9mobile-2gb": {
+    "price": 2250,
+    "maxDiscountPercent": 1
   }
 };
 
