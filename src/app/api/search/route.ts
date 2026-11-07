@@ -4,16 +4,29 @@ import { orders, walletTransactions, giftCards } from "@/db/schema";
 import { eq, and, or, ilike } from "drizzle-orm";
 import { requireAuthApi } from "@/lib/identity/auth";
 import { logger } from "@/lib/platform/logger";
+import { accountReadRateLimiter, rateLimitRefusal } from "@/lib/platform/rate-limit";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/search - Search user's orders, transactions, and gift cards
+/*
+ * Search scans three user-owned tables with three leading-wildcard `ILIKE`s
+ * each. Nothing about that query can use an index, so it is the most expensive
+ * read an ordinary account can ask for — and it is exactly what a search box
+ * fires on every keystroke. A signed-in script with nothing but a free account
+ * could therefore make the database do unbounded work. The budget is per
+ * account and far above a person typing; the throttle sits after authentication
+ * so an unauthenticated flood is refused by the 401 before it costs a bucket.
+ */
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuthApi();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const limit = await accountReadRateLimiter(`search:${user.id}`);
+    const refused = rateLimitRefusal(limit, "You are searching too quickly. Please wait a moment.");
+    if (refused) return refused;
 
     const { searchParams } = request.nextUrl;
     const query = searchParams.get("q")?.trim();

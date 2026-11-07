@@ -25,6 +25,9 @@ vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => state.sameOri
 vi.mock("@/lib/email/resend-config", () => ({ resendConfigured: () => state.configured }));
 vi.mock("@/lib/identity/email-verification", () => ({
   rateLimitEmailVerification: async () => state.throttle,
+  // The send budget is a second, narrower ceiling on the same action: five per
+  // fifteen minutes bounds one account's attempts, this bounds the mail it sends.
+  rateLimitVerificationSend: async () => ({ allowed: true, remaining: 1, resetTime: Date.now() + 60_000 }),
   issueEmailVerification: (...args: unknown[]) => {
     state.issue(...args);
     return Promise.resolve(state.delivery);

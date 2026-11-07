@@ -27,7 +27,7 @@ export default async function OperatorAccountPage({
 }: {
   searchParams: Promise<{ require?: string; next?: string }>;
 }) {
-  const operator = await requireAdmin("/admin/account");
+  const operator = await requireAdmin("/admin/account", { allowUnenrolled: true });
   const { require: required, next } = await searchParams;
   const back = safeRedirectPath(next, "/admin");
 

@@ -4,6 +4,7 @@ import { requireAuthApi } from "@/lib/identity/auth";
 import {
   issueEmailVerification,
   rateLimitEmailVerification,
+  rateLimitVerificationSend,
 } from "@/lib/identity/email-verification";
 import { isSameOriginMutation } from "@/lib/platform/net";
 import { resendConfigured } from "@/lib/email/resend-config";
@@ -70,6 +71,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Email delivery is not configured on this server, so the link cannot be sent." },
         { status: 503 },
+      );
+    }
+
+    // The send budget, checked after every refusal that costs nothing and before
+    // the one that costs a real message. Everything above answers without mail,
+    // so a caller whose address cannot be served never exhausts this.
+    const send = await rateLimitVerificationSend(`verify-send:${user.id}`);
+    if (send.unavailable) {
+      return NextResponse.json(
+        { error: "Temporarily unavailable. Try again shortly." },
+        { status: 503 },
+      );
+    }
+    if (!send.allowed) {
+      return NextResponse.json(
+        { error: "Too many verification emails for this account. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(Math.max(1, Math.ceil((send.resetTime - Date.now()) / 1000))) } },
       );
     }
 

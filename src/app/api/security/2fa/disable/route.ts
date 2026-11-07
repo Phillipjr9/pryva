@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
  * and neither must a password alone.
  */
 export async function POST(request: NextRequest) {
-  const user = await requireAuthApi();
+  const user = await requireAuthApi({ allowUnenrolled: true });
   if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
   if (!isJsonRequest(request)) return NextResponse.json({ error: "Expected JSON" }, { status: 415 });

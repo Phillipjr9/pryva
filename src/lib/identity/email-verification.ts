@@ -5,7 +5,7 @@ import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { emailVerificationTokens, users } from "@/db/schema";
 import { emailVerificationEmail } from "@/lib/email/email-templates";
-import { authRateLimiter } from "@/lib/platform/rate-limit";
+import { authRateLimiter, verificationSendRateLimiter } from "@/lib/platform/rate-limit";
 import { canonicalSiteUrl } from "@/lib/platform/net";
 import { logger } from "@/lib/platform/logger";
 import { readJsonWithLimit } from "@/lib/platform/request-body";
@@ -37,6 +37,22 @@ export function generateVerificationToken(): string {
  */
 export function rateLimitEmailVerification(key: string) {
   return authRateLimiter(key);
+}
+
+/**
+ * The hourly ceiling on *sending* a link, as opposed to attempting to.
+ *
+ * `authRateLimiter` above is five per fifteen minutes and keys the resend route
+ * by account — which bounds one account, and says nothing about the per-address
+ * cost. Each call mints a token, invalidates the previous one and posts a real
+ * message through Resend, so the thing being protected is the sending domain's
+ * reputation and the provider's quota, not a password. Twenty an hour for one
+ * account is far past what a person recovering a lost email needs, and low
+ * enough that a script cannot turn the resend button into an outbound-mail
+ * amplifier aimed at a third party's inbox.
+ */
+export function rateLimitVerificationSend(key: string) {
+  return verificationSendRateLimiter(key);
 }
 
 /**

@@ -24,15 +24,39 @@ as proof of identity.
   neither alone stops a distributed attack.
 - src/lib/identity/admin-two-factor.ts and admin authorization separate operators from
   customers. Verified operator addresses and 2FA are required by default.
+  src/lib/identity/two-factor.ts stores TOTP secrets encrypted under TWO_FACTOR_KEY
+  (AES-256-GCM, scrypt-derived) and refuses sign-in rather than skipping the second
+  factor when that key is missing. REQUIRE_2FA_FOR_ALL extends the rule to every
+  customer; it is off unless set to "true", and while it is on the only reachable
+  routes for an unenrolled account are its settings page, the enrolment endpoints,
+  sign-out and whoami.
 - src/lib/platform/turnstile.ts challenges public signup with Cloudflare Turnstile,
   and the signup route refuses a filled honeypot before it writes an account. The
   challenge is enforced only when NEXT_PUBLIC_TURNSTILE_SITE_KEY and
   TURNSTILE_SECRET_KEY are both set; /admin/security reports which state the
-  deployment is in. Once configured it fails closed: a refused token is a 400 and
-  a Cloudflare outage is a 503, never an unchecked signup.
+  deployment is in, including the case where the secret is set but the *build*
+  shipped without the site key (NEXT_PUBLIC_* is inlined at build time, so that
+  deployment renders no widget and needs a redeploy, not a variable). Once
+  configured it fails closed: a refused token is a 400 and a Cloudflare outage is
+  a 503, never an unchecked signup.
+- Account creation with Google meets the same challenge. The callback
+  (src/app/api/auth/google/callback/route.ts) verifies a Turnstile token before it
+  inserts a user, and the token is bound in a short-lived cookie by
+  `/api/auth/google` because Google's redirect returns only `code` and `state`.
+  Returning customers are never asked. The return leg is also limited per
+  connection (20 per 15 minutes) before any Google call is made.
 - src/lib/email/signup-alert.ts notifies operators when an address is confirmed, or
   on a Google signup, and only on the first verification. Signup itself is silent,
-  so an unverified bot no longer generates mail to the operator inbox.
+  so an unverified bot no longer generates mail to the operator inbox. Creating a
+  verification link is separately capped per account (5 per hour), because each one
+  is a real outbound message.
+- Expensive authenticated reads carry their own budgets
+  (src/lib/platform/rate-limit.ts): search, the order list and the bank directory
+  are per-account; search runs leading-wildcard `ILIKE` scans, and the bank
+  directory is the only authenticated read that calls the payment provider, so its
+  upstream fetch is also collapsed into one in-flight request per instance.
+  Refusals are 429 with `Retry-After`, and a counter that cannot be read is a 503,
+  never an allowance.
 - src/lib/platform/security-headers.ts and src/proxy.ts apply browser security headers;
   the CSP has deliberate limitations noted below.
 - src/lib/payments/paystack-webhook.ts and webhook routes verify signatures; settlement,
@@ -66,9 +90,16 @@ unconfirmed response. These controls do not verify production delivery.
 - Edge bot defence and a WAF are outside this repository; distributed abuse can
   exceed per-IP controls. Review firewall and account-lockout telemetry.
 - The signup challenge is off until both Turnstile keys are set. Until then the
-  honeypot and the 10-per-hour-per-IP limit are the only signup filters, and a
-  determined script defeats both. Setting only the site key is worse than setting
-  neither: the widget renders and nothing checks its token.
+  honeypot, the 10-per-hour-per-IP signup limit and the 20-per-15-minute Google
+  return limit are the only signup filters, and a determined script defeats them.
+  Setting only the site key is worse than setting neither: the widget renders and
+  nothing checks its token. Setting both but never rebuilding is the same trap for
+  a different reason — the page has no widget — which is why /admin/security
+  reports the build state separately from the variable state.
+- Per-IP limits are only as good as the client address. On Vercel the edge
+  overwrites X-Forwarded-For, which is what `clientIp()` reads; on a host that
+  appends instead of overwriting, a caller can choose the address it is counted
+  against. Verify this with the host before relying on the per-IP ceilings.
 - CAPTCHA raises the cost of an account; it does not verify a person. Signup risk
   scoring (src/lib/admin/fraud.ts) remains advisory and queues suspicious accounts
   for review rather than blocking them.

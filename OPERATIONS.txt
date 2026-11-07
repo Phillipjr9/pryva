@@ -67,6 +67,16 @@ Set ADMIN_EMAILS after the account exists and is verified:
   4. Follow the owner's deployment approval process, sign in, and enrol 2FA at
      /admin/account before depending on the account for operations.
 
+Requiring a second factor from every customer is a separate, off-by-default rule
+(REQUIRE_2FA_FOR_ALL=true). Unlike the operator rule it is a wall in front of the
+store: an unenrolled customer cannot browse, buy or open their wallet. Only their
+settings page, the enrolment endpoints, sign-out and whoami stay reachable, which
+is what lets them satisfy it. Before switching it on, confirm TWO_FACTOR_KEY is
+set and stored somewhere reachable without this deployment; losing it refuses
+every enrolled account at sign-in with a 503. To let people back in during a
+recovery, set REQUIRE_2FA_FOR_ALL to "false" -- that reopens the storefront
+without touching any stored secret.
+
 Adding the allowlisted address before signup can block the account from being
 created. Do not permanently disable ADMIN_2FA_REQUIRED to work around setup.
 Plan recovery before rotating TWO_FACTOR_KEY: changing it without a migration

@@ -10,6 +10,7 @@ import { isSameOriginMutation } from "@/lib/platform/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 import { attributeReferral, readReferralCodeFrom } from "@/lib/content/referrals";
 import { assessSignupRisk, recordFraudEvent, recordSignupSignal } from "@/lib/admin/fraud";
+import { noteSignupAndMaybeAlert } from "@/lib/admin/signup-spike";
 import { previewOperatorBootstrapEnabled } from "@/lib/platform/preview-operator";
 import { TURNSTILE_MESSAGES, verifyTurnstileToken } from "@/lib/platform/turnstile";
 
@@ -130,6 +131,12 @@ export async function POST(request: Request) {
         console.error("[auth] fraud event recording failed", error instanceof Error ? error.message : String(error));
       });
     }
+
+    // Aggregate detection, not per-account scoring. Whether or not this one
+    // looked suspicious, the question an operator needs answered is "how many
+    // accounts an hour are we creating" -- the shape a single bot signup never
+    // shows. Best effort and never awaited by the person signing up.
+    await noteSignupAndMaybeAlert();
 
     const referralCode = readReferralCodeFrom(request, fields.ref);
     if (referralCode) {

@@ -71,6 +71,10 @@ vi.mock("@/lib/platform/rate-limit", () => ({
   passwordChangeRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   accountDeletionRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   notificationRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
+  oauthRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
+  verificationSendRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
+  accountReadRateLimiter: async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
+  rateLimitRefusal: () => null,
   createRateLimiter: () => async () => ({ allowed: true, resetTime: Date.now() + 1000 }),
   resetRateLimit: async () => {},
 }));

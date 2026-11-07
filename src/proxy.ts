@@ -11,7 +11,23 @@ import { FRAMEWORK_BANNERS } from "@/lib/platform/server-banner";
 const runtimeEnv: Record<string, string | undefined> = process.env;
 
 export function proxy(request: NextRequest) {
-  const response = NextResponse.next();
+  /*
+   * Hand the pathname to the app.
+   *
+   * A layout cannot ask which child route is rendering, and one does need to
+   * know: the console layout gates everything under `/admin`, including
+   * `/admin/account`, which is the page an operator without a second factor is
+   * redirected to. Without the path it can only gate that page too, and the
+   * redirect loops on itself.
+   *
+   * `NextResponse.next({ request: { headers } })` is the documented way to add a
+   * request header (not `{ headers }`, which would send it to the client instead).
+   * The value comes from `nextUrl.pathname`, so a client cannot forge it: a
+   * caller-supplied copy is overwritten here on every request.
+   */
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pryva-pathname", request.nextUrl.pathname);
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
 
   // Security headers
   response.headers.set("X-DNS-Prefetch-Control", "on");
