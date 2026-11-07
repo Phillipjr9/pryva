@@ -4,7 +4,7 @@ import { isFundingFailure } from "@/lib/providers/types";
 import { isFleexaConfigured, listFleexaEmailProducts, listFleexaRentAreas, listFleexaSmsServices, type FleexaEmailProduct, type FleexaRentArea, type FleexaSmsService } from "@/lib/providers/fleexa";
 import { priceFromCost, isPriceInBand } from "@/lib/services/pricing";
 import { safeUnitCount } from "@/lib/services/service-units";
-import { explorerCountry, VERIFICATION_EXAMPLES, type ExplorerItem } from "@/lib/services/service-explorer";
+import { explorerCountry, matchBrand, VERIFICATION_EXAMPLES, type ExplorerItem } from "@/lib/services/service-explorer";
 
 export type SupplierSnapshot = {
   sms: FleexaSmsService[];
@@ -94,7 +94,7 @@ export function supplierItemsForCountry(snapshot: SupplierSnapshot, countryCode:
     const id = readable(entry.id, 120), name = readable(entry.name, 80);
     if (!id || !name || !matchesCountry(entry.country, country.code)) continue;
     const lower = name.toLowerCase();
-    const brand = VERIFICATION_EXAMPLES.find((item) => {
+    let brand = VERIFICATION_EXAMPLES.find((item) => {
       const itemLower = item.name.toLowerCase();
       if (itemLower === lower) return true;
       if (item.brand === "x" && (lower === "twitter" || lower === "x.com")) return true;
@@ -108,6 +108,13 @@ export function supplierItemsForCountry(snapshot: SupplierSnapshot, countryCode:
       if (item.brand === "playstation" && (lower.includes("psn") || lower.includes("playstation"))) return true;
       return false;
     });
+    // Widen the net to every real brand mark, not just the verification
+    // examples, so live supplier listings keep their real logo instead of the
+    // generic service icon.
+    if (!brand) {
+      const matched = matchBrand(name);
+      if (matched) brand = { name, brand: matched, tag: "Other" };
+    }
     add({
       id: itemId("sms", id, country.code), category: "verification", name, description: "SMS verification listing",
       tag: brand?.tag ?? "Other", artwork: brand ? { kind: "brand", name: brand.brand } : { kind: "service", name: "numbers" },

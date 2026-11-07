@@ -1,7 +1,7 @@
 import { plans, type Plan } from "@/lib/services/catalog";
 import { EXPLORER_COUNTRIES, type ExplorerCountry } from "@/lib/content/explorer-countries";
 import type { AirtimeProvider } from "@/lib/services/data/airtime";
-import type { BrandSlug } from "@/lib/content/brand-marks";
+import { BRAND_MARKS, type BrandSlug } from "@/lib/content/brand-marks";
 import { SERVICES, type ServiceId } from "@/lib/services/registry";
 
 /**
@@ -168,6 +168,65 @@ export const PROMOTION_EXAMPLES: Array<{ name: string; brand: BrandSlug; types: 
   { name: "SoundCloud", brand: "soundcloud", types: ["Plays", "Followers", "Likes"] },
   { name: "Kick", brand: "kick", types: ["Followers", "Views"] },
 ];
+
+/**
+ * Every real brand mark the shop can render, keyed by slug with its display
+ * title. A supplier listing whose name names a platform gets that platform's
+ * real mark instead of a generic service icon — so a "Netflix Standard" SMS
+ * listing shows the Netflix mark rather than the generic verification icon.
+ *
+ * `VERIFICATION_EXAMPLES`/`PROMOTION_EXAMPLES` stay the source of truth for
+ * tags and exact aliases; this matcher widens the net to every mark in
+ * `BRAND_MARKS` so the hundreds of live supplier listings aren't left with a
+ * generic icon.
+ */
+const KNOWN_BRANDS: ReadonlyArray<{ slug: BrandSlug; title: string }> = Object.entries(
+  BRAND_MARKS,
+).map(([slug, mark]) => ({ slug: slug as BrandSlug, title: mark.title }));
+
+/**
+ * Match a supplier listing name to a real brand mark, if one exists.
+ *
+ * An exact title match wins outright. Otherwise the longest brand title that
+ * appears in the name wins (so "Netflix Standard" → `netflix`). Single-letter
+ * titles such as `x` only match exactly, otherwise anything containing "x"
+ * would falsely claim the mark. Returns null when no real mark applies, so the
+ * caller falls back to the generic service icon.
+ */
+/** Does `word` appear in `text` as a whole word (bounded by non-alphanumerics)? */
+function containsWord(text: string, word: string): boolean {
+  let index = 0;
+  while ((index = text.indexOf(word, index)) !== -1) {
+    const before = index === 0 || !/[a-z0-9]/.test(text[index - 1]);
+    const after = index + word.length === text.length || !/[a-z0-9]/.test(text[index + word.length]);
+    if (before && after) return true;
+    index += 1;
+  }
+  return false;
+}
+
+/** Lowercase and strip everything that isn't a letter or digit, so "mail.ru"
+ *  and "maildotru" compare equal, as do "sinaweibo" and "Sina Weibo". */
+const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+export function matchBrand(name: string | null): BrandSlug | null {
+  if (!name) return null;
+  const target = normalize(name);
+  // Exact, punctuation-insensitive: "maildotru" matches the "Mail.ru" mark.
+  for (const { slug, title } of KNOWN_BRANDS) {
+    if (normalize(title) === target) return slug;
+  }
+  let best: BrandSlug | null = null;
+  let bestLen = 0;
+  for (const { slug, title } of KNOWN_BRANDS) {
+    const t = title.toLowerCase();
+    if (t.length > 1 && containsWord(name.trim().toLowerCase(), t) && t.length > bestLen) {
+      best = slug;
+      bestLen = t.length;
+    }
+  }
+  return best;
+}
 
 const categoryById = new Map(EXPLORER_CATEGORIES.map((category) => [category.id, category]));
 const countryByCode = new Map(EXPLORER_COUNTRIES.map((country) => [country.code, country]));
