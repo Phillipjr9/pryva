@@ -193,7 +193,8 @@ export function accountProductLines(products: BulkaccProduct[], limit = MAX_ACCO
  * Boosts have no inventory — a panel reports per-order minimums and maximums, not
  * units on a shelf. So the honest line is "orderable, between X and Y", and it is
  * built from exactly the selection the shop renders: the same function that
- * decides what is for sale decides what is reported as available.
+ * decides what is for sale decides what is reported as available. Every variant
+ * is reported, not one per platform and intent, so this list matches the shop.
  */
 export function boostLines(services: SmmService[], currency: string | null): StockLine[] {
   const selection = selectBoostServices(services, currency);
@@ -202,7 +203,9 @@ export function boostLines(services: SmmService[], currency: string | null): Sto
     const orderable = listing.min !== null && listing.max !== null;
     return {
       id: listing.id,
-      label: `${listing.platform ?? "Promotion"} ${listing.tag.toLowerCase()}`,
+      // Variants of one product now coexist, so the offer's own name is the
+      // label — "Instagram followers" three times over told an operator nothing.
+      label: listing.name,
       state: orderable ? "in-stock" : "unknown",
       stock: null,
       note: orderable

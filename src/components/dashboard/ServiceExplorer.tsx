@@ -8,7 +8,7 @@ import { CountrySelector } from "@/components/dashboard/CountrySelector";
 import { NetworkBadge } from "@/components/NetworkBadge";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
-import { ArrowRight, Globe, Lock, Search, Shield, Sparkle } from "@/components/icons";
+import { ArrowRight, ChevronDown, Globe, Lock, Search, Shield, Sparkle } from "@/components/icons";
 import { formatNaira } from "@/lib/services/catalog";
 import {
   orderByReadiness,
@@ -73,11 +73,12 @@ const POPULAR_COUNTRIES = [
   { code: "gh", name: "Ghana", desc: "Regional African plans" },
 ];
 
-function itemArt(item: ExplorerItem) {
+function itemArt(item: ExplorerItem, size: "sm" | "md" = "md") {
+  const pixels = size === "sm" ? 28 : 42;
   switch (item.artwork.kind) {
-    case "brand": return <BrandIcon brand={item.artwork.name} size={42} decorative />;
-    case "network": return <NetworkBadge provider={item.artwork.name} size={42} />;
-    case "service": return <ServiceIcon service={item.artwork.name} size="md" />;
+    case "brand": return <BrandIcon brand={item.artwork.name} size={pixels} decorative />;
+    case "network": return <NetworkBadge provider={item.artwork.name} size={pixels} />;
+    case "service": return <ServiceIcon service={item.artwork.name} size={size} />;
   }
 }
 
@@ -126,8 +127,11 @@ function ServiceCard({ item, countryName }: { item: ExplorerItem; countryName: s
               that look up the full price line would match both. */}
           {price !== null ? ` · ${formatNaira(price)}${item.priceFrom ? "+" : ""}` : item.category === "esim" && item.source === "live" ? " · Price unavailable" : item.source === "live" ? " · Price on request" : " · Price not listed"}
         </p>
+        {/* Variants of one product differ by refill and order bounds, so a phone
+            needs that line as much as a desktop does. */}
+        {item.detail && <p className="mt-0.5 truncate text-micro text-ink-3 sm:hidden">{item.detail}</p>}
         <p className="mt-1 hidden text-meta text-ink-3 sm:block">{item.description} · <span className="capitalize">{item.tag}</span></p>
-        <p className="mt-3 hidden text-micro leading-relaxed text-ink-3 sm:block">{coverage}</p>
+        <p className="mt-3 hidden text-micro leading-relaxed text-ink-3 sm:block">{item.detail ?? coverage}</p>
       </div>
       <div className="shrink-0 sm:mt-auto sm:w-full sm:pt-3">
         <p className="hidden min-h-[1.2rem] text-meta font-semibold text-ink sm:block">{priceLine}</p>
@@ -244,6 +248,8 @@ export function ServiceExplorer({
   const [search, setSearch] = useState("");
   const [tag, setTag] = useState("all");
   const [visible, setVisible] = useState(PAGE_SIZE);
+  const [platformOpen, setPlatformOpen] = useState<Record<string, boolean>>({});
+  const [groupVisible, setGroupVisible] = useState<Record<string, number>>({});
   const [liveState, setLiveState] = useState<LiveState | null>(null);
   const [liveRevision, setLiveRevision] = useState(0);
   const selectedCountry = explorerCountry(country);
@@ -254,6 +260,26 @@ export function ServiceExplorer({
       ? interleaveExplorerItems([...liveState.items, ...base]) : base;
   }, [country, liveState]);
   const filtered = useMemo(() => filterExplorerItems(items, category, search, tag), [items, category, search, tag]);
+  /**
+   * Social promotion lists every offer the supplier sells, which is hundreds
+   * rather than a handful. Grouping by platform keeps that navigable: each one
+   * collapses to a header with its count and opens to its own paginated grid.
+   * The server already orders by platform, so insertion order is the shelf order.
+   */
+  const platformGroups = useMemo(() => {
+    if (category !== "social") return null;
+    const groups = new Map<string, ExplorerItem[]>();
+    for (const item of filtered) {
+      const key = item.platform ?? "Other platforms";
+      const bucket = groups.get(key);
+      if (bucket) bucket.push(item);
+      else groups.set(key, [item]);
+    }
+    return [...groups.entries()].map(([platform, entries]) => ({ platform, items: entries }));
+  }, [category, filtered]);
+  // A search or a type filter must reveal its own matches, so filtering opens
+  // every section regardless of what was collapsed while browsing.
+  const filtering = search.trim().length > 0 || tag !== "all";
   const tags = category === "verification"
     ? VERIFICATION_TAGS
     : category === "social"
@@ -505,9 +531,64 @@ export function ServiceExplorer({
                 {liveState.reason !== "funding" && <button type="button" className="font-semibold underline" onClick={() => setLiveRevision((value) => value + 1)}>Retry</button>}
               </p>
             )}
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:mt-4 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
-              {filtered.slice(0, visible).map((item) => <ServiceCard key={item.id} item={item} countryName={selectedCountry.name} />)}
-            </div>
+            {platformGroups ? (
+              <div className="mt-3 grid gap-2.5 sm:mt-4 sm:gap-3">
+                {platformGroups.map((group, index) => {
+                  // Browsing opens the first platform only; the rest stay as
+                  // headers so 300 offers do not arrive as 300 cards at once.
+                  const open = filtering || (platformOpen[group.platform] ?? index === 0);
+                  const limit = groupVisible[group.platform] ?? PAGE_SIZE;
+                  // The panel is only mounted while open, so aria-controls is
+                  // omitted when collapsed rather than naming a missing element.
+                  const panelId = `platform-panel-${index}`;
+                  return (
+                    <section key={group.platform} className="overflow-hidden rounded-2xl border border-line bg-white">
+                      <h3 className="m-0">
+                        <button
+                          type="button"
+                          onClick={() => setPlatformOpen((current) => ({ ...current, [group.platform]: !open }))}
+                          aria-expanded={open}
+                          aria-controls={open ? panelId : undefined}
+                          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-cream/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-lav-400"
+                        >
+                          <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-lav-50/70">
+                            {itemArt(group.items[0], "sm")}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-[0.92rem] font-semibold text-ink">{group.platform}</span>
+                          <span className="shrink-0 rounded-full bg-cream px-2 py-0.5 text-micro font-semibold text-ink-2">
+                            {group.items.length}
+                            <span className="sr-only"> {group.items.length === 1 ? "listing" : "listings"}</span>
+                          </span>
+                          <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
+                        </button>
+                      </h3>
+                      {open && (
+                        <div id={panelId} className="border-t border-line p-2.5 sm:p-3">
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
+                            {group.items.slice(0, limit).map((item) => <ServiceCard key={item.id} item={item} countryName={selectedCountry.name} />)}
+                          </div>
+                          {limit < group.items.length && (
+                            <div className="mt-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => setGroupVisible((current) => ({ ...current, [group.platform]: limit + PAGE_SIZE }))}
+                                className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3.5 py-2 text-micro font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-lav-700"
+                              >
+                                More {group.platform} <span className="text-ink-3">({group.items.length - limit} remaining)</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </section>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:mt-4 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
+                {filtered.slice(0, visible).map((item) => <ServiceCard key={item.id} item={item} countryName={selectedCountry.name} />)}
+              </div>
+            )}
             {filtered.length === 0 && (
               <div className="rounded-2xl border border-dashed border-line bg-cream/50 p-8 text-center">
                 <p className="text-[0.88rem] font-semibold text-ink">No listings match these filters</p>
@@ -515,7 +596,7 @@ export function ServiceExplorer({
                 {(search || tag !== "all") && <button type="button" onClick={() => { setSearch(""); setTag("all"); setVisible(PAGE_SIZE); }} className="mt-3 text-meta font-semibold text-lav-700 underline underline-offset-2">Clear filters</button>}
               </div>
             )}
-            {visible < filtered.length && (
+            {!platformGroups && visible < filtered.length && (
               <div className="mt-5 text-center">
                 <button type="button" onClick={() => setVisible((current) => current + PAGE_SIZE)} className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2.5 text-meta font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-lav-700">Show more <span className="text-ink-3">({filtered.length - visible} remaining)</span></button>
               </div>

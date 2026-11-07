@@ -21,7 +21,7 @@ export type ExplorerCategory = ServiceId;
 export type ExplorerFilter = ExplorerCategory | "all";
 export type ExplorerArtwork =
   | { kind: "brand"; name: BrandSlug | "disney-plus" }
-  | { kind: "service"; name: "numbers" | "esim" | "proxies" | "email-otp" | "accounts" | "bulk" | "scheduled" }
+  | { kind: "service"; name: "numbers" | "esim" | "proxies" | "email-otp" | "accounts" | "bulk" | "scheduled" | "social-promotion" }
   | { kind: "network"; name: AirtimeProvider };
 export type ExplorerItem = {
   id: string;
@@ -31,6 +31,12 @@ export type ExplorerItem = {
   tag: string;
   /** Platform identity is separate from the selected promotion type. */
   platform?: string;
+  /**
+   * What distinguishes this listing from others of the same type on the same
+   * platform — refill, order bounds, rate per thousand. Shown in place of the
+   * coverage line, which says nothing useful for a boost.
+   */
+  detail?: string;
   artwork: ExplorerArtwork;
   /** Only real catalogue, tool or supplier entries are shown. */
   source: "catalog" | "tool" | "live";
@@ -316,6 +322,7 @@ export function filterExplorerItems(items: ExplorerItem[], category: ExplorerFil
     if (tag !== "all" && item.tag !== tag) return false;
     if (!query) return true;
     const categoryLabel = categoryById.get(item.category)?.label ?? "";
-    return [item.name, item.description, item.tag, categoryLabel].some((value) => value.toLocaleLowerCase().includes(query));
+    return [item.name, item.description, item.tag, item.platform ?? "", item.detail ?? "", categoryLabel]
+      .some((value) => value.toLocaleLowerCase().includes(query));
   });
 }

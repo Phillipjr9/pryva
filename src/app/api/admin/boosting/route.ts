@@ -86,9 +86,9 @@ export async function GET(request: NextRequest) {
   }
 
   const currency = normalizeCurrency(balance?.currency ?? services[0]?.currency ?? null);
-  // What the shop would actually show, which is the number that matters: a large
-  // panel returns thousands of services and Pryva lists a handful, one per
-  // platform and intent, every one of them priced.
+  // What the shop would actually show, which is the number that matters: every
+  // social offer the supplier sells that we can price, grouped by platform. The
+  // gap between the two counts is stock we cannot sell, so it is worth seeing.
   const selection = selectBoostServices(services, balance?.currency ?? null);
 
   const hint = (() => {
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
     if (selection.listed === 0) {
       return "The supplier answered, but none of its services is a social boost Pryva lists. Check that this is the catalogue you expect.";
     }
-    return `${selection.listed} of ${services.length} supplier services are listed for sale — one per platform and intent, each priced and ready. Place one small test order before announcing the service.`;
+    return `${selection.listed} of ${services.length} supplier services are listed for sale — every priced social offer, grouped by platform. Place one small test order before announcing the service.`;
   })();
 
   return NextResponse.json(
