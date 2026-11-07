@@ -124,13 +124,69 @@ the threshold.
    signup still works (it should now require the widget).
 3. **Set `ALERT_WEBHOOK_URL`** if you haven't — that's what makes the spike
    alert reachable. Slack/Discord webhooks both work; no account needed.
-4. **For an immediate stop on live traffic**, put Vercel Firewall (or
-   Cloudflare) in front of the domain with a rate rule on `/api/auth/*` and
-   `/api/*`. Application-level per-IP ceilings cannot stop a distributed
-   botnet — the code even says so in `SECURITY.txt`. That's the one layer this
-   repository cannot provide.
+4. **Add one Vercel Firewall rate-limit rule** — see below. This is the single
+   highest-value action available to you right now, and it needs no code.
+
+## The one rule that stops this at the edge
+
+I checked your plan and corrected an earlier claim of mine: **Vercel WAF,
+custom rules and rate limiting are available on Hobby**, not just Pro. The
+Hobby *limits* are the real constraint — about **3 custom rules**, and only
+**1 rate-limit rule**.
+
+So spend that one rule where it hurts the attacker most:
+
+| Field | Value |
+|---|---|
+| Path | starts with `/api/auth/` |
+| Counting key | IP (the only key on Hobby besides JA4) |
+| Window | 60 s |
+| Limit | 10 requests |
+| Action when exceeded | **challenge** (not deny) |
+
+Why `challenge` and not `deny`: a JS challenge passes real people and stops
+scripts, so a shared carrier NAT or an office IP doesn't lock out a genuine
+customer. Why `/api/auth/`: that single rule covers signup, login, password
+reset, verification and **the Google callback** — exactly the surface bots use
+to make accounts. Your in-app limits then work on what still gets through.
+
+Start it in **Log** mode for an hour if you want to see the baseline first;
+Firewall changes propagate globally in ~300ms with no redeploy, and roll back
+instantly.
+
+For deeper volumetric protection, Cloudflare in front of the domain gives you
+real WAF rulesets and bot scoring that Vercel reserves for Enterprise.
+
+## A note on preview deployments
+
+I verified this rather than assuming it, because your build command skips
+`db:migrate` on previews and the code swaps in an in-memory database whenever
+`DATABASE_URL` is absent:
+
+- Every `PG*` / `AWS_*` variable is scoped to **production only**.
+- `isPreviewDatabase()` returns true when neither `DATABASE_URL` nor a
+  complete IAM set is present.
+
+So previews run the in-memory shim and **cannot touch your production data**.
+That is the correct setup — keep it that way. Do not add `DATABASE_URL` to the
+Preview environment to "make previews realistic"; that would point every PR,
+including ones from forks and this agent, at your live customer table.
+
+Also worth knowing: **Turnstile is off on previews**, by design (both keys are
+production-scoped). That means you cannot exercise the challenge on a preview
+URL — test it on production after merging.
 
 ## Verification status
+
+**Build verified on Vercel**, not just locally: the PR branch deploys and
+reaches `READY` (~48 s) at
+`pryva-git-arena-17a0ce43-pryva-codehaven.vercel.app`.
+
+Two deployments before it were **blocked** — `COMMIT_AUTHOR_REQUIRED`. My
+commits were authored as `Arena Agent <agent@arena.ai>`, which Vercel cannot map
+to a GitHub account, so no preview was built at all. Re-authored to the repo's
+own identity; that is the cause, not a code problem. Worth remembering if a
+future agent branch silently shows no deployment.
 
 - `npm run typecheck` — clean
 - `eslint` — clean
