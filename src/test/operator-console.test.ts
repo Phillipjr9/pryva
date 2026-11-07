@@ -83,10 +83,22 @@ describe("the console door does not authorise anything", () => {
     expect(door).toContain("getCurrentUser");
   });
 
-  it("sends a signed-in customer away instead of showing them a form they cannot use", () => {
+  it("tells a signed-in customer they are in the wrong place, without redirecting", () => {
+    // This door used to `redirect("/admin/login?denied=1")` — to *itself*. The
+    // notice was rendered on the next request, but that request found the same
+    // signed-in customer, redirected again, and the tab span forever. A customer
+    // who followed a console link got a blank bouncing page and no explanation,
+    // and the same held for an operator who mistyped their email.
+    //
+    // The rule this encodes: a page must never redirect to its own URL while the
+    // condition that triggered the redirect is still true. It reports in place.
     const door = read("app/admin/login/page.tsx");
-    expect(door).toContain('redirect("/admin/login?denied=1")');
+    expect(door).not.toContain('redirect("/admin/login?denied=1")');
+    expect(door).toContain("signedInAsCustomer");
     expect(door).toContain("if (isAdminUser(user)) redirect(target)");
+    // The way out has to be offered, or the notice is a dead end: the form below
+    // would try to sign in as somebody who is already signed in.
+    expect(door).toContain("<SwitchAccount />");
   });
 
   it("only honours a next destination inside the console", () => {

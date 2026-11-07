@@ -6,6 +6,7 @@ import { getCurrentUser, isAdminUser } from "@/lib/identity/auth";
 import { operatorHomeFor } from "@/lib/platform/operator";
 import { safeRedirectPath } from "@/lib/platform/safe-redirect";
 import { Shield, Lock } from "@/components/icons";
+import { SwitchAccount } from "./SwitchAccount";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Operator sign in", robots: { index: false, follow: false } };
@@ -46,10 +47,22 @@ export default async function AdminLoginPage({
 
   if (user) {
     if (isAdminUser(user)) redirect(target);
-    // Signed in, but not an operator: say so here rather than bounce them through
-    // the admin layout, which would redirect to the dashboard anyway.
-    redirect("/admin/login?denied=1");
+    /*
+     * Signed in, but not an operator.
+     *
+     * The notice is rendered below, in place, rather than by redirecting to
+     * `?denied=1`. The old redirect pointed at *this same page*, so the next
+     * request found the same signed-in customer, redirected again, and the tab
+     * span forever: an operator who mistyped their email, or any customer who
+     * followed a console link, got a blank bouncing page instead of the sentence
+     * that explains it. A page must never redirect to itself while the condition
+     * that triggered it is still true.
+     *
+     * Rendering it here also keeps the form on screen, so signing in again with
+     * the right address is one field away instead of a dead end.
+     */
   }
+  const signedInAsCustomer = Boolean(user) && !isAdminUser(user);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-cream">
@@ -66,7 +79,8 @@ export default async function AdminLoginPage({
           </p>
         </div>
 
-        {denied === "1" && (
+        {(denied === "1" || signedInAsCustomer) && (
+
           <div
             role="alert"
             className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.84rem] text-amber-900"
@@ -77,8 +91,17 @@ export default async function AdminLoginPage({
               the customer dashboard
             </Link>
             .
+            {signedInAsCustomer && user ? (
+              <>
+                {" "}You are currently signed in as{" "}
+                <span className="font-medium">{user.email}</span> — sign out below and use your operator
+                account.
+              </>
+            ) : null}
           </div>
         )}
+
+        {signedInAsCustomer ? <SwitchAccount /> : null}
 
         <div className="rounded-[1.75rem] border border-line bg-[#fffdfa] p-6 shadow-[var(--shadow-card)] sm:p-8">
           <AuthForm mode="login" next={target} errorParam={error ?? null} />
