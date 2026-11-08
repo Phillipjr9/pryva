@@ -82,9 +82,6 @@ const serviceBrandOverrides: Partial<Record<CoreServiceType | AdditionalServiceT
   subscriptions: "spotify",
   "social-promotion": "instagram",
   "app-verification": "google",
-  // The family spans multiple temporary-mail providers, but the customer-facing
-  // identity is still a real email brand rather than Pryva's generic mail glyph.
-  "email-otp": "gmail",
 };
 
 type Glyph = ComponentType<SVGProps<SVGSVGElement>>;
