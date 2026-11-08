@@ -83,3 +83,17 @@ describe("choosing services", () => {
   });
 
 });
+
+describe("number-plan navigation", () => {
+  it("opens app-specific listings without losing the selected country", async () => {
+    window.history.replaceState(null, "", "/dashboard/services?country=us&category=numbers");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+      ok: true, country: "us", items: [{ id: "otp-1", category: "verification", name: "Test app", description: "Live listing", tag: "Other", artwork: { kind: "service", name: "numbers" }, source: "live", coverage: "catalog-country", stock: 7, myUnits: null, price: null, action: null }],
+    }) }));
+    render(<ServiceExplorer initialCountry="us" initialCategory="numbers" />);
+    fireEvent.click(screen.getByRole("button", { name: "Browse app-specific numbers" }));
+    expect(screen.getByRole("heading", { level: 1, name: "App verification" })).toBeTruthy();
+    expect(window.location.search).toBe("?country=us&category=verification");
+    expect(await screen.findByRole("heading", { name: "Test app" })).toBeTruthy();
+  });
+});
