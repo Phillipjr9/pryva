@@ -229,6 +229,17 @@ describe("POST /api/orders/bulk", () => {
     expect(state.debits[0].amount).toBeGreaterThan(0);
   });
 
+  it("warns against retrying an ambiguous purchase in a bulk basket", async () => {
+    const { FleexaError } = await import("@/lib/providers/fleexa");
+    state.failOnCall = 1;
+    state.fulfilError = new FleexaError("Unknown", 502, "AMBIGUOUS_PURCHASE");
+    const response = await POST(jsonRequest({ items: [{ productSlug: "vn-ng", quantity: 3 }] }));
+    expect(response.status).toBe(502);
+    expect((await response.json()).error).toMatch(/contact support before trying again/i);
+    expect(state.calls).toHaveLength(1);
+    expect(state.debits).toHaveLength(0);
+  });
+
   it("charges nothing and releases what was already bought when a supplier refuses a unit", async () => {
     state.failOnCall = 2;
     const response = await POST(jsonRequest({ items: [{ productSlug: "vn-ng", quantity: 3 }] }));

@@ -193,6 +193,14 @@ describe("Scheduled Orders", () => {
       expect(state.updates).toHaveLength(0);
     });
 
+    it("pauses the schedule when a purchase outcome is ambiguous", async () => {
+      const { FleexaError } = await import("@/lib/providers/fleexa");
+      state.fulfilError = new FleexaError("Unknown", 502, "AMBIGUOUS_PURCHASE");
+      expect(await processScheduledOrder(dueRow() as any)).toBe(false);
+      expect(state.updates).toContainEqual({ status: "paused" });
+      expect(state.debits).toHaveLength(0);
+    });
+
     it("records the supplier's own identifiers and charges only after a successful buy", async () => {
       const result = await processScheduledOrder(dueRow() as any);
 

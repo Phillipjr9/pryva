@@ -161,6 +161,9 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       await releaseAll(fulfilled);
       console.error("Bulk fulfilment failed", error instanceof FleexaError ? error.code : error);
+      if (error instanceof FleexaError && error.code === "AMBIGUOUS_PURCHASE") {
+        return NextResponse.json({ error: "A purchase outcome is uncertain. Your wallet was not charged. Contact support before trying again." }, { status: 502 });
+      }
       return NextResponse.json(
         {
           error: isUnavailable(error)

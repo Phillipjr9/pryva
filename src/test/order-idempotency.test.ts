@@ -312,6 +312,15 @@ describe("purchase idempotency", () => {
     })).rejects.toThrow();
   });
 
+  it("warns against retrying an ambiguous generic purchase", async () => {
+    const { FleexaError } = await import("@/lib/providers/fleexa");
+    mocks.fulfillPlan.mockRejectedValue(new FleexaError("Unknown", 502, "AMBIGUOUS_PURCHASE"));
+    const response = await POST(purchase({ planSlug: SLUG, requestId: crypto.randomUUID() }));
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({ safeToRetry: false, error: expect.stringMatching(/contact support before trying again/i) });
+    expect(await ledgerCount()).toBe(0);
+  });
+
   it("releases the number and records nothing when fulfilment itself fails", async () => {
     mocks.fulfillPlan.mockRejectedValue(new Error("provider exploded"));
     const requestId = crypto.randomUUID();

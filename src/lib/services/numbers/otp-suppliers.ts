@@ -638,9 +638,19 @@ export async function buyOtpNumber(offer: OtpOffer): Promise<BoughtNumber> {
   }
 
   const activation = await buyBitcallOtpActivation(offer.ref);
+  // Once the activation was accepted, failures during conversion are ambiguous
+  // regardless of their original error type: the paid call already succeeded.
+  let costNgn = offer.costNgn;
+  if (activation.price !== null) {
+    try {
+      costNgn = await supplierAmountToNgn(activation.price, activation.currency);
+    } catch {
+      throw new Error("Could not calculate the cost of an accepted activation");
+    }
+  }
   return {
     supplier: "bitcall",
-    providerCostNgn: activation.price !== null ? await supplierAmountToNgn(activation.price, activation.currency) : offer.costNgn,
+    providerCostNgn: costNgn,
     providerRequestId: activation.activationId,
     number: activation.phoneNumber,
     app: offer.app,
@@ -653,17 +663,15 @@ export async function buyOtpNumber(offer: OtpOffer): Promise<BoughtNumber> {
 /**
  * Did this failure possibly buy a number?
  *
- * Answering "yes" (or "don't know") ends the search. Answering "no" — the two
- * "not executed" codes — lets the caller try the next supplier. Anything
- * unrecognised is treated as ambiguous: the cost of one failed order is a
- * retry, and the cost of a wrong retry is two numbers for one customer.
+ * Answering "yes" (or "don't know") means reconciliation is required. A
+ * definitive refusal means no activation was created, but the checkout still
+ * does not automatically try another offer. Unrecognised failures are ambiguous.
  */
 export function isAmbiguousOtpPurchase(error: unknown): boolean {
   if (error instanceof FleexaError) {
-    // Raised before any request left this process, so nothing can have been
-    // bought: no key, no usable base URL, budget already spent, or a plan the
-    // provider refused outright.
-    return !["NO_API_KEY", "INVALID_BASE_URL", "RATE_LIMIT_UNAVAILABLE", "RATE_LIMITED"].includes(error.code ?? "");
+    // Local preflight errors or an explicitly classified provider refusal.
+    // OTP_PROVIDER_REFUSED is raised only after a definitive non-execution.
+    return !["NO_API_KEY", "INVALID_BASE_URL", "RATE_LIMIT_UNAVAILABLE", "RATE_LIMITED", "OTP_PROVIDER_REFUSED"].includes(error.code ?? "");
   }
   if (error instanceof Error && error.name === "BitcallError") return isAmbiguousBitcallOutcome(error);
   // A thrown non-provider value is a bug, not a receipt: assume the worst.

@@ -6,6 +6,7 @@ import { scheduledOrders, orders, users } from "@/db/schema";
 import { eq, and, lte, ne } from "drizzle-orm";
 import { logger } from "@/lib/platform/logger";
 import { findPlan } from "@/lib/services/catalog";
+import { FleexaError } from "@/lib/providers/fleexa";
 import { cancelUpstream, fulfillPlan, fulfilmentIntent } from "@/lib/services/fulfillment";
 import { makeReference, debitWalletInTx } from "@/lib/payments/wallet";
 
@@ -147,8 +148,15 @@ export async function processScheduledOrder(scheduled: typeof scheduledOrders.$i
   try {
     fulfilled = await fulfillPlan(plan);
   } catch (error) {
-    // Nothing bought, nothing charged. Leaving the row active lets the next run
-    // try again once the supplier is back.
+    // An ambiguous paid call may have created an activation. Stop future sweeps
+    // until an operator reconciles it instead of automatically buying again.
+    if (error instanceof FleexaError && error.code === "AMBIGUOUS_PURCHASE") {
+      await db.update(scheduledOrders).set({ status: "paused" })
+        .where(and(eq(scheduledOrders.id, current.id), eq(scheduledOrders.status, "active")));
+      console.error("Scheduled purchase outcome unknown; schedule paused for reconciliation", { scheduledOrderId: current.id, slug: plan.slug });
+      return false;
+    }
+    // A refusal leaves the wallet untouched; the schedule remains active.
     console.error("Scheduled fulfilment unavailable; run skipped", {
       scheduledOrderId: current.id,
       slug: plan.slug,
