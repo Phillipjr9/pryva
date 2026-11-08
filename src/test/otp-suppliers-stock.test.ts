@@ -96,8 +96,58 @@ describe("otp stock aggregation", () => {
     expect(read.offers).toMatchObject([
       { supplier: "bitcall", ref: "CHARLIE-US-whatsapp", country: "us", app: "WhatsApp", stock: 9 },
     ]);
-    // No country filter is sent, because the endpoint accepts none.
-    expect(bitcall.listServices).not.toHaveBeenCalled();
+    // This destination states its own offers, so those are what is listed. The
+    // service read still runs alongside the country read — it is started before
+    // anyone knows which path is needed, and the read it warms is shared — but it
+    // never gains a country filter, because the endpoint accepts none.
+    expect(read.offers).toHaveLength(1);
+    for (const call of bitcall.listServices.mock.calls) expect(call[0]).toEqual({});
+  });
+
+  it("walks the shared feeds once for many destinations, and never for a checkout", async () => {
+    bitcall.configured.mockReturnValue(true);
+    bitcall.listCountryEntries.mockResolvedValue([
+      {
+        countryCode: "NG_1", name: "Nigeria", serviceCount: 1, availableCount: 4,
+        startingPrice: 500, currency: "NGN",
+        pools: [{ serviceId: "CHARLIE-NG_1-whatsapp", price: 500, currency: "NGN", availableCount: 4, successRate: 87 }],
+      },
+      {
+        countryCode: "US_1", name: "United States (Virtual)", serviceCount: 1, availableCount: 2,
+        startingPrice: 900, currency: "NGN",
+        pools: [{ serviceId: "CHARLIE-US_1-gmail", price: 900, currency: "NGN", availableCount: 2, successRate: 80 }],
+      },
+    ]);
+
+    const { readOtpOffersForSupplier, clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");
+    clearOtpCatalogueCache();
+
+    expect((await readOtpOffersForSupplier("bitcall", "ng", "Nigeria")).offers).toHaveLength(1);
+    expect((await readOtpOffersForSupplier("bitcall", "us", "United States")).offers).toHaveLength(1);
+    // Both destinations were answered from one read of the same feed. Walking it
+    // per destination is what made the shop slow rather than the gateway.
+    expect(bitcall.listCountryEntries).toHaveBeenCalledTimes(1);
+
+    // A checkout is the one reader that must not share an older read: it is about
+    // to spend, so it re-reads the feed rather than trusting the cache.
+    await readOtpOffersForSupplier("bitcall", "ng", "Nigeria", true);
+    expect(bitcall.listCountryEntries).toHaveBeenCalledTimes(2);
+  });
+
+  it("starts the service catalogue read without waiting for the country read", async () => {
+    bitcall.configured.mockReturnValue(true);
+    let release!: (value: unknown) => void;
+    bitcall.listCountryEntries.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
+    bitcall.listServices.mockResolvedValue([]);
+
+    const { readOtpOffersForSupplier, clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");
+    clearOtpCatalogueCache();
+    const read = readOtpOffersForSupplier("bitcall", "ng", "Nigeria");
+
+    // The country read has not answered yet; the service read is already out.
+    expect(bitcall.listServices).toHaveBeenCalledTimes(1);
+    release([{ countryCode: "NG_1", name: "Nigeria", serviceCount: 0, availableCount: 0, startingPrice: null, currency: null, pools: [] }]);
+    await read;
   });
 
   it("falls back to the service rows only when the country catalogue carries no pools", async () => {

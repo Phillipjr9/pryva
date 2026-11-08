@@ -195,9 +195,21 @@ function rankByCost(offers: OtpOffer[]): OtpOffer[] {
   );
 }
 
-/** Reads one supplier's catalogue. Throws when it cannot be read. */
-async function fetchOffers(supplier: OtpSupplierId, country: string, regionName: string): Promise<OtpOffer[]> {
-  return supplier === "fleexa" ? fleexaOffers(country, regionName) : bitcallOffers(country, regionName);
+/**
+ * Reads one supplier's catalogue. Throws when it cannot be read.
+ *
+ * `fresh` is set by a checkout that is about to spend: it bypasses every cache
+ * on this path, including the shared feed caches below, so the offer being
+ * bought is priced from a live read rather than from a read another customer
+ * happened to trigger.
+ */
+async function fetchOffers(
+  supplier: OtpSupplierId,
+  country: string,
+  regionName: string,
+  fresh = false,
+): Promise<OtpOffer[]> {
+  return supplier === "fleexa" ? fleexaOffers(country, regionName) : bitcallOffers(country, regionName, fresh);
 }
 
 function mergeOtpOffer(existing: OtpOffer, next: OtpOffer): OtpOffer {
@@ -212,6 +224,46 @@ function mergeOtpOffer(existing: OtpOffer, next: OtpOffer): OtpOffer {
       existing.stock === null || next.stock === null ? null :
       existing.stock + next.stock,
   };
+}
+
+/**
+ * The two Bitcall feeds behind a destination read, cached as they were read.
+ *
+ * A destination's offers come from the country catalogue plus — when that
+ * country publishes no pools — the whole service catalogue. Both are global:
+ * the same destinations and the same thousands of services answer every
+ * country, and re-walking them per country and per request made first paint the
+ * sum of ten round trips. Read once and shared, the cost is paid by the first
+ * reader on an instance and nobody after them.
+ *
+ * Kept short because the pools inside carry stock counts, and skipped entirely
+ * for a checkout (`fresh`), which must price what it is about to buy from a
+ * live read.
+ */
+const FEED_TTL_MS = 5 * 60_000;
+const feedCache = new Map<string, { at: number; value: unknown }>();
+const feedInFlight = new Map<string, Promise<unknown>>();
+
+async function cachedFeed<T>(key: string, fresh: boolean, read: () => Promise<T>): Promise<T> {
+  const cached = feedCache.get(key) as { at: number; value: T } | undefined;
+  if (!fresh && cached && Date.now() - cached.at < FEED_TTL_MS) return cached.value;
+
+  // One walk at a time per feed. Two customers opening the shop together used to
+  // start two walks of the same catalogue, and both waited for their own. A
+  // checkout that asks for a fresh read joins a walk already in flight rather
+  // than starting a duplicate: that read was started now, which is all `fresh`
+  // is asking for.
+  const inFlight = feedInFlight.get(key) as Promise<T> | undefined;
+  if (inFlight) return inFlight;
+
+  const pending = read().then((value) => {
+    feedCache.set(key, { at: Date.now(), value });
+    return value;
+  }).finally(() => {
+    feedInFlight.delete(key);
+  });
+  feedInFlight.set(key, pending);
+  return pending;
 }
 
 async function fleexaOffers(country: string, regionName: string): Promise<OtpOffer[]> {
@@ -254,8 +306,12 @@ function serviceLabel(serviceId: string): string | null {
   return raw ? canonicalServiceName(raw) : null;
 }
 
-async function bitcallOffers(country: string, regionName: string): Promise<OtpOffer[]> {
+/** A read slower than this is worth a line in the logs, with the stage that spent it. */
+const SLOW_READ_MS = 2_500;
+
+async function bitcallOffers(country: string, regionName: string, fresh = false): Promise<OtpOffer[]> {
   if (!isBitcallConfigured()) return [];
+  const startedAt = Date.now();
 
   // Where an offer's destination is actually stated.
   //
@@ -272,7 +328,22 @@ async function bitcallOffers(country: string, regionName: string): Promise<OtpOf
   // the key, the balance and the catalogue were all fine.
   void supplierNgnRates(["EUR"]).catch(() => undefined);
 
-  const entries = await listBitcallOtpCountryEntries();
+  // Both feeds, started together.
+  //
+  // The service catalogue is only needed when this destination published no
+  // pools, and finding that out used to cost a serial round trip before the
+  // bigger read could even start. They do not depend on each other, so they go
+  // out at once; on the path that does not need the service catalogue, the read
+  // has still warmed a cache every other destination on this instance shares.
+  //
+  // The rejection is handled here rather than only at the await: on the pools
+  // path nothing consumes it, and an unobserved rejection is its own incident.
+  const countriesRead = cachedFeed("otp-countries", fresh, listBitcallOtpCountryEntries);
+  const servicesRead = cachedFeed("otp-services", fresh, () => listBitcallOtpServices({}));
+  servicesRead.catch(() => undefined);
+
+  const entries = await countriesRead;
+  const countriesMs = Date.now() - startedAt;
   const mine = entries.filter((entry) => matchesCountry(entry.countryCode ?? entry.name, country, regionName));
   const rows: PricedRow[] = [];
   const seen = new Set<string>();
@@ -292,7 +363,11 @@ async function bitcallOffers(country: string, regionName: string): Promise<OtpOf
     }
   }
   const funnel = { entries: entries.length, matched: mine.length, pools: poolsSeen };
-  if (rows.length > 0) return reportEmptyRead(country, funnel, await priceRows(rows, country));
+  if (rows.length > 0) {
+    const priced = await priceRows(rows, country);
+    noteReadTime(country, startedAt, { countriesMs, servicesMs: null });
+    return reportEmptyRead(country, funnel, priced);
+  }
 
   // A country entry can arrive without its inline pools: the field is documented
   // but optional. The fallback used to filter service rows on `service.countryCode`
@@ -312,7 +387,8 @@ async function bitcallOffers(country: string, regionName: string): Promise<OtpOf
       .flatMap((entry) => [normalizeCountryCode(entry.countryCode), normalizeCountryCode(entry.name)])
       .filter((code): code is string => code !== null),
   );
-  const services = await listBitcallOtpServices({});
+  const services = await servicesRead;
+  const servicesMs = Date.now() - startedAt - countriesMs;
   for (const service of services) {
     const namesCountry = matchesCountry(service.countryCode, country, regionName);
     const app = readableApp(service.name);
@@ -330,7 +406,33 @@ async function bitcallOffers(country: string, regionName: string): Promise<OtpOf
       });
     }
   }
-  return reportEmptyRead(country, funnel, await priceRows(rows, country));
+  const priced = await priceRows(rows, country);
+  noteReadTime(country, startedAt, { countriesMs, servicesMs });
+  return reportEmptyRead(country, funnel, priced);
+}
+
+/**
+ * How long a destination's read took, and which feed spent it.
+ *
+ * This is the number the shop's first paint is made of, and it is deliberately
+ * not a budget: a slow read is still a read, and nothing here shortens one. It
+ * exists so "the page takes ages" has an answer in the logs — the gateways are
+ * on another continent and each feed is a paginated walk, so which stage is
+ * slow decides whether the fix is paging, caching or the feed itself.
+ */
+function noteReadTime(
+  country: string,
+  startedAt: number,
+  stages: { countriesMs: number; servicesMs: number | null },
+): void {
+  const ms = Date.now() - startedAt;
+  if (ms < SLOW_READ_MS) return;
+  logger.warn("Bitcall OTP catalogue read was slow", {
+    country,
+    ms,
+    countriesMs: stages.countriesMs,
+    servicesMs: stages.servicesMs,
+  });
 }
 
 /**
@@ -412,6 +514,8 @@ export async function otpOffersFor(
 /** Forget cached catalogues. Exported so a test can prove a fresh read happens. */
 export function clearOtpCatalogueCache(): void {
   catalogueCache.clear();
+  feedCache.clear();
+  feedInFlight.clear();
 }
 
 /**
@@ -456,7 +560,7 @@ export async function readOtpOffersForSupplier(
   }
 
   try {
-    const offers = rankWithinSupplier(await fetchOffers(supplier, country, regionName));
+    const offers = rankWithinSupplier(await fetchOffers(supplier, country, regionName, refresh));
     catalogueCache.set(key, { at: Date.now(), offers });
     return { offers, errorCode: null, stale: false };
   } catch (error) {
@@ -497,7 +601,8 @@ export async function otpSupplierProbe(
 ): Promise<{ offers: OtpOffer[]; errorCode: string | null }> {
   if (!otpSupplierConfigured(supplier)) return { offers: [], errorCode: "NOT_CONFIGURED" };
   try {
-    return { offers: rankWithinSupplier(await fetchOffers(supplier, country, regionName)), errorCode: null };
+    // A probe is a live look at one supplier by an operator, so it reads fresh.
+    return { offers: rankWithinSupplier(await fetchOffers(supplier, country, regionName, true)), errorCode: null };
   } catch (error) {
     return { offers: [], errorCode: errorCodeOf(error) };
   }
