@@ -29,6 +29,11 @@ export type ExplorerArtwork =
    * duplicate-logo complaint all over again, one level down.
    */
   | { kind: "unidentified-inbox" }
+  /**
+   * A site listing with a public domain but no bundled brand mark. Load the
+   * site's real favicon rather than showing the same envelope on every tile.
+   */
+  | { kind: "site-favicon"; domain: string }
   | { kind: "network"; name: AirtimeProvider };
 export type ExplorerItem = {
   id: string;

@@ -91,15 +91,44 @@ function UnidentifiedInbox({ size }: { size: number }) {
   );
 }
 
+function SiteFavicon({ domain, size }: { domain: string; size: number }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <UnidentifiedInbox size={size} />;
+
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line/70 bg-white"
+      style={{ width: size, height: size }}
+    >
+      {/* The supplier lists destination sites as well as mail providers. Their
+          published favicons are the only honest logos for brands not bundled
+          with the app; this endpoint returns the site's real favicon. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(`https://${domain}`)}&sz=128`}
+        alt=""
+        width={size}
+        height={size}
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
+        className="h-full w-full object-contain p-1"
+      />
+    </span>
+  );
+}
+
 function itemArt(item: ExplorerItem, size: "sm" | "md" = "md") {
   const pixels = size === "sm" ? 28 : 42;
   switch (item.artwork.kind) {
     case "brand": return <BrandIcon brand={item.artwork.name} size={pixels} decorative />;
     case "network": return <NetworkBadge provider={item.artwork.name} size={pixels} />;
     case "service": return <ServiceIcon service={item.artwork.name} size={size} />;
-    // A mailbox we cannot place: Lucide's `mail-question`, in the same tile as
-    // the rest, so it reads as "an address, provider unknown" and never as
-    // another provider's logo or as the Temporary-inbox tool.
+    case "site-favicon": return <SiteFavicon domain={item.artwork.domain} size={pixels} />;
+    // A mailbox with no published favicon: Lucide's `mail-question`, never
+    // another provider's logo or the Temporary-inbox tool's mark.
     case "unidentified-inbox": return <UnidentifiedInbox size={pixels} />;
   }
 }

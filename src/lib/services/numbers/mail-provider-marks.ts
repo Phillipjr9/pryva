@@ -18,9 +18,11 @@ import type { BrandSlug } from "@/lib/content/brand-marks";
  *      would render nothing at all, which is worse than a neutral glyph — and
  *      the type of `brand` is `BrandSlug`, so a missing mark fails the build
  *      rather than shipping a blank tile.
- *   2. An unknown provider keeps the neutral envelope. It must never borrow
- *      another provider's logo — a Hotmail inbox wearing the Gmail mark is a lie
- *      a customer cannot check.
+ *   2. An unknown provider never borrows another provider's logo — a Hotmail
+ *      inbox wearing the Gmail mark is a lie a customer cannot check. When the
+ *      listing names a public site domain instead, the catalogue uses that
+ *      site's own published favicon; only invalid/unavailable domains get the
+ *      neutral envelope.
  *
  * This module is plain data so the server-only catalog can use it and the
  * browser bundle can be tested against it without pulling a provider client in.
@@ -33,9 +35,9 @@ export type MailProviderMark = {
   brand: BrandSlug;
   /**
    * Lowercased needles that identify the provider in a listing name or domain.
-   * A needle with a dot (`mail.ru`, `web.de`) or one longer than three
-   * characters is matched as a substring; a short bare one (`qq`, `msn`) has to
-   * match a whole word, so `qq` cannot fire on the middle of another word.
+   * A dotted needle (`mail.ru`, `web.de`) or short bare token (`qq`, `msn`)
+   * must match at a token boundary. Longer brand words are matched as
+   * substrings, so `protonmail` can be found inside a product label.
    */
   match: readonly string[];
 };
@@ -127,10 +129,9 @@ const MATCH_INDEX: readonly Needle[] = MAIL_PROVIDER_MARKS.flatMap((provider) =>
   provider.match.map((text) => ({
     text,
     brand: provider.brand,
-    // A dot already anchors the needle (mail.ru, web.de); a short bare token
-    // like "qq" or "msn" is too easy to hit inside another word, so it must
-    // stand alone.
-    wholeWord: !text.includes(".") && text.length <= 3,
+    // Dotted domains and short bare tokens need a boundary. Otherwise a domain
+    // like "10minutemail.com" falsely contains the mail.com logo in its name.
+    wholeWord: text.includes(".") || text.length <= 3,
   })),
 );
 
@@ -145,14 +146,49 @@ function present(haystack: string, needle: Needle): boolean {
  *
  * Both fields are lowercased once and searched together: the feed sometimes
  * names a product only by its domain, so "outlook.com" has to resolve as surely
- * as "Outlook inbox". A miss returns null, and the caller draws the neutral
- * envelope — never another provider's mark.
+ * as "Outlook inbox". A miss returns null so the catalogue can try the listed
+ * site's own favicon; it never guesses another provider's mark.
  */
 export function mailProviderBrand(name: string | null, domain?: string | null): BrandSlug | null {
   const haystack = `${name ?? ""} ${domain ?? ""}`.toLowerCase();
   if (!haystack.trim()) return null;
   for (const needle of MATCH_INDEX) {
     if (present(haystack, needle)) return needle.brand;
+  }
+  return null;
+}
+
+/**
+ * Resolve a listed site's domain for its own favicon. The feed can list a
+ * verification service (adobe.com, airbnb.com, etc.), not a mail provider, so a
+ * provider-only lookup leaves most of the real catalogue looking blank. A site
+ * favicon is the site's own published mark, fetched by the tile component from
+ * Google's favicon endpoint; it is not artwork we invent or bundle.
+ *
+ * Treat the supplier strings as untrusted: accept a hostname only, reject local
+ * or reserved names, and never let arbitrary URLs, ports, credentials or IPs
+ * into a browser image request.
+ */
+export function mailProviderFaviconDomain(name: string | null, domain?: string | null): string | null {
+  for (const value of [domain, name]) {
+    if (!value || value.length > 253) continue;
+    const candidate = value.trim().toLowerCase().replace(/^https?:[/][/]/, "").split(/[/?#]/, 1)[0].replace(/[.]$/, "");
+    if (!candidate || candidate.includes("@") || candidate.includes(":") || candidate.includes(String.fromCharCode(92))) continue;
+
+    let hostname: string;
+    try {
+      hostname = new URL(`https://${candidate}`).hostname;
+    } catch {
+      continue;
+    }
+    if (hostname !== candidate || !hostname.includes(".")) continue;
+    if (/^([0-9]{1,3}[.]){3}[0-9]{1,3}$/.test(hostname) || hostname.includes(":")) continue;
+    const labels = hostname.split(".");
+    if (labels.some((label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) continue;
+    const tld = labels.at(-1) ?? "";
+    if (!/^(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})$/.test(tld)) continue;
+    if (["test", "example", "invalid", "localhost", "local", "internal", "lan"].includes(tld)) continue;
+    return hostname;
   }
   return null;
 }

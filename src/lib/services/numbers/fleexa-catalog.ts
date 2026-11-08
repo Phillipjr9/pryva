@@ -5,7 +5,7 @@ import { isFleexaConfigured, listFleexaEmailProducts, listFleexaRentAreas, listF
 import { priceFromCost, isPriceInBand } from "@/lib/services/pricing";
 import { safeUnitCount } from "@/lib/services/service-units";
 import { explorerCountry, VERIFICATION_EXAMPLES, type ExplorerItem } from "@/lib/services/service-explorer";
-import { mailProviderBrand } from "@/lib/services/numbers/mail-provider-marks";
+import { mailProviderBrand, mailProviderFaviconDomain } from "@/lib/services/numbers/mail-provider-marks";
 
 export type SupplierSnapshot = {
   sms: FleexaSmsService[];
@@ -125,13 +125,17 @@ export function supplierItemsForCountry(snapshot: SupplierSnapshot, countryCode:
      * Yandex, Tuta, mail.com, WEB.DE, QQ and Naver all fell through to the same
      * envelope glyph, so eight different products wore one logo.
      *
-     * The fallback is still the neutral envelope, never another provider's
-     * mark, so an inbox we cannot identify claims nothing.
+     * A non-provider entry can still name the service's own domain (the feed
+     * includes sites like adobe.com and airbnb.com), so it uses that site's
+     * published favicon before falling back to a neutral mailbox. That closes
+     * the gap where every non-mail listing showed the same missing-logo glyph.
+     * Neither path borrows another provider's logo.
      */
     const brand = mailProviderBrand(name, entry.domain);
+    const faviconDomain = mailProviderFaviconDomain(name, entry.domain);
     add({
       id: itemId("email", id, "global"), category: "email", name, description: "Free temporary inbox", tag: "Free",
-      artwork: brand ? { kind: "brand", name: brand } : { kind: "unidentified-inbox" }, source: "live", coverage: "not-country-specific",
+      artwork: brand ? { kind: "brand", name: brand } : faviconDomain ? { kind: "site-favicon", domain: faviconDomain } : { kind: "unidentified-inbox" }, source: "live", coverage: "not-country-specific",
       // No price, and deliberately so. What the feed charges us per inbox is our
       // cost of running a free tool, not a price a customer sees. Marking it up
       // here would put a number on something we have decided to give away, and

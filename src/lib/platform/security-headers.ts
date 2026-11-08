@@ -20,6 +20,9 @@
  *
  * - `style-src 'unsafe-inline'` — Tailwind and React both emit inline styles.
  * - `img-src https://images.pexels.com` — the marketing photographs.
+ * - `img-src https://www.google.com` — Google serves the published favicons for
+ *   destination-site entries in the Email OTP catalogue; no remote host is
+ *   chosen from the supplier data.
  * - nothing for fonts: they are self-hosted from `@fontsource` packages and
  *   served from `/_next/static`, so `font-src 'self'` is enough. Google's
  *   style and font hosts were removed with the `<link>` tags that needed them.
@@ -66,7 +69,7 @@ export function contentSecurityPolicy(options: ContentSecurityPolicyOptions = {}
     ["script-src", ["'self'", "'unsafe-inline'", ...challenge, ...(development ? ["'unsafe-eval'"] : [])]],
     ["style-src", ["'self'", "'unsafe-inline'"]],
     ["font-src", ["'self'", "data:"]],
-    ["img-src", ["'self'", "data:", "blob:", "https://images.pexels.com"]],
+    ["img-src", ["'self'", "data:", "blob:", "https://images.pexels.com", "https://www.google.com"]],
     ["connect-src", ["'self'", ...challenge, ...(development ? ["ws:", "wss:"] : [])]],
     ["media-src", ["'self'"]],
     ["worker-src", ["'self'", "blob:"]],

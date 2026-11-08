@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BRAND_MARKS } from "@/lib/content/brand-marks";
-import { MAIL_PROVIDER_MARKS, mailProviderBrand } from "@/lib/services/numbers/mail-provider-marks";
+import { MAIL_PROVIDER_MARKS, mailProviderBrand, mailProviderFaviconDomain } from "@/lib/services/numbers/mail-provider-marks";
 
 /**
  * One listing, one logo.
@@ -21,7 +21,7 @@ import { MAIL_PROVIDER_MARKS, mailProviderBrand } from "@/lib/services/numbers/m
  *   2. Every mark is distinct. No two providers may share one logo, which is the
  *      owner's actual instruction.
  *   3. An unknown provider resolves to null and never to another provider's
- *      mark, so the caller can draw the neutral `mail-question` glyph instead.
+ *      mark, so a named public site can use its own favicon instead.
  */
 describe("mail provider marks", () => {
   it("resolves each provider the feed can name to its own real mark", () => {
@@ -96,10 +96,32 @@ describe("mail provider marks", () => {
     // "qq" has to stand alone. A substring rule would fire on any name that
     // happened to contain those two letters, and hand it QQ's logo.
     expect(mailProviderBrand("Squqqle inbox", null)).toBeNull();
+    // A site's name can contain the letters "mail.com" without being the
+    // mail.com provider; the boundary keeps 10minutemail.com on its own favicon.
+    expect(mailProviderBrand("10minutemail.com", null)).toBeNull();
     expect(mailProviderBrand("Tuta inbox", null)).toBe("tuta");
     // A dotted needle still matches as a substring, which is what picks up
     // addresses served from a provider subdomain.
     expect(mailProviderBrand("Inbox at mail.yandex.ru", null)).toBe("yandex");
+  });
+
+  it("resolves a safe site domain for its own published favicon", () => {
+    for (const domain of ["10minutemail.com", "126.com", "163.com", "adobe.com", "airbnb.com", "alibaba.com"]) {
+      expect(mailProviderFaviconDomain(domain, null), `${domain} should have its own favicon`).toBe(domain);
+    }
+    expect(mailProviderFaviconDomain("Inbox", "https://airbnb.com/path")).toBe("airbnb.com");
+  });
+
+  it("rejects unsafe or non-public favicon hosts", () => {
+    for (const [name, domain] of [
+      ["mail.test", null],
+      ["127.0.0.1", null],
+      ["localhost", null],
+      ["Inbox", "http://user:pass@example.com:8080/path"],
+      ["Inbox", "example.internal"],
+    ] as const) {
+      expect(mailProviderFaviconDomain(name, domain)).toBeNull();
+    }
   });
 
   it("keeps a more specific provider ahead of a broader one it contains", () => {

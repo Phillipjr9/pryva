@@ -107,6 +107,25 @@ describe("read-only supplier catalog", () => {
     expect(marks.size).toBe(providers.length);
   });
 
+  it("uses each listed website's own published favicon when the listing is a destination site", async () => {
+    const { supplierItemsForCountry } = await import("@/lib/services/numbers/fleexa-catalog");
+    const domains = ["10minutemail.com", "126.com", "163.com", "adobe.com", "airbnb.com", "alibaba.com"];
+    const items = supplierItemsForCountry(
+      {
+        ...snapshot,
+        email: domains.map((domain, index) => ({
+          id: `site-${index}`, name: domain, domain, priceNgn: 500, stock: 1,
+        })),
+      },
+      "us",
+    ).filter((item) => item.category === "email");
+
+    expect(items.map((item) => item.artwork)).toEqual(
+      domains.map((domain) => ({ kind: "site-favicon", domain })),
+    );
+    expect(new Set(items.map((item) => JSON.stringify(item.artwork))).size).toBe(domains.length);
+  });
+
   it("keeps an unidentified inbox off the free tool's glyph and off other providers", async () => {
     const { supplierItemsForCountry } = await import("@/lib/services/numbers/fleexa-catalog");
     const items = supplierItemsForCountry(
@@ -123,7 +142,7 @@ describe("read-only supplier catalog", () => {
     // Not `email-otp`: that is the Temporary-inbox card's mark, and an unknown
     // provider wearing it is the same duplicate-logo problem one level down.
     expect(items.map((item) => item.artwork)).toEqual([
-      { kind: "unidentified-inbox" },
+      { kind: "site-favicon", domain: "aol.com" },
       { kind: "unidentified-inbox" },
     ]);
     expect(items.some((item) => JSON.stringify(item.artwork).includes("email-otp"))).toBe(false);
