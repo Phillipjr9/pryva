@@ -184,3 +184,34 @@ describe("unit counts", () => {
     expect(markup).toContain("text-[0.58rem]");
   });
 });
+
+describe("number-plan stock on mobile", () => {
+  it("shows reported stock, zero, and unknown without inventing a plan total", () => {
+    const item: ExplorerItem = {
+      id: "live-rental", category: "numbers", name: "Number rental", description: "Rental listing",
+      tag: "Rental", artwork: { kind: "service", name: "numbers" }, source: "live",
+      coverage: "catalog-country", stock: 8, myUnits: null, price: null, action: null,
+    };
+    for (const [stock, expected] of [[8, "8 left"], [0, "0 left"], [null, "Not reported"]] as const) {
+      const markup = renderToStaticMarkup(<ServiceCard item={{ ...item, stock }} countryName="United States" />);
+      expect(markup).toContain("Stock:");
+      expect(markup).toContain(expected);
+      expect(markup).toContain("sm:hidden");
+    }
+    const plan = buildServiceExplorer("us").find((entry) => entry.id === "plan-vn-us")!;
+    expect(plan.stock).toBeNull();
+    expect(renderToStaticMarkup(<ServiceCard item={plan} countryName="United States" />)).toContain("Not reported");
+  });
+
+  it("distinguishes the three US catalogue plan cards from live app listings", () => {
+    const plans = buildServiceExplorer("us").filter((entry) => entry.category === "numbers");
+    expect(plans.map((entry) => entry.id).sort()).toEqual(["plan-rent-us-30", "plan-vn-otp-5", "plan-vn-us"]);
+    expect(plans.every((entry) => entry.source === "catalog" && entry.stock === null)).toBe(true);
+  });
+
+  it("explains where app-specific stock is shown", () => {
+    const markup = renderToStaticMarkup(<ServiceExplorer initialCountry="us" initialCategory="numbers" />);
+    expect(markup).toContain("app-specific number listings and their reported stock appear under App verification");
+    expect(markup).toContain("Browse app-specific numbers");
+  });
+});

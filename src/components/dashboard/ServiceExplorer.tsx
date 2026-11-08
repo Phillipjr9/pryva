@@ -216,6 +216,13 @@ export function ServiceCard({ item, countryName }: { item: ExplorerItem; country
             <span className="font-semibold">Bitcall stock:</span> {formatUnitCount(item.stock, "Not reported")}
           </p>
         )}
+        {/* Number-plan counts, when reported, must be visible on phones too.
+            A static plan has no independent inventory; null remains unknown. */}
+        {item.category === "numbers" && (
+          <p className="mt-0.5 truncate text-micro text-ink-3 sm:hidden">
+            <span className="font-semibold">Stock:</span> {formatUnitCount(item.stock, "Not reported")}
+          </p>
+        )}
         {/* Variants of one product differ by refill and order bounds, so a phone
             needs that line as much as a desktop does. */}
         {item.detail && <p className="mt-0.5 truncate text-micro text-ink-3 sm:hidden">{item.detail}</p>}
@@ -617,13 +624,23 @@ export function ServiceExplorer({
                 <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Sparkle className="h-3.5 w-3.5" /> Step 03</p>
                 <h2 id="services-title" className="mt-1 text-[1.05rem] font-semibold text-ink">{selectedCategory ? `Explore ${selectedCategory.label}` : "Explore services"}</h2>
                 <p aria-live="polite" className="mt-1 text-meta text-ink-3">{filtered.length} {`listing${filtered.length === 1 ? "" : "s"}`} · {selectedCountry.name} selected</p>
-                {liveState?.country === country && liveState.fetchedAt && <p className="mt-1 text-micro text-ink-3">Stock checked: <time dateTime={liveState.fetchedAt}>{new Date(liveState.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
+                {liveState?.country === country && liveState.fetchedAt && <p className="mt-1 text-micro text-ink-3">Live listings checked: <time dateTime={liveState.fetchedAt}>{new Date(liveState.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
               </div>
               <div className="relative w-full sm:max-w-[260px]">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
                 <input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setVisible(PAGE_SIZE); }} aria-label="Search services" placeholder="Search services or platforms" className="min-h-11 w-full rounded-xl border border-line bg-white py-2 pl-9 pr-3 text-meta text-ink outline-none placeholder:text-ink-3 focus:border-lav-400 focus:ring-4 focus:ring-lav-100" />
               </div>
             </div>
+
+            {category === "numbers" && (
+              <div className="mt-4 rounded-xl border border-line bg-white px-3.5 py-3 text-meta leading-relaxed text-ink-2">
+                Country-based catalogue plans do not have separate stock counts. Live rental listings may report stock;
+                app-specific number listings and their reported stock appear under App verification.{" "}
+                <button type="button" onClick={() => chooseCategory("verification")} className="font-semibold text-lav-700 underline underline-offset-2">
+                  Browse app-specific numbers
+                </button>
+              </div>
+            )}
 
             {tags.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-1.5 border-t border-line pt-4" aria-label="Service types">
