@@ -69,6 +69,14 @@ describe("real Paystack top-up flow", () => {
     expect(screen.queryByText(/Funds added to your wallet/i)).toBeNull();
   });
 
+  it.each(["1", "10000000"])("lets the customer review a boundary top-up of ₦%s", (value) => {
+    render(<PaystackTopUpFlow balance={0} userId={userId} onClose={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Amount (NGN)"), { target: { value } });
+    fireEvent.click(screen.getByRole("button", { name: "Review details" }));
+    expect(screen.getByRole("heading", { name: "Review your top-up" })).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("refuses unsafe checkout URLs and never navigates if recovery storage fails", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(response({ ok: true, authorizationUrl: "https://checkout.paystack.com.evil.test/session", reference }))
       .mockResolvedValueOnce(response({ ok: true, authorizationUrl: "https://checkout.paystack.com/session", reference }));

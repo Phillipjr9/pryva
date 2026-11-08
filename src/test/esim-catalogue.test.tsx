@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { catalogueItems, ESIM_CATALOGUE_LIMIT, type EsimOffer } from "@/lib/services/esim/esim-catalog";
 import { EsimCatalogue } from "@/app/dashboard/esim/EsimCatalogue";
+import { classifyEsimUsage } from "@/lib/services/esim/capabilities";
 
 /**
  * The catalogue, as a catalogue.
@@ -36,6 +37,19 @@ function offer(overrides: Partial<EsimOffer> = {}): EsimOffer {
 }
 
 afterEach(cleanup);
+
+describe("eSIM usage classification", () => {
+  it.each([
+    [true, true, "calls-and-texts"],
+    [false, false, "internet-only"],
+    [true, false, "calls-only"],
+    [false, true, "texts-only"],
+    [null, null, "not-specified"],
+    [true, null, "not-specified"],
+  ] as const)("classifies voice=%s and SMS=%s as %s", (voice, sms, expected) => {
+    expect(classifyEsimUsage(voice, sms)).toBe(expected);
+  });
+});
 
 describe("catalogueItems", () => {
   it("never carries the provider reference or our cost into a page", () => {
@@ -128,9 +142,29 @@ describe("EsimCatalogue", () => {
     expect(screen.getByText("West Africa pack")).toBeTruthy();
   });
 
+  it("labels and filters plans by explicit voice and SMS support", () => {
+    const usageItems = catalogueItems([
+      offer({ id: "live-esim-aaaaaaaaaaaaaaaaaaaa", name: "Calls and texts", supportsVoice: true, supportsSms: true }),
+      offer({ id: "live-esim-bbbbbbbbbbbbbbbbbbbb", name: "Internet only", supportsVoice: false, supportsSms: false }),
+      offer({ id: "live-esim-cccccccccccccccccccc", name: "Calls only", supportsVoice: true, supportsSms: false }),
+      offer({ id: "live-esim-dddddddddddddddddddd", name: "Unspecified", supportsVoice: null, supportsSms: null }),
+    ]);
+    render(<EsimCatalogue items={usageItems} truncated={false} />);
+    expect(screen.getByText("Plan type: Calls & texts")).toBeTruthy();
+    expect(screen.getByText("Plan type: Internet only")).toBeTruthy();
+    expect(screen.getByText("Plan type: Calls only")).toBeTruthy();
+    expect(screen.getByText("Plan type: Not fully specified")).toBeTruthy();
+
+    const filter = screen.getByLabelText("Filter by voice and SMS support") as HTMLSelectElement;
+    fireEvent.change(filter, { target: { value: "internet-only" } });
+    expect(screen.getByText(/1 plan match/)).toBeTruthy();
+    expect(screen.getByText("Plan type: Internet only")).toBeTruthy();
+    expect(screen.queryByText("Calls and texts")).toBeNull();
+  });
+
   it("filters by region and counts each one", () => {
     render(<EsimCatalogue items={items} truncated={false} />);
-    const select = screen.getByRole("combobox") as HTMLSelectElement;
+    const select = screen.getByLabelText("Filter by region") as HTMLSelectElement;
     expect(Array.from(select.options).map((option) => option.value)).toEqual(["all", "Africa", "Europe", "Worldwide"]);
     fireEvent.change(select, { target: { value: "Africa" } });
     expect(screen.getByText(/2 plans match/)).toBeTruthy();

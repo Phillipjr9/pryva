@@ -77,7 +77,7 @@ describe("homepage structure", () => {
 describe("homepage promises", () => {
   it("prices the page from the live catalogue, not from typed-in numbers", () => {
     expect(html).toContain("₦1,340"); // Nigeria number
-    expect(html).toContain("Wallet top-ups from ₦1,000");
+    expect(html).toContain("Wallet top-ups from ₦1");
   });
 
   /**

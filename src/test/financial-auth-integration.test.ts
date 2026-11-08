@@ -1322,6 +1322,29 @@ describe("Paystack top-up safety", () => {
     expect(await database.select().from(schema.paymentTopups)).toHaveLength(0);
   });
 
+  it("accepts inclusive ₦1 to ₦10,000,000 top-ups and sends the matching kobo amount", async () => {
+    mocks.initializePayment.mockImplementation(async ({ reference, amount }: { reference: string; amount: string }) => ({
+      status: true,
+      data: { reference, authorization_url: "https://checkout.paystack.com/safe", amount },
+    }));
+
+    const minimum = await topUpRoute.POST(request("", { amount: 1 }));
+    const maximum = await topUpRoute.POST(request("", { amount: 10_000_000 }));
+
+    expect(minimum.status).toBe(200);
+    expect(maximum.status).toBe(200);
+    expect(mocks.initializePayment.mock.calls.map(([payload]) => payload.amount)).toEqual(["100", "1000000000"]);
+    expect((await database.select().from(schema.paymentTopups)).map((row) => row.amount).sort((a, b) => a - b)).toEqual([1, 10_000_000]);
+  });
+
+  it("rejects top-ups outside the amount limits and fractional naira before checkout", async () => {
+    for (const amount of [0, -1, 1.5, 10_000_001, Number.MAX_SAFE_INTEGER]) {
+      expect((await topUpRoute.POST(request("", { amount }))).status).toBe(400);
+    }
+    expect(mocks.initializePayment).not.toHaveBeenCalled();
+    expect(await database.select().from(schema.paymentTopups)).toHaveLength(0);
+  });
+
   it("prefers the canonical site URL for the Paystack callback over the legacy app override", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://pryvalogs.com");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://retired.example.test");

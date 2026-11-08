@@ -676,7 +676,7 @@ export default async function HomePage() {
                   <ul className="space-y-3">
                     {[
                       "Review prices before checkout",
-                      "Wallet top-ups from ₦1,000",
+                      "Wallet top-ups from ₦1",
                       "Support for delivery issues",
                       "Prices fixed in Naira at checkout",
                     ].map((item) => (

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { formatNaira } from "@/lib/services/catalog";
+import { WALLET_TOPUP_MAX_NGN, WALLET_TOPUP_MIN_NGN } from "@/lib/payments/topup-limits";
 import { isSafePaystackCheckoutUrl } from "@/lib/payments/paystack-checkout";
 import { navigateToPaystack } from "@/lib/payments/paystack-navigate";
 import { notifyPaystackTopUpsChanged, readPendingPaystackTopUps, rememberPaystackTopUp } from "@/lib/payments/paystack-topup-intent";
@@ -21,7 +22,7 @@ export function PaystackTopUpFlow({ balance, userId, onClose, testMode = false }
   const mounted = useRef(false);
   const controller = useRef<AbortController | null>(null);
   const amount = Number(amountText);
-  const validAmount = /^\d+$/.test(amountText.trim()) && Number.isSafeInteger(amount) && amount >= 1_000 && amount <= 500_000;
+  const validAmount = /^\d+$/.test(amountText.trim()) && Number.isSafeInteger(amount) && amount >= WALLET_TOPUP_MIN_NGN && amount <= WALLET_TOPUP_MAX_NGN;
 
   useEffect(() => {
     mounted.current = true;
@@ -39,7 +40,7 @@ export function PaystackTopUpFlow({ balance, userId, onClose, testMode = false }
 
   function review(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!validAmount) { setError("Enter a whole-naira amount between ₦1,000 and ₦500,000."); return; }
+    if (!validAmount) { setError("Enter a whole-naira amount between ₦1 and ₦10,000,000."); return; }
     setError(null);
     setStage("review");
   }
@@ -114,7 +115,7 @@ export function PaystackTopUpFlow({ balance, userId, onClose, testMode = false }
           <input type="text" inputMode="numeric" autoComplete="off" value={amountText} onChange={(event) => { setAmountText(event.target.value); setError(null); }} placeholder="e.g. 5000" />
         </label>
         <div className={styles.presets}>{[2000, 5000, 10000, 25000, 50000].map((preset) => <button type="button" className={styles.preset} key={preset} onClick={() => { setAmountText(String(preset)); setError(null); }}>{formatNaira(preset)}</button>)}</div>
-        <p className={styles.hint}>Minimum ₦1,000 · maximum ₦500,000 per top-up.</p>
+        <p className={styles.hint}>Minimum ₦1 · maximum ₦10,000,000 per top-up.</p>
         {error && <p role="alert" className={styles.error}>{error}</p>}
         <div className={styles.actions}><button type="submit" className={`${styles.button} ${styles.primary}`}>Review details</button></div>
       </form>

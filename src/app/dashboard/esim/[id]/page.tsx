@@ -8,6 +8,7 @@ import { formatNaira } from "@/lib/services/catalog";
 import { CountryFlag } from "@/components/CountryFlag";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { EsimBuy } from "./EsimBuy";
+import { classifyEsimUsage, ESIM_USAGE_LABELS } from "@/lib/services/esim/capabilities";
 
 export const metadata: Metadata = { title: "eSIM plan" };
 export const dynamic = "force-dynamic";
@@ -53,6 +54,7 @@ export default async function EsimPlanPage({ params }: { params: Promise<{ id: s
   const offer = confirmed ?? { ...listed, purchasable: false };
 
   const countries = offer.countries.slice(0, 24);
+  const usageCategory = classifyEsimUsage(offer.supportsVoice, offer.supportsSms);
 
   return (
     <div className="grid gap-5">
@@ -70,6 +72,12 @@ export default async function EsimPlanPage({ params }: { params: Promise<{ id: s
           <h1 className="mt-1 text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">{offer.name}</h1>
           <p className="mt-1 text-[0.9rem] text-ink-2">
             {offer.dataLabel} · {offer.validityLabel} · eSIM
+          </p>
+          <p className="mt-2 inline-flex rounded-full border border-lav-200 bg-lav-50 px-3 py-1.5 text-meta font-semibold text-lav-800">
+            Plan type: {ESIM_USAGE_LABELS[usageCategory]}
+          </p>
+          <p className="mt-1 text-meta leading-relaxed text-ink-3">
+            This category is based on the plan listing. If calls or SMS are not specified, do not assume they are included.
           </p>
         </div>
       </div>
