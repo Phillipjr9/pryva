@@ -353,4 +353,64 @@ describe("eSIM catalogue reads", () => {
     expect(offers).toHaveLength(1);
     expect(partial).toBe(true);
   });
+
+  it("keeps the last whole catalogue when our own cap cuts a walk short", async () => {
+    // The cap is ours. A read it cut short is shorter because we stopped asking,
+    // not because the supplier stopped publishing — so publishing the shorter
+    // list would shrink the shop to fit our own limit.
+    const { readEsimCatalog } = await import("@/lib/services/esim/esim-catalog");
+    gateway.plans.mockResolvedValue({
+      plans: [plan({ planId: "pln_a" }), plan({ planId: "pln_b" })],
+      returned: 2,
+      unreadable: 0,
+      partial: false,
+      partialReason: null,
+    });
+    const whole = await readEsimCatalog(true);
+    expect(whole.offers).toHaveLength(2);
+
+    gateway.plans.mockResolvedValue({
+      plans: [plan({ planId: "pln_a" })],
+      returned: 200,
+      unreadable: 0,
+      partial: true,
+      partialReason: "budget",
+    });
+    const cut = await readEsimCatalog(true);
+
+    expect(cut.offers).toHaveLength(2);
+    expect(cut.offers.map((offer) => offer.id)).toEqual(whole.offers.map((offer) => offer.id));
+  });
+
+  it("stops standing in for a cut-short walk once the last whole read is old", async () => {
+    const { readEsimCatalog } = await import("@/lib/services/esim/esim-catalog");
+    gateway.plans.mockResolvedValue({
+      plans: [plan({ planId: "pln_a" }), plan({ planId: "pln_b" })],
+      returned: 2,
+      unreadable: 0,
+      partial: false,
+      partialReason: null,
+    });
+    await readEsimCatalog(true);
+
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(Date.now() + 31 * 60_000);
+      gateway.plans.mockResolvedValue({
+        plans: [plan({ planId: "pln_a" })],
+        returned: 200,
+        unreadable: 0,
+        partial: true,
+        partialReason: "budget",
+      });
+      const cut = await readEsimCatalog(true);
+
+      // Thirty minutes of a cap is enough: after that the shorter list stands,
+      // marked partial, rather than a half-hour-old catalogue pretending to be live.
+      expect(cut.offers).toHaveLength(1);
+      expect(cut.partial).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

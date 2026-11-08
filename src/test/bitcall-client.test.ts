@@ -22,6 +22,7 @@ import {
   listBitcallEsimCountries,
   listBitcallEsimOrders,
   listBitcallEsimPlans,
+  ESIM_PLAN_MAX_PAGES,
   listBitcallEsimProfiles,
   listBitcallOtpActivations,
   listBitcallOtpCountries,
@@ -38,6 +39,11 @@ const SECRET_LIVE = "b2".repeat(64);
 
 function json(payload: unknown, status = 200, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(payload), { status, headers: { "content-type": "application/json", ...headers } });
+}
+
+/** A plan row the parser accepts, with nothing else needed for pagination. */
+function esimRow(planId: string) {
+  return { planId, name: `Plan ${planId}`, region: "Africa", countries: ["Nigeria"], dataMb: 1024, validityDays: 7, price: { amount: 4.5, currency: "USD" } };
 }
 
 function lastCall(fetchMock: ReturnType<typeof vi.fn>) {
@@ -150,6 +156,57 @@ describe("gateway transport", () => {
     expect(local).toMatchObject({ status: 429, code: "LOCAL_RATE_BUDGET" });
     expect(isAmbiguousBitcallOutcome(local)).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("charges the catalogue cap once for a whole walk, not once per page", async () => {
+    // A walk is one logical read that needs up to five gateway calls. Charging
+    // every page made one walk cost five of twelve tokens, so two readers in the
+    // same minute refused the walk itself and the storefront quietly listed the
+    // first pages as if that were the whole catalogue.
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json({ data: [esimRow("pln_one")], meta: { page: 1, hasNext: true } }))
+      .mockResolvedValueOnce(json({ data: [esimRow("pln_two")], meta: { page: 2, hasNext: false } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const read = await listBitcallEsimPlans();
+
+    expect(read.partial).toBe(false);
+    expect(read.partialReason).toBeNull();
+    expect(read.plans.map((entry) => entry.planId)).toEqual(["pln_one", "pln_two"]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(runtime.catalogLimit).toHaveBeenCalledTimes(1);
+    // The shared budget still sees both calls.
+    expect(runtime.limit).toHaveBeenCalledTimes(2);
+  });
+
+  it("names a walk cut short by our own cap as ours, not as the supplier's", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(json({ data: [esimRow("pln_one")], meta: { page: 1, hasNext: true } }));
+    vi.stubGlobal("fetch", fetchMock);
+    runtime.limit.mockReset();
+    runtime.limit.mockResolvedValueOnce({ allowed: true }).mockResolvedValueOnce({ allowed: false });
+
+    const read = await listBitcallEsimPlans();
+
+    expect(read.partial).toBe(true);
+    expect(read.partialReason).toBe("budget");
+    // The page that did read is kept: a refusal is not a reason to discard facts.
+    expect(read.plans.map((entry) => entry.planId)).toEqual(["pln_one"]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports reaching the page cap as a cap, not as a failure", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: URL) => json({
+      data: [esimRow(`pln_page_${url.searchParams.get("page")}`)],
+      meta: { page: Number(url.searchParams.get("page")), hasNext: true },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const read = await listBitcallEsimPlans();
+
+    expect(read.partial).toBe(true);
+    expect(read.partialReason).toBe("page-cap");
+    expect(read.plans).toHaveLength(ESIM_PLAN_MAX_PAGES);
+    expect(runtime.catalogLimit).toHaveBeenCalledTimes(1);
   });
 
   it("caps catalog reads separately so they leave shared headroom for orders", async () => {
