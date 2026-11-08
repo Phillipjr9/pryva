@@ -997,6 +997,19 @@ export async function listBitcallOtpCountries(): Promise<string[]> {
  * offer. It is read for display only, and only after the service catalogue
  * failed to name that offer.
  */
+/**
+ * The country segment of a published `serviceId`, for attribution only.
+ *
+ * Same documented composite as the label below: read, never built or validated.
+ * It is only ever compared against a country code the catalogue itself
+ * published, so a segment that merely looks like a code cannot invent coverage.
+ */
+export function otpCountrySegmentFromId(serviceId: string): string | null {
+  const segments = serviceId.split("-");
+  const segment = segments.length >= 3 ? segments[1]?.trim() : "";
+  return segment ? segment.slice(0, 12) : null;
+}
+
 export function otpServiceLabelFromId(serviceId: string): string | null {
   const segments = serviceId.split("-");
   if (segments.length < 3) return null;

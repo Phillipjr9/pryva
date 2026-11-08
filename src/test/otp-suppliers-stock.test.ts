@@ -32,6 +32,7 @@ vi.mock("@/lib/providers/bitcall", () => ({
   listBitcallOtpServices: bitcall.listServices,
   listBitcallOtpCountryEntries: bitcall.listCountryEntries,
   otpServiceLabelFromId: (id: string) => id.split("-").slice(2).join("-") || null,
+  otpCountrySegmentFromId: (id: string) => id.split("-")[1] ?? null,
   isAmbiguousBitcallOutcome: vi.fn(() => false),
   buyBitcallOtpActivation: vi.fn(),
 }));
@@ -89,6 +90,35 @@ describe("otp stock aggregation", () => {
     ]);
     // No country filter is sent, because the endpoint accepts none.
     expect(bitcall.listServices).not.toHaveBeenCalled();
+  });
+
+  it("attributes offers by their published id when a country entry carries no pools", async () => {
+    bitcall.configured.mockReturnValue(true);
+    // The field is documented but optional, so a destination can arrive without
+    // its inline pools. The offer's own id names its destination; it is matched
+    // only against the codes this catalogue published for the destination.
+    bitcall.listCountryEntries.mockResolvedValue([
+      { countryCode: "NG_1", name: "Nigeria", serviceCount: 1, availableCount: 0, startingPrice: null, currency: null, pools: [] },
+      { countryCode: "US_1", name: "United States (Virtual)", serviceCount: 1, availableCount: 0, startingPrice: null, currency: null, pools: [] },
+    ]);
+    bitcall.listServices.mockResolvedValue([{
+      name: "WhatsApp",
+      slug: "whatsapp",
+      countryCode: null,
+      offers: [
+        { serviceId: "BRAVO-NG_1-whatsapp", price: 900, currency: "NGN", availableCount: 4, successRate: 90 },
+        { serviceId: "BRAVO-US_1-whatsapp", price: 900, currency: "NGN", availableCount: 4, successRate: 90 },
+        { serviceId: "BRAVO-GH_1-whatsapp", price: 900, currency: "NGN", availableCount: 4, successRate: 90 },
+      ],
+    }]);
+
+    const { readOtpOffersForSupplier, clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");
+    clearOtpCatalogueCache();
+    const read = await readOtpOffersForSupplier("bitcall", "ng", "Nigeria", undefined, true);
+
+    // Ghana's code is not one this destination published, so it cannot be
+    // attributed to Nigeria even though the service name matches.
+    expect(read.offers.map((offer) => offer.ref)).toEqual(["BRAVO-NG_1-whatsapp"]);
   });
 
   it("falls back to the service rows only when the country catalogue carries no pools", async () => {
