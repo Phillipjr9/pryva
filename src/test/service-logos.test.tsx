@@ -143,10 +143,11 @@ describe("service logos", () => {
     }
   });
 
-  it("names the icon only when nothing else does", () => {
+  it("uses the real Email OTP brand mark instead of the generic Pryva mail glyph", () => {
     const labelled = renderToStaticMarkup(<ServiceIcon service="email-otp" />);
-    expect(labelled).toContain('aria-label="Email OTP"');
+    expect(labelled).toContain('aria-label="Gmail"');
     expect(labelled).toContain('role="img"');
+    expect(labelled).not.toContain('aria-label="Email OTP"');
 
     const decorative = renderToStaticMarkup(<ServiceIcon service="email-otp" decorative />);
     expect(decorative).toContain('aria-hidden="true"');
