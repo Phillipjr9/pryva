@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { diagnosticsAuthorized } from "@/lib/admin/diagnostics-auth";
+import { diagnosticsDenial, diagnosticsDenialContext } from "@/lib/admin/diagnostics-auth";
 import { isPreviewDatabase } from "@/lib/platform/demo-policy";
 import { logger } from "@/lib/platform/logger";
 import { recentWebhookActivity } from "@/lib/payments/webhook-events";
@@ -28,8 +28,8 @@ export const dynamic = "force-dynamic";
  *   silent       — nothing at all; the URL, the deployment or the key is wrong
  */
 export async function GET(request: NextRequest) {
-  if (!diagnosticsAuthorized(request)) {
-    logger.warn("Unauthorized webhook diagnostics attempt");
+  if (diagnosticsDenial(request)) {
+    logger.warn("Unauthorized webhook diagnostics attempt", diagnosticsDenialContext(request));
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

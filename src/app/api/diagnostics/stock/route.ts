@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { diagnosticsAuthorized } from "@/lib/admin/diagnostics-auth";
+import { diagnosticsDenial, diagnosticsDenialContext } from "@/lib/admin/diagnostics-auth";
 import { logger } from "@/lib/platform/logger";
 import { buildStockReport } from "@/lib/admin/stock-live";
 import { laneHeadline } from "@/lib/admin/stock-report";
@@ -23,8 +23,8 @@ export const dynamic = "force-dynamic";
  * a read-only secret to it.
  */
 export async function GET(request: NextRequest) {
-  if (!diagnosticsAuthorized(request)) {
-    logger.warn("Unauthorized stock diagnostics attempt");
+  if (diagnosticsDenial(request)) {
+    logger.warn("Unauthorized stock diagnostics attempt", diagnosticsDenialContext(request));
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

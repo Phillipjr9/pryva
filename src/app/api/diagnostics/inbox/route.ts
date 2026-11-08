@@ -3,7 +3,7 @@ import { count, gt } from "drizzle-orm";
 
 import { db } from "@/db";
 import { disposableInboxes } from "@/db/schema";
-import { diagnosticsAuthorized } from "@/lib/admin/diagnostics-auth";
+import { diagnosticsDenial, diagnosticsDenialContext } from "@/lib/admin/diagnostics-auth";
 import { isPreviewDatabase } from "@/lib/platform/demo-policy";
 import { isFleexaConfigured, listFleexaEmailProducts, type FleexaEmailProduct } from "@/lib/providers/fleexa";
 import { logger } from "@/lib/platform/logger";
@@ -29,8 +29,8 @@ export const dynamic = "force-dynamic";
 type Verdict = "ready" | "preview" | "not_configured" | "no_products" | "unreachable";
 
 export async function GET(request: NextRequest) {
-  if (!diagnosticsAuthorized(request)) {
-    logger.warn("Unauthorized inbox diagnostics attempt");
+  if (diagnosticsDenial(request)) {
+    logger.warn("Unauthorized inbox diagnostics attempt", diagnosticsDenialContext(request));
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
