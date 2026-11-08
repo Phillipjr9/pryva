@@ -13,7 +13,11 @@ import {
 import { VERIFICATION_EXAMPLES } from "@/lib/services/service-explorer";
 import { buyFleexaSmsNumber, FleexaError, isFleexaConfigured, listFleexaSmsServices } from "@/lib/providers/fleexa";
 import { logger } from "@/lib/platform/logger";
-import { supplierAmountToNgn } from "@/lib/payments/supplier-currency";
+import {
+  supplierAmountToNgn,
+  supplierAmountWithRates,
+  supplierNgnRates,
+} from "@/lib/payments/supplier-currency";
 
 /**
  * Supplier catalog adapters for number verification.
@@ -64,10 +68,28 @@ export type BoughtNumber = {
  * budget keeps a stalled catalogue from holding the purchase flow. Operator
  * diagnostics may also probe Fleexa, but never as a single-use checkout fallback.
  */
-const CATALOGUE_BUDGET_MS = 4_000;
+const CHECKOUT_BUDGET_MS = 4_000;
+
+/**
+ * A browse read has no money riding on it, and the Bitcall read is two network
+ * calls (the country catalogue, plus a rate lookup for the euros it quotes).
+ * Four seconds was enough for the catalogue alone on a warm function and not
+ * enough for both on a cold one, so browsing gets the longer budget.
+ */
+const BROWSE_BUDGET_MS = 8_000;
 
 /** Catalogues are read-only, so a stale answer is safe for a short while. */
 const CATALOGUE_TTL_MS = 60_000;
+
+/**
+ * How long a last-good read stays usable when a fresh one fails.
+ *
+ * Without this, one slow or failed read turned a working shop into an empty one:
+ * the cached offers were already the right answer a second earlier, and a
+ * read-only catalogue is not made wrong by being old. Bounded, so a feed that
+ * has been down for an hour cannot keep advertising yesterday's stock.
+ */
+const CATALOGUE_STALE_MS = 30 * 60_000;
 
 type CacheEntry = { at: number; offers: OtpOffer[]; };
 const catalogueCache = new Map<string, CacheEntry>();
@@ -257,25 +279,30 @@ async function bitcallOffers(country: string, regionName: string): Promise<OtpOf
   // shape, filtering service rows on a `countryCode` no service row has,
   // discarded every offer for every destination. That is a catalogue which
   // reads as empty while the key, the balance and the eSIM catalogue all work.
+  // The rate lookup is a second network call, so start it before the catalogue
+  // read instead of after it. Run in series, either call could consume the whole
+  // budget on its own — which is how a country's listing came back empty while
+  // the key, the balance and the catalogue were all fine.
+  void supplierNgnRates(["EUR"]).catch(() => undefined);
+
   const entries = await listBitcallOtpCountryEntries();
   const mine = entries.filter((entry) => matchesCountry(entry.countryCode ?? entry.name, country, regionName));
-  const offers: OtpOffer[] = [];
+  const rows: PricedRow[] = [];
   const seen = new Set<string>();
   for (const entry of mine) {
     for (const pool of entry.pools) {
       if (!pool.serviceId || seen.has(pool.serviceId)) continue;
       seen.add(pool.serviceId);
-      offers.push({
-        supplier: "bitcall",
+      rows.push({
         ref: pool.serviceId,
-        country,
         app: readableApp(serviceLabel(pool.serviceId)),
-        costNgn: await supplierAmountToNgn(pool.price, pool.currency),
+        amount: pool.price,
+        currency: pool.currency,
         stock: pool.availableCount,
       });
     }
   }
-  if (offers.length > 0) return offers;
+  if (rows.length > 0) return priceRows(rows, country);
 
   // A country entry can arrive without its inline pools: the field is documented
   // but optional. Fall back to the service catalogue, attributing only rows that
@@ -287,17 +314,44 @@ async function bitcallOffers(country: string, regionName: string): Promise<OtpOf
     for (const entry of service.offers) {
       if (!entry.serviceId || seen.has(entry.serviceId)) continue;
       seen.add(entry.serviceId);
-      offers.push({
-        supplier: "bitcall",
+      rows.push({
         ref: entry.serviceId,
-        country,
         app,
-        costNgn: await supplierAmountToNgn(entry.price, entry.currency),
+        amount: entry.price,
+        currency: entry.currency,
         stock: entry.availableCount,
       });
     }
   }
-  return offers;
+  return priceRows(rows, country);
+}
+
+/** One offer's attributes, before its supplier price has been converted. */
+type PricedRow = {
+  ref: string;
+  app: string | null;
+  amount: number | null;
+  currency: string | null;
+  stock: number | null;
+};
+
+/**
+ * Convert a whole destination's rows in one pass.
+ *
+ * The distinct currencies are resolved concurrently — in practice that is the
+ * single EUR lookup — and the conversion is then synchronous, so a country with
+ * hundreds of pools costs one rate read rather than one per pool.
+ */
+async function priceRows(rows: PricedRow[], country: string): Promise<OtpOffer[]> {
+  const rates = await supplierNgnRates(rows.map((row) => row.currency));
+  return rows.map((row) => ({
+    supplier: "bitcall" as const,
+    ref: row.ref,
+    country,
+    app: row.app,
+    costNgn: supplierAmountWithRates(row.amount, row.currency, rates),
+    stock: row.stock,
+  }));
 }
 
 /**
@@ -315,7 +369,7 @@ export async function otpOffersFor(
   const [all, wanted] = [
     await Promise.all(
       OTP_SUPPLIERS.map((supplier) =>
-        otpOffersForSupplier(supplier, country, regionName, options.budgetMs ?? CATALOGUE_BUDGET_MS)),
+        otpOffersForSupplier(supplier, country, regionName, options.budgetMs)),
     ),
     options.app?.trim().toLowerCase() || null,
   ] as const;
@@ -333,7 +387,15 @@ export function clearOtpCatalogueCache(): void {
  * this with `bitcall`; the second adapter remains available for diagnostics and
  * the separate Fleexa rental service.
  */
-export type OtpOfferRead = { offers: OtpOffer[]; errorCode: string | null };
+export type OtpOfferRead = {
+  offers: OtpOffer[];
+  errorCode: string | null;
+  /**
+   * True when the offers came from the last good read rather than this request.
+   * They are still real offers for this country — just older than the TTL.
+   */
+  stale: boolean;
+};
 
 /** A stable opaque id for a live listing; the provider's service reference stays server-side. */
 export function otpOfferPublicId(country: string, ref: string, app: string): string {
@@ -345,25 +407,36 @@ export async function readOtpOffersForSupplier(
   supplier: OtpSupplierId,
   country: string,
   regionName: string,
-  budgetMs: number = CATALOGUE_BUDGET_MS,
+  budgetMs?: number,
   refresh = false,
 ): Promise<OtpOfferRead> {
-  if (!otpSupplierConfigured(supplier)) return { offers: [], errorCode: "NOT_CONFIGURED" };
+  if (!otpSupplierConfigured(supplier)) return { offers: [], errorCode: "NOT_CONFIGURED", stale: false };
 
   const key = `${supplier}:${country}`;
   const cached = catalogueCache.get(key);
-  if (!refresh && cached && Date.now() - cached.at < CATALOGUE_TTL_MS) return { offers: cached.offers, errorCode: null };
+  if (!refresh && cached && Date.now() - cached.at < CATALOGUE_TTL_MS) {
+    return { offers: cached.offers, errorCode: null, stale: false };
+  }
 
+  const budget = budgetMs ?? (refresh ? CHECKOUT_BUDGET_MS : BROWSE_BUDGET_MS);
   try {
-    const offers = rankWithinSupplier(await withBudget(fetchOffers(supplier, country, regionName), budgetMs));
+    const offers = rankWithinSupplier(await withBudget(fetchOffers(supplier, country, regionName), budget));
     catalogueCache.set(key, { at: Date.now(), offers });
-    return { offers, errorCode: null };
+    return { offers, errorCode: null, stale: false };
   } catch (error) {
-    logger.warn("Number catalogue unavailable", {
-      supplier,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return { offers: [], errorCode: errorCodeOf(error) };
+    const ageMs = cached ? Date.now() - cached.at : null;
+    const message = error instanceof Error ? error.message : String(error);
+
+    // Only browsing may fall back to the last good read. `refresh` is what a
+    // checkout passes when it is about to spend, and there an old answer must
+    // never stand in for a live one: refusing is the honest outcome.
+    if (!refresh && cached && ageMs !== null && ageMs <= CATALOGUE_STALE_MS) {
+      logger.warn("Serving the last good catalogue read", { supplier, ageMs, error: message });
+      return { offers: cached.offers, errorCode: null, stale: true };
+    }
+
+    logger.warn("Number catalogue unavailable", { supplier, error: message });
+    return { offers: [], errorCode: errorCodeOf(error), stale: false };
   }
 }
 
@@ -371,7 +444,7 @@ export async function otpOffersForSupplier(
   supplier: OtpSupplierId,
   country: string,
   regionName: string,
-  budgetMs: number = CATALOGUE_BUDGET_MS,
+  budgetMs?: number,
 ): Promise<OtpOffer[]> {
   return (await readOtpOffersForSupplier(supplier, country, regionName, budgetMs)).offers;
 }
