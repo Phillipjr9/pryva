@@ -235,11 +235,19 @@ async function bitcallOffers(country: string, regionName: string): Promise<OtpOf
   // its published code.
   const providerCodes = await listBitcallOtpCountries();
   const matchingCodes = [...new Set(providerCodes.filter((code) => matchesCountry(code, country, regionName)))];
-  if (matchingCodes.length === 0) return [];
-
-  const services = (await Promise.all(
-    matchingCodes.map((countryCode) => listBitcallOtpServices({ countryCode })),
-  )).flat();
+  const scopedServices = matchingCodes.length === 0
+    ? []
+    : (await Promise.all(
+        matchingCodes.map((countryCode) => listBitcallOtpServices({ countryCode })),
+      )).flat();
+  const scopedMatches = scopedServices.filter((service) => matchesCountry(service.countryCode, country, regionName));
+  // A country filter that returns nothing is not proof the country has no stock:
+  // providers sometimes publish region IDs but filter by a different canonical
+  // value. Retry the read-only catalog without a country filter and match only
+  // rows that identify this country. This stays on Bitcall and never purchases.
+  const services = scopedMatches.length > 0
+    ? scopedMatches
+    : (await listBitcallOtpServices()).filter((service) => matchesCountry(service.countryCode, country, regionName));
   const offers: OtpOffer[] = [];
   const seen = new Set<string>();
   for (const service of services) {

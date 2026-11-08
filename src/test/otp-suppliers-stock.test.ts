@@ -79,6 +79,24 @@ describe("otp stock aggregation", () => {
     expect(read.offers).toMatchObject([{ supplier: "bitcall", ref: "us-whatsapp-pool", country: "us", app: "WhatsApp", stock: 9 }]);
   });
 
+  it("falls back to Bitcall's unfiltered catalog when a country filter misses provider stock", async () => {
+    bitcall.configured.mockReturnValue(true);
+    bitcall.listCountries.mockResolvedValue(["US_1"]);
+    const service = {
+      name: "WhatsApp", slug: "us-whatsapp", countryCode: "US_1",
+      offers: [{ serviceId: "us-whatsapp-pool", price: 500, currency: "NGN", availableCount: 9, successRate: 87 }],
+    };
+    bitcall.listServices.mockImplementation(async (filter?: { countryCode?: string }) => filter?.countryCode ? [] : [service]);
+
+    const { readOtpOffersForSupplier, clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");
+    clearOtpCatalogueCache();
+    const read = await readOtpOffersForSupplier("bitcall", "us", "United States", undefined, true);
+
+    expect(bitcall.listServices).toHaveBeenNthCalledWith(1, { countryCode: "US_1" });
+    expect(bitcall.listServices).toHaveBeenNthCalledWith(2);
+    expect(read.offers).toMatchObject([{ ref: "us-whatsapp-pool", country: "us", app: "WhatsApp", stock: 9 }]);
+  });
+
   it("keeps Bitcall stock visible when the API returns uppercase ISO codes", async () => {
     bitcall.configured.mockReturnValue(true);
     bitcall.listServices.mockResolvedValue([
