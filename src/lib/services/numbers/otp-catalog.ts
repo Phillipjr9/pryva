@@ -109,7 +109,7 @@ export async function findOtpCheckoutOffer(
   const plan = numberPlanForCountry(country.code);
   if (!plan) return { listing: null, errorCode: "UNSUPPORTED_COUNTRY" };
 
-  const read = await readOtpOffersForSupplier("bitcall", country.code, country.name, undefined, options.refresh);
+  const read = await readOtpOffersForSupplier("bitcall", country.code, country.name, options.refresh);
   if (read.errorCode) return { listing: null, errorCode: read.errorCode };
   const offer = read.offers.find((entry) => entry.app && otpOfferPublicId(country.code, entry.ref, entry.app) === offerId);
   if (!offer?.app) return { listing: null, errorCode: null };

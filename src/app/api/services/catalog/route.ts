@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
     attempt(isSmmPanelConfigured(), () => readBoostSnapshot(refresh)),
     attempt(isBitcallConfigured(), () => readEsimCatalog(refresh)),
     attempt(isBitcallConfigured(), async () => {
-      const read = await readOtpOffersForSupplier("bitcall", country.code, country.name, undefined, refresh);
+      const read = await readOtpOffersForSupplier("bitcall", country.code, country.name, refresh);
       if (read.errorCode) throw otpCatalogProviderError(read.errorCode);
       return { offers: read.offers, partial: false, degraded: null, fetchedAt: new Date().toISOString() };
     }),

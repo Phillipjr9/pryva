@@ -62,21 +62,18 @@ export type BoughtNumber = {
 };
 
 /**
- * How long a catalogue read may take before it is treated as "nothing on offer".
+ * There is deliberately no wall-clock budget on a catalogue read.
  *
- * Customer checkout reads Bitcall's live offers before it can spend. This short
- * budget keeps a stalled catalogue from holding the purchase flow. Operator
- * diagnostics may also probe Fleexa, but never as a single-use checkout fallback.
+ * There used to be: four seconds for checkout, eight for browsing. Both were
+ * shorter than the gateway's own per-request timeout (twenty seconds), so a slow
+ * but working feed was reported as "nothing on offer" — the read was abandoned
+ * for being late, and being late was never evidence about the catalogue. The
+ * deadline only ever produced empty shops from impatience, and it is gone.
+ *
+ * The bound that remains is the network's: every gateway call carries its own
+ * abort timeout, so a stalled read cannot hang forever, and it cannot be cut off
+ * while it is still making progress.
  */
-const CHECKOUT_BUDGET_MS = 4_000;
-
-/**
- * A browse read has no money riding on it, and the Bitcall read is two network
- * calls (the country catalogue, plus a rate lookup for the euros it quotes).
- * Four seconds was enough for the catalogue alone on a warm function and not
- * enough for both on a cold one, so browsing gets the longer budget.
- */
-const BROWSE_BUDGET_MS = 8_000;
 
 /** Catalogues are read-only, so a stale answer is safe for a short while. */
 const CATALOGUE_TTL_MS = 60_000;
@@ -195,17 +192,6 @@ function rankByCost(offers: OtpOffer[]): OtpOffer[] {
       configuredOrder.indexOf(a.supplier) - configuredOrder.indexOf(b.supplier) ||
       stocked(a) - stocked(b),
   );
-}
-
-/** Reject after `ms`, so a slow supplier cannot hold a purchase or a page. */
-function withBudget<T>(work: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`catalogue read exceeded ${ms}ms`)), ms);
-    work.then(
-      (value) => { clearTimeout(timer); resolve(value); },
-      (error) => { clearTimeout(timer); reject(error); },
-    );
-  });
 }
 
 /** Reads one supplier's catalogue. Throws when it cannot be read. */
@@ -364,12 +350,12 @@ async function priceRows(rows: PricedRow[], country: string): Promise<OtpOffer[]
 export async function otpOffersFor(
   country: string,
   regionName: string,
-  options: { app?: string | null; budgetMs?: number } = {},
+  options: { app?: string | null } = {},
 ): Promise<OtpOffer[]> {
   const [all, wanted] = [
     await Promise.all(
       OTP_SUPPLIERS.map((supplier) =>
-        otpOffersForSupplier(supplier, country, regionName, options.budgetMs)),
+        otpOffersForSupplier(supplier, country, regionName)),
     ),
     options.app?.trim().toLowerCase() || null,
   ] as const;
@@ -407,7 +393,6 @@ export async function readOtpOffersForSupplier(
   supplier: OtpSupplierId,
   country: string,
   regionName: string,
-  budgetMs?: number,
   refresh = false,
 ): Promise<OtpOfferRead> {
   if (!otpSupplierConfigured(supplier)) return { offers: [], errorCode: "NOT_CONFIGURED", stale: false };
@@ -418,9 +403,8 @@ export async function readOtpOffersForSupplier(
     return { offers: cached.offers, errorCode: null, stale: false };
   }
 
-  const budget = budgetMs ?? (refresh ? CHECKOUT_BUDGET_MS : BROWSE_BUDGET_MS);
   try {
-    const offers = rankWithinSupplier(await withBudget(fetchOffers(supplier, country, regionName), budget));
+    const offers = rankWithinSupplier(await fetchOffers(supplier, country, regionName));
     catalogueCache.set(key, { at: Date.now(), offers });
     return { offers, errorCode: null, stale: false };
   } catch (error) {
@@ -444,9 +428,9 @@ export async function otpOffersForSupplier(
   supplier: OtpSupplierId,
   country: string,
   regionName: string,
-  budgetMs?: number,
+  refresh = false,
 ): Promise<OtpOffer[]> {
-  return (await readOtpOffersForSupplier(supplier, country, regionName, budgetMs)).offers;
+  return (await readOtpOffersForSupplier(supplier, country, regionName, refresh)).offers;
 }
 
 /**
