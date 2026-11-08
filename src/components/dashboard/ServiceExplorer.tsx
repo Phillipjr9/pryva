@@ -132,6 +132,24 @@ function SimpleIcon({ slug, hex, version, size }: { slug: string; hex: string; v
   </span>;
 }
 
+// Artwork published by the app developers in Apple's App Store. The image
+// paths come from the matching App Store IDs, never from an untrusted feed.
+const APP_STORE_IMAGES = {
+  ahealth: "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/49/e8/54/49e854ac-dca1-4a06-99c0-4f4cf33dbce4/AHEALTH-0-0-1x_U007ephone-0-1-sRGB-85-220.png/100x100bb.jpg",
+  airperks: "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/f8/3c/f6/f83cf604-683d-8c60-ec5d-e7ec7f18c578/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/100x100bb.jpg",
+} as const;
+
+function AppStoreIcon({ name, size }: { name: keyof typeof APP_STORE_IMAGES; size: number }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <ServiceIcon service="numbers" size={size <= 28 ? "sm" : "md"} />;
+  return (
+    <span aria-hidden="true" className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line/70 bg-white" style={{ width: size, height: size }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={APP_STORE_IMAGES[name]} alt="" width={size} height={size} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="h-full w-full object-contain" />
+    </span>
+  );
+}
+
 function itemArt(item: ExplorerItem, size: "sm" | "md" = "md") {
   const pixels = size === "sm" ? 28 : 42;
   switch (item.artwork.kind) {
@@ -140,6 +158,7 @@ function itemArt(item: ExplorerItem, size: "sm" | "md" = "md") {
     case "service": return <ServiceIcon service={item.artwork.name} size={size} />;
     case "site-favicon": return <SiteFavicon key={item.artwork.domain} domain={item.artwork.domain} size={pixels} verification={item.category === "verification"} />;
     case "simple-icon": return <SimpleIcon key={item.artwork.slug} {...item.artwork} size={pixels} />;
+    case "app-store-icon": return <AppStoreIcon key={item.artwork.name} name={item.artwork.name} size={pixels} />;
     // A mailbox with no published favicon: Lucide's `mail-question`, never
     // another provider's logo or the Temporary-inbox tool's mark.
     case "unidentified-inbox": return <UnidentifiedInbox size={pixels} />;

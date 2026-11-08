@@ -36,6 +36,8 @@ export type ExplorerArtwork =
   | { kind: "site-favicon"; domain: string }
   /** A real, pinned Simple Icons mark matched by its exact published title. */
   | { kind: "simple-icon"; slug: string; hex: string; version: string }
+  /** Official App Store artwork, selected from a fixed list of app IDs. */
+  | { kind: "app-store-icon"; name: "ahealth" | "airperks" }
   | { kind: "network"; name: AirtimeProvider };
 export type ExplorerItem = {
   id: string;
