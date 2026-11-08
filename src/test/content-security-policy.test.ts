@@ -87,6 +87,12 @@ describe("content security policy", () => {
     expect(img).toContain("https://*.gstatic.com");
   });
 
+  it("allows official App Store artwork without widening other CSP directives", () => {
+    expect(production.get("img-src")).toContain("https://is1-ssl.mzstatic.com");
+    expect(production.get("script-src")).not.toContain("mzstatic.com");
+    expect(production.get("connect-src")).not.toContain("mzstatic.com");
+  });
+
   it("allows every image host configured for next/image", () => {
     const img = production.get("img-src") ?? "";
     for (const pattern of nextConfig.images?.remotePatterns ?? []) {

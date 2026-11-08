@@ -11,7 +11,29 @@ describe("verification listing artwork", () => {
       "25clicks": "25clicks.com", "7Eleven": "7-eleven.com",
       "85C Bakery Cafe": "85cbakerycafe.com", "99Ranch": "99ranch.com",
       "Academy Sports and Outdoors": "academy.com", "Acima": "acima.com",
+      "Action Network": "actionnetwork.com", "AI Student Pack": "aistudentpack.com",
     })) expect(verificationArtwork(name)).toEqual({ kind: "site-favicon", domain });
+  });
+
+  it("uses the real App Store artwork for both apps in the screenshot", () => {
+    expect(verificationArtwork("AHEALTH formerly MoneyWalk")).toEqual({ kind: "app-store-icon", name: "ahealth" });
+    expect(verificationArtwork("AirPerks")).toEqual({ kind: "app-store-icon", name: "airperks" });
+    expect(verificationArtwork("AirPerks Plus")).toEqual({ kind: "service", name: "numbers" });
+  });
+
+  it("applies each screenshot match to live offers without changing stock", () => {
+    const names = ["Action Network", "AHEALTH formerly MoneyWalk", "AI Student Pack", "AirPerks"];
+    const offers: OtpOffer[] = names.map((app, i) => ({ supplier: "bitcall", ref: `private-screen-${i}`, app, country: "us", costNgn: 50, stock: 3 }));
+    const items = bitcallOtpItemsForCountry(offers, "us", "United States");
+    expect(items).toHaveLength(4);
+    for (const item of items) {
+      expect(item.artwork).toEqual(verificationArtwork(item.name));
+      expect(item.stock).toBe(3);
+      expect(item.action).not.toBeNull();
+      const html = renderToStaticMarkup(<ServiceCard item={item} countryName="United States" />);
+      expect(html).toMatch(/<img[^>]+(?:google.com\/s2\/favicons|is1-ssl.mzstatic.com)/);
+      expect(html).toContain('referrerPolicy="no-referrer"');
+    }
   });
 
   it("matches exact titles in the real pinned icon collection, not substrings or guessed domains", () => {

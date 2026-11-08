@@ -22,6 +22,16 @@ describe("verification artwork failures", () => {
     expect(screen.getByRole("heading", { name: "Activision" })).toBeTruthy();
   });
 
+  it("uses official app store artwork, falls back on failure and resets for a different app", () => {
+    const { container, rerender } = render(<ServiceCard item={{ ...item, artwork: { kind: "app-store-icon", name: "ahealth" } }} countryName="United States" />);
+    expect(container.querySelector("img")?.src).toContain("is1-ssl.mzstatic.com");
+    fireEvent.error(container.querySelector("img")!);
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Activision" })).toBeTruthy();
+    rerender(<ServiceCard item={{ ...item, artwork: { kind: "app-store-icon", name: "airperks" } }} countryName="United States" />);
+    expect(container.querySelector("img")?.src).toContain("f83cf604");
+  });
+
   it("resets a failed website icon when a card receives a different website", () => {
     const { container, rerender } = render(<ServiceCard item={{ ...item, artwork: { kind: "site-favicon", domain: "25clicks.com" } }} countryName="United States" />);
     fireEvent.error(container.querySelector("img")!);
