@@ -309,20 +309,6 @@ export function AuthForm({
           />
         </div>
 
-        {mode === "login" && isPreviewDatabase() && (
-          <div className="rounded-xl border border-dashed border-lav-300 bg-lav-50/80 p-3">
-            <p className="text-meta font-semibold text-ink">Preview demo account</p>
-            <p className="mt-1 text-meta text-ink-2">demo@pryva.test / Demo123!</p>
-            <button
-              type="button"
-              onClick={() => setForm({ ...form, email: "demo@pryva.test", password: "Demo123!" })}
-              className="mt-2 inline-flex items-center gap-1.5 text-meta font-semibold text-lav-700 underline underline-offset-2"
-            >
-              Use demo sign-in
-            </button>
-          </div>
-        )}
-
         {error && (
           <p className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-[0.8rem] font-medium text-rose-700">
             {error}
