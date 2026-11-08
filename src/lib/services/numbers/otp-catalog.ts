@@ -17,6 +17,12 @@ function numberPlanForCountry(countryCode: string): Plan | null {
   return fulfilablePlans().find(({ intent }) => intent.kind === "sms" && intent.country === code)?.plan ?? null;
 }
 
+/** A provider app name, cleaned for display; null when it is missing or unusable. */
+function readableLabel(app: string | null): string | null {
+  const cleaned = app?.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+  return cleaned && cleaned.length <= 80 ? cleaned : null;
+}
+
 function appBrand(app: string) {
   return VERIFICATION_EXAMPLES.find((entry) => entry.name.toLowerCase() === app.trim().toLowerCase()) ?? null;
 }
@@ -42,11 +48,16 @@ export function bitcallOtpItemsForCountry(
   // explicit checkout plan remain view-only below.
   const plan = numberPlanForCountry(country.code);
 
+  // An offer with no readable app is still stock Bitcall publishes. Dropping it
+  // was the quietest possible way to lose a whole country's inventory: the read
+  // succeeds, nothing errors, and the shelf simply has no numbers on it. It is
+  // listed under a neutral label and remains purchasable — the checkout resolves
+  // it by its opaque ref either way.
   const byApp = new Map<string, OtpOffer[]>();
   for (const offer of offers) {
-    const app = offer.app?.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
-    if (!app || app.length > 80) continue;
-    const key = app.toLocaleLowerCase();
+    const named = offer.app?.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+    if (named && named.length > 80) continue;
+    const key = named?.toLocaleLowerCase() ?? "";
     const group = byApp.get(key);
     if (group) group.push(offer);
     else byApp.set(key, [offer]);
@@ -61,14 +72,15 @@ export function bitcallOtpItemsForCountry(
         (a.costNgn ?? Number.MAX_SAFE_INTEGER) - (b.costNgn ?? Number.MAX_SAFE_INTEGER);
     });
     const offer = candidates[0];
-    if (!offer?.app) continue;
+    if (!offer) continue;
+    const label = readableLabel(offer.app) ?? "Verification number";
     const id = otpOfferPublicId(country.code, offer.ref, offer.app);
     const sellable = plan !== null && canSell(plan, offer);
-    const brand = appBrand(offer.app);
+    const brand = appBrand(label);
     items.push({
       id,
       category: "verification",
-      name: offer.app,
+      name: label,
       description: plan
         ? "Live app-specific number offer"
         : "Bitcall stock listing · checkout is not enabled for this country",
@@ -111,13 +123,15 @@ export async function findOtpCheckoutOffer(
 
   const read = await readOtpOffersForSupplier("bitcall", country.code, country.name, options.refresh);
   if (read.errorCode) return { listing: null, errorCode: read.errorCode };
-  const offer = read.offers.find((entry) => entry.app && otpOfferPublicId(country.code, entry.ref, entry.app) === offerId);
-  if (!offer?.app) return { listing: null, errorCode: null };
+  // The app is not required to resolve an offer: the id is the ref plus whatever
+  // label the provider gave it, which may be none.
+  const offer = read.offers.find((entry) => otpOfferPublicId(country.code, entry.ref, entry.app) === offerId);
+  if (!offer) return { listing: null, errorCode: null };
   const sellable = canSell(plan, offer);
   return {
     listing: {
       id: offerId,
-      app: offer.app,
+      app: readableLabel(offer.app) ?? "Verification number",
       countryCode: country.code,
       countryName: country.name,
       plan,

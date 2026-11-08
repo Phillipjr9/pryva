@@ -29,6 +29,7 @@ import {
   listBitcallOtpCountryEntries,
   listBitcallOtpPools,
   listBitcallOtpServices,
+  otpCountrySegmentFromId,
   otpServiceLabelFromId,
   reactivateBitcallOtpActivation,
 } from "@/lib/providers/bitcall";
@@ -125,6 +126,20 @@ describe("gateway configuration", () => {
     vi.stubEnv("BITCALL_API_URL", "https://api.bitcall.io");
     await listBitcallEsimPlans();
     expect(lastCall(fetchMock).url.origin).toBe("https://api.bitcall.io");
+  });
+});
+
+describe("published service ids", () => {
+  it("reads the destination segment without rebuilding the id", () => {
+    // The id is opaque by contract — it goes back to the gateway exactly as the
+    // catalogue published it. Reading the segment is only ever for attribution.
+    expect(otpCountrySegmentFromId("BRAVO-NG_1-whatsapp")).toBe("NG_1");
+    expect(otpCountrySegmentFromId("BRAVO-US-gmx")).toBe("US");
+    expect(otpCountrySegmentFromId("BRAVO-GH_1-gmail")).toBe("GH_1");
+    // Nothing to read: no separators, too few segments, or an empty id.
+    expect(otpCountrySegmentFromId("opaque")).toBeNull();
+    expect(otpCountrySegmentFromId("A-B")).toBeNull();
+    expect(otpCountrySegmentFromId("")).toBeNull();
   });
 });
 

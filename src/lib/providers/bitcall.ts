@@ -1022,6 +1022,23 @@ export async function listBitcallOtpCountries(): Promise<string[]> {
 }
 
 /**
+ * The destination segment of a published service id, e.g. `US_1` from
+ * `BRAVO-US_1-gmx`.
+ *
+ * The id is opaque per the docs — "send it back as published" — but it is built
+ * as `provider-country-service`, and the country catalogue publishes exactly one
+ * such shape. Reading the segment is therefore only ever used to *attribute* an
+ * offer when the catalogue did not state the destination itself, and never to
+ * rewrite or rebuild an id: whatever is sent back to the gateway is the value it
+ * published.
+ */
+export function otpCountrySegmentFromId(serviceId: string): string | null {
+  const segments = serviceId.split("-").filter((segment) => segment.length > 0);
+  if (segments.length < 3) return null;
+  return segments[1] ?? null;
+}
+
+/**
  * A display label for a pooled offer.
  *
  * `serviceId` is opaque: it is never built, validated or compared by parts, and
