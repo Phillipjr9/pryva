@@ -10,6 +10,7 @@ import { ServiceIcon } from "@/components/ServiceIcon";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
 import { ArrowRight, ChevronDown, Globe, Lock, MailQuestion, Search, Shield, Sparkle } from "@/components/icons";
 import { formatNaira } from "@/lib/services/catalog";
+import { formatUnitCount } from "@/lib/services/service-units";
 import {
   orderByReadiness,
   readinessSummary,
@@ -133,7 +134,7 @@ function itemArt(item: ExplorerItem, size: "sm" | "md" = "md") {
   }
 }
 
-function ServiceCard({ item, countryName }: { item: ExplorerItem; countryName: string }) {
+export function ServiceCard({ item, countryName }: { item: ExplorerItem; countryName: string }) {
   const coverage = item.source === "live"
       ? (item.coverage === "catalog-country" ? `Reported region: ${countryName}` : item.coverage === "unconfirmed" ? "Country coverage unconfirmed" : "Not country-specific")
       : item.coverage === "catalog-country" ? `Catalog region: ${countryName}` : item.coverage === "unconfirmed" ? "Country coverage unconfirmed" : "Not filtered by country";
@@ -178,6 +179,14 @@ function ServiceCard({ item, countryName }: { item: ExplorerItem; countryName: s
               that look up the full price line would match both. */}
           {price !== null ? ` · ${formatNaira(price)}${item.priceFrom ? "+" : ""}` : item.category === "esim" && item.source === "live" ? " · Price unavailable" : item.source === "live" ? " · Price on request" : " · Price not listed"}
         </p>
+        {/* OTP stock comes directly from Bitcall's selected pool. Keep it visible
+            on phones too; hiding UnitsStatus at the mobile breakpoint made a
+            live listing look empty even when the supplier reported inventory. */}
+        {item.category === "verification" && item.source === "live" && (
+          <p className="mt-0.5 truncate text-micro text-ink-3 sm:hidden">
+            <span className="font-semibold">Bitcall stock:</span> {formatUnitCount(item.stock, "Not reported")}
+          </p>
+        )}
         {/* Variants of one product differ by refill and order bounds, so a phone
             needs that line as much as a desktop does. */}
         {item.detail && <p className="mt-0.5 truncate text-micro text-ink-3 sm:hidden">{item.detail}</p>}
