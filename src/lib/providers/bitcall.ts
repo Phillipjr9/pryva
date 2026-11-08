@@ -54,6 +54,14 @@ const REQUEST_TIMEOUT_MS = 20_000;
 const gatewayBudget = createRateLimiter({ windowMs: 60_000, maxRequests: 30 });
 // A paginated storefront must not exhaust the shared budget needed to buy or
 // poll orders. This separate, lower cap is shared across app instances too.
+//
+// It is charged once per *catalogue walk*, not once per page: a walk is one
+// logical read that happens to need up to five gateway calls. Charging every
+// page made a single walk cost five of twelve tokens, so two readers in the same
+// minute refused the walk *itself* — the log said "pagination incomplete at page
+// 5" and the storefront quietly listed the first 800 plans as if that were all
+// of them. Per-page calls are still bounded (five, by ESIM_PLAN_MAX_PAGES) and
+// still charged to the shared gateway budget.
 const esimCatalogBudget = createRateLimiter({ windowMs: 60_000, maxRequests: 12 });
 
 /** The gateway's whole error vocabulary. Thirteen codes; nothing else is returned. */
@@ -283,7 +291,17 @@ function rowsFrom(payload: unknown, keys: string[] = ["data", "items", "plans", 
 async function gatewayFetch(
   method: "GET" | "POST",
   path: string,
-  options: { query?: Record<string, string | number | undefined>; body?: Record<string, unknown>; catalogRead?: boolean } = {},
+  options: {
+    query?: Record<string, string | number | undefined>;
+    body?: Record<string, unknown>;
+    /** This call reads the catalogue on a customer's behalf. */
+    catalogRead?: boolean;
+    /**
+     * Charge the catalogue cap or not, overriding the path default. A paginated
+     * walk charges it once, on its first page (see esimCatalogBudget).
+     */
+    catalogCharge?: boolean;
+  } = {},
 ): Promise<unknown> {
   const keyId = bitcallKeyId();
   const secret = bitcallApiSecret();
@@ -300,7 +318,9 @@ async function gatewayFetch(
   }
   const base = gatewayBase();
 
-  if (method === "GET" && (options.catalogRead || path === "/v1/esim/plans" || path === "/v1/esim/countries")) {
+  const chargesCatalogCap = options.catalogCharge ??
+    (Boolean(options.catalogRead) || path === "/v1/esim/plans" || path === "/v1/esim/countries");
+  if (method === "GET" && chargesCatalogCap) {
     const catalogBudget = await esimCatalogBudget("bitcall:esim-catalog-budget");
     if (catalogBudget.unavailable) throw new BitcallError("Gateway rate limit is unavailable", 503, "RATE_LIMIT_UNAVAILABLE");
     if (!catalogBudget.allowed) throw new BitcallError("eSIM catalog rate budget reached", 429, "LOCAL_RATE_BUDGET");
@@ -481,10 +501,22 @@ function coverageList(row: Record<string, unknown>): string[] {
 export const ESIM_PLAN_PAGE_SIZE = 200;
 export const ESIM_PLAN_MAX_PAGES = 5;
 
+/**
+ * Why a plan read is not the whole catalogue.
+ *
+ * `budget` is the one we inflict on ourselves: a local cap refused a later page.
+ * That is not evidence the supplier publishes fewer plans, so a caller must not
+ * render it as a smaller catalogue. Everything else is either the supplier's own
+ * shape (`upstream`, `unpaged`) or our deliberate bound (`page-cap`).
+ */
+export type BitcallEsimPlansPartial = "budget" | "upstream" | "unpaged" | "page-cap" | "no-progress";
+
 export type BitcallEsimPlans = {
   plans: BitcallEsimPlan[];
   /** A page failed, metadata was missing, or more pages remain beyond our cap. */
   partial: boolean;
+  /** Which of those it was; null when the read is whole. */
+  partialReason: BitcallEsimPlansPartial | null;
   /** Raw rows encountered, including invalid or duplicate references. */
   returned: number;
   unreadable: number;
@@ -539,7 +571,7 @@ export async function listBitcallEsimPlans(filter: { region?: string } = {}): Pr
   const seen = new Set<string>();
   let returned = 0;
   let unreadable = 0;
-  let partial = false;
+  let partialReason: BitcallEsimPlansPartial | null = null;
   let sampleKeys: string[] | null = null;
 
   for (let page = 1; page <= ESIM_PLAN_MAX_PAGES; page++) {
@@ -547,14 +579,15 @@ export async function listBitcallEsimPlans(filter: { region?: string } = {}): Pr
     try {
       payload = await gatewayFetch("GET", "/v1/esim/plans", {
         query: { region: filter.region, page, pageSize: ESIM_PLAN_PAGE_SIZE, sort: "price_asc" },
+        // One token for the whole walk; see the note on esimCatalogBudget.
+        catalogCharge: page === 1,
       });
     } catch (error) {
       if (page === 1) throw error;
-      logger.warn("eSIM catalog pagination incomplete", {
-        page,
-        code: error instanceof BitcallError ? error.code : "UNKNOWN",
-      });
-      partial = true;
+      const code = error instanceof BitcallError ? error.code : "UNKNOWN";
+      // A refusal by our own cap is not the supplier withholding plans.
+      partialReason = code === "LOCAL_RATE_BUDGET" ? "budget" : "upstream";
+      logger.warn("eSIM catalog pagination incomplete", { page, code, reason: partialReason });
       break;
     }
 
@@ -562,7 +595,7 @@ export async function listBitcallEsimPlans(filter: { region?: string } = {}): Pr
     const hasRows = Array.isArray(payload) || ["data", "items", "plans"].some((key) => Array.isArray(envelope[key]));
     if (!hasRows) {
       if (page === 1) throw new BitcallError("Invalid eSIM catalog response", 502, "SERVICE_RESPONSE_INVALID");
-      partial = true;
+      partialReason = "upstream";
       break;
     }
     const rows = rowsFrom(payload);
@@ -581,13 +614,14 @@ export async function listBitcallEsimPlans(filter: { region?: string } = {}): Pr
       added += 1;
     }
     // A response exceeding the requested page size is not a complete read.
-    if (rows.length > ESIM_PLAN_PAGE_SIZE) { partial = true; break; }
+    if (rows.length > ESIM_PLAN_PAGE_SIZE) { partialReason = "unpaged"; break; }
     const meta = asRecord(envelope.meta);
-    if (typeof meta.page === "number" && meta.page !== page) { partial = true; break; }
-    if (typeof meta.hasNext !== "boolean") { partial = true; break; }
+    if (typeof meta.page === "number" && meta.page !== page) { partialReason = "unpaged"; break; }
+    if (typeof meta.hasNext !== "boolean") { partialReason = "unpaged"; break; }
     if (!meta.hasNext) break;
     // Stop repeated/empty pages and mark the cap instead of looping indefinitely.
-    if (added === 0 || page === ESIM_PLAN_MAX_PAGES) { partial = true; break; }
+    if (added === 0) { partialReason = "no-progress"; break; }
+    if (page === ESIM_PLAN_MAX_PAGES) { partialReason = "page-cap"; break; }
   }
 
   if (returned > 0 && plans.length === 0) {
@@ -595,7 +629,7 @@ export async function listBitcallEsimPlans(filter: { region?: string } = {}): Pr
   } else if (unreadable > 0) {
     logger.warn("eSIM catalog rows skipped", { rows: returned, skipped: unreadable, sampleKeys });
   }
-  return { plans, partial, returned, unreadable };
+  return { plans, partial: partialReason !== null, partialReason, returned, unreadable };
 }
 
 /** Re-read the specific plan just before a purchase; the catalog itself is cached. */

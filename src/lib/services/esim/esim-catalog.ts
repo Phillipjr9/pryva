@@ -107,7 +107,18 @@ type EsimSnapshot = {
 };
 
 const CATALOG_TTL_MS = 2 * 60_000;
+/**
+ * How long the last whole snapshot may stand in for a read our own budget cut
+ * short. A cap we imposed says nothing about how many plans exist, so it must
+ * never become a shorter catalogue — but it also must not be served forever.
+ */
+const SNAPSHOT_FALLBACK_MS = 30 * 60_000;
+/** After a cut-short read, wait this long before walking the feed again. */
+const SNAPSHOT_RETRY_MS = 15_000;
+
 let snapshotCache: { expires: number; snapshot: EsimSnapshot } | null = null;
+/** The last snapshot that read whole, kept for the budget-truncation case above. */
+let lastWholeSnapshot: { at: number; snapshot: EsimSnapshot } | null = null;
 let snapshotInFlight: Promise<EsimSnapshot> | null = null;
 let catalogCache: { expires: number; catalog: EsimCatalog } | null = null;
 let catalogInFlight: Promise<EsimCatalog> | null = null;
@@ -126,6 +137,19 @@ async function readEsimSnapshot(refresh = false): Promise<EsimSnapshot> {
       if (isFundingFailure(plans.reason)) throw plans.reason;
       throw new Error("eSIM catalog unavailable");
     }
+    // A walk cut short by our own catalogue cap is not a smaller catalogue. The
+    // plans it did read are real, but publishing them as the whole list is how a
+    // cap turns into a storefront that quietly offers fewer products.
+    if (plans.value.partialReason === "budget") {
+      const age = lastWholeSnapshot ? Date.now() - lastWholeSnapshot.at : null;
+      if (lastWholeSnapshot && age !== null && age <= SNAPSHOT_FALLBACK_MS) {
+        logger.warn("Serving the last whole eSIM snapshot", { ageMs: age, reason: "budget" });
+        // Short hold, not a full TTL: the next attempt should walk the feed again.
+        snapshotCache = { snapshot: lastWholeSnapshot.snapshot, expires: Date.now() + SNAPSHOT_RETRY_MS };
+        return lastWholeSnapshot.snapshot;
+      }
+    }
+
     const snapshot: EsimSnapshot = {
       plans: plans.value.plans,
       countries: countries.status === "fulfilled" ? countries.value.slice(0, 400) : [],
@@ -138,6 +162,7 @@ async function readEsimSnapshot(refresh = false): Promise<EsimSnapshot> {
       fetchedAt: new Date().toISOString(),
     };
     snapshotCache = { snapshot, expires: Date.now() + CATALOG_TTL_MS };
+    if (!snapshot.partial) lastWholeSnapshot = { at: Date.now(), snapshot };
     return snapshot;
   })();
   try {
