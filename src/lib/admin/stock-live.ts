@@ -39,9 +39,20 @@ import {
  */
 
 const ACCOUNT_SAMPLE = 40;
+const NOT_CONFIGURED = "not configured in this environment";
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+function requestFailed(messageText: string): string {
+  if (!messageText) return "request failed";
+  const trimmed = messageText.trim();
+  const stripped = trimmed.replace(/^((marketplace|provider|supplier)\s+)/i, "").trim();
+  return stripped && /request failed$/i.test(stripped)
+    ? stripped
+    : stripped && /request failed/i.test(stripped)
+      ? stripped
+      : `request failed: ${trimmed}`;
 }
 
 export async function buildStockReport(options: { refresh?: boolean } = {}): Promise<StockReport> {
@@ -56,7 +67,7 @@ export async function buildStockReport(options: { refresh?: boolean } = {}): Pro
       .map((entry) => normalizeCountryCode(entry.intent.country) ?? ""),
   );
   let smsServices: FleexaSmsService[] = [];
-  let otpError: string | null = isBitcallConfigured() ? null : "feed not configured";
+  let otpError: string | null = isBitcallConfigured() ? null : NOT_CONFIGURED;
   if (isBitcallConfigured()) {
     try {
       const bitcall = await listBitcallOtpServices();
@@ -106,8 +117,8 @@ export async function buildStockReport(options: { refresh?: boolean } = {}): Pro
       lanes.push(summariseLane("email-otp", "Email inboxes", [], { connected: false, error: errorMessage }));
     }
   } else {
-    lanes.push(summariseLane("rentals", "Rentals", [], { connected: false, error: "feed not configured" }));
-    lanes.push(summariseLane("email-otp", "Email inboxes", [], { connected: false, error: "feed not configured" }));
+    lanes.push(summariseLane("rentals", "Rentals", [], { connected: false, error: NOT_CONFIGURED }));
+    lanes.push(summariseLane("email-otp", "Email inboxes", [], { connected: false, error: NOT_CONFIGURED }));
   }
 
   /* Account marketplace. */
@@ -139,14 +150,14 @@ export async function buildStockReport(options: { refresh?: boolean } = {}): Pro
         }),
       );
     } catch (error) {
-      lanes.push(summariseLane("accounts", "Accounts marketplace", [], { connected: false, error: message(error) }));
+      lanes.push(summariseLane("accounts", "Accounts marketplace", [], { connected: false, error: requestFailed(message(error)) }));
     }
   } else {
     const held = availableManualProducts().length;
     lanes.push(
       summariseLane("accounts", "Accounts marketplace", [], {
         connected: held > 0,
-        error: held > 0 ? `feed not configured · ${held} hand-prepared listing${held === 1 ? "" : "s"}` : "feed not configured",
+        error: held > 0 ? `${NOT_CONFIGURED} · ${held} hand-prepared listing${held === 1 ? "" : "s"}` : NOT_CONFIGURED,
       }),
     );
   }
@@ -164,7 +175,7 @@ export async function buildStockReport(options: { refresh?: boolean } = {}): Pro
       lanes.push(summariseLane("boosts", "Boosts", [], { connected: false, error: message(error) }));
     }
   } else {
-    lanes.push(summariseLane("boosts", "Boosts", [], { connected: false, error: "feed not configured" }));
+    lanes.push(summariseLane("boosts", "Boosts", [], { connected: false, error: NOT_CONFIGURED }));
   }
 
   /* Connected but deliberately not sold. */
@@ -175,7 +186,7 @@ export async function buildStockReport(options: { refresh?: boolean } = {}): Pro
       isBitcallConfigured()
         ? [notSoldLine("esim", "eSIM data plans", "feed is connected and answers balance reads, but Pryva does not sell eSIM")]
         : [],
-      { connected: isBitcallConfigured(), error: isBitcallConfigured() ? null : "feed not configured" },
+      { connected: isBitcallConfigured(), error: isBitcallConfigured() ? null : NOT_CONFIGURED },
     ),
   );
 

@@ -174,7 +174,7 @@ describe("the stock report", () => {
     expect(lanes.find((lane) => lane.lane === "accounts")!.error).toBeNull();
   });
 
-  it("says 'feed not configured' rather than 'out of stock' when a key is missing", async () => {
+  it("uses a truthful 'not configured' state rather than a misleading feed status when a key is missing", async () => {
     state.fleexa = false;
     state.bitcall = false;
     state.bulkacc = false;
@@ -183,7 +183,7 @@ describe("the stock report", () => {
     for (const id of ["numbers", "rentals", "accounts", "boosts"]) {
       const lane = lanes.find((entry) => entry.lane === id)!;
       expect(lane.connected, id).toBe(false);
-      expect(lane.error).toBe("feed not configured");
+      expect(lane.error).toBe("not configured in this environment");
     }
   });
 
