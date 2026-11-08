@@ -22,14 +22,14 @@ describe("verification artwork failures", () => {
     expect(screen.getByRole("heading", { name: "Activision" })).toBeTruthy();
   });
 
-  it("uses official app store artwork, falls back on failure and resets for a different app", () => {
-    const { container, rerender } = render(<ServiceCard item={{ ...item, artwork: { kind: "app-store-icon", name: "ahealth" } }} countryName="United States" />);
-    expect(container.querySelector("img")?.src).toContain("is1-ssl.mzstatic.com");
+  it("falls back on a broken bundled logo and resets for a different logo", () => {
+    const { container, rerender } = render(<ServiceCard item={{ ...item, artwork: { kind: "verified-brand-logo", slug: "adobe" } }} countryName="United States" />);
+    expect(container.querySelector("img")?.getAttribute("src")).toBe("/verification-logos/adobe.svg");
     fireEvent.error(container.querySelector("img")!);
     expect(container.querySelector("img")).toBeNull();
     expect(screen.getByRole("heading", { name: "Activision" })).toBeTruthy();
-    rerender(<ServiceCard item={{ ...item, artwork: { kind: "app-store-icon", name: "airperks" } }} countryName="United States" />);
-    expect(container.querySelector("img")?.src).toContain("f83cf604");
+    rerender(<ServiceCard item={{ ...item, artwork: { kind: "verified-brand-logo", slug: "authy" } }} countryName="United States" />);
+    expect(container.querySelector("img")?.getAttribute("src")).toBe("/verification-logos/authy.svg");
   });
 
   it("resets a failed website icon when a card receives a different website", () => {

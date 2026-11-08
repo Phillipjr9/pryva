@@ -1,0 +1,112 @@
+{
+  "alibaba": {
+    "slug": "alibaba",
+    "license": "MIT",
+    "source": "https://alibaba.com"
+  },
+  "adobe": {
+    "slug": "adobe",
+    "license": "MIT",
+    "source": "https://www.adobe.com/"
+  },
+  "authy": {
+    "slug": "authy",
+    "license": "MIT",
+    "source": "https://authy.com/"
+  },
+  "cathay pacific": {
+    "slug": "cathay-pacific",
+    "license": "CC0-1.0",
+    "source": "https://www.cathaypacific.com"
+  },
+  "g2a": {
+    "slug": "g2a",
+    "license": "CC0-1.0",
+    "source": "https://www.g2a.co/documents/"
+  },
+  "g2g": {
+    "slug": "g2g",
+    "license": "CC0-1.0",
+    "source": "https://hydron.holdings/media/media_kit"
+  },
+  "icq": {
+    "slug": "icq",
+    "license": "CC0-1.0",
+    "source": "https://commons.wikimedia.org/wiki/File:ICQNewlogo.svg"
+  },
+  "linkedin": {
+    "slug": "linkedin",
+    "license": "MIT",
+    "source": "https://www.linkedin.com/"
+  },
+  "makemytrip": {
+    "slug": "makemytrip",
+    "license": "CC0-1.0",
+    "source": "https://www.makemytrip.com"
+  },
+  "microsoft": {
+    "slug": "microsoft",
+    "license": "MIT",
+    "source": "https://www.microsoft.com/"
+  },
+  "openai": {
+    "slug": "openai",
+    "license": "MIT",
+    "source": "https://openai.com/"
+  },
+  "pepsi": {
+    "slug": "pepsi",
+    "license": "CC0-1.0",
+    "source": "https://www.pepsi.com"
+  },
+  "santander": {
+    "slug": "santander",
+    "license": "CC0-1.0",
+    "source": "https://www.santander.com"
+  },
+  "skype": {
+    "slug": "skype",
+    "license": "MIT",
+    "source": "https://www.skype.com/"
+  },
+  "twilio": {
+    "slug": "twilio",
+    "license": "MIT",
+    "source": "https://twilio.com"
+  },
+  "twitter": {
+    "slug": "twitter",
+    "license": "MIT",
+    "source": "https://twitter.com/"
+  },
+  "ufc": {
+    "slug": "ufc",
+    "license": "CC0-1.0",
+    "source": "https://www.ufc.com"
+  },
+  "wildberries": {
+    "slug": "wildberries",
+    "license": "CC0-1.0",
+    "source": "https://www.wildberries.ru"
+  },
+  "xbox": {
+    "slug": "xbox",
+    "license": "MIT",
+    "source": "https://www.xbox.com/"
+  },
+  "ozon": {
+    "slug": "ozon",
+    "license": "CC0-1.0",
+    "source": "https://www.ozon.ru"
+  },
+  "bet365": {
+    "slug": "bet365",
+    "license": "CC0-1.0",
+    "source": "https://www.bet365.com"
+  },
+  "bradesco": {
+    "slug": "bradesco",
+    "license": "CC0-1.0",
+    "source": "https://www.bradesco.com.br"
+  }
+}

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import verifiedBrands from "@/lib/services/numbers/verified-brand-logos.json";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ServiceCard } from "@/components/dashboard/ServiceExplorer";
 import { bitcallOtpItemsForCountry } from "@/lib/services/numbers/otp-catalog";
@@ -11,29 +13,28 @@ describe("verification listing artwork", () => {
       "25clicks": "25clicks.com", "7Eleven": "7-eleven.com",
       "85C Bakery Cafe": "85cbakerycafe.com", "99Ranch": "99ranch.com",
       "Academy Sports and Outdoors": "academy.com", "Acima": "acima.com",
-      "Action Network": "actionnetwork.com", "AI Student Pack": "aistudentpack.com",
     })) expect(verificationArtwork(name)).toEqual({ kind: "site-favicon", domain });
   });
 
-  it("uses the real App Store artwork for both apps in the screenshot", () => {
-    expect(verificationArtwork("AHEALTH formerly MoneyWalk")).toEqual({ kind: "app-store-icon", name: "ahealth" });
-    expect(verificationArtwork("AirPerks")).toEqual({ kind: "app-store-icon", name: "airperks" });
-    expect(verificationArtwork("AirPerks Plus")).toEqual({ kind: "service", name: "numbers" });
+  it("does not assign app-store artwork or an unverified identity", () => {
+    for (const name of ["AHEALTH formerly MoneyWalk", "AirPerks", "AirPerks Plus", "Action Network", "AI Student Pack"]) {
+      expect(verificationArtwork(name)).toEqual({ kind: "service", name: "numbers" });
+    }
   });
 
-  it("applies each screenshot match to live offers without changing stock", () => {
-    const names = ["Action Network", "AHEALTH formerly MoneyWalk", "AI Student Pack", "AirPerks"];
-    const offers: OtpOffer[] = names.map((app, i) => ({ supplier: "bitcall", ref: `private-screen-${i}`, app, country: "us", costNgn: 50, stock: 3 }));
-    const items = bitcallOtpItemsForCountry(offers, "us", "United States");
-    expect(items).toHaveLength(4);
-    for (const item of items) {
-      expect(item.artwork).toEqual(verificationArtwork(item.name));
-      expect(item.stock).toBe(3);
-      expect(item.action).not.toBeNull();
-      const html = renderToStaticMarkup(<ServiceCard item={item} countryName="United States" />);
-      expect(html).toMatch(/<img[^>]+(?:google.com\/s2\/favicons|is1-ssl.mzstatic.com)/);
-      expect(html).toContain('referrerPolicy="no-referrer"');
+  it("uses local brand logos only for the exact names in the reviewed allowlist", () => {
+    for (const [name, entry] of Object.entries(verifiedBrands)) {
+      expect(verificationArtwork(`  ${name.toUpperCase()}  `)).toEqual({ kind: "verified-brand-logo", slug: entry.slug });
+      expect(readFileSync(`public/verification-logos/${entry.slug}.svg`, "utf8")).toMatch(/<svg/);
+      expect(verificationArtwork(`${name} impostor`)).toEqual({ kind: "service", name: "numbers" });
     }
+    const apps = ["Adobe", "Alibaba", "Authy"];
+    const offers: OtpOffer[] = apps.map((app, i) => ({ supplier: "bitcall", ref: `private-${i}`, app, country: "us", costNgn: 50, stock: 3 }));
+    const items = bitcallOtpItemsForCountry(offers, "us", "United States");
+    expect(items).toHaveLength(apps.length);
+    expect(items.every(i => i.stock === 3 && i.action !== null && i.artwork.kind === "verified-brand-logo")).toBe(true);
+    const html = renderToStaticMarkup(<ServiceCard item={items.find(i => i.name === "Adobe")!} countryName="United States" />);
+    expect(html).toContain('/verification-logos/adobe.svg');
   });
 
   it("matches exact titles in the real pinned icon collection, not substrings or guessed domains", () => {
