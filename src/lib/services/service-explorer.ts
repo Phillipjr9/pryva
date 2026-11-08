@@ -34,6 +34,8 @@ export type ExplorerArtwork =
    * site's real favicon rather than showing the same envelope on every tile.
    */
   | { kind: "site-favicon"; domain: string }
+  /** A real, pinned Simple Icons mark matched by its exact published title. */
+  | { kind: "simple-icon"; slug: string; hex: string; version: string }
   | { kind: "network"; name: AirtimeProvider };
 export type ExplorerItem = {
   id: string;

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { verificationArtwork } from "@/lib/services/numbers/verification-marks";
 import { ProviderError } from "@/lib/providers/types";
 import { explorerCountry, VERIFICATION_EXAMPLES, type ExplorerItem } from "@/lib/services/service-explorer";
 import { checkMargin } from "@/lib/services/margin-guard";
@@ -85,7 +86,7 @@ export function bitcallOtpItemsForCountry(
         ? "Live app-specific number offer"
         : "Bitcall stock listing · checkout is not enabled for this country",
       tag: brand?.tag ?? "Other",
-      artwork: brand ? { kind: "brand", name: brand.brand } : { kind: "service", name: "numbers" },
+      artwork: brand ? { kind: "brand", name: brand.brand } : verificationArtwork(label),
       source: "live",
       coverage: "catalog-country",
       stock: safeUnitCount(offer.stock),

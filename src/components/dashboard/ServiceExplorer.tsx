@@ -92,9 +92,9 @@ function UnidentifiedInbox({ size }: { size: number }) {
   );
 }
 
-function SiteFavicon({ domain, size }: { domain: string; size: number }) {
+function SiteFavicon({ domain, size, verification = false }: { domain: string; size: number; verification?: boolean }) {
   const [failed, setFailed] = useState(false);
-  if (failed) return <UnidentifiedInbox size={size} />;
+  if (failed) return verification ? <ServiceIcon service="numbers" size={size <= 28 ? "sm" : "md"} /> : <UnidentifiedInbox size={size} />;
 
   return (
     <span
@@ -121,13 +121,25 @@ function SiteFavicon({ domain, size }: { domain: string; size: number }) {
   );
 }
 
+/** Static, version-pinned upstream SVGs. The slug and colour come only from
+ * our generated allowlist, never from a supplier URL or free-form label. */
+function SimpleIcon({ slug, hex, version, size }: { slug: string; hex: string; version: string; size: number }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <ServiceIcon service="numbers" size={size <= 28 ? "sm" : "md"} />;
+  return <span aria-hidden="true" className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line/70 bg-white" style={{ width: size, height: size }}>
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img src={`https://cdn.jsdelivr.net/npm/simple-icons@${version}/icons/${slug}.svg`} alt="" width={size} height={size} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="h-full w-full object-contain p-2" style={{ backgroundColor: `#${hex}10` }} />
+  </span>;
+}
+
 function itemArt(item: ExplorerItem, size: "sm" | "md" = "md") {
   const pixels = size === "sm" ? 28 : 42;
   switch (item.artwork.kind) {
     case "brand": return <BrandIcon brand={item.artwork.name} size={pixels} decorative />;
     case "network": return <NetworkBadge provider={item.artwork.name} size={pixels} />;
     case "service": return <ServiceIcon service={item.artwork.name} size={size} />;
-    case "site-favicon": return <SiteFavicon domain={item.artwork.domain} size={pixels} />;
+    case "site-favicon": return <SiteFavicon key={item.artwork.domain} domain={item.artwork.domain} size={pixels} verification={item.category === "verification"} />;
+    case "simple-icon": return <SimpleIcon key={item.artwork.slug} {...item.artwork} size={pixels} />;
     // A mailbox with no published favicon: Lucide's `mail-question`, never
     // another provider's logo or the Temporary-inbox tool's mark.
     case "unidentified-inbox": return <UnidentifiedInbox size={pixels} />;
