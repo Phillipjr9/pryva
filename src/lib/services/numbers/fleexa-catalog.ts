@@ -1,13 +1,13 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { isFundingFailure } from "@/lib/providers/types";
-import { isFleexaConfigured, listFleexaEmailProducts, listFleexaRentAreas, listFleexaSmsServices, type FleexaEmailProduct, type FleexaRentArea, type FleexaSmsService } from "@/lib/providers/fleexa";
+import { isFleexaConfigured, listFleexaEmailProducts, listFleexaRentAreas, type FleexaEmailProduct, type FleexaRentArea } from "@/lib/providers/fleexa";
 import { priceFromCost, isPriceInBand } from "@/lib/services/pricing";
 import { safeUnitCount } from "@/lib/services/service-units";
-import { explorerCountry, VERIFICATION_EXAMPLES, type ExplorerItem } from "@/lib/services/service-explorer";
+import { explorerCountry, type ExplorerItem } from "@/lib/services/service-explorer";
+import { mailProviderBrand, mailProviderFaviconDomain } from "@/lib/services/numbers/mail-provider-marks";
 
 export type SupplierSnapshot = {
-  sms: FleexaSmsService[];
   email: FleexaEmailProduct[];
   rentals: FleexaRentArea[];
   partial: boolean;
@@ -29,8 +29,8 @@ export async function readSupplierSnapshot(refresh = false): Promise<SupplierSna
   if (!refresh && cache && cache.expires > Date.now()) return cache.snapshot;
   if (inFlight) return inFlight;
   inFlight = (async () => {
-    const [sms, email, rentals] = await Promise.allSettled([listFleexaSmsServices(), listFleexaEmailProducts(), listFleexaRentAreas()]);
-    const results = [sms, email, rentals];
+    const [email, rentals] = await Promise.allSettled([listFleexaEmailProducts(), listFleexaRentAreas()]);
+    const results = [email, rentals];
     const failures = results.filter((result) => result.status === "rejected");
     // An unfunded account is not an outage: preserve the refusal's own class so
     // the hub can say "restocking" instead of offering a Retry that cannot work.
@@ -39,7 +39,6 @@ export async function readSupplierSnapshot(refresh = false): Promise<SupplierSna
       throw new Error("Supplier catalog unavailable");
     }
     const snapshot: SupplierSnapshot = {
-      sms: sms.status === "fulfilled" ? sms.value.slice(0, 2000) : [],
       email: email.status === "fulfilled" ? email.value.slice(0, 2000) : [],
       rentals: rentals.status === "fulfilled" ? rentals.value.slice(0, 2000) : [],
       partial: failures.length > 0,
@@ -90,47 +89,26 @@ export function supplierItemsForCountry(snapshot: SupplierSnapshot, countryCode:
   const ids = new Set<string>();
   function add(item: ExplorerItem) { if (!ids.has(item.id)) { ids.add(item.id); items.push(item); } }
 
-  for (const entry of snapshot.sms) {
-    const id = readable(entry.id, 120), name = readable(entry.name, 80);
-    if (!id || !name || !matchesCountry(entry.country, country.code)) continue;
-    const lower = name.toLowerCase();
-    const brand = VERIFICATION_EXAMPLES.find((item) => {
-      const itemLower = item.name.toLowerCase();
-      if (itemLower === lower) return true;
-      if (item.brand === "x" && (lower === "twitter" || lower === "x.com")) return true;
-      if (item.brand === "chatgpt" && (lower === "openai" || lower.includes("chatgpt"))) return true;
-      if (item.brand === "google" && (lower === "gmail" || lower === "google mail")) return true;
-      if (item.brand === "anthropic" && (lower === "claude" || lower.includes("claude"))) return true;
-      if (item.brand === "ubereats" && (lower.includes("uber eats") || lower === "ubereats")) return true;
-      if (item.brand === "doordash" && (lower.includes("door dash") || lower === "doordash")) return true;
-      if (item.brand === "riotgames" && (lower.includes("valorant") || lower.includes("riot"))) return true;
-      if (item.brand === "battledotnet" && (lower.includes("blizzard") || lower.includes("battle.net"))) return true;
-      if (item.brand === "playstation" && (lower.includes("psn") || lower.includes("playstation"))) return true;
-      return false;
-    });
-    add({
-      id: itemId("sms", id, country.code), category: "verification", name, description: "SMS verification listing",
-      tag: brand?.tag ?? "Other", artwork: brand ? { kind: "brand", name: brand.brand } : { kind: "service", name: "numbers" },
-      source: "live", coverage: "catalog-country", stock: safeUnitCount(entry.stock), myUnits: null,
-      price: retail(entry.priceNgn, "numbers"), action: null,
-    });
-  }
   for (const entry of snapshot.email) {
     const id = readable(entry.id, 120), name = readable(entry.name, 80) ?? readable(entry.domain, 80);
     if (!id || !name) continue;
-    const lower = name.toLowerCase();
-    const brand = (() => {
-      if (lower.includes("gmail") || lower.includes("google mail")) return "gmail";
-      if (lower.includes("outlook") || lower.includes("hotmail") || lower.includes("live mail")) return "outlook";
-      if (lower.includes("proton") || lower.includes("protonmail")) return "protonmail";
-      if (lower.includes("mail.ru") || lower.includes("maildotru") || lower.includes("mail ru")) return "maildotru";
-      if (lower.includes("yahoo")) return "yahoo";
-      if (lower.includes("zoho")) return "zoho";
-      return null;
-    })();
+    /*
+     * The provider's OWN mark, looked up in one table rather than a chain of
+     * `includes` calls, because the chain knew only six providers: GMX, iCloud,
+     * Yandex, Tuta, mail.com, WEB.DE, QQ and Naver all fell through to the same
+     * envelope glyph, so eight different products wore one logo.
+     *
+     * A non-provider entry can still name the service's own domain (the feed
+     * includes sites like adobe.com and airbnb.com), so it uses that site's
+     * published favicon before falling back to a neutral mailbox. That closes
+     * the gap where every non-mail listing showed the same missing-logo glyph.
+     * Neither path borrows another provider's logo.
+     */
+    const brand = mailProviderBrand(name, entry.domain);
+    const faviconDomain = mailProviderFaviconDomain(name, entry.domain);
     add({
       id: itemId("email", id, "global"), category: "email", name, description: "Free temporary inbox", tag: "Free",
-      artwork: brand ? { kind: "brand", name: brand } : { kind: "service", name: "email-otp" }, source: "live", coverage: "not-country-specific",
+      artwork: brand ? { kind: "brand", name: brand } : faviconDomain ? { kind: "site-favicon", domain: faviconDomain } : { kind: "unidentified-inbox" }, source: "live", coverage: "not-country-specific",
       // No price, and deliberately so. What the feed charges us per inbox is our
       // cost of running a free tool, not a price a customer sees. Marking it up
       // here would put a number on something we have decided to give away, and

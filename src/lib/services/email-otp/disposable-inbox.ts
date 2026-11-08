@@ -43,7 +43,7 @@ export const INBOX_PROVIDER = "fleexa";
  * Which provider to use for disposable inboxes.
  *
  * - "fleexa": Wholesale Nigerian B2B email provider (requires FLEEXA_API_KEY and NGN balance).
- * - "tempmail": Zero-setup public disposable email provider (fakemailo style, requires no custom domain or keys).
+ * - "tempmail": Zero-setup public disposable email provider (requires no custom domain or keys).
  */
 export function getInboxProvider(): "fleexa" | "tempmail" {
   const env = process.env.INBOX_PROVIDER?.trim().toLowerCase();
@@ -56,10 +56,12 @@ export function getInboxProvider(): "fleexa" | "tempmail" {
     return "fleexa";
   }
 
-  // In runtime/production:
-  // Default to tempmail (fakemailo style) so customers get free zero-setup
-  // inboxes without consuming Fleexa balance or failing when Fleexa has no email stock.
-  return "tempmail";
+  // Use the integrated inbox API whenever its credential is present. That is the
+  // only path that guarantees the bought product is the one the poller reads;
+  // falling back to a different public mailbox provider can return an address
+  // that never receives mail for the requested listing. Without the API key,
+  // keep the zero-setup public mailbox provider as the no-cost default.
+  return isFleexaConfigured() ? "fleexa" : "tempmail";
 }
 
 /** Whether the active inbox provider is configured and available. */
@@ -170,23 +172,20 @@ export type CreatedInbox = {
  *
  * The cheapest listed product with stock is chosen, because a free inbox is free
  * to the customer and costs Pryva real money: the free tier is a marketing
- * expense, not a subsidy for the priciest inbox on the shelf. Nothing is guessed
- * if the list cannot be read — the purchase falls back to the no-parameter call
- * it always made, so a feed that genuinely needs no product keeps working.
+ * expense, not a subsidy for the priciest inbox on the shelf. A missing or
+ * unreadable product list is a hard stop: buying without an id could create a
+ * different mailbox from the one the user expects to receive the OTP for.
  */
-async function cheapestEmailProduct(): Promise<string | null> {
-  try {
-    const products = await listFleexaEmailProducts();
-    const usable = products
-      .filter((product) => Boolean(product.id) && (product.stock === null || product.stock > 0))
-      .sort((a, b) => (a.priceNgn ?? Number.POSITIVE_INFINITY) - (b.priceNgn ?? Number.POSITIVE_INFINITY));
-    return usable[0]?.id ?? null;
-  } catch (error) {
-    logger.warn("Could not read the inbox product list; buying without naming a product", {
-      reason: error instanceof Error ? error.message : String(error),
-    });
-    return null;
+async function cheapestEmailProduct(): Promise<string> {
+  const products = await listFleexaEmailProducts();
+  const usable = products
+    .filter((product) => Boolean(product.id) && (product.stock === null || product.stock > 0))
+    .sort((a, b) => (a.priceNgn ?? Number.POSITIVE_INFINITY) - (b.priceNgn ?? Number.POSITIVE_INFINITY));
+  const product = usable[0]?.id;
+  if (!product) {
+    throw new InboxError("PROVIDER_FAILED", 503, "No inbox products are currently available.");
   }
+  return product;
 }
 
 /**
@@ -223,23 +222,17 @@ export async function createFreeInbox(userId: string): Promise<CreatedInbox> {
     }
     try {
       const product = await cheapestEmailProduct();
-      const purchased = await buyFleexaEmail(product ? { product } : {});
+      const purchased = await buyFleexaEmail({ product });
       emailId = purchased.emailId;
       address = purchased.address;
       expiresAt = purchased.expiresAt;
     } catch (error) {
-      if (process.env.VITEST || process.env.NODE_ENV === "test") {
-        throw error;
-      }
-      logger.warn("Fleexa email purchase failed, falling back to tempmail", {
+      // Never replace a failed product-specific API purchase with a random public
+      // mailbox: it could create successfully but never receive the requested OTP.
+      logger.warn("Fleexa email purchase failed; no unrelated mailbox was substituted", {
         reason: error instanceof Error ? error.message : String(error),
       });
-      const created = await createTempMailInbox();
-      provider = "tempmail";
-      emailId = created.id;
-      address = created.address;
-      expiresAt = created.expiresAt;
-      domain = created.domain;
+      throw error;
     }
   } else {
     // Before creating a new inbox, preserve any existing active inboxes as 'saved'
@@ -375,6 +368,8 @@ export type PollResult = {
   code: string | null;
   /** Whether the messages came from storage rather than a live provider read. */
   stored: boolean;
+  /** A refresh warning when stored messages are shown after a provider outage. */
+  warning?: string;
 };
 
 /**
@@ -408,12 +403,16 @@ export async function pollInbox(userId: string, inboxId: string): Promise<PollRe
       reason: error instanceof Error ? error.message : String(error),
     });
     const stored = await storedMessages(row.id);
-    return {
-      inbox: viewOf(row),
-      messages: stored,
-      code: stored.find((m) => m.code)?.code ?? null,
-      stored: true,
-    };
+    if (stored.length > 0) {
+      return {
+        inbox: viewOf(row),
+        messages: stored,
+        code: stored.find((m) => m.code)?.code ?? null,
+        stored: true,
+        warning: "Could not refresh this inbox. Showing messages already received.",
+      };
+    }
+    throw new InboxError("PROVIDER_FAILED", 502, "Could not check this inbox right now. Try again shortly.");
   }
 
   if (row.tier === "paid" || row.provider === "tempmail") {

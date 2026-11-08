@@ -99,6 +99,18 @@ describe("EsimCatalogue", () => {
     expect(screen.getAllByRole("link", { name: "Buy eSIM" })).toHaveLength(3);
   });
 
+  it("shows provider-listed number, voice and SMS capabilities on plan cards", () => {
+    const [item] = catalogueItems([offer({
+      includesPhoneNumber: false,
+      supportsVoice: true,
+      supportsSms: false,
+    })]);
+    render(<EsimCatalogue items={[item]} truncated={false} />);
+    expect(screen.getByText("Number").parentElement?.textContent).toContain("Not included");
+    expect(screen.getByText("Calls").parentElement?.textContent).toContain("Included");
+    expect(screen.getByText("SMS").parentElement?.textContent).toContain("Not included");
+  });
+
   it("filters by search across name, region and allowance", () => {
     render(<EsimCatalogue items={items} truncated={false} />);
     fireEvent.change(screen.getByPlaceholderText("Search a country, region or data allowance"), {

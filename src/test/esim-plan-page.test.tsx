@@ -57,7 +57,7 @@ describe("eSIM plan information before purchase", () => {
   it("clearly says exact number selection is unavailable and leaves unknown capabilities unknown", async () => {
     const { container } = await renderPage();
     expect(screen.getByText(/You cannot choose a specific phone number before buying/)).toBeTruthy();
-    expect(screen.getByText(/checkout and eSIM orders do not show a phone number/)).toBeTruthy();
+    expect(screen.getByText(/listing did not confirm the feature/)).toBeTruthy();
     expect(screen.getByText(/A specific phone number cannot be selected for this eSIM/)).toBeTruthy();
     expect(feature("Phone number").getByText("Not specified")).toBeTruthy();
     expect(feature("Calls").getByText("Not specified")).toBeTruthy();

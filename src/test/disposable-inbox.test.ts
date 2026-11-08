@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createFreeInbox,
+  getInboxProvider,
   dailyKeyFor,
   discardInbox,
   InboxError,
@@ -24,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   check: vi.fn(),
   cancel: vi.fn(),
   configured: vi.fn(),
+  tempCreate: vi.fn(),
   state: {
     calls: [] as string[],
     selectRows: [] as Record<string, unknown>[],
@@ -47,6 +49,10 @@ vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
 });
 // Every level the real logger exposes: a partial mock turns a call to a missing
 // method into a TypeError that reads as a broken module rather than a broken test.
+vi.mock("@/lib/providers/tempmail", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/tempmail")>();
+  return { ...actual, createTempMailInbox: mocks.tempCreate };
+});
 vi.mock("@/lib/platform/logger", () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -139,6 +145,7 @@ beforeEach(() => {
   mocks.state.updateResult = [];
   mocks.state.insertedMessages = [];
   mocks.configured.mockReturnValue(true);
+  mocks.tempCreate.mockResolvedValue({ id: "fallback-id", address: "other@public.test", domain: "public.test", expiresAt: null });
   mocks.buy.mockResolvedValue({
     emailId: "prov-1",
     address: "someone@inbox.test",
@@ -156,7 +163,24 @@ beforeEach(() => {
   ]);
 });
 
-afterEach(() => vi.resetAllMocks());
+afterEach(() => { vi.resetAllMocks(); vi.unstubAllEnvs(); });
+
+describe("provider selection", () => {
+  it("uses Fleexa when its API is configured unless tempmail is explicitly selected", () => {
+    vi.stubEnv("VITEST", "");
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("INBOX_PROVIDER", "");
+    mocks.configured.mockReturnValue(true);
+    expect(getInboxProvider()).toBe("fleexa");
+
+    mocks.configured.mockReturnValue(false);
+    expect(getInboxProvider()).toBe("tempmail");
+
+    mocks.configured.mockReturnValue(true);
+    vi.stubEnv("INBOX_PROVIDER", "tempmail");
+    expect(getInboxProvider()).toBe("tempmail");
+  });
+});
 
 describe("the daily key", () => {
   it("is scoped to a UTC day, so two servers cannot disagree about it", () => {
@@ -202,17 +226,18 @@ describe("choosing what to buy", () => {
     expect(mocks.buy).toHaveBeenCalledWith({ product: "p-stocked" });
   });
 
-  it("still buys when the product list cannot be read, rather than failing early", async () => {
+  it("does not buy without a known product when the product list cannot be read", async () => {
     mocks.products.mockRejectedValue(new FleexaError("Provider request failed", 502, "UPSTREAM_ERROR"));
-    await createFreeInbox(USER);
-    // The purchase falls back to the call it always made: some feeds need no product.
-    expect(mocks.buy).toHaveBeenCalledWith({});
+    await expect(createFreeInbox(USER)).rejects.toMatchObject({ code: "UPSTREAM_ERROR" });
+    expect(mocks.buy).not.toHaveBeenCalled();
   });
 
-  it("does not invent a product when the feed lists none", async () => {
-    mocks.products.mockResolvedValue([]);
-    await createFreeInbox(USER);
-    expect(mocks.buy).toHaveBeenCalledWith({});
+  it("refuses when the feed lists no in-stock products", async () => {
+    mocks.products.mockResolvedValue([
+      { id: "sold-out", name: "Sold out", domain: null, priceNgn: 100, stock: 0 },
+    ]);
+    await expect(createFreeInbox(USER)).rejects.toMatchObject({ code: "PROVIDER_FAILED", status: 503 });
+    expect(mocks.buy).not.toHaveBeenCalled();
   });
 });
 
@@ -246,6 +271,13 @@ describe("creating a free inbox", () => {
 
     expect(created).toMatchObject({ address: "someone@inbox.test", tier: "free", status: "active" });
     expect(mocks.cancel).not.toHaveBeenCalled();
+  });
+
+  it("does not substitute an unrelated public mailbox when the API purchase fails", async () => {
+    mocks.buy.mockRejectedValue(new FleexaError("Provider request failed", 502, "UPSTREAM_ERROR"));
+
+    await expect(createFreeInbox(USER)).rejects.toMatchObject({ code: "UPSTREAM_ERROR" });
+    expect(mocks.tempCreate).not.toHaveBeenCalled();
   });
 
   /**
@@ -314,6 +346,16 @@ describe("reading an inbox", () => {
     expect(result.code).toBe("123456");
     expect(result.stored).toBe(false);
     expect(mocks.state.insertedMessages).toEqual([]);
+  });
+
+  it("reports a provider outage instead of claiming the inbox is empty", async () => {
+    mocks.state.selectRows = [ACTIVE_ROW];
+    mocks.check.mockRejectedValue(new FleexaError("Upstream offline", 502, "UPSTREAM_UNREACHABLE"));
+
+    await expect(pollInbox(USER, "inbox-1")).rejects.toMatchObject({
+      code: "PROVIDER_FAILED",
+      status: 502,
+    });
   });
 
   it("retains messages for a paid inbox, idempotently", async () => {

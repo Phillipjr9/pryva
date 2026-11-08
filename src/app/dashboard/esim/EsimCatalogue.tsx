@@ -7,6 +7,10 @@ import type { EsimCatalogueItem } from "@/lib/services/esim/esim-catalog";
 
 const PAGE = 24;
 
+function capability(value: boolean | null | undefined): string {
+  return value === true ? "Included" : value === false ? "Not included" : "Not listed";
+}
+
 /**
  * The catalogue, as a list rather than a destination lookup.
  *
@@ -110,6 +114,18 @@ export function EsimCatalogue({ items, truncated }: { items: EsimCatalogueItem[]
                   {item.dataLabel} · {item.validityLabel} ·{" "}
                   {item.global ? "Global plan" : item.destinations > 0 ? `${item.destinations} destination${item.destinations === 1 ? "" : "s"}` : "Coverage not listed"}
                 </p>
+                <dl aria-label="Plan features" className="mt-3 grid grid-cols-3 gap-1.5 text-micro">
+                  {[
+                    ["Number", item.includesPhoneNumber],
+                    ["Calls", item.supportsVoice],
+                    ["SMS", item.supportsSms],
+                  ].map(([label, value]) => (
+                    <div key={String(label)} className="rounded-lg bg-cream/70 px-2 py-1.5">
+                      <dt className="font-medium text-ink-3">{label}</dt>
+                      <dd className="mt-0.5 font-semibold text-ink-2">{capability(value as boolean | null | undefined)}</dd>
+                    </div>
+                  ))}
+                </dl>
               </div>
               <div className="mt-3 flex items-center justify-between gap-3">
                 <p className="text-[1rem] font-semibold tabular-nums text-ink">

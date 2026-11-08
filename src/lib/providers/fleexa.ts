@@ -21,6 +21,7 @@ import "server-only";
 import { createRateLimiter } from "@/lib/platform/rate-limit";
 import { readJsonWithLimit } from "@/lib/platform/request-body";
 import { ProviderError, looksLikeFundingRefusal } from "@/lib/providers/types";
+import { emailTextForCode, extractVerificationCode } from "@/lib/services/email-otp/verification-code";
 
 const DEFAULT_BASE_URL = "https://fleexa.com.ng/developer";
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -409,16 +410,26 @@ export async function checkFleexaEmail(emailId: string): Promise<{
   const res = await fleexaFetch(`/email/check/${encodeURIComponent(emailId)}`);
   const data = res.data ? asRecord(res.data) : res;
 
-  const messages = listFrom(data, ["messages", "mails", "emails", "data", "items"]).map((item) => ({
-    subject: pickString(item, [["subject"], ["title"]]),
-    from: pickString(item, [["from"], ["sender"], ["from_address"]]),
-    body: pickString(item, [["body"], ["text"], ["content"], ["html"]]),
-    code: pickString(item, [["code"], ["otp"], ["otp_code"]]),
-    receivedAt: pickString(item, [["received_at"], ["created_at"], ["date"]]),
-  }));
+  const messages = listFrom(data, ["messages", "mails", "emails", "data", "items"]).map((item) => {
+    const subject = pickString(item, [["subject"], ["title"]]);
+    const body = pickString(item, [["body"], ["text"], ["content"], ["html"], ["html_body"], ["text_body"], ["message"]]);
+    const explicitCode = pickString(item, [["code"], ["otp"], ["otp_code"]]);
+    return {
+      subject,
+      from: pickString(item, [["from"], ["sender"], ["from_address"], ["sender_email"]]),
+      body,
+      code: explicitCode ?? extractVerificationCode(subject, emailTextForCode(body)),
+      receivedAt: pickString(item, [["received_at"], ["created_at"], ["date"]]),
+    };
+  });
 
-  const directCode =
-    pickString(data, [["code"], ["otp"], ["otp_code"]]) ?? messages.find((m) => m.code)?.code ?? null;
+  const explicitCode = pickString(data, [["code"], ["otp"], ["otp_code"]]);
+  const directCode = explicitCode
+    ?? messages.find((message) => message.code)?.code
+    ?? extractVerificationCode(
+      pickString(data, [["subject"], ["title"]]),
+      emailTextForCode(pickString(data, [["body"], ["text"], ["content"], ["html"], ["html_body"], ["text_body"]])),
+    );
 
   return { messages, code: directCode, raw: data };
 }

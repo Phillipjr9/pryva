@@ -7,9 +7,10 @@ import { ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 
-const config = vi.hoisted(() => ({ fleexa: false, boosting: false, accounts: false, preview: true }));
+const config = vi.hoisted(() => ({ fleexa: false, bitcall: false, boosting: false, accounts: false, preview: true }));
 
 vi.mock("@/lib/providers/fleexa", () => ({ isFleexaConfigured: () => config.fleexa }));
+vi.mock("@/lib/providers/bitcall", () => ({ isBitcallConfigured: () => config.bitcall }));
 vi.mock("@/lib/providers/smm-panel", () => ({ isSmmPanelConfigured: () => config.boosting }));
 vi.mock("@/lib/services/accounts/marketplace-policy", () => ({ isMarketplaceCheckoutConfigured: () => config.accounts }));
 vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => config.preview }));
@@ -19,6 +20,7 @@ const { readServiceReadiness } = await import("@/lib/services/service-readiness"
 afterEach(() => {
   cleanup();
   config.fleexa = false;
+  config.bitcall = false;
   config.boosting = false;
   config.accounts = false;
   config.preview = true;
@@ -39,6 +41,7 @@ describe("service readiness", () => {
   it("puts what a customer can actually do first", () => {
     config.preview = false;
     config.fleexa = true;
+    config.bitcall = true;
     config.boosting = true;
     config.accounts = true;
     const readiness = readServiceReadiness();
@@ -56,6 +59,10 @@ describe("service readiness", () => {
     expect(numbers.detail).toMatch(/not connected/i);
 
     config.fleexa = true;
+    const stillPaused = readServiceReadiness().find((entry) => entry.id === "numbers")!;
+    expect(stillPaused.state).toBe("paused");
+
+    config.bitcall = true;
     const live = readServiceReadiness().find((entry) => entry.id === "numbers")!;
     expect(live.state).toBe("buy");
   });
@@ -63,6 +70,7 @@ describe("service readiness", () => {
   it("does not advertise purchases or inboxes from a Vercel preview with live configuration", () => {
     config.preview = false;
     config.fleexa = true;
+    config.bitcall = true;
     config.boosting = true;
     config.accounts = true;
     vi.stubEnv("VERCEL_ENV", "preview");

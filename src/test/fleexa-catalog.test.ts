@@ -13,14 +13,6 @@ vi.mock("@/lib/providers/fleexa", () => ({
 
 const snapshot: SupplierSnapshot = {
   fetchedAt: "2026-01-01T00:00:00Z", partial: false, degraded: null,
-  sms: [
-    { id: "secret-sms-id", name: "WhatsApp", country: "US", priceNgn: 1234, stock: 7 },
-    { id: "gb-id", name: "Telegram", country: "GB", priceNgn: 1000, stock: 5 },
-    { id: "unknown-id", name: "Unknown", country: null, priceNgn: 1000, stock: 3 },
-    { id: "same-country", name: "Signal", country: "United States", priceNgn: 0.2, stock: -5 },
-    { id: "private", name: "Fleexa supplier name", country: "US", priceNgn: 1000, stock: 4 },
-    { id: "secret-sms-id", name: "WhatsApp", country: "US", priceNgn: 1234, stock: 7 },
-  ],
   email: [{ id: "secret-email-id", name: "Temporary inbox", domain: "mail.test", priceNgn: 2000, stock: 0 }],
   rentals: [
     { id: "secret-rent-id", country: "USA", pricePerMonthNgn: 3000, stock: 2 },
@@ -31,23 +23,17 @@ const snapshot: SupplierSnapshot = {
 beforeEach(() => { vi.resetModules(); vi.clearAllMocks(); supplier.configured.mockReturnValue(true); });
 
 describe("read-only supplier catalog", () => {
-  it("shows only explicitly matching countries, hides raw IDs and cost, and preserves unknown counts", async () => {
+  it("does not expose its legacy SMS feed as customer OTP availability", async () => {
     const { supplierItemsForCountry } = await import("@/lib/services/numbers/fleexa-catalog");
     const items = supplierItemsForCountry(snapshot, "us");
-    expect(items.map((item) => item.name)).toEqual(["WhatsApp", "Signal", "Temporary inbox", "Number rental"]);
-    expect(items.every((item) => item.source === "live" && item.action === null && item.myUnits === null)).toBe(true);
-    expect(items[0]).toMatchObject({ stock: 7, coverage: "catalog-country" });
-    expect(items[0].price).toBeGreaterThan(1234);
-    expect(items[0]).not.toHaveProperty("priceNgn");
-    expect(items[1]).toMatchObject({ stock: null, price: null });
-    expect(items[2]).toMatchObject({ stock: 0, coverage: "not-country-specific" });
+    expect(items.map((item) => item.name)).toEqual(["Temporary inbox", "Number rental"]);
+    expect(items.every((item) => item.source === "live" && item.myUnits === null)).toBe(true);
+    expect(items[0]).toMatchObject({ stock: 0, coverage: "not-country-specific" });
     const serialized = JSON.stringify(items);
-    expect(serialized).not.toContain("secret-sms-id");
     expect(serialized).not.toContain("secret-email-id");
     expect(serialized).not.toContain("secret-rent-id");
-    expect(serialized).not.toContain("1234");
     expect(supplierItemsForCountry(snapshot, "not-a-country")).toEqual([]);
-    expect(supplierItemsForCountry(snapshot, "gb").map((item) => item.name)).toEqual(["Telegram", "Temporary inbox"]);
+    expect(supplierItemsForCountry(snapshot, "gb").map((item) => item.name)).toEqual(["Temporary inbox"]);
   });
 
   it("uses real provider marks for live inbox listings", async () => {
@@ -67,8 +53,88 @@ describe("read-only supplier catalog", () => {
     ]);
   });
 
+  it("gives every listed inbox its own provider logo, never one shared glyph", async () => {
+    // The reported bug: GMX, iCloud, Yandex, Tuta, mail.com, WEB.DE, QQ and Naver
+    // all rendered the same envelope, so eight different products looked like one.
+    const { supplierItemsForCountry } = await import("@/lib/services/numbers/fleexa-catalog");
+    const providers = [
+      ["Gmail inbox", "gmail.com", "gmail"],
+      ["Outlook inbox", "outlook.com", "outlook"],
+      ["Yahoo Mail inbox", "yahoo.com", "yahoo"],
+      ["Proton Mail inbox", "proton.me", "protonmail"],
+      ["Mail.ru inbox", "mail.ru", "maildotru"],
+      ["Zoho Mail inbox", "zoho.com", "zoho"],
+      ["GMX inbox", "gmx.com", "gmx"],
+      ["iCloud inbox", "icloud.com", "icloud"],
+      ["Yandex Mail inbox", "yandex.ru", "yandex"],
+      ["Tuta inbox", "tuta.com", "tuta"],
+      ["mail.com inbox", "mail.com", "maildotcom"],
+      ["WEB.DE inbox", "web.de", "webdotde"],
+      ["QQ Mail inbox", "qq.com", "qq"],
+      ["Naver Mail inbox", "naver.com", "naver"],
+    ] as const;
+
+    const items = supplierItemsForCountry(
+      {
+        ...snapshot,
+        email: providers.map(([name, domain], index) => ({
+          id: `e${index}`, name, domain, priceNgn: 500, stock: 4,
+        })),
+      },
+      "us",
+    ).filter((item) => item.category === "email");
+
+    expect(items.map((item) => item.artwork)).toEqual(
+      providers.map(([, , brand]) => ({ kind: "brand", name: brand })),
+    );
+    // Fourteen listings, fourteen different marks. This is the assertion the bug
+    // would have failed, and it is the owner's actual instruction.
+    const marks = new Set(items.map((item) => JSON.stringify(item.artwork)));
+    expect(marks.size).toBe(providers.length);
+  });
+
+  it("uses each listed website's own published favicon when the listing is a destination site", async () => {
+    const { supplierItemsForCountry } = await import("@/lib/services/numbers/fleexa-catalog");
+    const domains = ["10minutemail.com", "126.com", "163.com", "adobe.com", "airbnb.com", "alibaba.com"];
+    const items = supplierItemsForCountry(
+      {
+        ...snapshot,
+        email: domains.map((domain, index) => ({
+          id: `site-${index}`, name: domain, domain, priceNgn: 500, stock: 1,
+        })),
+      },
+      "us",
+    ).filter((item) => item.category === "email");
+
+    expect(items.map((item) => item.artwork)).toEqual(
+      domains.map((domain) => ({ kind: "site-favicon", domain })),
+    );
+    expect(new Set(items.map((item) => JSON.stringify(item.artwork))).size).toBe(domains.length);
+  });
+
+  it("keeps an unidentified inbox off the free tool's glyph and off other providers", async () => {
+    const { supplierItemsForCountry } = await import("@/lib/services/numbers/fleexa-catalog");
+    const items = supplierItemsForCountry(
+      {
+        ...snapshot,
+        email: [
+          { id: "aol-1", name: "AOL inbox", domain: "aol.com", priceNgn: 500, stock: 1 },
+          { id: "anon-1", name: "Temporary inbox", domain: "mail.test", priceNgn: 500, stock: 1 },
+        ],
+      },
+      "us",
+    ).filter((item) => item.category === "email");
+
+    // Not `email-otp`: that is the Temporary-inbox card's mark, and an unknown
+    // provider wearing it is the same duplicate-logo problem one level down.
+    expect(items.map((item) => item.artwork)).toEqual([
+      { kind: "site-favicon", domain: "aol.com" },
+      { kind: "unidentified-inbox" },
+    ]);
+    expect(items.some((item) => JSON.stringify(item.artwork).includes("email-otp"))).toBe(false);
+  });
+
   it("coalesces requests and reports partial supplier outages without caching user data", async () => {
-    supplier.sms.mockResolvedValue(snapshot.sms);
     supplier.email.mockRejectedValue(new Error("offline"));
     supplier.rentals.mockResolvedValue(snapshot.rentals);
     const { readSupplierSnapshot } = await import("@/lib/services/numbers/fleexa-catalog");
@@ -76,11 +142,11 @@ describe("read-only supplier catalog", () => {
     expect(first).toEqual(second);
     expect(first.partial).toBe(true);
     expect(first.email).toEqual([]);
-    expect(supplier.sms).toHaveBeenCalledTimes(1);
+    expect(supplier.sms).not.toHaveBeenCalled();
     await readSupplierSnapshot();
-    expect(supplier.sms).toHaveBeenCalledTimes(1);
+    expect(supplier.email).toHaveBeenCalledTimes(1);
     await readSupplierSnapshot(true);
-    expect(supplier.sms).toHaveBeenCalledTimes(2);
+    expect(supplier.email).toHaveBeenCalledTimes(2);
   });
 
   it("fails rather than presenting an empty healthy catalog if all endpoints fail", async () => {

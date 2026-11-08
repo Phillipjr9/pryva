@@ -81,6 +81,12 @@ describe("content security policy", () => {
     expect(font).toMatch(/^'self' data:$/);
   });
 
+  it("allows Google's favicon endpoint and its static image CDN", () => {
+    const img = production.get("img-src") ?? "";
+    expect(img).toContain("https://www.google.com");
+    expect(img).toContain("https://*.gstatic.com");
+  });
+
   it("allows every image host configured for next/image", () => {
     const img = production.get("img-src") ?? "";
     for (const pattern of nextConfig.images?.remotePatterns ?? []) {

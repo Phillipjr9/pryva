@@ -8,7 +8,7 @@ import { CountrySelector } from "@/components/dashboard/CountrySelector";
 import { NetworkBadge } from "@/components/NetworkBadge";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
-import { ArrowRight, ChevronDown, Globe, Lock, Search, Shield, Sparkle } from "@/components/icons";
+import { ArrowRight, ChevronDown, Globe, Lock, MailQuestion, Search, Shield, Sparkle } from "@/components/icons";
 import { formatNaira } from "@/lib/services/catalog";
 import {
   orderByReadiness,
@@ -73,12 +73,63 @@ const POPULAR_COUNTRIES = [
   { code: "gh", name: "Ghana", desc: "Regional African plans" },
 ];
 
+/**
+ * The fallback for an inbox whose provider is not recognised.
+ *
+ * Always decorative: the card beside it carries the listing's own name, so an
+ * `aria-label` here would read that name twice.
+ */
+function UnidentifiedInbox({ size }: { size: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex shrink-0 items-center justify-center rounded-lg bg-lav-100 text-lav-700"
+      style={{ width: size, height: size }}
+    >
+      <MailQuestion width={Math.round(size * 0.55)} height={Math.round(size * 0.55)} />
+    </span>
+  );
+}
+
+function SiteFavicon({ domain, size }: { domain: string; size: number }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <UnidentifiedInbox size={size} />;
+
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line/70 bg-white"
+      style={{ width: size, height: size }}
+    >
+      {/* The supplier lists destination sites as well as mail providers. Their
+          published favicons are the only honest logos for brands not bundled
+          with the app; this endpoint returns the site's real favicon. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`}
+        alt=""
+        width={size}
+        height={size}
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
+        className="h-full w-full object-contain p-1"
+      />
+    </span>
+  );
+}
+
 function itemArt(item: ExplorerItem, size: "sm" | "md" = "md") {
   const pixels = size === "sm" ? 28 : 42;
   switch (item.artwork.kind) {
     case "brand": return <BrandIcon brand={item.artwork.name} size={pixels} decorative />;
     case "network": return <NetworkBadge provider={item.artwork.name} size={pixels} />;
     case "service": return <ServiceIcon service={item.artwork.name} size={size} />;
+    case "site-favicon": return <SiteFavicon domain={item.artwork.domain} size={pixels} />;
+    // A mailbox with no published favicon: Lucide's `mail-question`, never
+    // another provider's logo or the Temporary-inbox tool's mark.
+    case "unidentified-inbox": return <UnidentifiedInbox size={pixels} />;
   }
 }
 

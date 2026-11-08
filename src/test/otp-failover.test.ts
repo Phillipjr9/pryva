@@ -2,14 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { findPlan } from "@/lib/services/catalog";
 
 /**
- * Two suppliers now sell the same product, so the risk moves from "can we buy?"
- * to "did we buy twice?" and "was the second one actually usable?".
- *
- * These pin the three properties that make failover safe:
- *  • a switch is only ever made before a buy call, so it costs nothing;
- *  • an ambiguous purchase ends the search, because neither supplier takes an
- *    idempotency key and a second buy is a second number;
- *  • a supplier whose price cannot be converted is never sold.
+ * Bitcall is the only supplier for single-use OTP checkout. These pin the safety
+ * properties that matter: no Fleexa failover, no spend on unpriced or out-of-stock
+ * offers, and no repeat purchase after an ambiguous Bitcall response.
  */
 const fleexa = vi.hoisted(() => ({ configured: true, buy: vi.fn(), list: vi.fn() }));
 const bitcall = vi.hoisted(() => ({
@@ -43,7 +38,7 @@ vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
 });
 
 const { cancelUpstream, fulfillPlan } = await import("@/lib/services/fulfillment");
-const { otpSupplierOrder, otpSupplierProbe, clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");
+const { otpSupplierOrder, otpSupplierProbe, clearOtpCatalogueCache, otpOfferPublicId } = await import("@/lib/services/numbers/otp-suppliers");
 const { FleexaError } = await import("@/lib/providers/fleexa");
 
 const RATE = 1500;
@@ -101,8 +96,8 @@ afterEach(() => {
 });
 
 describe("supplier order", () => {
-  it("defaults to fleexa first, then the gateway", () => {
-    expect(otpSupplierOrder()).toEqual(["fleexa", "bitcall"]);
+  it("defaults to Bitcall first for OTP integrations", () => {
+    expect(otpSupplierOrder()).toEqual(["bitcall", "fleexa"]);
   });
 
   it("lets an environment list reorder suppliers without dropping any", async () => {
@@ -114,31 +109,36 @@ describe("supplier order", () => {
   });
 });
 
-describe("paying the least", () => {
-  it("buys from the cheaper supplier even when it is second in the order", async () => {
-    fleexa.list.mockResolvedValue(fleexaQuote(900));
+describe("Bitcall-only OTP checkout", () => {
+  it("uses Bitcall even when Fleexa is cheaper and configured first", async () => {
+    vi.stubEnv("OTP_PROVIDER_ORDER", "fleexa,bitcall");
+    fleexa.list.mockResolvedValue(fleexaQuote(1));
     fleexa.buy.mockResolvedValue(receipt);
-    bitcall.list.mockResolvedValue(bitcallQuote({ price: 0.05 })); // 75 naira
+    bitcall.list.mockResolvedValue(bitcallQuote({ price: 0.05 }));
 
     await expect(fulfillPlan(plan)).resolves.toMatchObject({ provider: "bitcall" });
-    // The plan price is fixed, so the cheaper purchase is the whole margin.
+    expect(fleexa.list).not.toHaveBeenCalled();
     expect(fleexa.buy).not.toHaveBeenCalled();
     expect(bitcall.buy).toHaveBeenCalledOnce();
   });
 
-  it("prefers the configured supplier only when the price is the same", async () => {
+  it("does not fall back to Fleexa when Bitcall has no offer", async () => {
     fleexa.list.mockResolvedValue(fleexaQuote(75));
-    fleexa.buy.mockResolvedValue(receipt);
-    bitcall.list.mockResolvedValue(bitcallQuote({ price: 0.05 })); // also 75 naira
+    bitcall.list.mockResolvedValue([]);
 
-    await expect(fulfillPlan(plan)).resolves.toMatchObject({ provider: "fleexa" });
+    await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
+    expect(fleexa.list).not.toHaveBeenCalled();
+    expect(fleexa.buy).not.toHaveBeenCalled();
+    expect(bitcall.buy).not.toHaveBeenCalled();
   });
 
-  it("skips a supplier that cannot be priced and buys the one that can", async () => {
-    fleexa.list.mockResolvedValue(fleexaQuote(null));
-    bitcall.list.mockResolvedValue(bitcallQuote());
+  it("refuses an unpriced Bitcall offer instead of switching suppliers", async () => {
+    fleexa.list.mockResolvedValue(fleexaQuote(75));
+    bitcall.list.mockResolvedValue(bitcallQuote({ currency: "EUR" }));
 
-    await expect(fulfillPlan(plan)).resolves.toMatchObject({ provider: "bitcall" });
+    await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "COST_UNKNOWN" });
+    expect(fleexa.buy).not.toHaveBeenCalled();
+    expect(bitcall.buy).not.toHaveBeenCalled();
   });
 });
 
@@ -163,58 +163,98 @@ describe("operator probe", () => {
   });
 });
 
-describe("failing over", () => {
-  it("buys from the gateway when the first supplier does not cover the country", async () => {
-    fleexa.list.mockResolvedValue([]);
+describe("Bitcall-only fulfilment", () => {
+  it("buys only the selected app offer, using a fresh catalogue and durable callbacks", async () => {
+    const selectedRef = "pool-whatsapp-selected";
+    bitcall.list.mockResolvedValue([{ name: "WhatsApp", offers: [
+      { serviceId: "pool-cheaper-other-app", price: 0.01, currency: "USD", availableCount: 20 },
+      { serviceId: selectedRef, price: 0.05, currency: "USD", availableCount: 5 },
+    ] }]);
+    const id = otpOfferPublicId("ng", selectedRef, "WhatsApp");
+    const onOtpAttempt = vi.fn(async () => undefined);
+    const onOtpAccepted = vi.fn(async () => undefined);
+
+    await expect(fulfillPlan(plan, { otpOfferId: id, onOtpAttempt, onOtpAccepted }))
+      .resolves.toMatchObject({ provider: "bitcall", providerRequestId: "act-1" });
+
+    expect(bitcall.list).toHaveBeenCalledWith({ countryCode: "NG" });
+    expect(bitcall.buy).toHaveBeenCalledTimes(1);
+    expect(bitcall.buy).toHaveBeenCalledWith(selectedRef);
+    expect(fleexa.buy).not.toHaveBeenCalled();
+    expect(onOtpAttempt.mock.invocationCallOrder[0]).toBeLessThan(bitcall.buy.mock.invocationCallOrder[0]);
+    expect(bitcall.buy.mock.invocationCallOrder[0]).toBeLessThan(onOtpAccepted.mock.invocationCallOrder[0]);
+  });
+
+  it("does not substitute a different app pool when the chosen offer fails its margin guard", async () => {
+    bitcall.list.mockResolvedValue([{ name: "WhatsApp", offers: [
+      { serviceId: "profitable-other-pool", price: 0.01, currency: "USD", availableCount: 20 },
+      { serviceId: "selected-unprofitable", price: 2, currency: "USD", availableCount: 5 },
+    ] }]);
+    const onOtpAttempt = vi.fn(async () => undefined);
+    const onOtpAccepted = vi.fn(async () => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(fulfillPlan(plan, {
+      otpOfferId: otpOfferPublicId("ng", "selected-unprofitable", "WhatsApp"), onOtpAttempt, onOtpAccepted,
+    })).rejects.toMatchObject({ code: "UNPROFITABLE" });
+    expect(bitcall.buy).not.toHaveBeenCalled();
+    expect(onOtpAttempt).not.toHaveBeenCalled();
+  });
+
+  it("requires claim callbacks before an app-specific spend can begin", async () => {
+    bitcall.list.mockResolvedValue(bitcallQuote());
+    await expect(fulfillPlan(plan, { otpOfferId: otpOfferPublicId("ng", "pool-1", "WhatsApp") }))
+      .rejects.toMatchObject({ code: "OTP_CLAIM_REQUIRED" });
+    expect(bitcall.buy).not.toHaveBeenCalled();
+  });
+
+  it("uses the exact Bitcall offer and records the returned app and activation", async () => {
+    fleexa.list.mockResolvedValue(fleexaQuote(100));
     bitcall.list.mockResolvedValue(bitcallQuote());
 
     const result = await fulfillPlan(plan);
 
+    expect(fleexa.list).not.toHaveBeenCalled();
     expect(fleexa.buy).not.toHaveBeenCalled();
     expect(bitcall.buy).toHaveBeenCalledWith("pool-1");
     expect(result).toMatchObject({
       provider: "bitcall",
       providerRequestId: "act-1",
       referenceCode: "+2348111111111",
-      // The code arrives by polling; nothing is invented here.
       otpCode: null,
-      // The pool only serves one app, so the order has to say which.
       serviceLabel: "WhatsApp",
     });
   });
 
-  it("skips a supplier whose cost would break the floor and uses the cheaper one", async () => {
-    fleexa.list.mockResolvedValue(fleexaQuote(plan.price * 2));
-    bitcall.list.mockResolvedValue(bitcallQuote());
-    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  it("refuses a Bitcall offer that breaks the margin floor without supplier substitution", async () => {
+    fleexa.list.mockResolvedValue(fleexaQuote(100));
+    bitcall.list.mockResolvedValue(bitcallQuote({ price: 2 }));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
 
-    await expect(fulfillPlan(plan)).resolves.toMatchObject({ provider: "bitcall" });
+    await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "UNPROFITABLE" });
     expect(fleexa.buy).not.toHaveBeenCalled();
-    expect(bitcall.buy).toHaveBeenCalledTimes(1);
-    error.mockRestore();
-  });
-
-  it("fails over when the first supplier refuses before sending a request", async () => {
-    fleexa.list.mockResolvedValue(fleexaQuote(100));
-    fleexa.buy.mockRejectedValue(new FleexaError("Rate limited", 429, "RATE_LIMITED"));
-    bitcall.list.mockResolvedValue(bitcallQuote());
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
-
-    await expect(fulfillPlan(plan)).resolves.toMatchObject({ provider: "bitcall" });
-    expect(bitcall.buy).toHaveBeenCalledTimes(1);
-  });
-
-  it("never fails over after a purchase that may have happened", async () => {
-    // Fleexa is the cheaper of the two here, so it is the one that gets bought --
-    // and its ambiguous failure must not send the order to the other supplier.
-    fleexa.list.mockResolvedValue(fleexaQuote(100));
-    fleexa.buy.mockRejectedValue(new FleexaError("Incomplete receipt", 502, "INCOMPLETE_RECEIPT"));
-    bitcall.list.mockResolvedValue(bitcallQuote({ price: 0.5 }));
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
-
-    await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "INCOMPLETE_RECEIPT" });
-    // A second number for one order is worse than no number at all.
     expect(bitcall.buy).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back to Fleexa when Bitcall refuses before purchase", async () => {
+    fleexa.list.mockResolvedValue(fleexaQuote(100));
+    bitcall.list.mockRejectedValue(new FleexaError("Rate limited", 429, "RATE_LIMITED"));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
+    expect(fleexa.buy).not.toHaveBeenCalled();
+    expect(bitcall.buy).not.toHaveBeenCalled();
+  });
+
+  it("never repeats or fails over after an ambiguous Bitcall purchase", async () => {
+    fleexa.list.mockResolvedValue(fleexaQuote(100));
+    bitcall.list.mockResolvedValue(bitcallQuote({ price: 0.05 }));
+    bitcall.buy.mockRejectedValue(new Error("Ambiguous provider outcome"));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "AMBIGUOUS_PURCHASE" });
+    expect(bitcall.buy).toHaveBeenCalledTimes(1);
+    expect(fleexa.buy).not.toHaveBeenCalled();
   });
 
   it("refuses a supplier price it cannot convert, instead of guessing a rate", async () => {

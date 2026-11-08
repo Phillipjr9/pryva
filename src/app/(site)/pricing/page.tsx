@@ -168,7 +168,7 @@ export default function PricingPage() {
                       </Link>
                     ) : (
                       <p className="block w-full rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-center text-[0.66rem] font-semibold leading-relaxed text-amber-900 sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.78rem]">
-                        Not deliverable yet
+                        This plan cannot be delivered yet, so it cannot be ordered or charged.
                       </p>
                     )}
                   </div>

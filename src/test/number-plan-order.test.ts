@@ -2,11 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { findPlan, plansFor } from "@/lib/services/catalog";
 
 /**
- * The storefront shows the destination it can serve most cheaply first.
- *
- * The selling price is fixed per plan, so the cheapest supplier is the widest
- * margin — but this ordering is rendered on a public page, so it must never
- * carry a cost, and a supplier that stops answering must never stop the page.
+ * The storefront shows the destination with the lowest Bitcall OTP cost first,
+ * because Bitcall is the only single-use purchase route. Costs stay server-side,
+ * and a catalogue read failure never takes the page offline.
  */
 const fleexa = vi.hoisted(() => ({ configured: true, list: vi.fn(), buy: vi.fn() }));
 const bitcall = vi.hoisted(() => ({ configured: true, list: vi.fn(), buy: vi.fn() }));
@@ -69,18 +67,17 @@ afterEach(() => {
 });
 
 describe("number plan order", () => {
-  it("puts the destination that costs least to serve first", async () => {
-    // Ghana is expensive on the first supplier, Nigeria cheap on the second.
-    fleexa.list.mockResolvedValue(fleexaRows({ ng: 900, us: 1_100, gb: 1_300, ca: 1_500, de: 1_600, gh: 100 }));
+  it("puts the destination with the lowest Bitcall cost first", async () => {
+    const costs = { NG: 0.01, US: 0.02, GB: 0.08, CA: 0.09, DE: 0.1, GH: 0.07 };
     bitcall.list.mockImplementation(async ({ countryCode }: { countryCode: string }) =>
-      countryCode === "NG" ? gatewayRows({ ng: 0.01 }) : [], // 15 naira
+      gatewayRows({ [countryCode.toLowerCase()]: costs[countryCode as keyof typeof costs] }),
     );
 
     const ordered = await orderNumberPlansByCheapestCost(sellable());
 
-    expect(ordered[0].slug).toBe("vn-ng"); // 15 naira, the cheapest of all
-    expect(ordered[1].slug).toBe("vn-gh"); // 100
-    expect(ordered.at(-1)?.slug).toBe("vn-de"); // 1,600
+    expect(ordered[0].slug).toBe("vn-ng");
+    expect(ordered[1].slug).toBe("vn-us");
+    expect(ordered.at(-1)?.slug).toBe("vn-de");
     // The ordering crosses a public boundary: it must carry no new facts. Same
     // plan objects, same fields — no cost, no app, no supplier anywhere.
     expect(ordered.map((plan) => Object.keys(plan).sort()))
@@ -98,10 +95,11 @@ describe("number plan order", () => {
     expect(fleexa.list).not.toHaveBeenCalled();
   });
 
-  it("keeps catalogue order for destinations it cannot price", async () => {
-    // Nobody prices Canada, so it stays where it was rather than being dropped.
-    fleexa.list.mockResolvedValue(fleexaRows({ ng: 900 }));
-    bitcall.list.mockResolvedValue([]);
+  it("keeps catalogue order for destinations Bitcall cannot price", async () => {
+    // Only Nigeria has a Bitcall price; all other destinations remain in place.
+    bitcall.list.mockImplementation(async ({ countryCode }: { countryCode: string }) =>
+      countryCode === "NG" ? gatewayRows({ ng: 0.01 }) : [],
+    );
     const plans = sellable();
 
     const ordered = await orderNumberPlansByCheapestCost(plans);
@@ -111,9 +109,8 @@ describe("number plan order", () => {
     expect(ordered.map((plan) => plan.slug).slice(1)).toEqual(["vn-us", "vn-uk", "vn-ca", "vn-de", "vn-gh"]);
   });
 
-  it("still renders when a supplier fails", async () => {
-    fleexa.list.mockRejectedValue(new Error("supplier down"));
-    bitcall.list.mockResolvedValue(gatewayRows({ ng: 0.01 }));
+  it("still renders when Bitcall catalog reads fail", async () => {
+    bitcall.list.mockRejectedValue(new Error("gateway down"));
     const plans = sellable();
 
     const ordered = await orderNumberPlansByCheapestCost(plans);
@@ -122,14 +119,14 @@ describe("number plan order", () => {
     expect(ordered[0].slug).toBe("vn-ng");
   });
 
-  it("reads the catalogues once and then serves from cache", async () => {
-    fleexa.list.mockResolvedValue(fleexaRows({ ng: 900, us: 1_100, gb: 1_300, ca: 1_500, de: 1_600, gh: 900 }));
+  it("reads Bitcall catalogs once and then serves from cache", async () => {
+    bitcall.list.mockResolvedValue(gatewayRows({ ng: 0.01 }));
 
     await orderNumberPlansByCheapestCost(sellable());
-    const callsAfterFirst = fleexa.list.mock.calls.length;
+    const callsAfterFirst = bitcall.list.mock.calls.length;
     await orderNumberPlansByCheapestCost(sellable());
 
     // A public page must not become a supplier-catalogue pager.
-    expect(fleexa.list.mock.calls.length).toBe(callsAfterFirst);
+    expect(bitcall.list.mock.calls.length).toBe(callsAfterFirst);
   });
 });

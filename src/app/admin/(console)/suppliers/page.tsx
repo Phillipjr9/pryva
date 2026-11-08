@@ -27,8 +27,8 @@ export default async function AdminSuppliersPage({
         <div>
           <h1 className="text-[1.5rem] font-medium tracking-tight">Supplier health</h1>
           <p className="mt-1 max-w-3xl text-[0.86rem] text-ink-2">
-            Read-only supplier checks for the countries we sell. This is the guardrail that tells us when a key is missing,
-            a balance is empty, or the cheapest available route would break the margin floor before a customer ever pays.
+            Read-only supplier checks for the countries we sell. Bitcall is the single-use OTP purchase route; Fleexa remains
+            visible for diagnostics and rentals. This highlights missing keys, low balance or a Bitcall offer below our margin floor.
           </p>
         </div>
         <div className="rounded-xl border border-line bg-white px-4 py-2 text-right">

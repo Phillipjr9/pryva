@@ -22,6 +22,18 @@ export type ExplorerFilter = ExplorerCategory | "all";
 export type ExplorerArtwork =
   | { kind: "brand"; name: BrandSlug | "disney-plus" }
   | { kind: "service"; name: "numbers" | "esim" | "proxies" | "email-otp" | "accounts" | "bulk" | "scheduled" | "social-promotion" }
+  /**
+   * An inbox whose provider we could not identify. It is deliberately not
+   * `email-otp`: that glyph belongs to the "Temporary inbox" card, and a grid
+   * where an unknown provider wears the same mark as the free tool is the
+   * duplicate-logo complaint all over again, one level down.
+   */
+  | { kind: "unidentified-inbox" }
+  /**
+   * A site listing with a public domain but no bundled brand mark. Load the
+   * site's real favicon rather than showing the same envelope on every tile.
+   */
+  | { kind: "site-favicon"; domain: string }
   | { kind: "network"; name: AirtimeProvider };
 export type ExplorerItem = {
   id: string;

@@ -18,6 +18,7 @@ type Props = {
   signedIn: boolean;
   walletBalance: number | null;
   nextPath: string;
+  otpOfferId?: string;
 };
 
 /**
@@ -35,7 +36,7 @@ function newRequestId(): string {
   return `${hex(8)}-${hex(4)}-4${hex(3)}-${variant}${hex(3)}-${hex(12)}`;
 }
 
-export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Props) {
+export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOfferId }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState(0);
   const plans = useMemo(() => groups[tab]?.plans ?? [], [groups, tab]);
@@ -45,7 +46,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsFunds, setNeedsFunds] = useState(false);
-  const [success, setSuccess] = useState<{ id: string; reference: string; name: string } | null>(
+  const [success, setSuccess] = useState<{ id: string; reference: string; name: string; review: boolean; reviewMessage: string } | null>(
     null,
   );
 
@@ -85,12 +86,14 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planSlug: selected.slug, requestId: requestIdFor(selected.slug) }),
+        body: JSON.stringify({ planSlug: selected.slug, requestId: requestIdFor(selected.slug), ...(otpOfferId ? { otpOfferId } : {}) }),
       });
       const data = (await response.json()) as {
         ok?: boolean;
         error?: string;
-        order?: { id: string; reference: string; productName: string };
+        safeToRetry?: boolean;
+        message?: string;
+        order?: { id: string; reference: string; productName: string; status?: string };
       };
 
       if (response.status === 401) {
@@ -98,6 +101,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
         return;
       }
       if (!response.ok || !data.ok || !data.order) {
+        if (data.safeToRetry) attempt.current = null;
         setError(data.error ?? "We couldn't complete that order. Please try again.");
         if (response.status === 402) setNeedsFunds(true);
         return;
@@ -106,6 +110,8 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
         id: data.order.id,
         reference: data.order.reference,
         name: data.order.productName,
+        review: data.order.status === "review",
+        reviewMessage: data.message ?? "This order needs review. Check the order status and wallet balance before retrying.",
       });
       // The attempt is settled, so the next purchase is genuinely a new one.
       attempt.current = null;
@@ -122,8 +128,8 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
       <PaymentLoading show={pending} message="Processing your order..." />
       <PaymentSuccess
         show={!!success}
-        title="Order Complete"
-        message={`${success?.name} is now in your dashboard.`}
+        title={success?.review ? "Order under review" : "Order Complete"}
+        message={success?.review ? success.reviewMessage : `${success?.name} is now in your dashboard.`}
         redirectUrl={`/dashboard/orders/${success?.id}`}
         redirectDelay={2500}
       />
@@ -134,9 +140,9 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
           <span className="grid h-12 w-12 place-items-center rounded-full bg-lav-100 text-lav-700">
             <Check className="h-6 w-6" />
           </span>
-          <h3 className="mt-5 text-2xl font-medium">Order complete.</h3>
+          <h3 className="mt-5 text-2xl font-medium">{success.review ? "Order needs review." : "Order complete."}</h3>
           <p className="mt-2 max-w-md text-[0.92rem] leading-relaxed text-ink-2">
-            <span className="font-semibold text-ink">{success.name}</span> is now in your dashboard. Your verification code appears in the order details as soon as it arrives.
+            {success.review ? <>{success.reviewMessage} </> : <><span className="font-semibold text-ink">{success.name}</span> is now in your dashboard. Your verification code appears in the order details as soon as it arrives. </>}
             Order reference{" "}
             <span className="rounded-md bg-lav-50 px-1.5 py-0.5 font-mono text-[0.8rem] text-lav-700">
               {success.reference}
@@ -145,16 +151,18 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath }: Prop
           </p>
           <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
             <Link href={`/dashboard/orders/${success.id}`} className="btn btn-primary">
-              View code &amp; details
+              {success.review ? "View order status" : "View code & details"}
               <ArrowRight className="h-4 w-4" />
             </Link>
-            <button
-              type="button"
-              onClick={() => setSuccess(null)}
-              className="btn btn-ghost"
-            >
-              Buy another
-            </button>
+            {!success.review && (
+              <button
+                type="button"
+                onClick={() => setSuccess(null)}
+                className="btn btn-ghost"
+              >
+                Buy another
+              </button>
+            )}
           </div>
         </div>
       )}
