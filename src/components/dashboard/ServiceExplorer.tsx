@@ -8,7 +8,7 @@ import { CountrySelector } from "@/components/dashboard/CountrySelector";
 import { NetworkBadge } from "@/components/NetworkBadge";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
-import { ArrowRight, ChevronDown, Globe, Lock, Search, Shield, Sparkle } from "@/components/icons";
+import { ArrowRight, ChevronDown, Globe, Lock, MailQuestion, Search, Shield, Sparkle } from "@/components/icons";
 import { formatNaira } from "@/lib/services/catalog";
 import {
   orderByReadiness,
@@ -73,12 +73,34 @@ const POPULAR_COUNTRIES = [
   { code: "gh", name: "Ghana", desc: "Regional African plans" },
 ];
 
+/**
+ * The fallback for an inbox whose provider is not recognised.
+ *
+ * Always decorative: the card beside it carries the listing's own name, so an
+ * `aria-label` here would read that name twice.
+ */
+function UnidentifiedInbox({ size }: { size: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex shrink-0 items-center justify-center rounded-lg bg-lav-100 text-lav-700"
+      style={{ width: size, height: size }}
+    >
+      <MailQuestion width={Math.round(size * 0.55)} height={Math.round(size * 0.55)} />
+    </span>
+  );
+}
+
 function itemArt(item: ExplorerItem, size: "sm" | "md" = "md") {
   const pixels = size === "sm" ? 28 : 42;
   switch (item.artwork.kind) {
     case "brand": return <BrandIcon brand={item.artwork.name} size={pixels} decorative />;
     case "network": return <NetworkBadge provider={item.artwork.name} size={pixels} />;
     case "service": return <ServiceIcon service={item.artwork.name} size={size} />;
+    // A mailbox we cannot place: Lucide's `mail-question`, in the same tile as
+    // the rest, so it reads as "an address, provider unknown" and never as
+    // another provider's logo or as the Temporary-inbox tool.
+    case "unidentified-inbox": return <UnidentifiedInbox size={pixels} />;
   }
 }
 

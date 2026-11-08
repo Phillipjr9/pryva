@@ -2,12 +2,13 @@
  * Generates `src/lib/content/brand-marks.ts` from official open icon sources.
  *
  * Run:
- *   npm i --no-save simple-icons @iconify-json/logos devicon
+ *   npm i --no-save simple-icons @iconify-json/logos @iconify-json/cib devicon
  *   node scripts/extract-brand-marks.mjs
  *
  * Sources: simple-icons (CC0 data), @iconify-json/logos (CC0 set),
- * devicon (MIT) for Canva. Brands remain the trademarks of their owners; the
- * marks are used for identification of the product being sold, nothing else.
+ * @iconify-json/cib (CC0 set) and devicon (MIT) for Canva. Brands remain the
+ * trademarks of their owners; the marks are used for identification of the
+ * product being sold, nothing else.
  */
 import { createRequire } from "node:module";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -15,6 +16,7 @@ const require = createRequire(new URL("../package.json", import.meta.url));
 
 const si = require("simple-icons");
 const logos = require("@iconify-json/logos/icons.json");
+const cib = require("@iconify-json/cib/icons.json");
 
 /** slug -> {title, hex, viewBox, body} */
 const out = {};
@@ -36,6 +38,26 @@ function fromLogos(name, slug, hexOverride, title) {
     viewBox: `0 0 ${w} ${h}`,
     body: icon.body,
     source: "logos (CC0 set)",
+  };
+}
+
+/**
+ * The "@iconify-json/cib" set is CC0 like the other two. It is the source used
+ * for Yandex: simple-icons no longer carries that brand. Its paths are painted
+ * with `fill="currentColor"`, which would fight the brand colour the tile
+ * supplies, so the attribute is stripped and the tile's fill wins.
+ */
+function fromCib(name, slug, hexOverride, title) {
+  const icon = cib.icons[name];
+  if (!icon) throw new Error("missing cib icon " + name);
+  const w = icon.width ?? cib.width;
+  const h = icon.height ?? cib.height;
+  out[slug] = {
+    title: title ?? name,
+    hex: hexOverride ?? "",
+    viewBox: `0 0 ${w} ${h}`,
+    body: icon.body.replace(/\s*fill="currentColor"/g, ""),
+    source: "cib (CC0 set)",
   };
 }
 
@@ -84,6 +106,29 @@ fromLogos("openai-icon", "chatgpt", "#10A37F", "ChatGPT");
 fromSimple("siGmail", "gmail", "#EA4335");
 // Google ships as solid multi-colour paths — no defs, safe to repeat.
 fromLogos("google-icon", "google", "", "Google");
+
+/*
+ * Mail providers the temporary-inbox feed lists.
+ *
+ * The feed reports an inbox per provider, so each listing has to carry that
+ * provider's own mark. Without these rules a GMX entry fell through to the
+ * neutral envelope and eight different providers rendered identically — the
+ * complaint this block answers. Real marks only: nothing here is drawn by eye.
+ *
+ * Outlook, Yahoo, Proton, Zoho and Mail.Ru are absent on purpose. simple-icons
+ * carries no Outlook mark, and the Yahoo/Proton/Zoho/Mail.Ru entries that ship
+ * today were extracted by hand from artwork these packages no longer expose,
+ * so re-deriving them would silently replace real logos with different ones.
+ * They stay in BRAND_MARKS untouched.
+ */
+fromSimple("siGmx", "gmx");
+fromSimple("siIcloud", "icloud");
+fromSimple("siMaildotcom", "maildotcom");
+fromSimple("siWebdotde", "webdotde");
+fromSimple("siTuta", "tuta");
+fromSimple("siQq", "qq");
+fromSimple("siNaver", "naver");
+fromCib("yandex", "yandex", "#FC3F1D", "Yandex");
 
 // Canva: devicon's original mark (multi-colour), MIT-licensed source files.
 const canva = readFileSync("/tmp/probe/node_modules/devicon/icons/canva/canva-original.svg", "utf8");

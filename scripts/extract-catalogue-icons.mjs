@@ -36,6 +36,7 @@ const ICONS = [
   ["Megaphone", "megaphone"],
   ["IdCard", "id-card"],
   ["MonitorPlay", "monitor-play"],
+  ["MailQuestion", "mail-question"],
 ];
 
 const START = "/**\n * Catalogue glyphs — official Lucide path data, not hand-drawn.";

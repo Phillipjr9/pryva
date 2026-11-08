@@ -5,6 +5,7 @@ import { isFleexaConfigured, listFleexaEmailProducts, listFleexaRentAreas, listF
 import { priceFromCost, isPriceInBand } from "@/lib/services/pricing";
 import { safeUnitCount } from "@/lib/services/service-units";
 import { explorerCountry, VERIFICATION_EXAMPLES, type ExplorerItem } from "@/lib/services/service-explorer";
+import { mailProviderBrand } from "@/lib/services/numbers/mail-provider-marks";
 
 export type SupplierSnapshot = {
   sms: FleexaSmsService[];
@@ -118,19 +119,19 @@ export function supplierItemsForCountry(snapshot: SupplierSnapshot, countryCode:
   for (const entry of snapshot.email) {
     const id = readable(entry.id, 120), name = readable(entry.name, 80) ?? readable(entry.domain, 80);
     if (!id || !name) continue;
-    const lower = name.toLowerCase();
-    const brand = (() => {
-      if (lower.includes("gmail") || lower.includes("google mail")) return "gmail";
-      if (lower.includes("outlook") || lower.includes("hotmail") || lower.includes("live mail")) return "outlook";
-      if (lower.includes("proton") || lower.includes("protonmail")) return "protonmail";
-      if (lower.includes("mail.ru") || lower.includes("maildotru") || lower.includes("mail ru")) return "maildotru";
-      if (lower.includes("yahoo")) return "yahoo";
-      if (lower.includes("zoho")) return "zoho";
-      return null;
-    })();
+    /*
+     * The provider's OWN mark, looked up in one table rather than a chain of
+     * `includes` calls, because the chain knew only six providers: GMX, iCloud,
+     * Yandex, Tuta, mail.com, WEB.DE, QQ and Naver all fell through to the same
+     * envelope glyph, so eight different products wore one logo.
+     *
+     * The fallback is still the neutral envelope, never another provider's
+     * mark, so an inbox we cannot identify claims nothing.
+     */
+    const brand = mailProviderBrand(name, entry.domain);
     add({
       id: itemId("email", id, "global"), category: "email", name, description: "Free temporary inbox", tag: "Free",
-      artwork: brand ? { kind: "brand", name: brand } : { kind: "service", name: "email-otp" }, source: "live", coverage: "not-country-specific",
+      artwork: brand ? { kind: "brand", name: brand } : { kind: "unidentified-inbox" }, source: "live", coverage: "not-country-specific",
       // No price, and deliberately so. What the feed charges us per inbox is our
       // cost of running a free tool, not a price a customer sees. Marking it up
       // here would put a number on something we have decided to give away, and

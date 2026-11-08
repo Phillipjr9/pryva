@@ -67,6 +67,68 @@ describe("read-only supplier catalog", () => {
     ]);
   });
 
+  it("gives every listed inbox its own provider logo, never one shared glyph", async () => {
+    // The reported bug: GMX, iCloud, Yandex, Tuta, mail.com, WEB.DE, QQ and Naver
+    // all rendered the same envelope, so eight different products looked like one.
+    const { supplierItemsForCountry } = await import("@/lib/services/numbers/fleexa-catalog");
+    const providers = [
+      ["Gmail inbox", "gmail.com", "gmail"],
+      ["Outlook inbox", "outlook.com", "outlook"],
+      ["Yahoo Mail inbox", "yahoo.com", "yahoo"],
+      ["Proton Mail inbox", "proton.me", "protonmail"],
+      ["Mail.ru inbox", "mail.ru", "maildotru"],
+      ["Zoho Mail inbox", "zoho.com", "zoho"],
+      ["GMX inbox", "gmx.com", "gmx"],
+      ["iCloud inbox", "icloud.com", "icloud"],
+      ["Yandex Mail inbox", "yandex.ru", "yandex"],
+      ["Tuta inbox", "tuta.com", "tuta"],
+      ["mail.com inbox", "mail.com", "maildotcom"],
+      ["WEB.DE inbox", "web.de", "webdotde"],
+      ["QQ Mail inbox", "qq.com", "qq"],
+      ["Naver Mail inbox", "naver.com", "naver"],
+    ] as const;
+
+    const items = supplierItemsForCountry(
+      {
+        ...snapshot,
+        email: providers.map(([name, domain], index) => ({
+          id: `e${index}`, name, domain, priceNgn: 500, stock: 4,
+        })),
+      },
+      "us",
+    ).filter((item) => item.category === "email");
+
+    expect(items.map((item) => item.artwork)).toEqual(
+      providers.map(([, , brand]) => ({ kind: "brand", name: brand })),
+    );
+    // Fourteen listings, fourteen different marks. This is the assertion the bug
+    // would have failed, and it is the owner's actual instruction.
+    const marks = new Set(items.map((item) => JSON.stringify(item.artwork)));
+    expect(marks.size).toBe(providers.length);
+  });
+
+  it("keeps an unidentified inbox off the free tool's glyph and off other providers", async () => {
+    const { supplierItemsForCountry } = await import("@/lib/services/numbers/fleexa-catalog");
+    const items = supplierItemsForCountry(
+      {
+        ...snapshot,
+        email: [
+          { id: "aol-1", name: "AOL inbox", domain: "aol.com", priceNgn: 500, stock: 1 },
+          { id: "anon-1", name: "Temporary inbox", domain: "mail.test", priceNgn: 500, stock: 1 },
+        ],
+      },
+      "us",
+    ).filter((item) => item.category === "email");
+
+    // Not `email-otp`: that is the Temporary-inbox card's mark, and an unknown
+    // provider wearing it is the same duplicate-logo problem one level down.
+    expect(items.map((item) => item.artwork)).toEqual([
+      { kind: "unidentified-inbox" },
+      { kind: "unidentified-inbox" },
+    ]);
+    expect(items.some((item) => JSON.stringify(item.artwork).includes("email-otp"))).toBe(false);
+  });
+
   it("coalesces requests and reports partial supplier outages without caching user data", async () => {
     supplier.sms.mockResolvedValue(snapshot.sms);
     supplier.email.mockRejectedValue(new Error("offline"));

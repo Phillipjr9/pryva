@@ -28,6 +28,8 @@ const ICONS: Array<[string, string]> = [
   ["Megaphone", "megaphone"],
   ["IdCard", "id-card"],
   ["MonitorPlay", "monitor-play"],
+  // The neutral mark for an inbox whose provider we cannot identify.
+  ["MailQuestion", "mail-question"],
 ];
 
 const source = readFileSync("src/components/icons.tsx", "utf8");
