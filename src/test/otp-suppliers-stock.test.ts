@@ -89,7 +89,7 @@ describe("otp stock aggregation", () => {
 
     const { readOtpOffersForSupplier, clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");
     clearOtpCatalogueCache();
-    const read = await readOtpOffersForSupplier("bitcall", "us", "United States", undefined, true);
+    const read = await readOtpOffersForSupplier("bitcall", "us", "United States", true);
 
     expect(read.errorCode).toBeNull();
     expect(read.offers).toMatchObject([
@@ -119,7 +119,7 @@ describe("otp stock aggregation", () => {
 
     const { readOtpOffersForSupplier, clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");
     clearOtpCatalogueCache();
-    const read = await readOtpOffersForSupplier("bitcall", "us", "United States", undefined, true);
+    const read = await readOtpOffersForSupplier("bitcall", "us", "United States", true);
 
     expect(read.offers).toMatchObject([{ ref: "us-whatsapp-pool", country: "us", app: "WhatsApp", stock: 9 }]);
   });
@@ -188,6 +188,43 @@ describe("otp stock aggregation", () => {
       }
     });
 
+    it("waits for a slow feed instead of declaring the country empty", async () => {
+      // Being late is not evidence about the catalogue. The read used to be
+      // abandoned after 4 s (checkout) or 8 s (browsing) — both shorter than the
+      // gateway's own 20 s timeout — so a slow but working feed reported
+      // "nothing on offer" and the shop went empty for a country that had stock.
+      bitcall.configured.mockReturnValue(true);
+      let answer: () => void = () => {};
+      bitcall.listCountryEntries.mockReturnValue(new Promise((resolve) => {
+        answer = () => resolve([{
+          countryCode: "NG",
+          name: "Nigeria",
+          serviceCount: 1,
+          availableCount: 4,
+          startingPrice: 800,
+          currency: "NGN",
+          pools: [{ serviceId: "BRAVO-NG_1-whatsapp", price: 800, currency: "NGN", availableCount: 4, successRate: 91 }],
+        }]);
+      }));
+
+      const { readOtpOffersForSupplier, clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");
+      clearOtpCatalogueCache();
+      const reading = readOtpOffersForSupplier("bitcall", "ng", "Nigeria");
+
+      vi.useFakeTimers();
+      try {
+        await vi.advanceTimersByTimeAsync(30_000);
+        answer();
+        const read = await reading;
+
+        expect(read.errorCode).toBeNull();
+        expect(read.stale).toBe(false);
+        expect(read.offers).toMatchObject([{ ref: "BRAVO-NG_1-whatsapp", stock: 4 }]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("refuses an old read when the caller asked for a live one", async () => {
       bitcall.configured.mockReturnValue(true);
       bitcall.listCountryEntries.mockResolvedValue([NG_ENTRY]);
@@ -202,7 +239,7 @@ describe("otp stock aggregation", () => {
         bitcall.listCountryEntries.mockRejectedValue(new Error("catalogue read exceeded 4000ms"));
         // A checkout revalidates with `refresh` because it is about to spend: a
         // stale answer must never stand in for a live one there.
-        const live = await readOtpOffersForSupplier("bitcall", "ng", "Nigeria", undefined, true);
+        const live = await readOtpOffersForSupplier("bitcall", "ng", "Nigeria", true);
 
         expect(live.stale).toBe(false);
         expect(live.offers).toEqual([]);

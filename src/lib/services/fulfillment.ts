@@ -207,7 +207,7 @@ async function fulfillNumber(plan: Plan, intent: SmsIntent, options: FulfillPlan
   // freshly published service ID. No customer-supplied identifier reaches the
   // provider API directly.
   const read = options.otpOfferId
-    ? await readOtpOffersForSupplier("bitcall", intent.country, plan.region, undefined, true)
+    ? await readOtpOffersForSupplier("bitcall", intent.country, plan.region, true)
     : null;
   if (read?.errorCode) {
     throw new FleexaError("The selected service could not be confirmed", read.errorCode === "INSUFFICIENT_BALANCE" ? 402 : 503, read.errorCode);

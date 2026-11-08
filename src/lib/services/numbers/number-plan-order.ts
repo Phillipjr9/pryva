@@ -16,12 +16,6 @@ import { otpOffersForSupplier, otpSupplierConfigured } from "@/lib/services/numb
 /** Long enough that a listing page does not re-read catalogues on every view. */
 const TTL_MS = 5 * 60_000;
 
-/**
- * A page is not worth waiting on: if a supplier cannot quote within this window
- * the list falls back to catalogue order rather than hanging the render.
- */
-const DISPLAY_BUDGET_MS = 1_500;
-
 let cache: { at: number; costs: Map<string, number> } | null = null;
 
 async function cheapestByCountry(countries: string[], regionNames: Map<string, string>): Promise<Map<string, number>> {
@@ -30,11 +24,12 @@ async function cheapestByCountry(countries: string[], regionNames: Map<string, s
   const costs = new Map<string, number>();
   await Promise.all(
     countries.map(async (country) => {
+      // No per-country deadline: a quote that arrives late still beats a list
+      // sorted by nothing, and the catalogue read is cached across countries.
       const offers = await otpOffersForSupplier(
         "bitcall",
         country,
         regionNames.get(country) ?? country,
-        DISPLAY_BUDGET_MS,
       );
       const priced = offers.filter(
         (offer) => offer.costNgn !== null && (offer.stock === null || offer.stock > 0),

@@ -221,6 +221,6 @@ describe("supplier catalog endpoint", () => {
     expect(state.snapshot).toHaveBeenCalledWith(true);
     expect(state.boostSnapshot).toHaveBeenCalledWith(true);
     expect(state.esimSnapshot).toHaveBeenCalledWith(true);
-    expect(state.otpRead).toHaveBeenCalledWith("bitcall", "us", expect.any(String), undefined, true);
+    expect(state.otpRead).toHaveBeenCalledWith("bitcall", "us", expect.any(String), true);
   });
 });
