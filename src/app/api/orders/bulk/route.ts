@@ -8,6 +8,7 @@ import { calculateBulkOrder, expandBulkOrder, MAX_BULK_UNITS, type BulkOrderItem
 import { findPlan, type Plan } from "@/lib/services/catalog";
 import { cancelUpstream, fulfillPlan, isPlanFulfillable, type FulfilledOrder } from "@/lib/services/fulfillment";
 import { FleexaError } from "@/lib/providers/fleexa";
+import { isRentalOrderingUnconfigured } from "@/lib/services/numbers/number-availability";
 import { debitWalletInTx, InsufficientFundsError, makeReference } from "@/lib/payments/wallet";
 
 export const dynamic = "force-dynamic";
@@ -126,6 +127,12 @@ export async function POST(request: NextRequest) {
       },
       { status: 400 },
     );
+  }
+
+  // Preflight the entire basket. A missing rental provider must be detected before
+  // buying any earlier unit, especially since rentals cannot be cancelled upstream.
+  if (calculated.items.some((item) => isRentalOrderingUnconfigured(item.productSlug))) {
+    return NextResponse.json({ error: "A rental plan is temporarily unavailable. Nothing was purchased or charged." }, { status: 503 });
   }
 
   const [account] = await db

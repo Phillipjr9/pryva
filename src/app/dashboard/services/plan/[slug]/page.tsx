@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/identity/auth";
 import { findPlan } from "@/lib/services/catalog";
 import { isPlanFulfillable } from "@/lib/services/fulfillment";
+import { isRentalOrderingUnconfigured } from "@/lib/services/numbers/number-availability";
 import { canPreviewPlan, explorerCountry } from "@/lib/services/service-explorer";
 import { CountryFlag } from "@/components/CountryFlag";
 import { PlanPurchase } from "@/components/purchase/PlanPurchase";
@@ -48,7 +49,7 @@ export default async function DashboardPlanPage({
       {fulfillable ? (
         <>
           <div role="note" className="rounded-2xl border border-line bg-white p-4 text-meta leading-relaxed text-ink-2">
-            Delivered automatically once payment is taken from your wallet. Your verification code
+            Availability is checked before an order is charged. Your verification code
             appears in the order details as soon as it arrives.
           </div>
           <PlanPurchase
@@ -56,6 +57,7 @@ export default async function DashboardPlanPage({
             signedIn
             walletBalance={user.walletBalance}
             nextPath={back}
+            unavailableSlugs={isRentalOrderingUnconfigured(plan.slug) ? [plan.slug] : []}
           />
         </>
       ) : (

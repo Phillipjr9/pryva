@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { serviceMap, plansFor, formatNaira } from "@/lib/services/catalog";
 import { isPlanFulfillable, SUPPORTED_VIRTUAL_NUMBER_COUNTRIES } from "@/lib/services/fulfillment";
+import { isRentalOrderingUnconfigured } from "@/lib/services/numbers/number-availability";
 import { orderNumberPlansByCheapestCost } from "@/lib/services/numbers/number-plan-order";
 import { getCurrentUser } from "@/lib/identity/auth";
 import { PlanPurchase } from "@/components/purchase/PlanPurchase";
@@ -202,6 +203,7 @@ export default async function VirtualNumbersPage() {
             signedIn={Boolean(user)}
             walletBalance={user?.walletBalance ?? null}
             nextPath="/virtual-numbers"
+            unavailableSlugs={rentals.filter((plan) => isRentalOrderingUnconfigured(plan.slug)).map((plan) => plan.slug)}
           />
         </div>
       </section>
