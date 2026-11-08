@@ -149,7 +149,11 @@ export default async function AdminStockPage({
           shows what happened to actual customers, and the two pages disagreeing is the useful signal.
           The same report is available as JSON at{" "}
           <code className="rounded bg-cream px-1 py-0.5 text-[0.8rem]">/api/diagnostics/stock</code>{" "}
-          with the diagnostics secret, for anything that needs to watch it.
+          with the diagnostics secret, for anything that needs to watch it. For an empty Bitcall feed, the{" "}
+          <Link href="/api/admin/diagnostics/bitcall-otp" className="mx-1 underline">
+            Bitcall catalog diagnostic
+          </Link>
+          shows response keys and counts only; it never returns credential or raw offer values.
         </p>
         <p className="mt-2 text-[0.8rem] text-ink-3">
           Checked {new Date(report.checkedAt).toLocaleString("en-GB", { timeZone: "Africa/Lagos" })} Lagos time.

@@ -19,6 +19,7 @@ import {
   getBitcallOtpActivation,
   isAmbiguousBitcallOutcome,
   isBitcallConfigured,
+  inspectBitcallOtpCatalog,
   listBitcallEsimCountries,
   listBitcallEsimOrders,
   listBitcallEsimPlans,
@@ -616,6 +617,53 @@ describe("OTP catalog", () => {
     expect(url.pathname).toBe("/v1/otp/services");
     expect(url.searchParams.get("q")).toBe("whatsapp");
     expect(url.searchParams.get("country_code")).toBe("US_1");
+  });
+
+  it("reports only safe catalog shape, counts, and country identifiers for diagnosis", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
+      data: [{
+        name: "Private sample label",
+        country_code: "US_1",
+        pools: [{ serviceId: "private-offer-id", price: 0.42, availableCount: 12 }],
+      }],
+      meta: { total: 1 },
+    })));
+
+    const diagnostics = await inspectBitcallOtpCatalog();
+    expect(diagnostics).toMatchObject({
+      configured: true,
+      keyEnvironment: "test",
+      endpoint: "/v1/otp/services",
+      payloadType: "object",
+      topLevelKeys: ["data", "meta"],
+      topLevelArrays: [{ key: "data", length: 1 }],
+      recognizedRowContainer: "data",
+      rowCount: 1,
+      sampleRowKeys: ["country_code", "name", "pools"],
+      sampleFieldTypes: { country_code: "string", name: "string", pools: "array" },
+      sampleNestedArrays: [{ key: "pools", length: 1, firstItemKeys: ["availableCount", "price", "serviceId"] }],
+      countrySamples: ["US_1"],
+      parsedServiceCount: 1,
+      parsedOfferCount: 1,
+    });
+    expect(JSON.stringify(diagnostics)).not.toContain("Private sample label");
+    expect(JSON.stringify(diagnostics)).not.toContain("private-offer-id");
+  });
+
+  it("shows unrecognized top-level arrays instead of silently calling the catalog empty", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
+      services: [{ country: "US", applications: [{ id: "whatsapp" }] }],
+    })));
+
+    const diagnostics = await inspectBitcallOtpCatalog();
+    expect(diagnostics).toMatchObject({
+      recognizedRowContainer: "services",
+      rowCount: 1,
+      sampleRowKeys: ["applications", "country"],
+      sampleNestedArrays: [{ key: "applications", length: 1, firstItemKeys: ["id"] }],
+      parsedServiceCount: 0,
+      parsedOfferCount: 0,
+    });
   });
 
   it("drops a service whose offers carry no serviceId, since it could not be bought", async () => {

@@ -844,6 +844,88 @@ function parseOtpService(row: unknown): BitcallOtpService {
   };
 }
 
+export type BitcallOtpCatalogDiagnostics = {
+  configured: boolean;
+  keyEnvironment: "test" | "live" | "unknown";
+  endpoint: "/v1/otp/services";
+  payloadType: string;
+  topLevelKeys: string[];
+  topLevelArrays: Array<{ key: string; length: number }>;
+  recognizedRowContainer: string | null;
+  rowCount: number;
+  sampleRowKeys: string[];
+  sampleFieldTypes: Record<string, string>;
+  sampleNestedArrays: Array<{ key: string; length: number; firstItemKeys: string[] }>;
+  countrySamples: string[];
+  parsedServiceCount: number;
+  parsedOfferCount: number;
+};
+
+function safeType(value: unknown): string {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  if (typeof value === "object") return "object";
+  return typeof value;
+}
+
+function inspectOtpPayload(payload: unknown): Omit<BitcallOtpCatalogDiagnostics, "configured" | "keyEnvironment" | "endpoint"> {
+  const envelope = asRecord(payload);
+  const currentRows = rowsFrom(payload);
+  const candidateContainers = ["data", "items", "plans", "orders", "profiles", "countries", "regions", "services", "results"];
+  const recognizedRowContainer = Array.isArray(payload)
+    ? "$root"
+    : candidateContainers.find((key) => Array.isArray(envelope[key])) ?? null;
+  const rows = currentRows.length > 0
+    ? currentRows
+    : candidateContainers.map((key) => envelope[key]).find(Array.isArray)?.map(asRecord) ?? [];
+  const sample = rows[0] ?? {};
+  const sampleArrays = Object.entries(sample)
+    .filter(([, value]) => Array.isArray(value))
+    .slice(0, 20)
+    .map(([key, value]) => ({
+      key,
+      length: (value as unknown[]).length,
+      firstItemKeys: Object.keys(asRecord((value as unknown[])[0])).slice(0, 30).sort(),
+    }));
+  const parsed = rows.slice(0, 2000).map(parseOtpService);
+  const countrySamples = [...new Set(rows
+    .map((row) => pickString(row, ["country_code", "countryCode", "country"]))
+    .filter((value): value is string => Boolean(value)))]
+    .slice(0, 20);
+
+  return {
+    payloadType: safeType(payload),
+    topLevelKeys: Object.keys(envelope).slice(0, 50).sort(),
+    topLevelArrays: Object.entries(envelope)
+      .filter(([, value]) => Array.isArray(value))
+      .slice(0, 20)
+      .map(([key, value]) => ({ key, length: (value as unknown[]).length })),
+    recognizedRowContainer,
+    rowCount: rows.length,
+    sampleRowKeys: Object.keys(sample).slice(0, 50).sort(),
+    sampleFieldTypes: Object.fromEntries(Object.entries(sample).slice(0, 50).map(([key, value]) => [key, safeType(value)])),
+    sampleNestedArrays: sampleArrays,
+    countrySamples,
+    parsedServiceCount: parsed.filter((service) => service.offers.length > 0).length,
+    parsedOfferCount: parsed.reduce((total, service) => total + service.offers.length, 0),
+  };
+}
+
+/**
+ * Read-only, sanitized shape diagnostics for an admin investigating an empty
+ * catalog. It intentionally returns keys, types and counts—not raw payload
+ * fields, offer values, headers, or credentials.
+ */
+export async function inspectBitcallOtpCatalog(): Promise<BitcallOtpCatalogDiagnostics> {
+  const payload = await gatewayFetch("GET", "/v1/otp/services");
+  return {
+    configured: isBitcallConfigured(),
+    keyEnvironment: bitcallKeyEnvironment(),
+    endpoint: "/v1/otp/services",
+    ...inspectOtpPayload(payload),
+  };
+}
+
 /**
  * The whole OTP catalog, filtered. One collection — there is no per-country
  * sub-resource, so country is a query parameter rather than a path.
