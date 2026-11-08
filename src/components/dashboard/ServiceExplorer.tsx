@@ -138,7 +138,9 @@ export function ServiceCard({ item, countryName }: { item: ExplorerItem; country
   const coverage = item.source === "live"
       ? (item.coverage === "catalog-country" ? `Reported region: ${countryName}` : item.coverage === "unconfirmed" ? "Country coverage unconfirmed" : "Not country-specific")
       : item.coverage === "catalog-country" ? `Catalog region: ${countryName}` : item.coverage === "unconfirmed" ? "Country coverage unconfirmed" : "Not filtered by country";
-  const noAction = item.source === "live" ? "Ordering paused" : "Not available";
+  const noAction = item.category === "verification" && item.source === "live"
+    ? "Not available to order"
+    : item.source === "live" ? "Ordering paused" : "Not available";
   const action = item.action;
   const price = item.price;
   const sourceLabel = item.source === "live" ? "Live listing" : item.source === "tool" ? "Tool" : "Catalog";
@@ -149,7 +151,9 @@ export function ServiceCard({ item, countryName }: { item: ExplorerItem; country
     : "border border-line bg-cream-2 text-ink-2";
   const priceLine = price !== null
     ? `${item.source === "live" ? "Indicative" : "Listed"} ${item.priceFrom ? "from " : "price "}${formatNaira(price)}`
-    : item.category === "esim" && item.source === "live" ? "Price unavailable" : "See details";
+    : item.category === "verification" && item.source === "live"
+      ? "Ordering unavailable"
+      : item.category === "esim" && item.source === "live" ? "Price unavailable" : "See details";
 
   /*
    * One card, two densities. On a phone this is a 68 px row: artwork, name,
@@ -177,7 +181,7 @@ export function ServiceCard({ item, countryName }: { item: ExplorerItem; country
           {/* Deliberately not the desktop wording: two visible-in-one-breakpoint
               copies of the same sentence would be read out twice, and the tests
               that look up the full price line would match both. */}
-          {price !== null ? ` · ${formatNaira(price)}${item.priceFrom ? "+" : ""}` : item.category === "esim" && item.source === "live" ? " · Price unavailable" : item.source === "live" ? " · Price on request" : " · Price not listed"}
+          {price !== null ? ` · ${formatNaira(price)}${item.priceFrom ? "+" : ""}` : item.category === "verification" && item.source === "live" ? " · Ordering unavailable" : item.category === "esim" && item.source === "live" ? " · Price unavailable" : item.source === "live" ? " · Price on request" : " · Price not listed"}
         </p>
         {/* OTP stock comes directly from Bitcall's selected pool. Keep it visible
             on phones too; hiding UnitsStatus at the mobile breakpoint made a

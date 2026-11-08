@@ -134,6 +134,19 @@ describe("country-first service explorer", () => {
     expect(markup).toContain("Not tracked");
   });
 
+  it("shows view-only Bitcall OTP listings without implying unsupported countries can be ordered", () => {
+    const item: ExplorerItem = {
+      id: "otp-whatsapp-bj", category: "verification", name: "WhatsApp", description: "Bitcall stock listing · checkout is not enabled for this country",
+      tag: "Messaging", artwork: { kind: "brand", name: "whatsapp" }, source: "live",
+      coverage: "catalog-country", stock: 6, myUnits: null, price: null, action: null,
+    };
+    const markup = renderToStaticMarkup(<ServiceCard item={item} countryName="Benin" />);
+    expect(markup).toContain("Bitcall stock:");
+    expect(markup).toContain("6 left");
+    expect(markup).toContain("Ordering unavailable");
+    expect(markup).toContain("Not available to order");
+  });
+
   it("shows provider-reported Bitcall OTP stock on mobile, including zero and unknown distinctly", () => {
     const item: ExplorerItem = {
       id: "otp-whatsapp", category: "verification", name: "WhatsApp", description: "One-time verification",
