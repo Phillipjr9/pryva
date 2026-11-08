@@ -1,4 +1,5 @@
 import { paystackKeyUsable } from "@/lib/payments/paystack-policy";
+import { WALLET_TOPUP_MAX_NGN, WALLET_TOPUP_MIN_NGN } from "@/lib/payments/topup-limits";
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
@@ -42,8 +43,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Choose the payment method in Paystack checkout." }, { status: 400 });
     }
     const { amount } = body as { amount?: unknown };
-    if (typeof amount !== "number" || !Number.isSafeInteger(amount) || amount < 1000 || amount > 500000) {
-      return NextResponse.json({ error: "Enter a whole-naira amount between ₦1,000 and ₦500,000." }, { status: 400 });
+    if (typeof amount !== "number" || !Number.isSafeInteger(amount) || amount < WALLET_TOPUP_MIN_NGN || amount > WALLET_TOPUP_MAX_NGN) {
+      return NextResponse.json({ error: "Enter a whole-naira amount between ₦1 and ₦10,000,000." }, { status: 400 });
     }
 
     const origin = paystackAppOrigin(process.env.NEXT_PUBLIC_SITE_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim() || publicOrigin(request), process.env.NODE_ENV !== "production");

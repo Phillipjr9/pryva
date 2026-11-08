@@ -6,6 +6,7 @@ import {
   buyBitcallOtpActivation,
   isAmbiguousBitcallOutcome,
   isBitcallConfigured,
+  listBitcallOtpCountries,
   listBitcallOtpServices,
 } from "@/lib/providers/bitcall";
 import { buyFleexaSmsNumber, FleexaError, isFleexaConfigured, listFleexaSmsServices } from "@/lib/providers/fleexa";
@@ -185,7 +186,7 @@ function withBudget<T>(work: Promise<T>, ms: number): Promise<T> {
 
 /** Reads one supplier's catalogue. Throws when it cannot be read. */
 async function fetchOffers(supplier: OtpSupplierId, country: string, regionName: string): Promise<OtpOffer[]> {
-  return supplier === "fleexa" ? fleexaOffers(country, regionName) : bitcallOffers(country);
+  return supplier === "fleexa" ? fleexaOffers(country, regionName) : bitcallOffers(country, regionName);
 }
 
 function mergeOtpOffer(existing: OtpOffer, next: OtpOffer): OtpOffer {
@@ -224,12 +225,35 @@ async function fleexaOffers(country: string, regionName: string): Promise<OtpOff
   return [...offersByKey.values()];
 }
 
-async function bitcallOffers(country: string): Promise<OtpOffer[]> {
+async function bitcallOffers(country: string, regionName: string): Promise<OtpOffer[]> {
   if (!isBitcallConfigured()) return [];
-  const services = await listBitcallOtpServices({ countryCode: country.toUpperCase() });
+
+  // Bitcall publishes opaque country codes (for example, US_1), which are not
+  // necessarily the ISO code we use in the storefront. Resolve the supplier's
+  // own values first, then filter with the tolerant ISO/region matcher; sending
+  // `US` directly can silently return an empty catalog when the provider expects
+  // its published code.
+  const providerCodes = await listBitcallOtpCountries();
+  const matchingCodes = [...new Set(providerCodes.filter((code) => matchesCountry(code, country, regionName)))];
+  const scopedServices = matchingCodes.length === 0
+    ? []
+    : (await Promise.all(
+        matchingCodes.map((countryCode) => listBitcallOtpServices({ countryCode })),
+      )).flat();
+  const scopedMatches = scopedServices.filter((service) => matchesCountry(service.countryCode, country, regionName));
+  // A country filter that returns nothing is not proof the country has no stock:
+  // providers sometimes publish region IDs but filter by a different canonical
+  // value. Retry the read-only catalog without a country filter and match only
+  // rows that identify this country. This stays on Bitcall and never purchases.
+  const services = scopedMatches.length > 0
+    ? scopedMatches
+    : (await listBitcallOtpServices()).filter((service) => matchesCountry(service.countryCode, country, regionName));
   const offers: OtpOffer[] = [];
   const seen = new Set<string>();
   for (const service of services) {
+    // Do not trust that an upstream filter was honored: only attach a listing to
+    // this country when the response itself names a matching published region.
+    if (!matchesCountry(service.countryCode, country, regionName)) continue;
     const app = readableApp(service.name);
     for (const entry of service.offers) {
       if (!entry.serviceId || seen.has(entry.serviceId)) continue;

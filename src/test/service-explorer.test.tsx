@@ -2,13 +2,13 @@ import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { findPlan, plans } from "@/lib/services/catalog";
-import { ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
+import { ServiceCard, ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
 import { formatUnitCount, safeUnitCount } from "@/lib/services/service-units";
 import { EXPLORER_COUNTRIES } from "@/lib/content/explorer-countries";
 import {
   buildServiceExplorer, canPreviewPlan, EXPLORER_CATEGORIES, explorerCategory, explorerCountry,
-  filterExplorerItems, planMatchesCountry,
+  filterExplorerItems, planMatchesCountry, type ExplorerItem,
 } from "@/lib/services/service-explorer";
 
 describe("country-first service explorer", () => {
@@ -132,6 +132,37 @@ describe("country-first service explorer", () => {
     expect(markup).toContain("Unknown");
     expect(markup).toContain("My units");
     expect(markup).toContain("Not tracked");
+  });
+
+  it("shows view-only Bitcall OTP listings without implying unsupported countries can be ordered", () => {
+    const item: ExplorerItem = {
+      id: "otp-whatsapp-bj", category: "verification", name: "WhatsApp", description: "Bitcall stock listing · checkout is not enabled for this country",
+      tag: "Messaging", artwork: { kind: "brand", name: "whatsapp" }, source: "live",
+      coverage: "catalog-country", stock: 6, myUnits: null, price: null, action: null,
+    };
+    const markup = renderToStaticMarkup(<ServiceCard item={item} countryName="Benin" />);
+    expect(markup).toContain("Bitcall stock:");
+    expect(markup).toContain("6 left");
+    expect(markup).toContain("Ordering unavailable");
+    expect(markup).toContain("Not available to order");
+  });
+
+  it("shows provider-reported Bitcall OTP stock on mobile, including zero and unknown distinctly", () => {
+    const item: ExplorerItem = {
+      id: "otp-whatsapp", category: "verification", name: "WhatsApp", description: "One-time verification",
+      tag: "Messaging", artwork: { kind: "brand", name: "whatsapp" }, source: "live",
+      coverage: "catalog-country", stock: 17, myUnits: null, price: 1400,
+      action: { label: "Choose service", href: "/dashboard/services/otp?country=ng" },
+    };
+    const markup = renderToStaticMarkup(<ServiceCard item={item} countryName="Nigeria" />);
+    expect(markup).toContain("Bitcall stock:");
+    expect(markup).toContain("17 left");
+    expect(markup).toContain("sm:hidden");
+
+    for (const [stock, expected] of [[0, "0 left"], [null, "Not reported"]] as const) {
+      const state = renderToStaticMarkup(<ServiceCard item={{ ...item, stock }} countryName="Nigeria" />);
+      expect(state).toContain(expected);
+    }
   });
 });
 

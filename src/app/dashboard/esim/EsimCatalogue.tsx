@@ -4,8 +4,10 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatNaira } from "@/lib/services/catalog";
 import type { EsimCatalogueItem } from "@/lib/services/esim/esim-catalog";
+import { classifyEsimUsage, ESIM_USAGE_LABELS, type EsimUsageCategory } from "@/lib/services/esim/capabilities";
 
 const PAGE = 24;
+type UsageFilter = EsimUsageCategory | "all";
 
 function capability(value: boolean | null | undefined): string {
   return value === true ? "Included" : value === false ? "Not included" : "Not listed";
@@ -22,6 +24,7 @@ function capability(value: boolean | null | undefined): string {
 export function EsimCatalogue({ items, truncated }: { items: EsimCatalogueItem[]; truncated: boolean }) {
   const [search, setSearch] = useState("");
   const [region, setRegion] = useState<string>("all");
+  const [usage, setUsage] = useState<UsageFilter>("all");
   const [visible, setVisible] = useState(PAGE);
 
   const regions = useMemo(() => {
@@ -34,16 +37,18 @@ export function EsimCatalogue({ items, truncated }: { items: EsimCatalogueItem[]
     const needle = search.trim().toLowerCase();
     return items.filter((item) => {
       if (region !== "all" && item.region !== region) return false;
+      const itemUsage = classifyEsimUsage(item.supportsVoice, item.supportsSms);
+      if (usage !== "all" && itemUsage !== usage) return false;
       if (!needle) return true;
-      return `${item.name} ${item.region} ${item.dataLabel} ${item.validityLabel} ${item.countrySearch.join(" ")}`.toLowerCase().includes(needle);
+      return `${item.name} ${item.region} ${item.dataLabel} ${item.validityLabel} ${item.countrySearch.join(" ")} ${ESIM_USAGE_LABELS[itemUsage]}`.toLowerCase().includes(needle);
     });
-  }, [items, region, search]);
+  }, [items, region, search, usage]);
 
   const shown = filtered.slice(0, visible);
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+      <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
         <label className="block">
           <span className="sr-only">Search eSIM plans</span>
           <input
@@ -75,11 +80,27 @@ export function EsimCatalogue({ items, truncated }: { items: EsimCatalogueItem[]
             ))}
           </select>
         </label>
+        <label className="block">
+          <span className="sr-only">Filter by voice and SMS support</span>
+          <select
+            value={usage}
+            onChange={(event) => {
+              setUsage(event.target.value as UsageFilter);
+              setVisible(PAGE);
+            }}
+            className="min-h-11 w-full rounded-xl border border-line bg-white px-3 py-2 text-[0.86rem] text-ink sm:w-auto"
+          >
+            <option value="all">All plan types</option>
+            {(Object.entries(ESIM_USAGE_LABELS) as [EsimUsageCategory, string][]).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <p aria-live="polite" className="text-meta text-ink-3">
         {filtered.length} {filtered.length === 1 ? "plan" : "plans"} match
-        {region === "all" && !search.trim() ? "" : " this filter"}
+        {region === "all" && usage === "all" && !search.trim() ? "" : " this filter"}
         {truncated ? " · the cheapest plans are listed first" : ""}
       </p>
 
@@ -87,14 +108,15 @@ export function EsimCatalogue({ items, truncated }: { items: EsimCatalogueItem[]
         <div className="rounded-xl border border-dashed border-line bg-cream/50 p-8 text-center">
           <p className="text-[0.9rem] font-semibold text-ink">No plan matches that</p>
           <p className="mt-1 text-meta text-ink-2">
-            Try a country name, a region, or clear the filters — this does not mean the destination is unsupported.
+            Try a country name, a region or another plan type — this does not mean the destination is unsupported.
           </p>
-          {(search || region !== "all") && (
+          {(search || region !== "all" || usage !== "all") && (
             <button
               type="button"
               onClick={() => {
                 setSearch("");
                 setRegion("all");
+                setUsage("all");
                 setVisible(PAGE);
               }}
               className="mt-3 text-meta font-semibold text-lav-700 underline underline-offset-2"
@@ -113,6 +135,9 @@ export function EsimCatalogue({ items, truncated }: { items: EsimCatalogueItem[]
                 <p className="mt-1 text-meta text-ink-2">
                   {item.dataLabel} · {item.validityLabel} ·{" "}
                   {item.global ? "Global plan" : item.destinations > 0 ? `${item.destinations} destination${item.destinations === 1 ? "" : "s"}` : "Coverage not listed"}
+                </p>
+                <p className="mt-2 inline-flex rounded-full border border-lav-200 bg-lav-50 px-2.5 py-1 text-micro font-semibold text-lav-800">
+                  Plan type: {ESIM_USAGE_LABELS[classifyEsimUsage(item.supportsVoice, item.supportsSms)]}
                 </p>
                 <dl aria-label="Plan features" className="mt-3 grid grid-cols-3 gap-1.5 text-micro">
                   {[

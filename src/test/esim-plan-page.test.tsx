@@ -70,6 +70,16 @@ describe("eSIM plan information before purchase", () => {
     expect(container.textContent).not.toContain("4,500");
   });
 
+  it("classifies explicitly call-and-text capable and internet-only plans", async () => {
+    const callsAndTexts = await renderPage({ supportsVoice: true, supportsSms: true });
+    expect(screen.getByText("Plan type: Calls & texts")).toBeTruthy();
+    callsAndTexts.unmount();
+    cleanup();
+
+    await renderPage({ supportsVoice: false, supportsSms: false });
+    expect(screen.getByText("Plan type: Internet only")).toBeTruthy();
+  });
+
   it("shows a temporary failure rather than a not-found page when the catalogue read fails", async () => {
     findOffer.mockRejectedValue(new Error("down"));
     render(await EsimPlanPage({ params: Promise.resolve({ id: "live-esim-0123456789abcdef0123" }) }));

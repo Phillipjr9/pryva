@@ -81,7 +81,7 @@ export const blogPosts: BlogPost[] = [
     excerpt: "A step-by-step guide to funding your wallet with Paystack by bank transfer or card.",
     category: "Guides",
     sections: [
-      { heading: "Open the wallet page", paragraphs: ["Sign in to your dashboard and navigate to Wallet. Choose an amount to add — the minimum top-up is ₦1,000. You will be taken to Paystack's secure checkout, where you can pay by bank transfer or card."] },
+      { heading: "Open the wallet page", paragraphs: ["Sign in to your dashboard and navigate to Wallet. Choose an amount to add — top-ups range from ₦1 to ₦10,000,000. You will be taken to Paystack's secure checkout, where you can pay by bank transfer or card."] },
       { heading: "Wait for confirmation", paragraphs: ["Your wallet is credited only after Paystack confirms the payment. Do not close the browser or navigate away until you see the confirmation screen. If you are redirected back to the dashboard without a credit, check your wallet history before trying again — the payment may still be processing."] },
       { heading: "If a top-up does not arrive", paragraphs: ["Keep the Paystack reference from your bank or card statement and contact support. Do not top up again until the first transaction is resolved, as duplicate payments are not automatically refunded."] },
     ],

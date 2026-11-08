@@ -58,9 +58,10 @@ export default async function EsimCataloguePage() {
       <div>
         <ServiceTitle service="esim">eSIM plans</ServiceTitle>
         <p className="mt-1 text-[0.86rem] leading-relaxed text-ink-2">
-          Browse current plans by data allowance, validity and naira price. Availability can change;
-          your wallet is charged when the profile is issued. You cannot select a specific phone number
-          when ordering an eSIM.
+          Browse current plans by data allowance, validity, naira price and listed calling/texting support.
+          Plans are labeled only when the listing confirms those features; missing details stay unconfirmed.
+          Availability can change; your wallet is charged when the profile is issued. You cannot select a
+          specific phone number when ordering an eSIM.
         </p>
       </div>
 

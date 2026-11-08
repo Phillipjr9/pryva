@@ -36,8 +36,11 @@ export function bitcallOtpItemsForCountry(
   countryName: string,
 ): ExplorerItem[] {
   const country = explorerCountry(countryCode);
-  const plan = country ? numberPlanForCountry(country.code) : null;
-  if (!country || !plan) return [];
+  if (!country) return [];
+  // A number plan is required to sell an offer, not to report the stock Bitcall
+  // publishes. Show inventory for every selected country; countries without an
+  // explicit checkout plan remain view-only below.
+  const plan = numberPlanForCountry(country.code);
 
   const byApp = new Map<string, OtpOffer[]>();
   for (const offer of offers) {
@@ -52,28 +55,30 @@ export function bitcallOtpItemsForCountry(
   const items: ExplorerItem[] = [];
   for (const group of byApp.values()) {
     const candidates = [...group].sort((a, b) => {
-      const aSellable = canSell(plan, a) ? 0 : 1;
-      const bSellable = canSell(plan, b) ? 0 : 1;
+      const aSellable = plan !== null && canSell(plan, a) ? 0 : 1;
+      const bSellable = plan !== null && canSell(plan, b) ? 0 : 1;
       return aSellable - bSellable ||
         (a.costNgn ?? Number.MAX_SAFE_INTEGER) - (b.costNgn ?? Number.MAX_SAFE_INTEGER);
     });
     const offer = candidates[0];
     if (!offer?.app) continue;
     const id = otpOfferPublicId(country.code, offer.ref, offer.app);
-    const sellable = canSell(plan, offer);
+    const sellable = plan !== null && canSell(plan, offer);
     const brand = appBrand(offer.app);
     items.push({
       id,
       category: "verification",
       name: offer.app,
-      description: "Live app-specific number offer",
+      description: plan
+        ? "Live app-specific number offer"
+        : "Bitcall stock listing · checkout is not enabled for this country",
       tag: brand?.tag ?? "Other",
       artwork: brand ? { kind: "brand", name: brand.brand } : { kind: "service", name: "numbers" },
       source: "live",
       coverage: "catalog-country",
       stock: safeUnitCount(offer.stock),
       myUnits: null,
-      price: sellable ? plan.price : null,
+      price: sellable && plan ? plan.price : null,
       action: sellable
         ? { label: "Choose service", href: `/dashboard/services/otp/${encodeURIComponent(id)}?country=${country.code}` }
         : null,

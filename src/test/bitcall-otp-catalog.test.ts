@@ -45,6 +45,20 @@ describe("Bitcall app-specific OTP catalogue", () => {
     expect(payload).not.toContain("250");
   });
 
+  it("shows Bitcall inventory for other countries without enabling unsupported checkout", () => {
+    const beninOffer: OtpOffer = {
+      supplier: "bitcall", ref: "private-benin-service", country: "bj", app: "WhatsApp",
+      costNgn: 250, stock: 6,
+    };
+    const items = bitcallOtpItemsForCountry([beninOffer], "bj", "Benin");
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      name: "WhatsApp", category: "verification", source: "live", stock: 6,
+      price: null, action: null, detail: "Benin · single-use verification",
+    });
+    expect(items[0].description).toContain("checkout is not enabled for this country");
+  });
+
   it("re-resolves an opaque offer ID from the live listing before checkout", async () => {
     const id = otpOfferPublicId("ng", "private-service-id-1", "WhatsApp");
     const result = await findOtpCheckoutOffer("ng", id, { refresh: true });
