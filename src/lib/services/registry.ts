@@ -167,7 +167,7 @@ export const SERVICES: readonly ServiceDefinition[] = [
     id: "numbers",
     label: "Number plans",
     description: "Single-use & rentals",
-    sale: { kind: "supplier", source: "fleexa" },
+    sale: { kind: "supplier", source: "bitcall" },
     lane: "numbers",
     orderServices: ["numbers"],
     deliveryMinutes: 5,

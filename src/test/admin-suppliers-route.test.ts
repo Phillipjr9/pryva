@@ -4,10 +4,10 @@ import { NextRequest } from "next/server";
 /**
  * The operator's "is my key actually working?" endpoint.
  *
- * It exists because a bad or absent supplier key is *silently* survivable: the
- * catalogue comes back empty, the purchase quietly proceeds with the other
- * supplier, and nothing ever says so. These pin the two properties that matter —
- * the answer is honest, and asking for it can never spend money.
+ * It exists to show which supplier catalogs are connected and healthy. OTP
+ * checkout is Bitcall-only; Fleexa remains visible for diagnostics and rentals.
+ * These tests pin the two properties that matter — the answer is honest, and
+ * asking for it can never spend money.
  */
 const gate = vi.hoisted(() => ({ allow: true, list: vi.fn(), buy: vi.fn(), cancel: vi.fn() }));
 const fleexa = vi.hoisted(() => ({ configured: true, list: vi.fn(), buy: vi.fn() }));
@@ -83,7 +83,7 @@ describe("supplier status endpoint", () => {
 
     expect(body).toMatchObject({
       ok: true,
-      routing: { order: ["fleexa", "bitcall"], configured: { fleexa: true, bitcall: true } },
+      routing: { purchaseSupplier: "bitcall", diagnosticOrder: ["bitcall", "fleexa"], configured: { bitcall: true, fleexa: true } },
       gateway: { keyEnvironment: "live", balance: { amount: 12.5, currency: "USD", amountNgn: 18750 } },
       usdToNgn: { rate: 1500, source: "override" },
     });
@@ -92,9 +92,9 @@ describe("supplier status endpoint", () => {
       country: "ng",
       sellable: true,
       suppliers: [
-        { supplier: "fleexa", configured: true, listed: 0, inStock: 0, errorCode: null },
         // 0.40 USD at 1,500 is 600 naira — converted, never displayed raw.
         { supplier: "bitcall", configured: true, listed: 1, inStock: 1, cheapestNgn: 600, apps: ["WhatsApp"] },
+        { supplier: "fleexa", configured: true, listed: 0, inStock: 0, errorCode: null },
       ],
     });
 
@@ -104,7 +104,18 @@ describe("supplier status endpoint", () => {
     expect(gate.cancel).not.toHaveBeenCalled();
   });
 
-  it("shows the profit each plan still makes at the cheapest supplier", async () => {
+  it("does not call a Fleexa-only number plan sellable for OTP checkout", async () => {
+    gate.list.mockResolvedValue([]);
+    fleexa.list.mockResolvedValue([{ id: "svc-ng", country: "ng", name: "WhatsApp", priceNgn: 900, stock: 5 }]);
+
+    const body = await (await report("?country=ng")).json();
+    const nigeria = body.plans.find((plan: { slug: string }) => plan.slug === "vn-ng");
+
+    expect(body.destinations[0].sellable).toBe(false);
+    expect(nigeria).toMatchObject({ cheapest: null, clearsFloor: false });
+  });
+
+  it("shows the profit each plan still makes at Bitcall cost", async () => {
     const body = await (await report("?country=ng")).json();
     const nigeria = body.plans.find((plan: { slug: string }) => plan.slug === "vn-ng");
 
@@ -121,7 +132,7 @@ describe("supplier status endpoint", () => {
     });
   });
 
-  it("says a plan does not clear the floor when the cheapest cost is too high", async () => {
+  it("says a plan does not clear the floor when the Bitcall cost is too high", async () => {
     gate.list.mockResolvedValue([
       { name: "WhatsApp", offers: [{ serviceId: "pool-ng", price: 1.2, currency: "USD", availableCount: 7 }] },
     ]);
@@ -150,7 +161,8 @@ describe("supplier status endpoint", () => {
   it("reports fleexa's own error code when its catalogue cannot be read", async () => {
     fleexa.list.mockRejectedValue(new FleexaError("upstream exploded", 502, "UPSTREAM_ERROR"));
     const body = await (await report("?country=ng")).json();
-    expect(body.destinations[0].suppliers[0]).toMatchObject({
+    const fleexaStatus = body.destinations[0].suppliers.find((entry: { supplier: string }) => entry.supplier === "fleexa");
+    expect(fleexaStatus).toMatchObject({
       supplier: "fleexa",
       errorCode: "UPSTREAM_ERROR",
       listed: 0,

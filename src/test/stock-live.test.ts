@@ -21,6 +21,7 @@ const state = vi.hoisted(() => ({
   productsError: null as string | null,
   manual: 0,
   accszone: false,
+  otpServices: [] as unknown[],
 }));
 
 vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
@@ -65,7 +66,7 @@ vi.mock("@/lib/services/boosts/smm-catalog", async (importOriginal) => {
 
 vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/providers/bitcall")>();
-  return { ...actual, isBitcallConfigured: () => state.bitcall };
+  return { ...actual, isBitcallConfigured: () => state.bitcall, listBitcallOtpServices: async () => state.otpServices };
 });
 
 vi.mock("@/lib/providers/accszone", async (importOriginal) => {
@@ -80,7 +81,6 @@ import { laneHeadline } from "@/lib/admin/stock-report";
 
 function snapshot() {
   return {
-    sms: [{ id: "s1", name: "WhatsApp", country: "ng", priceNgn: 900, stock: 15 }],
     email: [{ id: "e1", name: "Gmail inbox", domain: "gmail.com", priceNgn: 500, stock: 3 }],
     rentals: [{ id: "r1", country: "ng", pricePerMonthNgn: 20_000, stock: 2 }],
     partial: false,
@@ -117,6 +117,7 @@ beforeEach(() => {
   state.bulkacc = true;
   state.smm = true;
   state.bitcall = true;
+  state.otpServices = [{ countryCode: "NG", name: "WhatsApp", offers: [{ serviceId: "s1", price: 900, currency: "NGN", availableCount: 15 }] }];
   state.snapshot = snapshot();
   state.snapshotError = null;
   state.boost = boostSnapshot();
@@ -175,6 +176,7 @@ describe("the stock report", () => {
 
   it("says 'feed not configured' rather than 'out of stock' when a key is missing", async () => {
     state.fleexa = false;
+    state.bitcall = false;
     state.bulkacc = false;
     state.smm = false;
     const { lanes } = await buildStockReport();

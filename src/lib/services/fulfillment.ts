@@ -1,4 +1,4 @@
-import { cancelBitcallOtpActivation } from "@/lib/providers/bitcall";
+import { cancelBitcallOtpActivation, isBitcallConfigured } from "@/lib/providers/bitcall";
 import { plans, type Plan } from "@/lib/services/catalog";
 import {
   buyFleexaRental,
@@ -11,13 +11,13 @@ import {
   buyOtpNumber,
   isAmbiguousOtpPurchase,
   matchesCountry,
-  otpOffersFor,
-  otpSupplierConfigured,
-  otpSupplierOrder,
+  otpOffersForSupplier,
+  otpOfferPublicId,
+  readOtpOffersForSupplier,
 } from "@/lib/services/numbers/otp-suppliers";
 import { checkMargin, MARGIN_BLOCKED_MESSAGE } from "@/lib/services/margin-guard";
 import { deliveryWindowMs } from "@/lib/services/registry";
-import { LIVE_OTP_PROVIDER, type OrderProvider } from "@/lib/services/order-providers";
+import { FLEEXA_PROVIDER, type OrderProvider } from "@/lib/services/order-providers";
 
 export type FulfilledOrder = {
   /**
@@ -33,9 +33,9 @@ export type FulfilledOrder = {
   otpCode: string | null;
   expiresAt: Date;
   /**
-   * The app this number was bought for, when the supplier named one. A fallback
-   * supplier sells app-specific pools, and a customer who receives a WhatsApp
-   * number when the plan said "a number" needs to be told which it is.
+   * The app this number was bought for, when the selected live offer named one.
+   * App-specific checkout records that service so the order details match the
+   * customer-selected pool rather than implying a generic number.
    */
   serviceLabel?: string | null;
 };
@@ -157,7 +157,16 @@ function guardMargin(plan: Plan, costNgn: number | null): void {
   throw new FleexaError(MARGIN_BLOCKED_MESSAGE, 503, verdict.code);
 }
 
-export async function fulfillPlan(plan: Plan): Promise<FulfilledOrder> {
+export type FulfillPlanOptions = {
+  /** Opaque live Bitcall offer ID from the country/app catalogue. */
+  otpOfferId?: string;
+  /** Persist the claim immediately before starting the provider's paid call. */
+  onOtpAttempt?: () => Promise<void>;
+  /** Persist the activation reference before the wallet debit is attempted. */
+  onOtpAccepted?: (providerRequestId: string) => Promise<void>;
+};
+
+export async function fulfillPlan(plan: Plan, options: FulfillPlanOptions = {}): Promise<FulfilledOrder> {
   const intent = FULFILMENT_MAP[plan.slug];
   if (!intent) {
     throw new FleexaError(
@@ -167,29 +176,50 @@ export async function fulfillPlan(plan: Plan): Promise<FulfilledOrder> {
     );
   }
 
-  return intent.kind === "sms" ? fulfillNumber(plan, intent) : fulfillRental(plan, intent);
+  if (options.otpOfferId && intent.kind !== "sms") {
+    throw new FleexaError("That selection is not available for this plan", 400, "INVALID_OTP_SELECTION");
+  }
+  return intent.kind === "sms" ? fulfillNumber(plan, intent, options) : fulfillRental(plan, intent);
 }
 
 /**
- * A verification number, from whichever configured supplier can serve it.
+ * A single-use verification number, purchased from Bitcall only.
  *
- * Both suppliers are asked to describe the country before either is asked to buy
- * anything, so switching suppliers on a missing key, a missing country, sold-out
- * stock or an unprofitable price costs nothing. Once a buy has been attempted the
- * search stops at the first ambiguous answer: neither supplier takes an
- * idempotency key, so a failover there would rent a second number for one order.
+ * The live offer is checked for price, stock and margin before a buy call. There
+ * is no Fleexa fallback, including when Bitcall cannot be read or cannot sell the
+ * requested destination. Once a buy has been attempted, an ambiguous response is
+ * never retried because that could create a second number for one order.
  */
-async function fulfillNumber(plan: Plan, intent: SmsIntent): Promise<FulfilledOrder> {
-  if (!otpSupplierOrder().some(otpSupplierConfigured)) {
-    throw new FleexaError("Live fulfilment is not configured", 503, "NO_API_KEY");
+async function fulfillNumber(plan: Plan, intent: SmsIntent, options: FulfillPlanOptions): Promise<FulfilledOrder> {
+  if (options.otpOfferId && (!options.onOtpAttempt || !options.onOtpAccepted)) {
+    throw new FleexaError("A safe order claim is required for app-specific checkout", 400, "OTP_CLAIM_REQUIRED");
   }
 
-  // Every configured supplier is asked for a price, because the cheapest one is
-  // the one we buy from: the selling price is fixed by the catalogue, so paying
-  // less is the whole margin. Catalogue reads are bounded and briefly cached, so
-  // comparing never holds a purchase hostage to a supplier that stopped answering.
-  const offers = await otpOffersFor(intent.country, plan.region);
+  // Pryva's single-use OTP orders are routed to Bitcall only. Fleexa remains in
+  // use for product families Bitcall does not provide (including the legacy
+  // rental path), but must never silently receive an app-verification purchase.
+  if (!isBitcallConfigured()) {
+    throw new FleexaError("Live Bitcall fulfilment is not configured", 503, "NO_API_KEY");
+  }
 
+  // Resolve the current Bitcall offer for this destination before spending.
+  // An app-specific selection bypasses the cache, then is matched against the
+  // freshly published service ID. No customer-supplied identifier reaches the
+  // provider API directly.
+  const read = options.otpOfferId
+    ? await readOtpOffersForSupplier("bitcall", intent.country, plan.region, undefined, true)
+    : null;
+  if (read?.errorCode) {
+    throw new FleexaError("The selected service could not be confirmed", read.errorCode === "INSUFFICIENT_BALANCE" ? 402 : 503, read.errorCode);
+  }
+  const offers = read?.offers ?? await otpOffersForSupplier("bitcall", intent.country, plan.region);
+  const selectedOffer = options.otpOfferId
+    ? offers.find((offer) => offer.app && otpOfferPublicId(intent.country, offer.ref, offer.app) === options.otpOfferId)
+    : null;
+
+  if (options.otpOfferId && (!selectedOffer || selectedOffer.supplier !== "bitcall")) {
+    throw new FleexaError("That app offer is no longer available", 409, "OTP_OFFER_STALE");
+  }
   if (offers.length === 0) {
     throw new FleexaError(
       "No number coverage is confirmed for that destination",
@@ -201,7 +231,9 @@ async function fulfillNumber(plan: Plan, intent: SmsIntent): Promise<FulfilledOr
   // "We do not know what it costs" is not the same as "it is sold out", and both
   // differ from "nobody serves that country" -- each is counted so the refusal
   // below can say which one happened.
-  const priced = offers.filter((offer) => offer.costNgn !== null);
+  const priced = selectedOffer
+    ? selectedOffer.costNgn === null ? [] : [selectedOffer]
+    : offers.filter((offer) => offer.costNgn !== null);
   if (priced.length === 0) {
     throw new FleexaError("That destination has no usable price", 503, "COST_UNKNOWN");
   }
@@ -232,7 +264,13 @@ async function fulfillNumber(plan: Plan, intent: SmsIntent): Promise<FulfilledOr
     }
 
     try {
+      if (options.otpOfferId) await options.onOtpAttempt?.();
       const bought = await buyOtpNumber(offer);
+      if (options.otpOfferId) {
+        if (!bought.providerRequestId) throw new Error("Provider accepted an activation without a durable reference");
+        await options.onOtpAccepted?.(bought.providerRequestId);
+        if (!bought.number) throw new Error("Provider accepted an activation without a usable phone number");
+      }
       if (
         typeof bought.providerCostNgn === "number" &&
         bought.providerCostNgn > (offer.costNgn ?? 0)
@@ -306,7 +344,7 @@ async function fulfillRental(plan: Plan, intent: RentalIntent): Promise<Fulfille
   const rental = await buyFleexaRental({ area: area.id, months: intent.months });
   const quotedRentalCost = area.pricePerMonthNgn != null ? area.pricePerMonthNgn * intent.months : null;
   return {
-    provider: LIVE_OTP_PROVIDER,
+    provider: FLEEXA_PROVIDER,
     providerCostNgn: quotedRentalCost,
     providerRequestId: rental.rentalId,
     referenceCode: rental.number,

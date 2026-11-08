@@ -12,5 +12,5 @@ export function isNumberPlanOrderingConfigured(slug: string): boolean {
   if (!intent) return false;
   return intent.kind === "rental"
     ? isFleexaConfigured()
-    : isFleexaConfigured() || isBitcallConfigured();
+    : isBitcallConfigured();
 }

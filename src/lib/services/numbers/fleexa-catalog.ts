@@ -1,14 +1,13 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { isFundingFailure } from "@/lib/providers/types";
-import { isFleexaConfigured, listFleexaEmailProducts, listFleexaRentAreas, listFleexaSmsServices, type FleexaEmailProduct, type FleexaRentArea, type FleexaSmsService } from "@/lib/providers/fleexa";
+import { isFleexaConfigured, listFleexaEmailProducts, listFleexaRentAreas, type FleexaEmailProduct, type FleexaRentArea } from "@/lib/providers/fleexa";
 import { priceFromCost, isPriceInBand } from "@/lib/services/pricing";
 import { safeUnitCount } from "@/lib/services/service-units";
-import { explorerCountry, VERIFICATION_EXAMPLES, type ExplorerItem } from "@/lib/services/service-explorer";
+import { explorerCountry, type ExplorerItem } from "@/lib/services/service-explorer";
 import { mailProviderBrand, mailProviderFaviconDomain } from "@/lib/services/numbers/mail-provider-marks";
 
 export type SupplierSnapshot = {
-  sms: FleexaSmsService[];
   email: FleexaEmailProduct[];
   rentals: FleexaRentArea[];
   partial: boolean;
@@ -30,8 +29,8 @@ export async function readSupplierSnapshot(refresh = false): Promise<SupplierSna
   if (!refresh && cache && cache.expires > Date.now()) return cache.snapshot;
   if (inFlight) return inFlight;
   inFlight = (async () => {
-    const [sms, email, rentals] = await Promise.allSettled([listFleexaSmsServices(), listFleexaEmailProducts(), listFleexaRentAreas()]);
-    const results = [sms, email, rentals];
+    const [email, rentals] = await Promise.allSettled([listFleexaEmailProducts(), listFleexaRentAreas()]);
+    const results = [email, rentals];
     const failures = results.filter((result) => result.status === "rejected");
     // An unfunded account is not an outage: preserve the refusal's own class so
     // the hub can say "restocking" instead of offering a Retry that cannot work.
@@ -40,7 +39,6 @@ export async function readSupplierSnapshot(refresh = false): Promise<SupplierSna
       throw new Error("Supplier catalog unavailable");
     }
     const snapshot: SupplierSnapshot = {
-      sms: sms.status === "fulfilled" ? sms.value.slice(0, 2000) : [],
       email: email.status === "fulfilled" ? email.value.slice(0, 2000) : [],
       rentals: rentals.status === "fulfilled" ? rentals.value.slice(0, 2000) : [],
       partial: failures.length > 0,
@@ -91,31 +89,6 @@ export function supplierItemsForCountry(snapshot: SupplierSnapshot, countryCode:
   const ids = new Set<string>();
   function add(item: ExplorerItem) { if (!ids.has(item.id)) { ids.add(item.id); items.push(item); } }
 
-  for (const entry of snapshot.sms) {
-    const id = readable(entry.id, 120), name = readable(entry.name, 80);
-    if (!id || !name || !matchesCountry(entry.country, country.code)) continue;
-    const lower = name.toLowerCase();
-    const brand = VERIFICATION_EXAMPLES.find((item) => {
-      const itemLower = item.name.toLowerCase();
-      if (itemLower === lower) return true;
-      if (item.brand === "x" && (lower === "twitter" || lower === "x.com")) return true;
-      if (item.brand === "chatgpt" && (lower === "openai" || lower.includes("chatgpt"))) return true;
-      if (item.brand === "google" && (lower === "gmail" || lower === "google mail")) return true;
-      if (item.brand === "anthropic" && (lower === "claude" || lower.includes("claude"))) return true;
-      if (item.brand === "ubereats" && (lower.includes("uber eats") || lower === "ubereats")) return true;
-      if (item.brand === "doordash" && (lower.includes("door dash") || lower === "doordash")) return true;
-      if (item.brand === "riotgames" && (lower.includes("valorant") || lower.includes("riot"))) return true;
-      if (item.brand === "battledotnet" && (lower.includes("blizzard") || lower.includes("battle.net"))) return true;
-      if (item.brand === "playstation" && (lower.includes("psn") || lower.includes("playstation"))) return true;
-      return false;
-    });
-    add({
-      id: itemId("sms", id, country.code), category: "verification", name, description: "SMS verification listing",
-      tag: brand?.tag ?? "Other", artwork: brand ? { kind: "brand", name: brand.brand } : { kind: "service", name: "numbers" },
-      source: "live", coverage: "catalog-country", stock: safeUnitCount(entry.stock), myUnits: null,
-      price: retail(entry.priceNgn, "numbers"), action: null,
-    });
-  }
   for (const entry of snapshot.email) {
     const id = readable(entry.id, 120), name = readable(entry.name, 80) ?? readable(entry.domain, 80);
     if (!id || !name) continue;

@@ -1,16 +1,12 @@
 import "server-only";
 
 import { fulfilmentIntent } from "@/lib/services/fulfillment";
-import { otpOffersFor, otpSupplierConfigured, otpSupplierOrder } from "@/lib/services/numbers/otp-suppliers";
+import { otpOffersForSupplier, otpSupplierConfigured } from "@/lib/services/numbers/otp-suppliers";
 
 /**
- * Show the number a customer can buy most cheaply for Pryva first.
- *
- * Every sellable number plan is one country, and each country can be served by
- * more than one supplier at a different price. The selling price is fixed by the
- * catalogue, so the cheapest supplier is also the one with the widest margin —
- * which makes "cheapest for us" and "best value first" the same ordering, with no
- * cost ever leaving the server.
+ * Show the destination with the lowest current Bitcall OTP cost first. Single-use
+ * OTP orders now use Bitcall only, so comparing another supplier would advertise
+ * a price we cannot fulfil against. The cost remains server-only.
  *
  * Only the ordering crosses this boundary: no price, no supplier name and no
  * availability figure is returned, because those are wholesale facts and the
@@ -34,9 +30,12 @@ async function cheapestByCountry(countries: string[], regionNames: Map<string, s
   const costs = new Map<string, number>();
   await Promise.all(
     countries.map(async (country) => {
-      const offers = await otpOffersFor(country, regionNames.get(country) ?? country, {
-        budgetMs: DISPLAY_BUDGET_MS,
-      });
+      const offers = await otpOffersForSupplier(
+        "bitcall",
+        country,
+        regionNames.get(country) ?? country,
+        DISPLAY_BUDGET_MS,
+      );
       const priced = offers.filter(
         (offer) => offer.costNgn !== null && (offer.stock === null || offer.stock > 0),
       );
@@ -61,7 +60,7 @@ export async function orderNumberPlansByCheapestCost<T extends { slug: string; r
   plans: T[],
 ): Promise<T[]> {
   try {
-    if (!otpSupplierOrder().some(otpSupplierConfigured)) return plans;
+    if (!otpSupplierConfigured("bitcall")) return plans;
 
     const intents = new Map<string, string>();
     const regionNames = new Map<string, string>();

@@ -375,6 +375,10 @@ export type EsimCatalogueItem = {
   global: boolean;
   priceNgn: number | null;
   purchasable: boolean;
+  /** Provider-listed capabilities. Null/undefined means the plan did not specify it. */
+  includesPhoneNumber?: boolean | null;
+  supportsVoice?: boolean | null;
+  supportsSms?: boolean | null;
 };
 
 /** A page cannot render ten thousand cards, and a price-sorted slice is the honest cut. */
@@ -397,6 +401,9 @@ export function catalogueItems(offers: EsimListing[], limit = ESIM_CATALOGUE_LIM
     global: offer.coverage === "not-country-specific",
     priceNgn: offer.priceNgn,
     purchasable: offer.purchasable,
+    includesPhoneNumber: offer.includesPhoneNumber,
+    supportsVoice: offer.supportsVoice,
+    supportsSms: offer.supportsSms,
   }));
 }
 

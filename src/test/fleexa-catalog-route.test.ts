@@ -11,6 +11,8 @@ const state = vi.hoisted(() => ({
   boostItems: vi.fn(),
   esimSnapshot: vi.fn(),
   esimItems: vi.fn(),
+  otpRead: vi.fn(),
+  otpItems: vi.fn(),
   fleexaConfigured: true,
   boostConfigured: false,
   bitcallConfigured: false,
@@ -32,6 +34,11 @@ vi.mock("@/lib/providers/fleexa", () => ({ isFleexaConfigured: () => state.fleex
 vi.mock("@/lib/providers/smm-panel", () => ({ isSmmPanelConfigured: () => state.boostConfigured }));
 vi.mock("@/lib/services/boosts/smm-catalog", () => ({ readBoostSnapshot: state.boostSnapshot, boostItems: state.boostItems }));
 vi.mock("@/lib/providers/bitcall", () => ({ isBitcallConfigured: () => state.bitcallConfigured }));
+vi.mock("@/lib/services/numbers/otp-suppliers", () => ({ readOtpOffersForSupplier: state.otpRead }));
+vi.mock("@/lib/services/numbers/otp-catalog", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/numbers/otp-catalog")>();
+  return { ...actual, bitcallOtpItemsForCountry: state.otpItems };
+});
 vi.mock("@/lib/services/esim/esim-catalog", () => ({ readEsimCatalog: state.esimSnapshot, esimItemsForCountry: state.esimItems }));
 
 import { ProviderError } from "@/lib/providers/types";
@@ -55,6 +62,8 @@ beforeEach(() => {
   state.boostItems.mockReturnValue([BOOST]);
   state.esimSnapshot.mockResolvedValue({ partial: false, fetchedAt: "2026-01-03T00:00:00Z", offers: [], listings: [] });
   state.esimItems.mockReturnValue([ESIM]);
+  state.otpRead.mockResolvedValue({ offers: [], errorCode: null });
+  state.otpItems.mockReturnValue([]);
 });
 
 afterEach(() => vi.unstubAllEnvs());
@@ -142,7 +151,8 @@ describe("supplier catalog endpoint", () => {
     expect(state.snapshot).not.toHaveBeenCalled();
     expect(state.boostSnapshot).not.toHaveBeenCalled();
     expect(response.status).toBe(200);
-    expect(body).toMatchObject({ ok: true, live: true, partial: false, fetchedAt: "2026-01-03T00:00:00Z", items: [ESIM] });
+    expect(body).toMatchObject({ ok: true, live: true, partial: false, items: [ESIM] });
+    expect(Number.isFinite(Date.parse(body.fetchedAt))).toBe(true);
   });
 
   it("is unavailable only when every configured supplier fails", async () => {
@@ -150,6 +160,7 @@ describe("supplier catalog endpoint", () => {
     state.snapshot.mockRejectedValue(new Error("Supplier catalog unavailable"));
     state.boostSnapshot.mockRejectedValue(new Error("Boosting catalog unavailable"));
     state.esimSnapshot.mockRejectedValue(new Error("eSIM catalog unavailable"));
+    state.otpRead.mockResolvedValue({ offers: [], errorCode: "UPSTREAM_ERROR" });
     expect((await GET(request())).status).toBe(503);
 
   });
@@ -171,6 +182,7 @@ describe("supplier catalog endpoint", () => {
     state.snapshot.mockRejectedValue(unfunded());
     state.boostSnapshot.mockRejectedValue(new ProviderError("balance", { provider: "smm", status: 402, code: "INSUFFICIENT_BALANCE" }));
     state.esimSnapshot.mockRejectedValue(new ProviderError("balance", { provider: "bitcall", status: 402, code: "INSUFFICIENT_BALANCE" }));
+    state.otpRead.mockResolvedValue({ offers: [], errorCode: "INSUFFICIENT_BALANCE" });
 
     const response = await GET(request());
     expect(response.status).toBe(200);
@@ -209,5 +221,6 @@ describe("supplier catalog endpoint", () => {
     expect(state.snapshot).toHaveBeenCalledWith(true);
     expect(state.boostSnapshot).toHaveBeenCalledWith(true);
     expect(state.esimSnapshot).toHaveBeenCalledWith(true);
+    expect(state.otpRead).toHaveBeenCalledWith("bitcall", "us", expect.any(String), undefined, true);
   });
 });

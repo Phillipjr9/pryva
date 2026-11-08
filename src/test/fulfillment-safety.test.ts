@@ -14,17 +14,28 @@ const provider = vi.hoisted(() => ({
   listAreas: vi.fn(),
   cancelSms: vi.fn(),
 }));
+const bitcall = vi.hoisted(() => ({ configured: true, buyOtp: vi.fn(), listOtp: vi.fn() }));
 
 vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/providers/fleexa")>();
   return {
     ...actual,
     isFleexaConfigured: () => provider.configured,
-    buyFleexaSmsNumber: provider.buySms,
+    buyFleexaSmsNumber: bitcall.buyOtp,
     listFleexaSmsServices: provider.listServices,
     buyFleexaRental: provider.buyRental,
     listFleexaRentAreas: provider.listAreas,
     cancelFleexaSms: provider.cancelSms,
+  };
+});
+
+vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/providers/bitcall")>();
+  return {
+    ...actual,
+    isBitcallConfigured: () => bitcall.configured,
+    listBitcallOtpServices: bitcall.listOtp,
+    buyBitcallOtpActivation: bitcall.buyOtp,
   };
 });
 
@@ -35,6 +46,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   clearOtpCatalogueCache();
   provider.configured = true;
+  bitcall.configured = true;
+  bitcall.listOtp.mockImplementation(async ({ countryCode }: { countryCode: string }) => SMS_SERVICES.filter((service) => service.countryCode === countryCode));
+  bitcall.buyOtp.mockResolvedValue({ activationId: "act-1", phoneNumber: "+2348000000000", price: 100, currency: "NGN", status: "pending" });
 });
 afterEach(() => { vi.restoreAllMocks(); });
 
@@ -45,19 +59,15 @@ afterEach(() => { vi.restoreAllMocks(); });
  * the owner's balance has already been spent.
  */
 const SMS_SERVICES = ["ng", "us", "gb", "ca", "de", "gh"].map((country) => ({
-  id: `svc-${country}`, country, name: country.toUpperCase(), priceNgn: 100, stock: 10,
+  countryCode: country.toUpperCase(),
+  name: country.toUpperCase(),
+  offers: [{ serviceId: `svc-${country}`, price: 100, currency: "NGN", availableCount: 10 }],
 }));
 
-/** Plans we can deliver, and the exact provider arguments each one implies. */
-const DELIVERABLE: Array<[slug: string, args: unknown]> = [
-  // The app is passed too: a catalogue row names one, and buying it by country
-  // alone could rent a pool that cannot receive the customer's code.
-  ["vn-ng", { app: "NG", country: "ng" }],
-  ["vn-us", { app: "US", country: "us" }],
-  ["vn-uk", { app: "GB", country: "gb" }],
-  ["vn-ca", { app: "CA", country: "ca" }],
-  ["vn-de", { app: "DE", country: "de" }],
-  ["vn-gh", { app: "GH", country: "gh" }],
+/** Plans we can deliver, and the provider-published service ID selected per country. */
+const DELIVERABLE: Array<[slug: string, serviceId: string]> = [
+  ["vn-ng", "svc-ng"], ["vn-us", "svc-us"], ["vn-uk", "svc-gb"],
+  ["vn-ca", "svc-ca"], ["vn-de", "svc-de"], ["vn-gh", "svc-gh"],
 ];
 
 /**
@@ -89,24 +99,18 @@ describe("fulfilment", () => {
     }
   });
   it("refuses everything when no provider key is configured", async () => {
-    provider.configured = false;
+    bitcall.configured = false;
     await expect(fulfillPlan(findPlan("vn-ng")!)).rejects.toMatchObject({ code: "NO_API_KEY" });
-    expect(provider.buySms).not.toHaveBeenCalled();
+    expect(bitcall.buyOtp).not.toHaveBeenCalled();
   });
 
-  it.each(DELIVERABLE)("buys a real number for %s and returns the provider receipt", async (slug, args) => {
-    provider.listServices.mockResolvedValue(SMS_SERVICES);
-    provider.buySms.mockResolvedValue({
-      requestId: "req-1", number: "+2348000000000", service: null,
-      country: null, priceNgn: null, expiresAt: null, raw: {},
-    });
-
+  it.each(DELIVERABLE)("buys a real number for %s and returns the provider receipt", async (slug, serviceId) => {
     const result = await fulfillPlan(findPlan(slug)!);
 
-    expect(provider.buySms).toHaveBeenCalledWith(args);
+    expect(bitcall.buyOtp).toHaveBeenCalledWith(serviceId);
     expect(result).toMatchObject({
-      provider: "fleexa",
-      providerRequestId: "req-1",
+      provider: "bitcall",
+      providerRequestId: "act-1",
       referenceCode: "+2348000000000",
       // The code arrives later; the order page polls for it.
       otpCode: null,
@@ -117,21 +121,20 @@ describe("fulfilment", () => {
 
   describe("margin guard", () => {
     const plan = findPlan("vn-ng")!;
-    const receipt = { requestId: "req-1", number: "+2348000000000", service: null,
-      country: null, priceNgn: null, expiresAt: null, raw: {} };
+    const receipt = { activationId: "act-1", phoneNumber: "+2348000000000", price: 100, currency: "NGN", status: "pending" };
     /** Quote a cost for the destination we are about to buy. */
     function quote(priceNgn: number | null) {
       // Catalogues are cached briefly in production; a re-quote here has to be
       // seen, so the cache is cleared with it.
       clearOtpCatalogueCache();
-      provider.listServices.mockResolvedValue([{ id: "svc-ng", country: "ng", priceNgn, stock: 10 }]);
+      bitcall.listOtp.mockResolvedValue([{ name: "WhatsApp", offers: [{ serviceId: "svc-ng", price: priceNgn, currency: "NGN", availableCount: 10 }] }]);
     }
 
     it("refuses to spend when the provider costs more than we charge", async () => {
       quote(plan.price * 2);
       const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
       await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "UNPROFITABLE", status: 503 });
-      expect(provider.buySms).not.toHaveBeenCalled();
+      expect(bitcall.buyOtp).not.toHaveBeenCalled();
       // The owner must be able to see why; the customer never does.
       expect(error).toHaveBeenCalled();
       error.mockRestore();
@@ -140,32 +143,32 @@ describe("fulfilment", () => {
     it("refuses a margin below the floor but sells one that clears it", async () => {
       quote(Math.ceil(plan.price * 0.95));
       await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "UNPROFITABLE" });
-      expect(provider.buySms).not.toHaveBeenCalled();
+      expect(bitcall.buyOtp).not.toHaveBeenCalled();
 
       quote(Math.floor(plan.price * 0.5));
-      provider.buySms.mockResolvedValue(receipt);
-      await expect(fulfillPlan(plan)).resolves.toMatchObject({ provider: "fleexa" });
-      expect(provider.buySms).toHaveBeenCalledTimes(1);
+      bitcall.buyOtp.mockResolvedValue(receipt);
+      await expect(fulfillPlan(plan)).resolves.toMatchObject({ provider: "bitcall" });
+      expect(bitcall.buyOtp).toHaveBeenCalledTimes(1);
     });
 
     it("refuses to spend when the provider does not report a price at all", async () => {
       quote(null);
       const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
       await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "COST_UNKNOWN", status: 503 });
-      expect(provider.buySms).not.toHaveBeenCalled();
+      expect(bitcall.buyOtp).not.toHaveBeenCalled();
       error.mockRestore();
     });
 
     it("refuses before any spend when no service matches the destination", async () => {
-      provider.listServices.mockResolvedValue([{ id: "svc-zz", country: "zz", priceNgn: 100, stock: 10 }]);
+      bitcall.listOtp.mockResolvedValue([]);
       await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
-      expect(provider.buySms).not.toHaveBeenCalled();
+      expect(bitcall.buyOtp).not.toHaveBeenCalled();
     });
 
     it("refuses when the matching destination is out of stock, before spending", async () => {
-      provider.listServices.mockResolvedValue([{ id: "svc-ng", country: "ng", priceNgn: 100, stock: 0 }]);
+      bitcall.listOtp.mockResolvedValue([{ name: "WhatsApp", offers: [{ serviceId: "svc-ng", price: 100, currency: "NGN", availableCount: 0 }] }]);
       await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
-      expect(provider.buySms).not.toHaveBeenCalled();
+      expect(bitcall.buyOtp).not.toHaveBeenCalled();
     });
   });
 
@@ -175,7 +178,7 @@ describe("fulfilment", () => {
 
     await expect(fulfillPlan(plan!)).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
     expect(isPlanFulfillable(slug)).toBe(false);
-    expect(provider.buySms).not.toHaveBeenCalled();
+    expect(bitcall.buyOtp).not.toHaveBeenCalled();
     expect(provider.buyRental).not.toHaveBeenCalled();
   });
 
@@ -196,7 +199,7 @@ describe("fulfilment", () => {
       expect(isPlanFulfillable(slug), `${slug} must never be fulfillable`).toBe(false);
     }
 
-    expect(provider.buySms).not.toHaveBeenCalled();
+    expect(bitcall.buyOtp).not.toHaveBeenCalled();
     expect(provider.buyRental).not.toHaveBeenCalled();
   });
 

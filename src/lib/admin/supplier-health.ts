@@ -34,7 +34,7 @@ export type SupplierHealthPlan = {
 };
 
 export type SupplierHealthReport = {
-  routing: { order: string[]; configured: Record<string, boolean> };
+  routing: { purchaseSupplier: "bitcall"; diagnosticOrder: string[]; configured: Record<string, boolean> };
   gateway: {
     keyEnvironment: string | null;
     balance: { amount: number | null; currency: string | null; amountNgn: number | null } | null;
@@ -55,8 +55,8 @@ export async function readSupplierHealth(options: { country?: string | null } = 
   }
 
   const wanted = [...destinations.entries()].filter(([code]) => !requested || code === requested);
-  const order = otpSupplierOrder();
-  const configured = Object.fromEntries(order.map((supplier) => [supplier, otpSupplierConfigured(supplier)]));
+  const diagnosticOrder = otpSupplierOrder();
+  const configured = Object.fromEntries(diagnosticOrder.map((supplier) => [supplier, otpSupplierConfigured(supplier)]));
 
   const rate = Object.values(configured).some(Boolean) ? await getUsdToNgnRate() : null;
 
@@ -73,7 +73,7 @@ export async function readSupplierHealth(options: { country?: string | null } = 
   const reports = await Promise.all(
     wanted.map(async ([code, name]) => {
       const suppliers = await Promise.all(
-        order.map(async (supplier) => {
+        diagnosticOrder.map(async (supplier) => {
           const probe = await otpSupplierProbe(supplier, code, name);
           const priced = probe.offers.filter((offer) => offer.costNgn !== null);
           const inStock = priced.filter((offer) => offer.stock === null || offer.stock > 0);
@@ -94,7 +94,9 @@ export async function readSupplierHealth(options: { country?: string | null } = 
       return {
         country: code,
         name,
-        sellable: suppliers.some((entry) => entry.inStock > 0),
+        // Fleexa is still probed for diagnostics, but only Bitcall can fulfill a
+        // single-use number plan now.
+        sellable: suppliers.some((entry) => entry.supplier === "bitcall" && entry.inStock > 0),
         suppliers,
       };
     }),
@@ -106,9 +108,8 @@ export async function readSupplierHealth(options: { country?: string | null } = 
     .map(({ plan, intent }) => {
       const country = intent.kind === "sms" ? intent.country : "";
       const offers = byCountry.get(country)?.suppliers ?? [];
-      const cheapest = offers
-        .filter((entry) => entry.cheapestNgn !== null)
-        .sort((a, b) => (a.cheapestNgn as number) - (b.cheapestNgn as number))[0] ?? null;
+      const bitcall = offers.find((entry) => entry.supplier === "bitcall" && entry.inStock > 0) ?? null;
+      const cheapest = bitcall && bitcall.cheapestNgn !== null ? bitcall : null;
       const margin = cheapest ? checkMargin(plan.price, cheapest.cheapestNgn) : null;
 
       return {
@@ -125,7 +126,7 @@ export async function readSupplierHealth(options: { country?: string | null } = 
     });
 
   return {
-    routing: { order, configured },
+    routing: { purchaseSupplier: "bitcall", diagnosticOrder, configured },
     gateway: { keyEnvironment: bitcallKeyEnvironment(), balance },
     usdToNgn: rate ? { rate: rate.rate, source: rate.source } : null,
     plans,

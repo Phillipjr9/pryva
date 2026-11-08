@@ -74,9 +74,9 @@ const LANE_PROVIDERS: Record<LaneId, readonly string[]> = {
   esim: [ESIM_PROVIDER],
   accounts: [ACCOUNTS_PROVIDER, MANUAL_PROVIDER],
   boosts: [SMM_PROVIDER],
-  proxies: [ORDER_PROVIDERS.liveOtp],
-  subscriptions: [ORDER_PROVIDERS.liveOtp],
-  data: [ORDER_PROVIDERS.liveOtp],
+  proxies: [ORDER_PROVIDERS.fleexa],
+  subscriptions: [ORDER_PROVIDERS.fleexa],
+  data: [ORDER_PROVIDERS.fleexa],
 };
 
 /** Providers this lane shares with another, which is why it needs a service filter. */

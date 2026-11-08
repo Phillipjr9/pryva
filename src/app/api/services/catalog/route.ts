@@ -10,6 +10,8 @@ import { esimItemsForCountry, readEsimCatalog } from "@/lib/services/esim/esim-c
 import { explorerCountry } from "@/lib/services/service-explorer";
 import { catalogRateLimiter } from "@/lib/platform/rate-limit";
 import { isFundingFailure } from "@/lib/providers/types";
+import { readOtpOffersForSupplier } from "@/lib/services/numbers/otp-suppliers";
+import { bitcallOtpItemsForCountry, otpCatalogProviderError } from "@/lib/services/numbers/otp-catalog";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -35,8 +37,9 @@ async function attempt<T>(configured: boolean, read: () => Promise<T>): Promise<
 }
 
 /**
- * Read-only catalog. Live purchases remain disabled until mappings, pricing and
- * reconciliation are verified.
+ * Customer catalogue. App-specific OTP entries are mapped to the Bitcall
+ * single-use order flow; eSIM and the other live catalogues retain their own
+ * checkout gates.
  *
  * Each supplier is attempted independently. A deployment with only one key
  * configured must still serve that supplier's listings, so one supplier being
@@ -72,12 +75,17 @@ export async function GET(request: NextRequest) {
   if (!limit.allowed) return NextResponse.json({ error: "Please try again shortly", reason: "throttled" }, { status: 429 });
 
   const refresh = request.nextUrl.searchParams.get("refresh") === "1";
-  const [supplier, boost, esim] = await Promise.all([
+  const [supplier, boost, esim, otp] = await Promise.all([
     attempt(isFleexaConfigured(), () => readSupplierSnapshot(refresh)),
     attempt(isSmmPanelConfigured(), () => readBoostSnapshot(refresh)),
     attempt(isBitcallConfigured(), () => readEsimCatalog(refresh)),
+    attempt(isBitcallConfigured(), async () => {
+      const read = await readOtpOffersForSupplier("bitcall", country.code, country.name, undefined, refresh);
+      if (read.errorCode) throw otpCatalogProviderError(read.errorCode);
+      return { offers: read.offers, partial: false, degraded: null, fetchedAt: new Date().toISOString() };
+    }),
   ]);
-  const sources = [supplier, boost, esim];
+  const sources = [supplier, boost, esim, otp];
 
   /**
    * No supplier connected is the steady state of a fresh deployment, not an
@@ -115,6 +123,7 @@ export async function GET(request: NextRequest) {
 
   const items = [
     ...(supplier.snapshot ? supplierItemsForCountry(supplier.snapshot, country.code) : []),
+    ...(otp.snapshot ? bitcallOtpItemsForCountry(otp.snapshot.offers, country.code, country.name) : []),
     ...(esim.snapshot ? esimItemsForCountry(esim.snapshot.listings, country.code) : []),
     ...(boost.snapshot ? boostItems(boost.snapshot) : []),
   ];

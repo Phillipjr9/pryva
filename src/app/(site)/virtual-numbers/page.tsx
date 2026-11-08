@@ -110,7 +110,7 @@ export default async function VirtualNumbersPage() {
         <div className="shell">
           <h2 className="mb-3 text-[1.75rem] font-semibold text-ink">Countries</h2>
           <p className="mb-6 max-w-2xl text-[0.95rem] text-ink-2">
-            These are the reseller-backed destinations currently available for instant virtual number verification and rentals.
+            These destinations are currently available for instant virtual number verification and rentals.
           </p>
           <CountryChips codes={[...SUPPORTED_VIRTUAL_NUMBER_COUNTRIES]} />
         </div>

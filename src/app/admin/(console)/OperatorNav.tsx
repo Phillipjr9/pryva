@@ -29,7 +29,7 @@ export const ADMIN_SECTIONS: NavSection[] = [
       { href: "/admin/fulfilment", label: "Fulfilment", icon: Receipt },
       { href: "/admin/services", label: "Services", icon: Globe },
       { href: "/admin/stock", label: "Stock", icon: Gift },
-      { href: "/admin/suppliers", label: "Suppliers", icon: Activity },
+      { href: "/admin/integrations", label: "Integrations", icon: Activity },
       { href: "/admin/boosting", label: "Boosting", icon: Bolt },
     ],
   },

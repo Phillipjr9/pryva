@@ -27,9 +27,9 @@ type Copy = (context: Context) => string;
 
 const DETAIL: Record<ServiceId, Copy> = {
   verification: ({ supplier }) =>
-    supplier("fleexa")
-      ? "Listings are readable, but each app still needs its own mapping before a code can be bought."
-      : "App-specific listings are not currently available to order.",
+    supplier("bitcall")
+      ? "Browse live app-specific number offers by destination. Each offer is checked again before purchase."
+      : "Live app-specific offers are not connected, so verification orders cannot be placed.",
   social: ({ preview, supplier }) =>
     supplier("smm")
       ? "Boosts are priced live and can be bought from your wallet."
@@ -37,11 +37,11 @@ const DETAIL: Record<ServiceId, Copy> = {
         ? "Ordering is unavailable in this environment."
         : "The boosting panel is not connected, so nothing here can be ordered or charged.",
   numbers: ({ preview, supplier }) =>
-    supplier("fleexa")
-      ? "Single-use numbers and rentals are delivered automatically, and bulk orders buy the same units."
-      : preview
-        ? "Ordering is unavailable in this environment."
-        : "Plans are catalogued with prices; ordering is not connected yet.",
+    preview
+      ? "Ordering is unavailable in this environment."
+      : supplier("bitcall")
+        ? "Single-use OTP numbers are checked against live offers before purchase. Rentals remain on a separate catalogue."
+        : "Single-use OTP ordering is not connected, so those plans cannot be bought.",
   esim: ({ preview, supplier }) =>
     preview
       ? "eSIM ordering is unavailable in this environment."

@@ -11,16 +11,18 @@ const mocks = vi.hoisted(() => ({
   db: null as unknown,
   currentUser: vi.fn(),
   fulfillPlan: vi.fn(),
+  findOtpOffer: vi.fn(),
   cancelUpstream: vi.fn(),
   rateLimit: vi.fn(),
   scheduleWalletEmails: vi.fn(),
 }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
 vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: mocks.currentUser, requireAuthApi: mocks.currentUser }));
-vi.mock("@/lib/services/fulfillment", () => ({
-  fulfillPlan: mocks.fulfillPlan,
-  cancelUpstream: mocks.cancelUpstream,
-}));
+vi.mock("@/lib/services/fulfillment", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/fulfillment")>();
+  return { ...actual, fulfillPlan: mocks.fulfillPlan, cancelUpstream: mocks.cancelUpstream };
+});
+vi.mock("@/lib/services/numbers/otp-catalog", () => ({ findOtpCheckoutOffer: mocks.findOtpOffer }));
 vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.scheduleWalletEmails }));
 vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
@@ -33,6 +35,7 @@ vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
 let POST: typeof import("@/app/api/orders/route").POST;
+let GET: typeof import("@/app/api/orders/route").GET;
 let findPlan: typeof import("@/lib/services/catalog").findPlan;
 
 const USER = "11111111-1111-4111-8111-111111111111";
@@ -56,7 +59,7 @@ beforeAll(async () => {
   database = drizzle(pg, { schema });
   mocks.db = database;
   ({ findPlan } = await import("@/lib/services/catalog"));
-  ({ POST } = await import("@/app/api/orders/route"));
+  ({ POST, GET } = await import("@/app/api/orders/route"));
   await database.insert(schema.users).values({
     id: USER, name: "Buyer", email: "buyer@example.com", passwordHash: "hash", walletBalance: 500_000,
   });
@@ -95,6 +98,10 @@ beforeEach(async () => {
     referenceCode: "+2348000000000",
     otpCode: null, expiresAt: new Date(Date.now() + 20 * 60_000),
   });
+  mocks.findOtpOffer.mockResolvedValue({
+    listing: { id: `otp-${"a".repeat(24)}`, app: "WhatsApp", countryCode: "ng", countryName: "Nigeria", plan: findPlan(SLUG), priceNgn: findPlan(SLUG)!.price, purchasable: true },
+    errorCode: null,
+  });
   mocks.cancelUpstream.mockResolvedValue(false);
   await database.delete(schema.walletTransactions);
   await database.delete(schema.orders);
@@ -126,6 +133,27 @@ describe("purchase isolation", () => {
   });
 });
 
+describe("customer order API disclosure", () => {
+  it("does not return supplier routing, wholesale cost, or reconciliation internals", async () => {
+    await database.insert(schema.orders).values({
+      reference: "PRY-PRIVATE-1", userId: USER, requestId: crypto.randomUUID(), service: "numbers",
+      productSlug: SLUG, productName: "WhatsApp", planLabel: "NG single use", region: "Nigeria",
+      duration: "Single-use", amount: 1340, status: "review", provider: "bitcall",
+      providerCostNgn: 900, providerRequestId: "private-activation-id",
+      reconciliationNote: "private internal note",
+    });
+
+    const body = await (await GET()).json();
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain("bitcall");
+    expect(serialized).not.toContain("providerCostNgn");
+    expect(serialized).not.toContain("providerRequestId");
+    expect(serialized).not.toContain("private-activation-id");
+    expect(serialized).not.toContain("reconciliationNote");
+    expect(body.orders[0]).toMatchObject({ productName: "WhatsApp", status: "review" });
+  });
+});
+
 describe("recorded unit cost", () => {
   it("persists what the unit actually cost so real margin is measurable", async () => {
     const requestId = crypto.randomUUID();
@@ -136,6 +164,7 @@ describe("recorded unit cost", () => {
     // the receipt is an explicit field allowlist, and this keeps it that way.
     expect(JSON.stringify(body)).not.toContain("providerCostNgn");
     expect(JSON.stringify(body)).not.toContain("900");
+    expect(JSON.stringify(body)).not.toContain('"provider"');
 
     // The cost sheet holds planned prices; only this column holds what the
     // supplier really charged, which is the only honest basis for margin.
@@ -156,6 +185,64 @@ describe("recorded unit cost", () => {
     // Zero would read as "this unit was free" and report a 100% margin on a
     // sale whose real cost was simply never observed. Null keeps the two apart.
     expect(row.providerCostNgn).toBeNull();
+  });
+});
+
+describe("app-specific OTP purchase claims", () => {
+  const offerId = `otp-${"a".repeat(24)}`;
+
+  it("claims before the Bitcall attempt, stores the provider reference, then charges once", async () => {
+    const requestId = crypto.randomUUID();
+    mocks.fulfillPlan.mockImplementationOnce(async (_plan: unknown, options: { otpOfferId: string; onOtpAttempt: () => Promise<void>; onOtpAccepted: (id: string) => Promise<void> }) => {
+      expect(options.otpOfferId).toBe(offerId);
+      await options.onOtpAttempt();
+      await options.onOtpAccepted("activation-1");
+      return {
+        provider: "bitcall", providerCostNgn: 900, providerRequestId: "activation-1",
+        referenceCode: "+2348000000000", otpCode: null, expiresAt: new Date(Date.now() + 20 * 60_000),
+      };
+    });
+
+    const firstResponse = await POST(purchase({ planSlug: SLUG, requestId, otpOfferId: offerId }));
+    const first = await firstResponse.json();
+    const [saved] = await ordersFor(requestId);
+
+    expect(firstResponse.status).toBe(200);
+    expect(first.order).toMatchObject({ productName: "WhatsApp", status: "active" });
+    expect(saved).toMatchObject({ provider: "bitcall", providerRequestId: "activation-1", status: "active" });
+    expect(mocks.findOtpOffer).toHaveBeenCalledWith("ng", offerId, { refresh: true });
+    expect(await ledgerCount()).toBe(1);
+    expect(500_000 - (await walletBalance())).toBe(findPlan(SLUG)!.price);
+
+    const replay = await POST(purchase({ planSlug: SLUG, requestId, otpOfferId: offerId }));
+    expect(replay.status).toBe(200);
+    expect((await replay.json()).order.id).toBe(first.order.id);
+    expect(mocks.fulfillPlan).toHaveBeenCalledTimes(1);
+    expect(await ledgerCount()).toBe(1);
+  });
+
+  it("holds an ambiguous provider outcome for review without charging or retrying", async () => {
+    const requestId = crypto.randomUUID();
+    mocks.fulfillPlan.mockImplementationOnce(async (_plan: unknown, options: { onOtpAttempt: () => Promise<void> }) => {
+      await options.onOtpAttempt();
+      throw new Error("provider response was lost");
+    });
+
+    const firstResponse = await POST(purchase({ planSlug: SLUG, requestId, otpOfferId: offerId }));
+    const first = await firstResponse.json();
+    const [saved] = await ordersFor(requestId);
+
+    expect(firstResponse.status).toBe(202);
+    expect(first).toMatchObject({ ok: true, pending: true, order: { status: "review" } });
+    expect(saved).toMatchObject({ status: "review", provider: "bitcall" });
+    expect(await ledgerCount()).toBe(0);
+    expect(await walletBalance()).toBe(500_000);
+
+    const replay = await POST(purchase({ planSlug: SLUG, requestId, otpOfferId: offerId }));
+    expect(replay.status).toBe(200);
+    expect((await replay.json())).toMatchObject({ pending: true, order: { id: saved.id, status: "review" } });
+    expect(mocks.fulfillPlan).toHaveBeenCalledTimes(1);
+    expect(await ledgerCount()).toBe(0);
   });
 });
 

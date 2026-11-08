@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import {
   BitcallError,
   buyBitcallOtpActivation,
@@ -12,29 +13,22 @@ import { logger } from "@/lib/platform/logger";
 import { supplierAmountToNgn } from "@/lib/payments/supplier-currency";
 
 /**
- * One verification number, from whichever supplier can actually deliver it.
+ * Supplier catalog adapters for number verification.
  *
- * Pryva has two suppliers for this product and they describe it differently:
- * one sells "an app in a country" at a naira price, the other sells opaque
- * per-pool offers in dollars. Both can deliver the thing a customer bought — a
- * number that receives one code — so the product stays one product and the
- * supplier becomes a routing decision.
+ * Bitcall is the sole supplier for new single-use OTP activations. Fleexa's SMS
+ * listing and purchase adapter remain for historical diagnostics and separately
+ * supported products, but neither catalog selection nor an ambiguous outcome may
+ * route an OTP checkout to Fleexa. Operator reports can still compare both feeds.
  *
- * Two rules make that safe:
- *
- *  • **Every check happens before the first buy call.** Configuration, country
- *    coverage, stock and margin are all answered from the catalogues, so moving
- *    to the next supplier costs nothing.
- *  • **A purchase that may have happened ends the search.** Both suppliers charge
- *    on every buy call and neither takes an idempotency key, so an ambiguous
- *    outcome is never retried and never failed over — that would rent two
- *    numbers for one order. `isAmbiguousOtpPurchase` is the only thing allowed to
- *    decide this, and it answers "unsafe" when it does not know.
+ * Checkout checks its selected Bitcall offer before spending and revalidates an
+ * app-specific selection against the live listing. A purchase with an ambiguous
+ * response is never retried or substituted; `isAmbiguousOtpPurchase` errs toward
+ * reconciliation when it cannot prove the provider refused the operation.
  */
 
 export type OtpSupplierId = "fleexa" | "bitcall";
 
-export const OTP_SUPPLIERS: readonly OtpSupplierId[] = ["fleexa", "bitcall"] as const;
+export const OTP_SUPPLIERS: readonly OtpSupplierId[] = ["bitcall", "fleexa"] as const;
 
 export type OtpOffer = {
   supplier: OtpSupplierId;
@@ -63,10 +57,9 @@ export type BoughtNumber = {
 /**
  * How long a catalogue read may take before it is treated as "nothing on offer".
  *
- * Comparing suppliers is only useful if both answer quickly: the checkout path
- * waits on these reads, and a gateway that hangs must not hold a purchase the
- * other supplier could already serve. Bitcall's own client allows 20s, which is
- * right for a purchase it is making and far too long to wait for a price quote.
+ * Customer checkout reads Bitcall's live offers before it can spend. This short
+ * budget keeps a stalled catalogue from holding the purchase flow. Operator
+ * diagnostics may also probe Fleexa, but never as a single-use checkout fallback.
  */
 const CATALOGUE_BUDGET_MS = 4_000;
 
@@ -76,7 +69,7 @@ const CATALOGUE_TTL_MS = 60_000;
 type CacheEntry = { at: number; offers: OtpOffer[]; };
 const catalogueCache = new Map<string, CacheEntry>();
 
-/** Read once so a typo in the environment cannot change routing mid-order. */
+/** Read once so a typo in the environment cannot reshuffle diagnostics mid-request. */
 const configuredOrder: OtpSupplierId[] = (() => {
   const raw = process.env.OTP_PROVIDER_ORDER?.trim();
   if (!raw) return [...OTP_SUPPLIERS];
@@ -89,7 +82,7 @@ const configuredOrder: OtpSupplierId[] = (() => {
   return [...new Set([...parsed, ...OTP_SUPPLIERS])];
 })();
 
-/** Supplier names in the order they should be tried. Exported for diagnostics. */
+/** Supplier names in the order they should be probed. Exported for diagnostics. */
 export function otpSupplierOrder(): OtpSupplierId[] {
   return [...configuredOrder];
 }
@@ -137,8 +130,8 @@ export function matchesCountry(value: string | null, code: string, regionName: s
   const target = normalizeCountryCode(code);
   const region = normalizeCountryCode(regionName);
 
-  if (!candidate || !target || !region) return false;
-  return candidate === target || candidate === region || target === region;
+  if (!candidate || !target) return false;
+  return candidate === target || (region !== null && candidate === region);
 }
 
 function readableApp(value: string | null): string | null {
@@ -151,8 +144,8 @@ function readableApp(value: string | null): string | null {
 
 /**
  * Within one supplier: in-stock first, then cheapest. A supplier's own rows are
- * interchangeable, so this is pure value ordering — the cross-supplier order is
- * a policy decision and lives in `otpSupplierOrder()`.
+ * interchangeable, so this is pure value ordering. Cross-provider comparisons
+ * are retained for operator diagnostics only; single-use checkout is Bitcall-only.
  */
 function rankWithinSupplier(offers: OtpOffer[]): OtpOffer[] {
   const stocked = (offer: OtpOffer) => (offer.stock === null ? 1 : offer.stock > 0 ? 0 : 2);
@@ -164,13 +157,10 @@ function rankWithinSupplier(offers: OtpOffer[]): OtpOffer[] {
 }
 
 /**
- * Cheapest first, across suppliers. This is the ordering the storefront shows
- * and the order a purchase walks, so the plan a customer sees first is the one
- * that costs Pryva the least — which is also the one with the most margin on it.
- *
- * Ties go to the configured supplier order (a deliberate preference, not an
- * accident), and an offer whose cost is unknown sorts last because it cannot be
- * sold — it is listed, never bought.
+ * Cheapest first across suppliers for read-only diagnostics. Checkout does not
+ * use this merged order: single-use OTP purchases resolve Bitcall offers only.
+ * An offer whose cost is unknown sorts last because it cannot be sold — it may
+ * still be listed in operator diagnostics as covered but unpriced.
  */
 function rankByCost(offers: OtpOffer[]): OtpOffer[] {
   const stocked = (offer: OtpOffer) => (offer.stock === null ? 1 : offer.stock > 0 ? 0 : 2);
@@ -258,12 +248,11 @@ async function bitcallOffers(country: string): Promise<OtpOffer[]> {
 }
 
 /**
- * Every way this deployment can deliver a number for one country, best first.
+ * Merge configured provider catalogs for read-only operator diagnostics.
  *
- * Order: cheapest first, ties to the configured supplier order. An offer whose
- * cost is unknown sorts last because it cannot be sold — it is kept so a
- * diagnostic can say the country is covered but unpriced, rather than implying
- * nobody serves it.
+ * This is deliberately not used by customer checkout. Order is cheapest first,
+ * with ties by configured diagnostic order; an offer whose cost is unknown sorts
+ * last so operators can distinguish unpriced coverage from no coverage.
  */
 export async function otpOffersFor(
   country: string,
@@ -287,38 +276,51 @@ export function clearOtpCatalogueCache(): void {
 }
 
 /**
- * One supplier's offers for a country, best first.
- *
- * Fetching per supplier rather than always both is what keeps the second one
- * free of consequences: a purchase only asks the next supplier once the current
- * one has nothing it can sell, so a slow or limited gateway never delays a
- * purchase the first supplier could already serve.
+ * One supplier's offers for a country, best first. Customer OTP checkout calls
+ * this with `bitcall`; the second adapter remains available for diagnostics and
+ * the separate Fleexa rental service.
  */
+export type OtpOfferRead = { offers: OtpOffer[]; errorCode: string | null };
+
+/** A stable opaque id for a live listing; the provider's service reference stays server-side. */
+export function otpOfferPublicId(country: string, ref: string, app: string): string {
+  return `otp-${createHash("sha256").update(`${country.toLowerCase()}\0${ref}\0${app}`).digest("hex").slice(0, 24)}`;
+}
+
+/** Read one supplier's offers while preserving a safe error code for storefront status. */
+export async function readOtpOffersForSupplier(
+  supplier: OtpSupplierId,
+  country: string,
+  regionName: string,
+  budgetMs: number = CATALOGUE_BUDGET_MS,
+  refresh = false,
+): Promise<OtpOfferRead> {
+  if (!otpSupplierConfigured(supplier)) return { offers: [], errorCode: "NOT_CONFIGURED" };
+
+  const key = `${supplier}:${country}`;
+  const cached = catalogueCache.get(key);
+  if (!refresh && cached && Date.now() - cached.at < CATALOGUE_TTL_MS) return { offers: cached.offers, errorCode: null };
+
+  try {
+    const offers = rankWithinSupplier(await withBudget(fetchOffers(supplier, country, regionName), budgetMs));
+    catalogueCache.set(key, { at: Date.now(), offers });
+    return { offers, errorCode: null };
+  } catch (error) {
+    logger.warn("Number catalogue unavailable", {
+      supplier,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { offers: [], errorCode: errorCodeOf(error) };
+  }
+}
+
 export async function otpOffersForSupplier(
   supplier: OtpSupplierId,
   country: string,
   regionName: string,
   budgetMs: number = CATALOGUE_BUDGET_MS,
 ): Promise<OtpOffer[]> {
-  if (!otpSupplierConfigured(supplier)) return [];
-
-  const key = `${supplier}:${country}`;
-  const cached = catalogueCache.get(key);
-  if (cached && Date.now() - cached.at < CATALOGUE_TTL_MS) return cached.offers;
-
-  try {
-    const offers = rankWithinSupplier(await withBudget(fetchOffers(supplier, country, regionName), budgetMs));
-    catalogueCache.set(key, { at: Date.now(), offers });
-    return offers;
-  } catch (error) {
-    // A catalogue that cannot be read is skipped, not fatal: the other supplier
-    // may still serve the same country.
-    logger.warn("Number catalogue unavailable", {
-      supplier,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return [];
-  }
+  return (await readOtpOffersForSupplier(supplier, country, regionName, budgetMs)).offers;
 }
 
 /**

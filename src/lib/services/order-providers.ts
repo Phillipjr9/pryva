@@ -13,8 +13,8 @@ import "server-only";
  * drifting apart across queries and route handlers.
  */
 export const ORDER_PROVIDERS = {
-  /** Live verification delivered through the configured OTP adapter. */
-  liveOtp: "fleexa",
+  /** Historical Fleexa OTP orders and the separate live number-rental path. */
+  fleexa: "fleexa",
   /**
    * Seeded by the in-memory preview store. Nothing was purchased or delivered and
    * there is no provider to ask for a release, so a refund of one correctly fails
@@ -29,27 +29,19 @@ export const ORDER_PROVIDERS = {
   smm: "smm",
   /** Hand-prepared item waiting on the admin fulfilment queue. */
   manual: "manual",
-  /** eSIM profile bought through the gateway and installed from a QR code. */
+  /** Bitcall supplies single-use OTP numbers and eSIM profiles. */
   bitcall: "bitcall",
 } as const;
 
 export type OrderProvider = (typeof ORDER_PROVIDERS)[keyof typeof ORDER_PROVIDERS];
 
-export const LIVE_OTP_PROVIDER = ORDER_PROVIDERS.liveOtp;
+export const FLEEXA_PROVIDER = ORDER_PROVIDERS.fleexa;
 
 /**
- * Every provider that can sell a verification number.
- *
- * Numbers are routed between suppliers, so "is this a number we can still ask
- * about" is a membership question, not an equality one. Written once here
- * because the order screen, the coverage page and the release path all need the
- * same answer, and three copies of an equality check is how one of them silently
- * stops refreshing.
+ * Providers that may appear on number orders: Bitcall for new single-use OTP,
+ * plus Fleexa for historical OTP orders and the separate rental path.
  */
-export const NUMBER_PROVIDERS: readonly string[] = [
-  ORDER_PROVIDERS.liveOtp,
-  ORDER_PROVIDERS.bitcall,
-];
+export const NUMBER_PROVIDERS: readonly string[] = [ORDER_PROVIDERS.fleexa, ORDER_PROVIDERS.bitcall];
 
 export function isNumberProvider(provider: string | null): boolean {
   return provider !== null && NUMBER_PROVIDERS.includes(provider);

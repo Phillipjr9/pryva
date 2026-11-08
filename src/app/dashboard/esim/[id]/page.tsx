@@ -84,9 +84,9 @@ export default async function EsimPlanPage({ params }: { params: Promise<{ id: s
             <li>• The activation code appears on your order once issued; your wallet is charged when it arrives.</li>
           </ul>
 
-          <h2 className="mt-6 text-[1.05rem] font-semibold text-ink">Phone number and services</h2>
+          <h2 className="mt-6 text-[1.05rem] font-semibold text-ink">Plan features and services</h2>
           <p className="mt-2 text-[0.9rem] leading-relaxed text-ink-2">
-            You cannot choose a specific phone number before buying. Our checkout and eSIM orders do not show a phone number.
+            These are the capabilities reported for this specific plan. “Not specified” means the listing did not confirm the feature; do not assume it is included. You cannot choose a specific phone number before buying.
           </p>
           <dl className="mt-3 grid gap-2 sm:grid-cols-3">
             {[
