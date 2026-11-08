@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { logger } from "@/lib/platform/logger";
 import { ProviderError } from "@/lib/providers/types";
+import { emailTextForCode, extractVerificationCode } from "@/lib/services/email-otp/verification-code";
+export { extractVerificationCode } from "@/lib/services/email-otp/verification-code";
 
 /**
  * Public Disposable Mailbox Provider.
@@ -32,45 +34,6 @@ export class TempMailError extends ProviderError {
     super(message, { provider: "tempmail", status, code });
     this.name = "TempMailError";
   }
-}
-
-/**
- * Extract verification / OTP codes from message subject and body text.
- */
-export function extractVerificationCode(
-  subject?: string | null,
-  body?: string | null,
-): string | null {
-  const text = `${subject ?? ""} \n ${body ?? ""}`;
-  if (!text.trim()) return null;
-
-  // 1. Explicit forward keyword match (e.g. "code: 123456", "verification code is 849201", "OTP: 49201")
-  const forwardMatch = text.match(
-    /(?:verification code|verify code|confirmation code|security code|auth code|login code|otp code|otp|pin|one-time password|code)[^\w\d]{1,10}([0-9]{4,8}|(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{4,8})\b/i,
-  );
-  if (forwardMatch?.[1]) return forwardMatch[1];
-
-  // 2. Explicit backward keyword match (e.g. "849201 is your verification code", "123456 is your code")
-  const backwardMatch = text.match(
-    /\b([0-9]{4,8}|(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{4,8})[^\w\d]{1,15}(?:is your|for your|to verify|as your)?[^\w\d]{0,10}(?:verification code|confirmation code|security code|auth code|sign-in code|login code|otp|pin|code)\b/i,
-  );
-  if (backwardMatch?.[1]) return backwardMatch[1];
-
-  // 3. Standalone 4-8 digit number in subject
-  if (subject) {
-    const subjectDigits = subject.match(/\b([0-9]{4,8})\b/);
-    if (subjectDigits?.[1]) return subjectDigits[1];
-  }
-
-  // 4. Standalone 6-digit number in body (standard OTP length)
-  const sixDigitMatch = text.match(/\b([0-9]{6})\b/);
-  if (sixDigitMatch?.[1]) return sixDigitMatch[1];
-
-  // 5. Standalone 4-8 digit number anywhere
-  const anyDigitsMatch = text.match(/\b([0-9]{4,8})\b/);
-  if (anyDigitsMatch?.[1]) return anyDigitsMatch[1];
-
-  return null;
 }
 
 export function isTempMailConfigured(): boolean {
@@ -147,16 +110,10 @@ export async function createTempMailInbox(): Promise<TempMailOrder> {
     });
   }
 
-  // 3. Fallback: Generate an address on an active public temp mail domain
-  const login = randomBytes(5).toString("hex");
-  const domain = "sharklasers.com";
-  const address = `${login}@${domain}`;
-  return {
-    id: `guerrilla:${login}:${address}`,
-    address,
-    domain,
-    expiresAt: null,
-  };
+  // Do not fabricate a domain address here. Without a successful provider
+  // response there is no mailbox or polling token behind it, so it could never
+  // receive an OTP even though the UI reported that creation succeeded.
+  throw new TempMailError("No temporary mailbox provider is responding. Try again shortly.", 503, "TEMPMAIL_UNAVAILABLE");
 }
 
 /**
@@ -173,16 +130,16 @@ async function checkMailTm(
       body: JSON.stringify({ address, password }),
       signal: AbortSignal.timeout(10_000),
     });
-    if (!tokenRes.ok) return { messages: [], code: null };
+    if (!tokenRes.ok) throw new Error("Mail.tm rejected the mailbox token request");
     const tokenData = (await tokenRes.json()) as { token?: string };
     const token = tokenData?.token;
-    if (!token) return { messages: [], code: null };
+    if (!token) throw new Error("Mail.tm returned no mailbox token");
 
     const msgRes = await fetch("https://api.mail.tm/messages", {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       signal: AbortSignal.timeout(10_000),
     });
-    if (!msgRes.ok) return { messages: [], code: null };
+    if (!msgRes.ok) throw new Error("Mail.tm rejected the inbox read request");
     const msgData = (await msgRes.json()) as { "hydra:member"?: unknown[] };
     const items = Array.isArray(msgData?.["hydra:member"]) ? msgData["hydra:member"] : [];
     if (items.length === 0) return { messages: [], code: null };
@@ -216,7 +173,7 @@ async function checkMailTm(
           Array.isArray(detail.html) && detail.html[0]?.trim() ? detail.html[0].trim() : null;
         const textContent = detail.text?.trim() || detail.intro?.trim() || null;
         const body = htmlContent || textContent || null;
-        const plainForCode = textContent || (htmlContent ? htmlContent.replace(/<[^>]+>/g, " ") : "");
+        const plainForCode = textContent || (htmlContent ? emailTextForCode(htmlContent) : "");
         const code = extractVerificationCode(subject, plainForCode);
         const receivedAt = detail.createdAt || item.createdAt || null;
         messages.push({ subject, from, body, code, receivedAt });
@@ -235,7 +192,7 @@ async function checkMailTm(
     logger.warn("Mail.tm poll failed", {
       reason: error instanceof Error ? error.message : String(error),
     });
-    return { messages: [], code: null };
+    throw new TempMailError("Could not check this mailbox right now.", 502, "TEMPMAIL_POLL_FAILED");
   }
 }
 
@@ -251,7 +208,7 @@ async function checkGuerrillaMail(
       signal: AbortSignal.timeout(10_000),
       headers: { Accept: "application/json" },
     });
-    if (!res.ok) return { messages: [], code: null };
+    if (!res.ok) throw new Error("Guerrilla Mail rejected the inbox read request");
     const data = (await res.json()) as {
       list?: Array<{
         mail_id?: string;
@@ -288,7 +245,7 @@ async function checkGuerrillaMail(
         const htmlContent = detail.mail_body?.trim() ? detail.mail_body.trim() : null;
         const textContent = item.mail_excerpt?.trim() || null;
         const body = htmlContent || textContent || null;
-        const plainForCode = htmlContent ? htmlContent.replace(/<[^>]+>/g, " ") : textContent || "";
+        const plainForCode = htmlContent ? emailTextForCode(htmlContent) : textContent || "";
         const code = extractVerificationCode(subject, plainForCode);
         const receivedAt = detail.mail_date || item.mail_date || null;
         messages.push({ subject, from, body, code, receivedAt });
@@ -307,7 +264,7 @@ async function checkGuerrillaMail(
     logger.warn("Guerrilla Mail poll failed", {
       reason: error instanceof Error ? error.message : String(error),
     });
-    return { messages: [], code: null };
+    throw new TempMailError("Could not check this mailbox right now.", 502, "TEMPMAIL_POLL_FAILED");
   }
 }
 
@@ -354,38 +311,41 @@ export async function checkTempMail(
     try {
       const url = `https://www.1secmail.com/api/v1/?action=getMessages&login=${encodeURIComponent(login)}&domain=${encodeURIComponent(domain)}`;
       const res = await fetch(url, { signal: AbortSignal.timeout(8_000), headers: { Accept: "application/json" } });
-      if (res.ok) {
-        const listData = await res.json();
-        if (Array.isArray(listData) && listData.length > 0) {
-          const messages: TempMailMessage[] = [];
-          for (const item of listData.slice(0, 10)) {
-            if (!item?.id) continue;
-            try {
-              const readUrl = `https://www.1secmail.com/api/v1/?action=readMessage&login=${encodeURIComponent(login)}&domain=${encodeURIComponent(domain)}&id=${encodeURIComponent(String(item.id))}`;
-              const readRes = await fetch(readUrl, { signal: AbortSignal.timeout(8_000), headers: { Accept: "application/json" } });
-              if (!readRes.ok) continue;
-              const detail = await readRes.json();
-              const subject = detail?.subject || item?.subject || null;
-              const from = detail?.from || item?.from || null;
-              const htmlContent = detail?.htmlBody && typeof detail.htmlBody === "string" && detail.htmlBody.trim() ? detail.htmlBody.trim() : null;
-              const textContent = detail?.textBody && typeof detail.textBody === "string" ? detail.textBody.trim() : detail?.body && typeof detail.body === "string" ? detail.body.trim() : null;
-              const body = htmlContent || textContent || null;
-              const plainForCode = textContent || (htmlContent ? htmlContent.replace(/<[^>]+>/g, " ") : "");
-              const code = extractVerificationCode(subject, plainForCode);
-              messages.push({ subject, from, body, code, receivedAt: detail?.date || item?.date || null });
-            } catch {
-              messages.push({ subject: item?.subject || null, from: item?.from || null, body: null, code: null, receivedAt: item?.date || null });
-            }
+      if (!res.ok) throw new Error("1secmail rejected the inbox read request");
+      const listData = await res.json();
+      if (Array.isArray(listData) && listData.length === 0) return { messages: [], code: null };
+      if (Array.isArray(listData) && listData.length > 0) {
+        const messages: TempMailMessage[] = [];
+        for (const item of listData.slice(0, 10)) {
+          if (!item?.id) continue;
+          try {
+            const readUrl = `https://www.1secmail.com/api/v1/?action=readMessage&login=${encodeURIComponent(login)}&domain=${encodeURIComponent(domain)}&id=${encodeURIComponent(String(item.id))}`;
+            const readRes = await fetch(readUrl, { signal: AbortSignal.timeout(8_000), headers: { Accept: "application/json" } });
+            if (!readRes.ok) continue;
+            const detail = await readRes.json();
+            const subject = detail?.subject || item?.subject || null;
+            const from = detail?.from || item?.from || null;
+            const htmlContent = detail?.htmlBody && typeof detail.htmlBody === "string" && detail.htmlBody.trim() ? detail.htmlBody.trim() : null;
+            const textContent = detail?.textBody && typeof detail.textBody === "string" ? detail.textBody.trim() : detail?.body && typeof detail.body === "string" ? detail.body.trim() : null;
+            const body = htmlContent || textContent || null;
+            const plainForCode = textContent || (htmlContent ? emailTextForCode(htmlContent) : "");
+            const code = extractVerificationCode(subject, plainForCode);
+            messages.push({ subject, from, body, code, receivedAt: detail?.date || item?.date || null });
+          } catch {
+            messages.push({ subject: item?.subject || null, from: item?.from || null, body: null, code: null, receivedAt: item?.date || null });
           }
-          return { messages, code: messages.find((m) => m.code)?.code ?? null };
         }
+        return { messages, code: messages.find((m) => m.code)?.code ?? null };
       }
-    } catch {
-      // ignore
+    } catch (error) {
+      logger.warn("1secmail poll failed", {
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      throw new TempMailError("Could not check this mailbox right now.", 502, "TEMPMAIL_POLL_FAILED");
     }
   }
 
-  return { messages: [], code: null };
+  throw new TempMailError("This mailbox has no valid provider polling handle.", 502, "INVALID_MAILBOX_HANDLE");
 }
 
 /**

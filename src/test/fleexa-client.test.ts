@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const runtime = vi.hoisted(() => ({ limit: vi.fn() }));
 vi.mock("@/lib/platform/rate-limit", () => ({ createRateLimiter: () => runtime.limit }));
 
-import { buyFleexaEmail, buyFleexaRental, buyFleexaSmsNumber, listFleexaRentAreas, listFleexaSmsServices } from "@/lib/providers/fleexa";
+import { buyFleexaEmail, buyFleexaRental, buyFleexaSmsNumber, checkFleexaEmail, listFleexaRentAreas, listFleexaSmsServices } from "@/lib/providers/fleexa";
 
 beforeEach(() => {
   vi.stubEnv("FLEEXA_API_KEY", "provider-secret");
@@ -45,6 +45,30 @@ describe("supplier client safety", () => {
       expect(init.headers.Authorization).toBe("Bearer provider-secret");
       expect(init.headers["X-API-Key"]).toBe("provider-secret");
     });
+  });
+
+  it("polls the purchased inbox and extracts an OTP from HTML when the API omits a code field", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: {
+        messages: [{
+          subject: "Confirm your email",
+          from: "security@example.com",
+          html: "<p>Your verification code is <strong>482901</strong></p>",
+          received_at: "2026-11-08T08:00:00Z",
+        }],
+      },
+    }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await checkFleexaEmail("mail/1");
+    expect(result.code).toBe("482901");
+    expect(result.messages).toMatchObject([{
+      subject: "Confirm your email",
+      from: "security@example.com",
+      code: "482901",
+      receivedAt: "2026-11-08T08:00:00Z",
+    }]);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://fleexa.com.ng/developer/email/check/mail%2F1");
   });
 
   it("rejects credential-exfiltrating base URLs and never follows redirects", async () => {

@@ -104,15 +104,15 @@ export function InboxManager() {
         const data = await response.json();
         if (inFlight.current !== request) return;
         if (!response.ok || !data.ok) {
-          if (!silent) setError(data?.error ?? "Could not read that inbox.");
+          setError(data?.error ?? "Could not read that inbox.");
           return;
         }
         setMessages(Array.isArray(data.messages) ? data.messages : []);
         setCode(typeof data.code === "string" ? data.code : null);
         setLastChecked(new Date());
-        setError(null);
+        setError(typeof data.warning === "string" ? data.warning : null);
       } catch {
-        if (inFlight.current === request && !silent) setError("Could not reach the inbox. Try again.");
+        if (inFlight.current === request) setError("Could not reach the inbox. Try again.");
       } finally {
         if (inFlight.current === request) {
           inFlight.current = null;
@@ -313,8 +313,9 @@ export function InboxManager() {
             <div>
               <h2 className="text-[1.05rem] font-medium text-ink">Create a disposable email</h2>
               <p className="mt-1 text-[0.84rem] leading-relaxed text-ink-2">
-                Generate instant temporary email addresses to receive emails and verification codes.
-                All your emails and received messages are saved so you can reuse them anytime.
+                Generate a temporary address for verification emails. The app checks it for new
+                messages automatically; how long the address and messages remain available depends
+                on the mailbox provider.
               </p>
             </div>
             <button

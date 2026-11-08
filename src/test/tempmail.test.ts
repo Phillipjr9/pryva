@@ -5,6 +5,7 @@ import {
   createTempMailInbox,
   extractVerificationCode,
   isTempMailConfigured,
+  TempMailError,
 } from "@/lib/providers/tempmail";
 import {
   activateInbox,
@@ -97,11 +98,35 @@ describe("extractVerificationCode", () => {
 });
 
 describe("createTempMailInbox", () => {
-  it("generates a valid address on a public domain", async () => {
-    const inbox = await createTempMailInbox();
-    expect(inbox.address).toContain("@");
-    expect(inbox.domain).toBeTruthy();
-    expect(inbox.id).toContain(":");
+  it("returns only an address the upstream provider actually created", async () => {
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        "hydra:member": [{ domain: "mail.test", isActive: true }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "account-1" }), { status: 201 }));
+    try {
+      const inbox = await createTempMailInbox();
+      expect(inbox.address).toMatch(/^pryva_[a-f0-9]+@mail\.test$/);
+      expect(inbox.id).toMatch(/^mailtm:account-1:PryvaPass![a-f0-9]+$/);
+      expect(inbox.domain).toBe("mail.test");
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it("refuses instead of fabricating an address when both providers are down", async () => {
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn().mockResolvedValue(new Response("{}", { status: 503 }));
+    try {
+      await expect(createTempMailInbox()).rejects.toMatchObject({
+        name: "TempMailError",
+        code: "TEMPMAIL_UNAVAILABLE",
+        status: 503,
+      });
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 
   it("is configured by default without credentials", () => {
@@ -242,6 +267,14 @@ describe("checkTempMail and cancelTempMail", () => {
     expect(result.code).toBeNull();
   });
 
+  it("surfaces provider failures instead of presenting them as an empty inbox", async () => {
+    global.fetch = vi.fn().mockResolvedValue(new Response("unavailable", { status: 503 }));
+    await expect(checkTempMail("mailtm:account-1:secret", "user@mail.test")).rejects.toMatchObject({
+      name: "TempMailError",
+      code: "TEMPMAIL_POLL_FAILED",
+    });
+  });
+
   it("cancels cleanly as a no-op", async () => {
     await expect(cancelTempMail("myid:1secmail.com")).resolves.toBeUndefined();
   });
@@ -267,10 +300,20 @@ describe("integration with disposable-inbox lifecycle", () => {
   });
 
   it("creates a free inbox via tempmail and saves to db", async () => {
-    const created = await createFreeInbox("user-1");
-    expect(created.address).toContain("@");
-    expect(created.tier).toBe("free");
-    expect(created.status).toBe("active");
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        "hydra:member": [{ domain: "mail.test", isActive: true }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "account-2" }), { status: 201 }));
+    try {
+      const created = await createFreeInbox("user-1");
+      expect(created.address).toMatch(/^pryva_[a-f0-9]+@mail\.test$/);
+      expect(created.tier).toBe("free");
+      expect(created.status).toBe("active");
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 
   it("polls and stores live messages in the database", async () => {
