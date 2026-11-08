@@ -160,17 +160,30 @@ describe("gateway transport", () => {
     expect(url.toString()).not.toContain(KEY_ID);
   });
 
-  it("never contacts the gateway when the shared budget fails, and says so unambiguously", async () => {
+  it("keeps the eSIM catalogue cap fail-closed when its counter fails or is exhausted", async () => {
     const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
-    runtime.limit.mockResolvedValueOnce({ allowed: false, unavailable: true }).mockResolvedValueOnce({ allowed: false });
+    runtime.catalogLimit.mockResolvedValueOnce({ allowed: false, unavailable: true }).mockResolvedValueOnce({ allowed: false });
     await expect(listBitcallEsimPlans()).rejects.toMatchObject({ code: "RATE_LIMIT_UNAVAILABLE" });
-    // Distinct from the gateway's own RATE_LIMITED: nothing left this process, so
-    // no money can have moved and a caller may safely do something else. Sharing
-    // one code with the gateway's 429 would make that unanswerable.
     const local = await listBitcallEsimPlans().catch((caught: unknown) => caught) as BitcallError;
     expect(local).toMatchObject({ status: 429, code: "LOCAL_RATE_BUDGET" });
     expect(isAmbiguousBitcallOutcome(local)).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not impose a shared 30-per-minute budget on Bitcall reads or purchases", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: URL) => {
+      if (url.pathname === "/v1/balance") return json({ data: { balance: 10, currency: "EUR" } });
+      if (url.pathname === "/v1/otp/services") return json({ data: [], meta: { page: 1, hasNext: false } });
+      return json({ data: { orderId: "ord_1", status: "pending" } }, 202);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    runtime.limit.mockResolvedValue({ allowed: false });
+    for (let i = 0; i < 35; i++) await getBitcallBalance();
+    await listBitcallOtpServices();
+    await buyBitcallEsimPlan("pln_abc123");
+    expect(fetchMock).toHaveBeenCalledTimes(37);
+    expect(runtime.limit).not.toHaveBeenCalled();
+    expect(runtime.catalogLimit).not.toHaveBeenCalled();
   });
 
   it("charges the catalogue cap once for a whole walk, not once per page", async () => {
@@ -190,23 +203,7 @@ describe("gateway transport", () => {
     expect(read.plans.map((entry) => entry.planId)).toEqual(["pln_one", "pln_two"]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(runtime.catalogLimit).toHaveBeenCalledTimes(1);
-    // The shared budget still sees both calls.
-    expect(runtime.limit).toHaveBeenCalledTimes(2);
-  });
-
-  it("names a walk cut short by our own cap as ours, not as the supplier's", async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce(json({ data: [esimRow("pln_one")], meta: { page: 1, hasNext: true } }));
-    vi.stubGlobal("fetch", fetchMock);
-    runtime.limit.mockReset();
-    runtime.limit.mockResolvedValueOnce({ allowed: true }).mockResolvedValueOnce({ allowed: false });
-
-    const read = await listBitcallEsimPlans();
-
-    expect(read.partial).toBe(true);
-    expect(read.partialReason).toBe("budget");
-    // The page that did read is kept: a refusal is not a reason to discard facts.
-    expect(read.plans.map((entry) => entry.planId)).toEqual(["pln_one"]);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(runtime.limit).not.toHaveBeenCalled();
   });
 
   it("reports reaching the page cap as a cap, not as a failure", async () => {
@@ -224,7 +221,7 @@ describe("gateway transport", () => {
     expect(runtime.catalogLimit).toHaveBeenCalledTimes(1);
   });
 
-  it("caps catalog reads separately so they leave shared headroom for orders", async () => {
+  it("keeps the eSIM browsing cap separate from purchases", async () => {
     runtime.catalogLimit.mockResolvedValue({ allowed: false });
     const fetchMock = vi.fn().mockImplementation(() => json({ data: { orderId: "ord_1", status: "pending" } }, 202));
     vi.stubGlobal("fetch", fetchMock);
@@ -233,7 +230,7 @@ describe("gateway transport", () => {
     await expect(getBitcallEsimPlan("pln_abc123", { browse: true })).rejects.toMatchObject({ code: "LOCAL_RATE_BUDGET" });
     expect(runtime.limit).not.toHaveBeenCalled();
     await buyBitcallEsimPlan("pln_abc123");
-    expect(runtime.limit).toHaveBeenCalledTimes(1);
+    expect(runtime.limit).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -265,6 +262,13 @@ describe("gateway transport", () => {
     expect(error.code).toBe("RATE_LIMITED");
     expect(error.retryAfterSeconds).toBe(17);
     expect(classifyRetry("RATE_LIMITED")).toBe("retry_after_acting");
+  });
+
+  it("surfaces a Bitcall 429 on a purchase without automatically retrying it", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(json({ error: { code: "RATE_LIMITED" } }, 429, { "Retry-After": "17" }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(buyBitcallEsimPlan("pln_abc123")).rejects.toMatchObject({ code: "RATE_LIMITED", status: 429, retryAfterSeconds: 17 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("treats a body that is not JSON as a contract failure", async () => {
