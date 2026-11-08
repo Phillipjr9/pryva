@@ -18,6 +18,22 @@ type Props = {
   pollInterval?: number;
   /** Additional CSS classes for the bell button. */
   className?: string;
+  /**
+   * Render the bell alone, with no "Notifications" label.
+   *
+   * The dashboard header places this beside the balance and the search control,
+   * where a wide button does not fit. It used to pass `h-9 w-9 p-0` and hope the
+   * label went away; it did not. The button kept its own `px-3 py-2`, so a 36px
+   * square ended up holding 24px of horizontal padding plus a 14px icon plus a
+   * "Notifications" label — which, because the shared `.btn` rule sets
+   * `white-space: normal; overflow-wrap: anywhere`, broke onto one line per
+   * character and ran out of the button and over its neighbours.
+   *
+   * Hiding the label is therefore a decision the component has to make, not
+   * something a class on the outside can do: the label and the padding have to
+   * go together, and only the owner of both can remove them consistently.
+   */
+  iconOnly?: boolean;
 };
 
 const POLL_DEFAULT = 30_000;
@@ -29,7 +45,7 @@ const POLL_DEFAULT = 30_000;
  * and admin console operators (same endpoint, scoped to their admin session).
  * Clicking a notification marks it read and dismisses the pop-up item.
  */
-export function NotificationBell({ pollInterval = POLL_DEFAULT, className }: Props) {
+export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconOnly = false }: Props) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
@@ -107,16 +123,38 @@ export function NotificationBell({ pollInterval = POLL_DEFAULT, className }: Pro
         onClick={toggle}
         aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : "Notifications"}
         aria-expanded={open}
-        className={`inline-flex items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2 text-[0.8rem] font-semibold text-ink-2 hover:border-lav-300 focus:outline-none focus:ring-2 focus:ring-lav-400 ${className ?? ""} disabled:opacity-50`}
+        className={`inline-flex items-center gap-1.5 rounded-xl border border-line bg-white text-[0.8rem] font-semibold text-ink-2 hover:border-lav-300 focus:outline-none focus:ring-2 focus:ring-lav-400 ${
+          iconOnly
+            ? // A square with no padding of its own: the size comes from the
+              // caller's `h-9 w-9`, and `!p-0` is needed because the shared `.btn`
+              // rule above sets padding that a bare `p-0` would not override.
+              "h-9 w-9 shrink-0 justify-center !p-0"
+            : "px-3 py-2"
+        } ${className ?? ""} disabled:opacity-50`}
         disabled={loading}
       >
         <Bell className="h-3.5 w-3.5 shrink-0" />
         {unreadCount > 0 && (
-          <span className="mt-px h-2 w-2 rounded-full bg-rose-600 text-[10px] font-bold text-white leading-none">
-            {unreadCount > 9 ? "9+" : unreadCount}
+          /*
+           * The count, when it actually fits.
+           *
+           * This used to be a fixed `h-2 w-2` dot holding "9+" in 10px type, so
+           * any count overflowed a 8px circle. It is now sized by its content —
+           * a pill — and the whole badge is replaced by a plain dot when there is
+           * no room for digits, which is the icon-only case on a phone.
+           */
+          <span
+            className={
+              iconOnly
+                ? "h-2 w-2 shrink-0 rounded-full bg-rose-600"
+                : "grid h-4 min-w-4 shrink-0 place-items-center rounded-full bg-rose-600 px-1 text-[10px] font-bold leading-none text-white"
+            }
+            aria-hidden="true"
+          >
+            {iconOnly ? null : unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
-        <span className="hidden sm:block">Notifications</span>
+        {iconOnly ? null : <span className="hidden whitespace-nowrap sm:block">Notifications</span>}
       </button>
 
       {open && (

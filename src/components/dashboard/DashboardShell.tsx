@@ -275,7 +275,17 @@ export function DashboardShell({
         </aside>
 
         <div className="min-w-0 flex-1">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-line bg-[#fffdfa]/80 px-3 py-2.5 backdrop-blur lg:mb-5 lg:px-5 lg:py-3">
+          {/*
+            The header is a single row on every width.
+
+            It used to be `flex-wrap`, so between roughly 400px and 640px the
+            right-hand controls could not fit beside the greeting and dropped
+            onto a second line — landing under each other rather than beside
+            each other. The controls now stay in one non-wrapping row and the
+            greeting is what gives way: `min-w-0` lets it truncate instead of
+            pushing its neighbours out of the bar.
+          */}
+          <div className="mb-4 flex items-center justify-between gap-2 rounded-[1.25rem] border border-line bg-[#fffdfa]/80 px-3 py-2.5 backdrop-blur sm:gap-3 lg:mb-5 lg:px-5 lg:py-3">
             <div className="flex min-w-0 items-center gap-2.5">
               <button
                 type="button"
@@ -288,14 +298,16 @@ export function DashboardShell({
               <span className="hidden sm:inline-flex lg:hidden">
                 <BrandLockup size="xs" />
               </span>
-              <div className="hidden lg:block">
+              <div className="hidden min-w-0 lg:block">
                 <p className="text-micro uppercase tracking-[0.16em] text-ink-3">Dashboard</p>
-                <p className="text-[0.88rem] font-semibold leading-tight text-ink">
+                <p className="truncate text-[0.88rem] font-semibold leading-tight text-ink">
                   Hello, {user.name.split(" ")[0]}
                 </p>
               </div>
             </div>
-            <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
+            {/* One row, never wrapped: the controls keep their own size and the
+                greeting truncates instead. */}
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               <CommandPaletteTrigger onClick={() => setCommandPaletteOpen(true)} />
               {/* The balance belongs at the top of every dashboard page, on every
                   width — it is the number people come back to check. */}
@@ -307,17 +319,26 @@ export function DashboardShell({
                 <Wallet className="h-3.5 w-3.5 text-lav-600" />
                 {formatNaira(user.walletBalance)}
               </Link>
-              <NotificationBell className="h-9 w-9 p-0" />
+              <NotificationBell iconOnly />
 
+              {/*
+                "Need help?" used to sit here. It was wide, it duplicated the
+                Support entry in the sidebar and in the mobile tab bar, and it was
+                what pushed this row over the available width — the reason the
+                controls ended up on top of each other. Support is still one tap
+                away on every width (sidebar on desktop, bottom tab on mobile),
+                so removing it here costs no route, only a duplicate.
+
+                "Services" stays: it steps down to an icon on narrow screens and
+                carries its own accessible name when the text is hidden.
+              */}
               <Link
-                href={`/dashboard/support#ask=${encodeURIComponent("I need help with my account, order or wallet")}`}
-                className="btn btn-ghost !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.76rem] max-[374px]:!hidden"
+                href="/dashboard/services"
+                aria-label="Browse services"
+                className="btn btn-primary h-9 shrink-0 !px-3 !py-0 !text-[0.8125rem] sm:!px-3.5 sm:!text-[0.76rem]"
               >
-                Need help?
-              </Link>
-              <Link href="/dashboard/services" className="btn btn-primary !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.76rem] max-[374px]:!hidden">
-                Services
-                <ArrowRight className="h-3 w-3" />
+                <span className="hidden whitespace-nowrap sm:inline">Services</span>
+                <ArrowRight className="h-3 w-3 shrink-0" />
               </Link>
             </div>
           </div>

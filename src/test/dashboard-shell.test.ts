@@ -109,9 +109,55 @@ describe("dashboard navigation", () => {
     expect(count).toBe(5);
   });
 
-  it("adds a quick-access help button for users who need support immediately", () => {
-    expect(shell).toContain('/dashboard/support#ask=');
-    expect(shell).toContain('Need help?');
+  it("keeps support reachable, without a second header button for it", () => {
+    // Support has always been one tap away: the sidebar links it on desktop and
+    // the bottom bar has a Support tab on phones. The header's "Need help?"
+    // button was a third route to the same page, and it was the control that
+    // pushed the header row past the available width — which is what made the
+    // balance, the bell and the buttons overlap. The requirement is that support
+    // stays reachable, not that this particular button exists.
+    expect(shell).toContain('{ href: "/dashboard/support", label: "Support"');
+    expect(shell).toContain('{ href: "/dashboard/support", label: "Support", nav: "support" }');
+    // The button itself is gone. Assert on the rendered text, not on the file:
+    // the comment explaining the removal is allowed to name it.
+    expect(shell).not.toContain(">\n                Need help?\n");
+  });
+
+  it("keeps the header controls in one row so they cannot overlap", () => {
+    // `flex-wrap` was the actual defect: between ~400px and 640px the controls
+    // could not fit beside the greeting, dropped to a second line, and the
+    // balance and bell ended up stacked and clipped.
+    const header = shell.slice(shell.indexOf("rounded-[1.25rem]"), shell.indexOf("<main"));
+    expect(header).not.toContain("flex-wrap");
+    // The greeting yields space instead of the controls.
+    expect(header).toContain("truncate text-[0.88rem]");
+    expect(header).toContain("flex shrink-0 items-center");
+  });
+
+  it("renders the bell icon-only in the header, with no label to wrap", () => {
+    // The bell was given `h-9 w-9 p-0` from outside while still rendering a
+    // "Notifications" label and its own padding. The label could not fit, and
+    // `overflow-wrap: anywhere` from the shared `.btn` rule broke it one
+    // character per line — the vertical "Notifications" that ran out of the bar.
+    expect(shell).not.toContain("NotificationBell className=\"h-9 w-9 p-0\"");
+    expect(shell).toContain("<NotificationBell iconOnly />");
+  });
+
+  it("lifts the floating help button clear of the mobile tab bar", () => {
+    // The tab bar is `fixed inset-x-0 bottom-0`; the floating button is also
+    // `fixed`, at `bottom-4`. On a phone that put the pill on top of the tabs and
+    // covered the Support tab — the same destination it opens. On dashboard
+    // routes it has to sit above the bar.
+    expect(shell).toContain("fixed inset-x-0 bottom-0 z-50");
+
+    const float = readFileSync(
+      join(process.cwd(), "src/components/site/SupportFloatButton.tsx"),
+      "utf8",
+    );
+    expect(float).toContain("raisedAboveTabBar");
+    expect(float).toContain("4.75rem");
+    // Outside the dashboard there is no tab bar, so the button stays put.
+    expect(float).toContain("bottom-4 sm:bottom-5");
   });
 });
 

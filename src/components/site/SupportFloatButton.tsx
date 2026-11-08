@@ -48,9 +48,26 @@ export function SupportFloatButton() {
   // customer assistant inside the privileged console.
   if (pathname?.startsWith("/admin")) return null;
 
+  /*
+   * The dashboard has a fixed bottom tab bar on phones, and this button used to
+   * sit directly on top of it — `bottom-4` against a bar roughly 64px tall — so
+   * the pill covered the tabs, and the Support tab most of all: the one place
+   * this button's own destination was already reachable. Lift it clear of the
+   * bar on those routes only, and leave every other page where it was.
+   */
+  const raisedAboveTabBar = Boolean(
+    pathname === "/dashboard" || pathname?.startsWith("/dashboard/"),
+  );
+
   return (
     <>
-      <div className="pointer-events-none fixed bottom-4 right-3 z-50 sm:bottom-5 sm:right-5">
+      <div
+        className={`pointer-events-none fixed right-3 z-50 sm:right-5 ${
+          raisedAboveTabBar
+            ? "bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] sm:bottom-5"
+            : "bottom-4 sm:bottom-5"
+        }`}
+      >
         <button
           type="button"
           onClick={() => setOpen(true)}
