@@ -32,6 +32,7 @@ vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
     isBitcallConfigured: () => bitcall.configured,
     buyBitcallOtpActivation: bitcall.buy,
     listBitcallOtpServices: bitcall.list,
+    listBitcallOtpCountryEntries: async () => [],
     cancelBitcallOtpActivation: bitcall.cancel,
     getBitcallOtpActivation: bitcall.read,
   };
@@ -55,7 +56,7 @@ function bitcallQuote({
   currency = "USD",
   availableCount = 25,
 }: { price?: number; currency?: string; availableCount?: number } = {}) {
-  return [{ name: "WhatsApp", offers: [{ serviceId: "pool-1", price, currency, availableCount }] }];
+  return [{ countryCode: "NG_1", name: "WhatsApp", offers: [{ serviceId: "pool-1", price, currency, availableCount }] }];
 }
 
 const receipt = {
@@ -134,7 +135,7 @@ describe("Bitcall-only OTP checkout", () => {
 
   it("refuses an unpriced Bitcall offer instead of switching suppliers", async () => {
     fleexa.list.mockResolvedValue(fleexaQuote(75));
-    bitcall.list.mockResolvedValue(bitcallQuote({ currency: "EUR" }));
+    bitcall.list.mockResolvedValue(bitcallQuote({ currency: "GBP" }));
 
     await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "COST_UNKNOWN" });
     expect(fleexa.buy).not.toHaveBeenCalled();
@@ -166,7 +167,7 @@ describe("operator probe", () => {
 describe("Bitcall-only fulfilment", () => {
   it("buys only the selected app offer, using a fresh catalogue and durable callbacks", async () => {
     const selectedRef = "pool-whatsapp-selected";
-    bitcall.list.mockResolvedValue([{ name: "WhatsApp", offers: [
+    bitcall.list.mockResolvedValue([{ countryCode: "NG_1", name: "WhatsApp", offers: [
       { serviceId: "pool-cheaper-other-app", price: 0.01, currency: "USD", availableCount: 20 },
       { serviceId: selectedRef, price: 0.05, currency: "USD", availableCount: 5 },
     ] }]);
@@ -177,7 +178,7 @@ describe("Bitcall-only fulfilment", () => {
     await expect(fulfillPlan(plan, { otpOfferId: id, onOtpAttempt, onOtpAccepted }))
       .resolves.toMatchObject({ provider: "bitcall", providerRequestId: "act-1" });
 
-    expect(bitcall.list).toHaveBeenCalledWith({ countryCode: "NG" });
+    expect(bitcall.list).toHaveBeenCalledWith({});
     expect(bitcall.buy).toHaveBeenCalledTimes(1);
     expect(bitcall.buy).toHaveBeenCalledWith(selectedRef);
     expect(fleexa.buy).not.toHaveBeenCalled();
@@ -186,7 +187,7 @@ describe("Bitcall-only fulfilment", () => {
   });
 
   it("does not substitute a different app pool when the chosen offer fails its margin guard", async () => {
-    bitcall.list.mockResolvedValue([{ name: "WhatsApp", offers: [
+    bitcall.list.mockResolvedValue([{ countryCode: "NG_1", name: "WhatsApp", offers: [
       { serviceId: "profitable-other-pool", price: 0.01, currency: "USD", availableCount: 20 },
       { serviceId: "selected-unprofitable", price: 2, currency: "USD", availableCount: 5 },
     ] }]);

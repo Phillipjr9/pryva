@@ -25,8 +25,10 @@ import {
   listBitcallEsimProfiles,
   listBitcallOtpActivations,
   listBitcallOtpCountries,
+  listBitcallOtpCountryEntries,
   listBitcallOtpPools,
   listBitcallOtpServices,
+  otpServiceLabelFromId,
   reactivateBitcallOtpActivation,
 } from "@/lib/providers/bitcall";
 
@@ -603,7 +605,7 @@ describe("OTP catalog", () => {
   it("reads one offer per pool, keeping the success rate and stock it is routed on", async () => {
     const fetchMock = vi.fn().mockImplementation(() => json(POOLED));
     vi.stubGlobal("fetch", fetchMock);
-    const services = await listBitcallOtpServices({ q: "whatsapp", countryCode: "US_1" });
+    const services = await listBitcallOtpServices({ q: "whatsapp" });
     expect(services).toHaveLength(1);
     expect(services[0]).toMatchObject({ name: "WhatsApp", slug: "whatsapp", countryCode: "US_1" });
     expect(services[0].offers).toHaveLength(2);
@@ -615,7 +617,57 @@ describe("OTP catalog", () => {
     const { url } = lastCall(fetchMock);
     expect(url.pathname).toBe("/v1/otp/services");
     expect(url.searchParams.get("q")).toBe("whatsapp");
-    expect(url.searchParams.get("country_code")).toBe("US_1");
+    // Not a documented parameter: the endpoint accepts `q` and paging only, and a
+    // country filter it does not honour reads as "this country has no stock".
+    expect(url.searchParams.get("country_code")).toBeNull();
+    expect(url.searchParams.get("pageSize")).toBe("200");
+  });
+
+  it("reads the documented money object, so a euro offer is priced instead of unknown", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
+      data: [{
+        name: "WhatsApp",
+        slug: "whatsapp",
+        pools: [{ serviceId: "CHARLIE-US-whatsapp", price: { amount: 0.42, currency: "EUR" }, availableCount: 12 }],
+      }],
+    })));
+    const services = await listBitcallOtpServices();
+    // `price` is an object in every documented response; reading it as a number
+    // returned null for both the amount and the currency, which priced a full
+    // catalogue as unknown and therefore unsellable.
+    expect(services[0].offers[0]).toMatchObject({ price: 0.42, currency: "EUR" });
+  });
+
+  it("attributes pooled offers to a country from the country catalogue, the only place a destination is stated", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => json({
+      data: [
+        {
+          countryCode: "NG_1",
+          name: "Nigeria",
+          serviceCount: 62,
+          availableCount: 9,
+          startingPrice: { amount: 0.4, currency: "EUR" },
+          pools: [{ serviceId: "BRAVO-NG-whatsapp", price: { amount: 0.4, currency: "EUR" }, availableCount: 9 }],
+        },
+        { countryCode: "US_1", name: "United States (Virtual)", pools: [] },
+      ],
+      meta: { page: 1, pageSize: 200, hasNext: false },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const entries = await listBitcallOtpCountryEntries();
+    expect(entries.map((entry) => entry.countryCode)).toEqual(["NG_1", "US_1"]);
+    expect(entries[0].pools[0]).toMatchObject({ serviceId: "BRAVO-NG-whatsapp", price: 0.4, currency: "EUR", availableCount: 9 });
+    expect(entries[0]).toMatchObject({ name: "Nigeria", startingPrice: 0.4, currency: "EUR" });
+    const { url } = lastCall(fetchMock);
+    expect(url.pathname).toBe("/v1/otp/countries");
+    expect(url.searchParams.get("pageSize")).toBe("200");
+  });
+
+  it("labels a pooled offer from its documented service segment, for display only", () => {
+    expect(otpServiceLabelFromId("DELTA-CO-instagram_/_threads")).toBe("instagram / threads");
+    expect(otpServiceLabelFromId("ALPHA-46-adidas")).toBe("adidas");
+    expect(otpServiceLabelFromId("no-separators")).toBeNull();
   });
 
   it("drops a service whose offers carry no serviceId, since it could not be bought", async () => {

@@ -4,7 +4,7 @@ import { isAccsZoneConfigured } from "@/lib/providers/accszone";
 import { isBulkaccConfigured, listProducts } from "@/lib/providers/bulkacc";
 import {
   isBitcallConfigured,
-  listBitcallOtpServices,
+  listBitcallOtpCountryEntries,
 } from "@/lib/providers/bitcall";
 import type { FleexaEmailProduct, FleexaSmsService } from "@/lib/providers/fleexa";
 import { isFleexaConfigured } from "@/lib/providers/fleexa";
@@ -70,15 +70,18 @@ export async function buildStockReport(options: { refresh?: boolean } = {}): Pro
   let otpError: string | null = isBitcallConfigured() ? null : NOT_CONFIGURED;
   if (isBitcallConfigured()) {
     try {
-      const bitcall = await listBitcallOtpServices();
-      for (const service of bitcall) {
-        const countryCode = normalizeCountryCode(service.countryCode);
+      // The country catalogue is where a destination and its pooled offers are
+      // stated. The service catalogue names no country at all, so building this
+      // lane from it reported every destination as having no stock.
+      const catalogue = await listBitcallOtpCountryEntries();
+      for (const entry of catalogue) {
+        const countryCode = normalizeCountryCode(entry.countryCode || entry.name);
         if (!countryCode || !sellableSmsCountries.has(countryCode)) continue;
-        for (const offer of service.offers) {
+        for (const offer of entry.pools) {
           if (!offer.serviceId) continue;
           smsServices.push({
             id: offer.serviceId,
-            name: service.name ?? offer.serviceId,
+            name: entry.name ?? countryCode,
             country: countryCode,
             priceNgn: await supplierAmountToNgn(offer.price, offer.currency),
             stock: offer.availableCount,

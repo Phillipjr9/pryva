@@ -784,10 +784,13 @@ export async function listBitcallEsimProfiles(): Promise<BitcallEsimProfile[]> {
  */
 export type BitcallOtpOffer = {
   /**
-   * Opaque. "Do not assemble one yourself — the segments are spelled the way the
-   * selling side spells them, and a value you build will not resolve." It happens
-   * to read as pool-country-service; that shape is a coincidence of their naming
-   * and must never be parsed, generated or validated against.
+   * Opaque. "Read it, do not build it — the segments are spelled the way the
+   * selling side spells them, and a value you build will not resolve." It is
+   * documented as pool-country-service, which is why the country catalogue can
+   * be joined to it, and why its trailing segment can label an offer whose
+   * service the catalogue did not name (see `otpServiceLabelFromId`). It is
+   * never generated or validated against: only read, and never sent to a
+   * customer.
    */
   serviceId: string | null;
   /** The price this offer charges. Units and cost-vs-retail are not assumed here. */
@@ -811,15 +814,35 @@ export type BitcallOtpService = {
   offers: BitcallOtpOffer[];
 };
 
+/**
+ * An offer's money, in both shapes the gateway uses.
+ *
+ * A pool carries the documented `{ amount, currency }` object; a bare number is
+ * the older shape. Reading `price` with `pickNumber` alone returned null for the
+ * amount *and* the currency of every documented offer, so a full catalogue
+ * priced as "unknown" — and an unknown cost can be neither sold nor ranked.
+ */
+function parseOtpMoney(row: Record<string, unknown>): { amount: number | null; currency: string | null } {
+  const nested = asRecord(row.price);
+  const amount =
+    nonNegative(pickNumber(nested, ["amount", "value"])) ??
+    nonNegative(pickNumber(row, ["price", "amount", "cost"]));
+  const currency =
+    currencyCode(pickString(nested, ["currency"])) ??
+    currencyCode(pickString(row, ["currency"]));
+  return { amount, currency };
+}
+
 function parseOtpOffer(row: unknown): BitcallOtpOffer | null {
   const offer = asRecord(row);
   // Without a serviceId the offer cannot be bought, so it cannot be offered.
   const serviceId = pickString(offer, ["serviceId", "service_id", "id"]);
   if (!serviceId) return null;
+  const money = parseOtpMoney(offer);
   return {
     serviceId,
-    price: nonNegative(pickNumber(offer, ["price", "amount", "cost"])),
-    currency: currencyCode(pickString(offer, ["currency"])),
+    price: money.amount,
+    currency: money.currency,
     availableCount: nonNegative(pickNumber(offer, ["availableCount", "available_count", "available", "stock", "count"])),
     successRate: nonNegative(pickNumber(offer, ["successRate", "success_rate", "success"])),
   };
@@ -844,17 +867,39 @@ function parseOtpService(row: unknown): BitcallOtpService {
   };
 }
 
+/** The documented page size; the catalogue runs to thousands of services. */
+const OTP_PAGE_SIZE = 200;
+/** How many pages one catalogue read may walk before reporting what it has. */
+const OTP_PAGE_CAP = 5;
+
+/** `meta.hasNext` when stated; otherwise compare page with totalPages. */
+function hasNextPage(payload: unknown): boolean {
+  const meta = asRecord(asRecord(payload).meta);
+  if (typeof meta.hasNext === "boolean") return meta.hasNext;
+  const page = pickNumber(meta, ["page"]);
+  const totalPages = pickNumber(meta, ["totalPages"]);
+  return page !== null && totalPages !== null && page < totalPages;
+}
+
 /**
- * The whole OTP catalog, filtered. One collection — there is no per-country
- * sub-resource, so country is a query parameter rather than a path.
+ * The service catalogue.
+ *
+ * One collection, paginated: the endpoint accepts `q` and paging only. It
+ * carries no country field and *no country filter*, so this is where services
+ * get their names, never their destinations — see `listBitcallOtpCountryEntries`.
  */
 export async function listBitcallOtpServices(
-  filter: { q?: string; countryCode?: string; pool?: string } = {},
+  filter: { q?: string; pageSize?: number } = {},
 ): Promise<BitcallOtpService[]> {
-  const payload = await gatewayFetch("GET", "/v1/otp/services", {
-    query: { q: filter.q, country_code: filter.countryCode, pool: filter.pool },
-  });
-  return rowsFrom(payload).slice(0, 2000).map(parseOtpService).filter((service) => service.offers.length > 0);
+  const services: BitcallOtpService[] = [];
+  for (let page = 1; page <= OTP_PAGE_CAP; page += 1) {
+    const payload = await gatewayFetch("GET", "/v1/otp/services", {
+      query: { q: filter.q, page, pageSize: filter.pageSize ?? OTP_PAGE_SIZE },
+    });
+    services.push(...rowsFrom(payload).map(parseOtpService).filter((service) => service.offers.length > 0));
+    if (!hasNextPage(payload)) break;
+  }
+  return services.slice(0, 2000);
 }
 
 /**
@@ -877,19 +922,92 @@ export async function findBitcallOtpService(reference: string): Promise<BitcallO
   return rowsFrom(payload).slice(0, 2000).map(parseOtpService).filter((service) => service.offers.length > 0);
 }
 
+/**
+ * One destination, as the country catalogue states it.
+ *
+ * This is the only documented place an offer's destination exists: the response
+ * names a `countryCode`, and its `pools[]` are the offers published for that
+ * country, each with its price and stock. Filtering the *service* catalogue by
+ * country — what this client used to do — cannot work, because a service row
+ * never says which country it belongs to.
+ */
+export type BitcallOtpCountryEntry = {
+  /** The provider's own identifier, e.g. `US_1`. Sent back, never built. */
+  countryCode: string | null;
+  /** The provider's own label, e.g. "United States (Virtual)". */
+  name: string | null;
+  serviceCount: number | null;
+  availableCount: number | null;
+  startingPrice: number | null;
+  currency: string | null;
+  pools: BitcallOtpOffer[];
+};
+
+function parseOtpCountryEntry(row: unknown): BitcallOtpCountryEntry {
+  const country = asRecord(row);
+  const starting = asRecord(country.startingPrice);
+  const pools: BitcallOtpOffer[] = [];
+  const seen = new Set<string>();
+  for (const entry of Array.isArray(country.pools) ? country.pools.slice(0, 200) : []) {
+    const offer = parseOtpOffer(entry);
+    if (!offer?.serviceId || seen.has(offer.serviceId)) continue;
+    seen.add(offer.serviceId);
+    pools.push(offer);
+  }
+  return {
+    countryCode: pickString(country, ["countryCode", "country_code", "code", "country"]),
+    name: pickString(country, ["name", "countryName", "title"]),
+    serviceCount: nonNegative(pickNumber(country, ["serviceCount", "service_count"])),
+    availableCount: nonNegative(pickNumber(country, ["availableCount", "available_count"])),
+    startingPrice: nonNegative(pickNumber(starting, ["amount"])) ?? nonNegative(pickNumber(country, ["startingPrice"])),
+    currency: currencyCode(pickString(starting, ["currency"])) ?? currencyCode(pickString(country, ["currency"])),
+    pools,
+  };
+}
+
+/** Every destination the catalogue publishes, pooled offers included. */
+export async function listBitcallOtpCountryEntries(): Promise<BitcallOtpCountryEntry[]> {
+  const entries: BitcallOtpCountryEntry[] = [];
+  for (let page = 1; page <= OTP_PAGE_CAP; page += 1) {
+    const payload = await gatewayFetch("GET", "/v1/otp/countries", {
+      query: { page, pageSize: OTP_PAGE_SIZE },
+    });
+    entries.push(...rowsFrom(payload, ["data", "countries", "items"]).map(parseOtpCountryEntry));
+    if (!hasNextPage(payload)) break;
+  }
+  return entries;
+}
+
 export async function listBitcallOtpCountries(): Promise<string[]> {
-  const payload = await gatewayFetch("GET", "/v1/otp/countries");
   const codes = new Set<string>();
-  for (const row of rowsFrom(payload, ["data", "countries", "items"]).slice(0, 1000)) {
-    const code = pickString(row, ["country_code", "countryCode", "code", "country"]);
-    if (code) codes.add(code.trim().toUpperCase());
-    else {
-      // A bare array of strings is the other plausible shape.
-      const raw = Object.values(row).find((value): value is string => typeof value === "string");
-      if (raw?.trim()) codes.add(raw.trim().toUpperCase());
-    }
+  for (const entry of await listBitcallOtpCountryEntries()) {
+    const code = entry.countryCode?.trim();
+    if (code) codes.add(code.toUpperCase());
   }
   return [...codes];
+}
+
+/**
+ * A display label for a pooled offer.
+ *
+ * `serviceId` is opaque: it is never built, validated or compared by parts, and
+ * the raw value never leaves the server. The gateway does document its shape as
+ * pool-country-service, though, and a country's pools name no service at all —
+ * so the trailing segment is the one thing that can label the app behind an
+ * offer. It is read for display only, and only after the service catalogue
+ * failed to name that offer.
+ */
+export function otpServiceLabelFromId(serviceId: string): string | null {
+  const segments = serviceId.split("-");
+  if (segments.length < 3) return null;
+  const label = segments
+    .slice(2)
+    .join("-")
+    .replace(/_\/_/g, " / ")
+    .replace(/[_+]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return label ? label.slice(0, 40) : null;
 }
 
 /**
