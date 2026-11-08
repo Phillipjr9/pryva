@@ -54,12 +54,12 @@ Object.defineProperty(dom.window.document, "baseURI", {
   configurable: true,
 });
 
+const pgliteScript = dom.window.document.createElement("script");
+pgliteScript.src = pgliteSource;
 Object.defineProperty(dom.window.document, "currentScript", {
-  value: dom.window.document.createElement('script'),
+  value: pgliteScript,
   configurable: true,
 });
-
-console.log("setup patched", dom.window.document.baseURI, (dom.window.document.currentScript as HTMLScriptElement | null)?.src);
 
 const raf = (callback: FrameRequestCallback) => dom.window.setTimeout(() => callback(Date.now()), 0);
 const caf = (id: number) => dom.window.clearTimeout(id);

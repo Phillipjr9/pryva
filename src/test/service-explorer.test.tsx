@@ -12,14 +12,15 @@ import {
 } from "@/lib/services/service-explorer";
 
 describe("country-first service explorer", () => {
-  it("does not construct or show services before a valid country is chosen", () => {
+  it("defaults to a single active country instead of blocking the whole explorer", () => {
     expect(buildServiceExplorer(null)).toEqual([]);
     expect(buildServiceExplorer("")).toEqual([]);
     expect(buildServiceExplorer("not-a-country")).toEqual([]);
     const markup = renderToStaticMarkup(<ServiceExplorer initialCountry={null} initialCategory={null} />);
-    expect(markup).toContain("Choose a country to explore");
-    expect(markup).not.toContain("WhatsApp");
-    expect(markup).not.toContain("Social promotion");
+    expect(markup).toContain("Nigeria selected");
+    expect(markup).not.toContain("Choose a country to explore");
+    expect(markup).toContain("Choose a category");
+    expect(markup).not.toContain("Start with a country.");
   });
 
   it("offers the ISO country and territory directory without treating it as supplier coverage", () => {
@@ -145,7 +146,10 @@ describe("unit counts", () => {
     expect(formatUnitCount(0, "Unknown")).toBe("0 left");
     expect(formatUnitCount(1000, "Unknown")).toBe("1,000 left");
     const markup = renderToStaticMarkup(<UnitsStatus stock={0} owned={23} />);
+    expect(markup).toContain("grid-cols-1");
+    expect(markup).toContain("sm:grid-cols-2");
     expect(markup).toContain("0 left");
     expect(markup).toContain("23 left");
+    expect(markup).toContain("text-[0.58rem]");
   });
 });

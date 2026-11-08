@@ -56,11 +56,10 @@ describe("selecting a service on a phone", () => {
     expect(phoneLine, "the compact phone line is missing").toBeTruthy();
   });
 
-  it("puts the overview's eight services in compact tiles, three or four per row", () => {
+  it("puts the overview's eight services in a balanced two-column phone tray", () => {
     const page = read("app/dashboard/page.tsx");
     expect(page).toContain("Select a service");
-    expect(page).toContain("grid grid-cols-3 gap-1.5 min-[400px]:grid-cols-4 sm:grid-cols-2 sm:gap-2");
-    // The old phone layout stacked every service full width.
-    expect(page).not.toContain("mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2");
+    expect(page).toContain("grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-2.5 lg:grid-cols-1");
+    expect(page).not.toContain("grid-cols-3 gap-1.5 min-[400px]:grid-cols-4");
   });
 });

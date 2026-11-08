@@ -72,6 +72,18 @@ const digitalServiceBrands: Record<DigitalServiceType, BrandIconProps["brand"]> 
   canva: "canva",
 };
 
+/**
+ * Brand-backed service families. Pryva's own catalogue stays in the flat glyph set,
+ * but the family pages that stand for a real platform are allowed to show the
+ * platform's official mark instead of a generic utility icon.
+ */
+const serviceBrandOverrides: Partial<Record<CoreServiceType | AdditionalServiceType, BrandIconProps["brand"]>> = {
+  accounts: "netflix",
+  subscriptions: "spotify",
+  "social-promotion": "instagram",
+  "app-verification": "google",
+};
+
 type Glyph = ComponentType<SVGProps<SVGSVGElement>>;
 
 /** One flat glyph per Pryva product. No two share one. */
@@ -155,11 +167,14 @@ function GlyphTile({
 
 export function ServiceIcon({ service, size = "md", className = "", decorative = false }: ServiceIconProps) {
   const pixelSize = sizeMap[size];
+  const brandOverride = serviceBrandOverrides[service as keyof typeof serviceBrandOverrides];
 
-  if (service in digitalServiceBrands) {
+  if (service in digitalServiceBrands || brandOverride) {
     return (
       <BrandIcon
-        brand={digitalServiceBrands[service as DigitalServiceType]}
+        brand={(service in digitalServiceBrands
+          ? digitalServiceBrands[service as DigitalServiceType]
+          : brandOverride!) as BrandIconProps["brand"]}
         size={pixelSize}
         variant="tile"
         decorative={false}

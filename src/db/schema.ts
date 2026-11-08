@@ -316,6 +316,8 @@ export const orders = pgTable(
     providerRequestId: varchar("provider_request_id", { length: 160 }),
     referenceCode: text("reference_code"),
     otpCode: varchar("otp_code", { length: 12 }),
+    /** Immutable proof the provider confirmed the code actually arrived. */
+    codeReceivedAt: timestamp("code_received_at", { withTimezone: true }),
     /** JSON array of delivered credential strings (marketplace accounts only). */
     accounts: text("accounts"),
     /**

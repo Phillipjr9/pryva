@@ -33,8 +33,16 @@ import { digitalServices } from "@/lib/services/digital/digital-services";
 
 /** Pryva's own catalogue. Each must render a distinct flat glyph. */
 const CATALOGUE_SERVICES = [
-  "numbers", "esim", "proxies", "email-otp", "accounts", "data", "gift-cards",
-  "bulk", "scheduled", "subscriptions", "app-verification", "social-promotion",
+  "numbers", "esim", "proxies", "email-otp", "data", "gift-cards",
+  "bulk", "scheduled",
+] as const;
+
+/** Brand-backed family pages that intentionally show the platform's own mark. */
+const BRANDED_FAMILIES = [
+  ["accounts", "Netflix"],
+  ["subscriptions", "Spotify"],
+  ["app-verification", "Google"],
+  ["social-promotion", "Instagram"],
 ] as const;
 
 /** Third-party products: slug -> the accessible name of the real mark. */
@@ -112,6 +120,14 @@ describe("service logos", () => {
     }
 
     expect(shapes.size).toBe(Object.keys(DIGITAL_MARKS).length);
+  });
+
+  it("uses a real brand mark for the platform-style service families that have one", () => {
+    for (const [service, expectedLabel] of BRANDED_FAMILIES) {
+      const html = renderToStaticMarkup(<ServiceIcon service={service} />);
+      expect(html, `${service} should use the platform's mark`).toContain(`aria-label="${expectedLabel}"`);
+      expect(html).not.toContain("/images/");
+    }
   });
 
   it("never draws another service's icon for an unknown key", () => {

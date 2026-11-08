@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+beforeEach(() => { window.localStorage.clear(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.localStorage.clear(); });
 
 describe("service explorer live listings", () => {
-  it("waits for a country and labels stock, indicative price and paused ordering", async () => {
+  it("uses the saved default country and labels stock, indicative price and paused ordering", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
       ok: true, country: "us", partial: false, fetchedAt: "2026-01-01T12:34:56.000Z", items: [{
         id: "live-sms-test", category: "verification", name: "Example live app", description: "SMS verification listing", tag: "Other",
@@ -15,7 +16,8 @@ describe("service explorer live listings", () => {
     }) });
     vi.stubGlobal("fetch", fetchMock);
     render(<ServiceExplorer initialCountry={null} initialCategory="verification" />);
-    expect(fetchMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/services/catalog?country=ng");
     fireEvent.click(screen.getByRole("button", { name: "US" }));
     const card = (await screen.findByRole("heading", { name: "Example live app" })).closest("article")!;
     expect(within(card).getByText("Live listing")).toBeTruthy();

@@ -62,15 +62,15 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
     label: "Buy",
     items: [
       { href: "/dashboard/services", label: "All services", nav: "services" },
-      { href: "/dashboard/services", label: "App verification", art: "app-verification", category: "verification" },
-      { href: "/dashboard/services", label: "Social promotion", art: "social-promotion", category: "social" },
       { href: "/dashboard/services", label: "Number plans", art: "numbers", category: "numbers" },
       { href: "/dashboard/services", label: "eSIM", art: "esim", category: "esim" },
-      { href: "/dashboard/services", label: "Proxies", art: "proxies", category: "proxies" },
-      { href: "/dashboard/services", label: "Email OTP", art: "email-otp", category: "email" },
+      { href: "/dashboard/services", label: "Data Plans", art: "data", category: "data" },
       { href: "/dashboard/services", label: "Accounts", art: "accounts", category: "accounts" },
       { href: "/dashboard/services", label: "Subscriptions", art: "subscriptions", category: "subscriptions" },
-      { href: "/dashboard/services", label: "Data Plans", art: "data", category: "data" },
+      { href: "/dashboard/services", label: "App verification", art: "app-verification", category: "verification" },
+      { href: "/dashboard/services", label: "Social promotion", art: "social-promotion", category: "social" },
+      { href: "/dashboard/services", label: "Proxies", art: "proxies", category: "proxies" },
+      { href: "/dashboard/services", label: "Email OTP", art: "email-otp", category: "email" },
       // Gift cards are wallet credit Pryva issues itself, not a service in the
       // catalogue, so this links straight at the page instead of the hub.
       { href: "/dashboard/gift-cards", label: "Gift cards", art: "gift-cards" },

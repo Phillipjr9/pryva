@@ -281,9 +281,6 @@ export function OrderActions({
       </div>
 
       <div className="rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
-        <p className="flex items-center gap-2 text-[0.85rem] font-semibold text-ink">
-          <Shield className="h-4 w-4 text-lav-700" /> Refund information
-        </p>
         {refundedNow || settledStatus === "refunded" ? (
           <p className="mt-2 flex items-center gap-2 text-[0.82rem] text-ink-2">
             <Check className="h-4 w-4 text-emerald-600" />
@@ -308,9 +305,9 @@ export function OrderActions({
             )}
           </div>
         ) : active || settledStatus === "review" || settledStatus === "processing" ? (
-          <p className="mt-2 text-[0.82rem] text-ink-2">
-            Refunds require review. <Link href="/dashboard/support" className="font-semibold underline">Ask support</Link> with
-            your order reference — the assistant can check the order and tell you where it stands straight away.
+          <p className="mt-2 flex items-center gap-2 text-[0.82rem] text-ink-2">
+            <Shield className="h-4 w-4 text-lav-700" />
+            Your order is active and being monitored. If it stalls, the support assistant can review it with your order reference.
           </p>
         ) : (
           <p className="mt-2 flex items-center gap-2 text-[0.82rem] text-ink-2">

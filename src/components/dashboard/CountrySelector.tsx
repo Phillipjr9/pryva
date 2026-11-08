@@ -30,7 +30,6 @@ export function CountrySelector({ id, value, onChange, name }: Props) {
           name={name}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          required
           className="min-h-12 w-full appearance-none rounded-xl bg-transparent py-3 pl-12 pr-10 text-[0.85rem] font-medium text-ink outline-none"
         >
           <option value="">Select a country</option>

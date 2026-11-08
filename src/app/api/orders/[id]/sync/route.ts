@@ -83,7 +83,10 @@ export async function GET(
     }
 
     const updates: Partial<typeof orders.$inferSelect> = {};
-    if (code && code !== order.otpCode) updates.otpCode = code;
+    if (code) {
+      if (code !== order.otpCode) updates.otpCode = code;
+      if (!order.codeReceivedAt) updates.codeReceivedAt = new Date();
+    }
     // A rental can receive more than one message; one code must not end it.
     if (!order.duration.startsWith("Rent") && (upstreamStatus === "delivered" || code)) updates.status = "delivered";
     if ((upstreamStatus === "cancelled" || upstreamStatus === "expired") && order.expiresAt && order.expiresAt < new Date()) {

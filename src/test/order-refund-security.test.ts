@@ -33,7 +33,7 @@ function fakeDatabase() {
   const state = {
     order: { id: "order-id", userId: "user-id", status: "active", refundedAt: null as Date | null, amount: 1200,
       provider: "fleexa", providerRequestId: null as string | null, service: "numbers", productName: "Test", reference: "ORDER-1",
-      duration: "Single verification · 20 min window", otpCode: null as string | null, createdAt: new Date(Date.now() - 21 * 60_000) },
+      duration: "Single verification · 5 min window", otpCode: null as string | null, createdAt: new Date(Date.now() - 21 * 60_000) },
     balance: 500,
     ledger: [] as Array<Record<string, unknown>>,
     failLedger: false,
@@ -131,7 +131,7 @@ describe("order refund safety", () => {
     state.order.otpCode = null;
     state.order.duration = "7 day rental";
     expect((await POST(request(), context)).status).toBe(409);
-    state.order.duration = "Single verification · 20 min window";
+    state.order.duration = "Single verification · 5 min window";
     state.order.createdAt = new Date();
     expect((await POST(request(), context)).status).toBe(409);
     expect(state.balance).toBe(500);

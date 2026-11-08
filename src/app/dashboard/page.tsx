@@ -11,7 +11,6 @@ import { ServiceIcon } from "@/components/ServiceIcon";
 import { LiveCodeCard, type LiveCode } from "@/components/dashboard/LiveCodeCard";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { BalanceHero } from "@/components/dashboard/BalanceHero";
-import { CountryLaunch } from "@/components/dashboard/CountryLaunch";
 import { readServiceReadiness } from "@/lib/services/service-readiness";
 import { orderByReadiness, SERVICE_STATE_DOT, SERVICE_STATE_LABEL } from "@/lib/services/service-states";
 
@@ -134,10 +133,8 @@ export default async function DashboardOverviewPage() {
         ]}
       />
 
-      {/* Country comes before services, whether browsing from Home or the hub. */}
-      <CountryLaunch />
-
-      {/* 2 — then whatever is on a timer */}
+      {/* Keep a live code card and a country hint near the active account state,
+          while letting recent activity and quick actions lead the page. */}
       {liveCodes.length > 0 ? (
         <LiveCodeCard codes={liveCodes} initialNow={now} />
       ) : (
@@ -150,53 +147,8 @@ export default async function DashboardOverviewPage() {
       )}
 
       <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
-        {/* 3 — choose a service. It leads on a phone, where the previous
-            orders-first order buried the whole hub below the fold; `lg:order-2`
-            keeps the desktop two-column arrangement unchanged. */}
-        <section aria-labelledby="select-service-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-4 sm:p-5 lg:order-2">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h2 id="select-service-title" className="text-[1rem] font-semibold">Select a service</h2>
-              <p className="mt-0.5 text-meta text-ink-3">Pick what you need, then choose a plan.</p>
-            </div>
-            <Link
-              href="/dashboard/services?country=ng"
-              className="inline-flex shrink-0 items-center gap-1 text-meta font-semibold text-lav-700 hover:underline"
-            >
-              <Receipt className="h-3 w-3" /> All services
-            </Link>
-          </div>
-          {/*
-            The old grid stacked eight full-width rows on a phone, so the hub sat
-            below more than a screen of scrolling. On phones this is now a compact
-            three-up tile grid (four-up from 400px); the note and arrow return at
-            `sm`, where each tile has room to be a full row again.
-            From `lg` the panel is the narrow right-hand column of the overview
-            grid — about 330px — so two tiles per row leaves "Residential
-            proxies" rendering as "Resid…". One tile per row again there.
-          */}
-          <div className="mt-3 grid grid-cols-3 gap-1.5 min-[400px]:grid-cols-4 sm:grid-cols-2 sm:gap-2 lg:grid-cols-1">
-            {serviceTiles.map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className="group flex min-w-0 flex-col items-center gap-1.5 rounded-xl border border-line bg-white p-2 text-center transition-all hover:border-lav-300 hover:shadow-xs sm:flex-row sm:items-center sm:gap-2.5 sm:p-2.5 sm:text-left"
-              >
-                <ServiceIcon service={item.service} size="sm" />
-                <span className="min-w-0 flex-1">
-                  <span className="flex min-w-0 items-center justify-center gap-1.5 sm:justify-start">
-                    <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${SERVICE_STATE_DOT[item.state]}`} />
-                    <span className="block min-w-0 text-micro font-semibold leading-tight text-ink group-hover:text-lav-700 sm:truncate sm:text-[0.82rem]">{item.label}</span>
-                  </span>
-                  <span className="hidden truncate text-micro text-ink-3 sm:block">{item.note}</span>
-                  <span className="sr-only"> — {SERVICE_STATE_LABEL[item.state]}</span>
-                </span>
-                <ArrowRight className="hidden h-3.5 w-3.5 shrink-0 text-ink-3 transition-colors group-hover:text-lav-600 sm:block" />
-              </Link>
-            ))}
-          </div>
-        </section>
-        {/* 4 — recent orders */}
+        {/* Recent orders lead the overview because they reflect what the account is
+            already doing; the service browser stays as a quick action panel. */}
         <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 lg:order-1">
           <div className="flex items-center justify-between">
             <h2 className="text-[1rem] font-semibold">Recent orders</h2>
@@ -244,6 +196,52 @@ export default async function DashboardOverviewPage() {
               ))}
             </div>
           )}
+        </section>
+
+        <section aria-labelledby="select-service-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-4 sm:p-5 lg:order-2">
+          <h2 id="select-service-title" className="sr-only">Select a service</h2>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="text-[1rem] font-semibold">Quick actions</h3>
+              <p className="mt-0.5 text-meta text-ink-3">Choose the next service or plan you need.</p>
+            </div>
+            <Link
+              href="/dashboard/services?country=ng"
+              className="inline-flex shrink-0 items-center gap-1 text-meta font-semibold text-lav-700 hover:underline"
+            >
+              <Receipt className="h-3 w-3" /> All services
+            </Link>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-2.5 lg:grid-cols-1">
+            {serviceTiles.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className="group flex min-w-0 flex-col items-center gap-1.5 rounded-xl border border-line bg-white p-2 text-center transition-all hover:border-lav-300 hover:shadow-xs sm:flex-row sm:items-center sm:gap-2.5 sm:p-2.5 sm:text-left"
+              >
+                <ServiceIcon service={item.service} size="sm" />
+                <span className="min-w-0 flex-1">
+                  <span className="flex min-w-0 items-center justify-center gap-1.5 sm:justify-start">
+                    <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${SERVICE_STATE_DOT[item.state]}`} />
+                    <span className="block min-w-0 text-[0.72rem] font-semibold leading-tight text-ink group-hover:text-lav-700 sm:truncate sm:text-[0.82rem]">{item.label}</span>
+                  </span>
+                  <span className="hidden truncate text-micro text-ink-3 sm:block">{item.note}</span>
+                  <span className="sr-only"> — {SERVICE_STATE_LABEL[item.state]}</span>
+                </span>
+                <ArrowRight className="hidden h-3.5 w-3.5 shrink-0 text-ink-3 transition-colors group-hover:text-lav-600 sm:block" />
+              </Link>
+            ))}
+          </div>
+          <div className="mt-4 rounded-xl border border-dashed border-line bg-cream/30 px-3 py-2.5">
+            <p className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-ink-3">Recommended next</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-[0.74rem] text-ink-3">
+              <Link href="/dashboard/services?country=ng&category=numbers" className="font-semibold text-lav-700 hover:underline">Numbers</Link>
+              <span>•</span>
+              <Link href="/dashboard/services?country=ng&category=social" className="font-semibold text-lav-700 hover:underline">Social</Link>
+              <span>•</span>
+              <Link href="/dashboard/services?country=ng&category=esim" className="font-semibold text-lav-700 hover:underline">eSIM</Link>
+            </div>
+          </div>
         </section>
       </div>
 

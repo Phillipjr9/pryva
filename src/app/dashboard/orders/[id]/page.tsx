@@ -6,6 +6,7 @@ import { orders } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { CountryFlag } from "@/components/CountryFlag";
 import { formatNaira } from "@/lib/services/catalog";
 import Link from "next/link";
 import { ArrowLeft } from "@/components/icons";
@@ -153,9 +154,10 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                   </div>
                   <div>
                     <p className="text-[0.82rem] text-ink-3 mb-1">Region</p>
-                    <p className="text-[0.95rem] font-medium text-ink">
-                      {order.region}
-                    </p>
+                    <div className="inline-flex items-center gap-2 text-[0.95rem] font-medium text-ink">
+                      <CountryFlag region={order.region} size={16} decorative radius={8} />
+                      <span>{order.region}</span>
+                    </div>
                   </div>
                   <div>
                     <p className="text-[0.82rem] text-ink-3 mb-1">Duration</p>
@@ -189,6 +191,17 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                       {status}
                     </Badge>
                   </div>
+                  {order.codeReceivedAt && (
+                    <div>
+                      <p className="text-[0.82rem] text-ink-3 mb-1">Code confirmed</p>
+                      <p className="text-[0.95rem] font-medium text-ink">
+                        {new Date(order.codeReceivedAt).toLocaleString("en-NG", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <p className="mt-3 text-meta">
                   {/* The order page is a live screen; a receipt is a document. */}

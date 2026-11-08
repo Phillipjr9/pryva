@@ -20,7 +20,7 @@
 export const RECONCILIATION_NOTE =
   "Refunded, but the provider could not cancel this number. Cancel it manually or absorb the cost.";
 
-export const SINGLE_NUMBER_WINDOW = "Single verification · 20 min window";
+export const SINGLE_NUMBER_WINDOW = "Single verification · 5 min window";
 
 /** A single-verification number order that produced no code. */
 export function isUndeliveredSingleNumber(order: {

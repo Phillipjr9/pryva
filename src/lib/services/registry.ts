@@ -60,17 +60,23 @@ type DeclaredTagsAreKnown = Assert<
 >;
 export type _DeclaredTagsAreKnown = DeclaredTagsAreKnown;
 
-/** Customer-facing families, in the order the hub presents them. */
+/**
+ * Customer-facing families, ordered by how often a user wants to buy them and
+ * how much context they need before checkout.
+ *
+ * On mobile, the hierarchy must stay compact and high-signal: the highest intent
+ * categories lead, while the utility/order-tools stay later.
+ */
 export const SERVICE_IDS = [
-  "verification",
-  "social",
   "numbers",
   "esim",
-  "proxies",
-  "email",
+  "data",
   "accounts",
   "subscriptions",
-  "data",
+  "verification",
+  "social",
+  "proxies",
+  "email",
   "tools",
 ] as const;
 
@@ -164,7 +170,7 @@ export const SERVICES: readonly ServiceDefinition[] = [
     sale: { kind: "supplier", source: "fleexa" },
     lane: "numbers",
     orderServices: ["numbers"],
-    deliveryMinutes: 20,
+    deliveryMinutes: 5,
     retry: { attempts: 3, delayMs: 60_000 },
   },
   {

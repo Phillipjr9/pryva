@@ -4,6 +4,7 @@ import { desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
+import { CountryFlag } from "@/components/CountryFlag";
 import { requireAdmin } from "@/lib/identity/auth";
 
 export const dynamic = "force-dynamic";
@@ -111,7 +112,10 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
             </div>
             <div className="flex justify-between gap-4 border-b border-line pb-2">
               <dt className="text-ink-3">Region</dt>
-              <dd className="font-medium text-ink">{order.region}</dd>
+              <dd className="inline-flex items-center gap-2 font-medium text-ink">
+                <CountryFlag region={order.region} size={16} decorative radius={8} />
+                <span>{order.region}</span>
+              </dd>
             </div>
             <div className="flex justify-between gap-4 border-b border-line pb-2">
               <dt className="text-ink-3">Duration</dt>

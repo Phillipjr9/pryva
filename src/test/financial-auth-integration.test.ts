@@ -196,6 +196,7 @@ beforeAll(async () => {
   await pg.exec(await readFile("migrations/0032_welcome_verified_emails.sql", "utf8"));
   await pg.exec(await readFile("migrations/0033_account_activity_emails.sql", "utf8"));
   await pg.exec(await readFile("migrations/0034_customer_activity_emails.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0035_code_received_at.sql", "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
   [purchaseRoute, refundRoute, bankRoute, verifyBankRoute, googleRoute, signupRoute, contactRoute, deleteRoute, passwordRoute, sessionsRoute, autoRefund, giftPurchaseRoute, giftCheckRoute, giftRedeemRoute, topUpRoute, verifyTopUpRoute, webhookRoute, profileRoute, notificationsRoute, markReadRoute, logoutRoute, syncRoute, scheduledRoute, promoRoute, withdrawalRoute, adminWithdrawalRoute, integrity] = await Promise.all([
@@ -616,8 +617,8 @@ describe("undelivered number refund SQL", () => {
     vi.stubEnv("DATABASE_URL", "");
     const common = { userId: USER, productSlug: "test", productName: "Test", planLabel: "Test", region: "Nigeria", amount: 1000, status: "active", provider: "fleexa", createdAt: new Date(Date.now() - 60 * 60_000) };
     await database.insert(schema.orders).values([
-      { ...common, reference: "no-code", service: "numbers", duration: "Single verification · 20 min window" },
-      { ...common, reference: "with-code", service: "numbers", duration: "Single verification · 20 min window", otpCode: "123456" },
+      { ...common, reference: "no-code", service: "numbers", duration: "Single verification · 5 min window" },
+      { ...common, reference: "with-code", service: "numbers", duration: "Single verification · 5 min window", otpCode: "123456" },
       { ...common, reference: "rental", service: "numbers", duration: "7 days" },
       { ...common, reference: "esim", service: "esim", duration: "30 days" },
     ]);
@@ -634,7 +635,7 @@ describe("undelivered number refund SQL", () => {
 
   it("rolls back the claim and balance when a refund ledger entry fails", async () => {
     vi.stubEnv("DATABASE_URL", "");
-    await database.insert(schema.orders).values({ reference: "refund-rollback", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "Nigeria", duration: "Single verification · 20 min window", amount: 1000, provider: "fleexa", createdAt: new Date(Date.now() - 60 * 60_000) });
+    await database.insert(schema.orders).values({ reference: "refund-rollback", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "Nigeria", duration: "Single verification · 5 min window", amount: 1000, provider: "fleexa", createdAt: new Date(Date.now() - 60 * 60_000) });
     await pg.exec('ALTER TABLE "wallet_transactions" ADD CONSTRAINT "test_no_refund" CHECK ("type" <> \'refund\')');
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
@@ -1947,7 +1948,7 @@ describe("order sync and scheduler safety", () => {
   it("polls the supplier that actually sold the number for its code", async () => {
     const [order] = await database.insert(schema.orders).values({
       reference: "GATEWAY-ORDER", userId: USER, service: "numbers", productSlug: "vn-ng", productName: "Number",
-      planLabel: "Nigeria number · WhatsApp", region: "NG", duration: "Single verification · 20 min window",
+      planLabel: "Nigeria number · WhatsApp", region: "NG", duration: "Single verification · 5 min window",
       amount: 1000, status: "active", provider: "bitcall", providerRequestId: "act-1",
       expiresAt: new Date(Date.now() + 60_000),
     }).returning();

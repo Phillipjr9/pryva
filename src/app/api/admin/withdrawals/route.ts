@@ -98,8 +98,8 @@ export async function PUT(request: NextRequest) {
       if (!["pending", "processing"].includes(existing.status)) {
         return NextResponse.json({ error: "This withdrawal is already settled or has been resolved. Reconcile it before retrying." }, { status: 409 });
       }
-      if (existing.status === "processing" && existing.transferReference) {
-        return NextResponse.json({ error: "This payout already has a transfer code and final status is already in progress; use completion or reconciliation instead." }, { status: 409 });
+      if (existing.status === "processing" && (existing.paystackReference || existing.transferReference)) {
+        return NextResponse.json({ error: "This payout has already been claimed for transfer and is awaiting confirmation. Reconcile it before retrying." }, { status: 409 });
       }
 
       // Persist a unique, Paystack-compatible lowercase reference in the same
@@ -111,6 +111,7 @@ export async function PUT(request: NextRequest) {
         .where(and(
           eq(withdrawals.id, id),
           inArray(withdrawals.status, ["pending", "processing"]),
+          isNull(withdrawals.paystackReference),
           isNull(withdrawals.transferReference),
         ))
         .returning();

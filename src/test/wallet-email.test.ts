@@ -19,7 +19,7 @@ let database: ReturnType<typeof drizzle<typeof schema>>;
 
 beforeAll(async () => {
   pg = new PGlite();
-  for (const file of ["0000_base_schema.sql", "0001_google_subject.sql", "0002_shared_rate_limits.sql", "0003_withdrawal_idempotency.sql", "0004_paystack_transfer_reference.sql", "0005_wallet_email_outbox.sql", "0006_order_idempotency.sql", "0007_order_reconciliation_note.sql", "0008_order_provider_cost.sql", "0009_password_reset_tokens.sql", "0010_order_provider_no_default.sql", "0011_email_verification.sql", "0012_topup_payer_name.sql", "0013_disposable_inboxes.sql", "0014_admin_audit_log.sql", "0015_two_factor.sql", "0016_product_reviews.sql", "0017_login_lockout.sql", "0018_reconciliation_runs.sql", "0019_support_tickets.sql", "0020_webauthn.sql", "0021_referrals.sql", "0022_fraud.sql", "0023_boost_orders.sql", "0024_account_deletions.sql", "0025_account_deletion_forfeiture.sql", "0026_webhook_events.sql", "0027_esim_credentials.sql", "0028_esim_delivery_email.sql", "0029_notification_gaps.sql", "0030_payout_name_approvals.sql", "0031_email_delivery_events.sql", "0032_welcome_verified_emails.sql", "0033_account_activity_emails.sql", "0034_customer_activity_emails.sql"]) {
+  for (const file of ["0000_base_schema.sql", "0001_google_subject.sql", "0002_shared_rate_limits.sql", "0003_withdrawal_idempotency.sql", "0004_paystack_transfer_reference.sql", "0005_wallet_email_outbox.sql", "0006_order_idempotency.sql", "0007_order_reconciliation_note.sql", "0008_order_provider_cost.sql", "0009_password_reset_tokens.sql", "0010_order_provider_no_default.sql", "0011_email_verification.sql", "0012_topup_payer_name.sql", "0013_disposable_inboxes.sql", "0014_admin_audit_log.sql", "0015_two_factor.sql", "0016_product_reviews.sql", "0017_login_lockout.sql", "0018_reconciliation_runs.sql", "0019_support_tickets.sql", "0020_webauthn.sql", "0021_referrals.sql", "0022_fraud.sql", "0023_boost_orders.sql", "0024_account_deletions.sql", "0025_account_deletion_forfeiture.sql", "0026_webhook_events.sql", "0027_esim_credentials.sql", "0028_esim_delivery_email.sql", "0029_notification_gaps.sql", "0030_payout_name_approvals.sql", "0031_email_delivery_events.sql", "0032_welcome_verified_emails.sql", "0033_account_activity_emails.sql", "0034_customer_activity_emails.sql", "0035_code_received_at.sql"]) {
     await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   }
   database = drizzle(pg, { schema });
@@ -174,7 +174,7 @@ describe("wallet email outbox on embedded PostgreSQL", () => {
   it("does not infer purchase completion for unverified providers", async () => {
     const [order] = await database.insert(schema.orders).values({
       reference: "LEGACY-ORDER", userId: USER, service: "numbers", productSlug: "vn-us", productName: "Number",
-      planLabel: "One", region: "US", duration: "20 minutes", amount: 2500, status: "active", provider: "fleexa",
+      planLabel: "One", region: "US", duration: "5 minutes", amount: 2500, status: "active", provider: "fleexa",
     }).returning();
     await database.update(schema.orders).set({ status: "delivered", otpCode: "123456" }).where(eq(schema.orders.id, order.id));
     // No purchase-completion email, because this provider's receipt is not

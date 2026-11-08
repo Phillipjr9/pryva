@@ -231,7 +231,7 @@ describe("fulfilment", () => {
   it("cancels a single-verification number upstream after a failed charge", async () => {
     await cancelUpstream({
       provider: "fleexa", providerRequestId: "req-1",
-      service: "numbers", duration: "Single verification · 20 min window",
+      service: "numbers", duration: "Single verification · 5 min window",
     });
     expect(provider.cancelSms).toHaveBeenCalledWith("req-1");
   });

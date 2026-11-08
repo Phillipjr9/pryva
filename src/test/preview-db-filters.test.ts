@@ -25,7 +25,7 @@ beforeAll(async () => {
     {
       reference: "FILTER-NG-NUMBER", service: "numbers", productSlug: "vn-ng",
       productName: "Nigeria number", planLabel: "Single verification", region: "Nigeria",
-      duration: "20 minutes", amount: 1340, status: "active",
+      duration: "5 minutes", amount: 1340, status: "active",
     },
     {
       reference: "FILTER-US-ESIM", service: "esim", productSlug: "esim-us",

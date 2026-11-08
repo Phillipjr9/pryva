@@ -68,7 +68,7 @@ async function insertOrder(id: string, overrides: Record<string, unknown> = {}) 
     providerRequestId: `req-${id}`,
     otpCode: null,
     refundedAt: null,
-    createdAt: minutesAgo(5),
+    createdAt: minutesAgo(3),
     ...overrides,
   } as never);
 }
@@ -87,6 +87,7 @@ describe("number code sweep", () => {
 
     const saved = await readOrder("sweep-live");
     expect(saved).toMatchObject({ otpCode: "424242", status: "delivered" });
+    expect(saved.codeReceivedAt).toBeTruthy();
     // Delivered once, then out of scope: the next run must not ask again.
     expect(await sweep()).toMatchObject({ delivered: 0 });
   });

@@ -233,33 +233,33 @@ const planDefinitions: PlanDefinition[] = [
   // Virtual numbers — one-time verification
   {
     slug: "vn-ng", service: "numbers", name: "Nigeria", planLabel: "Nigeria number",
-    region: "Nigeria", flag: "🇳🇬", duration: "Single verification · 20 min window",
+    region: "Nigeria", flag: "🇳🇬", duration: "Single verification · 5 min window",
     popular: true, badge: "Most popular", highlight: "Best for WhatsApp, Telegram & local apps",
     features: ["Real non-VoIP line", "Instant delivery", "Support review for delivery issues"]
   },
   {
     slug: "vn-us", service: "numbers", name: "United States", planLabel: "US number",
-    region: "United States", flag: "🇺🇸", duration: "Single verification · 20 min window",
+    region: "United States", flag: "🇺🇸", duration: "Single verification · 5 min window",
     features: ["Non-VoIP carrier line", "Instant delivery", "Support review for delivery issues"]
   },
   {
     slug: "vn-uk", service: "numbers", name: "United Kingdom", planLabel: "UK number",
-    region: "United Kingdom", flag: "🇬🇧", duration: "Single verification · 20 min window",
+    region: "United Kingdom", flag: "🇬🇧", duration: "Single verification · 5 min window",
     features: ["Non-VoIP carrier line", "Instant delivery", "Support review for delivery issues"]
   },
   {
     slug: "vn-ca", service: "numbers", name: "Canada", planLabel: "Canada number",
-    region: "Canada", flag: "🇨🇦", duration: "Single verification · 20 min window",
+    region: "Canada", flag: "🇨🇦", duration: "Single verification · 5 min window",
     features: ["Non-VoIP carrier line", "Instant delivery", "Support review for delivery issues"]
   },
   {
     slug: "vn-de", service: "numbers", name: "Germany", planLabel: "Germany number",
-    region: "Germany", flag: "🇩🇪", duration: "Single verification · 20 min window",
+    region: "Germany", flag: "🇩🇪", duration: "Single verification · 5 min window",
     features: ["Non-VoIP carrier line", "Instant delivery", "Support review for delivery issues"]
   },
   {
     slug: "vn-gh", service: "numbers", name: "Ghana", planLabel: "Ghana number",
-    region: "Ghana", flag: "🇬🇭", duration: "Single verification · 20 min window",
+    region: "Ghana", flag: "🇬🇭", duration: "Single verification · 5 min window",
     features: ["Non-VoIP carrier line", "Instant delivery", "Support review for delivery issues"]
   },
   {

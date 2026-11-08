@@ -20,15 +20,13 @@ const overview = readFileSync(join(root, "app/dashboard/page.tsx"), "utf8");
 describe("overview service hub", () => {
   const grid = overview.match(/className="mt-3 grid[^"]*"/)?.[0] ?? "";
 
-  it("goes back to one tile per row once the panel becomes the narrow column", () => {
-    expect(grid).toContain("grid-cols-3");
+  it("keeps quick actions balanced on a phone and stacks to one column on the wide sidebar", () => {
+    expect(grid).toContain("grid-cols-2");
     expect(grid).toContain("sm:grid-cols-2");
     expect(grid).toContain("lg:grid-cols-1");
   });
 
-  it("applies the single-column rule after the two-up one", () => {
-    // Tailwind resolves equal-specificity utilities by source order, so
-    // `grid-cols-1` before `sm:grid-cols-2` would never take effect.
+  it("applies the single-column rule after the phone-friendly two-up layout", () => {
     expect(grid.indexOf("sm:grid-cols-2")).toBeLessThan(grid.indexOf("lg:grid-cols-1"));
   });
 

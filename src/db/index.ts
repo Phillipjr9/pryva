@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID, scryptSync } from "node:crypto";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
@@ -444,6 +444,86 @@ const mockState: PreviewState =
     adminBans: [],
   };
 
+function hashPreviewPassword(password: string): string {
+  const salt = randomBytes(16).toString("hex");
+  const derived = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${derived}`;
+}
+
+function seedPreviewDemo(): void {
+  if (databaseUrl || persistentDatabaseConfigured()) return;
+
+  const email = (process.env.NEXT_PUBLIC_DEMO_EMAIL ?? "demo@pryva.test").trim().toLowerCase();
+  const password = (process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? "Demo123!").trim();
+  if (!email || !password) return;
+
+  const hasDemoUser = mockState.users.some((row) => String(row.email).toLowerCase() === email);
+  if (hasDemoUser) return;
+
+  const now = new Date();
+  const demoUserId = randomUUID();
+  const expiresAt = new Date(now.getTime() + 15 * 60 * 1000);
+
+  mockState.users.push({
+    id: demoUserId,
+    name: "Demo Customer",
+    email,
+    googleSubject: null,
+    passwordHash: hashPreviewPassword(password),
+    walletBalance: 25000,
+    emailVerifiedAt: now,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
+    createdAt: now,
+    deletedAt: null,
+    deletedEmailHash: null,
+  });
+
+  const demoOrderId = randomUUID();
+  mockState.orders.push({
+    id: demoOrderId,
+    reference: "PRY-DEMO-001",
+    userId: demoUserId,
+    service: "numbers",
+    productSlug: "nigeria-single",
+    productName: "Nigeria virtual number",
+    planLabel: "Single verification",
+    region: "Nigeria",
+    duration: "5 minutes",
+    amount: 1340,
+    status: "active",
+    provider: "preview",
+    providerRequestId: null,
+    referenceCode: "PRY-1042",
+    otpCode: "482615",
+    codeReceivedAt: now,
+    accounts: null,
+    esimIccid: null,
+    esimActivationCode: null,
+    esimInstallUrl: null,
+    targetLink: null,
+    quantity: null,
+    expiresAt,
+    refundedAt: null,
+    reconciliationNote: null,
+    providerCostNgn: 850,
+    requestId: null,
+    createdAt: new Date(now.getTime() - 3 * 60 * 1000),
+  });
+
+  mockState.walletTransactions.push({
+    id: randomUUID(),
+    userId: demoUserId,
+    orderId: demoOrderId,
+    type: "credit",
+    amount: 25000,
+    balanceAfter: 25000,
+    description: "Demo wallet top-up",
+    reference: "DEMO-WALLET",
+    createdAt: new Date(now.getTime() - 30 * 60 * 1000),
+  });
+}
+
 // Next can load route handlers and server components in separate bundles.
 // Share the in-memory preview state across those bundles in this process.
 if (!databaseUrl) {
@@ -451,9 +531,11 @@ if (!databaseUrl) {
     mockState[key] ??= [];
   }
   globalForDb.__arenaPryvaMockState = mockState;
+  seedPreviewDemo();
 }
 
-// An unconfigured preview starts empty: never seed balances, accounts or transactions.
+// The local preview is intentionally seeded with a working demo account and an
+// active verification code so the dashboard can be reviewed without a database.
 
 /** Read an isolated snapshot; never expose the mutable process-local state. */
 export function readPreviewDatabase<T>(reader: (snapshot: PreviewState) => T): T {

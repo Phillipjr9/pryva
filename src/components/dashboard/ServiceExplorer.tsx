@@ -224,6 +224,19 @@ function liveUnavailableCopy(reason: LiveState["reason"]) {
   };
 }
 
+const SERVICE_COUNTRY_STORAGE_KEY = "pryva:selected-country";
+
+function resolveExplorerCountry(initialCountry: string | null) {
+  const explicit = explorerCountry(initialCountry)?.code;
+  if (explicit) return explicit;
+  if (typeof window !== "undefined") {
+    const stored = window.localStorage.getItem(SERVICE_COUNTRY_STORAGE_KEY);
+    const remembered = explorerCountry(stored)?.code;
+    if (remembered) return remembered;
+  }
+  return "ng";
+}
+
 export function ServiceExplorer({
   initialCountry,
   initialCategory,
@@ -243,7 +256,7 @@ export function ServiceExplorer({
    */
   readiness?: ServiceReadinessEntry[];
 }) {
-  const [country, setCountry] = useState(() => explorerCountry(initialCountry)?.code ?? "");
+  const [country, setCountry] = useState(() => resolveExplorerCountry(initialCountry));
   const [category, setCategory] = useState<ExplorerFilter>(() => explorerCategory(initialCategory));
   const [search, setSearch] = useState("");
   const [tag, setTag] = useState("all");
@@ -341,11 +354,17 @@ export function ServiceExplorer({
     return () => controller.abort();
   }, [country, liveRevision]);
 
+  useEffect(() => {
+    if (typeof window !== "undefined" && country) {
+      window.localStorage.setItem(SERVICE_COUNTRY_STORAGE_KEY, country);
+    }
+  }, [country]);
+
   // Handle browser back/forward when a history entry from another page is restored.
   useEffect(() => {
     function restoreSelection() {
       const params = new URLSearchParams(window.location.search);
-      setCountry(explorerCountry(params.get("country"))?.code ?? "");
+      setCountry(explorerCountry(params.get("country"))?.code ?? resolveExplorerCountry(null));
       setCategory(explorerCategory(params.get("category")));
       setSearch("");
       setTag("all");
@@ -356,7 +375,7 @@ export function ServiceExplorer({
   }, []);
 
   function chooseCountry(code: string) {
-    const next = explorerCountry(code)?.code ?? "";
+    const next = explorerCountry(code)?.code ?? (country || "ng");
     setCountry(next);
     if (next !== country) setLiveRevision(0);
     setTag("all");
@@ -379,7 +398,7 @@ export function ServiceExplorer({
         <div>
           <p className="text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Explore PryvaLogs</p>
           <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">{selectedCategory?.label ?? "Your service hub"}</h1>
-          <p className="mt-1.5 max-w-2xl text-[0.82rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Choose a country, then select a service below.` : "Choose a country, then browse categories and available services in one place."}</p>
+          <p className="mt-1.5 max-w-2xl text-[0.82rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Pick a country once, then browse the matched services.` : "Pick a country once and browse categories without redoing the choice every time."}</p>
         </div>
         <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline">My orders <ArrowRight className="h-3.5 w-3.5" /></Link>
       </div>
@@ -400,9 +419,9 @@ export function ServiceExplorer({
         <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 h-48 w-48 rounded-full bg-lav-300/30 blur-3xl" />
         <div className="relative grid gap-3 md:grid-cols-[1fr_1.1fr] md:items-center md:gap-4">
           <div>
-            <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Globe className="h-3.5 w-3.5" /> Step 01</p>
-            <h2 id="choose-country-title" className="mt-1.5 text-[1.1rem] font-semibold text-ink sm:mt-2 sm:text-[1.25rem]">Start with a country.</h2>
-            <p className="mt-1.5 max-w-sm text-meta leading-relaxed text-ink-2">Select where you need the service. Boosts can be ordered right away; other listings still need their coverage confirmed before ordering.</p>
+            <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Globe className="h-3.5 w-3.5" /> Country</p>
+            <h2 id="choose-country-title" className="mt-1.5 text-[1.1rem] font-semibold text-ink sm:mt-2 sm:text-[1.25rem]">Pick a country once.</h2>
+            <p className="mt-1.5 max-w-sm text-meta leading-relaxed text-ink-2">Your selection stays saved for this service hub, so you do not need to rechoose it for every category or browse session.</p>
           </div>
           <div className="rounded-2xl border border-white/80 bg-white/60 p-3 shadow-sm sm:p-4">
             <CountrySelector id="service-country" value={country} onChange={chooseCountry} />

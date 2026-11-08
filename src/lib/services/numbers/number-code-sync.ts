@@ -113,7 +113,7 @@ export async function sweepPendingNumberCodes(
       // landed while the supplier was being asked, and neither may be undone.
       const [saved] = await db
         .update(orders)
-        .set({ otpCode: read.code, status: "delivered" })
+        .set({ otpCode: read.code, status: "delivered", codeReceivedAt: new Date() })
         .where(
           and(
             eq(orders.id, order.id),

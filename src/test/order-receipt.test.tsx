@@ -32,7 +32,7 @@ const RECEIPT: ReceiptData = {
   service: "Virtual number",
   planLabel: "Any app · 1 use",
   region: "Nigeria",
-  duration: "20 minutes",
+  duration: "5 minutes",
   amount: 1_500,
   status: "delivered",
   createdAt: "3 November 2026, 14:05",
@@ -108,7 +108,7 @@ describe("receiptLineItems", () => {
     const [item] = receiptLineItems(RECEIPT, "₦1,500");
     expect(item.detail).toContain("Any app · 1 use");
     expect(item.detail).toContain("Nigeria");
-    expect(item.detail).toContain("20 minutes");
+    expect(item.detail).toContain("5 minutes");
     // The amount belongs to the description line only.
     expect(item.detail).not.toContain("₦");
   });
@@ -124,7 +124,7 @@ describe("receiptLineItems", () => {
 
   it("does not leave a dangling separator when a field is empty", () => {
     const [item] = receiptLineItems({ ...RECEIPT, planLabel: "", region: "Nigeria" }, "₦1,500");
-    expect(item.detail).toBe("Nigeria · 20 minutes");
+    expect(item.detail).toBe("Nigeria · 5 minutes");
     expect(item.detail).not.toContain("· ·");
   });
 });
