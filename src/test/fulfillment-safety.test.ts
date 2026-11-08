@@ -107,6 +107,14 @@ describe("fulfilment", () => {
     expect(bitcall.buyOtp).not.toHaveBeenCalled();
   });
 
+  it("rejects a rental before a provider call when the rental key is missing, without affecting Bitcall", async () => {
+    provider.configured = false;
+    await expect(fulfillPlan(findPlan("rent-ng-30")!)).rejects.toMatchObject({ code: "NO_API_KEY", message: "Live fulfilment is not configured" });
+    expect(provider.listAreas).not.toHaveBeenCalled();
+    expect(provider.buyRental).not.toHaveBeenCalled();
+    await expect(fulfillPlan(findPlan("vn-ng")!)).resolves.toMatchObject({ provider: "bitcall" });
+  });
+
   it.each(DELIVERABLE)("buys a real number for %s and returns the provider receipt", async (slug, serviceId) => {
     const result = await fulfillPlan(findPlan(slug)!);
 

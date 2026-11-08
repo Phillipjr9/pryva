@@ -14,6 +14,7 @@ import { NextRequest } from "next/server";
 const state = vi.hoisted(() => ({
   user: { id: "u1", email: "user@example.com", walletBalance: 50000 } as { id: string; email: string; walletBalance: number } | null,
   sameOrigin: true,
+  rentalUnconfigured: false,
   balance: 50000,
   fulfillable: new Set(["vn-ng", "vn-us", "rent-ng-30"]),
   fulfilError: null as Error | null,
@@ -38,6 +39,10 @@ vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
 });
 
 vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
+
+vi.mock("@/lib/services/numbers/number-availability", () => ({
+  isRentalOrderingUnconfigured: (slug: string) => state.rentalUnconfigured && slug === "rent-ng-30",
+}));
 
 vi.mock("@/lib/providers/fleexa", () => ({
   FleexaError: class FleexaError extends Error {
@@ -127,6 +132,7 @@ beforeEach(() => {
   vi.stubEnv("VERCEL_ENV", "");
   state.user = { id: "u1", email: "user@example.com", walletBalance: 50000 };
   state.sameOrigin = true;
+  state.rentalUnconfigured = false;
   state.balance = 50000;
   state.fulfilError = null;
   state.failOnCall = 0;
@@ -143,6 +149,16 @@ afterEach(() => {
 });
 
 describe("POST /api/orders/bulk", () => {
+  it("preflights a missing rental provider before buying any unit", async () => {
+    state.rentalUnconfigured = true;
+    const response = await POST(jsonRequest({ items: [{ productSlug: "vn-ng", quantity: 1 }, { productSlug: "rent-ng-30", quantity: 1 }] }));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("Nothing was purchased or charged") });
+    expect(state.calls).toEqual([]);
+    expect(state.inserts).toEqual([]);
+    expect(state.debits).toEqual([]);
+  });
+
   it("never buys from a supplier in a Vercel preview", async () => {
     vi.stubEnv("VERCEL_ENV", "preview");
     expect((await POST(jsonRequest({ items: [{ productSlug: "vn-ng", quantity: 1 }] }))).status).toBe(503);

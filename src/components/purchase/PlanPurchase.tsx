@@ -19,6 +19,7 @@ type Props = {
   walletBalance: number | null;
   nextPath: string;
   otpOfferId?: string;
+  unavailableSlugs?: string[];
 };
 
 /**
@@ -36,7 +37,7 @@ function newRequestId(): string {
   return `${hex(8)}-${hex(4)}-4${hex(3)}-${variant}${hex(3)}-${hex(12)}`;
 }
 
-export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOfferId }: Props) {
+export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOfferId, unavailableSlugs = [] }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState(0);
   const plans = useMemo(() => groups[tab]?.plans ?? [], [groups, tab]);
@@ -51,6 +52,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOff
   );
 
   const selected = plans.find((plan) => plan.slug === selectedSlug) ?? plans[0];
+  const unavailable = selected ? unavailableSlugs.includes(selected.slug) : false;
 
   // One key per purchase attempt. It is reused across a retry of the same attempt
   // so a browser retry, a second tab, or a resubmit after a timeout whose first
@@ -78,7 +80,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOff
   }
 
   async function buy() {
-    if (!selected) return;
+    if (!selected || unavailable) return;
     setPending(true);
     setError(null);
     setNeedsFunds(false);
@@ -296,7 +298,9 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOff
                   {selected ? formatNaira(selected.price) : "—"}
                 </span>
               </div>
-              {signedIn ? (
+              {unavailable ? (
+                <p role="status" className="max-w-xs text-meta font-medium text-ink-2">This plan is temporarily unavailable to order.</p>
+              ) : signedIn ? (
                 <button
                   type="button"
                   onClick={buy}

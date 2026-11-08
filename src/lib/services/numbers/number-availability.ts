@@ -14,3 +14,9 @@ export function isNumberPlanOrderingConfigured(slug: string): boolean {
     ? isFleexaConfigured()
     : isBitcallConfigured();
 }
+
+/** Keep the plan visible, but do not offer a rental checkout without its provider.
+ * This says nothing about provider stock or the validity of a configured key. */
+export function isRentalOrderingUnconfigured(slug: string): boolean {
+  return fulfilmentIntent(slug)?.kind === "rental" && !isFleexaConfigured();
+}
