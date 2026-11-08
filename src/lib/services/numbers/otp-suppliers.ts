@@ -6,9 +6,11 @@ import {
   buyBitcallOtpActivation,
   isAmbiguousBitcallOutcome,
   isBitcallConfigured,
-  listBitcallOtpCountries,
+  listBitcallOtpCountryEntries,
   listBitcallOtpServices,
+  otpServiceLabelFromId,
 } from "@/lib/providers/bitcall";
+import { VERIFICATION_EXAMPLES } from "@/lib/services/service-explorer";
 import { buyFleexaSmsNumber, FleexaError, isFleexaConfigured, listFleexaSmsServices } from "@/lib/providers/fleexa";
 import { logger } from "@/lib/platform/logger";
 import { supplierAmountToNgn } from "@/lib/payments/supplier-currency";
@@ -225,34 +227,61 @@ async function fleexaOffers(country: string, regionName: string): Promise<OtpOff
   return [...offersByKey.values()];
 }
 
+/** The catalogue's own spelling where we recognize the brand, else a clean label. */
+function canonicalServiceName(raw: string): string {
+  const lower = raw.toLowerCase();
+  for (const entry of VERIFICATION_EXAMPLES) {
+    const brand = String(entry.brand);
+    if (!lower.startsWith(brand)) continue;
+    // Only a whole word counts: "threads" must not turn "threadsapp" into "Threads".
+    const next = lower.charAt(brand.length);
+    if (!next || /[\s/\-_,.+]/.test(next)) return entry.name;
+  }
+  return raw.replace(/(^|\s)([a-z])/g, (_match, space: string, letter: string) => `${space}${letter.toUpperCase()}`);
+}
+
+function serviceLabel(serviceId: string): string | null {
+  const raw = otpServiceLabelFromId(serviceId);
+  return raw ? canonicalServiceName(raw) : null;
+}
+
 async function bitcallOffers(country: string, regionName: string): Promise<OtpOffer[]> {
   if (!isBitcallConfigured()) return [];
 
-  // Bitcall publishes opaque country codes (for example, US_1), which are not
-  // necessarily the ISO code we use in the storefront. Resolve the supplier's
-  // own values first, then filter with the tolerant ISO/region matcher; sending
-  // `US` directly can silently return an empty catalog when the provider expects
-  // its published code.
-  const providerCodes = await listBitcallOtpCountries();
-  const matchingCodes = [...new Set(providerCodes.filter((code) => matchesCountry(code, country, regionName)))];
-  const scopedServices = matchingCodes.length === 0
-    ? []
-    : (await Promise.all(
-        matchingCodes.map((countryCode) => listBitcallOtpServices({ countryCode })),
-      )).flat();
-  const scopedMatches = scopedServices.filter((service) => matchesCountry(service.countryCode, country, regionName));
-  // A country filter that returns nothing is not proof the country has no stock:
-  // providers sometimes publish region IDs but filter by a different canonical
-  // value. Retry the read-only catalog without a country filter and match only
-  // rows that identify this country. This stays on Bitcall and never purchases.
-  const services = scopedMatches.length > 0
-    ? scopedMatches
-    : (await listBitcallOtpServices()).filter((service) => matchesCountry(service.countryCode, country, regionName));
+  // Where an offer's destination is actually stated.
+  //
+  // `GET /v1/otp/services` names no country and accepts no country filter: its
+  // rows carry a name, a slug and pools, nothing else. The country catalogue
+  // does publish a `countryCode`, and its `pools[]` are the offers for that
+  // country. So the join below is the documented attribution — the previous
+  // shape, filtering service rows on a `countryCode` no service row has,
+  // discarded every offer for every destination. That is a catalogue which
+  // reads as empty while the key, the balance and the eSIM catalogue all work.
+  const entries = await listBitcallOtpCountryEntries();
+  const mine = entries.filter((entry) => matchesCountry(entry.countryCode ?? entry.name, country, regionName));
   const offers: OtpOffer[] = [];
   const seen = new Set<string>();
+  for (const entry of mine) {
+    for (const pool of entry.pools) {
+      if (!pool.serviceId || seen.has(pool.serviceId)) continue;
+      seen.add(pool.serviceId);
+      offers.push({
+        supplier: "bitcall",
+        ref: pool.serviceId,
+        country,
+        app: readableApp(serviceLabel(pool.serviceId)),
+        costNgn: await supplierAmountToNgn(pool.price, pool.currency),
+        stock: pool.availableCount,
+      });
+    }
+  }
+  if (offers.length > 0) return offers;
+
+  // A country entry can arrive without its inline pools: the field is documented
+  // but optional. Fall back to the service catalogue, attributing only rows that
+  // name this country themselves rather than assuming a filter was honoured.
+  const services = await listBitcallOtpServices({});
   for (const service of services) {
-    // Do not trust that an upstream filter was honored: only attach a listing to
-    // this country when the response itself names a matching published region.
     if (!matchesCountry(service.countryCode, country, regionName)) continue;
     const app = readableApp(service.name);
     for (const entry of service.offers) {

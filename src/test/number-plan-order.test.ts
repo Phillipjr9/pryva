@@ -25,6 +25,9 @@ vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
     ...actual,
     isBitcallConfigured: () => bitcall.configured,
     listBitcallOtpServices: bitcall.list,
+    // Attribution now comes from the country catalogue; these tests exercise the
+    // service-row fallback, so the country read is empty on purpose.
+    listBitcallOtpCountryEntries: async () => [],
     buyBitcallOtpActivation: bitcall.buy,
   };
 });
@@ -46,8 +49,11 @@ function fleexaRows(costs: Record<string, number>) {
 
 function gatewayRows(costs: Record<string, number>) {
   return Object.entries(costs).map(([country, usd]) => ({
+    // The service catalogue states no country and accepts no country filter, so a
+    // row that names its own country is the only shape the fallback can attribute.
+    countryCode: `${country}_1`,
     name: "WhatsApp",
-    offers: [{ serviceId: `pool-${country}`, price: usd, currency: "USD", availableCount: 10 }],
+    offers: [{ serviceId: `ALPHA-${country}-whatsapp`, price: usd, currency: "USD", availableCount: 10 }],
   }));
 }
 
@@ -69,9 +75,7 @@ afterEach(() => {
 describe("number plan order", () => {
   it("puts the destination with the lowest Bitcall cost first", async () => {
     const costs = { NG: 0.01, US: 0.02, GB: 0.08, CA: 0.09, DE: 0.1, GH: 0.07 };
-    bitcall.list.mockImplementation(async ({ countryCode }: { countryCode: string }) =>
-      gatewayRows({ [countryCode.toLowerCase()]: costs[countryCode as keyof typeof costs] }),
-    );
+    bitcall.list.mockResolvedValue(gatewayRows(costs));
 
     const ordered = await orderNumberPlansByCheapestCost(sellable());
 
@@ -97,9 +101,7 @@ describe("number plan order", () => {
 
   it("keeps catalogue order for destinations Bitcall cannot price", async () => {
     // Only Nigeria has a Bitcall price; all other destinations remain in place.
-    bitcall.list.mockImplementation(async ({ countryCode }: { countryCode: string }) =>
-      countryCode === "NG" ? gatewayRows({ ng: 0.01 }) : [],
-    );
+    bitcall.list.mockResolvedValue(gatewayRows({ NG: 0.01 }));
     const plans = sellable();
 
     const ordered = await orderNumberPlansByCheapestCost(plans);
@@ -120,7 +122,7 @@ describe("number plan order", () => {
   });
 
   it("reads Bitcall catalogs once and then serves from cache", async () => {
-    bitcall.list.mockResolvedValue(gatewayRows({ ng: 0.01 }));
+    bitcall.list.mockResolvedValue(gatewayRows({ NG: 0.01 }));
 
     await orderNumberPlansByCheapestCost(sellable());
     const callsAfterFirst = bitcall.list.mock.calls.length;

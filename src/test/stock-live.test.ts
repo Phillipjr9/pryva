@@ -21,7 +21,7 @@ const state = vi.hoisted(() => ({
   productsError: null as string | null,
   manual: 0,
   accszone: false,
-  otpServices: [] as unknown[],
+  otpCountries: [] as unknown[],
 }));
 
 vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
@@ -66,7 +66,7 @@ vi.mock("@/lib/services/boosts/smm-catalog", async (importOriginal) => {
 
 vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/providers/bitcall")>();
-  return { ...actual, isBitcallConfigured: () => state.bitcall, listBitcallOtpServices: async () => state.otpServices };
+  return { ...actual, isBitcallConfigured: () => state.bitcall, listBitcallOtpCountryEntries: async () => state.otpCountries };
 });
 
 vi.mock("@/lib/providers/accszone", async (importOriginal) => {
@@ -117,7 +117,10 @@ beforeEach(() => {
   state.bulkacc = true;
   state.smm = true;
   state.bitcall = true;
-  state.otpServices = [{ countryCode: "NG", name: "WhatsApp", offers: [{ serviceId: "s1", price: 900, currency: "NGN", availableCount: 15 }] }];
+  state.otpCountries = [{
+    countryCode: "NG_1", name: "Nigeria", serviceCount: 1, availableCount: 15, startingPrice: 900, currency: "NGN",
+    pools: [{ serviceId: "s1", price: 900, currency: "NGN", availableCount: 15, successRate: 90 }],
+  }];
   state.snapshot = snapshot();
   state.snapshotError = null;
   state.boost = boostSnapshot();

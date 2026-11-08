@@ -35,6 +35,7 @@ vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
     ...actual,
     isBitcallConfigured: () => bitcall.configured,
     listBitcallOtpServices: bitcall.listOtp,
+    listBitcallOtpCountryEntries: async () => [],
     buyBitcallOtpActivation: bitcall.buyOtp,
   };
 });
@@ -47,7 +48,9 @@ beforeEach(() => {
   clearOtpCatalogueCache();
   provider.configured = true;
   bitcall.configured = true;
-  bitcall.listOtp.mockImplementation(async ({ countryCode }: { countryCode: string }) => SMS_SERVICES.filter((service) => service.countryCode === countryCode));
+  // No country filter is sent: the endpoint accepts none. Each row states its own
+  // country, which is what the fallback path attributes on.
+  bitcall.listOtp.mockImplementation(async () => SMS_SERVICES);
   bitcall.buyOtp.mockResolvedValue({ activationId: "act-1", phoneNumber: "+2348000000000", price: 100, currency: "NGN", status: "pending" });
 });
 afterEach(() => { vi.restoreAllMocks(); });
@@ -127,7 +130,7 @@ describe("fulfilment", () => {
       // Catalogues are cached briefly in production; a re-quote here has to be
       // seen, so the cache is cleared with it.
       clearOtpCatalogueCache();
-      bitcall.listOtp.mockResolvedValue([{ name: "WhatsApp", offers: [{ serviceId: "svc-ng", price: priceNgn, currency: "NGN", availableCount: 10 }] }]);
+      bitcall.listOtp.mockResolvedValue([{ countryCode: "NG_1", name: "WhatsApp", offers: [{ serviceId: "svc-ng", price: priceNgn, currency: "NGN", availableCount: 10 }] }]);
     }
 
     it("refuses to spend when the provider costs more than we charge", async () => {
@@ -166,7 +169,7 @@ describe("fulfilment", () => {
     });
 
     it("refuses when the matching destination is out of stock, before spending", async () => {
-      bitcall.listOtp.mockResolvedValue([{ name: "WhatsApp", offers: [{ serviceId: "svc-ng", price: 100, currency: "NGN", availableCount: 0 }] }]);
+      bitcall.listOtp.mockResolvedValue([{ countryCode: "NG_1", name: "WhatsApp", offers: [{ serviceId: "svc-ng", price: 100, currency: "NGN", availableCount: 0 }] }]);
       await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
       expect(bitcall.buyOtp).not.toHaveBeenCalled();
     });

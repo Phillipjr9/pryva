@@ -27,6 +27,8 @@ vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
     bitcallKeyEnvironment: () => "live" as const,
     getBitcallBalance: async () => ({ balance: 12.5, currency: "USD" }),
     listBitcallOtpServices: gate.list,
+    // Empty: this endpoint's fixtures exercise the service-row probe path.
+    listBitcallOtpCountryEntries: async () => [],
     buyBitcallOtpActivation: gate.buy,
     cancelBitcallOtpActivation: gate.cancel,
   };
@@ -44,6 +46,7 @@ vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
 
 vi.mock("@/lib/payments/exchange-rate", () => ({
   getUsdToNgnRate: async () => ({ rate: 1500, source: "override", fetchedAt: new Date().toISOString() }),
+  getFreshNgnRate: async (currency: string) => ({ rate: currency === "EUR" ? 1650 : 1500, source: "override", fetchedAt: new Date().toISOString() }),
 }));
 
 const { GET } = await import("@/app/api/admin/suppliers/route");
@@ -62,7 +65,7 @@ beforeEach(() => {
   fleexa.list.mockResolvedValue([{ id: "svc-ng", country: "ng", name: "WhatsApp", priceNgn: 900, stock: 5 }]);
   fleexa.list.mockResolvedValue([]);
   gate.list.mockResolvedValue([
-    { name: "WhatsApp", offers: [{ serviceId: "pool-ng", price: 0.4, currency: "USD", availableCount: 7 }] },
+    { countryCode: "NG", name: "WhatsApp", offers: [{ serviceId: "pool-ng", price: 0.4, currency: "USD", availableCount: 7 }] },
   ]);
 });
 
@@ -134,7 +137,7 @@ describe("supplier status endpoint", () => {
 
   it("says a plan does not clear the floor when the Bitcall cost is too high", async () => {
     gate.list.mockResolvedValue([
-      { name: "WhatsApp", offers: [{ serviceId: "pool-ng", price: 1.2, currency: "USD", availableCount: 7 }] },
+      { countryCode: "NG", name: "WhatsApp", offers: [{ serviceId: "pool-ng", price: 1.2, currency: "USD", availableCount: 7 }] },
     ]);
 
     const body = await (await report("?country=ng")).json();
