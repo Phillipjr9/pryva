@@ -45,6 +45,29 @@ describe("Bitcall app-specific OTP catalogue", () => {
     expect(payload).not.toContain("250");
   });
 
+  it("lists and resolves an offer whose id names no app", async () => {
+    // `if (!app) continue` was the quietest way to lose a country's inventory:
+    // the read succeeds, nothing errors, and the shelf is simply empty. The offer
+    // is real stock, so it is listed under a neutral label and can still be bought.
+    const unlabelled: OtpOffer = { supplier: "bitcall", ref: "opaque_ref_1", country: "ng", app: null, costNgn: 250, stock: 5 };
+    const items = bitcallOtpItemsForCountry([unlabelled], "ng", "Nigeria");
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      name: "Verification number",
+      source: "live",
+      stock: 5,
+      price: 1340,
+      action: { label: "Choose service" },
+    });
+    expect(JSON.stringify(items)).not.toContain("opaque_ref_1");
+
+    state.read.mockResolvedValue({ offers: [unlabelled], errorCode: null, stale: false });
+    const resolved = await findOtpCheckoutOffer("ng", items[0].id);
+    expect(resolved.errorCode).toBeNull();
+    expect(resolved.listing).toMatchObject({ app: "Verification number", priceNgn: 1340, purchasable: true });
+  });
+
   it("shows Bitcall inventory for other countries without enabling unsupported checkout", () => {
     const beninOffer: OtpOffer = {
       supplier: "bitcall", ref: "private-benin-service", country: "bj", app: "WhatsApp",

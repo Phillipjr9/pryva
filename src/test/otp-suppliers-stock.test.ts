@@ -40,6 +40,7 @@ vi.mock("@/lib/providers/bitcall", () => ({
   listBitcallOtpServices: bitcall.listServices,
   listBitcallOtpCountryEntries: bitcall.listCountryEntries,
   otpServiceLabelFromId: (id: string) => id.split("-").slice(2).join("-") || null,
+  otpCountrySegmentFromId: (id: string) => id.split("-").filter(Boolean)[1] ?? null,
   isAmbiguousBitcallOutcome: vi.fn(() => false),
   buyBitcallOtpActivation: vi.fn(),
 }));
@@ -122,6 +123,30 @@ describe("otp stock aggregation", () => {
     const read = await readOtpOffersForSupplier("bitcall", "us", "United States", true);
 
     expect(read.offers).toMatchObject([{ ref: "us-whatsapp-pool", country: "us", app: "WhatsApp", stock: 9 }]);
+  });
+
+  it("attributes offers by their published id when a country entry carries no pools", async () => {
+    // The fallback used to filter service rows on a `countryCode` they never
+    // carry, so a destination whose country entry omits `pools[]` read as empty —
+    // and said nothing about it. Attribution now comes from the destination
+    // segment of the offer's own id, and only for a code this destination itself
+    // published, so a Ghanaian offer cannot surface under Nigeria.
+    bitcall.configured.mockReturnValue(true);
+    bitcall.listCountryEntries.mockResolvedValue([
+      { countryCode: "NG_1", name: "Nigeria (Virtual)", serviceCount: 3, availableCount: 0, startingPrice: null, currency: null, pools: [] },
+    ]);
+    bitcall.listServices.mockResolvedValue([
+      { name: "WhatsApp", slug: "whatsapp", offers: [{ serviceId: "BRAVO-NG_1-whatsapp", price: 800, currency: "NGN", availableCount: 4, successRate: 91 }] },
+      { name: "Telegram", slug: "telegram", offers: [{ serviceId: "BRAVO-US_1-telegram", price: 900, currency: "NGN", availableCount: 4, successRate: 91 }] },
+      { name: "Gmail", slug: "gmail", offers: [{ serviceId: "BRAVO-GH_1-gmail", price: 700, currency: "NGN", availableCount: 4, successRate: 91 }] },
+    ]);
+
+    const { readOtpOffersForSupplier, clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");
+    clearOtpCatalogueCache();
+    const read = await readOtpOffersForSupplier("bitcall", "ng", "Nigeria");
+
+    expect(read.offers.map((offer) => offer.ref)).toEqual(["BRAVO-NG_1-whatsapp"]);
+    expect(read.offers[0]).toMatchObject({ app: "WhatsApp", stock: 4, costNgn: 800 });
   });
 
   it("keeps Bitcall stock visible when the country catalogue reports uppercase ISO codes", async () => {

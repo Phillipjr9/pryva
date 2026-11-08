@@ -8,6 +8,7 @@ import {
   isBitcallConfigured,
   listBitcallOtpCountryEntries,
   listBitcallOtpServices,
+  otpCountrySegmentFromId,
   otpServiceLabelFromId,
 } from "@/lib/providers/bitcall";
 import { VERIFICATION_EXAMPLES } from "@/lib/services/service-explorer";
@@ -275,8 +276,10 @@ async function bitcallOffers(country: string, regionName: string): Promise<OtpOf
   const mine = entries.filter((entry) => matchesCountry(entry.countryCode ?? entry.name, country, regionName));
   const rows: PricedRow[] = [];
   const seen = new Set<string>();
+  let poolsSeen = 0;
   for (const entry of mine) {
     for (const pool of entry.pools) {
+      poolsSeen += 1;
       if (!pool.serviceId || seen.has(pool.serviceId)) continue;
       seen.add(pool.serviceId);
       rows.push({
@@ -288,17 +291,35 @@ async function bitcallOffers(country: string, regionName: string): Promise<OtpOf
       });
     }
   }
-  if (rows.length > 0) return priceRows(rows, country);
+  const funnel = { entries: entries.length, matched: mine.length, pools: poolsSeen };
+  if (rows.length > 0) return reportEmptyRead(country, funnel, await priceRows(rows, country));
 
   // A country entry can arrive without its inline pools: the field is documented
-  // but optional. Fall back to the service catalogue, attributing only rows that
-  // name this country themselves rather than assuming a filter was honoured.
+  // but optional. The fallback used to filter service rows on `service.countryCode`
+  // — a field service rows do not carry — so it attributed nothing, for every
+  // destination, and said so only by returning an empty list. Attribution now
+  // comes from what the catalogue does publish:
+  //
+  //   1. a service row that states its own country, and
+  //   2. the destination segment of the offer's own published id
+  //      (`BRAVO-NG_1-whatsapp` is a Nigerian offer),
+  //
+  // and (2) only counts when the segment matches a code this destination itself
+  // published. A code it did not publish (Ghana's, on a Nigerian read) is not
+  // evidence, so coverage is never invented.
+  const ownCodes = new Set(
+    mine
+      .flatMap((entry) => [normalizeCountryCode(entry.countryCode), normalizeCountryCode(entry.name)])
+      .filter((code): code is string => code !== null),
+  );
   const services = await listBitcallOtpServices({});
   for (const service of services) {
-    if (!matchesCountry(service.countryCode, country, regionName)) continue;
+    const namesCountry = matchesCountry(service.countryCode, country, regionName);
     const app = readableApp(service.name);
     for (const entry of service.offers) {
       if (!entry.serviceId || seen.has(entry.serviceId)) continue;
+      const segment = normalizeCountryCode(otpCountrySegmentFromId(entry.serviceId));
+      if (!namesCountry && !(segment !== null && ownCodes.has(segment))) continue;
       seen.add(entry.serviceId);
       rows.push({
         ref: entry.serviceId,
@@ -309,7 +330,32 @@ async function bitcallOffers(country: string, regionName: string): Promise<OtpOf
       });
     }
   }
-  return priceRows(rows, country);
+  return reportEmptyRead(country, funnel, await priceRows(rows, country));
+}
+
+/**
+ * A read that succeeds and yields nothing is the one failure mode with no
+ * evidence: no error, no exception, just a country with no numbers on it. The
+ * funnel counters say which stage emptied it — nothing published for the
+ * destination, no pools, no usable price, or rows that were dropped later for
+ * want of a label — because those have entirely different fixes.
+ */
+function reportEmptyRead(
+  country: string,
+  funnel: { entries: number; matched: number; pools: number },
+  offers: OtpOffer[],
+): OtpOffer[] {
+  if (offers.length > 0 && offers.some((offer) => offer.costNgn !== null)) return offers;
+  logger.warn("Bitcall OTP catalogue produced no sellable offer", {
+    country,
+    entries: funnel.entries,
+    matched: funnel.matched,
+    pools: funnel.pools,
+    offers: offers.length,
+    priced: offers.filter((offer) => offer.costNgn !== null).length,
+    labelled: offers.filter((offer) => offer.app !== null).length,
+  });
+  return offers;
 }
 
 /** One offer's attributes, before its supplier price has been converted. */
@@ -383,9 +429,15 @@ export type OtpOfferRead = {
   stale: boolean;
 };
 
-/** A stable opaque id for a live listing; the provider's service reference stays server-side. */
-export function otpOfferPublicId(country: string, ref: string, app: string): string {
-  return `otp-${createHash("sha256").update(`${country.toLowerCase()}\0${ref}\0${app}`).digest("hex").slice(0, 24)}`;
+/**
+ * A stable opaque id for a live listing; the provider's service reference stays
+ * server-side.
+ *
+ * An offer whose id names no app still has an id: the app is part of the hash as
+ * an empty string, so an unlabelled offer is addressable instead of invisible.
+ */
+export function otpOfferPublicId(country: string, ref: string, app: string | null): string {
+  return `otp-${createHash("sha256").update(`${country.toLowerCase()}\0${ref}\0${app ?? ""}`).digest("hex").slice(0, 24)}`;
 }
 
 /** Read one supplier's offers while preserving a safe error code for storefront status. */
