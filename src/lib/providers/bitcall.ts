@@ -574,23 +574,30 @@ export async function listBitcallEsimPlans(filter: { region?: string } = {}): Pr
   let partialReason: BitcallEsimPlansPartial | null = null;
   let sampleKeys: string[] | null = null;
 
-  for (let page = 1; page <= ESIM_PLAN_MAX_PAGES; page++) {
-    let payload: unknown;
-    try {
-      payload = await gatewayFetch("GET", "/v1/esim/plans", {
-        query: { region: filter.region, page, pageSize: ESIM_PLAN_PAGE_SIZE, sort: "price_asc" },
-        // One token for the whole walk; see the note on esimCatalogBudget.
-        catalogCharge: page === 1,
-      });
-    } catch (error) {
-      if (page === 1) throw error;
-      const code = error instanceof BitcallError ? error.code : "UNKNOWN";
+  // The pages after the first are requested together (see readCataloguePages)
+  // and then consumed in page order, so a refusal still stops the walk where it
+  // stopped when the requests were serial — earlier pages are kept, later ones
+  // are not presented as a whole catalogue.
+  const pages = await readCataloguePages("/v1/esim/plans", {
+    pageSize: ESIM_PLAN_PAGE_SIZE,
+    maxPages: ESIM_PLAN_MAX_PAGES,
+    query: { region: filter.region, sort: "price_asc" },
+    // One token for the whole walk; see the note on esimCatalogBudget.
+    catalogCharge: (page) => page === 1,
+  });
+
+  for (const entry of pages) {
+    const page = entry.page;
+    if (entry.error !== null) {
+      if (page === 1) throw entry.error;
+      const code = entry.error instanceof BitcallError ? entry.error.code : "UNKNOWN";
       // A refusal by our own cap is not the supplier withholding plans.
       partialReason = code === "LOCAL_RATE_BUDGET" ? "budget" : "upstream";
       logger.warn("eSIM catalog pagination incomplete", { page, code, reason: partialReason });
       break;
     }
 
+    const payload = entry.payload;
     const envelope = asRecord(payload);
     const hasRows = Array.isArray(payload) || ["data", "items", "plans"].some((key) => Array.isArray(envelope[key]));
     if (!hasRows) {
@@ -916,6 +923,81 @@ function hasNextPage(payload: unknown): boolean {
 }
 
 /**
+ * One page of a walk: the payload, or the error that stopped it.
+ *
+ * Errors are values here because the pages after the first are requested
+ * together. One refusal must not cancel pages that are already in flight, and
+ * only the caller knows what a failure on page one (fatal) rather than page
+ * three (a partial read) means for its own catalogue.
+ */
+type CataloguePage =
+  | { page: number; payload: unknown; error: null }
+  | { page: number; payload: null; error: unknown };
+
+function pageNumbers(from: number, to: number): number[] {
+  return Array.from({ length: Math.max(0, to - from + 1) }, (_, index) => from + index);
+}
+
+/**
+ * Every page a bounded walk needs, with the pages after the first in flight
+ * together.
+ *
+ * These walks used to be strictly serial: page n+1 was requested only after page
+ * n answered. A single destination read touches up to five pages of the country
+ * catalogue and five of the service catalogue, and the eSIM walk runs alongside
+ * both — so first paint cost the *sum* of a dozen round trips to a gateway on
+ * another continent, for feeds that do not depend on each other.
+ *
+ * Page one stays alone because it is what states whether there is a second page
+ * (`meta.hasNext`); when it also states how many (`meta.totalPages`) the rest go
+ * out at once. Without a page count, page two is read next and then the
+ * remainder, so a catalogue too short to have five pages is never billed for
+ * them. `maxPages` still bounds the walk, and page one is the caller's to
+ * interpret.
+ */
+async function readCataloguePages(
+  path: string,
+  options: {
+    pageSize: number;
+    maxPages: number;
+    query?: Record<string, string | number | undefined>;
+    /** Rate accounting per page; a walk charges its own token on page one. */
+    catalogCharge?: (page: number) => boolean;
+  },
+): Promise<CataloguePage[]> {
+  const fetchPage = async (page: number): Promise<CataloguePage> => {
+    try {
+      const payload = await gatewayFetch("GET", path, {
+        query: { ...options.query, page, pageSize: options.pageSize },
+        ...(options.catalogCharge ? { catalogCharge: options.catalogCharge(page) } : {}),
+      });
+      return { page, payload, error: null };
+    } catch (error) {
+      return { page, payload: null, error };
+    }
+  };
+
+  const first = await fetchPage(1);
+  const pages: CataloguePage[] = [first];
+  if (first.error !== null || !hasNextPage(first.payload)) return pages;
+
+  const totalPages = pickNumber(asRecord(asRecord(first.payload).meta), ["totalPages", "total_pages"]);
+  if (totalPages !== null && totalPages > 1) {
+    const last = Math.min(Math.floor(totalPages), options.maxPages);
+    pages.push(...await Promise.all(pageNumbers(2, last).map(fetchPage)));
+    return pages;
+  }
+
+  // No page count: one more page says whether the walk even continues, and the
+  // rest still go out together rather than one at a time.
+  const second = await fetchPage(2);
+  pages.push(second);
+  if (second.error !== null || !hasNextPage(second.payload)) return pages;
+  pages.push(...await Promise.all(pageNumbers(3, options.maxPages).map(fetchPage)));
+  return pages;
+}
+
+/**
  * The service catalogue.
  *
  * One collection, paginated: the endpoint accepts `q` and paging only. It
@@ -925,16 +1007,21 @@ function hasNextPage(payload: unknown): boolean {
 export async function listBitcallOtpServices(
   filter: { q?: string; pageSize?: number } = {},
 ): Promise<BitcallOtpService[]> {
+  const pages = await readCataloguePages("/v1/otp/services", {
+    pageSize: filter.pageSize ?? OTP_PAGE_SIZE,
+    maxPages: OTP_PAGE_CAP,
+    query: { q: filter.q },
+  });
   const services: BitcallOtpService[] = [];
-  for (let page = 1; page <= OTP_PAGE_CAP; page += 1) {
-    const payload = await gatewayFetch("GET", "/v1/otp/services", {
-      query: { q: filter.q, page, pageSize: filter.pageSize ?? OTP_PAGE_SIZE },
-    });
-    services.push(...rowsFrom(payload).map(parseOtpService).filter((service) => service.offers.length > 0));
-    if (!hasNextPage(payload)) break;
+  for (const entry of pages) {
+    // A page that failed is not a page that said "no more services": the read
+    // throws rather than returning the pages before it as the whole catalogue.
+    if (entry.error !== null) throw entry.error;
+    services.push(...rowsFrom(entry.payload).map(parseOtpService).filter((service) => service.offers.length > 0));
   }
   return services.slice(0, 2000);
 }
+
 
 /**
  * Offers for one service, addressed either by a `serviceId` the catalog published
@@ -1001,13 +1088,14 @@ function parseOtpCountryEntry(row: unknown): BitcallOtpCountryEntry {
 
 /** Every destination the catalogue publishes, pooled offers included. */
 export async function listBitcallOtpCountryEntries(): Promise<BitcallOtpCountryEntry[]> {
+  const pages = await readCataloguePages("/v1/otp/countries", {
+    pageSize: OTP_PAGE_SIZE,
+    maxPages: OTP_PAGE_CAP,
+  });
   const entries: BitcallOtpCountryEntry[] = [];
-  for (let page = 1; page <= OTP_PAGE_CAP; page += 1) {
-    const payload = await gatewayFetch("GET", "/v1/otp/countries", {
-      query: { page, pageSize: OTP_PAGE_SIZE },
-    });
-    entries.push(...rowsFrom(payload, ["data", "countries", "items"]).map(parseOtpCountryEntry));
-    if (!hasNextPage(payload)) break;
+  for (const entry of pages) {
+    if (entry.error !== null) throw entry.error;
+    entries.push(...rowsFrom(entry.payload, ["data", "countries", "items"]).map(parseOtpCountryEntry));
   }
   return entries;
 }

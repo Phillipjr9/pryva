@@ -776,6 +776,67 @@ describe("OTP catalog", () => {
   });
 });
 
+describe("catalogue paging", () => {
+  it("requests the pages after the first together, so a walk is one wait per round", async () => {
+    const pending: Array<(response: Response) => void> = [];
+    const requested: string[] = [];
+    const fetchMock = vi.fn().mockImplementation((url: URL) => {
+      requested.push(String(url.searchParams.get("page")));
+      return new Promise<Response>((resolve) => pending.push(resolve));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const read = listBitcallEsimPlans();
+    await vi.waitFor(() => expect(pending).toHaveLength(1));
+    pending.shift()!(json({ data: [esimRow("pln_1")], meta: { page: 1, hasNext: true, totalPages: 3 } }));
+
+    // Pages two and three are both in flight before either answers. Waiting for
+    // each page in turn is what made first paint the sum of every round trip.
+    await vi.waitFor(() => expect(pending).toHaveLength(2));
+    pending.shift()!(json({ data: [esimRow("pln_2")], meta: { page: 2, hasNext: true } }));
+    pending.shift()!(json({ data: [esimRow("pln_3")], meta: { page: 3, hasNext: false } }));
+
+    const result = await read;
+    expect(requested).toEqual(["1", "2", "3"]);
+    expect(result.plans.map((plan) => plan.planId)).toEqual(["pln_1", "pln_2", "pln_3"]);
+    expect(result.partial).toBe(false);
+  });
+
+  it("stops at the page count the gateway states instead of requesting the cap", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: URL) => {
+      const page = Number(url.searchParams.get("page"));
+      return json({
+        data: [{
+          name: `Service ${page}`,
+          countryCode: "US_1",
+          pools: [{ serviceId: `POOL-US_1-svc${page}`, price: { amount: 0.1, currency: "EUR" }, availableCount: 1 }],
+        }],
+        meta: { page, hasNext: page < 2, totalPages: 2 },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const services = await listBitcallOtpServices();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(services.map((service) => service.name)).toEqual(["Service 1", "Service 2"]);
+  });
+
+  it("refuses a walk whose later page failed rather than listing what it read", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json({
+        data: [{ name: "One", pools: [{ serviceId: "POOL-US_1-one", price: 0.1, availableCount: 1 }] }],
+        meta: { page: 1, hasNext: true, totalPages: 2 },
+      }))
+      .mockResolvedValueOnce(json({ error: { code: "SERVICE_UNAVAILABLE", message: "try later", requestId: "r1" } }, 503));
+    vi.stubGlobal("fetch", fetchMock);
+
+    // The pages that answered are not the catalogue: a country read that listed
+    // them as one would offer a fraction of the stock and call it the whole.
+    await expect(listBitcallOtpServices()).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
+  });
+});
+
 describe("OTP activations", () => {
   it("buys with the serviceId alone and never retries a call that charges", async () => {
     const fetchMock = vi.fn().mockImplementation(() => json({
