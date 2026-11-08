@@ -48,20 +48,9 @@ import { ProviderError } from "@/lib/providers/types";
 
 const API_HOST = "api.bitcall.io";
 const REQUEST_TIMEOUT_MS = 20_000;
-// The gateway documents rate limits and answers 429 with Retry-After, but does
-// not publish the quota here. A conservative shared budget leaves headroom;
-// a 429 is still handled rather than assumed away.
-const gatewayBudget = createRateLimiter({ windowMs: 60_000, maxRequests: 30 });
-// A paginated storefront must not exhaust the shared budget needed to buy or
-// poll orders. This separate, lower cap is shared across app instances too.
-//
-// It is charged once per *catalogue walk*, not once per page: a walk is one
-// logical read that happens to need up to five gateway calls. Charging every
-// page made a single walk cost five of twelve tokens, so two readers in the same
-// minute refused the walk *itself* — the log said "pagination incomplete at page
-// 5" and the storefront quietly listed the first 800 plans as if that were all
-// of them. Per-page calls are still bounded (five, by ESIM_PLAN_MAX_PAGES) and
-// still charged to the shared gateway budget.
+// The separate eSIM browsing cap remains shared across app instances. It is
+// charged once per catalogue walk rather than once per page. The gateway's own
+// 429 responses are still surfaced; there is no app-wide per-key request budget.
 const esimCatalogBudget = createRateLimiter({ windowMs: 60_000, maxRequests: 12 });
 
 /** The gateway's whole error vocabulary. Thirteen codes; nothing else is returned. */
@@ -325,14 +314,6 @@ async function gatewayFetch(
     if (catalogBudget.unavailable) throw new BitcallError("Gateway rate limit is unavailable", 503, "RATE_LIMIT_UNAVAILABLE");
     if (!catalogBudget.allowed) throw new BitcallError("eSIM catalog rate budget reached", 429, "LOCAL_RATE_BUDGET");
   }
-  const budget = await gatewayBudget("bitcall:shared-key-budget");
-  if (budget.unavailable) throw new BitcallError("Gateway rate limit is unavailable", 503, "RATE_LIMIT_UNAVAILABLE");
-  // Distinct from the gateway's own `RATE_LIMITED`: this refusal happens here,
-  // so the request never left the process and nothing upstream can have executed.
-  // Collapsing the two would make "did my purchase go out?" unanswerable, which
-  // is exactly what isAmbiguousBitcallOutcome has to decide.
-  if (!budget.allowed) throw new BitcallError("Gateway rate limit reached", 429, "LOCAL_RATE_BUDGET");
-
   const url = new URL(base + path);
   for (const [name, value] of Object.entries(options.query ?? {})) {
     if (value !== undefined) url.searchParams.set(name, String(value));
@@ -497,7 +478,7 @@ function coverageList(row: Record<string, unknown>): string[] {
   return [...new Set(parts)].slice(0, 300);
 }
 
-/** Maximum 1,000 rows per read: preserve the shared gateway budget for orders. */
+/** Maximum 1,000 rows per read; additional pages are reported as incomplete. */
 export const ESIM_PLAN_PAGE_SIZE = 200;
 export const ESIM_PLAN_MAX_PAGES = 5;
 

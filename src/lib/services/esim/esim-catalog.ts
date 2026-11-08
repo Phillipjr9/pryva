@@ -123,7 +123,7 @@ let snapshotInFlight: Promise<EsimSnapshot> | null = null;
 let catalogCache: { expires: number; catalog: EsimCatalog } | null = null;
 let catalogInFlight: Promise<EsimCatalog> | null = null;
 
-/** A short-lived, process-local read cache; the shared gateway budget still protects the credential across instances. */
+/** A short-lived, process-local read cache; the eSIM catalogue cap is shared across instances. */
 async function readEsimSnapshot(refresh = false): Promise<EsimSnapshot> {
   if (!isBitcallConfigured()) throw new Error("eSIM provider not configured");
   if (!refresh && snapshotCache && snapshotCache.expires > Date.now()) return snapshotCache.snapshot;
