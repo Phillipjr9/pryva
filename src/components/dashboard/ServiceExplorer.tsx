@@ -106,7 +106,7 @@ function SiteFavicon({ domain, size }: { domain: string; size: number }) {
           with the app; this endpoint returns the site's real favicon. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={`https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(`https://${domain}`)}&sz=128`}
+        src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`}
         alt=""
         width={size}
         height={size}
