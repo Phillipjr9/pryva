@@ -20,7 +20,10 @@ const state = vi.hoisted(() => ({
   throws: false,
 }));
 
-vi.mock("@/lib/admin/diagnostics-auth", () => ({ diagnosticsAuthorized: () => state.authorized }));
+vi.mock("@/lib/admin/diagnostics-auth", () => ({
+  diagnosticsDenial: () => (state.authorized ? null : "secret-mismatch"),
+  diagnosticsDenialContext: () => ({ reason: state.authorized ? null : "secret-mismatch" }),
+}));
 vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => state.preview }));
 vi.mock("@/lib/identity/retention", async (importOriginal) => {

@@ -11,7 +11,10 @@ import { NextRequest } from "next/server";
 
 const state = vi.hoisted(() => ({ authorized: false, build: vi.fn() }));
 
-vi.mock("@/lib/admin/diagnostics-auth", () => ({ diagnosticsAuthorized: () => state.authorized }));
+vi.mock("@/lib/admin/diagnostics-auth", () => ({
+  diagnosticsDenial: () => (state.authorized ? null : "secret-mismatch"),
+  diagnosticsDenialContext: () => ({ reason: state.authorized ? null : "secret-mismatch" }),
+}));
 vi.mock("@/lib/platform/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/admin/stock-live", () => ({ buildStockReport: state.build }));
 

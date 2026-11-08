@@ -23,7 +23,7 @@ import {
 import { isMarketplaceCatalogAvailable } from "@/lib/services/accounts/marketplace-suppliers";
 import { isManualFulfilmentReachable } from "@/lib/services/accounts/manual-fulfilment";
 import { logger } from "@/lib/platform/logger";
-import { diagnosticsAuthorized } from "@/lib/admin/diagnostics-auth";
+import { diagnosticsDenial, diagnosticsDenialContext } from "@/lib/admin/diagnostics-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -73,8 +73,8 @@ function keyTail(name: string): string | null {
  * so an open endpoint would be a way to exhaust the budget.
  */
 export async function GET(request: NextRequest) {
-  if (!diagnosticsAuthorized(request)) {
-    logger.warn("Unauthorized integrations diagnostics attempt");
+  if (diagnosticsDenial(request)) {
+    logger.warn("Unauthorized integrations diagnostics attempt", diagnosticsDenialContext(request));
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -3,7 +3,7 @@ import { count, isNotNull } from "drizzle-orm";
 
 import { db } from "@/db";
 import { accountDeletions, users } from "@/db/schema";
-import { diagnosticsAuthorized } from "@/lib/admin/diagnostics-auth";
+import { diagnosticsDenial, diagnosticsDenialContext } from "@/lib/admin/diagnostics-auth";
 import { isPreviewDatabase } from "@/lib/platform/demo-policy";
 import { logger } from "@/lib/platform/logger";
 import { RETENTION_YEARS, countDueForPurge, purgeEnabled, retentionCutoff } from "@/lib/identity/retention";
@@ -27,8 +27,8 @@ export const dynamic = "force-dynamic";
  * number lives in a server-only module (`src/lib/identity/retention.ts`).
  */
 export async function GET(request: NextRequest) {
-  if (!diagnosticsAuthorized(request)) {
-    logger.warn("Unauthorized retention diagnostics attempt");
+  if (diagnosticsDenial(request)) {
+    logger.warn("Unauthorized retention diagnostics attempt", diagnosticsDenialContext(request));
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
