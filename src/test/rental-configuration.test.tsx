@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { PlanPurchase } from "@/components/purchase/PlanPurchase";
 import { findPlan } from "@/lib/services/catalog";
 import { isRentalOrderingUnconfigured } from "@/lib/services/numbers/number-availability";
@@ -38,6 +38,19 @@ describe("rental provider configuration", () => {
     expect(screen.getByRole("button", { name: /Pay from wallet/ }).hasAttribute("disabled")).toBe(false);
     rerender(<PlanPurchase groups={[{ label: "Rental", plans: [rental] }]} signedIn walletBalance={500000} nextPath="/virtual-numbers" />);
     expect(screen.getByRole("button", { name: /Pay from wallet/ }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("disables further purchases on the page after an uncertain outcome", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 502, json: async () => ({
+      ok: false, safeToRetry: false, error: "Contact support before trying again.",
+    }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const plan = findPlan("vn-us")!;
+    render(<PlanPurchase groups={[{ label: "Single", plans: [plan] }]} signedIn walletBalance={500000} nextPath="/virtual-numbers" />);
+    fireEvent.click(screen.getByRole("button", { name: /Pay from wallet/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Pay from wallet/ }).hasAttribute("disabled")).toBe(true));
+    expect(screen.getByText(/Contact support before trying again/)).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("does not send an unavailable rental to sign-in as if it could be purchased", () => {

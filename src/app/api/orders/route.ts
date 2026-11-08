@@ -340,7 +340,10 @@ export async function POST(request: Request) {
       fulfilled = await fulfillPlan(plan);
     } catch (error) {
       if (error instanceof FleexaError) {
-        console.error("Fleexa fulfilment failed", error.code, error.message);
+        console.error("Fulfilment failed", error.code, error.message);
+        if (error.code === "AMBIGUOUS_PURCHASE") {
+          return Response.json({ ok: false, error: "The purchase outcome is uncertain. Your wallet was not charged. Contact support before trying again.", safeToRetry: false }, { status: 502 });
+        }
         // Every one of these leaves nothing bought and nothing charged, so they
         // read as "unavailable" rather than a provider failure. The margin codes
         // in particular must not leak wholesale economics into the wording a

@@ -41,6 +41,8 @@ vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
 const { cancelUpstream, fulfillPlan } = await import("@/lib/services/fulfillment");
 const { otpSupplierOrder, otpSupplierProbe, clearOtpCatalogueCache, otpOfferPublicId } = await import("@/lib/services/numbers/otp-suppliers");
 const { FleexaError } = await import("@/lib/providers/fleexa");
+const { BitcallError } = await import("@/lib/providers/bitcall");
+const { isAmbiguousOtpPurchase } = await import("@/lib/services/numbers/otp-suppliers");
 
 const RATE = 1500;
 const plan = findPlan("vn-ng")!;
@@ -245,6 +247,41 @@ describe("Bitcall-only fulfilment", () => {
     await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
     expect(fleexa.buy).not.toHaveBeenCalled();
     expect(bitcall.buy).not.toHaveBeenCalled();
+  });
+
+  it.each(["RATE_LIMITED", "INVALID_API_KEY", "INSUFFICIENT_BALANCE", "PRODUCT_UNAVAILABLE", "NOT_FOUND"])(
+    "stops after one %s refusal even when many other offers exist", async (code) => {
+      bitcall.list.mockResolvedValue([{ countryCode: "NG_1", name: "WhatsApp", offers: Array.from({ length: 100 }, (_, i) => ({
+        serviceId: `pool-${i}`, price: 0.01, currency: "USD", availableCount: 1,
+      })) }]);
+      bitcall.buy.mockRejectedValue(new BitcallError("Gateway request failed", 429, code, "request-123", [], 17));
+      const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const error = await fulfillPlan(plan).catch((caught: unknown) => caught);
+      expect(error).toMatchObject({ code: "OTP_PROVIDER_REFUSED" });
+      expect(isAmbiguousOtpPurchase(error)).toBe(false);
+      expect(bitcall.buy).toHaveBeenCalledTimes(1);
+      expect(log).toHaveBeenCalledWith("Number purchase refused; not trying other offers", expect.objectContaining({ code, status: 429, requestId: "request-123", retryAfterSeconds: 17 }));
+    },
+  );
+
+  it("holds an accepted activation for review if recording it fails", async () => {
+    bitcall.list.mockResolvedValue(bitcallQuote());
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(fulfillPlan(plan, {
+      otpOfferId: otpOfferPublicId("ng", "pool-1", "WhatsApp"),
+      onOtpAttempt: async () => undefined,
+      onOtpAccepted: async () => { throw new FleexaError("test", 503, "RATE_LIMITED"); },
+    })).rejects.toMatchObject({ code: "AMBIGUOUS_PURCHASE" });
+    expect(bitcall.buy).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith("Number purchase outcome unknown; not retrying", expect.any(Object));
+  });
+
+  it.each(["activationId", "phoneNumber"])("does not treat an accepted activation missing %s as delivered", async (missing) => {
+    bitcall.list.mockResolvedValue(bitcallQuote());
+    bitcall.buy.mockResolvedValue({ ...activation, [missing]: null });
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "AMBIGUOUS_PURCHASE" });
+    expect(bitcall.buy).toHaveBeenCalledTimes(1);
   });
 
   it("never repeats or fails over after an ambiguous Bitcall purchase", async () => {

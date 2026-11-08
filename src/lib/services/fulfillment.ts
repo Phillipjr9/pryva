@@ -1,4 +1,4 @@
-import { cancelBitcallOtpActivation, isBitcallConfigured } from "@/lib/providers/bitcall";
+import { BitcallError, cancelBitcallOtpActivation, isBitcallConfigured } from "@/lib/providers/bitcall";
 import { plans, type Plan } from "@/lib/services/catalog";
 import {
   buyFleexaRental,
@@ -263,14 +263,14 @@ async function fulfillNumber(plan: Plan, intent: SmsIntent, options: FulfillPlan
       continue;
     }
 
+    let providerAccepted = false;
     try {
       if (options.otpOfferId) await options.onOtpAttempt?.();
       const bought = await buyOtpNumber(offer);
-      if (options.otpOfferId) {
-        if (!bought.providerRequestId) throw new Error("Provider accepted an activation without a durable reference");
-        await options.onOtpAccepted?.(bought.providerRequestId);
-        if (!bought.number) throw new Error("Provider accepted an activation without a usable phone number");
-      }
+      providerAccepted = true;
+      if (!bought.providerRequestId) throw new Error("Provider accepted an activation without a durable reference");
+      if (options.otpOfferId) await options.onOtpAccepted?.(bought.providerRequestId);
+      if (!bought.number) throw new Error("Provider accepted an activation without a usable phone number");
       if (
         typeof bought.providerCostNgn === "number" &&
         bought.providerCostNgn > (offer.costNgn ?? 0)
@@ -296,23 +296,22 @@ async function fulfillNumber(plan: Plan, intent: SmsIntent, options: FulfillPlan
         serviceLabel: bought.app,
       };
     } catch (error) {
-      if (isAmbiguousOtpPurchase(error)) {
-        // The number may exist. Retrying, or failing over, would buy a second one.
-        console.error("Number purchase outcome unknown; not retrying", {
-          slug: plan.slug,
-          provider: offer.supplier,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        throw error instanceof FleexaError
-          ? error
-          : new FleexaError("The provider did not confirm that purchase", 502, "AMBIGUOUS_PURCHASE");
+      // Never cascade a failed paid request through every catalogue offer. Even a
+      // definitive refusal can be account-wide (credentials, rate limit, funding),
+      // and a different offer is a different app, not necessarily a substitute.
+      // Keep only bounded, non-secret diagnostic fields; never log provider prose.
+      const details = error instanceof BitcallError ? {
+        code: /^[A-Z0-9_]{1,64}$/.test(error.code) ? error.code : "UNKNOWN",
+        status: error.status,
+        requestId: error.requestId && /^[A-Za-z0-9_.:-]{1,128}$/.test(error.requestId) ? error.requestId : null,
+        retryAfterSeconds: error.retryAfterSeconds,
+      } : { code: "UNKNOWN", status: null, requestId: null, retryAfterSeconds: null };
+      if (providerAccepted || isAmbiguousOtpPurchase(error)) {
+        console.error("Number purchase outcome unknown; not retrying", { slug: plan.slug, provider: offer.supplier, ...details });
+        throw new FleexaError("The provider did not confirm that purchase", 502, "AMBIGUOUS_PURCHASE");
       }
-      console.error("Supplier could not sell that number; trying the next", {
-        slug: plan.slug,
-        provider: offer.supplier,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      lastError = error;
+      console.error("Number purchase refused; not trying other offers", { slug: plan.slug, provider: offer.supplier, ...details });
+      throw new FleexaError("The provider declined that purchase", 503, "OTP_PROVIDER_REFUSED");
     }
   }
 

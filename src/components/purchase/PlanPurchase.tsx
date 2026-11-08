@@ -45,6 +45,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOff
     () => (groups[0]?.plans.find((plan) => plan.popular) ?? groups[0]?.plans[0])?.slug ?? "",
   );
   const [pending, setPending] = useState(false);
+  const [reviewRequired, setReviewRequired] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsFunds, setNeedsFunds] = useState(false);
   const [success, setSuccess] = useState<{ id: string; reference: string; name: string; review: boolean; reviewMessage: string } | null>(
@@ -75,12 +76,12 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOff
     const nextPlans = groups[index]?.plans ?? [];
     const preferred = nextPlans.find((plan) => plan.popular) ?? nextPlans[0];
     if (preferred) setSelectedSlug(preferred.slug);
-    setError(null);
+    if (!reviewRequired) setError(null);
     setNeedsFunds(false);
   }
 
   async function buy() {
-    if (!selected || unavailable) return;
+    if (!selected || unavailable || reviewRequired) return;
     setPending(true);
     setError(null);
     setNeedsFunds(false);
@@ -104,6 +105,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOff
       }
       if (!response.ok || !data.ok || !data.order) {
         if (data.safeToRetry) attempt.current = null;
+        if (data.safeToRetry === false) setReviewRequired(true);
         setError(data.error ?? "We couldn't complete that order. Please try again.");
         if (response.status === 402) setNeedsFunds(true);
         return;
@@ -199,7 +201,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOff
                   type="button"
                   onClick={() => {
                     setSelectedSlug(plan.slug);
-                    setError(null);
+                    if (!reviewRequired) setError(null);
                     setNeedsFunds(false);
                   }}
                   aria-pressed={isSelected}
@@ -304,7 +306,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOff
                 <button
                   type="button"
                   onClick={buy}
-                  disabled={pending || !selected}
+                  disabled={pending || !selected || reviewRequired}
                   className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
                   {pending ? "Processing…" : "Pay from wallet"}
