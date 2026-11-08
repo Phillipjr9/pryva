@@ -17,6 +17,7 @@ import { pollsForCode } from "@/lib/services/order-providers";
 import { canResendNumberCode } from "@/lib/services/numbers/otp-resend";
 import { syncBoostOrderStatus, type BoostSyncResult } from "@/lib/services/boosts/boost-status";
 import { esimQrDataUrl } from "@/lib/services/esim/esim-qr";
+import { getOrderProgressMessage } from "@/lib/services/order-progress-copy";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -248,8 +249,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                 </CardHeader>
                 <CardContent>
                   <p className="text-[0.88rem] text-ink-2">
-                    Delivery has not been confirmed. Please don&apos;t place this order again; contact support
-                    with your reference if you need help. Refunds require verification.
+                    {getOrderProgressMessage(status)}
                   </p>
                   {progress && <p className="mt-2 text-[0.88rem] font-medium text-ink">{progress}</p>}
                 </CardContent>
