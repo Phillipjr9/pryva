@@ -28,6 +28,7 @@ import {
   listBitcallOtpCountryEntries,
   listBitcallOtpPools,
   listBitcallOtpServices,
+  otpCountrySegmentFromId,
   otpServiceLabelFromId,
   reactivateBitcallOtpActivation,
 } from "@/lib/providers/bitcall";
@@ -668,6 +669,9 @@ describe("OTP catalog", () => {
     expect(otpServiceLabelFromId("DELTA-CO-instagram_/_threads")).toBe("instagram / threads");
     expect(otpServiceLabelFromId("ALPHA-46-adidas")).toBe("adidas");
     expect(otpServiceLabelFromId("no-separators")).toBeNull();
+    expect(otpCountrySegmentFromId("DELTA-CO-instagram_/_threads")).toBe("CO");
+    expect(otpCountrySegmentFromId("ALPHA-46-adidas")).toBe("46");
+    expect(otpCountrySegmentFromId("no-separators")).toBeNull();
   });
 
   it("drops a service whose offers carry no serviceId, since it could not be bought", async () => {

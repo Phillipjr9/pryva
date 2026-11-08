@@ -8,6 +8,7 @@ import {
   isBitcallConfigured,
   listBitcallOtpCountryEntries,
   listBitcallOtpServices,
+  otpCountrySegmentFromId,
   otpServiceLabelFromId,
 } from "@/lib/providers/bitcall";
 import { VERIFICATION_EXAMPLES } from "@/lib/services/service-explorer";
@@ -278,20 +279,29 @@ async function bitcallOffers(country: string, regionName: string): Promise<OtpOf
   if (offers.length > 0) return offers;
 
   // A country entry can arrive without its inline pools: the field is documented
-  // but optional. Fall back to the service catalogue, attributing only rows that
-  // name this country themselves rather than assuming a filter was honoured.
+  // but optional. Two fallbacks follow, both of which attribute only against a
+  // code the catalogue itself published — never a guess.
+  const ownCodes = new Set(
+    mine.map((entry) => entry.countryCode?.toUpperCase()).filter((code): code is string => Boolean(code)),
+  );
   const services = await listBitcallOtpServices({});
   for (const service of services) {
-    if (!matchesCountry(service.countryCode, country, regionName)) continue;
-    const app = readableApp(service.name);
     for (const entry of service.offers) {
-      if (!entry.serviceId || seen.has(entry.serviceId)) continue;
+      if (!entry.serviceId) continue;
+      // (1) The destination segment of the offer's own published id, matched to
+      // the country codes this catalogue published for our destination.
+      const segment = otpCountrySegmentFromId(entry.serviceId);
+      const byId = segment !== null && ownCodes.has(segment.toUpperCase());
+      // (2) A service row that states its own country.
+      const byRow = !byId && matchesCountry(service.countryCode, country, regionName);
+      if (!byId && !byRow) continue;
+      if (seen.has(entry.serviceId)) continue;
       seen.add(entry.serviceId);
       offers.push({
         supplier: "bitcall",
         ref: entry.serviceId,
         country,
-        app,
+        app: byRow ? readableApp(service.name) : readableApp(service.name) ?? readableApp(serviceLabel(entry.serviceId)),
         costNgn: await supplierAmountToNgn(entry.price, entry.currency),
         stock: entry.availableCount,
       });
