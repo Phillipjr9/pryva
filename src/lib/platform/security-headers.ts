@@ -20,6 +20,7 @@
  *
  * - `style-src 'unsafe-inline'` — Tailwind and React both emit inline styles.
  * - `img-src https://images.pexels.com` — the marketing photographs.
+ * - `img-src https://cdn.jsdelivr.net` — version-pinned Simple Icons brand marks.
  * - `img-src https://www.google.com https://*.gstatic.com` — Google's favicon
  *   endpoint serves the published favicons for destination-site entries in the
  *   Email OTP catalogue and may redirect the image to its static CDN; no remote
@@ -70,7 +71,7 @@ export function contentSecurityPolicy(options: ContentSecurityPolicyOptions = {}
     ["script-src", ["'self'", "'unsafe-inline'", ...challenge, ...(development ? ["'unsafe-eval'"] : [])]],
     ["style-src", ["'self'", "'unsafe-inline'"]],
     ["font-src", ["'self'", "data:"]],
-    ["img-src", ["'self'", "data:", "blob:", "https://images.pexels.com", "https://www.google.com", "https://*.gstatic.com"]],
+    ["img-src", ["'self'", "data:", "blob:", "https://images.pexels.com", "https://www.google.com", "https://*.gstatic.com", "https://cdn.jsdelivr.net"]],
     ["connect-src", ["'self'", ...challenge, ...(development ? ["ws:", "wss:"] : [])]],
     ["media-src", ["'self'"]],
     ["worker-src", ["'self'", "blob:"]],
