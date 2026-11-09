@@ -4,12 +4,13 @@ import type { SQL } from "drizzle-orm";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { POST } from "@/app/api/orders/[id]/refund/route";
 
-const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), select: vi.fn(), transaction: vi.fn(), cancelUpstream: vi.fn(), flagReconciliation: vi.fn(), refundRateLimit: vi.fn() }));
+const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), select: vi.fn(), transaction: vi.fn(), cancelUpstream: vi.fn(), flagReconciliation: vi.fn(), confirm: vi.fn(), refundRateLimit: vi.fn() }));
 vi.mock("@/db", () => ({ db: { select: mocks.select, transaction: mocks.transaction } }));
 vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: mocks.currentUser }));
 // Must be mocked: the route releases the number upstream after committing the
 // refund, and an unmocked call would reach the real provider.
 vi.mock("@/lib/services/fulfillment", () => ({ cancelUpstream: mocks.cancelUpstream }));
+vi.mock("@/lib/services/numbers/refund-confirmation", () => ({ confirmNumberRefund: mocks.confirm }));
 vi.mock("@/lib/services/reconciliation", () => ({ flagReconciliation: mocks.flagReconciliation }));
 // The throttle is DB-backed, and the fake database below exposes only select and
 // transaction -- without this the limiter correctly reports itself unavailable
@@ -42,6 +43,7 @@ function fakeDatabase() {
     from: () => ({ where: () => ({ limit: async () => [{ ...state.order }] }) }),
   }));
   const tx = {
+    select: () => ({ from: () => ({ where: () => ({ limit: async () => [{ id: "debit" }] }) }) }),
     update(table: unknown) {
       return {
         set(values: Record<string, unknown>) {
@@ -51,7 +53,7 @@ function fakeDatabase() {
                 async returning() {
                   const params = dialect.sqlToQuery(condition).params;
                   if (table === orders) {
-                    if (params[0] !== state.order.id || params[1] !== state.order.userId || params[2] !== state.order.status || state.order.refundedAt) return [];
+                    if (params[0] !== state.order.id || params[1] !== state.order.userId || !params.includes(state.order.status) || state.order.refundedAt) return [];
                     Object.assign(state.order, values);
                     return [{ ...state.order }];
                   }
@@ -94,6 +96,7 @@ function fakeDatabase() {
 beforeEach(() => {
   vi.stubEnv("DATABASE_URL", "");
   mocks.currentUser.mockReset().mockResolvedValue({ id: "user-id" });
+  mocks.confirm.mockReset().mockResolvedValue("refundable");
   mocks.select.mockReset();
   mocks.transaction.mockReset();
 });
@@ -122,6 +125,23 @@ describe("order refund safety", () => {
     expect(state.order.status).toBe("refunded");
     expect(state.balance).toBe(1700);
     expect(state.ledger).toHaveLength(1);
+  });
+
+  it("does not refund if the provider outcome is pending or cannot be confirmed", async () => {
+    const state = fakeDatabase();
+    mocks.confirm.mockResolvedValue("unconfirmed");
+    expect((await POST(request(), context)).status).toBe(409);
+    expect(state.balance).toBe(500);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.cancelUpstream).not.toHaveBeenCalled();
+  });
+
+  it("does not refund when the final provider check found a code", async () => {
+    const state = fakeDatabase();
+    mocks.confirm.mockResolvedValue("delivered");
+    expect((await POST(request(), context)).status).toBe(409);
+    expect(state.balance).toBe(500);
+    expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
   it("does not refund delivered codes, rentals, or an unexpired number", async () => {

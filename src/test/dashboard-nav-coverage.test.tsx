@@ -170,9 +170,9 @@ describe("sidebar and tab icons", () => {
 describe("category icons", () => {
   it("gives each shelf its own glyph and an accessible name", () => {
     const expected: Array<[ServiceType, string]> = [
-      ["app-verification", "App Verification"],
-      ["social-promotion", "Social Promotion"],
-      ["subscriptions", "Subscriptions"],
+      ["app-verification", "Google"],
+      ["social-promotion", "Instagram"],
+      ["subscriptions", "Spotify"],
     ];
     const shapes = new Set<string>();
     for (const [service, name] of expected) {

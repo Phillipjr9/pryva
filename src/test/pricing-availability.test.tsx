@@ -19,7 +19,7 @@ import { isPlanFulfillable } from "@/lib/services/fulfillment";
  * details, and only the promise to sell is withdrawn -- in the plan page's own
  * existing words.
  */
-const NOTE = "This plan cannot be delivered yet, so it cannot be ordered or charged.";
+const NOTE = "Ordering is unavailable for this plan here; no charge can be made.";
 /**
  * With a live catalogue, eSIM sample cards replace the note with a pointer to
  * `/esim`. They are still not sellable -- the link is a signpost, not a sale --
@@ -33,8 +33,14 @@ const PRICED_SERVICES = ["numbers", "esim", "proxies"];
 
 const priced = plans.filter((plan) => PRICED_SERVICES.includes(plan.service));
 
-// The suite runs with no supplier key, which is how a fresh checkout behaves.
+// Exercise configured paths without contacting providers.
+vi.stubEnv("DATABASE_URL", "postgres://mock.invalid/db");
+vi.stubEnv("VERCEL_ENV", "production");
+vi.stubEnv("BITCALL_KEY_ID", "ak_live_test_only");
+vi.stubEnv("BITCALL_API_SECRET", "test-only");
+vi.stubEnv("FLEEXA_API_KEY", "test-only");
 const markup = renderToStaticMarkup(<PricingPage />);
+vi.unstubAllEnvs();
 const deliverable = priced.filter((plan) => isPlanFulfillable(plan.slug));
 const undeliverable = priced.filter((plan) => !isPlanFulfillable(plan.slug));
 
@@ -57,6 +63,17 @@ describe("/pricing only offers to sell what can be delivered", () => {
     expect(priced.length).toBe(17);
     expect(deliverable.length).toBe(10);
     expect(undeliverable.length).toBe(7);
+  });
+
+  it("does not offer checkout when supplier ordering is unconfigured", () => {
+    vi.stubEnv("DATABASE_URL", "postgres://mock.invalid/db");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("BITCALL_KEY_ID", "");
+    vi.stubEnv("BITCALL_API_SECRET", "");
+    vi.stubEnv("FLEEXA_API_KEY", "");
+    const html = renderToStaticMarkup(<PricingPage />);
+    for (const plan of priced) expect(html).not.toContain(`/signup?plan=${plan.slug}`);
+    expect(html).toContain(NOTE);
   });
 
   it("links a signup funnel only for plans that can be delivered", () => {

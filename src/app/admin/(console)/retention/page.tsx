@@ -64,11 +64,11 @@ export default async function AdminRetentionPage() {
         <h2 className="text-lg font-semibold text-ink">Current retention window</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div className="rounded-xl border border-line bg-cream/50 p-4">
-            <p className="text-[0.72rem] uppercase tracking-[0.12em] text-ink-3">Cutoff date</p>
+            <p className="text-[0.8125rem] uppercase tracking-[0.12em] text-ink-3">Cutoff date</p>
             <p className="mt-2 text-lg font-semibold text-ink">{formatDate(cutoff)}</p>
           </div>
           <div className="rounded-xl border border-line bg-cream/50 p-4">
-            <p className="text-[0.72rem] uppercase tracking-[0.12em] text-ink-3">Status</p>
+            <p className="text-[0.8125rem] uppercase tracking-[0.12em] text-ink-3">Status</p>
             <p className={`mt-2 text-lg font-semibold ${due > 0 ? "text-red-700" : "text-emerald-700"}`}>
               {due > 0 ? `${due} closure(s) need review` : "No closure is currently due"}
             </p>

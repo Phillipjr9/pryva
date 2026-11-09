@@ -79,10 +79,10 @@ describe("ScheduledManager", () => {
     expect(screen.getByText(/your balance is below one run/)).toBeTruthy();
   });
 
-  it("states that a night where delivery fails costs nothing", () => {
+  it("explains when purchases are charged and how uncertainty is handled", () => {
     vi.stubGlobal("fetch", fetchMock());
     render(<ScheduledManager rows={[]} creatable={[PLAN]} balance={5_000} />);
-    expect(screen.getByText(/Nothing is charged unless the plan is delivered/)).toBeTruthy();
+    expect(screen.getByText(/charged after the purchase is accepted/)).toBeTruthy();
   });
 
   it("offers only cadences the nightly runner can honour", () => {

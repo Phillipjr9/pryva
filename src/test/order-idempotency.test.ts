@@ -47,7 +47,7 @@ const MIGRATIONS = [
   "0007_order_reconciliation_note.sql",
   "0008_order_provider_cost.sql",
   "0009_password_reset_tokens.sql",
-  "0010_order_provider_no_default.sql", "0011_email_verification.sql", "0012_topup_payer_name.sql", "0013_disposable_inboxes.sql", "0014_admin_audit_log.sql", "0015_two_factor.sql", "0016_product_reviews.sql", "0017_login_lockout.sql", "0018_reconciliation_runs.sql", "0019_support_tickets.sql", "0020_webauthn.sql", "0021_referrals.sql", "0022_fraud.sql", "0023_boost_orders.sql", "0024_account_deletions.sql", "0025_account_deletion_forfeiture.sql", "0026_webhook_events.sql", "0027_esim_credentials.sql", "0028_esim_delivery_email.sql", "0029_notification_gaps.sql", "0030_payout_name_approvals.sql", "0031_email_delivery_events.sql", "0032_welcome_verified_emails.sql", "0033_account_activity_emails.sql", "0034_customer_activity_emails.sql", "0035_code_received_at.sql",
+  "0010_order_provider_no_default.sql", "0011_email_verification.sql", "0012_topup_payer_name.sql", "0013_disposable_inboxes.sql", "0014_admin_audit_log.sql", "0015_two_factor.sql", "0016_product_reviews.sql", "0017_login_lockout.sql", "0018_reconciliation_runs.sql", "0019_support_tickets.sql", "0020_webauthn.sql", "0021_referrals.sql", "0022_fraud.sql", "0023_boost_orders.sql", "0024_account_deletions.sql", "0025_account_deletion_forfeiture.sql", "0026_webhook_events.sql", "0027_esim_credentials.sql", "0028_esim_delivery_email.sql", "0029_notification_gaps.sql", "0030_payout_name_approvals.sql", "0031_email_delivery_events.sql", "0032_welcome_verified_emails.sql", "0033_account_activity_emails.sql", "0034_customer_activity_emails.sql", "0035_admin_bans.sql", "0035_code_received_at.sql", "0036_account_suspension.sql", "0037_gift_card_request_id.sql", "0038_referral_credit_provenance.sql", "0039_refund_check_fairness.sql", "0040_bulk_batch_claims.sql",
 ];
 
 beforeAll(async () => {
@@ -105,7 +105,7 @@ beforeEach(async () => {
   mocks.cancelUpstream.mockResolvedValue(false);
   await database.delete(schema.walletTransactions);
   await database.delete(schema.orders);
-  await database.update(schema.users).set({ walletBalance: 500_000 }).where(eq(schema.users.id, USER));
+  await database.update(schema.users).set({ walletBalance: 500_000, suspendedAt: null }).where(eq(schema.users.id, USER));
 });
 
 describe("purchase isolation", () => {
@@ -185,6 +185,46 @@ describe("recorded unit cost", () => {
     // Zero would read as "this unit was free" and report a 100% margin on a
     // sale whose real cost was simply never observed. Null keeps the two apart.
     expect(row.providerCostNgn).toBeNull();
+  });
+});
+
+describe("rental purchase claims", () => {
+  it("claims before a rental call and replays the same key while the call is in flight", async () => {
+    const requestId = crypto.randomUUID();
+    let finish!: (value: unknown) => void;
+    mocks.fulfillPlan.mockImplementationOnce(async (_plan: unknown, options: { onRentalAttempt: () => Promise<void> }) => {
+      await options.onRentalAttempt();
+      return new Promise((resolve) => { finish = resolve; });
+    });
+    const first = POST(purchase({ planSlug: "rent-ng-30", requestId }));
+    await vi.waitFor(() => expect(mocks.fulfillPlan).toHaveBeenCalledTimes(1));
+    expect((await ordersFor(requestId))[0]).toMatchObject({ status: "review", provider: "fleexa" });
+    const replay = await POST(purchase({ planSlug: "rent-ng-30", requestId }));
+    expect(replay.status).toBe(200);
+    expect((await replay.json()).pending).toBe(true);
+    finish({ provider: "fleexa", providerCostNgn: 900, providerRequestId: "rental-1", referenceCode: "+2348000000000", otpCode: null, expiresAt: new Date() });
+    expect((await first).status).toBe(200);
+    expect(mocks.fulfillPlan).toHaveBeenCalledTimes(1);
+    expect(await ledgerCount()).toBe(1);
+  });
+  it("holds an uncertain rental for review, without a second purchase or charge", async () => {
+    const requestId = crypto.randomUUID();
+    mocks.fulfillPlan.mockImplementationOnce(async (_plan: unknown, options: { onRentalAttempt: () => Promise<void> }) => {
+      await options.onRentalAttempt();
+      throw new Error("response lost");
+    });
+    expect((await POST(purchase({ planSlug: "rent-ng-30", requestId }))).status).toBe(202);
+    expect((await ordersFor(requestId))[0].status).toBe("review");
+    expect((await POST(purchase({ planSlug: "rent-ng-30", requestId }))).status).toBe(200);
+    expect(mocks.fulfillPlan).toHaveBeenCalledTimes(1);
+    expect(await ledgerCount()).toBe(0);
+  });
+  it("rejects a reused key with a different plan or app offer", async () => {
+    const requestId = crypto.randomUUID();
+    expect((await POST(purchase({ planSlug: SLUG, requestId }))).status).toBe(200);
+    expect((await POST(purchase({ planSlug: "rent-ng-30", requestId }))).status).toBe(409);
+    expect((await POST(purchase({ planSlug: SLUG, requestId, otpOfferId: `otp-${"a".repeat(24)}` }))).status).toBe(409);
+    expect(mocks.fulfillPlan).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -292,8 +332,9 @@ describe("purchase idempotency", () => {
     expect(response.status).toBe(402);
     expect(await ordersFor(requestId)).toHaveLength(0);
     expect(await ledgerCount()).toBe(0);
-    // The number was already bought upstream, so it must be released.
-    expect(mocks.cancelUpstream).toHaveBeenCalledTimes(1);
+    // The fresh balance is checked before calling a supplier.
+    expect(mocks.fulfillPlan).not.toHaveBeenCalled();
+    expect(mocks.cancelUpstream).not.toHaveBeenCalled();
   });
 
   it("rejects a second order reusing another attempt's key at the database level", async () => {
@@ -312,21 +353,67 @@ describe("purchase idempotency", () => {
     })).rejects.toThrow();
   });
 
-  it("warns against retrying an ambiguous generic purchase", async () => {
-    const { FleexaError } = await import("@/lib/providers/fleexa");
-    mocks.fulfillPlan.mockRejectedValue(new FleexaError("Unknown", 502, "AMBIGUOUS_PURCHASE"));
-    const response = await POST(purchase({ planSlug: SLUG, requestId: crypto.randomUUID() }));
-    expect(response.status).toBe(502);
-    expect(await response.json()).toMatchObject({ safeToRetry: false, error: expect.stringMatching(/contact support before trying again/i) });
+  it("claims generic purchases before spending and holds an ambiguous outcome for review", async () => {
+    const requestId = crypto.randomUUID();
+    mocks.fulfillPlan.mockImplementationOnce(async (_plan: unknown, options: { onOtpAttempt: () => Promise<void> }) => {
+      const [claim] = await ordersFor(requestId);
+      expect(claim.status).toBe("review");
+      await options.onOtpAttempt();
+      throw new Error("provider response lost");
+    });
+    const first = await POST(purchase({ planSlug: SLUG, requestId }));
+    expect(first.status).toBe(202);
+    expect(await first.json()).toMatchObject({ ok: true, pending: true, order: { status: "review" }, message: expect.stringMatching(/do not submit/i) });
+    expect((await POST(purchase({ planSlug: SLUG, requestId }))).status).toBe(200);
+    expect(mocks.fulfillPlan).toHaveBeenCalledOnce();
     expect(await ledgerCount()).toBe(0);
   });
 
-  it("releases the number and records nothing when fulfilment itself fails", async () => {
-    mocks.fulfillPlan.mockRejectedValue(new Error("provider exploded"));
+  it("blocks a provider attempt if suspension won after request authentication", async () => {
+    const requestId = crypto.randomUUID();
+    const providerBuy = vi.fn();
+    mocks.fulfillPlan.mockImplementationOnce(async (_plan: unknown, options: { onOtpAttempt: () => Promise<void> }) => {
+      await database.update(schema.users).set({ suspendedAt: new Date() }).where(eq(schema.users.id, USER));
+      await options.onOtpAttempt();
+      providerBuy();
+    });
+    const response = await POST(purchase({ planSlug: SLUG, requestId }));
+    expect(response.status).toBe(503);
+    expect(providerBuy).not.toHaveBeenCalled();
+    expect((await ordersFor(requestId))[0].status).toBe("cancelled");
+    expect(await ledgerCount()).toBe(0);
+  });
+
+  it("replays the claim while a generic paid call is in flight", async () => {
+    const requestId = crypto.randomUUID();
+    let started!: () => void;
+    const entered = new Promise<void>((resolve) => { started = resolve; });
+    let release!: () => void;
+    const waiting = new Promise<void>((resolve) => { release = resolve; });
+    mocks.fulfillPlan.mockImplementationOnce(async (_plan: unknown, options: { onOtpAttempt: () => Promise<void> }) => {
+      await options.onOtpAttempt();
+      started();
+      await waiting;
+      throw new Error("lost response");
+    });
+    const first = POST(purchase({ planSlug: SLUG, requestId }));
+    await entered;
+    const replay = await POST(purchase({ planSlug: SLUG, requestId }));
+    expect((await replay.json())).toMatchObject({ pending: true, order: { status: "review" } });
+    release();
+    expect((await first).status).toBe(202);
+    expect(mocks.fulfillPlan).toHaveBeenCalledOnce();
+    expect(await ledgerCount()).toBe(0);
+  });
+
+  it("cancels a claim if fulfilment fails before any provider call", async () => {
+    mocks.fulfillPlan.mockRejectedValue(new Error("preflight failed"));
     const requestId = crypto.randomUUID();
     const response = await POST(purchase({ planSlug: SLUG, requestId }));
-    expect(response.status).toBe(500);
-    expect(await ordersFor(requestId)).toHaveLength(0);
+    expect(response.status).toBe(503);
+    expect((await ordersFor(requestId))[0].status).toBe("cancelled");
     expect(await walletBalance()).toBe(500_000);
+    expect(mocks.cancelUpstream).not.toHaveBeenCalled();
   });
+
 });

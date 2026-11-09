@@ -101,7 +101,7 @@ export default async function OrdersPage({
             Every number, eSIM, proxy pack and inbox you&apos;ve bought — with codes kept safe.
           </p>
         </div>
-        <Link href="/pricing" className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.78rem]">
+        <Link href="/pricing" className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.8125rem]">
           <Sparkle className="h-3.5 w-3.5" /> New order
         </Link>
       </div>

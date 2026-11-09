@@ -28,7 +28,7 @@ export const blogPosts: BlogPost[] = [
     sections: [
       { heading: "Before you travel", paragraphs: ["Confirm that your device supports eSIM, is not carrier-locked, and can use a data plan in the countries on your itinerary. Check the plan's data allowance, validity period, coverage and any roaming restrictions."] },
       { heading: "Protect activation details", paragraphs: ["Installation instructions and QR codes can be sensitive. Store them securely, follow the device manufacturer's instructions, and avoid posting them publicly. You may need an internet connection to install a profile."] },
-      { heading: "Availability", paragraphs: ["eSIM plans provide instant digital connectivity across supported destinations with automated provisioning."] },
+      { heading: "Availability", paragraphs: ["Check current plans, device compatibility and coverage in your dashboard. Provisioning and activation depend on the provider."] },
     ],
   },
   {
@@ -39,7 +39,7 @@ export const blogPosts: BlogPost[] = [
     sections: [
       { heading: "What a proxy does", paragraphs: ["A proxy forwards network requests through another endpoint. Residential proxies use addresses associated with residential networks; location and performance can vary, and a proxy does not guarantee anonymity or access to a particular site."] },
       { heading: "Evaluate a plan", paragraphs: ["Review the location, bandwidth, expiry, authentication method and intended use before choosing a plan. Protect proxy credentials as you would a password, and use any service only with authorization and in accordance with applicable terms."] },
-      { heading: "Availability", paragraphs: ["Residential proxies offer high-speed, reliable routing with instant credential generation upon checkout."] },
+      { heading: "Availability", paragraphs: ["Proxy purchases are not available yet. Check the status page for current availability."] },
     ],
   },
   {
@@ -92,7 +92,7 @@ export const blogPosts: BlogPost[] = [
     excerpt: "What happens when you withdraw from your Pryva wallet, and what to check before you do.",
     category: "Guides",
     sections: [
-      { heading: "Before you withdraw", paragraphs: ["Add and verify your bank account details in Settings before requesting a withdrawal. The name on the bank account must match the name on your Pryva account — mismatches are flagged for review and can delay the transfer."] },
+      { heading: "Before you withdraw", paragraphs: ["Add and verify your bank account details in Settings before requesting a withdrawal. The destination must pass the payout name check or be approved after review. If it does not match, contact support before trying again."] },
       { heading: "What \"sent to bank\" means", paragraphs: ["A withdrawal marked \"Processing\" means the transfer has been submitted to the payment provider. \"Paid out\" means the bank confirmed receipt. Processing times vary by bank and can take up to one business day."] },
       { heading: "If a withdrawal is delayed", paragraphs: ["Check the status in your wallet history. If it has been more than one business day and the status has not updated, contact support with the withdrawal reference. Do not submit the same withdrawal again — a duplicate request will not speed up the original."] },
     ],

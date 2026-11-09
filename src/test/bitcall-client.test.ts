@@ -826,6 +826,33 @@ describe("catalogue paging", () => {
     expect(services.map((service) => service.name)).toEqual(["Service 1", "Service 2"]);
   });
 
+  it("walks beyond five OTP pages without silently shortening the catalogue", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: URL) => {
+      const page = Number(url.searchParams.get("page"));
+      return json({ data: [{ name: `Service ${page}`, pools: [{ serviceId: `POOL-US_1-${page}`, price: 0.1 }] }],
+        meta: { page, hasNext: page < 8, totalPages: 8 } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const services = await listBitcallOtpServices();
+    expect(services.map((service) => service.name)).toEqual(Array.from({ length: 8 }, (_, i) => `Service ${i + 1}`));
+    expect(fetchMock).toHaveBeenCalledTimes(8);
+  });
+
+  it("rejects repeated pages instead of caching a shortened catalogue", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: URL) => json({
+      data: [{ name: "Same", pools: [{ serviceId: "POOL-US_1-same" }] }],
+      meta: { page: Number(url.searchParams.get("page")), hasNext: true },
+    })));
+    await expect(listBitcallOtpServices()).rejects.toMatchObject({ code: "CATALOGUE_INCOMPLETE" });
+  });
+
+  it("retains every published pool in a country entry", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json({ data: [{ countryCode: "US_1", pools:
+      Array.from({ length: 250 }, (_, i) => ({ serviceId: `POOL-US_1-${i}`, price: 0.1 }))
+    }], meta: { page: 1, hasNext: false } })));
+    expect((await listBitcallOtpCountryEntries())[0].pools).toHaveLength(250);
+  });
+
   it("refuses a walk whose later page failed rather than listing what it read", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(json({

@@ -136,12 +136,12 @@ describe("country-first service explorer", () => {
 
   it("shows view-only Bitcall OTP listings without implying unsupported countries can be ordered", () => {
     const item: ExplorerItem = {
-      id: "otp-whatsapp-bj", category: "verification", name: "WhatsApp", description: "Bitcall stock listing · checkout is not enabled for this country",
+      id: "otp-whatsapp-bj", category: "verification", name: "WhatsApp", description: "Live stock listing · checkout is not enabled for this country",
       tag: "Messaging", artwork: { kind: "brand", name: "whatsapp" }, source: "live",
       coverage: "catalog-country", stock: 6, myUnits: null, price: null, action: null,
     };
     const markup = renderToStaticMarkup(<ServiceCard item={item} countryName="Benin" />);
-    expect(markup).toContain("Bitcall stock:");
+    expect(markup).toContain("Reported stock:");
     expect(markup).toContain("6 left");
     expect(markup).toContain("Ordering unavailable");
     expect(markup).toContain("Not available to order");
@@ -155,7 +155,7 @@ describe("country-first service explorer", () => {
       action: { label: "Choose service", href: "/dashboard/services/otp?country=ng" },
     };
     const markup = renderToStaticMarkup(<ServiceCard item={item} countryName="Nigeria" />);
-    expect(markup).toContain("Bitcall stock:");
+    expect(markup).toContain("Reported stock:");
     expect(markup).toContain("17 left");
     expect(markup).toContain("sm:hidden");
 
@@ -181,7 +181,7 @@ describe("unit counts", () => {
     expect(markup).toContain("sm:grid-cols-2");
     expect(markup).toContain("0 left");
     expect(markup).toContain("23 left");
-    expect(markup).toContain("text-[0.58rem]");
+    expect(markup).toContain("text-[0.8125rem]");
   });
 });
 

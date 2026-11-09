@@ -183,6 +183,45 @@ reconciliation_runs; a missing run is not a clean run. The destructive retention
 sweep remains off unless explicitly enabled. Investigate alerts rather than
 assuming the job repaired every uncertain transaction.
 
+Referral-credit and purchase safety rollout (not yet production-verified):
+* Schedule a controlled, quiet rollout: stop financial mutations and workers,
+  take and verify a backup, apply migrations 0036 through 0040 in order, deploy
+  the matching application, then validate with an isolated environment before
+  reopening traffic. Old application instances must not run financial writes
+  while provenance is being established. Do not run these steps on production
+  without the owner's approval and a tested rollback/recovery plan.
+* Referral rewards are spendable but cannot be withdrawn. Migration 0038 marks
+  historical referrers and connected gift recipients as unknown; it preserves
+  their total balances but blocks withdrawals until an authorized, audited
+  source-of-funds review. There is currently no operator reconciliation tool to
+  release these holds. Do not simply set wallet_provenance_known=true or assign
+  zero restricted credit: reconstruct ledger, gifts, refunds and prior payouts,
+  preserve evidence, have a second authorized reviewer verify the calculation,
+  and use a separately designed, tested and audited adjustment workflow. Until
+  that exists, these customers may be unable to withdraw legitimate cash.
+* Historical bulk debits were not associated with individual orders. Automatic,
+  self-service and admin order refunds now require a matching per-order debit;
+  legacy bulk refunds may require an authorized reconciliation and separate
+  audited adjustment workflow. Do not bypass the check or assume a missing debit
+  proves the customer was not charged.
+* Bulk checkout reserves the batch and a linked debit per unit before supplier
+  calls. An interrupted batch is not resumed automatically: processing/review
+  units and batches require provider and ledger reconciliation. Unattempted units
+  are refunded during a completed request; a crash can leave them reserved for
+  review. Apply migration 0040 before deploying bulk checkout.
+* The SMM panel has no idempotency key. Boost checkout now retains uncertain
+  outcomes for review instead of automatically refunding or retrying. Inspect
+  historical failed/refunded boosts against supplier records before any action.
+  A review or processing boost blocks new boosts until an operator reconciles it.
+* Any pending or review order, claimed schedule, or processing payout may have
+  reached its provider, even if its reference or response is missing. Do not
+  retry, refund, resume or mark it settled based only on missing local data.
+  Reconcile provider records and wallet ledger first. Legacy processing payouts
+  are no longer eligible for manual retry or rejection by this endpoint.
+* Refund sweeps rotate unconfirmed candidates but still require a definitive
+  provider check and a matching debit; inspect logs and backlog, and verify actual
+  scheduler frequency and duration. There is no guarantee of a five-minute refund.
+
 5. Backups and incident response
 --------------------------------
 
@@ -217,3 +256,14 @@ payments and contact the owner. Avoid logging credentials, full bank numbers,
 recipient addresses, customer messages or activation codes. ALERT_WEBHOOK_URL
 can surface application errors, but logs and alerts are not a substitute for
 provider monitoring. See SECURITY.txt for known gaps and safe reporting.
+
+Unattempted bulk reservations
+-----------------------------
+A verified administrator can POST an orderId and a reason (10–200 characters)
+to /api/admin/bulk-unattempted using the authenticated same-origin JSON admin
+session. The endpoint refunds only a processing bulk unit whose durable marker
+still says the provider was not contacted, with one exact linked debit. Its claim,
+wallet credit and administrator audit entry commit together. It cannot settle a
+unit whose provider call started or whose outcome is ambiguous; check supplier
+records and use the separate confirmed-reconciliation process for those. Once
+all units are terminal, replaying the original batch closes it without spending.

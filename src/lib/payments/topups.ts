@@ -26,7 +26,7 @@ export async function completeTopUp(input: {
   const outcome = await db.transaction(async (tx) => {
     // Read the name inside the transaction, before the credit, so the value
     // frozen onto the deposit is the one that held when the money arrived. It is
-    // the reference every later withdrawal is checked against, and it is written
+    // a profile-name reference, not independent verification of the payer. It is written
     // only on the pending -> completed transition, so a duplicate callback cannot
     // overwrite it with a name edited in between.
     const [accountHolder] = await tx

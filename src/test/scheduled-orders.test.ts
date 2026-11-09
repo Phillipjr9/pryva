@@ -1,271 +1,178 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readFileSync } from "node:fs";
-import type { Frequency } from "@/lib/services/scheduled-orders";
+import { readFile, readdir } from "node:fs/promises";
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle, type PgliteDatabase } from "drizzle-orm/pglite";
+import { eq } from "drizzle-orm";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import * as schema from "@/db/schema";
 
-/**
- * A scheduled run may not charge for something it did not buy.
- *
- * The old implementation debited the wallet and wrote an order marked
- * `delivered` with provider `scheduled`, without ever calling a supplier. These
- * tests pin the corrected order: fulfil first, then record and charge, and skip
- * the run entirely (leaving the money alone) when fulfilment is refused.
- */
-
-const state = vi.hoisted(() => ({
-  balance: 20000,
-  schedule: null as any,
-  /**
-   * What the locked re-read inside the transaction sees. Defaults to `schedule`,
-   * and a test sets it to the row as the *other* sweep left it — next run already
-   * advanced — which is what the loser of an overlapping run reads once it stops
-   * waiting on the lock.
-   */
-  scheduleUnderLock: null as any,
-  scheduleReads: 0,
-  insertRows: [] as any[],
-  debits: [] as any[],
-  updates: [] as any[],
-  released: [] as any[],
-  fulfilError: null as Error | null,
-  fulfilable: new Set(["vn-ng", "rent-ng-30"]),
-  txError: null as Error | null,
-}));
-
-vi.mock("@/db", async () => {
-  const schema = await import("@/db/schema");
-  const rowsFor = (table: unknown) => {
-    if (table === schema.users) return [{ walletBalance: state.balance }];
-    if (!state.schedule) return [];
-    state.scheduleReads += 1;
-    // Read 1 is the pre-flight check, read 2 the locked one that decides the run.
-    return state.scheduleReads === 2 && state.scheduleUnderLock ? [state.scheduleUnderLock] : [state.schedule];
-  };
-  const chain = (rows: unknown[]) => {
-    const api: Record<string, unknown> = {
-      from: (table: unknown) => chain(rowsFor(table)),
-      where: () => api,
-      for: () => api,
-      limit: () => Promise.resolve(rows),
-      values: (value: unknown) => {
-        state.insertRows.push(value);
-        return Promise.resolve();
-      },
-      set: (value: unknown) => {
-        state.updates.push(value);
-        return { where: () => Promise.resolve() };
-      },
-    };
-    return api;
-  };
-  const tx = {
-    select: () => ({ from: (table: unknown) => chain(rowsFor(table)) }),
-    insert: () => chain([]),
-    update: () => chain([]),
-  };
-  return {
-    db: {
-      select: () => ({ from: (table: unknown) => chain(rowsFor(table)) }),
-      insert: () => chain([]),
-      update: () => chain([]),
-      transaction: async (callback: (txArg: unknown) => Promise<unknown>) => {
-        if (state.txError) throw state.txError;
-        return callback(tx);
-      },
-    },
-  };
+const mocks = vi.hoisted(() => ({ db: null as unknown, fulfill: vi.fn(), email: vi.fn() }));
+vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
+vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.email }));
+vi.mock("@/lib/services/fulfillment", async (original) => {
+  const real = await original<typeof import("@/lib/services/fulfillment")>();
+  return { ...real, fulfillPlan: mocks.fulfill };
 });
 
-vi.mock("@/lib/services/fulfillment", () => ({
-  fulfilmentIntent: (slug: string) => (state.fulfilable.has(slug) ? { kind: "sms", country: "ng" } : null),
-  fulfillPlan: async (plan: { slug: string; price: number }) => {
-    if (state.fulfilError) throw state.fulfilError;
-    return {
-      provider: "fleexa",
-      providerCostNgn: plan.price - 200,
-      providerRequestId: `req-${plan.slug}`,
-      referenceCode: "+2348012345678",
-      otpCode: null,
-      expiresAt: new Date(Date.now() + 600_000),
-    };
-  },
-  cancelUpstream: async (order: unknown) => {
-    state.released.push(order);
-    return true;
-  },
-}));
+let pg: PGlite;
+let database: PgliteDatabase<typeof schema>;
+let scheduled: typeof import("@/lib/services/scheduled-orders");
+const USER = "11111111-1111-4111-8111-111111111111";
 
-vi.mock("@/lib/payments/wallet", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/payments/wallet")>();
-  return {
-    ...actual,
-    debitWalletInTx: async (_tx: unknown, entry: unknown) => {
-      state.debits.push(entry);
-      state.balance -= (entry as { amount: number }).amount;
-      return state.balance;
-    },
-  };
-});
-
-const { calculateNextRun, createScheduledOrder, processScheduledOrder } = await import("@/lib/services/scheduled-orders");
-
-const USER_ID = "test-sched-user-1";
-const SCHEDULE_ID = "sched-row-1";
-
-function dueRow(overrides: Record<string, unknown> = {}) {
-  return {
-    id: SCHEDULE_ID,
-    userId: USER_ID,
-    service: "numbers",
-    productSlug: "vn-ng",
-    frequency: "daily" as Frequency,
-    nextRunAt: new Date(Date.now() - 60_000),
-    status: "active" as const,
-    lastRunAt: null,
-    lastOrderId: null,
-    createdAt: new Date(),
-    ...overrides,
-  };
-}
-
-beforeEach(() => {
-  // These tests exercise a mocked live database; no external database is contacted.
-  vi.stubEnv("DATABASE_URL", "postgres://test.invalid/db");
+beforeAll(async () => {
+  vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db");
   vi.stubEnv("VERCEL_ENV", "");
-  state.balance = 20000;
-  state.schedule = dueRow();
-  state.scheduleUnderLock = null;
-  state.scheduleReads = 0;
-  state.insertRows = [];
-  state.debits = [];
-  state.updates = [];
-  state.released = [];
-  state.fulfilError = null;
-  state.txError = null;
+  pg = new PGlite();
+  for (const file of (await readdir("migrations")).filter((name) => /^\d{4}_.*\.sql$/.test(name)).sort()) {
+    await pg.exec(await readFile(`migrations/${file}`, "utf8"));
+  }
+  database = drizzle(pg, { schema });
+  mocks.db = database;
+  scheduled = await import("@/lib/services/scheduled-orders");
+  await database.insert(schema.users).values({ id: USER, name: "Customer", email: "schedule@example.test", passwordHash: "hash", walletBalance: 50000 });
+}, 60000);
+afterAll(async () => { vi.unstubAllEnvs(); await pg?.close(); });
+beforeEach(async () => {
+  vi.clearAllMocks();
+  await database.delete(schema.walletTransactions);
+  await database.delete(schema.scheduledOrders);
+  await database.delete(schema.orders);
+  await database.update(schema.users).set({ walletBalance: 50000, suspendedAt: null }).where(eq(schema.users.id, USER));
 });
 
-afterEach(() => vi.unstubAllEnvs());
+async function due(overrides: Partial<typeof schema.scheduledOrders.$inferInsert> = {}) {
+  const [row] = await database.insert(schema.scheduledOrders).values({ userId: USER, service: "numbers", productSlug: "vn-ng", frequency: "daily", nextRunAt: new Date(Date.now() - 60000), ...overrides }).returning();
+  return row;
+}
+const result = { provider: "bitcall", providerCostNgn: 900, providerRequestId: "activation-123", referenceCode: "+2348000000000", otpCode: null, expiresAt: new Date(Date.now() + 600000) };
+type Hooks = { onOtpAttempt: () => Promise<void>; onOtpAccepted: (id: string) => Promise<void> };
 
-describe("Scheduled Orders", () => {
-  describe("calculateNextRun", () => {
-    it("calculates each frequency", () => {
-      const now = new Date();
-      const days = (frequency: Frequency) => (calculateNextRun(frequency).getTime() - now.getTime()) / 86_400_000;
-      expect(days("daily")).toBeCloseTo(1, 0);
-      expect(days("weekly")).toBeCloseTo(7, 0);
-      expect(days("biweekly")).toBeCloseTo(14, 0);
+describe("scheduled purchase safety", () => {
+  it("claims before spending, stores the provider reference and charges once", async () => {
+    const row = await due();
+    mocks.fulfill.mockImplementationOnce(async (_plan: unknown, hooks: Hooks) => {
+      const [run] = await database.select().from(schema.scheduledOrders).where(eq(schema.scheduledOrders.id, row.id));
+      const [claim] = await database.select().from(schema.orders);
+      expect(run).toMatchObject({ status: "processing", lastOrderId: claim.id });
+      expect(claim.status).toBe("review");
+      await hooks.onOtpAttempt();
+      await hooks.onOtpAccepted(result.providerRequestId);
+      expect((await database.select().from(schema.orders))[0].providerRequestId).toBe(result.providerRequestId);
+      return result;
     });
-
-    it("handles monthly rollover and clamps month-end dates", () => {
-      const december = new Date(2024, 11, 15);
-      const next = calculateNextRun("monthly", december);
-      expect(next.getFullYear()).toBe(2025);
-      expect(next.getMonth()).toBe(0);
-
-      const monthEnd = calculateNextRun("monthly", new Date(2024, 0, 31));
-      expect(monthEnd.getMonth()).toBe(1);
-      expect(monthEnd.getDate()).toBe(29);
-    });
-
-    it("rejects an unknown frequency rather than scheduling immediately", () => {
-      expect(() => calculateNextRun("invalid" as Frequency)).toThrow("Invalid frequency");
-    });
+    expect(await scheduled.processScheduledOrder(row)).toBe(true);
+    const [order] = await database.select().from(schema.orders);
+    const [run] = await database.select().from(schema.scheduledOrders);
+    expect(order).toMatchObject({ status: "active", providerRequestId: result.providerRequestId });
+    expect(run).toMatchObject({ status: "active", lastOrderId: order.id });
+    expect(run.nextRunAt.getTime()).toBeGreaterThan(Date.now());
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+    expect(await scheduled.processScheduledOrder(row)).toBe(false);
+    expect(mocks.fulfill).toHaveBeenCalledOnce();
   });
 
-  describe("createScheduledOrder", () => {
-    it("refuses a plan with no supplier path", async () => {
-      await expect(
-        createScheduledOrder({ userId: USER_ID, service: "proxies", productSlug: "proxy-ng-1", frequency: "weekly" }),
-      ).rejects.toThrow(/cannot be delivered automatically/);
+  it("prevents an overlapping sweep from buying while the first is in flight", async () => {
+    const row = await due();
+    let started!: () => void, release!: () => void;
+    const entered = new Promise<void>((resolve) => { started = resolve; });
+    const wait = new Promise<void>((resolve) => { release = resolve; });
+    mocks.fulfill.mockImplementationOnce(async (_plan: unknown, hooks: Hooks) => {
+      await hooks.onOtpAttempt(); started(); await wait;
+      throw new Error("lost response");
     });
+    const first = scheduled.processScheduledOrder(row);
+    await entered;
+    expect(await scheduled.processScheduledOrder(row)).toBe(false);
+    release();
+    expect(await first).toBe(false);
+    expect(mocks.fulfill).toHaveBeenCalledOnce();
+    const [run] = await database.select().from(schema.scheduledOrders);
+    expect(run.status).toBe("paused");
+    expect((await database.select().from(schema.orders))[0].status).toBe("review");
+    expect(await scheduled.resumeScheduledOrder(row.id, USER)).toBe(false);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
   });
 
-  describe("processScheduledOrder", () => {
-    it("charges nothing and records nothing when fulfilment is unavailable", async () => {
-      state.fulfilError = new Error("provider is down");
-
-      const result = await processScheduledOrder(dueRow() as any);
-
-      expect(result).toBe(false);
-      expect(state.balance).toBe(20000);
-      expect(state.debits).toHaveLength(0);
-      expect(state.insertRows).toHaveLength(0);
-      // The row stays active, so the next run can try again.
-      expect(state.updates).toHaveLength(0);
+  it("does not start a call if the account was suspended after the run was claimed", async () => {
+    const row = await due();
+    const buy = vi.fn();
+    mocks.fulfill.mockImplementationOnce(async (_plan: unknown, hooks: Hooks) => {
+      await database.update(schema.users).set({ suspendedAt: new Date() }).where(eq(schema.users.id, USER));
+      await hooks.onOtpAttempt(); buy();
     });
+    expect(await scheduled.processScheduledOrder(row)).toBe(false);
+    expect(buy).not.toHaveBeenCalled();
+    expect((await database.select().from(schema.orders))[0].status).toBe("cancelled");
+    expect((await database.select().from(schema.scheduledOrders))[0].status).toBe("paused");
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
+  });
 
-    it("pauses the schedule when a purchase outcome is ambiguous", async () => {
-      const { FleexaError } = await import("@/lib/providers/fleexa");
-      state.fulfilError = new FleexaError("Unknown", 502, "AMBIGUOUS_PURCHASE");
-      expect(await processScheduledOrder(dueRow() as any)).toBe(false);
-      expect(state.updates).toContainEqual({ status: "paused" });
-      expect(state.debits).toHaveLength(0);
+  it("holds an accepted order for review when its wallet debit cannot commit", async () => {
+    const row = await due();
+    mocks.fulfill.mockImplementationOnce(async (_plan: unknown, hooks: Hooks) => {
+      await hooks.onOtpAttempt(); await hooks.onOtpAccepted(result.providerRequestId);
+      await database.update(schema.users).set({ walletBalance: 0 }).where(eq(schema.users.id, USER));
+      return result;
     });
+    expect(await scheduled.processScheduledOrder(row)).toBe(false);
+    const [order] = await database.select().from(schema.orders);
+    expect(order).toMatchObject({ status: "review", providerRequestId: result.providerRequestId });
+    expect((await database.select().from(schema.scheduledOrders))[0].status).toBe("paused");
+    expect(await scheduled.resumeScheduledOrder(row.id, USER)).toBe(false);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
+  });
 
-    it("records the supplier's own identifiers and charges only after a successful buy", async () => {
-      const result = await processScheduledOrder(dueRow() as any);
-
-      expect(result).toBe(true);
-      expect(state.insertRows).toHaveLength(1);
-      const order = state.insertRows[0];
-      expect(order.provider).toBe("fleexa");
-      expect(order.providerRequestId).toBe("req-vn-ng");
-      expect(order.referenceCode).toBe("+2348012345678");
-      expect(order.status).toBe("active");
-      expect(state.debits).toHaveLength(1);
-      expect(state.updates[0]).toMatchObject({ lastOrderId: order.id });
+  it("does not buy if the schedule is cancelled before its supplier boundary", async () => {
+    const row = await due();
+    const buy = vi.fn();
+    mocks.fulfill.mockImplementationOnce(async (_plan: unknown, hooks: Hooks) => {
+      expect(await scheduled.cancelScheduledOrder(row.id, USER)).toBe(true);
+      await hooks.onOtpAttempt();
+      buy();
     });
+    expect(await scheduled.processScheduledOrder(row)).toBe(false);
+    expect(buy).not.toHaveBeenCalled();
+    expect((await database.select().from(schema.scheduledOrders))[0].status).toBe("cancelled");
+    expect((await database.select().from(schema.orders))[0].status).toBe("cancelled");
+  });
 
-    it("skips a run that is not yet due and buys nothing", async () => {
-      state.schedule = dueRow({ nextRunAt: new Date(Date.now() + 86_400_000) });
-
-      expect(await processScheduledOrder(dueRow({ nextRunAt: new Date(Date.now() + 86_400_000) }) as any)).toBe(false);
-      expect(state.debits).toHaveLength(0);
-      expect(state.insertRows).toHaveLength(0);
+  it("preserves cancellation while recording a provider purchase already started", async () => {
+    const row = await due();
+    mocks.fulfill.mockImplementationOnce(async (_plan: unknown, hooks: Hooks) => {
+      await hooks.onOtpAttempt();
+      expect(await scheduled.cancelScheduledOrder(row.id, USER)).toBe(true);
+      await hooks.onOtpAccepted(result.providerRequestId);
+      return result;
     });
+    expect(await scheduled.processScheduledOrder(row)).toBe(true);
+    expect((await database.select().from(schema.scheduledOrders))[0].status).toBe("cancelled");
+    expect((await database.select().from(schema.orders))[0].status).toBe("active");
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+  });
 
-    it("skips a paused schedule", async () => {
-      state.schedule = null;
-      expect(await processScheduledOrder(dueRow({ status: "paused" as const }) as any)).toBe(false);
-      expect(state.debits).toHaveLength(0);
-    });
+  it("does not spend when the account lacks funds, the run is paused or not due", async () => {
+    const row = await due();
+    await database.update(schema.users).set({ walletBalance: 0 }).where(eq(schema.users.id, USER));
+    expect(await scheduled.processScheduledOrder(row)).toBe(false);
+    await database.update(schema.users).set({ walletBalance: 50000 }).where(eq(schema.users.id, USER));
+    await database.update(schema.scheduledOrders).set({ status: "paused" }).where(eq(schema.scheduledOrders.id, row.id));
+    expect(await scheduled.processScheduledOrder(row)).toBe(false);
+    await database.update(schema.scheduledOrders).set({ status: "active", nextRunAt: new Date(Date.now() + 60000) }).where(eq(schema.scheduledOrders.id, row.id));
+    expect(await scheduled.processScheduledOrder(row)).toBe(false);
+    expect(mocks.fulfill).not.toHaveBeenCalled();
+  });
 
-    it("skips a plan that has no supplier path without charging", async () => {
-      state.schedule = dueRow({ service: "proxies", productSlug: "proxy-ng-1" });
-      expect(await processScheduledOrder(state.schedule as any)).toBe(false);
-      expect(state.debits).toHaveLength(0);
-      expect(state.insertRows).toHaveLength(0);
-    });
+  it("does not buy when the claim transaction fails", async () => {
+    const row = await due();
+    await pg.exec(`ALTER TABLE orders ADD CONSTRAINT reject_review_test CHECK (status <> 'review')`);
+    try { await expect(scheduled.processScheduledOrder(row)).rejects.toThrow(); }
+    finally { await pg.exec(`ALTER TABLE orders DROP CONSTRAINT reject_review_test`); }
+    expect(mocks.fulfill).not.toHaveBeenCalled();
+    expect((await database.select().from(schema.scheduledOrders))[0].status).toBe("active");
+  });
 
-    it("releases the purchase when recording it fails", async () => {
-      state.txError = new Error("database went away");
-
-      await expect(processScheduledOrder(dueRow() as any)).rejects.toThrow("database went away");
-      expect(state.released).toHaveLength(1);
-      expect(state.debits).toHaveLength(0);
-      expect(state.insertRows).toHaveLength(0);
-    });
-
-    it("releases the number a run that declines cannot keep", async () => {
-      // The sweep that overlapped this one got here first and advanced the row.
-      // This run had already bought a number by then, so the number has to go
-      // back: it is the business's money, and keeping it means paying a supplier
-      // for a number nobody holds and nobody is charged for.
-      state.scheduleUnderLock = dueRow({ nextRunAt: new Date(Date.now() + 86_400_000) });
-
-      expect(await processScheduledOrder(dueRow() as any)).toBe(false);
-      expect(state.released).toHaveLength(1);
-      expect(state.debits).toHaveLength(0);
-      expect(state.insertRows).toHaveLength(0);
-      expect(state.balance).toBe(20000);
-    });
-
-    it("locks the schedule before spending anything on it", () => {
-      // PGlite holds one connection, so two transactions genuinely overlapping
-      // cannot be produced from a test. The lock is asserted where it is written.
-      // Without it the loser of an overlapping sweep reads the same past
-      // `nextRunAt` as the winner, both buy, and the customer is charged twice.
-      const source = readFileSync("src/lib/services/scheduled-orders.ts", "utf8");
-      expect(source).toMatch(/from\(scheduledOrders\)[^;]*?\.for\("update"\)/);
-    });
+  it("calculates frequency and clamps month-end", () => {
+    expect(scheduled.calculateNextRun("daily", new Date("2024-01-01T00:00:00Z")).toISOString()).toBe("2024-01-02T00:00:00.000Z");
+    expect(scheduled.calculateNextRun("monthly", new Date("2024-01-31T00:00:00Z")).toISOString()).toBe("2024-02-29T00:00:00.000Z");
+    expect(() => scheduled.calculateNextRun("invalid" as never)).toThrow("Invalid frequency");
   });
 });

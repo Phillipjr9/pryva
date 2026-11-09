@@ -281,7 +281,7 @@ export const LANES: readonly LaneDefinition[] = [
     staleHours: 2,
     delivery: "The number is issued at purchase and the code is polled onto the order page.",
     recovery:
-      "A number that never delivers is refunded by the nightly sweep and released upstream.",
+      "Single-use number refunds require a confirmed terminal no-code outcome and a matching wallet debit; uncertain cases need review.",
   },
   {
     id: "esim",

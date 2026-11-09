@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { plansFor } from "@/lib/services/catalog";
-import { isPlanFulfillable } from "@/lib/services/fulfillment";
+import { isNumberPlanOrderingConfigured } from "@/lib/services/numbers/number-availability";
 
 vi.mock("@/lib/identity/auth", () => ({
   getCurrentUser: async () => null,
@@ -135,23 +135,11 @@ describe("homepage SEO and navigation", () => {
     expect(og.images?.[0]).toMatchObject({ url: "/og.png", width: 1200, height: 630 });
   });
 
-  /**
-   * The footer hardcoded `Number fulfillment: Paused` long after numbers became
-   * deliverable, so the busiest page on the site said the core product was
-   * switched off while /pricing sold ten number plans with working "Get Started"
-   * links. The row now derives from the same allowlist /status uses.
-   *
-   * The expectation is computed here from that allowlist rather than written as a
-   * literal, so the test keeps holding when the numbers change -- and so the two
-   * cannot drift apart the way a typed-in "Paused" did.
-   */
-  it("agrees with the fulfilment allowlist about whether numbers are deliverable", () => {
+  it("reports configured ordering paths without promising live stock or delivery", () => {
     const numbers = plansFor("numbers");
-    const deliverable = numbers.filter((plan) => isPlanFulfillable(plan.slug)).length;
-    expect(deliverable, "numbers are deliverable, so this branch is the live one").toBeGreaterThan(0);
-
-    expect(html).toContain(`Automatic · ${deliverable} of ${numbers.length} plans`);
-    expect(html).not.toContain("Paused");
+    const configured = numbers.filter((plan) => isNumberPlanOrderingConfigured(plan.slug)).length;
+    expect(html).toContain(configured ? `Ordering configured · ${configured} of ${numbers.length} plans` : "Ordering unavailable");
+    expect(html).not.toContain(`Automatic · ${configured} of ${numbers.length} plans`);
   });
 
   it("keeps the sticky phone CTA, which knows when to hide", () => {
@@ -215,12 +203,14 @@ describe("homepage service list", () => {
       "eSIM Data",
       "Residential Proxies",
       "Email OTP",
-      "Digital Accounts",
+      "Netflix",
       "Data Plans",
       "Bulk Orders",
       "Scheduled Purchases",
     ];
 
+    // Accounts deliberately uses the real Netflix mark, whose accessible name
+    // describes the actual logo. Other service families use their own glyphs.
     // The accessible name is the icon's identity now that it is inline SVG.
     // Counting `aria-label` rather than a file name also proves the icon is
     // actually labelled, which a bare <img src> never guaranteed.

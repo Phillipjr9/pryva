@@ -55,6 +55,7 @@ export default async function DashboardPlanPage({
           <PlanPurchase
             groups={[{ label: plan.planLabel, plans: [plan] }]}
             signedIn
+            userId={user.id}
             walletBalance={user.walletBalance}
             nextPath={back}
             unavailableSlugs={isRentalOrderingUnconfigured(plan.slug) ? [plan.slug] : []}

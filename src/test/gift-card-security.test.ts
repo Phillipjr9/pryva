@@ -48,14 +48,24 @@ function fakeDatabase() {
         },
       };
     },
+    select() {
+      return { from: () => ({ where: (condition: SQL) => ({ limit: async () => {
+        const [owner, requestId] = dialect.sqlToQuery(condition).params;
+        return state.cards.filter((card) => card.purchasedBy === owner && card.requestId === requestId);
+      } }) }) };
+    },
     insert(table: unknown) {
       return {
-        async values(value: Record<string, unknown>) {
-          if (table === giftCards) state.cards.push({ ...value });
-          else if (table === walletTransactions) {
-            if (state.failLedger) throw new Error("ledger unavailable");
-            state.ledger.push({ ...value });
-          } else throw new Error("Unexpected insert");
+        values(value: Record<string, unknown>) {
+          if (table === giftCards) return { onConflictDoNothing: () => ({ returning: async () => {
+            if (state.cards.some((card) => card.purchasedBy === value.purchasedBy && card.requestId === value.requestId)) return [];
+            const card = { ...value }; state.cards.push(card); return [card];
+          } }) };
+          if (table === walletTransactions) {
+            if (state.failLedger) return Promise.reject(new Error("ledger unavailable"));
+            state.ledger.push({ ...value }); return Promise.resolve();
+          }
+          throw new Error("Unexpected insert");
         },
       };
     },
@@ -78,14 +88,14 @@ beforeEach(() => { mocks.transaction.mockReset(); });
 
 describe("gift card transaction safety", () => {
   it("rejects fractional amounts before making a transaction", async () => {
-    await expect(createGiftCard({ userId: "buyer", amount: 1000.5 })).rejects.toThrow("whole-naira");
+    await expect(createGiftCard({ userId: "buyer", requestId: crypto.randomUUID(), amount: 1000.5 })).rejects.toThrow("whole-naira");
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
   it("deducts the purchase atomically and refuses a purchase that would overdraw", async () => {
     const state = fakeDatabase();
-    await createGiftCard({ userId: "buyer", amount: 4000 });
-    await expect(createGiftCard({ userId: "buyer", amount: 4000 })).rejects.toThrow("Insufficient");
+    await createGiftCard({ userId: "buyer", requestId: crypto.randomUUID(), amount: 4000 });
+    await expect(createGiftCard({ userId: "buyer", requestId: crypto.randomUUID(), amount: 4000 })).rejects.toThrow("Insufficient");
     expect(state.balances.buyer).toBe(1000);
     expect(state.cards).toHaveLength(1);
     expect(state.ledger).toHaveLength(1);
@@ -93,7 +103,7 @@ describe("gift card transaction safety", () => {
 
   it("does not allow self-redemption or a second redemption of the same card", async () => {
     const state = fakeDatabase();
-    const card = await createGiftCard({ userId: "buyer", amount: 3000 });
+    const card = await createGiftCard({ userId: "buyer", requestId: crypto.randomUUID(), amount: 3000 });
     await expect(redeemGiftCard({ userId: "buyer", code: card.code })).rejects.toThrow();
     expect(await redeemGiftCard({ userId: "recipient", code: card.code })).toEqual({ amount: 3000 });
     await expect(redeemGiftCard({ userId: "recipient", code: card.code })).rejects.toThrow();
@@ -103,7 +113,7 @@ describe("gift card transaction safety", () => {
 
   it("rolls back card redemption and balance if the ledger write fails", async () => {
     const state = fakeDatabase();
-    const card = await createGiftCard({ userId: "buyer", amount: 3000 });
+    const card = await createGiftCard({ userId: "buyer", requestId: crypto.randomUUID(), amount: 3000 });
     state.failLedger = true;
     await expect(redeemGiftCard({ userId: "recipient", code: card.code })).rejects.toThrow("ledger unavailable");
     expect(state.cards[0].status).toBe("active");

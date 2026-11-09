@@ -3,7 +3,8 @@ import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 import { RECONCILIATION_NOTE, SINGLE_NUMBER_WINDOW } from "@/lib/services/refund-policy";
 
-const mocks = vi.hoisted(() => ({ cancelUpstream: vi.fn() }));
+const mocks = vi.hoisted(() => ({ cancelUpstream: vi.fn(), confirm: vi.fn() }));
+vi.mock("@/lib/services/numbers/refund-confirmation", () => ({ confirmNumberRefund: mocks.confirm }));
 vi.mock("@/lib/services/fulfillment", () => ({ cancelUpstream: mocks.cancelUpstream }));
 
 // Exercise the real in-memory adapter as well as the refund policy: its
@@ -38,6 +39,7 @@ beforeAll(async () => {
   ({ POST: cronPost } = await import("@/app/api/cron/auto-refund/route"));
 });
 beforeEach(() => {
+  mocks.confirm.mockReset().mockResolvedValue("refundable");
   mocks.cancelUpstream.mockReset();
   // cancelUpstream reports whether a real upstream release happened.
   mocks.cancelUpstream.mockResolvedValue(true);
@@ -54,6 +56,9 @@ async function insertUndelivered(overrides: Record<string, unknown> = {}) {
     providerRequestId: "req-123", createdAt: old(), refundedAt: null, otpCode: null,
     ...overrides,
   } as never);
+  const id = String(overrides.id ?? "refund-eligible");
+  await db.insert(schema.walletTransactions).values({ userId: "refund-fixture-user", orderId: id, type: "debit", amount: 1000,
+    balanceAfter: 25000, description: "Fixture debit", reference: `DEB-${id}` });
 }
 
 describe("automatic refunds for undelivered number orders", () => {
@@ -80,8 +85,8 @@ describe("automatic refunds for undelivered number orders", () => {
     expect(after.walletBalance).toBe(before.walletBalance + 1000);
 
     const ledger = await db.select().from(schema.walletTransactions).where(eq(schema.walletTransactions.orderId, "refund-eligible"));
-    expect(ledger).toHaveLength(1);
-    expect(ledger[0]).toMatchObject({ type: "refund", amount: 1000, balanceAfter: after.walletBalance });
+    expect(ledger).toHaveLength(2);
+    expect(ledger.find((row) => row.type === "refund")).toMatchObject({ amount: 1000, balanceAfter: after.walletBalance });
 
     expect(mocks.cancelUpstream).toHaveBeenCalledTimes(1);
     expect(mocks.cancelUpstream.mock.calls[0][0]).toMatchObject({

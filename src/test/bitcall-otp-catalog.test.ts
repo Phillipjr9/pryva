@@ -26,9 +26,11 @@ beforeEach(() => {
 });
 
 describe("Bitcall app-specific OTP catalogue", () => {
-  it("deduplicates app services, chooses a sellable pool and hides provider references and costs", () => {
+  it("keeps all app pools and hides provider references and costs", () => {
     const items = bitcallOtpItemsForCountry(offers, "ng", "Nigeria");
-    expect(items.map((item) => item.name)).toEqual(["Signal", "Unknown app", "WhatsApp"]);
+    expect(items.map((item) => item.name)).toEqual(["Signal", "Unknown app", "WhatsApp", "WhatsApp"]);
+    expect(items.filter((item) => item.name === "WhatsApp").map((item) => item.stock)).toEqual([3, 20]);
+    expect(new Set(items.map((item) => item.id)).size).toBe(4);
     const whatsapp = items.find((item) => item.name === "WhatsApp")!;
     expect(whatsapp).toMatchObject({
       source: "live",

@@ -223,10 +223,23 @@ describe("fulfilment", () => {
       rentalId: "rent-1", number: "+2348000000001", months: 3, expiresAt: null, raw: {},
     });
 
-    const result = await fulfillPlan(findPlan("rent-ng-90")!);
+    const onRentalAttempt = vi.fn();
+    const onRentalAccepted = vi.fn();
+    provider.buyRental.mockImplementationOnce(async () => {
+      expect(onRentalAttempt).toHaveBeenCalledOnce();
+      return { rentalId: "rent-1", number: "+2348000000001", months: 3, expiresAt: null, raw: {} };
+    });
+    const result = await fulfillPlan(findPlan("rent-ng-90")!, { onRentalAttempt, onRentalAccepted });
+    expect(onRentalAccepted).toHaveBeenCalledWith("rent-1");
 
     expect(provider.buyRental).toHaveBeenCalledWith({ area: "area-ng", months: 3 });
     expect(result).toMatchObject({ provider: "fleexa", providerRequestId: "rent-1" });
+  });
+
+  it("does not buy a rental without a durable claim callback", async () => {
+    provider.listAreas.mockResolvedValue([{ id: "area-ng", country: "Nigeria", pricePerMonthNgn: 5000, stock: 3 }]);
+    await expect(fulfillPlan(findPlan("rent-ng-30")!)).rejects.toMatchObject({ code: "RENTAL_CLAIM_REQUIRED" });
+    expect(provider.buyRental).not.toHaveBeenCalled();
   });
 
   it("refuses a rental with no matching coverage or no stock, before buying", async () => {

@@ -35,6 +35,7 @@ const FREQUENCIES = [
 
 const STATUS_LABELS: Record<string, string> = {
   active: "Active",
+  processing: "Processing",
   paused: "Paused",
   cancelled: "Cancelled",
 };
@@ -136,9 +137,8 @@ export function ScheduledManager({
         <div className="rounded-xl border border-line bg-white p-6">
           <h2 className="text-[1rem] font-semibold text-ink">New schedule</h2>
           <p className="mt-1 text-[0.82rem] leading-relaxed text-ink-2">
-            Runs once a night. Nothing is charged unless the plan is delivered, so a night where
-            your balance is short or the service cannot deliver costs you nothing — the schedule
-            stays due and we try again the next night.
+            Schedules are checked nightly. A run is charged after the purchase is accepted.
+            If an outcome is uncertain, the schedule stops for review rather than buying again.
           </p>
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -218,7 +218,11 @@ export function ScheduledManager({
               <p className="mt-3 text-[0.82rem] text-ink-2">
                 {row.status === "cancelled"
                   ? "Cancelled. Nothing further will run."
-                  : row.due
+                  : row.status === "processing"
+                    ? "A run is being processed. If it remains here, contact support before trying again."
+                    : row.status === "paused"
+                      ? "Paused. A run under review must be resolved before resuming."
+                      : row.due
                     ? "Due now — the last attempt did not go through (balance or availability). We will try again tonight."
                     : `Next attempt: ${row.nextRunLabel}`}
                 {row.lastRunLabel && ` · last run ${row.lastRunLabel}`}
@@ -244,7 +248,7 @@ export function ScheduledManager({
                     >
                       Pause
                     </button>
-                  ) : (
+                  ) : row.status === "paused" ? (
                     <button
                       type="button"
                       aria-label={`Resume ${row.productName}`}
@@ -254,7 +258,7 @@ export function ScheduledManager({
                     >
                       Resume
                     </button>
-                  )}
+                  ) : null}
                   <button
                     type="button"
                     aria-label={`Cancel ${row.productName}`}

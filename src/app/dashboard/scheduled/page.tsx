@@ -75,7 +75,7 @@ export default async function ScheduledOrdersPage() {
         <ServiceTitle service="scheduled">Scheduled Purchases</ServiceTitle>
         <p className="mt-1 text-[0.86rem] text-ink-2">
           Repeat a number plan automatically. We check your schedules once a night, buy the plan the
-          same way an order is bought, and charge only what was delivered.
+          same way an order is bought, and charge after the purchase is accepted. Uncertain outcomes require review.
         </p>
       </div>
       <ScheduledManager

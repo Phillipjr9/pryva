@@ -188,6 +188,17 @@ describe("Bitcall-only fulfilment", () => {
     expect(bitcall.buy.mock.invocationCallOrder[0]).toBeLessThan(onOtpAccepted.mock.invocationCallOrder[0]);
   });
 
+  it("buys an unlabelled offer by the same opaque ID used in the catalogue", async () => {
+    bitcall.list.mockResolvedValue([{ countryCode: "NG_1", name: null, offers: [
+      { serviceId: "unlabelled-pool", price: 0.01, currency: "USD", availableCount: 5 },
+    ] }]);
+    const id = otpOfferPublicId("ng", "unlabelled-pool", null);
+    await expect(fulfillPlan(plan, { otpOfferId: id, onOtpAttempt: async () => {}, onOtpAccepted: async () => {} }))
+      .resolves.toMatchObject({ provider: "bitcall", providerRequestId: "act-1" });
+    expect(bitcall.buy).toHaveBeenCalledOnce();
+    expect(bitcall.buy).toHaveBeenCalledWith("unlabelled-pool");
+  });
+
   it("does not substitute a different app pool when the chosen offer fails its margin guard", async () => {
     bitcall.list.mockResolvedValue([{ countryCode: "NG_1", name: "WhatsApp", offers: [
       { serviceId: "profitable-other-pool", price: 0.01, currency: "USD", availableCount: 20 },

@@ -1,10 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { and, eq, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { cancelUpstream } from "@/lib/services/fulfillment";
 import { flagReconciliation } from "@/lib/services/reconciliation";
 import { deliveryWindowMs } from "@/lib/services/registry";
+import { confirmNumberRefund } from "@/lib/services/numbers/refund-confirmation";
 import { isUndeliveredSingleNumber, SINGLE_NUMBER_WINDOW } from "@/lib/services/refund-policy";
 
 /**
@@ -23,14 +24,15 @@ import { isUndeliveredSingleNumber, SINGLE_NUMBER_WINDOW } from "@/lib/services/
 export async function processAutoRefunds(): Promise<{ refunded: number; cancelled: number }> {
   const cutoff = new Date(Date.now() - deliveryWindowMs("numbers"));
   const eligible = and(
-    eq(orders.status, "active"),
+    inArray(orders.status, ["active", "expired"]),
     eq(orders.service, "numbers"),
     eq(orders.duration, SINGLE_NUMBER_WINDOW),
     isNull(orders.otpCode),
     isNull(orders.refundedAt),
     lte(orders.createdAt, cutoff),
   );
-  const candidates = await db.select().from(orders).where(eligible).limit(100);
+  const candidates = await db.select().from(orders).where(eligible)
+    .orderBy(sql`${orders.refundCheckedAt} ASC NULLS FIRST`, orders.createdAt, orders.id).limit(100);
   let refunded = 0;
   let cancelled = 0;
 
@@ -40,15 +42,24 @@ export async function processAutoRefunds(): Promise<{ refunded: number; cancelle
     if (!isUndeliveredSingleNumber(candidate)) continue;
 
     try {
+      // Mark before network I/O, so an unavailable or slow supplier cannot
+      // permanently starve the rest of the queue. This does not claim/refund.
+      const [stillEligible] = await db.update(orders).set({ refundCheckedAt: new Date() })
+        .where(and(eq(orders.id, candidate.id), eligible)).returning({ id: orders.id });
+      if (!stillEligible) continue;
+      if (await confirmNumberRefund(candidate) !== "refundable") continue;
       const claimed = await db.transaction(async (tx) => {
         const [row] = await tx.update(orders)
           .set({ status: "refunded", refundedAt: new Date() })
           .where(and(eq(orders.id, candidate.id), eligible))
           .returning();
         if (!row) return null;
-        if (!Number.isSafeInteger(row.amount) || row.amount <= 0) {
-          throw new Error("Invalid order amount");
-        }
+        if (!Number.isSafeInteger(row.amount) || row.amount <= 0) throw new Error("Invalid order amount");
+        const [debit] = await tx.select({ id: walletTransactions.id }).from(walletTransactions).where(and(
+          eq(walletTransactions.orderId, row.id), eq(walletTransactions.userId, row.userId),
+          eq(walletTransactions.type, "debit"), eq(walletTransactions.amount, row.amount),
+        )).limit(1);
+        if (!debit) throw new Error("Matching order debit not found; refund requires review");
 
         const [user] = await tx.update(users)
           .set({ walletBalance: sql`${users.walletBalance} + ${row.amount}` })
@@ -73,6 +84,7 @@ export async function processAutoRefunds(): Promise<{ refunded: number; cancelle
 
       try {
         if (await cancelUpstream(claimed)) cancelled++;
+        else await flagReconciliation(claimed.id);
       } catch (cancelError) {
         // The customer is already made whole. This is our cost to chase.
         console.error("Auto-refund succeeded but upstream cancel failed", {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 const STORAGE_KEY = "pryva_cookie_consent";
 const CONSENT_VERSION = "2026-11-06";
@@ -12,35 +12,41 @@ type ConsentState = {
   createdAt: string;
 };
 
+function subscribeConsent(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  window.addEventListener("pryva-cookie-consent", onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener("pryva-cookie-consent", onChange);
+  };
+}
+
+function readConsent(): string {
+  try { return window.localStorage.getItem(STORAGE_KEY) ?? ""; } catch { return ""; }
+}
+
 export function CookieConsentBanner() {
-  const [visible, setVisible] = useState(false);
-  const [ready, setReady] = useState(false);
+  // The server cannot read browser storage; a separate server snapshot prevents
+  // a consent flash and hydration mismatch. The string is stable for React.
+  const raw = useSyncExternalStore(subscribeConsent, readConsent, () => "server");
+  const [dismissed, setDismissed] = useState(false);
+  let saved: Partial<ConsentState> | null = null;
+  try { if (raw && raw !== "server") saved = JSON.parse(raw); } catch { /* ask again */ }
+  const valid = saved !== null && typeof saved.accepted === "boolean";
 
   useEffect(() => {
+    if (!raw || raw === "server") return;
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        setVisible(true);
-      } else {
-        const parsed = JSON.parse(raw) as Partial<ConsentState>;
-        const accepted = Boolean(parsed.accepted);
-        document.documentElement.dataset.cookieConsent = accepted ? "accepted" : "declined";
-        if (accepted) {
-          window.dispatchEvent(
-            new CustomEvent("pryva-cookie-consent", {
-              detail: { accepted: true, createdAt: parsed.createdAt ?? new Date().toISOString() },
-            }),
-          );
-        } else {
-          setVisible(true);
-        }
+      const consent = JSON.parse(raw) as Partial<ConsentState>;
+      if (typeof consent?.accepted !== "boolean") return;
+      document.documentElement.dataset.cookieConsent = consent.accepted ? "accepted" : "declined";
+      if (consent.accepted) {
+        window.dispatchEvent(new CustomEvent("pryva-cookie-consent", {
+          detail: { accepted: true, createdAt: consent.createdAt },
+        }));
       }
-    } catch {
-      setVisible(true);
-    } finally {
-      setReady(true);
-    }
-  }, []);
+    } catch { /* invalid saved consent is treated as unanswered */ }
+  }, [raw]);
 
   const saveConsent = (accepted: boolean) => {
     if (typeof window === "undefined") return;
@@ -63,10 +69,10 @@ export function CookieConsentBanner() {
       // Ignore storage failures so the site still works if a browser blocks storage.
     }
 
-    setVisible(false);
+    setDismissed(true);
   };
 
-  if (!ready || !visible) return null;
+  if (raw === "server" || valid || dismissed) return null;
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-white/95 px-4 py-4 shadow-[0_-12px_40px_rgba(18,16,12,0.12)] backdrop-blur-sm">

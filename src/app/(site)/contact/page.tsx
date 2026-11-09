@@ -75,7 +75,7 @@ export default async function ContactPage() {
               defaultEmail={user?.email ?? ""}
             />
 
-            <div className="mt-6 grid gap-3 rounded-2xl border border-line bg-white p-4 text-[0.75rem] text-ink-2 sm:grid-cols-2 sm:p-5">
+            <div className="mt-6 grid gap-3 rounded-2xl border border-line bg-white p-4 text-[0.8125rem] text-ink-2 sm:grid-cols-2 sm:p-5">
               <p className="flex items-start gap-2 leading-relaxed">
                 <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
                 Never send passwords, card details, bank logins or verification codes.

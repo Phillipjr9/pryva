@@ -68,7 +68,7 @@ export default async function AdminAnomaliesPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-semibold text-ink">{item.reference}</p>
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${
+                        className={`rounded-full px-2 py-0.5 text-[0.8125rem] font-semibold ${
                           item.riskLevel === "high"
                             ? "bg-red-100 text-red-700"
                             : item.riskLevel === "warn"
@@ -78,7 +78,7 @@ export default async function AdminAnomaliesPage() {
                       >
                         {item.riskLevel}
                       </span>
-                      <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[0.7rem] font-semibold text-sky-700">
+                      <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[0.8125rem] font-semibold text-sky-700">
                         {item.status}
                       </span>
                     </div>
@@ -95,22 +95,22 @@ export default async function AdminAnomaliesPage() {
 
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
                   <div className="rounded-lg border border-line bg-white p-3">
-                    <p className="text-[0.72rem] uppercase tracking-[0.12em] text-ink-3">Amount</p>
+                    <p className="text-[0.8125rem] uppercase tracking-[0.12em] text-ink-3">Amount</p>
                     <p className="mt-1 font-medium text-ink">{formatNaira(item.amount)}</p>
                   </div>
                   <div className="rounded-lg border border-line bg-white p-3">
-                    <p className="text-[0.72rem] uppercase tracking-[0.12em] text-ink-3">Fee</p>
+                    <p className="text-[0.8125rem] uppercase tracking-[0.12em] text-ink-3">Fee</p>
                     <p className="mt-1 font-medium text-ink">{formatNaira(item.fee)}</p>
                   </div>
                   <div className="rounded-lg border border-line bg-white p-3">
-                    <p className="text-[0.72rem] uppercase tracking-[0.12em] text-ink-3">Age</p>
+                    <p className="text-[0.8125rem] uppercase tracking-[0.12em] text-ink-3">Age</p>
                     <p className="mt-1 font-medium text-ink">{item.ageHours.toFixed(1)} hrs</p>
                   </div>
                 </div>
 
                 {item.riskReasons ? (
                   <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                    <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-amber-800">Risk reasons</p>
+                    <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.12em] text-amber-800">Risk reasons</p>
                     <p className="mt-1 text-sm text-amber-900">{item.riskReasons}</p>
                   </div>
                 ) : null}

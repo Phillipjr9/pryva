@@ -111,7 +111,7 @@ export default async function VirtualNumbersPage() {
         <div className="shell">
           <h2 className="mb-3 text-[1.75rem] font-semibold text-ink">Countries</h2>
           <p className="mb-6 max-w-2xl text-[0.95rem] text-ink-2">
-            These destinations are currently available for instant virtual number verification and rentals.
+            Explore number plans for these destinations. Current stock and availability must be confirmed before ordering.
           </p>
           <CountryChips codes={[...SUPPORTED_VIRTUAL_NUMBER_COUNTRIES]} />
         </div>
@@ -201,6 +201,7 @@ export default async function VirtualNumbersPage() {
               ...(rentals.length > 0 ? [{ label: "Number rentals", plans: rentals }] : []),
             ]}
             signedIn={Boolean(user)}
+            userId={user?.id ?? null}
             walletBalance={user?.walletBalance ?? null}
             nextPath="/virtual-numbers"
             unavailableSlugs={rentals.filter((plan) => isRentalOrderingUnconfigured(plan.slug)).map((plan) => plan.slug)}

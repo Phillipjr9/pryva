@@ -38,9 +38,9 @@ function request(body: string, signature = createHmac("sha512", secret).update(b
   });
 }
 
-function fakeDatabase() {
+function fakeDatabase(amount = 2500) {
   const state = {
-    topup: { reference, userId, amount: 2500, status: "pending", paidAt: null as Date | null },
+    topup: { reference, userId, amount, status: "pending", paidAt: null as Date | null },
     balance: 500,
     ledger: [] as Array<Record<string, unknown>>,
     failInsert: false,
@@ -201,6 +201,20 @@ describe("Paystack webhook", () => {
       "Paystack event rejected: invalid payment details",
       expect.objectContaining({ amountType: "string", amount: "250000" }),
     );
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([1, 99, 100, 10_000_000])("credits a valid ₦%i webhook exactly once", async (amount) => {
+    const state = fakeDatabase(amount);
+    const body = JSON.stringify(payload({ amount: amount * 100 }));
+    expect((await POST(request(body))).status).toBe(200);
+    expect(await (await POST(request(body))).json()).toMatchObject({ duplicate: true });
+    expect(state.balance).toBe(500 + amount);
+    expect(state.ledger).toHaveLength(1);
+  });
+
+  it.each([0, 10_000_001])("rejects an out-of-range ₦%i webhook", async (amount) => {
+    expect((await POST(request(JSON.stringify(payload({ amount: amount * 100 }))))).status).toBe(400);
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 

@@ -30,7 +30,7 @@ const faqCategories = [
     questions: [
       {
         q: "How quickly will I receive my virtual number?",
-        a: "A number is provisioned immediately after payment. The code itself arrives when the platform sends it, and your order page keeps checking until the delivery window closes.",
+        a: "When a number is provisioned, your order page checks for a code until the delivery window closes. Delivery depends on the provider and the platform sending it.",
       },
       {
         q: "Which platforms do your virtual numbers work with?",

@@ -121,8 +121,8 @@ describe("app manifest", () => {
   const value = manifest();
 
   it("describes an installable, standalone app that starts at the dashboard entry", () => {
-    expect(value.name).toBe("Pryva");
-    expect(value.short_name).toBe("Pryva");
+    expect(value.name).toBe("PryvaLogs");
+    expect(value.short_name).toBe("PryvaLogs");
     expect(value.start_url).toBe("/");
     expect(value.scope).toBe("/");
     expect(value.display).toBe("standalone");

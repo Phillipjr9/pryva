@@ -52,9 +52,9 @@ const rows = [
   },
   {
     product: "Bulk & scheduled orders",
-    refund: "Failed units refunded",
+    refund: "Review required",
     detail:
-      "Failed or unfulfilled units are refunded to your wallet.",
+      "Refunds depend on each unit’s delivery outcome. Contact support with your order reference if the outcome cannot be confirmed.",
   },
 ];
 
@@ -67,7 +67,7 @@ export default function RefundPolicyPage() {
             Refund Policy
           </h1>
           <p className="mt-3 max-w-2xl text-[0.94rem] leading-relaxed text-ink-2 sm:text-[0.98rem]">
-            Automatic refunds are processed for failed or cancelled deliveries.
+            Eligible number refunds require confirmation of the delivery outcome; uncertain cases need review.
             Contact support with your order reference if you need assistance.
           </p>
         </div>
@@ -76,7 +76,7 @@ export default function RefundPolicyPage() {
       <section className="shell py-10">
         <div className="overflow-x-auto rounded-2xl border border-line bg-white">
           <table className="w-full min-w-0 text-left">
-            <thead className="bg-cream/70 text-[0.68rem] uppercase tracking-[0.12em] text-ink-3 sm:text-meta">
+            <thead className="bg-cream/70 text-[0.8125rem] uppercase tracking-[0.12em] text-ink-3 sm:text-meta">
               <tr>
                 <th className="px-3 py-3 font-semibold sm:px-4">Product</th>
                 <th className="px-3 py-3 font-semibold sm:px-4">Refund</th>
@@ -89,7 +89,7 @@ export default function RefundPolicyPage() {
                   <td className="px-3 py-4 text-[0.8rem] font-medium text-ink sm:px-4 sm:text-[0.88rem]">{row.product}</td>
                   <td className="px-3 py-4 sm:px-4">
                     <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-[0.72rem] font-semibold sm:text-meta ${
+                      className={`inline-flex rounded-full px-2.5 py-1 text-[0.8125rem] font-semibold sm:text-meta ${
                         row.refund === "Not refundable"
                           ? "bg-red-50 text-red-700"
                           : row.refund === "Automatic"

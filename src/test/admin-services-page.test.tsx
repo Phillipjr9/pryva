@@ -29,6 +29,7 @@ vi.mock("@/db", () => ({
 }));
 
 vi.mock("@/lib/identity/auth", () => ({ requireAdmin: vi.fn().mockResolvedValue({ id: "admin-1" }) }));
+vi.mock("@/lib/providers/bitcall", async (original) => ({ ...(await original<typeof import("@/lib/providers/bitcall")>()), isBitcallConfigured: vi.fn(() => true) }));
 vi.mock("@/lib/providers/fleexa", () => ({ isFleexaConfigured: vi.fn(() => true) }));
 vi.mock("@/lib/providers/smm-panel", () => ({ isSmmPanelConfigured: vi.fn(() => true) }));
 vi.mock("@/lib/services/accounts/marketplace-policy", () => ({ isMarketplaceCheckoutConfigured: vi.fn(() => false) }));
@@ -85,7 +86,7 @@ describe("the service coverage page", () => {
     state.results = [[], [], [], [], []];
     render(await AdminServicesPage());
     expect(screen.getByText("Not for sale, on purpose")).toBeTruthy();
-    expect(screen.getByText(/Bulk baskets/)).toBeTruthy();
+    expect(screen.queryByText(/Bulk baskets/)).toBeNull();
     expect(screen.getByText(/Airtime/)).toBeTruthy();
   });
 

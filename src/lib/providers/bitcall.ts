@@ -875,7 +875,7 @@ function parseOtpService(row: unknown): BitcallOtpService {
   const pools = Array.isArray(service.pools) ? service.pools : [];
   const offers: BitcallOtpOffer[] = [];
   const seen = new Set<string>();
-  for (const entry of pools.slice(0, 200)) {
+  for (const entry of pools) {
     const offer = parseOtpOffer(entry);
     if (!offer?.serviceId || seen.has(offer.serviceId)) continue;
     seen.add(offer.serviceId);
@@ -891,8 +891,7 @@ function parseOtpService(row: unknown): BitcallOtpService {
 
 /** The documented page size; the catalogue runs to thousands of services. */
 const OTP_PAGE_SIZE = 200;
-/** How many pages one catalogue read may walk before reporting what it has. */
-const OTP_PAGE_CAP = 5;
+
 
 /** `meta.hasNext` when stated; otherwise compare page with totalPages. */
 function hasNextPage(payload: unknown): boolean {
@@ -978,6 +977,59 @@ async function readCataloguePages(
   return pages;
 }
 
+/** Walk every OTP catalogue page, without silently treating a bounded prefix as
+ * the full feed. Batches bound concurrent read requests, not catalogue size. An
+ * upstream failure or a pagination loop fails the read rather than caching an
+ * incomplete list. Paid operations never use this read-only pagination helper. */
+async function readAllOtpPages(path: string, pageSize: number, query?: Record<string, string | number | undefined>): Promise<CataloguePage[]> {
+  const fetchPage = async (page: number): Promise<CataloguePage> => {
+    try {
+      return { page, payload: await gatewayFetch("GET", path, { query: { ...query, page, pageSize } }), error: null };
+    } catch (error) { return { page, payload: null, error }; }
+  };
+  const pages: CataloguePage[] = [];
+  const fingerprints = new Set<string>();
+  let next = 1;
+  let last: number | null = null;
+  while (true) {
+    const end = last === null ? next : Math.min(next + 3, last);
+    const batch = await Promise.all(pageNumbers(next, end).map(fetchPage));
+    for (const entry of batch) {
+      if (entry.error !== null) throw entry.error;
+      const envelope = asRecord(entry.payload);
+      const meta = asRecord(envelope.meta);
+      const declaredPage = pickNumber(meta, ["page"]);
+      const total = pickNumber(meta, ["totalPages", "total_pages"]);
+      if (declaredPage !== null && declaredPage !== entry.page) {
+        throw new BitcallError("OTP catalogue pagination did not advance", 502, "CATALOGUE_INCOMPLETE");
+      }
+      const rows = rowsFrom(entry.payload);
+      const fingerprint = JSON.stringify(rows);
+      if (entry.page > 1 && fingerprints.has(fingerprint)) {
+        throw new BitcallError("OTP catalogue pagination repeated a page", 502, "CATALOGUE_INCOMPLETE");
+      }
+      fingerprints.add(fingerprint);
+      pages.push(entry);
+      if (total !== null && Number.isSafeInteger(total) && total >= entry.page) last = total;
+      if (typeof meta.hasNext === "boolean") {
+        if (!meta.hasNext) {
+          if (last !== null && entry.page < last) throw new BitcallError("OTP catalogue pagination metadata conflicts", 502, "CATALOGUE_INCOMPLETE");
+          return pages;
+        }
+        if (last !== null && entry.page >= last) throw new BitcallError("OTP catalogue pagination metadata conflicts", 502, "CATALOGUE_INCOMPLETE");
+        if (rows.length === 0) throw new BitcallError("OTP catalogue pagination made no progress", 502, "CATALOGUE_INCOMPLETE");
+      } else if (last === null) {
+        // Short, unpaged responses are accepted; a full page without metadata
+        // cannot prove that there is no next page.
+        if (rows.length < pageSize) return pages;
+        throw new BitcallError("OTP catalogue completeness could not be confirmed", 502, "CATALOGUE_INCOMPLETE");
+      }
+      if (last !== null && entry.page >= last) return pages;
+    }
+    next = end + 1;
+  }
+}
+
 /**
  * The service catalogue.
  *
@@ -988,11 +1040,7 @@ async function readCataloguePages(
 export async function listBitcallOtpServices(
   filter: { q?: string; pageSize?: number } = {},
 ): Promise<BitcallOtpService[]> {
-  const pages = await readCataloguePages("/v1/otp/services", {
-    pageSize: filter.pageSize ?? OTP_PAGE_SIZE,
-    maxPages: OTP_PAGE_CAP,
-    query: { q: filter.q },
-  });
+  const pages = await readAllOtpPages("/v1/otp/services", filter.pageSize ?? OTP_PAGE_SIZE, { q: filter.q });
   const services: BitcallOtpService[] = [];
   for (const entry of pages) {
     // A page that failed is not a page that said "no more services": the read
@@ -1000,7 +1048,7 @@ export async function listBitcallOtpServices(
     if (entry.error !== null) throw entry.error;
     services.push(...rowsFrom(entry.payload).map(parseOtpService).filter((service) => service.offers.length > 0));
   }
-  return services.slice(0, 2000);
+  return services;
 }
 
 
@@ -1050,7 +1098,7 @@ function parseOtpCountryEntry(row: unknown): BitcallOtpCountryEntry {
   const starting = asRecord(country.startingPrice);
   const pools: BitcallOtpOffer[] = [];
   const seen = new Set<string>();
-  for (const entry of Array.isArray(country.pools) ? country.pools.slice(0, 200) : []) {
+  for (const entry of Array.isArray(country.pools) ? country.pools : []) {
     const offer = parseOtpOffer(entry);
     if (!offer?.serviceId || seen.has(offer.serviceId)) continue;
     seen.add(offer.serviceId);
@@ -1069,10 +1117,7 @@ function parseOtpCountryEntry(row: unknown): BitcallOtpCountryEntry {
 
 /** Every destination the catalogue publishes, pooled offers included. */
 export async function listBitcallOtpCountryEntries(): Promise<BitcallOtpCountryEntry[]> {
-  const pages = await readCataloguePages("/v1/otp/countries", {
-    pageSize: OTP_PAGE_SIZE,
-    maxPages: OTP_PAGE_CAP,
-  });
+  const pages = await readAllOtpPages("/v1/otp/countries", OTP_PAGE_SIZE);
   const entries: BitcallOtpCountryEntry[] = [];
   for (const entry of pages) {
     if (entry.error !== null) throw entry.error;

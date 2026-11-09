@@ -312,7 +312,7 @@ export default async function AdminAnalyticsPage() {
               className="font-medium text-lav-700 underline underline-offset-2 hover:text-lav-800"
             >the full user list</Link> to act on them.
             <br />
-            <span className="text-[0.78rem] text-ink-3">
+            <span className="text-[0.8125rem] text-ink-3">
               Note: the database does not currently record signup source or IP
               address, so “where they came from” isn’t available yet. That would
               need to be added to the signup flow.
@@ -343,7 +343,7 @@ export default async function AdminAnalyticsPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div
-                          className="grid h-7 w-7 place-items-center rounded-full bg-cream text-ink-2 text-[0.7rem] font-semibold"
+                          className="grid h-7 w-7 place-items-center rounded-full bg-cream text-ink-2 text-[0.8125rem] font-semibold"
                           title={row.email}
                         >
                           {row.name

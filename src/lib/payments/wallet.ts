@@ -29,6 +29,10 @@ export type WalletEntryInput = {
   reference?: string;
 };
 
+export class AccountUnavailableError extends Error {
+  constructor() { super("Account is not eligible for new debits"); this.name = "AccountUnavailableError"; }
+}
+
 export class InsufficientFundsError extends Error {
   constructor(public readonly balance: number, public readonly required: number) {
     super("Insufficient wallet balance");
@@ -102,15 +106,16 @@ export async function debitWalletInTx(tx: any, input: WalletEntryInput): Promise
   const [updated] = await tx
     .update(users)
     .set({ walletBalance: sql`${users.walletBalance} - ${input.amount}` })
-    .where(sql`${users.id} = ${input.userId} AND ${users.walletBalance} >= ${input.amount}`)
+    .where(sql`${users.id} = ${input.userId} AND ${users.walletBalance} >= ${input.amount} AND ${users.suspendedAt} IS NULL AND ${users.deletedAt} IS NULL`)
     .returning({ balance: users.walletBalance });
 
   if (!updated) {
     const [current] = await tx
-      .select({ balance: users.walletBalance })
+      .select({ balance: users.walletBalance, suspendedAt: users.suspendedAt, deletedAt: users.deletedAt })
       .from(users)
       .where(eq(users.id, input.userId))
       .limit(1);
+    if (current?.suspendedAt || current?.deletedAt) throw new AccountUnavailableError();
     throw new InsufficientFundsError(current?.balance ?? 0, input.amount);
   }
 

@@ -95,7 +95,7 @@ describe("the gift card order route tells the truth when its own refund fails", 
 
   it("does not claim a refund that did not happen", () => {
     // The old code printed the same sentence whether or not the credit committed.
-    expect(source).toContain("We could not return the money to your wallet automatically");
-    expect(source).toContain("refunded\n          ?");
+    expect(source).toContain("We could not return the money automatically");
+    expect(source).toContain("error: refunded");
   });
 });

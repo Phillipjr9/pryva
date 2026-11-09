@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
     attempt(isBitcallConfigured(), async () => {
       const read = await readOtpOffersForSupplier("bitcall", country.code, country.name, refresh);
       if (read.errorCode) throw otpCatalogProviderError(read.errorCode);
-      return { offers: read.offers, partial: false, degraded: null, fetchedAt: new Date().toISOString() };
+      return { offers: read.offers, partial: read.stale, degraded: read.stale ? "outage" as const : null, fetchedAt: read.stale ? null : new Date().toISOString() };
     }),
   ]);
   const sources = [supplier, boost, esim, otp];

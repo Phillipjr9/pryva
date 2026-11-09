@@ -1,12 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import StatusPage from "@/app/(site)/status/page";
+const auth = vi.hoisted(() => ({ current: vi.fn() }));
+vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: auth.current }));
 import { GET as dataPlans } from "@/app/api/airtime/plans/route";
 
 afterEach(() => vi.unstubAllEnvs());
 
 describe("unavailable services", () => {
   it("does not publish an unverified static data catalogue through the API", async () => {
+    auth.current.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "user" });
+    const unauthenticated = await dataPlans();
+    expect(unauthenticated.status).toBe(401);
     const response = await dataPlans();
     expect(response.status).toBe(503);
     expect(await response.json()).not.toHaveProperty("plans");

@@ -196,7 +196,13 @@ beforeAll(async () => {
   await pg.exec(await readFile("migrations/0032_welcome_verified_emails.sql", "utf8"));
   await pg.exec(await readFile("migrations/0033_account_activity_emails.sql", "utf8"));
   await pg.exec(await readFile("migrations/0034_customer_activity_emails.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0035_admin_bans.sql", "utf8"));
   await pg.exec(await readFile("migrations/0035_code_received_at.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0036_account_suspension.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0037_gift_card_request_id.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0038_referral_credit_provenance.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0039_refund_check_fairness.sql", "utf8"));
+  await pg.exec(await readFile("migrations/0040_bulk_batch_claims.sql", "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
   [purchaseRoute, refundRoute, bankRoute, verifyBankRoute, googleRoute, signupRoute, contactRoute, deleteRoute, passwordRoute, sessionsRoute, autoRefund, giftPurchaseRoute, giftCheckRoute, giftRedeemRoute, topUpRoute, verifyTopUpRoute, webhookRoute, profileRoute, notificationsRoute, markReadRoute, logoutRoute, syncRoute, scheduledRoute, promoRoute, withdrawalRoute, adminWithdrawalRoute, integrity] = await Promise.all([
@@ -319,7 +325,7 @@ describe("withdrawal request idempotency on embedded PostgreSQL", () => {
     const body = await submitted.json();
     // No approval step: the customer's request is the payout.
     expect(body.withdrawal.status).toBe("processing");
-    expect(body.message).toContain("Payout sent to your bank");
+    expect(body.message).toContain("Bank settlement has not yet been confirmed");
     const [stored] = await database.select().from(schema.withdrawals);
     expect(stored).toMatchObject({ status: "processing", paystackReference: `wd-${stored.id.replace(/-/g, "")}`, transferReference: "TRF-test" });
     expect((await database.select().from(schema.users))[0].walletBalance).toBe(3940);
@@ -474,7 +480,12 @@ describe("ledger integrity", () => {
       { userId: USER, type: "refund", amount: 500, balanceAfter: 4500, description: "Refund", reference: "integrity-refund" },
     ]);
     expect(await integrity.checkWalletIntegrity(USER)).toEqual({ valid: true, issues: [] });
-    await database.insert(schema.walletTransactions).values({ userId: USER, type: "unrecognized", amount: 1, balanceAfter: 4500, description: "Unknown", reference: "integrity-unknown" });
+    // Simulate a pre-existing legacy row; the new provenance guard refuses new
+    // unknown transaction types, but integrity must still detect historical ones.
+    await pg.exec('ALTER TABLE wallet_transactions DISABLE TRIGGER wallet_referral_provenance');
+    try {
+      await database.insert(schema.walletTransactions).values({ userId: USER, type: "unrecognized", amount: 1, balanceAfter: 4500, description: "Unknown", reference: "integrity-unknown" });
+    } finally { await pg.exec('ALTER TABLE wallet_transactions ENABLE TRIGGER wallet_referral_provenance'); }
     expect((await integrity.checkWalletIntegrity(USER)).issues).toContain("Unknown transaction type: unrecognized");
   });
 
@@ -615,13 +626,16 @@ describe("marketplace money safety", () => {
 describe("undelivered number refund SQL", () => {
   it("only claims timed-out single numbers without a code and never double-credits", async () => {
     vi.stubEnv("DATABASE_URL", "");
-    const common = { userId: USER, productSlug: "test", productName: "Test", planLabel: "Test", region: "Nigeria", amount: 1000, status: "active", provider: "fleexa", createdAt: new Date(Date.now() - 60 * 60_000) };
+    mocks.checkSms.mockResolvedValue({ code: null, message: null, status: "expired" });
+    const common = { userId: USER, productSlug: "test", productName: "Test", planLabel: "Test", region: "Nigeria", amount: 1000, status: "active", provider: "fleexa", providerRequestId: "fixture-reference", createdAt: new Date(Date.now() - 60 * 60_000) };
     await database.insert(schema.orders).values([
       { ...common, reference: "no-code", service: "numbers", duration: "Single verification · 5 min window" },
       { ...common, reference: "with-code", service: "numbers", duration: "Single verification · 5 min window", otpCode: "123456" },
       { ...common, reference: "rental", service: "numbers", duration: "7 days" },
       { ...common, reference: "esim", service: "esim", duration: "30 days" },
     ]);
+    const [paidOrder] = await database.select().from(schema.orders).where(eq(schema.orders.reference, "no-code"));
+    await database.insert(schema.walletTransactions).values({ userId: USER, orderId: paidOrder.id, type: "debit", amount: 1000, balanceAfter: 10000, description: "Fixture", reference: "fixture-debit" });
     expect(await autoRefund.processAutoRefunds()).toEqual({ refunded: 1, cancelled: 0 });
     expect(await autoRefund.processAutoRefunds()).toEqual({ refunded: 0, cancelled: 0 });
     const rows = await database.select().from(schema.orders);
@@ -630,19 +644,31 @@ describe("undelivered number refund SQL", () => {
       expect(rows.find((order) => order.reference === reference)?.status).toBe("active");
     }
     expect((await database.select().from(schema.users))[0].walletBalance).toBe(11000);
-    expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(2);
+  });
+
+  it("never refunds a review claim that was never charged", async () => {
+    const [order] = await database.insert(schema.orders).values({ userId: USER, reference: "unpaid-review", service: "numbers", productSlug: "vn-ng", productName: "Number", planLabel: "Single", region: "NG", duration: "Single verification · 5 min window", amount: 1000, status: "review", provider: "bitcall" }).returning();
+    const response = await refundRoute.POST(adminRefund(order.id, { reconciliationConfirmed: true, reason: "Checked" }));
+    expect(response.status).toBe(409);
+    expect((await database.select().from(schema.orders).where(eq(schema.orders.id, order.id)))[0].status).toBe("review");
+    expect((await database.select().from(schema.users).where(eq(schema.users.id, USER)))[0].walletBalance).toBe(10000);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
   });
 
   it("rolls back the claim and balance when a refund ledger entry fails", async () => {
     vi.stubEnv("DATABASE_URL", "");
-    await database.insert(schema.orders).values({ reference: "refund-rollback", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "Nigeria", duration: "Single verification · 5 min window", amount: 1000, provider: "fleexa", createdAt: new Date(Date.now() - 60 * 60_000) });
+    mocks.checkSms.mockResolvedValue({ code: null, message: null, status: "expired" });
+    await database.insert(schema.orders).values({ providerRequestId: "fixture-reference", reference: "refund-rollback", userId: USER, service: "numbers", productSlug: "test", productName: "Test", planLabel: "Single", region: "Nigeria", duration: "Single verification · 5 min window", amount: 1000, provider: "fleexa", createdAt: new Date(Date.now() - 60 * 60_000) });
+    const [paidOrder] = await database.select().from(schema.orders).where(eq(schema.orders.reference, "refund-rollback"));
+    await database.insert(schema.walletTransactions).values({ userId: USER, orderId: paidOrder.id, type: "debit", amount: 1000, balanceAfter: 10000, description: "Fixture", reference: "fixture-debit" });
     await pg.exec('ALTER TABLE "wallet_transactions" ADD CONSTRAINT "test_no_refund" CHECK ("type" <> \'refund\')');
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
       expect(await autoRefund.processAutoRefunds()).toEqual({ refunded: 0, cancelled: 0 });
       expect((await database.select().from(schema.orders))[0].status).toBe("active");
       expect((await database.select().from(schema.users))[0].walletBalance).toBe(10000);
-      expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
+      expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
     } finally {
       consoleError.mockRestore();
       await pg.exec('ALTER TABLE "wallet_transactions" DROP CONSTRAINT "test_no_refund"');
@@ -1261,7 +1287,7 @@ describe("gift-card SQL and bearer-code safety", () => {
 
   it("debits the purchaser, checks without URL secrets, and credits a card exactly once", async () => {
     await database.insert(schema.users).values({ id: RECIPIENT, name: "Recipient", email: "recipient@example.com", passwordHash: "hash", walletBalance: 0 });
-    const purchase = await giftPurchaseRoute.POST(giftRequest("purchase", { amount: 1000, recipientEmail: "recipient@example.com" }));
+    const purchase = await giftPurchaseRoute.POST(giftRequest("purchase", { amount: 1000, requestId: crypto.randomUUID(), recipientEmail: "recipient@example.com" }));
     expect(purchase.status).toBe(200);
     expect(purchase.headers.get("cache-control")).toContain("no-store");
     const { code } = await purchase.json();
@@ -1280,6 +1306,21 @@ describe("gift-card SQL and bearer-code safety", () => {
     expect(buyer.walletBalance).toBe(9000);
     expect(recipient.walletBalance).toBe(1000);
     expect(await database.select().from(schema.walletTransactions)).toHaveLength(2);
+  });
+
+  it("replays a gift-card purchase without issuing or charging twice and rejects changed details", async () => {
+    const requestId = crypto.randomUUID();
+    const body = { amount: 1000, requestId, recipientEmail: "recipient@example.com" };
+    const first = await giftPurchaseRoute.POST(giftRequest("purchase", body));
+    const card = await first.json();
+    expect(first.status).toBe(200);
+    const replay = await giftPurchaseRoute.POST(giftRequest("purchase", body));
+    expect(replay.status).toBe(200);
+    expect((await replay.json()).code).toBe(card.code);
+    expect((await giftPurchaseRoute.POST(giftRequest("purchase", { ...body, amount: 2000 }))).status).toBe(409);
+    expect(await database.select().from(schema.giftCards)).toHaveLength(1);
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(1);
+    expect((await database.select().from(schema.users).where(eq(schema.users.id, USER)))[0].walletBalance).toBe(9000);
   });
 
   it("rejects invalid or cross-origin gift-card requests before changing funds", async () => {

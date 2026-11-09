@@ -1,264 +1,208 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { readdir, readFile } from "node:fs/promises";
 import { NextRequest } from "next/server";
+import { randomUUID } from "node:crypto";
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle, type PgliteDatabase } from "drizzle-orm/pglite";
+import { eq, sql } from "drizzle-orm";
+import * as schema from "@/db/schema";
 
-/**
- * Bulk checkout must buy what it charges for.
- *
- * The route previously wrote every unit as `delivered` with provider `manual`
- * and no fulfilment call: the wallet was debited, nothing was bought, and the
- * order did not even appear in the hand-fulfilment queue. These tests pin the
- * order of operations — fulfil, then record and charge — and the release that
- * has to happen when a later step fails.
- */
-
-const state = vi.hoisted(() => ({
-  user: { id: "u1", email: "user@example.com", walletBalance: 50000 } as { id: string; email: string; walletBalance: number } | null,
-  sameOrigin: true,
-  rentalUnconfigured: false,
-  balance: 50000,
-  fulfillable: new Set(["vn-ng", "vn-us", "rent-ng-30"]),
-  fulfilError: null as Error | null,
-  failOnCall: 0 as number, // 0 = never; n = fail the nth fulfilment attempt
-  calls: [] as string[],
-  inserts: [] as any[],
-  released: [] as any[],
-  debits: [] as any[],
-  txError: null as Error | null,
-  balanceAfter: 49000,
-}));
-
-vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: async () => state.user, getCurrentUser: async () => state.user }));
-
-vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => state.sameOrigin }));
-
-vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
-  // Keep the real module: `createRateLimiter` runs when a money module is
-  // imported, so a factory with only one function fails at import time.
-  const actual = await importOriginal<typeof import("@/lib/platform/rate-limit")>();
-  return { ...actual, purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }) };
-});
-
+const mocks = vi.hoisted(() => ({ db: null as unknown, fulfill: vi.fn(), authenticated: true, sameOrigin: true }));
+vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
+vi.mock("@/lib/identity/admin-auth", () => ({ authorizeAdminApi: async () => ({ user: { id: "22222222-2222-4222-8222-222222222222", email: "admin@example.test" }, response: null }) }));
+vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: async () => mocks.authenticated ? { id: "11111111-1111-4111-8111-111111111111" } : null }));
+vi.mock("@/lib/platform/net", () => ({ isSameOriginMutation: () => mocks.sameOrigin }));
+vi.mock("@/lib/platform/rate-limit", async (original) => ({ ...await original<typeof import("@/lib/platform/rate-limit")>(), purchaseRateLimiter: async () => ({ allowed: true }) }));
+vi.mock("@/lib/admin/fraud", () => ({ purchaseVelocity: async () => ({ allowed: true }), recordFraudEvent: vi.fn() }));
 vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
-
-vi.mock("@/lib/services/numbers/number-availability", () => ({
-  isRentalOrderingUnconfigured: (slug: string) => state.rentalUnconfigured && slug === "rent-ng-30",
-}));
-
-vi.mock("@/lib/providers/fleexa", () => ({
-  FleexaError: class FleexaError extends Error {
-    code: string;
-    constructor(message: string, _status: number, code: string) {
-      super(message);
-      this.code = code;
-    }
-  },
-}));
-
-vi.mock("@/lib/services/fulfillment", () => ({
-  isPlanFulfillable: (slug: string) => state.fulfillable.has(slug),
-  fulfillPlan: async (plan: { slug: string; price: number }) => {
-    state.calls.push(plan.slug);
-    if (state.failOnCall && state.calls.length >= state.failOnCall) {
-      throw state.fulfilError ?? new Error("provider down");
-    }
-    return {
-      provider: "fleexa",
-      providerCostNgn: Math.max(0, plan.price - 100),
-      providerRequestId: `req-${plan.slug}-${state.calls.length}`,
-      referenceCode: `+234800000${state.calls.length}`,
-      otpCode: null,
-      expiresAt: new Date(Date.now() + 600_000),
-    };
-  },
-  cancelUpstream: async (order: unknown) => {
-    state.released.push(order);
-    return true;
-  },
-}));
-
-vi.mock("@/lib/payments/wallet", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/payments/wallet")>();
-  return {
-    ...actual,
-    debitWalletInTx: async (_tx: unknown, entry: unknown) => {
-      state.debits.push(entry);
-      return state.balanceAfter;
-    },
-  };
+vi.mock("@/lib/content/referrals", () => ({ settleReferralRewards: async () => ({ credited: 0 }) }));
+vi.mock("@/lib/services/numbers/number-availability", () => ({ isNumberPlanOrderingConfigured: () => true }));
+vi.mock("@/lib/services/fulfillment", async (original) => ({ ...await original<typeof import("@/lib/services/fulfillment")>(), fulfillPlan: mocks.fulfill }));
+const USER = "11111111-1111-4111-8111-111111111111";
+let pg: PGlite, database: PgliteDatabase<typeof schema>, POST: typeof import("@/app/api/orders/bulk/route").POST;
+let refundUnattempted: typeof import("@/app/api/admin/bulk-unattempted/route").POST;
+const body = (requestId: string, quantity = 2) => ({ requestId, items: [{ productSlug: "vn-ng", quantity }] });
+const request = (value: unknown) => new Request("https://pryva.test/api/orders/bulk", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(value) });
+const delivery = { provider: "bitcall", providerRequestId: "provider-123", providerCostNgn: 100, referenceCode: "+123456789", otpCode: null, expiresAt: new Date(Date.now() + 600000) };
+beforeAll(async () => {
+  vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db"); vi.stubEnv("VERCEL_ENV", "");
+  pg = new PGlite();
+  for (const file of (await readdir("migrations")).filter((name) => /^\d{4}_.*\.sql$/.test(name)).sort()) await pg.exec(await readFile(`migrations/${file}`, "utf8"));
+  database = drizzle(pg, { schema }); mocks.db = database;
+  ({ POST } = await import("@/app/api/orders/bulk/route"));
+  ({ POST: refundUnattempted } = await import("@/app/api/admin/bulk-unattempted/route"));
+}, 60000);
+afterAll(async () => { await pg?.close(); vi.unstubAllEnvs(); });
+beforeEach(async () => {
+  await pg.exec('TRUNCATE TABLE "users" CASCADE');
+  await database.insert(schema.users).values([
+    { id: USER, name: "Buyer", email: "bulk@example.test", passwordHash: "x", walletBalance: 100000 },
+    { id: "22222222-2222-4222-8222-222222222222", name: "Admin", email: "admin@example.test", passwordHash: "x", walletBalance: 0 },
+  ]);
+  mocks.authenticated = true; mocks.sameOrigin = true; mocks.fulfill.mockReset();
+  mocks.fulfill.mockImplementation(async (_plan, hooks) => { await hooks.onOtpAttempt(); await hooks.onOtpAccepted(delivery.providerRequestId); return delivery; });
 });
+async function rows() { return database.select().from(schema.orders); }
+async function ledger() { return database.select().from(schema.walletTransactions); }
+async function balance() { return (await database.select().from(schema.users).where(eq(schema.users.id, USER)))[0].walletBalance; }
 
-function chain(result: unknown) {
-  const api: Record<string, unknown> = {
-    from: () => api,
-    where: () => api,
-    limit: () => Promise.resolve(result),
-    values: (value: unknown) => {
-      state.inserts.push(value);
-      return Promise.resolve();
-    },
-    set: () => ({ where: () => Promise.resolve() }),
-  };
-  return api;
-}
-
-vi.mock("@/db", () => ({
-  db: {
-    select: () => chain([{ walletBalance: state.balance }]),
-    transaction: async (callback: (tx: unknown) => Promise<unknown>) => {
-      if (state.txError) throw state.txError;
-      const tx = {
-        select: () => chain([{ walletBalance: state.balance }]),
-        insert: () => chain(null),
-        update: () => chain(null),
-      };
-      return callback(tx);
-    },
-  },
-}));
-
-const { POST } = await import("@/app/api/orders/bulk/route");
-
-function jsonRequest(body: unknown, origin = "https://pryva.test") {
-  return new NextRequest("https://pryva.test/api/orders/bulk", {
-    method: "POST",
-    headers: { origin, "content-type": "application/json" },
-    body: JSON.stringify(body),
+describe("durable bulk checkout", () => {
+  it("creates individually linked debits and replays without spending twice", async () => {
+    const input = body(randomUUID());
+    const first = await POST(request(input));
+    expect(first.status).toBe(200);
+    const data = await first.json();
+    expect(data.units).toHaveLength(2);
+    expect(data.units.every((unit: { status: string }) => unit.status === "active")).toBe(true);
+    const entries = await ledger();
+    expect(entries).toHaveLength(2);
+    expect(entries.every((entry) => entry.type === "debit" && entry.orderId)).toBe(true);
+    expect(entries.reduce((sum, entry) => sum + entry.amount, 0)).toBe(data.batch.total);
+    expect(await balance()).toBe(100000 - data.batch.total);
+    const replay = await POST(request(input));
+    expect((await replay.json()).replayed).toBe(true);
+    expect(mocks.fulfill).toHaveBeenCalledTimes(2);
+    expect(await ledger()).toHaveLength(2);
+    expect((await POST(request(body(input.requestId, 3)))).status).toBe(409);
   });
-}
-
-beforeEach(() => {
-  // These tests exercise a mocked live database; no external database is contacted.
-  vi.stubEnv("DATABASE_URL", "postgres://test.invalid/db");
-  vi.stubEnv("VERCEL_ENV", "");
-  state.user = { id: "u1", email: "user@example.com", walletBalance: 50000 };
-  state.sameOrigin = true;
-  state.rentalUnconfigured = false;
-  state.balance = 50000;
-  state.fulfilError = null;
-  state.failOnCall = 0;
-  state.calls = [];
-  state.inserts = [];
-  state.released = [];
-  state.debits = [];
-  state.txError = null;
-});
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-  vi.clearAllMocks();
-});
-
-describe("POST /api/orders/bulk", () => {
-  it("preflights a missing rental provider before buying any unit", async () => {
-    state.rentalUnconfigured = true;
-    const response = await POST(jsonRequest({ items: [{ productSlug: "vn-ng", quantity: 1 }, { productSlug: "rent-ng-30", quantity: 1 }] }));
-    expect(response.status).toBe(503);
-    expect(await response.json()).toMatchObject({ error: expect.stringContaining("Nothing was purchased or charged") });
-    expect(state.calls).toEqual([]);
-    expect(state.inserts).toEqual([]);
-    expect(state.debits).toEqual([]);
-  });
-
-  it("never buys from a supplier in a Vercel preview", async () => {
-    vi.stubEnv("VERCEL_ENV", "preview");
-    expect((await POST(jsonRequest({ items: [{ productSlug: "vn-ng", quantity: 1 }] }))).status).toBe(503);
-    expect(state.calls).toEqual([]);
-    expect(state.debits).toEqual([]);
-  });
-
-  it("rejects unauthenticated and cross-origin requests", async () => {
-    state.user = null;
-    expect((await POST(jsonRequest({ items: [{ productSlug: "vn-ng", quantity: 1 }] }))).status).toBe(401);
-    state.user = { id: "u1", email: "user@example.com", walletBalance: 50000 };
-    state.sameOrigin = false;
-    expect((await POST(jsonRequest({ items: [{ productSlug: "vn-ng", quantity: 1 }] }))).status).toBe(403);
-  });
-
-  it("rejects empty, invalid and oversized baskets", async () => {
-    expect((await POST(jsonRequest({ items: [] }))).status).toBe(400);
-    expect((await POST(jsonRequest({ items: [{ productSlug: "nope", quantity: 1 }] }))).status).toBe(400);
-    expect((await POST(jsonRequest({ items: [{ productSlug: "vn-ng", quantity: -1 }] }))).status).toBe(400);
-    // 21 units is over the per-checkout ceiling, so no supplier call is made.
-    expect((await POST(jsonRequest({ items: [{ productSlug: "vn-ng", quantity: 21 }] }))).status).toBe(400);
-    expect(state.calls).toHaveLength(0);
-  });
-
-  it("refuses a plan with no supplier path instead of charging for it", async () => {
-    const response = await POST(jsonRequest({ items: [{ productSlug: "proxy-ng-1", quantity: 2 }] }));
-    expect(response.status).toBe(400);
-    const data = await response.json();
-    expect(data.error).toContain("cannot be delivered automatically");
-    expect(state.calls).toHaveLength(0);
-    expect(state.debits).toHaveLength(0);
-    expect(state.inserts).toHaveLength(0);
-  });
-
-  it("refuses a basket the wallet cannot cover before buying anything", async () => {
-    state.balance = 100;
-    const response = await POST(jsonRequest({ items: [{ productSlug: "vn-ng", quantity: 2 }] }));
-    expect(response.status).toBe(402);
-    expect(state.calls).toHaveLength(0);
-  });
-
-  it("buys every unit, then records delivered orders and charges once", async () => {
-    const response = await POST(jsonRequest({
-      items: [
-        { productSlug: "vn-ng", quantity: 2 },
-        { productSlug: "vn-us", quantity: 1 },
-      ],
-    }));
-
+  it("allocates the discounted total across every unit and checks the discounted margin", async () => {
+    const response = await POST(request(body(randomUUID(), 10)));
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data.ok).toBe(true);
-    expect(data.count).toBe(3);
-    expect(state.calls).toEqual(["vn-ng", "vn-ng", "vn-us"]);
-
-    // Three real orders, each carrying the provider's own identifiers.
-    expect(state.inserts).toHaveLength(3);
-    for (const order of state.inserts) {
-      expect(order.status).toBe("active");
-      expect(order.provider).toBe("fleexa");
-      expect(order.providerRequestId).toMatch(/^req-/);
-      expect(order.referenceCode).toMatch(/^\+234/);
-      expect(order.providerCostNgn).toBeTypeOf("number");
-    }
-
-    // One debit for the whole basket, not one per item.
-    expect(state.debits).toHaveLength(1);
-    expect(state.debits[0].amount).toBeGreaterThan(0);
+    expect(data.units).toHaveLength(10);
+    expect((await ledger()).reduce((sum, entry) => sum + entry.amount, 0)).toBe(data.batch.total);
+    expect(mocks.fulfill.mock.calls.map((call) => call[0].price).reduce((sum, price) => sum + price, 0)).toBe(data.batch.total);
+  });
+  it("rolls back the entire batch when the wallet cannot cover all units", async () => {
+    await database.update(schema.users).set({ walletBalance: 1 }).where(eq(schema.users.id, USER));
+    expect((await POST(request(body(randomUUID())))).status).toBe(402);
+    expect(await rows()).toHaveLength(0);
+    expect(await ledger()).toHaveLength(0);
+    expect(await database.select().from(schema.bulkBatches)).toHaveLength(0);
+    expect(mocks.fulfill).not.toHaveBeenCalled();
   });
 
-  it("warns against retrying an ambiguous purchase in a bulk basket", async () => {
-    const { FleexaError } = await import("@/lib/providers/fleexa");
-    state.failOnCall = 1;
-    state.fulfilError = new FleexaError("Unknown", 502, "AMBIGUOUS_PURCHASE");
-    const response = await POST(jsonRequest({ items: [{ productSlug: "vn-ng", quantity: 3 }] }));
-    expect(response.status).toBe(502);
-    expect((await response.json()).error).toMatch(/contact support before trying again/i);
-    expect(state.calls).toHaveLength(1);
-    expect(state.debits).toHaveLength(0);
+  it("holds an ambiguous supplier call and refunds only unattempted units", async () => {
+    mocks.fulfill.mockImplementation(async (_plan, hooks) => { await hooks.onOtpAttempt(); throw new Error("lost supplier response"); });
+    const input = body(randomUUID(), 3);
+    const response = await POST(request(input));
+    expect(response.status).toBe(202);
+    const orders = await rows();
+    expect(orders.filter((order) => order.status === "review")).toHaveLength(1);
+    expect(orders.filter((order) => order.status === "refunded")).toHaveLength(2);
+    expect((await ledger()).filter((entry) => entry.type === "refund")).toHaveLength(2);
+    expect(mocks.fulfill).toHaveBeenCalledTimes(1);
+    expect((await POST(request(input))).status).toBe(202);
+    expect((await POST(request(body(randomUUID())))).status).toBe(202);
+    expect(mocks.fulfill).toHaveBeenCalledTimes(1);
+  });
+  it("closes a reviewed batch only after all units have been settled", async () => {
+    mocks.fulfill.mockImplementation(async (_plan, hooks) => { await hooks.onOtpAttempt(); throw new Error("unknown"); });
+    const input = body(randomUUID());
+    expect((await POST(request(input))).status).toBe(202);
+    const held = (await rows()).find((order) => order.status === "review")!;
+    // Simulate a separate operator reconciliation; the replay itself never
+    // decides whether the upstream order was delivered or refunds money.
+    await database.update(schema.orders).set({ status: "active", providerRequestId: "confirmed" }).where(eq(schema.orders.id, held.id));
+    expect((await POST(request(input))).status).toBe(200);
+    expect((await database.select().from(schema.bulkBatches))[0].status).toBe("completed");
+    expect((await ledger()).filter((entry) => entry.type === "refund")).toHaveLength(1);
   });
 
-  it("charges nothing and releases what was already bought when a supplier refuses a unit", async () => {
-    state.failOnCall = 2;
-    const response = await POST(jsonRequest({ items: [{ productSlug: "vn-ng", quantity: 3 }] }));
-
-    expect(response.status).toBe(502);
-    const data = await response.json();
-    expect(data.error).toMatch(/nothing was charged/i);
-    expect(state.released).toHaveLength(1);
-    expect(state.released[0].providerRequestId).toMatch(/^req-/);
-    expect(state.inserts).toHaveLength(0);
-    expect(state.debits).toHaveLength(0);
+  it("refunds every unit if supplier preflight fails before the call", async () => {
+    mocks.fulfill.mockRejectedValue(new Error("unavailable before purchase"));
+    const response = await POST(request(body(randomUUID())));
+    expect(response.status).toBe(200);
+    expect((await rows()).every((order) => order.status === "refunded")).toBe(true);
+    expect(await balance()).toBe(100000);
+    expect((await ledger()).filter((entry) => entry.type === "refund")).toHaveLength(2);
+  });
+  it("preserves restricted referral credit through per-unit refunds", async () => {
+    await database.execute(sql`UPDATE users SET referral_credit_balance = 1200 WHERE id = ${USER}`);
+    mocks.fulfill.mockRejectedValue(new Error("preflight unavailable"));
+    expect((await POST(request(body(randomUUID())))).status).toBe(200);
+    const state = await pg.query<{ wallet_balance: number; referral_credit_balance: number }>("SELECT wallet_balance, referral_credit_balance FROM users WHERE id = $1", [USER]);
+    expect(state.rows[0]).toEqual({ wallet_balance: 100000, referral_credit_balance: 1200 });
+    const entries = await ledger();
+    expect(entries.filter((entry) => entry.type === "debit")).toHaveLength(2);
+    expect(entries.filter((entry) => entry.type === "refund")).toHaveLength(2);
   });
 
-  it("releases bought units when recording the order fails", async () => {
-    state.txError = new Error("database went away");
-    const response = await POST(jsonRequest({ items: [{ productSlug: "vn-ng", quantity: 2 }] }));
+  it("never contacts the provider if suspension wins after reservation", async () => {
+    mocks.fulfill.mockImplementation(async (_plan, hooks) => {
+      await database.update(schema.users).set({ suspendedAt: new Date() }).where(eq(schema.users.id, USER));
+      await hooks.onOtpAttempt(); throw new Error("should not reach provider");
+    });
+    expect((await POST(request(body(randomUUID())))).status).toBe(200);
+    expect((await rows()).every((order) => order.status === "refunded")).toBe(true);
+    expect(await balance()).toBe(100000);
+    expect(mocks.fulfill).toHaveBeenCalledOnce();
+  });
+  it("replays while a first unit is in flight rather than starting another batch", async () => {
+    let release!: () => void, entered!: () => void;
+    const waiting = new Promise<void>((resolve) => { release = resolve; });
+    const started = new Promise<void>((resolve) => { entered = resolve; });
+    mocks.fulfill.mockImplementationOnce(async (_plan, hooks) => { await hooks.onOtpAttempt(); entered(); await waiting; await hooks.onOtpAccepted(delivery.providerRequestId); return delivery; });
+    const input = body(randomUUID());
+    const first = POST(request(input)); await started;
+    expect((await POST(request(input))).status).toBe(202);
+    expect((await POST(request(body(randomUUID())))).status).toBe(202);
+    expect(mocks.fulfill).toHaveBeenCalledTimes(1);
+    release(); expect((await first).status).toBe(200);
+    expect(mocks.fulfill).toHaveBeenCalledTimes(2);
+  });
+  it("atomically refunds a provably unattempted unit before its paid boundary", async () => {
+    let release!: () => void, entered!: () => void;
+    const waiting = new Promise<void>((resolve) => { release = resolve; });
+    const started = new Promise<void>((resolve) => { entered = resolve; });
+    let paidCalls = 0;
+    mocks.fulfill.mockImplementationOnce(async (_plan, hooks) => { entered(); await waiting; await hooks.onOtpAttempt(); paidCalls++; return delivery; });
+    const input = body(randomUUID(), 1);
+    const first = POST(request(input)); await started;
+    const unit = (await rows())[0];
+    const adminRequest = () => new NextRequest("https://pryva.test/api/admin/bulk-unattempted", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ orderId: unit.id, reason: "Investigated interrupted batch" }) });
+    expect((await refundUnattempted(adminRequest())).status).toBe(200);
+    expect((await refundUnattempted(adminRequest())).status).toBe(409);
+    release(); await first;
+    expect(paidCalls).toBe(0);
+    expect((await rows())[0].status).toBe("refunded");
+    expect(await balance()).toBe(100000);
+    expect((await ledger()).filter((entry) => entry.type === "refund")).toHaveLength(1);
+    expect(await database.select().from(schema.adminAuditLog)).toHaveLength(1);
+  });
+  it("rolls back an unattempted refund if its audit entry fails", async () => {
+    let release!: () => void, entered!: () => void;
+    const waiting = new Promise<void>((resolve) => { release = resolve; });
+    const started = new Promise<void>((resolve) => { entered = resolve; });
+    mocks.fulfill.mockImplementationOnce(async (_plan, hooks) => { entered(); await waiting; await hooks.onOtpAttempt(); return delivery; });
+    const first = POST(request(body(randomUUID(), 1))); await started;
+    const unit = (await rows())[0];
+    await pg.exec("ALTER TABLE admin_audit_log ADD CONSTRAINT reject_bulk_audit CHECK (action <> 'order.refund')");
+    try {
+      const result = await refundUnattempted(new NextRequest("https://pryva.test/api/admin/bulk-unattempted", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ orderId: unit.id, reason: "Investigated interrupted batch" }) }));
+      expect(result.status).toBe(500);
+      expect((await rows())[0].status).toBe("processing");
+      expect((await ledger()).filter((entry) => entry.type === "refund")).toHaveLength(0);
+    } finally { await pg.exec("ALTER TABLE admin_audit_log DROP CONSTRAINT reject_bulk_audit"); release(); await first; }
+  });
 
-    expect(response.status).toBe(500);
-    expect(state.released).toHaveLength(2);
-    expect(state.debits).toHaveLength(0);
+  it("refuses to refund when the paid supplier boundary has started", async () => {
+    let release!: () => void, entered!: () => void;
+    const waiting = new Promise<void>((resolve) => { release = resolve; });
+    const started = new Promise<void>((resolve) => { entered = resolve; });
+    mocks.fulfill.mockImplementationOnce(async (_plan, hooks) => { await hooks.onOtpAttempt(); entered(); await waiting; return delivery; });
+    const first = POST(request(body(randomUUID(), 1))); await started;
+    const unit = (await rows())[0];
+    const result = await refundUnattempted(new NextRequest("https://pryva.test/api/admin/bulk-unattempted", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ orderId: unit.id, reason: "Investigated interrupted batch" }) }));
+    expect(result.status).toBe(409);
+    expect((await ledger()).filter((entry) => entry.type === "refund")).toHaveLength(0);
+    release(); await first;
+  });
+
+  it("rejects anonymous, cross-origin and invalid batches without a debit", async () => {
+    mocks.authenticated = false; expect((await POST(request(body(randomUUID())))).status).toBe(401);
+    mocks.authenticated = true; mocks.sameOrigin = false; expect((await POST(request(body(randomUUID())))).status).toBe(403);
+    mocks.sameOrigin = true; expect((await POST(request(body(randomUUID(), 21)))).status).toBe(400);
+    expect(await ledger()).toHaveLength(0);
   });
 });

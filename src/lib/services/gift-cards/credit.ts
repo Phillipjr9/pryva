@@ -14,7 +14,7 @@
 
 import { db } from "@/db";
 import { giftCards, users, walletTransactions } from "@/db/schema";
-import { eq, and, gte, gt, ne, sql } from "drizzle-orm";
+import { eq, and, gte, gt, ne, isNull, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
 import {
@@ -40,10 +40,11 @@ export function generateCode(): string {
 export async function createGiftCard(params: {
   userId: string;
   amount: number;
+  requestId: string;
   recipientEmail?: string;
   message?: string;
-}): Promise<{ code: string; amount: number; expiresAt: Date }> {
-  const { userId, amount, recipientEmail, message } = params;
+}): Promise<{ code: string; amount: number; expiresAt: Date; replayed: boolean }> {
+  const { userId, amount, requestId, recipientEmail, message } = params;
 
   if (
     !Number.isSafeInteger(amount) ||
@@ -55,39 +56,44 @@ export async function createGiftCard(params: {
     );
   }
 
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) {
+    throw new Error("A valid purchase request ID is required");
+  }
+
   const code = generateCode();
   const expiresAt = new Date();
   expiresAt.setMonth(expiresAt.getMonth() + GIFT_CARD_VALIDITY_MONTHS);
 
-  await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
+    // The unique key arbitrates concurrent retries before either can debit.
+    const [created] = await tx.insert(giftCards).values({
+      code, requestId: requestId.toLowerCase(), amount, initialAmount: amount, purchasedBy: userId,
+      recipientEmail, message, status: "active", expiresAt,
+    }).onConflictDoNothing().returning();
+    if (!created) {
+      const [existing] = await tx.select().from(giftCards)
+        .where(and(eq(giftCards.purchasedBy, userId), eq(giftCards.requestId, requestId.toLowerCase()))).limit(1);
+      if (!existing) throw new Error("Gift card purchase could not be claimed");
+      if (existing.initialAmount !== amount || (existing.recipientEmail ?? null) !== (recipientEmail ?? null) || (existing.message ?? null) !== (message ?? null)) {
+        throw new Error("Purchase request ID belongs to a different gift card");
+      }
+      return { code: existing.code, amount: existing.initialAmount, expiresAt: existing.expiresAt, replayed: true };
+    }
+
     const [user] = await tx.update(users)
       .set({ walletBalance: sql`${users.walletBalance} - ${amount}` })
-      .where(and(eq(users.id, userId), gte(users.walletBalance, amount)))
+      .where(and(eq(users.id, userId), gte(users.walletBalance, amount), isNull(users.suspendedAt), isNull(users.deletedAt)))
       .returning({ balance: users.walletBalance });
     if (!user) throw new Error("Insufficient wallet balance or user not found");
-
-    await tx.insert(giftCards).values({
-      code,
-      amount,
-      initialAmount: amount,
-      purchasedBy: userId,
-      recipientEmail,
-      message,
-      status: "active",
-      expiresAt,
-    });
     await tx.insert(walletTransactions).values({
-      userId,
-      type: "debit",
-      amount,
-      balanceAfter: user.balance,
-      description: `Gift card purchase: ${code}`,
-      reference: `GIFT-${code}`,
+      userId, type: "debit", amount, balanceAfter: user.balance,
+      description: `Gift card purchase: ${code}`, reference: `GIFT-${code}`,
     });
+    return { code, amount, expiresAt, replayed: false };
   });
 
-  scheduleWalletEmails();
-  return { code, amount, expiresAt };
+  if (!result.replayed) scheduleWalletEmails();
+  return result;
 }
 
 export async function redeemGiftCard(params: {

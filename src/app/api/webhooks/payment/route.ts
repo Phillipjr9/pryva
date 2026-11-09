@@ -1,3 +1,4 @@
+import { WALLET_TOPUP_MIN_NGN, WALLET_TOPUP_MAX_NGN } from "@/lib/payments/topup-limits";
 import { paystackKeyUsable } from "@/lib/payments/paystack-policy";
 import { NextRequest, NextResponse } from "next/server";
 import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
     typeof userId !== "string" ||
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId) ||
     typeof reference !== "string" || reference.length > 40 || reference.length === 0 ||
-    typeof kobo !== "number" || !Number.isSafeInteger(kobo) || kobo < 10000 || kobo > 1000000000 || kobo % 100 !== 0
+    typeof kobo !== "number" || !Number.isSafeInteger(kobo) || kobo < WALLET_TOPUP_MIN_NGN * 100 || kobo > WALLET_TOPUP_MAX_NGN * 100 || kobo % 100 !== 0
   ) {
     // This rejection previously returned 400 with nothing logged, so a webhook
     // that refused to credit a real payment left no evidence anywhere -- not in

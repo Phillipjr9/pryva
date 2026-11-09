@@ -36,6 +36,7 @@ export type AdminAuditAction =
   | "withdrawal.reject"
   | "withdrawal.complete"
   | "user.ban"
+  | "user.unban"
   | "user.credit"
   | "user.debit"
   | "user.payout_name"

@@ -208,12 +208,12 @@ export function ServiceCard({ item, countryName }: { item: ExplorerItem; country
               that look up the full price line would match both. */}
           {price !== null ? ` · ${formatNaira(price)}${item.priceFrom ? "+" : ""}` : item.category === "verification" && item.source === "live" ? " · Ordering unavailable" : item.category === "esim" && item.source === "live" ? " · Price unavailable" : item.source === "live" ? " · Price on request" : " · Price not listed"}
         </p>
-        {/* OTP stock comes directly from Bitcall's selected pool. Keep it visible
+        {/* OTP stock comes from the selected pool. Keep it visible
             on phones too; hiding UnitsStatus at the mobile breakpoint made a
             live listing look empty even when the supplier reported inventory. */}
         {item.category === "verification" && item.source === "live" && (
           <p className="mt-0.5 truncate text-micro text-ink-3 sm:hidden">
-            <span className="font-semibold">Bitcall stock:</span> {formatUnitCount(item.stock, "Not reported")}
+            <span className="font-semibold">Reported stock:</span> {formatUnitCount(item.stock, "Not reported")}
           </p>
         )}
         {/* Number-plan counts, when reported, must be visible on phones too.
@@ -418,7 +418,7 @@ export function ServiceExplorer({
   }, [readinessById]);
   const summary = readinessSummary(readiness);
 
-  // Live listings: boosts are purchasable, the others are read-only until their ordering is wired.
+  // Boost listings link to checkout when priced; other live listings may be read-only.
   useEffect(() => {
     if (!country) return;
     const controller = new AbortController();
@@ -615,7 +615,7 @@ export function ServiceExplorer({
 
           <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-meta leading-relaxed border-amber-200 bg-amber-50/70 text-amber-900`}>
             <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-            {liveState?.country === country && liveState.live && liveState.reason !== "funding" && !liveState.failed ? <p><strong>Live listings are current.</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. {liveState.partial && "Some listings may be missing. "}<Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).lead}</strong>{" "}{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).rest} <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
+            {liveState?.country === country && liveState.live && liveState.reason !== "funding" && !liveState.failed ? <p><strong>{liveState.partial ? "Live listings may be incomplete or out of date." : "Live listings are current."}</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. <Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).lead}</strong>{" "}{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).rest} <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
           </div>
 
           <section aria-labelledby="services-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-3.5 sm:p-6">

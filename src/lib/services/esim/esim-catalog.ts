@@ -152,7 +152,7 @@ async function readEsimSnapshot(refresh = false): Promise<EsimSnapshot> {
 
     const snapshot: EsimSnapshot = {
       plans: plans.value.plans,
-      countries: countries.status === "fulfilled" ? countries.value.slice(0, 400) : [],
+      countries: countries.status === "fulfilled" ? countries.value : [],
       returned: plans.value.returned,
       unreadable: plans.value.unreadable,
       partial: plans.value.partial || countries.status === "rejected",

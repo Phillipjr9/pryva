@@ -80,7 +80,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
           <p className="text-meta text-ink-3">{order.productName}</p>
         </div>
         <span
-          className={`inline-flex rounded-full px-3 py-1 text-[0.76rem] font-semibold capitalize ${
+          className={`inline-flex rounded-full px-3 py-1 text-[0.8125rem] font-semibold capitalize ${
             STATUS_STYLES[order.status] ?? "bg-slate-100 text-slate-600"
           }`}
         >

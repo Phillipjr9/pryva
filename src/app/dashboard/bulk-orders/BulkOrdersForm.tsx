@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { plans, formatNaira, findPlan } from "@/lib/services/catalog";
 import { calculateBulkOrder, getBulkDiscountMessage, type BulkOrderItem } from "@/lib/services/bulk-orders";
 import type { PublicUser } from "@/lib/identity/auth";
@@ -18,11 +18,34 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [recovering, setRecovering] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [inReview, setInReview] = useState(false);
+  const sending = useRef(false);
+  const storageKey = `pryva.bulk.pending.v1.${user.id}`;
+  useEffect(() => {
+    let cancelled = false;
+    // Storage is a browser-only external source; wait until after hydration and
+    // never enable checkout before recovery has been inspected.
+    queueMicrotask(() => {
+      if (cancelled) return;
+      try {
+        const pending = JSON.parse(window.localStorage.getItem(storageKey) || "null");
+        if (pending && typeof pending.id === "string" && Array.isArray(pending.items)) {
+          setItems(pending.items);
+          setRecovering(true);
+        }
+      } catch { setError("Could not read a previous batch. Check your orders before buying again."); setInReview(true); }
+      finally { setReady(true); }
+    });
+    return () => { cancelled = true; };
+  }, [storageKey]);
 
   const sellable = new Set(sellableSlugs);
   const allPlans = plans.filter((p) => sellable.has(p.slug));
 
   function addItem(productSlug: string) {
+    if (!ready || recovering) return;
     if (totalQuantity >= maxUnits) { setError(`A basket can contain at most ${maxUnits} items.`); return; }
     setError(null);
     setSuccessMessage(null);
@@ -37,6 +60,7 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
   }
 
   function updateQuantity(productSlug: string, quantity: number) {
+    if (recovering) return;
     const current = items.find((item) => item.productSlug === productSlug)?.quantity ?? 0;
     if (totalQuantity - current + quantity > maxUnits) { setError(`A basket can contain at most ${maxUnits} items.`); return; }
     setError(null);
@@ -51,38 +75,51 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
   }
 
   function removeItem(productSlug: string) {
+    if (recovering) return;
     setSuccessMessage(null);
     setItems(items.filter((item) => item.productSlug !== productSlug));
   }
 
   async function handlePurchase() {
-    if (items.length === 0 || submitting) return;
+    if (!ready || items.length === 0 || sending.current || inReview) return;
+    let pending: { id: string; items: BulkOrderItem[] };
+    try {
+      const stored = window.localStorage.getItem(storageKey);
+      pending = stored ? JSON.parse(stored) : { id: crypto.randomUUID(), items };
+      window.localStorage.setItem(storageKey, JSON.stringify(pending));
+      if (!window.localStorage.getItem(storageKey)) throw new Error("Storage unavailable");
+    } catch {
+      setError("Could not save recovery information. No order was sent.");
+      return;
+    }
+    sending.current = true;
+    setRecovering(true);
     setSubmitting(true);
     setError(null);
     setSuccessMessage(null);
-
     try {
       const res = await fetch("/api/orders/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: items.map((i) => ({ productSlug: i.productSlug, quantity: i.quantity })),
-        }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: pending.id, items: pending.items }),
       });
-
       const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to complete bulk purchase.");
+      if (!res.ok || !data.ok) {
+        setError(data.error || "Could not confirm the batch. Check your orders and wallet before retrying.");
         return;
       }
-
-      setSuccessMessage(`Bulk order placed: ${data.count} ${data.count === 1 ? "item" : "items"}. Codes appear in your orders as they arrive. Reference: ${data.reference}`);
+      if (data.pending) {
+        setInReview(true);
+        setError(data.message || "This batch needs review. Check your orders and wallet before placing another.");
+        return;
+      }
+      try { window.localStorage.removeItem(storageKey); setRecovering(false); } catch { /* replay is safer */ }
+      const active = Array.isArray(data.units) ? data.units.filter((unit: { status?: string }) => unit.status === "active").length : 0;
+      const refunded = Array.isArray(data.units) ? data.units.filter((unit: { status?: string }) => unit.status === "refunded").length : 0;
+      setSuccessMessage(`Batch processed: ${active} active, ${refunded} refunded. Check your orders for details.`);
       setItems([]);
     } catch {
-      setError("An unexpected error occurred. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
+      setError("Could not confirm the batch. Check your orders and wallet before retrying this same request.");
+    } finally { setSubmitting(false); sending.current = false; }
   }
 
   const result = calculateBulkOrder(items);
@@ -92,6 +129,7 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
   return (
     <>
       <div className="space-y-6">
+      {recovering && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">A previous batch is being recovered. Its items cannot be changed until its outcome is known.</p>}
       {/* Add Items */}
       <div>
         <label className="block text-[0.86rem] font-medium text-ink mb-3">
@@ -112,6 +150,7 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
               </div>
               <button
                 onClick={() => addItem(plan.slug)}
+                disabled={!ready || recovering}
                 className="w-full rounded-lg bg-lav-100 px-3 py-2 text-[0.82rem] font-semibold text-lav-700 transition-colors hover:bg-lav-200"
               >
                 Add to Order
@@ -219,7 +258,7 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
         <button
           type="button"
           onClick={handlePurchase}
-          disabled={submitting}
+          disabled={!ready || submitting || inReview}
           className="w-full rounded-xl bg-lav-700 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-800 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitting ? "Processing purchase..." : `Purchase (${totalQuantity} ${totalQuantity === 1 ? "item" : "items"}) · ${formatNaira(result.total)}`}

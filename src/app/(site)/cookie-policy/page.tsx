@@ -32,7 +32,7 @@ export default function CookiePolicyPage() {
       <section className="shell py-10">
         <div className="overflow-x-auto rounded-2xl border border-line bg-white">
           <table className="w-full min-w-0 text-left">
-            <thead className="bg-cream/70 text-[0.68rem] uppercase tracking-[0.12em] text-ink-3 sm:text-meta">
+            <thead className="bg-cream/70 text-[0.8125rem] uppercase tracking-[0.12em] text-ink-3 sm:text-meta">
               <tr>
                 <th className="px-3 py-3 font-semibold sm:px-4">Cookie</th>
                 <th className="px-3 py-3 font-semibold sm:px-4">Type</th>
@@ -43,13 +43,13 @@ export default function CookiePolicyPage() {
             <tbody className="divide-y divide-line/70">
               {cookies.map((cookie) => (
                 <tr key={cookie.name} className="align-top">
-                  <td className="px-3 py-4 font-mono text-[0.72rem] text-ink sm:px-4 sm:text-[0.8rem]">{cookie.name}</td>
+                  <td className="px-3 py-4 font-mono text-[0.8125rem] text-ink sm:px-4 sm:text-[0.8rem]">{cookie.name}</td>
                   <td className="px-3 py-4 sm:px-4">
-                    <span className="inline-flex rounded-full bg-lav-50 px-2.5 py-1 text-[0.72rem] font-semibold text-lav-700 sm:text-meta">
+                    <span className="inline-flex rounded-full bg-lav-50 px-2.5 py-1 text-[0.8125rem] font-semibold text-lav-700 sm:text-meta">
                       {cookie.type}
                     </span>
                   </td>
-                  <td className="px-3 py-4 text-[0.78rem] text-ink-2 sm:px-4 sm:text-[0.84rem]">{cookie.duration}</td>
+                  <td className="px-3 py-4 text-[0.8125rem] text-ink-2 sm:px-4 sm:text-[0.84rem]">{cookie.duration}</td>
                   <td className="hidden px-3 py-4 text-[0.8rem] leading-relaxed text-ink-2 md:table-cell sm:px-4 sm:text-[0.84rem]">
                     {cookie.purpose}
                   </td>

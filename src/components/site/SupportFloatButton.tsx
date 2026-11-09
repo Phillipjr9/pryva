@@ -74,7 +74,7 @@ export function SupportFloatButton() {
           aria-label="Open support chat"
           className={`floating pointer-events-auto group relative inline-flex items-center justify-center overflow-hidden rounded-full border border-lav-300/80 bg-gradient-to-b from-lav-600 via-lav-700 to-lav-800 text-white shadow-[0_10px_20px_rgba(78,58,130,0.24),0_18px_34px_rgba(107,79,174,0.18),inset_0_1px_0_rgba(255,255,255,0.32)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_14px_24px_rgba(78,58,130,0.3),0_24px_40px_rgba(107,79,174,0.22),inset_0_1px_0_rgba(255,255,255,0.38)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-4 ${
             visible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0 pointer-events-none"
-          } h-10 gap-1.5 px-2.5 text-[0.72rem] font-semibold tracking-[0.01em] sm:h-11 sm:gap-2 sm:px-3.5 sm:text-[0.76rem]`}
+          } h-10 gap-1.5 px-2.5 text-[0.8125rem] font-semibold tracking-[0.01em] sm:h-11 sm:gap-2 sm:px-3.5 sm:text-[0.8125rem]`}
         >
           <span className="absolute inset-x-2 top-1 h-1.5 rounded-full bg-white/30 blur-[2px]" />
           <span className="relative grid h-6 w-6 place-items-center rounded-full border border-white/30 bg-white/10 shadow-inner shadow-white/20 sm:h-7 sm:w-7">
@@ -93,12 +93,12 @@ export function SupportFloatButton() {
                 <span className="grid h-5 w-5 place-items-center rounded-full bg-lav-700 text-white">
                   <ChatIcon />
                 </span>
-                <span className="text-[0.72rem] font-semibold text-ink">Support</span>
+                <span className="text-[0.8125rem] font-semibold text-ink">Support</span>
               </div>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-full border border-line bg-white px-1.5 py-0.5 text-[0.65rem] font-semibold text-ink-2 hover:border-lav-300 hover:text-lav-700"
+                className="rounded-full border border-line bg-white px-1.5 py-0.5 text-[0.8125rem] font-semibold text-ink-2 hover:border-lav-300 hover:text-lav-700"
               >
                 ×
               </button>

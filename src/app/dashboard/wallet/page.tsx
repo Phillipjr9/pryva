@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, count, desc, eq, sum } from "drizzle-orm";
+import { and, count, desc, eq, sum, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { walletTransactions } from "@/db/schema";
+import { users, walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/identity/auth";
 import { formatNaira } from "@/lib/services/catalog";
 import { walletEntryDirection, walletEntrySign } from "@/lib/payments/wallet-activity";
@@ -26,7 +26,7 @@ export default async function WalletPage({
 
   // Headline totals come from aggregates, not from the visible slice: the old
   // version summed the newest 40 rows and labelled them "in total".
-  const [transactions, [creditRow], [refundRow], [spentRow], [debitCount]] = await Promise.all([
+  const [transactions, [creditRow], [refundRow], [spentRow], [debitCount], [source]] = await Promise.all([
     db
       .select()
       .from(walletTransactions)
@@ -51,11 +51,15 @@ export default async function WalletPage({
       .select({ value: count() })
       .from(walletTransactions)
       .where(and(eq(walletTransactions.userId, user.id), eq(walletTransactions.type, "debit"))),
+    db.select({ balance: users.walletBalance, referral: sql<number>`referral_credit_balance`, known: sql<boolean>`wallet_provenance_known` })
+      .from(users).where(eq(users.id, user.id)).limit(1),
   ]);
 
   const added = Number(creditRow?.value ?? 0) + Number(refundRow?.value ?? 0);
   const spent = Number(spentRow?.value ?? 0);
   const spendCount = Number(debitCount?.value ?? 0);
+  const provenanceKnown = source?.known === true && Number.isSafeInteger(source.referral) && Number.isSafeInteger(source.balance);
+  const withdrawable = provenanceKnown ? Math.max(0, source.balance - source.referral) : 0;
 
   return (
     <div className="grid min-w-0 grid-cols-1 gap-4">
@@ -67,6 +71,8 @@ export default async function WalletPage({
       </div>
 
       {paystackTestMode && <p role="note" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8rem] leading-relaxed text-amber-900"><strong>Paystack test mode.</strong> A test key cannot take real payments. Production checkout is disabled with this key; use an isolated staging database for testing.</p>}
+      {!provenanceKnown && <p role="note" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8rem] text-amber-900">Your wallet funds need a source-of-funds review before withdrawal. Your balance remains available for eligible purchases and refunds. Contact support for help.</p>}
+      {provenanceKnown && source.referral > 0 && <p role="note" className="rounded-2xl border border-lav-200 bg-lav-50 px-4 py-3 text-[0.8rem] text-lav-900">{formatNaira(source.referral)} of your balance is nonwithdrawable referral credit. Withdrawable balance: {formatNaira(withdrawable)} before fees.</p>}
       <TopUpReturn key={`${params.topup ?? ""}:${params.reference ?? params.trxref ?? ""}`} status={params.topup} reference={params.reference ?? params.trxref} userId={user.id} testMode={paystackTestMode} />
 
       <div className="grid gap-2.5 sm:grid-cols-3">
@@ -178,7 +184,7 @@ export default async function WalletPage({
           </div>
         </div>
       </div>
-      <WithdrawalDashboard balance={user.walletBalance} userId={user.id} testMode={paystackTestMode} />
+      <WithdrawalDashboard balance={withdrawable} userId={user.id} testMode={paystackTestMode} />
     </div>
   );
 }

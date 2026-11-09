@@ -103,7 +103,18 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
     setBrandOrderError(null);
     setBrandOrderSuccess(null);
 
-    const requestId = crypto.randomUUID();
+    const storageKey = `pryva.brand-gift.pending.v1.${user.id}`;
+    let requestId: string;
+    try {
+      requestId = window.localStorage.getItem(storageKey) ?? crypto.randomUUID();
+      window.localStorage.setItem(storageKey, requestId);
+      if (window.localStorage.getItem(storageKey) !== requestId) throw new Error("storage unavailable");
+    } catch {
+      setBrandOrderError("Purchase recovery storage is unavailable. Enable browser storage before buying.");
+      setBrandOrderLoading(false);
+      orderingBrand.current = false;
+      return;
+    }
 
     try {
       const response = await fetch("/api/gift-cards/order", {
@@ -118,10 +129,12 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
       const data = await response.json();
 
       if (!response.ok || !data.ok) {
+        if (data.safeToRetry) { try { window.localStorage.removeItem(storageKey); } catch { /* keep the key */ } }
         setBrandOrderError(data.error || "Order failed. Please check your balance and try again.");
         return;
       }
 
+      try { window.localStorage.removeItem(storageKey); } catch { /* replay is safer than another debit */ }
       fireConfetti();
       setBrandOrderSuccess({
         code: data.code,
@@ -146,6 +159,18 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
     setError(null);
     setSuccess(null);
 
+    const storageKey = `pryva.gift.pending.v1.${user.id}`;
+    let requestId: string;
+    try {
+      requestId = window.localStorage.getItem(storageKey) ?? crypto.randomUUID();
+      window.localStorage.setItem(storageKey, requestId);
+      if (window.localStorage.getItem(storageKey) !== requestId) throw new Error("storage unavailable");
+    } catch {
+      setError("Purchase recovery storage is unavailable. Enable browser storage before buying.");
+      setLoading(false);
+      creating.current = false;
+      return;
+    }
     try {
       const [response] = await Promise.all([
         fetch("/api/gift-cards/purchase", {
@@ -153,6 +178,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             amount,
+            requestId,
             recipientEmail: recipientEmail.trim() || undefined,
             message: message.trim() || undefined,
           }),
@@ -167,6 +193,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
         return;
       }
 
+      try { window.localStorage.removeItem(storageKey); } catch { /* replay is safer than another debit */ }
       fireConfetti();
       setSuccess({ code: data.code, amount: data.amount });
       router.refresh();

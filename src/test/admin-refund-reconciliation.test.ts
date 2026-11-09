@@ -29,6 +29,7 @@ const ORDER_ID = "2f1c9a4e-0000-4000-8000-000000000001";
 function fakeTransaction(claimed: boolean) {
   const order = { id: ORDER_ID, userId: "user-1", reference: "PV-1", amount: 1200, status: "review" };
   const tx = {
+    select: () => ({ from: () => ({ where: () => ({ limit: async () => [{ id: "debit" }] }) }) }),
     update(table: unknown) {
       return {
         set() {

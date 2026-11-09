@@ -90,7 +90,7 @@ export function SessionsCard() {
             type="button"
             onClick={() => void revoke(undefined, true)}
             disabled={busy === "all"}
-            className="btn border border-line bg-white !px-3 !py-1.5 !text-[0.8125rem] sm:!text-[0.74rem] text-ink hover:border-lav-200 disabled:opacity-50"
+            className="btn border border-line bg-white !px-3 !py-1.5 !text-[0.8125rem] sm:!text-[0.8125rem] text-ink hover:border-lav-200 disabled:opacity-50"
           >
             {busy === "all" ? (
               <>

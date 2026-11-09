@@ -129,8 +129,9 @@ const clauses: Clause[] = [
           was not paid, was paid twice, or was the subject of a chargeback.
         </p>
         <p>
-          Payouts are only sent to a bank account in the same name as the account that funded the
-          wallet. We compare the destination against the first completed top-up name, ignoring
+          We compare the payout destination against the profile name recorded when your first
+          top-up completed, or an approved payout name. The recorded profile name is not independent
+          verification of the person who made the payment. We compare names ignoring
           titles, accents and ordering differences, and allowing only a small difference such as a
           fuller bank-record name or a middle name. If your bank spells your name differently, ask
           support for a payout-name review with a bank statement or account screenshot. We may reject
@@ -217,9 +218,9 @@ const clauses: Clause[] = [
           Refunds are decided against the delivery outcome, and the{" "}
           <Link href="/refund-policy">refund policy</Link> sets out the rule for each product. In
           short: if the product was not delivered, contact support with the order reference and we
-          will review it against what the delivery side reports. Automatic refunds stay paused until
-          delivery and cancellation can be verified from both ends, because paying a refund on an
-          unknown outcome loses the money twice.
+          will review it against what the delivery side reports. Eligible single-number refunds can
+          be processed after the delivery window when a final status confirms no code was delivered.
+          An unknown or still-pending outcome requires further checking.
         </p>
         <p>
           Gift cards are not refundable whether or not they have been redeemed. That is enforced in

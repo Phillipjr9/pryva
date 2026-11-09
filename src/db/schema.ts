@@ -49,6 +49,8 @@ export const users = pgTable("users", {
    * whatever else survived. See `migrations/0024_account_deletions.sql`.
    */
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  /** Reversible operator suspension; distinct from account closure. */
+  suspendedAt: timestamp("suspended_at", { withTimezone: true }),
   /**
    * Salted one-way fingerprint of the address the account used.
    *
@@ -285,6 +287,17 @@ export const emailVerificationTokens = pgTable(
   ],
 );
 
+export const bulkBatches = pgTable("bulk_batches", {
+  id: uuid("id").primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  requestId: uuid("request_id").notNull(),
+  intentHash: varchar("intent_hash", { length: 64 }).notNull(),
+  total: integer("total").notNull(),
+  unitCount: integer("unit_count").notNull(),
+  status: varchar("status", { length: 24 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("bulk_batches_user_request_idx").on(table.userId, table.requestId)]);
+
 export const orders = pgTable(
   "orders",
   {
@@ -343,6 +356,8 @@ export const orders = pgTable(
     quantity: integer("quantity"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     refundedAt: timestamp("refunded_at", { withTimezone: true }),
+    refundCheckedAt: timestamp("refund_checked_at", { withTimezone: true }),
+    requestIntent: varchar("request_intent", { length: 160 }),
     /**
      * Set when a refund committed but the provider unit could not be released:
      * the money is back with the customer and the number may still be working,
@@ -542,6 +557,7 @@ export const giftCards = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     code: varchar("code", { length: 20 }).notNull().unique(),
+    requestId: uuid("request_id"),
     amount: integer("amount").notNull(),
     initialAmount: integer("initial_amount").notNull(),
     purchasedBy: uuid("purchased_by")

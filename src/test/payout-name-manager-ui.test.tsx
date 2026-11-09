@@ -60,7 +60,7 @@ describe("the payout-name review queue", () => {
 
     expect(await screen.findByText("emeka@example.com")).toBeTruthy();
     // Shown once as the account holder and once as the frozen depositor name.
-    expect(screen.getByText(/Depositor name on record:/).textContent).toContain("Emeka");
+    expect(screen.getByText(/Profile name recorded at first top-up:/).textContent).toContain("Emeka");
     expect(screen.getByText(/••••6789/)).toBeTruthy();
     expect(document.body.textContent).not.toContain("0123456789");
   });

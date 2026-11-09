@@ -151,6 +151,16 @@ describe("admin withdrawal processing", () => {
     expect(mocks.initiateTransfer).not.toHaveBeenCalled();
   });
 
+  it("never retries or refunds a processing transfer, even without a saved reference", async () => {
+    const state = fakeDatabase();
+    state.withdrawal.status = "processing";
+    expect((await PUT(request("approve"))).status).toBe(409);
+    expect((await PUT(request("reject"))).status).toBe(409);
+    expect(state.balance).toBe(2000);
+    expect(state.ledger).toHaveLength(0);
+    expect(mocks.initiateTransfer).not.toHaveBeenCalled();
+  });
+
   it("requires an initiation code and explicit settlement reconciliation before completion", async () => {
     const state = fakeDatabase();
     state.withdrawal.status = "processing";

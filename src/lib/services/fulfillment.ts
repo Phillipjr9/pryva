@@ -164,6 +164,9 @@ export type FulfillPlanOptions = {
   onOtpAttempt?: () => Promise<void>;
   /** Persist the activation reference before the wallet debit is attempted. */
   onOtpAccepted?: (providerRequestId: string) => Promise<void>;
+  /** Rental preflight is read-only; persist the claim immediately before buying. */
+  onRentalAttempt?: () => Promise<void>;
+  onRentalAccepted?: (providerRequestId: string) => Promise<void>;
 };
 
 export async function fulfillPlan(plan: Plan, options: FulfillPlanOptions = {}): Promise<FulfilledOrder> {
@@ -179,7 +182,7 @@ export async function fulfillPlan(plan: Plan, options: FulfillPlanOptions = {}):
   if (options.otpOfferId && intent.kind !== "sms") {
     throw new FleexaError("That selection is not available for this plan", 400, "INVALID_OTP_SELECTION");
   }
-  return intent.kind === "sms" ? fulfillNumber(plan, intent, options) : fulfillRental(plan, intent);
+  return intent.kind === "sms" ? fulfillNumber(plan, intent, options) : fulfillRental(plan, intent, options);
 }
 
 /**
@@ -214,7 +217,7 @@ async function fulfillNumber(plan: Plan, intent: SmsIntent, options: FulfillPlan
   }
   const offers = read?.offers ?? await otpOffersForSupplier("bitcall", intent.country, plan.region);
   const selectedOffer = options.otpOfferId
-    ? offers.find((offer) => offer.app && otpOfferPublicId(intent.country, offer.ref, offer.app) === options.otpOfferId)
+    ? offers.find((offer) => otpOfferPublicId(intent.country, offer.ref, offer.app) === options.otpOfferId)
     : null;
 
   if (options.otpOfferId && (!selectedOffer || selectedOffer.supplier !== "bitcall")) {
@@ -265,11 +268,11 @@ async function fulfillNumber(plan: Plan, intent: SmsIntent, options: FulfillPlan
 
     let providerAccepted = false;
     try {
-      if (options.otpOfferId) await options.onOtpAttempt?.();
+      await options.onOtpAttempt?.();
       const bought = await buyOtpNumber(offer);
       providerAccepted = true;
       if (!bought.providerRequestId) throw new Error("Provider accepted an activation without a durable reference");
-      if (options.otpOfferId) await options.onOtpAccepted?.(bought.providerRequestId);
+      await options.onOtpAccepted?.(bought.providerRequestId);
       if (!bought.number) throw new Error("Provider accepted an activation without a usable phone number");
       if (
         typeof bought.providerCostNgn === "number" &&
@@ -321,7 +324,7 @@ async function fulfillNumber(plan: Plan, intent: SmsIntent, options: FulfillPlan
 }
 
 /** Rentals have one supplier, and the rental path is unchanged. */
-async function fulfillRental(plan: Plan, intent: RentalIntent): Promise<FulfilledOrder> {
+async function fulfillRental(plan: Plan, intent: RentalIntent, options: FulfillPlanOptions): Promise<FulfilledOrder> {
   if (!isFleexaConfigured()) {
     throw new FleexaError("Live fulfilment is not configured", 503, "NO_API_KEY");
   }
@@ -340,7 +343,13 @@ async function fulfillRental(plan: Plan, intent: RentalIntent): Promise<Fulfille
   }
   guardMargin(plan, area.pricePerMonthNgn != null ? area.pricePerMonthNgn * intent.months : null);
 
+  if (!options.onRentalAttempt || !options.onRentalAccepted) {
+    throw new FleexaError("A safe order claim is required for rental checkout", 400, "RENTAL_CLAIM_REQUIRED");
+  }
+  await options.onRentalAttempt();
   const rental = await buyFleexaRental({ area: area.id, months: intent.months });
+  if (!rental.rentalId || !rental.number) throw new Error("Provider rental receipt is incomplete");
+  await options.onRentalAccepted(rental.rentalId);
   const quotedRentalCost = area.pricePerMonthNgn != null ? area.pricePerMonthNgn * intent.months : null;
   return {
     provider: FLEEXA_PROVIDER,

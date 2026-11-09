@@ -23,9 +23,9 @@ describe("service explorer live listings", () => {
     expect(within(card).getByText("Live listing")).toBeTruthy();
     expect(within(card).getByText("Reported region: United States")).toBeTruthy();
     expect(within(card).getByText("Indicative price ₦1,250")).toBeTruthy();
-    expect(within(card).getByText("7 left")).toBeTruthy();
+    expect(within(card).getAllByText("7 left").length).toBeGreaterThan(0);
     expect(within(card).getByText("Not tracked")).toBeTruthy();
-    expect(within(card).getByRole("button", { name: "Ordering paused" }).hasAttribute("disabled")).toBe(true);
+    expect(within(card).getByRole("button", { name: "Not available to order" }).hasAttribute("disabled")).toBe(true);
     expect(screen.getByText(/Live listings are current/)).toBeTruthy();
     expect(screen.getByText("2026-01-01 12:34:56 UTC")).toBeTruthy();
   });

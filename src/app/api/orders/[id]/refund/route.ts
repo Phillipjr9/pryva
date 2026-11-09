@@ -1,6 +1,6 @@
 import { isVercelPreview } from "@/lib/platform/financial-environment";
 import { randomBytes } from "node:crypto";
-import { and, eq, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { getCurrentUser } from "@/lib/identity/auth";
@@ -9,6 +9,7 @@ import { refundRateLimiter } from "@/lib/platform/rate-limit";
 import { cancelUpstream } from "@/lib/services/fulfillment";
 import { flagReconciliation } from "@/lib/services/reconciliation";
 import { isUndeliveredSingleNumber, SINGLE_NUMBER_WINDOW } from "@/lib/services/refund-policy";
+import { confirmNumberRefund } from "@/lib/services/numbers/refund-confirmation";
 import { deliveryWindowMs } from "@/lib/services/registry";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const [order] = await db.select().from(orders)
       .where(and(eq(orders.id, id), eq(orders.userId, user.id))).limit(1);
     if (!order) return Response.json({ ok: false, error: "We couldn't find that order." }, { status: 404 });
-    if (order.status !== "active" || order.refundedAt) {
+    if (!["active", "expired"].includes(order.status) || order.refundedAt) {
       return Response.json({ ok: false, error: "This order is already complete or refunded." }, { status: 409 });
     }
 
@@ -62,17 +63,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }, { status: 409 });
     }
 
+    const confirmation = await confirmNumberRefund(order);
+    if (confirmation === "delivered") {
+      return Response.json({ ok: false, error: "A code was received for this order. Check your order details." }, { status: 409 });
+    }
+    if (confirmation !== "refundable") {
+      return Response.json({ ok: false, error: "Delivery could not yet be confirmed. Contact support with your reference; no refund has been issued." }, { status: 409 });
+    }
+
     const claimed = await db.transaction(async (tx) => {
       const [row] = await tx.update(orders)
         .set({ status: "refunded", refundedAt: new Date() })
         .where(and(
-          eq(orders.id, id), eq(orders.userId, user.id), eq(orders.status, "active"),
+          eq(orders.id, id), eq(orders.userId, user.id), inArray(orders.status, ["active", "expired"]),
           isNull(orders.refundedAt), eq(orders.service, "numbers"),
           eq(orders.duration, SINGLE_NUMBER_WINDOW), isNull(orders.otpCode), lte(orders.createdAt, cutoff),
         ))
         .returning();
       if (!row) return null;
       if (!Number.isSafeInteger(row.amount) || row.amount <= 0) throw new Error("Invalid order amount");
+      const [debit] = await tx.select({ id: walletTransactions.id }).from(walletTransactions).where(and(
+        eq(walletTransactions.orderId, row.id), eq(walletTransactions.userId, row.userId),
+        eq(walletTransactions.type, "debit"), eq(walletTransactions.amount, row.amount),
+      )).limit(1);
+      if (!debit) throw new Error("Matching order debit not found; refund requires review");
 
       const [updated] = await tx.update(users)
         .set({ walletBalance: sql`${users.walletBalance} + ${row.amount}` })
@@ -99,8 +113,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // to reconcile, never a reason to withhold the customer's money.
     let providerCancelled = false;
     try {
-      await cancelUpstream(claimed.row);
-      providerCancelled = true;
+      providerCancelled = await cancelUpstream(claimed.row);
+      if (!providerCancelled) await flagReconciliation(claimed.row.id);
     } catch (cancelError) {
       console.error("Refund succeeded but upstream cancel failed", {
         orderId: claimed.row.id,

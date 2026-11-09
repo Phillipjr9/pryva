@@ -75,6 +75,7 @@ export default async function BoostPage({ params }: { params: Promise<{ id: stri
             max: listing.max,
           }}
           walletBalance={user.walletBalance}
+          userId={user.id}
         />
       )}
 

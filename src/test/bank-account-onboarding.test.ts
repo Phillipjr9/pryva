@@ -115,7 +115,7 @@ describe("a new customer saving their first account", () => {
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.payoutWarning).toMatch(/same name as the one that funded this wallet/i);
+    expect(body.payoutWarning).toMatch(/profile name recorded with your first completed top-up/i);
     expect(body.message).toMatch(/payouts to it are blocked/i);
     // Saved, and the provider recipient is registered, because nothing was sent.
     const [saved] = await database.select().from(bankAccounts);
@@ -160,7 +160,7 @@ describe("the saved accounts list", () => {
     const body = await (await route.GET()).json();
     const byName = Object.fromEntries((body.bankAccounts as { accountName: string; payoutWarning: string | null }[]).map((account) => [account.accountName, account.payoutWarning]));
 
-    expect(byName["OBINNA CHINEDU"]).toMatch(/same name as the one that funded this wallet/i);
+    expect(byName["OBINNA CHINEDU"]).toMatch(/profile name recorded with your first completed top-up/i);
     expect(byName["OKAFOR EMEKA"]).toBeNull();
   });
 

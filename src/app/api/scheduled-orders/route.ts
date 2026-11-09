@@ -111,7 +111,7 @@ export async function PATCH(request: NextRequest) {
     } else {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
-    if (!updated) return NextResponse.json({ error: "Schedule not found or cannot be changed in its current state" }, { status: 409 });
+    if (!updated) return NextResponse.json({ error: "Schedule cannot be changed. If a purchase is still processing or under review, contact support." }, { status: 409 });
     return NextResponse.json({ ok: true });
   } catch {
     console.error("Failed to update scheduled order");

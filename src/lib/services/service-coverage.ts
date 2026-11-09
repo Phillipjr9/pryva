@@ -121,7 +121,6 @@ export const SERVICE_LANES: LaneSpec[] = LANES.map((lane) => ({
  * storefront, which has been selling eSIM for several releases.
  */
 export const NOT_FOR_SALE: Array<{ label: string; reason: string }> = [
-  { label: "Bulk baskets", reason: "Not built: quoting a basket needs the per-item purchase path to be proven first." },
   { label: "Airtime", reason: "The purchase endpoint answers 503 by design; no VTU supplier is contracted." },
 ];
 
