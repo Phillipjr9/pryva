@@ -23,6 +23,8 @@ const state = vi.hoisted(() => ({
   orderRows: [] as Array<Record<string, unknown>>,
   ledger: [] as Array<Record<string, unknown>>,
   failOrderWrite: false,
+  suspended: false,
+  providerCalls: 0,
   fulfillError: null as Error | null,
   codes: ["GIFT-CODE-1"],
   upstreamId: "fox-1",
@@ -44,7 +46,7 @@ vi.mock("@/lib/providers/foxreload", () => ({
   FoxreloadError: FoxreloadErrorMock,
   isFoxreloadConfigured: () => true,
   resolveFoxreloadProductId: async () => "item-steam-10",
-  createFoxreloadOrder: async () => ({ id: state.upstreamId }),
+  createFoxreloadOrder: async () => { state.providerCalls++; return { id: state.upstreamId }; },
   payFoxreloadOrder: async () => {
     if (state.fulfillError) throw state.fulfillError;
   },
@@ -71,7 +73,7 @@ vi.mock("@/db", () => {
     const params = condition ? dialect.sqlToQuery(condition).params : [];
     if (table === users) {
       const balance = state.balances[String(params[0])] ?? 0;
-      return fields ? [{ balance }] : [{ id: String(params[0]), walletBalance: balance }];
+      return fields ? [{ balance, suspendedAt: state.suspended ? new Date() : null, deletedAt: null }] : [{ id: String(params[0]), walletBalance: balance }];
     }
     if (table === orders) {
       const row = state.orderRows.find((entry) => entry.userId === params[0] && entry.requestId === params[1]);
@@ -90,6 +92,7 @@ vi.mock("@/db", () => {
       where(condition: SQL) {
         return {
           limit: () => readRows(fields, table, condition),
+          for: () => ({ limit: () => readRows(fields, table, condition) }),
         };
       },
     };
@@ -186,6 +189,8 @@ beforeEach(() => {
   state.orderRows = [];
   state.ledger = [];
   state.failOrderWrite = false;
+  state.suspended = false;
+  state.providerCalls = 0;
   state.fulfillError = new Error("provider is down");
   state.codes = ["GIFT-CODE-1"];
   mocks.scheduleWalletEmails.mockReset();
@@ -203,16 +208,38 @@ describe("POST /api/gift-cards/order refund", () => {
     expect(state.balances.u1).toBe(20_000);
   });
 
-  it("hands the money back and records the refund together", async () => {
+  it("does not start a provider call after suspension and returns the preflight debit", async () => {
+    state.suspended = true;
+    const response = await POST(request());
+    expect(response.status).toBe(502);
+    expect(state.providerCalls).toBe(0);
+    expect(state.orderRows[0].status).toBe("refunded");
+    expect(state.ledger.map((row) => row.type)).toEqual(["debit", "refund"]);
+    expect(state.balances.u1).toBe(20_000);
+  });
+
+  it("holds the debit and provider reference for review when payment is uncertain", async () => {
     const response = await POST(request());
 
     expect(response.status).toBe(502);
-    expect(state.orderRows[0]).toMatchObject({ status: "refunded", providerRequestId: "fox-1" });
-    expect(state.ledger.map((entry) => entry.type)).toEqual(["debit", "refund"]);
-    expect(state.balances.u1).toBe(20_000);
+    expect(state.orderRows[0]).toMatchObject({ status: "review", providerRequestId: "fox-1" });
+    expect(state.ledger.map((entry) => entry.type)).toEqual(["debit"]);
+    expect(state.balances.u1).toBe(3_500);
     // Both wallet entries need their nudge; the route calls the InTx helpers, so
     // nothing else would schedule the receipt email.
-    expect(mocks.scheduleWalletEmails).toHaveBeenCalledTimes(2);
+    expect(mocks.scheduleWalletEmails).toHaveBeenCalledTimes(1);
+  });
+
+  it("replays a paid card despite low balance and an offline provider", async () => {
+    state.fulfillError = null;
+    expect((await POST(request())).status).toBe(200);
+    vi.stubEnv("FOXRELOAD_IS_MOCK", "true");
+    state.balances.u1 = 0;
+    const replay = await POST(request());
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({ replayed: true, code: "GIFT-CODE-1" });
+    expect(state.orderRows).toHaveLength(1);
+    expect(state.ledger).toHaveLength(1);
   });
 
   it("keeps the refund out of the wallet when the order cannot be marked refunded", async () => {

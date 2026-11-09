@@ -277,7 +277,7 @@ export function InboxManager() {
           <button
             type="button"
             onClick={reload}
-            className="btn border border-line bg-white !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.78rem] text-ink hover:border-lav-200"
+            className="btn border border-line bg-white !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.8125rem] text-ink hover:border-lav-200"
           >
             <Refresh className="h-3.5 w-3.5" /> Try again
           </button>

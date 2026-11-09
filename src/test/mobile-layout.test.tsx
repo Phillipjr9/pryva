@@ -209,7 +209,7 @@ describe("responsive overflow regressions", () => {
 
   it("allows dashboard header actions to wrap on narrow screens", () => {
     const shell = readFileSync("src/components/dashboard/DashboardShell.tsx", "utf8");
-    expect(shell).toContain("mb-4 flex flex-wrap items-center justify-between");
-    expect(shell).toContain("flex min-w-0 max-w-full flex-wrap items-center gap-1.5");
+    expect(shell).toContain("mb-4 flex items-center justify-between gap-2 max-[340px]:flex-wrap");
+    expect(shell).toContain("flex min-w-0 max-w-full shrink-0 items-center gap-1.5 max-[340px]:flex-wrap");
   });
 });

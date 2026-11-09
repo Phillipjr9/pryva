@@ -246,11 +246,11 @@ describe("the printed sheet is the document, not the dashboard", () => {
 describe("PrintButton", () => {
   it("prints, which is how every browser saves a PDF", () => {
     const print = vi.fn();
-    vi.stubGlobal("print", print);
+    vi.spyOn(window, "print").mockImplementation(print);
     render(<PrintButton />);
     screen.getByRole("button", { name: "Print or save as PDF" }).click();
     expect(print).toHaveBeenCalled();
-    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("is hidden from the paper it produces", () => {

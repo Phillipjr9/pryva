@@ -3,26 +3,11 @@ import { db } from "@/db";
 import { paymentTopups, payoutNameApprovals, TOPUP_STATUS } from "@/db/schema";
 
 /**
- * Payouts may only go to the person who deposited the money.
- *
- * Ownership of the bank account was already enforced — a withdrawal can only
- * name an account belonging to the signed-in user. That stops a stranger's
- * account being attached to somebody else's session, but it does not stop a mule
- * payout, which is the actual risk: the account holder adds a bank account in a
- * *different person's* name and withdraws to it. Money in from one identity,
- * money out to another, and the platform is the route between them.
- *
- * So the destination name is compared against the name frozen on the user's
- * first settled deposit (`payment_topups.payer_name`, migration 0012). That
- * column is used rather than `users.name` because the profile endpoint edits
- * `users.name` at any time — a reference that can be changed after the money
- * arrives cannot prove who sent it.
- *
- * The comparison is deliberately strict, and the cost of that is accepted on
- * purpose: a legitimate customer whose bank name differs from their profile name
- * is refused and told to contact support, whereas a loose comparison would let a
- * payout reach somebody else. Refusing is recoverable. Sending money to a third
- * party is not.
+ * The current payout rule compares a bank name with the profile name frozen at
+ * the first completed top-up, or an independently reviewed approval. The
+ * self-declared profile name is NOT proof of the actual payer's identity.
+ * Independent verification and historical financial reconciliation remain
+ * operational risks; do not describe this name match as verified funding identity.
  */
 
 /**
@@ -177,9 +162,9 @@ export type PayoutNameReason = Extract<PayoutNameCheck, { ok: false }>["reason"]
 /** Wording shared by every surface that refuses a payout, so they agree. */
 export const PAYOUT_NAME_MESSAGES: Record<PayoutNameReason, string> = {
   "no-deposit":
-    "Withdrawals are paid to the name on the account that funded this wallet, and no completed deposit has recorded one yet. Contact support to have this reviewed.",
+    "No profile name was recorded with a completed top-up. Contact support for a payout-name review.",
   "no-name":
     "That bank account has no name on record, so it cannot be paid. Verify it again before saving.",
   mismatch:
-    "Withdrawals can only be paid to a bank account in the same name as the one that funded this wallet. This account's name does not match, so it cannot be used. If your bank spells your name differently — a fuller name, or surname first — contact support and ask for a payout-name review; a bank statement or an account screenshot showing the name is usually enough.",
+    "This bank account does not have the same name as the profile name recorded with your first completed top-up, so it cannot be used without review. If your bank spells your name differently — a fuller name, or surname first — contact support and ask for a payout-name review; a bank statement or an account screenshot showing the name is usually enough.",
 };

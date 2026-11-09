@@ -276,7 +276,8 @@ export function DashboardShell({
 
         <div className="min-w-0 flex-1">
           {/*
-            The header is a single row on every width.
+            The header stays in one row on ordinary phone widths. On the very
+            narrowest screens it may wrap instead of clipping controls.
 
             It used to be `flex-wrap`, so between roughly 400px and 640px the
             right-hand controls could not fit beside the greeting and dropped
@@ -285,7 +286,7 @@ export function DashboardShell({
             greeting is what gives way: `min-w-0` lets it truncate instead of
             pushing its neighbours out of the bar.
           */}
-          <div className="mb-4 flex items-center justify-between gap-2 rounded-[1.25rem] border border-line bg-[#fffdfa]/80 px-3 py-2.5 backdrop-blur sm:gap-3 lg:mb-5 lg:px-5 lg:py-3">
+          <div className="mb-4 flex items-center justify-between gap-2 max-[340px]:flex-wrap rounded-[1.25rem] border border-line bg-[#fffdfa]/80 px-3 py-2.5 backdrop-blur sm:gap-3 lg:mb-5 lg:px-5 lg:py-3">
             <div className="flex min-w-0 items-center gap-2.5">
               <button
                 type="button"
@@ -305,9 +306,8 @@ export function DashboardShell({
                 </p>
               </div>
             </div>
-            {/* One row, never wrapped: the controls keep their own size and the
-                greeting truncates instead. */}
-            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            {/* Keep controls in one row except on exceptionally narrow screens. */}
+            <div className="flex min-w-0 max-w-full shrink-0 items-center gap-1.5 max-[340px]:flex-wrap sm:gap-2">
               <CommandPaletteTrigger onClick={() => setCommandPaletteOpen(true)} />
               {/* The balance belongs at the top of every dashboard page, on every
                   width — it is the number people come back to check. */}
@@ -335,7 +335,7 @@ export function DashboardShell({
               <Link
                 href="/dashboard/services"
                 aria-label="Browse services"
-                className="btn btn-primary h-9 shrink-0 !px-3 !py-0 !text-[0.8125rem] sm:!px-3.5 sm:!text-[0.76rem]"
+                className="btn btn-primary h-9 shrink-0 !px-3 !py-0 !text-[0.8125rem] sm:!px-3.5 sm:!text-[0.8125rem]"
               >
                 <span className="hidden whitespace-nowrap sm:inline">Services</span>
                 <ArrowRight className="h-3 w-3 shrink-0" />

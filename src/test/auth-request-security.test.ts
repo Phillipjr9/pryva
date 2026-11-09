@@ -27,6 +27,12 @@ describe.each([["login", login.POST], ["signup", signup.POST]] as const)("%s req
     expect((await handler(new Request("https://pryva.test/api/auth/signup", { method: "POST", headers: { host: "pryva.test", "x-forwarded-proto": "https", "content-type": "application/json" }, body: '{}' }))).status).toBe(403);
     expect((await handler(request('{}', { "content-type": "text/plain" }))).status).toBe(415);
   });
+  it("accepts a same-origin Fetch Metadata signal when Origin is absent", async () => {
+    const response = await handler(new Request("https://pryva.test/api/auth/login", {
+      method: "POST", headers: { host: "pryva.test", "x-forwarded-proto": "https", "sec-fetch-site": "same-origin", "content-type": "application/json" }, body: '{}',
+    }));
+    expect(response.status).toBe(400);
+  });
   it("rejects oversized, malformed and non-object JSON bodies", async () => {
     expect((await handler(request('"' + 'x'.repeat(8_192) + '"'))).status).toBe(413);
     expect((await handler(request('{'))).status).toBe(400);

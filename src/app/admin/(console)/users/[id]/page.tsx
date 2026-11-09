@@ -113,7 +113,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
       </div>
 
       {!user.deletedAt && (
-        <BanAccountButton userId={user.id} email={user.email} name={user.name} />
+        <BanAccountButton userId={user.id} email={user.email} name={user.name} suspended={Boolean(user.suspendedAt)} />
       )}
 
       <div className="grid gap-6 xl:grid-cols-2">

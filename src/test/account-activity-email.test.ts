@@ -28,7 +28,7 @@ let pg: PGlite;
 let database: ReturnType<typeof drizzle<typeof schema>>;
 let fetchMock: ReturnType<typeof vi.fn>;
 
-async function applyMigrations(target: PGlite, through = "0035") {
+async function applyMigrations(target: PGlite, through = "0040") {
   const files = (await readdir("migrations")).filter((file) => /^\d{4}_.*\.sql$/.test(file) && file.slice(0, 4) <= through).sort();
   for (const file of files) await target.exec(await readFile(`migrations/${file}`, "utf8"));
 }
@@ -245,6 +245,7 @@ describe("account activity emails", () => {
     ["bulk", `BLK-${"A".repeat(21)}`, "Bulk purchase: 2 items"],
     ["gift card", "GIFT-PRYVA-SECRET-CODE", "Gift card purchase: PRYVA-SECRET-CODE"],
   ])("recognizes a %s purchase without an order id and never leaks a gift code", async (_kind, reference, description) => {
+    if (_kind === "gift card") await database.insert(schema.giftCards).values({ code: "PRYVA-SECRET-CODE", amount: 2000, initialAmount: 2000, purchasedBy: USER, expiresAt: new Date(Date.now() + 86400000) });
     await database.insert(schema.walletTransactions).values({ userId: USER, type: "debit", amount: 2000, balanceAfter: 18000, reference, description });
     expect(await jobs("first_purchase")).toHaveLength(1);
     await dispatchWalletEmails(4);
@@ -339,13 +340,15 @@ describe("the migration respects existing customers", () => {
     try {
       await applyMigrations(older, "0032");
       const prior = drizzle(older, { schema });
-      await prior.insert(schema.users).values({ id: USER, name: "Ada", email: EMAIL, passwordHash: "hash", walletBalance: 5000 });
-      const [oldOrder] = await prior.insert(schema.orders).values({ userId: USER, reference: "OLD", service: "accounts", productSlug: "old", productName: "Old order", planLabel: "One", region: "Global", duration: "One", amount: 1000, status: "delivered", provider: "accounts" }).returning();
+      await older.query('INSERT INTO users (id, name, email, password_hash, wallet_balance) VALUES ($1, $2, $3, $4, $5)', [USER, "Ada", EMAIL, "hash", 5000]);
+      const oldRows = await older.query<{ id: string }>(`INSERT INTO orders (user_id, reference, service, product_slug, product_name, plan_label, region, duration, amount, status, provider) VALUES ($1, 'OLD', 'accounts', 'old', 'Old order', 'One', 'Global', 'One', 1000, 'delivered', 'accounts') RETURNING id`, [USER]);
+      const oldOrder = oldRows.rows[0];
       await prior.insert(schema.walletTransactions).values({ userId: USER, orderId: oldOrder.id, type: "debit", amount: 1000, balanceAfter: 4000, reference: "OLD", description: "Old order" });
       await older.exec(await readFile("migrations/0033_account_activity_emails.sql", "utf8"));
       expect(await prior.select().from(schema.firstPurchaseEmailClaims)).toMatchObject([{ userId: USER, source: "historical" }]);
       expect(await prior.select({ id: schema.walletEmailOutbox.id }).from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "first_purchase"))).toHaveLength(0);
-      const [nextOrder] = await prior.insert(schema.orders).values({ userId: USER, reference: "NEW", service: "accounts", productSlug: "new", productName: "New order", planLabel: "One", region: "Global", duration: "One", amount: 1000, status: "active", provider: "accounts" }).returning();
+      const nextRows = await older.query<{ id: string }>(`INSERT INTO orders (user_id, reference, service, product_slug, product_name, plan_label, region, duration, amount, status, provider) VALUES ($1, 'NEW', 'accounts', 'new', 'New order', 'One', 'Global', 'One', 1000, 'active', 'accounts') RETURNING id`, [USER]);
+      const nextOrder = nextRows.rows[0];
       await prior.insert(schema.walletTransactions).values({ userId: USER, orderId: nextOrder.id, type: "debit", amount: 1000, balanceAfter: 3000, reference: "NEW", description: "New order" });
       expect(await prior.select({ id: schema.walletEmailOutbox.id }).from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "first_purchase"))).toHaveLength(0);
     } finally {

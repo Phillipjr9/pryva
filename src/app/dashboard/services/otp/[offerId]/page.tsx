@@ -53,6 +53,7 @@ export default async function AppOtpCheckoutPage({
           <PlanPurchase
             groups={[{ label: purchasePlan.planLabel, plans: [purchasePlan] }]}
             signedIn
+            userId={user.id}
             walletBalance={user.walletBalance}
             nextPath={back}
             otpOfferId={listing.id}

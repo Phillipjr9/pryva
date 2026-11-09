@@ -42,7 +42,7 @@ export function EmptyState({
             <button
               type="button"
               onClick={action.onClick}
-              className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.78rem]"
+              className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.8125rem]"
             >
               {action.label}
               <ArrowRight className="h-3.5 w-3.5" />
@@ -50,7 +50,7 @@ export function EmptyState({
           ) : (
             <Link
               href={action.href ?? "#"}
-              className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.78rem]"
+              className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.8125rem]"
             >
               {action.label}
               <ArrowRight className="h-3.5 w-3.5" />

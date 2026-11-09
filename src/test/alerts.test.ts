@@ -102,12 +102,14 @@ describe("redaction", () => {
 
 describe("logger integration", () => {
   it("forwards logger.error to the webhook when one is configured", async () => {
+    // setup.ts installs a DOM even for Node tests; exercise the server branch.
+    vi.stubGlobal("window", undefined);
     const { logger } = await import("@/lib/platform/logger");
     const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     logger.error("Cron job failed", { step: "daily-reconciliation" });
-    // The forward is fire-and-forget: give the dynamic import its turn.
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(posts.length).toBe(1);
+    // The forward is fire-and-forget and its dynamic import may take longer
+    // under a loaded test runner; wait for the observable effect.
+    await vi.waitFor(() => expect(posts.length).toBe(1));
     expect(posts[0].body.text).toContain("Cron job failed");
     spy.mockRestore();
   });

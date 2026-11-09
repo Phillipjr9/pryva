@@ -6,21 +6,8 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Lock } from "@/components/icons";
 import { formatNaira } from "@/lib/services/catalog";
 
-/**
- * Same idempotency-key rule as every other purchase: one key per attempt, kept
- * across a retry of that attempt, replaced only after success. A boost cannot be
- * placed twice by a double click, a second tab or a resubmit after a timeout —
- * and the supplier has no idempotency key of its own, so this is the only thing
- * standing between a retry and a second charge.
- */
-function newRequestId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
-  const hex = (digits: number) =>
-    Math.floor(Math.random() * 16 ** digits).toString(16).padStart(digits, "0");
-  const variant = "89ab"[Math.floor(Math.random() * 4)];
-  return `${hex(8)}-${hex(4)}-4${hex(3)}-${variant}${hex(3)}-${hex(12)}`;
-}
-
+/** Persist the attempt before sending. A reload or lost response must not
+ * silently create a second supplier purchase. */
 type Listing = {
   id: string;
   name: string;
@@ -32,7 +19,7 @@ type Listing = {
 
 type Receipt = { reference: string; amount: number; quantity: number; link: string; replayed: boolean };
 
-export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing; walletBalance: number }) {
+export function BoostPurchaseForm({ listing, walletBalance, userId }: { listing: Listing; walletBalance: number; userId: string }) {
   const router = useRouter();
   const [link, setLink] = useState("");
   const [quantity, setQuantity] = useState<number>(listing.min);
@@ -40,6 +27,9 @@ export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const attempt = useRef<string | null>(null);
+  const sending = useRef(false);
+  const [review, setReview] = useState<{ reference: string; message: string } | null>(null);
+  const storageKey = `pryva.boost.pending.v1.${userId}.${listing.id}`;
 
   const total = Number.isFinite(quantity) && quantity > 0 ? Math.ceil((listing.perThousand * quantity) / 1_000) : 0;
   const shortfall = Math.max(0, total - walletBalance);
@@ -49,7 +39,7 @@ export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing
     (listing.max === null || quantity <= listing.max);
 
   async function buy() {
-    if (pending) return;
+    if (sending.current) return;
     setError(null);
     if (!quantityValid) {
       setError(
@@ -63,7 +53,17 @@ export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing
       setError("Paste the public profile or post link you want boosted.");
       return;
     }
-    if (!attempt.current) attempt.current = newRequestId();
+    try {
+      const stored = window.localStorage.getItem(storageKey);
+      const id = stored || crypto.randomUUID();
+      window.localStorage.setItem(storageKey, id);
+      if (window.localStorage.getItem(storageKey) !== id) throw new Error("Could not save request");
+      attempt.current = id;
+    } catch {
+      setError("Could not save purchase recovery information. No order was sent.");
+      return;
+    }
+    sending.current = true;
     setPending(true);
     try {
       const response = await fetch("/api/boosts/order", {
@@ -75,10 +75,18 @@ export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing
         ok?: boolean;
         error?: string;
         replayed?: boolean;
+        pending?: boolean;
+        message?: string;
         balance?: number;
         order?: { reference: string; amount: number; quantity: number; targetLink: string };
       };
-      if (!response.ok || !data.ok || !data.order) throw new Error(data.error || "That order could not be placed.");
+      if (response.ok && data.ok && data.pending && data.order) {
+        setReview({ reference: data.order.reference, message: data.message || "This order needs review. Check your wallet and orders before trying again." });
+        router.refresh();
+        return;
+      }
+      if (!response.ok || !data.ok || !data.order) throw new Error(data.error || "Could not confirm this order. Check your orders before trying again.");
+      try { window.localStorage.removeItem(storageKey); } catch { /* replay remains safer */ }
       attempt.current = null;
       setReceipt({
         reference: data.order.reference,
@@ -91,11 +99,21 @@ export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing
     } catch (caught) {
       // The key is kept on failure: if the request did reach the server, the
       // retry replays that order instead of charging a second time.
-      setError(caught instanceof Error ? caught.message : "That order could not be placed.");
+      setError(caught instanceof Error && caught.message !== "Failed to fetch" && caught.message !== "NetworkError when attempting to fetch resource."
+        ? caught.message : "Could not confirm this order. Check your wallet and orders before trying again.");
     } finally {
       setPending(false);
+      sending.current = false;
     }
   }
+
+  if (review) return (
+    <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
+      <p className="font-semibold">Boost order needs review</p>
+      <p className="mt-2 text-sm">{review.message} Reference: <strong>{review.reference}</strong>.</p>
+      <Link href="/dashboard/orders" className="mt-3 inline-block font-semibold underline">View orders</Link>
+    </div>
+  );
 
   if (receipt) {
     return (
@@ -190,8 +208,8 @@ export function BoostPurchaseForm({ listing, walletBalance }: { listing: Listing
         {pending ? "Placing order…" : <>Pay {formatNaira(total)} from wallet</>}
       </button>
       <p className="flex items-center gap-1.5 text-micro text-ink-3">
-        <Lock className="h-3 w-3" /> Charged from your Pryva wallet. If the boost cannot be started, the charge is
-        reversed automatically.
+        <Lock className="h-3 w-3" /> Charged from your Pryva wallet. If the order outcome is uncertain,
+        the order and charge are held for review rather than automatically retried or refunded.
       </p>
     </div>
   );

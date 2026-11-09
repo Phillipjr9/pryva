@@ -181,6 +181,23 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, error: "Check your orders before trying again." }, { status: 409 });
     }
 
+    // Serialize the paid-provider boundary with suspension. Once this commits,
+    // a suspension cannot cancel a supplier call that has already started.
+    const eligible = await db.transaction(async (tx) => {
+      const [account] = await tx.select({ suspendedAt: users.suspendedAt, deletedAt: users.deletedAt })
+        .from(users).where(eq(users.id, user.id)).for("update").limit(1);
+      if (!account || account.suspendedAt || account.deletedAt) {
+        await tx.update(orders).set({ status: "cancelled", reconciliationNote: "Account unavailable before supplier purchase; nothing was charged." })
+          .where(and(eq(orders.id, orderId), eq(orders.status, "review")));
+        return false;
+      }
+      const [started] = await tx.update(orders).set({ reconciliationNote: "eSIM provider purchase started; outcome requires tracking. Nothing has been charged." })
+        .where(and(eq(orders.id, orderId), eq(orders.status, "review"))).returning({ id: orders.id });
+      if (!started) throw new Error("eSIM purchase claim unavailable");
+      return true;
+    });
+    if (!eligible) return Response.json({ ok: false, error: "This account cannot start a purchase. Nothing was charged." }, { status: 403 });
+
     const outcome = await purchaseEsim(offer, async (providerOrderId) => {
       const [recorded] = await db.update(orders).set({
         providerRequestId: providerOrderId,

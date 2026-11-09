@@ -354,7 +354,7 @@ describe("withdrawal requests", () => {
     // absent name is not a match -- it fails closed rather than paying out on the
     // strength of a name nobody captured.
     expect(response.status).toBe(403);
-    expect((await response.json()).error).toContain("no completed deposit");
+    expect((await response.json()).error).toMatch(/No profile name was recorded with a completed top-up/i);
     expect(mocks.transaction).not.toHaveBeenCalled();
     expect(state.balance).toBe(7000);
   });

@@ -151,7 +151,7 @@ export function PayoutNameManager() {
   }
 
   async function revoke(row: ReviewRow) {
-    if (!confirm(`Revoke the approved payout name for ${row.userEmail}? The depositor-name rule applies again immediately.`)) return;
+    if (!confirm(`Revoke the approved payout name for ${row.userEmail}? The profile-name rule applies again immediately.`)) return;
     setBusy(row.userId);
     try {
       const response = await fetch("/api/admin/payout-names", {
@@ -251,7 +251,7 @@ export function PayoutNameManager() {
         </span>
         <p className="mt-3 text-[0.95rem] font-medium text-ink">Nothing is blocked</p>
         <p className="mx-auto mt-1 max-w-md text-meta leading-relaxed text-ink-2">
-          Every saved bank account matches the name that funded its wallet. Re-run this page after a
+          Every saved bank account passes the current profile-name or approved-name check. This does not verify the payer. Re-run this page after a
           customer updates their payout account.
         </p>
         <button
@@ -399,12 +399,12 @@ export function PayoutNameManager() {
                 <div className="flex-1 px-5 py-4">
                   {/* Why the rule fired, in the operator's terms. */}
                   <p className="text-meta text-ink-2">
-                    Depositor name on record:{" "}
+                    Profile name recorded at first top-up:{" "}
                     <strong className="text-ink">{row.depositorName ?? "none recorded"}</strong>
                   </p>
                   {!row.depositorName && (
                     <p className="mt-1 text-micro leading-relaxed text-ink-3">
-                      No settled deposit has recorded a payer name, so there is nothing to match against.
+                      No completed top-up has a recorded profile name, so there is nothing to match against.
                       Approving here is a decision about identity — check it before you make it.
                     </p>
                   )}
@@ -430,7 +430,7 @@ export function PayoutNameManager() {
                             {differs && (
                               <span
                                 className="rounded-full bg-amber-50 px-1.5 py-0.5 text-micro font-semibold text-amber-800"
-                                title="Does not match the depositor name on record"
+                                title="Does not match the saved profile name"
                               >
                                 differs
                               </span>
@@ -474,7 +474,7 @@ export function PayoutNameManager() {
 
                 <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-line/70 px-5 py-3">
                   <p className="max-w-sm text-micro leading-relaxed text-ink-3">
-                    Approving does not edit the depositor name frozen on the deposit. It allows payouts to
+                    Approving does not edit the profile name recorded at the first top-up. It allows payouts to
                     this customer&rsquo;s accounts in the reviewed name, and every approval and revocation is
                     written to the audit log.
                   </p>

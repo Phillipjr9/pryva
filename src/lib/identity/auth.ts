@@ -139,7 +139,15 @@ export async function createSession(userId: string, request?: Request): Promise<
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
 
-  await db.insert(sessions).values({ token, userId, expiresAt });
+  // Serialize issuance with suspension. An in-flight second-factor or OAuth
+  // challenge cannot create a surviving session after an operator suspends it.
+  await db.transaction(async (tx) => {
+    const [account] = await tx.select({ id: users.id }).from(users)
+      .where(and(eq(users.id, userId), isNull(users.deletedAt), isNull(users.suspendedAt)))
+      .for("update").limit(1);
+    if (!account) throw new Error("Account unavailable");
+    await tx.insert(sessions).values({ token, userId, expiresAt });
+  });
 
   const proto = request ? requestProto(request) : (await requestIsSecure()) ? "https" : "http";
   const embedded = await needsEmbeddedSessionCookie(request);
@@ -199,6 +207,7 @@ async function sessionUser(token: string): Promise<User | null> {
         // deletes every session row as well; this is the second lock, because
         // "every session was deleted" is a fact about a previous request.
         isNull(users.deletedAt),
+        isNull(users.suspendedAt),
       ),
     )
     .limit(1);

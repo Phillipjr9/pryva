@@ -12,7 +12,7 @@ import { orders, users, walletTransactions } from "@/db/schema";
  * and no reliable release, so the failure modes are the interesting part:
  *
  *   • a retried request must replay the first order, never place a second;
- *   • a supplier that refuses must leave the customer exactly as they were;
+ *   • uncertain provider outcomes must never be refunded or retried automatically;
  *   • a quantity the supplier will not accept must never reach the supplier;
  *   • the price must come from the server's catalogue, not the request.
  */
@@ -193,25 +193,50 @@ describe("placing a boost", () => {
     expect(await balance()).toBe(500);
   });
 
-  it("refunds in full when the supplier refuses, and says so", async () => {
-    mocks.add.mockRejectedValue(new Error("panel said no"));
+  it("holds an uncertain supplier outcome without retrying or refunding", async () => {
+    mocks.add.mockRejectedValue(new Error("lost response"));
     const result = await place();
-    expect(result.kind).toBe("unavailable");
-    expect((result as { error: string }).error).toContain("nothing was charged");
+    expect(result.kind).toBe("pending");
+    const state = await refundState();
+    expect(state.order.status).toBe("review");
+    expect(state.order.refundedAt).toBeNull();
+    expect(state.moneyIsBack).toBe(false);
+    expect(state.balance).toBe(23_500);
+    expect((await place()).kind).toBe("replay");
+    expect((await place({ requestId: "33333333-3333-4333-8333-333333333333" })).kind).toBe("pending");
+    expect(mocks.add).toHaveBeenCalledTimes(1);
+  });
 
-    expect(await balance()).toBe(25_000);
-    const [order] = await database.select().from(orders).where(eq(orders.userId, USER));
-    expect(order.status).toBe("refunded");
-    expect(order.refundedAt).not.toBeNull();
+  it("blocks concurrent requests while a supplier call is in flight", async () => {
+    let release!: () => void;
+    let entered!: () => void;
+    const waiting = new Promise<void>((resolve) => { release = resolve; });
+    const started = new Promise<void>((resolve) => { entered = resolve; });
+    mocks.add.mockImplementationOnce(async () => { entered(); await waiting; return { orderId: "panel-order-1" }; });
+    const first = place();
+    await started;
+    expect((await place()).kind).toBe("replay");
+    expect((await place({ requestId: "33333333-3333-4333-8333-333333333333" })).kind).toBe("pending");
+    expect(mocks.add).toHaveBeenCalledOnce();
+    release();
+    expect((await first).kind).toBe("created");
+    expect(await balance()).toBe(23_500);
+  });
 
-    // The ledger tells the whole story: a debit and its reversal.
-    const entries = await database.select().from(walletTransactions).where(eq(walletTransactions.userId, USER));
-    expect(entries.map((entry) => entry.type).sort()).toEqual(["debit", "refund"]);
+  it("binds a request ID to the original target and quantity", async () => {
+    expect((await place()).kind).toBe("created");
+    expect((await place({ link: "https://instagram.com/other" })).kind).toBe("invalid");
+    expect((await place({ quantity: 2000 })).kind).toBe("invalid");
+    expect(mocks.add).toHaveBeenCalledTimes(1);
+  });
 
-    // The receipt nudge used to ride along with the standalone credit. Once the
-    // refund commits inside a transaction, somebody has to call it on purpose.
-    const { scheduleWalletEmails } = await import("@/lib/email/schedule-wallet-emails");
-    expect(vi.mocked(scheduleWalletEmails)).toHaveBeenCalledTimes(1);
+  it("replays an accepted order even when the supplier is offline", async () => {
+    expect((await place()).kind).toBe("created");
+    const smm = await import("@/lib/providers/smm-panel");
+    const spy = vi.spyOn(smm, "isSmmPanelConfigured").mockReturnValue(false);
+    expect((await place()).kind).toBe("replay");
+    expect(mocks.add).toHaveBeenCalledOnce();
+    spy.mockRestore();
   });
 
   it("never trusts a price the browser sends", async () => {
@@ -248,30 +273,49 @@ describe("placing a boost", () => {
     expect(mocks.add).not.toHaveBeenCalled();
   });
 
-  describe("when the refund cannot be recorded", () => {
-    it("keeps the money and the order record as one event", async () => {
-      const state = { fired: false };
-      mocks.db = flakyDatabase(state);
-      mocks.add.mockRejectedValue(new Error("panel said no"));
-      try {
-        const result = await place();
-        expect(result.kind).toBe("unavailable");
+  it("holds a durable claim if the provider boundary cannot be recorded", async () => {
+    const state = { fired: false };
+    mocks.db = flakyDatabase(state);
+    try {
+      expect((await place()).kind).toBe("pending");
+      const saved = await refundState();
+      expect(saved.moneyIsBack).toBe(false);
+      expect(saved.order.status).toBe("review");
+      expect(saved.balance).toBe(23_500);
+      expect(mocks.add).not.toHaveBeenCalled();
+    } finally { mocks.db = database; }
+  });
 
-        const { order, moneyIsBack, balance: wallet } = await refundState();
-        // Either the customer has the money and the order says so, or nothing
-        // moved and the row still reads `processing` for an operator to settle.
-        // The state this rejects is the one the split left reachable: wallet
-        // refunded, order insisting the refund failed, and nothing to tell the
-        // next reader — or the admin refund screen — that it already happened.
-        expect(moneyIsBack).toBe(order.refundedAt !== null);
-        expect(order.status).toBe(moneyIsBack ? "refunded" : "processing");
-        expect(wallet).toBe(moneyIsBack ? 25_000 : 23_500);
-        expect(order.reconciliationNote).toContain("automatic refund failed");
-        expect(state.fired).toBe(true);
-      } finally {
-        mocks.db = database;
-      }
+  it("does not call the supplier when suspension wins after reservation", async () => {
+    let transactions = 0;
+    mocks.db = new Proxy(database, {
+      get(target, property) {
+        if (property === "transaction") return async (callback: (tx: unknown) => Promise<unknown>) => {
+          const result = await target.transaction(callback);
+          transactions++;
+          if (transactions === 1) await target.update(users).set({ suspendedAt: new Date() }).where(eq(users.id, USER));
+          return result;
+        };
+        const value = Reflect.get(target, property, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
     });
+    try {
+      expect((await place()).kind).toBe("pending");
+      expect(mocks.add).not.toHaveBeenCalled();
+      const saved = await refundState();
+      expect(saved.order.status).toBe("review");
+      expect(saved.moneyIsBack).toBe(false);
+      expect(saved.balance).toBe(23_500);
+    } finally { mocks.db = database; }
+  });
+
+  it("does not charge a suspended account", async () => {
+    await database.update(users).set({ suspendedAt: new Date() }).where(eq(users.id, USER));
+    await expect(place()).rejects.toThrow("not eligible");
+    expect(mocks.add).not.toHaveBeenCalled();
+    expect(await balance()).toBe(25_000);
+    expect(await database.select().from(orders)).toHaveLength(0);
   });
 
   it("refuses an unpriced listing rather than guessing", async () => {

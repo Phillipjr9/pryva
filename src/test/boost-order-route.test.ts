@@ -167,6 +167,20 @@ describe("POST /api/boosts/order", () => {
     expect(data.balance).toBeUndefined();
   });
 
+  it("reports an uncertain boost as review, not started", async () => {
+    mocks.place.mockResolvedValueOnce({ kind: "pending", orderId: "order-1", reference: "PRY-BOOST1" });
+    const response = await POST(post(valid));
+    expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({ ok: true, pending: true, order: { reference: "PRY-BOOST1" } });
+  });
+
+  it("reports a replayed review order as pending", async () => {
+    mocks.place.mockResolvedValueOnce({ kind: "replay", order: { ...ORDER, status: "review" } });
+    const response = await POST(post(valid));
+    expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({ pending: true, replayed: true });
+  });
+
   it("never leaks an internal failure as a stack trace", async () => {
     mocks.place.mockRejectedValueOnce(new Error("connect ECONNREFUSED 10.0.0.4:5432"));
     const response = await POST(post(valid));

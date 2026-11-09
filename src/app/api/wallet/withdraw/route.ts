@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { users, withdrawals, walletTransactions, bankAccounts } from "@/db/schema";
 import { getCurrentUser } from "@/lib/identity/auth";
@@ -38,7 +38,7 @@ function receiptMessage(withdrawal: Withdrawal): string {
     case "completed":
       return "Payout sent and confirmed by the payment provider.";
     case "processing":
-      return "Payout sent to your bank. It usually lands within a minute; this page updates when the bank confirms it.";
+      return "Your payout is processing. Bank settlement has not yet been confirmed.";
     case "failed":
       return "The payout could not be completed, so the amount and fee were returned to your wallet.";
     case "rejected":
@@ -193,7 +193,8 @@ export async function POST(request: NextRequest) {
 
       const [debited] = await tx.update(users)
         .set({ walletBalance: sql`${users.walletBalance} - ${totalDeduction}` })
-        .where(and(eq(users.id, user.id), gte(users.walletBalance, totalDeduction)))
+        .where(and(eq(users.id, user.id), gte(users.walletBalance, totalDeduction), isNull(users.suspendedAt), isNull(users.deletedAt),
+          sql`wallet_provenance_known = true AND wallet_balance - referral_credit_balance >= ${totalDeduction}`))
         .returning({ balance: users.walletBalance });
       if (!debited) throw new InsufficientWithdrawalBalance();
 
@@ -271,7 +272,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     if (error instanceof InsufficientWithdrawalBalance) {
-      return NextResponse.json({ error: "Insufficient balance to cover withdrawal and fees" }, { status: 400 });
+      return NextResponse.json({ error: "Your withdrawable balance cannot cover the amount and fee, or your wallet needs a source-of-funds review. Referral credit cannot be withdrawn; contact support if your balance needs review." }, { status: 400 });
     }
     logger.error("Withdrawal request failed", { error });
     return NextResponse.json({ error: "Failed to process withdrawal request" }, { status: 500 });

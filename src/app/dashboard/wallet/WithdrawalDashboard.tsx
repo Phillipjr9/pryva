@@ -118,7 +118,10 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
   const [loaded, setLoaded] = useState(false);
 
   const [amount, setAmount] = useState("");
-  const [selectedBankAccountId, setSelectedBankAccountId] = useState("");
+  const [chosenBankAccountId, setSelectedBankAccountId] = useState("");
+  const selectedBankAccountId = bankAccounts.some((account) => account.id === chosenBankAccountId)
+    ? chosenBankAccountId
+    : (bankAccounts.find((account) => account.isDefault) ?? bankAccounts[0])?.id ?? "";
 
   const [bankCode, setBankCode] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
@@ -151,18 +154,6 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, [intentKey]);
-
-  useEffect(() => {
-    if (bankAccounts.length === 0) {
-      setSelectedBankAccountId("");
-      return;
-    }
-    setSelectedBankAccountId((current) => {
-      if (current && bankAccounts.some((account) => account.id === current)) return current;
-      const fallback = bankAccounts.find((account) => account.isDefault) ?? bankAccounts[0];
-      return fallback?.id ?? "";
-    });
-  }, [bankAccounts]);
 
   async function fetchBankAccounts() {
     try {
@@ -479,7 +470,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
           </p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-micro text-ink-3">
-          <Wallet className="h-3 w-3 text-lav-600" /> {formatNaira(balance)} available
+          <Wallet className="h-3 w-3 text-lav-600" /> {formatNaira(balance)} withdrawable before fees
         </span>
       </div>
 
@@ -593,7 +584,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                   ))}
                 </select>
                 <p className="mt-2 rounded-xl border border-lav-200 bg-lav-50 px-3 py-2.5 text-meta leading-relaxed text-lav-800">
-                  For fraud protection, withdrawals are only sent to a bank account that matches the name on the account that funded your wallet. If your bank shows a fuller or surname-first version of your name, contact support for a payout-name review before withdrawing.
+                  Withdrawals are checked against the profile name recorded with your first completed top-up or an approved payout name. This name check does not verify who made the payment. If your bank shows a fuller or surname-first version of your name, contact support for a payout-name review before withdrawing.
                 </p>
               </div>
 
@@ -749,7 +740,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                     type="button"
                     onClick={verifyAccount}
                     disabled={verifyingAccount || loading || !bankCode || accountNumber.length !== 10}
-                    className="btn shrink-0 border border-line bg-white !px-3.5 !py-2.5 !text-[0.8125rem] sm:!text-[0.78rem] text-ink hover:border-lav-200 disabled:opacity-50"
+                    className="btn shrink-0 border border-line bg-white !px-3.5 !py-2.5 !text-[0.8125rem] sm:!text-[0.8125rem] text-ink hover:border-lav-200 disabled:opacity-50"
                   >
                     {verifyingAccount ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Verify"}
                   </button>

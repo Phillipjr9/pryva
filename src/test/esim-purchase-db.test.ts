@@ -96,6 +96,18 @@ beforeEach(async () => {
 });
 
 describe("eSIM purchase with the real unique index and wallet transaction", () => {
+  it("does not call the provider if the account is suspended after authentication", async () => {
+    mocks.recheck.mockImplementationOnce(async () => {
+      await database.update(schema.users).set({ suspendedAt: new Date() }).where(eq(schema.users.id, USER));
+      return offer();
+    });
+    const response = await purchase(request(randomUUID()));
+    expect(response.status).toBe(403);
+    expect(mocks.purchase).not.toHaveBeenCalled();
+    expect(await balance()).toBe(50_000);
+    expect((await database.select().from(schema.orders))[0].status).toBe("cancelled");
+  });
+
   it("commits one delivery and one debit, and replays the same request", async () => {
     const requestId = randomUUID();
     expect((await purchase(request(requestId))).status).toBe(200);

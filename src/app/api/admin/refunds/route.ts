@@ -14,7 +14,7 @@ import { isSameOriginMutation } from "@/lib/platform/net";
 
 export const dynamic = "force-dynamic";
 
-class UnpaidEsimOrderError extends Error {}
+class UnpaidOrderError extends Error {}
 
 // GET /api/admin/refunds - List orders eligible for refund or with pending refunds
 export async function GET(request: NextRequest) {
@@ -106,19 +106,13 @@ export async function POST(request: NextRequest) {
         .returning();
       if (!order) return null;
       if (!Number.isSafeInteger(order.amount) || order.amount <= 0) throw new Error("Invalid order amount");
-      // eSIM orders are claimed before the supplier call and are charged only
-      // when delivered. Review/cancelled orders can therefore be uncharged.
-      // A refund must not create money for a debit that never happened, even
-      // when an administrator has confirmed supplier reconciliation.
-      if (order.service === "esim") {
-        const [debit] = await tx.select({ id: walletTransactions.id }).from(walletTransactions).where(and(
-          eq(walletTransactions.orderId, order.id),
-          eq(walletTransactions.userId, order.userId),
-          eq(walletTransactions.type, "debit"),
-          eq(walletTransactions.amount, order.amount),
-        )).limit(1);
-        if (!debit) throw new UnpaidEsimOrderError();
-      }
+      // Review claims for numbers and schedules can also be uncharged. Never
+      // create wallet money unless this exact order has a matching debit.
+      const [debit] = await tx.select({ id: walletTransactions.id }).from(walletTransactions).where(and(
+        eq(walletTransactions.orderId, order.id), eq(walletTransactions.userId, order.userId),
+        eq(walletTransactions.type, "debit"), eq(walletTransactions.amount, order.amount),
+      )).limit(1);
+      if (!debit) throw new UnpaidOrderError();
 
       const [user] = await tx.update(users)
         .set({ walletBalance: sql`${users.walletBalance} + ${order.amount}` })
@@ -159,8 +153,8 @@ export async function POST(request: NextRequest) {
     scheduleWalletEmails();
     return NextResponse.json({ ok: true, message: "Refund processed successfully", refundAmount: result.amount });
   } catch (error) {
-    if (error instanceof UnpaidEsimOrderError) {
-      return NextResponse.json({ error: "No matching eSIM wallet debit was found. Reconcile the order before refunding." }, { status: 409 });
+    if (error instanceof UnpaidOrderError) {
+      return NextResponse.json({ error: "No matching order wallet debit was found. Reconcile the order and its payment before refunding." }, { status: 409 });
     }
     logger.error("Failed to process refund", { error });
     return NextResponse.json({ error: "Failed to process refund" }, { status: 500 });

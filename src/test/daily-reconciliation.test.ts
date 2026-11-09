@@ -266,6 +266,8 @@ describe("the daily close", () => {
     // A type in neither direction list has no arithmetic to check, so both
     // queries skip it. Reporting the account as clean would be the wrong kind of
     // quiet: it is a row the books cannot read, and the close has to say so.
+    // Legacy unknown types may already exist even though new ones are rejected.
+    await pg.exec('ALTER TABLE wallet_transactions DISABLE TRIGGER wallet_referral_provenance');
     await database.insert(walletTransactions).values({
       userId: USER,
       type: "gift_redeem",
@@ -275,6 +277,7 @@ describe("the daily close", () => {
       reference: "GFT-1",
       createdAt: new Date(NOON.getTime() + 120_000),
     });
+    await pg.exec('ALTER TABLE wallet_transactions ENABLE TRIGGER wallet_referral_provenance');
 
     const result = await reconciliation.runDailyReconciliation(DAY);
     expect(result.status).toBe("attention");

@@ -165,7 +165,7 @@ export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconO
               <button
                 type="button"
                 onClick={markAllRead}
-                className="ml-auto text-[0.76rem] font-medium text-lav-700 hover:text-lav-800 underline"
+                className="ml-auto text-[0.8125rem] font-medium text-lav-700 hover:text-lav-800 underline"
               >
                 Mark all read
               </button>
@@ -209,7 +209,7 @@ export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconO
                             <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-lav-500" />
                           )}
                         </p>
-                        <p className="mt-0.5 text-[0.76rem] leading-relaxed text-ink-3 line-clamp-2">
+                        <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-ink-3 line-clamp-2">
                           {notification.message}
                         </p>
                       </div>
@@ -227,7 +227,7 @@ export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconO
                 void markAllRead();
                 setOpen(false);
               }}
-              className="w-full rounded-lg border border-line bg-white px-3 py-1.5 text-[0.78rem] font-medium text-ink-2 hover:bg-lav-50"
+              className="w-full rounded-lg border border-line bg-white px-3 py-1.5 text-[0.8125rem] font-medium text-ink-2 hover:bg-lav-50"
             >
               View all notifications
             </button>

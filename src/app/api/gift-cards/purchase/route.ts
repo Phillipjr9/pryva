@@ -30,7 +30,10 @@ export async function POST(request: NextRequest) {
     if (!begun.ok) return begun.response;
     const { user, body } = begun;
     if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-    const { amount, recipientEmail, message } = body as { amount?: unknown; recipientEmail?: unknown; message?: unknown };
+    const { amount, recipientEmail, message, requestId } = body as { amount?: unknown; recipientEmail?: unknown; message?: unknown; requestId?: unknown };
+    if (typeof requestId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) {
+      return NextResponse.json({ error: "A valid purchase request ID is required." }, { status: 400 });
+    }
     if (
       typeof amount !== "number" ||
       !Number.isSafeInteger(amount) ||
@@ -52,11 +55,11 @@ export async function POST(request: NextRequest) {
     }
     const recipient = typeof recipientEmail === "string" ? recipientEmail.trim().toLowerCase() : undefined;
     const note = typeof message === "string" ? message.trim() : undefined;
-    const result = await createGiftCard({ userId: user.id, amount, recipientEmail: recipient, message: note });
+    const result = await createGiftCard({ userId: user.id, amount, requestId, recipientEmail: recipient, message: note });
 
     // The card exists and the wallet is debited; mail is a courtesy on top, so it
     // can never turn this into a failure the customer would retry (and pay twice).
-    if (recipient) {
+    if (recipient && !result.replayed) {
       await sendGiftCardDelivery({
         to: recipient,
         code: result.code,
@@ -69,6 +72,9 @@ export async function POST(request: NextRequest) {
       headers: { "Cache-Control": "private, no-store" },
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "Purchase request ID belongs to a different gift card") {
+      return NextResponse.json({ error: "This purchase attempt used different card details. Check your gift card history before starting another." }, { status: 409 });
+    }
     if (error instanceof Error && error.message === "Insufficient wallet balance or user not found") {
       return NextResponse.json({ error: "Insufficient wallet balance." }, { status: 400 });
     }

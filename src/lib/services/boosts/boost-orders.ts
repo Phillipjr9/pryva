@@ -1,43 +1,23 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { orders, type Order } from "@/db/schema";
+import { orders, users, type Order } from "@/db/schema";
 import { SMM_PROVIDER } from "@/lib/services/order-providers";
 import { findBoostListing } from "@/lib/services/boosts/smm-catalog";
-import { addSmmOrder, isSmmPanelConfigured, SmmPanelError } from "@/lib/providers/smm-panel";
+import { addSmmOrder, isSmmPanelConfigured } from "@/lib/providers/smm-panel";
 import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
 import { totalForQuantity } from "@/lib/services/boosts/smm-pricing";
-import { creditWalletInTx, debitWalletInTx, InsufficientFundsError, makeReference } from "@/lib/payments/wallet";
+import { debitWalletInTx, InsufficientFundsError, makeReference } from "@/lib/payments/wallet";
 
-/**
- * Buying a boost.
- *
- * The order matters here, and it is the opposite of the catalogue purchase path
- * on purpose. For a number, fulfilment comes first and the wallet is charged
- * only once a working unit exists, because the supplier can release it again if
- * the charge fails. A boosting panel offers neither of those things:
- *
- *   • **No idempotency key.** `add` is not repeatable — a retry is a second
- *     order and a second charge — so we must never call it twice for one
- *     customer action.
- *   • **No reliable release.** Some panels cancel, some do not, and a cancelled
- *     order may still have delivered part of the quantity.
- *
- * So the wallet is debited and the order recorded **first**, then the panel is
- * called exactly once. If the panel refuses, the debit is reversed in full and
- * the order is marked refunded — the customer is never out of pocket for a
- * delivery that never started. If the process dies between the debit and the
- * panel call, the order sits at `processing` with no supplier reference, which
- * is a state an operator can see and settle; charging after an un-repeatable
- * call would instead leave a paid-for nothing.
- */
-
+/** A debit and durable review claim precede the non-idempotent supplier call.
+ * Ambiguous outcomes are never automatically refunded or retried. */
 export type BoostOrderResult =
   | { kind: "created"; order: Order; balance: number }
   | { kind: "replay"; order: Order }
+  | { kind: "pending"; orderId: string; reference: string }
   | { kind: "invalid"; error: string }
   | { kind: "unavailable"; error: string }
   /** Nothing is configured to fulfil this, so there is nothing to sell yet. */
@@ -72,29 +52,25 @@ export async function placeBoostOrder(input: {
   /** Client-supplied, stable across a retry of the same attempt. */
   requestId: string;
 }): Promise<BoostOrderResult> {
+  const matches = (row: Order) => row.service === "social" && row.provider === SMM_PROVIDER &&
+    row.productSlug === input.itemId && row.targetLink === input.link && row.quantity === input.quantity;
+  const replay = (row: Order): BoostOrderResult => matches(row)
+    ? { kind: "replay", order: row }
+    : { kind: "invalid", error: "This request belongs to a different order. Check your orders before trying again." };
+
+  // Replays work even if the provider or catalogue is currently unavailable.
+  const [existing] = await db.select().from(orders)
+    .where(and(eq(orders.userId, input.userId), eq(orders.requestId, input.requestId))).limit(1);
+  if (existing) return replay(existing);
   if (!isSmmPanelConfigured()) return { kind: "disabled", error: DISABLED };
-  // The catalog read can fail on its own (unreachable panel, corrupt snapshot).
-  // That is not the customer's fault and must never surface as a 500.
   const found = await findBoostListing(input.itemId).catch(() => null);
   if (!found) return { kind: "invalid", error: "That boosting service is no longer available." };
   const { listing } = found;
-
   const problem = quantityProblem(input.quantity, listing.min, listing.max);
   if (problem) return { kind: "invalid", error: problem };
-
-  if (listing.perThousand === null) {
-    return { kind: "unavailable", error: "This boosting service is not available right now." };
-  }
+  if (listing.perThousand === null) return { kind: "unavailable", error: "This boosting service is not available right now." };
   const total = totalForQuantity(listing.perThousand, input.quantity);
   if (total <= 0) return { kind: "unavailable", error: "This boosting service is not available right now." };
-
-  // A replay must cost nothing and buy nothing: same attempt, same order.
-  const [existing] = await db
-    .select()
-    .from(orders)
-    .where(and(eq(orders.userId, input.userId), eq(orders.requestId, input.requestId)))
-    .limit(1);
-  if (existing) return { kind: "replay", order: existing };
 
   const reference = makeReference("PRY");
   const orderId = randomUUID();
@@ -103,12 +79,20 @@ export async function placeBoostOrder(input: {
   let balance: number;
   try {
     balance = await db.transaction(async (tx: any) => {
+      // Serialize new attempts for this account and block another purchase
+      // while any earlier SMM result is unresolved, even after a browser reload.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.userId}))`);
       const [raced] = await tx
         .select()
         .from(orders)
         .where(and(eq(orders.userId, input.userId), eq(orders.requestId, input.requestId)))
         .limit(1);
       if (raced) throw new ReplaySignal(raced);
+      const [unresolved] = await tx.select().from(orders).where(and(
+        eq(orders.userId, input.userId), eq(orders.provider, SMM_PROVIDER),
+        or(eq(orders.status, "processing"), eq(orders.status, "review")), isNull(orders.refundedAt),
+      )).limit(1);
+      if (unresolved) throw new PendingSignal(unresolved.id, unresolved.reference);
 
       await tx.insert(orders).values({
         id: orderId,
@@ -124,7 +108,8 @@ export async function placeBoostOrder(input: {
         amount: total,
         // Nothing has been delivered yet: this is the state that says "the
         // supplier has not confirmed", not "the customer owns this".
-        status: "processing",
+        status: "review",
+        reconciliationNote: "Boost order claimed before provider call; outcome requires tracking.",
         provider: SMM_PROVIDER,
         targetLink: input.link,
         quantity: input.quantity,
@@ -140,7 +125,8 @@ export async function placeBoostOrder(input: {
       });
     });
   } catch (error) {
-    if (error instanceof ReplaySignal) return { kind: "replay", order: error.order };
+    if (error instanceof ReplaySignal) return replay(error.order);
+    if (error instanceof PendingSignal) return { kind: "pending", orderId: error.orderId, reference: error.reference };
     if (error instanceof InsufficientFundsError) {
       return { kind: "insufficient", balance: error.balance, required: error.required };
     }
@@ -150,77 +136,48 @@ export async function placeBoostOrder(input: {
         .from(orders)
         .where(and(eq(orders.userId, input.userId), eq(orders.requestId, input.requestId)))
         .limit(1);
-      if (winner) return { kind: "replay", order: winner };
+      if (winner) return replay(winner);
     }
     throw error;
   }
 
-  // Exactly one call. Never retried here or above: a second call is a second
-  // supplier charge for the same customer action.
+  // The debit committed with the claim. Nudge the receipt even if the supplier
+  // never answers; no path below can infer a refund from a missing response.
+  scheduleWalletEmails();
+  let providerOrderId: string | null = null;
   try {
-    const placement = await addSmmOrder({
-      service: listing.serviceId,
-      link: input.link,
-      quantity: input.quantity,
+    const eligible = await db.transaction(async (tx) => {
+      const [account] = await tx.select({ suspendedAt: users.suspendedAt, deletedAt: users.deletedAt })
+        .from(users).where(eq(users.id, input.userId)).for("update").limit(1);
+      if (!account || account.suspendedAt || account.deletedAt) return false;
+      const [claim] = await tx.update(orders).set({ reconciliationNote: "Boost provider purchase started; outcome requires reconciliation." })
+        .where(and(eq(orders.id, orderId), eq(orders.status, "review"), isNull(orders.refundedAt))).returning({ id: orders.id });
+      if (!claim) throw new Error("Boost claim unavailable");
+      return true;
     });
-    const [updated] = await db
-      .update(orders)
-      .set({ status: "active", providerRequestId: placement.orderId })
-      .where(eq(orders.id, orderId))
-      .returning();
-    scheduleWalletEmails();
-    return { kind: "created", order: updated ?? ({ id: orderId } as Order), balance };
-  } catch (error) {
-    // The supplier did not accept the order: give the money back, record why,
-    // and leave the row refunded so support can see it was never delivered.
-    const reason =
-      error instanceof SmmPanelError
-        ? `Supplier refused the order (${error.code ?? error.status})`
-        : "Supplier call failed";
-    try {
-      // One transaction, the same way the purchase above commits its charge and
-      // its row: the money going back and the order saying it went back are one
-      // event. Written separately, the credit could commit and the status write
-      // then fail, leaving a wallet the customer had been refunded into and an
-      // order — plus a note below — insisting the refund had not happened.
-      await db.transaction(async (tx: any) => {
-        // The claim is the first write and it repeats the guard against the row:
-        // only an order that has not already been refunded may add money to a
-        // balance. A declined claim rolls the whole thing back.
-        const [claimable] = await tx
-          .update(orders)
-          .set({ status: "refunded", refundedAt: new Date(), reconciliationNote: reason })
-          .where(and(eq(orders.id, orderId), isNull(orders.refundedAt)))
-          .returning({ id: orders.id });
-        if (!claimable) throw new Error("Boost order was already settled");
-
-        await creditWalletInTx(tx, {
-          userId: input.userId,
-          amount: total,
-          type: "refund",
-          description: `Refund · ${listing.name} · ${planLabel}`,
-          orderId,
-          reference: makeReference("RFB"),
-        });
-      });
-      // `creditWallet` used to send the receipt as a side effect of its own
-      // commit. Crediting inside a transaction deliberately does not, so the
-      // nudge has to be asked for here or the customer waits for the nightly.
-      scheduleWalletEmails();
-    } catch (refundError) {
-      // Nothing moved: the credit rolled back with the status write, so the
-      // debit stands and the row stays at `processing` for an operator to see.
-      // Better a visible unfulfilled order than a silent loss.
-      console.error("Boost refund failed", refundError);
-      await db
-        .update(orders)
-        .set({ reconciliationNote: `${reason}; automatic refund failed` })
-        .where(eq(orders.id, orderId));
+    if (!eligible) {
+      await db.update(orders).set({ reconciliationNote: "Account unavailable before supplier call; debit requires reconciliation." })
+        .where(and(eq(orders.id, orderId), eq(orders.status, "review"), isNull(orders.refundedAt)));
+      return { kind: "pending", orderId, reference };
     }
-    return {
-      kind: "unavailable",
-      error: "We couldn't start that boost, so nothing was charged. Please try again.",
-    };
+    const placement = await addSmmOrder({ service: listing.serviceId, link: input.link, quantity: input.quantity });
+    providerOrderId = placement.orderId;
+    const [updated] = await db.update(orders)
+      .set({ status: "active", providerRequestId: providerOrderId, reconciliationNote: null })
+      .where(and(eq(orders.id, orderId), eq(orders.status, "review"), isNull(orders.refundedAt)))
+      .returning();
+    if (!updated) return { kind: "pending", orderId, reference };
+    return { kind: "created", order: updated, balance };
+  } catch {
+    // Supplier failures, missing responses, and failed database commits are all
+    // ambiguous. Preserve any known provider id, never auto-refund or retry.
+    try {
+      await db.update(orders).set({
+        ...(providerOrderId ? { providerRequestId: providerOrderId } : {}),
+        reconciliationNote: "Boost purchase outcome requires supplier and wallet reconciliation; no automatic refund issued.",
+      }).where(and(eq(orders.id, orderId), eq(orders.status, "review"), isNull(orders.refundedAt)));
+    } catch { /* The original durable review claim remains for an operator. */ }
+    return { kind: "pending", orderId, reference };
   }
 }
 
@@ -230,4 +187,8 @@ class ReplaySignal extends Error {
     super("replay");
     this.name = "ReplaySignal";
   }
+}
+
+class PendingSignal extends Error {
+  constructor(public readonly orderId: string, public readonly reference: string) { super("Previous boost needs review"); }
 }

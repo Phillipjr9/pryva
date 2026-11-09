@@ -49,15 +49,12 @@ export function bitcallOtpItemsForCountry(
   // explicit checkout plan remain view-only below.
   const plan = numberPlanForCountry(country.code);
 
-  // An offer with no readable app is still stock Bitcall publishes. Dropping it
-  // was the quietest possible way to lose a whole country's inventory: the read
-  // succeeds, nothing errors, and the shelf simply has no numbers on it. It is
-  // listed under a neutral label and remains purchasable — the checkout resolves
-  // it by its opaque ref either way.
+  // Each provider offer remains visible, including multiple pools for one app
+  // and unnamed offers. Selecting one card resolves exactly that opaque ID.
+  // Never collapse pools into one stock number or silently discard long labels.
   const byApp = new Map<string, OtpOffer[]>();
   for (const offer of offers) {
     const named = offer.app?.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
-    if (named && named.length > 80) continue;
     const key = named?.toLocaleLowerCase() ?? "";
     const group = byApp.get(key);
     if (group) group.push(offer);
@@ -72,31 +69,31 @@ export function bitcallOtpItemsForCountry(
       return aSellable - bSellable ||
         (a.costNgn ?? Number.MAX_SAFE_INTEGER) - (b.costNgn ?? Number.MAX_SAFE_INTEGER);
     });
-    const offer = candidates[0];
-    if (!offer) continue;
-    const label = readableLabel(offer.app) ?? "Verification number";
-    const id = otpOfferPublicId(country.code, offer.ref, offer.app);
-    const sellable = plan !== null && canSell(plan, offer);
-    const brand = appBrand(label);
-    items.push({
-      id,
-      category: "verification",
-      name: label,
-      description: plan
-        ? "Live app-specific number offer"
-        : "Bitcall stock listing · checkout is not enabled for this country",
-      tag: brand?.tag ?? "Other",
-      artwork: brand ? { kind: "brand", name: brand.brand } : verificationArtwork(label),
-      source: "live",
-      coverage: "catalog-country",
-      stock: safeUnitCount(offer.stock),
-      myUnits: null,
-      price: sellable && plan ? plan.price : null,
-      action: sellable
-        ? { label: "Choose service", href: `/dashboard/services/otp/${encodeURIComponent(id)}?country=${country.code}` }
-        : null,
-      detail: `${countryName} · single-use verification`,
-    });
+    for (const [index, offer] of candidates.entries()) {
+      const label = readableLabel(offer.app) ?? "Verification number";
+      const id = otpOfferPublicId(country.code, offer.ref, offer.app);
+      const sellable = plan !== null && canSell(plan, offer);
+      const brand = appBrand(label);
+      items.push({
+        id,
+        category: "verification",
+        name: label,
+        description: plan
+          ? "Live app-specific number offer"
+          : "Live stock listing · checkout is not enabled for this country",
+        tag: brand?.tag ?? "Other",
+        artwork: brand ? { kind: "brand", name: brand.brand } : verificationArtwork(label),
+        source: "live",
+        coverage: "catalog-country",
+        stock: safeUnitCount(offer.stock),
+        myUnits: null,
+        price: sellable && plan ? plan.price : null,
+        action: sellable
+          ? { label: "Choose service", href: `/dashboard/services/otp/${encodeURIComponent(id)}?country=${country.code}` }
+          : null,
+        detail: `${countryName} · single-use verification${candidates.length > 1 ? ` · option ${index + 1} of ${candidates.length}` : ""}`,
+      });
+    }
   }
   return items.sort((a, b) => a.name.localeCompare(b.name));
 }

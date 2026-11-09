@@ -223,7 +223,7 @@ export default async function DashboardOverviewPage() {
                 <span className="min-w-0 flex-1">
                   <span className="flex min-w-0 items-center justify-center gap-1.5 sm:justify-start">
                     <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${SERVICE_STATE_DOT[item.state]}`} />
-                    <span className="block min-w-0 text-[0.72rem] font-semibold leading-tight text-ink group-hover:text-lav-700 sm:truncate sm:text-[0.82rem]">{item.label}</span>
+                    <span className="block min-w-0 text-[0.8125rem] font-semibold leading-tight text-ink group-hover:text-lav-700 sm:truncate sm:text-[0.82rem]">{item.label}</span>
                   </span>
                   <span className="hidden truncate text-micro text-ink-3 sm:block">{item.note}</span>
                   <span className="sr-only"> — {SERVICE_STATE_LABEL[item.state]}</span>
@@ -233,8 +233,8 @@ export default async function DashboardOverviewPage() {
             ))}
           </div>
           <div className="mt-4 rounded-xl border border-dashed border-line bg-cream/30 px-3 py-2.5">
-            <p className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-ink-3">Recommended next</p>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-[0.74rem] text-ink-3">
+            <p className="text-[0.8125rem] font-medium uppercase tracking-[0.12em] text-ink-3">Recommended next</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-[0.8125rem] text-ink-3">
               <Link href="/dashboard/services?country=ng&category=numbers" className="font-semibold text-lav-700 hover:underline">Numbers</Link>
               <span>•</span>
               <Link href="/dashboard/services?country=ng&category=social" className="font-semibold text-lav-700 hover:underline">Social</Link>

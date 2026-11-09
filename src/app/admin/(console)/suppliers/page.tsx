@@ -111,7 +111,7 @@ export default async function AdminSuppliersPage({
                       <td className="px-3 py-2.5 font-medium text-ink">{supplier.supplier}</td>
                       <td className="px-3 py-2.5">
                         <span
-                          className={`rounded-full px-2 py-0.5 text-[0.72rem] font-semibold ${supplier.configured && !supplier.errorCode ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}
+                          className={`rounded-full px-2 py-0.5 text-[0.8125rem] font-semibold ${supplier.configured && !supplier.errorCode ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}
                         >
                           {supplier.errorCode ? supplier.errorCode : supplier.configured ? "Connected" : "Not configured"}
                         </span>
@@ -156,7 +156,7 @@ export default async function AdminSuppliersPage({
                   <td className="px-3 py-2.5 text-right text-ink-2">{plan.marginPct === null ? "—" : `${plan.marginPct}%`}</td>
                   <td className="px-3 py-2.5">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[0.72rem] font-semibold ${plan.clearsFloor ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}
+                      className={`rounded-full px-2 py-0.5 text-[0.8125rem] font-semibold ${plan.clearsFloor ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}
                     >
                       {plan.clearsFloor ? "Clears floor" : plan.blockedBy ?? "Unprofitable"}
                     </span>

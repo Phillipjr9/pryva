@@ -4,7 +4,15 @@ import type { SQL } from "drizzle-orm";
 
 const mocks = vi.hoisted(() => ({ cookies: vi.fn(), headers: vi.fn(), insert: vi.fn(), remove: vi.fn(), set: vi.fn() }));
 vi.mock("next/headers", () => ({ cookies: mocks.cookies, headers: mocks.headers }));
-vi.mock("@/db", () => ({ db: { insert: () => ({ values: mocks.insert }), delete: () => ({ where: mocks.remove }) } }));
+vi.mock("@/db", () => {
+  const db = {
+    insert: () => ({ values: mocks.insert }),
+    delete: () => ({ where: mocks.remove }),
+    select: () => ({ from: () => ({ where: () => ({ for: () => ({ limit: async () => [{ id: "eligible-user" }] }) }) }) }),
+    transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback(db),
+  };
+  return { db };
+});
 import { createSession, destroySession, requestIsSecure } from "@/lib/identity/auth";
 
 beforeEach(() => {

@@ -44,7 +44,7 @@ const faqs = [
   },
   {
     question: "Why can I not withdraw to my bank account?",
-    answer: "Withdrawals are only paid to an account matching the funded wallet name, unless a payout-name review has been approved by an operator. If the account uses a different spelling, ask support for a payout-name review with a bank statement or screenshot.",
+    answer: "Withdrawals are only paid to an account matching the profile name recorded with the first completed top-up, unless a payout-name review has been approved by an operator. If the account uses a different spelling, ask support for a payout-name review with a bank statement or screenshot.",
   },
   {
     question: "What should I include in a support message?",
@@ -61,7 +61,7 @@ export default function HelpPage() {
     <div className="min-h-screen bg-cream">
       <section className="py-16 sm:py-20">
         <div className="shell text-center">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-lav-200 bg-lav-50 px-3 py-1 text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-lav-700">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-lav-200 bg-lav-50 px-3 py-1 text-[0.8125rem] font-semibold uppercase tracking-[0.12em] text-lav-700">
             <Shield className="h-3.5 w-3.5" /> Support centre
           </div>
           <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem]">How can we help you?</h1>

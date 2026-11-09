@@ -211,7 +211,7 @@ export default async function AdminHealthPage() {
                         <div key={row.id} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm">
                           <div className="flex items-center justify-between gap-2">
                             <div className="font-medium text-red-900">{FRAUD_KIND_LABEL[row.kind] ?? row.kind}</div>
-                            <span className={`rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${row.severity === "high" ? "bg-red-100 text-red-700" : row.severity === "warn" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-700"}`}>
+                            <span className={`rounded-full px-2 py-0.5 text-[0.8125rem] font-semibold ${row.severity === "high" ? "bg-red-100 text-red-700" : row.severity === "warn" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-700"}`}>
                               {row.severity}
                             </span>
                           </div>
@@ -231,7 +231,7 @@ export default async function AdminHealthPage() {
                         <div key={row.user_id} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm">
                           <div className="flex items-center justify-between gap-2">
                             <div className="font-medium text-red-900">{row.email}</div>
-                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[0.7rem] font-semibold text-red-700">Mismatch</span>
+                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[0.8125rem] font-semibold text-red-700">Mismatch</span>
                           </div>
                           <div className="mt-1 text-red-800">Wallet {formatNaira(row.wallet_balance)} · ledger {formatNaira(row.ledger_balance)}</div>
                         </div>
@@ -261,7 +261,7 @@ export default async function AdminHealthPage() {
                       <div className="font-medium text-ink">{run.day}</div>
                       <div className="text-xs text-ink-3">{run.accountsChecked} accounts checked</div>
                     </div>
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${statusTone[run.status] ?? "bg-slate-100 text-slate-600"}`}>
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[0.8125rem] font-semibold ${statusTone[run.status] ?? "bg-slate-100 text-slate-600"}`}>
                       {run.status}
                     </span>
                   </div>

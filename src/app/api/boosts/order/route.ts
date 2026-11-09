@@ -49,6 +49,10 @@ export async function POST(request: Request) {
       requestId: rawRequestId.toLowerCase(),
     });
 
+    if (result.kind === "pending") return Response.json({
+      ok: true, pending: true, order: { id: result.orderId, reference: result.reference },
+      message: "A boost order needs review. Your wallet was charged; check your orders or contact support before placing another.",
+    }, { status: 202 });
     if (result.kind === "invalid") return Response.json({ ok: false, error: result.error }, { status: 400 });
     if (result.kind === "disabled") return Response.json({ ok: false, error: result.error }, { status: 503 });
     if (result.kind === "unavailable") return Response.json({ ok: false, error: result.error }, { status: 502 });
@@ -65,6 +69,13 @@ export async function POST(request: Request) {
     }
 
     const order = result.order;
+    if (order.status === "review" || order.status === "processing") return Response.json({
+      ok: true, pending: true, replayed: true, order: { id: order.id, reference: order.reference },
+      message: "This boost order needs review. Check your wallet and orders before placing another.",
+    }, { status: 202 });
+    if (order.status === "refunded" || order.status === "cancelled") return Response.json({
+      ok: false, error: "This boost attempt was closed. Check your orders before starting another.",
+    }, { status: 409 });
     // A created order may be this customer's first delivery, which is what a
     // referral reward waits for. Best effort, and idempotent.
     if (result.kind !== "replay") void afterPurchase(user.id);
@@ -86,7 +97,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Boost order failed", error);
     return Response.json(
-      { ok: false, error: "We couldn't place that order right now. Please try again." },
+      { ok: false, error: "We couldn't confirm this order. Check your orders and wallet before trying again." },
       { status: 500 },
     );
   }

@@ -1,27 +1,20 @@
-import { BulkOrdersForm } from "./BulkOrdersForm";
 import { requireUser } from "@/lib/identity/auth";
-import { fulfilablePlans } from "@/lib/services/fulfillment";
-import { MAX_BULK_UNITS } from "@/lib/services/bulk-orders";
 import { ServiceTitle } from "@/components/ServiceTitle";
+import { plans } from "@/lib/services/catalog";
+import { isNumberPlanOrderingConfigured } from "@/lib/services/numbers/number-availability";
+import { MAX_BULK_UNITS } from "@/lib/services/bulk-orders";
+import { BulkOrdersForm } from "./BulkOrdersForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function BulkOrdersPage() {
   const user = await requireUser("/dashboard/bulk-orders");
-  // Only plans with a supplier path are offered: the checkout refuses anything
-  // else, so showing it here would be an invitation to a guaranteed failure.
-  const sellableSlugs = fulfilablePlans().map(({ plan }) => plan.slug);
-
+  const sellable = plans.filter((plan) => plan.service === "numbers" && isNumberPlanOrderingConfigured(plan.slug)).map((plan) => plan.slug);
   return (
     <div className="space-y-6">
-      <div>
-        <ServiceTitle service="bulk">Bulk Orders</ServiceTitle>
-        <p className="mt-1 text-[0.86rem] text-ink-2">
-          Buy several number plans in one go. Items are delivered automatically, and a basket of
-          10+ saves 5% — 20 items saves 10%, up to {MAX_BULK_UNITS} items per checkout.
-        </p>
-      </div>
-      <BulkOrdersForm user={user} sellableSlugs={sellableSlugs} maxUnits={MAX_BULK_UNITS} />
+      <ServiceTitle service="bulk">Bulk Orders</ServiceTitle>
+      <p className="text-sm text-ink-2">Availability is checked per unit. If an outcome is uncertain, the batch stops for review; check your orders before buying again.</p>
+      {sellable.length ? <BulkOrdersForm user={user} sellableSlugs={sellable} maxUnits={MAX_BULK_UNITS} /> : <p role="status">Bulk ordering is currently unavailable.</p>}
     </div>
   );
 }

@@ -45,7 +45,7 @@ describe("public content integrity", () => {
     // The row used to bundle gift cards with categories that have no live
     // fulfilment, so the page said "Not available" while the dashboard sold them.
     expect(html).toContain("Gift cards");
-    expect(html).toContain("issued by Pryva from your wallet balance");
+    expect(html).toContain("issued by PryvaLogs from your wallet balance");
     expect(html).not.toContain("Digital subscriptions, gift cards");
   });
   it("does not promise automatic refunds or unverified top-up credit", () => {

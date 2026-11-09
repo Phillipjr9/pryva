@@ -241,7 +241,7 @@ export async function POST(request: NextRequest) {
       if (unresolved) throw new PendingPurchase(unresolved.reference);
       const [updated] = await tx.update(users)
         .set({ walletBalance: sql`${users.walletBalance} - ${price.totalNgn}` })
-        .where(and(eq(users.id, user.id), gte(users.walletBalance, price.totalNgn)))
+        .where(and(eq(users.id, user.id), gte(users.walletBalance, price.totalNgn), isNull(users.suspendedAt), isNull(users.deletedAt)))
         .returning({ balance: users.walletBalance });
       if (!updated) throw new InsufficientBalance();
       const [created] = await tx.insert(orders).values({
@@ -294,6 +294,22 @@ export async function POST(request: NextRequest) {
 
   let purchase;
   try {
+    // Lock the account at the provider boundary. An already-started supplier
+    // purchase cannot be cancelled by a later suspension; preserve its receipt.
+    const eligible = await db.transaction(async (tx) => {
+      const [account] = await tx.select({ suspendedAt: users.suspendedAt, deletedAt: users.deletedAt })
+        .from(users).where(eq(users.id, user.id)).for("update").limit(1);
+      if (!account || account.suspendedAt || account.deletedAt) return false;
+      const [started] = await tx.update(orders).set({ reconciliationNote: "Marketplace supplier purchase started; outcome requires tracking." })
+        .where(and(eq(orders.id, orderId), eq(orders.status, "processing"), isNull(orders.refundedAt)))
+        .returning({ id: orders.id });
+      if (!started) throw new Error("Marketplace purchase claim unavailable");
+      return true;
+    });
+    if (!eligible) {
+      await markForReview(orderId, reference);
+      return pendingResponse(reference, orderId);
+    }
     purchase = await purchaseMarketplaceListing({ listing, quantity, clientReference, promoCode: appliedPromo });
   } catch (error) {
     // An ambiguous outcome means the supplier may already have taken our money.

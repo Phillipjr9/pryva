@@ -7,12 +7,12 @@ export const metadata = { title: "Payout names" };
 /** The three things an operator has to hold in mind while working this queue. */
 const RULES = [
   {
-    title: "Payouts go to the funding name",
-    body: "Money only leaves to a bank account matching the name frozen on the first settled deposit.",
+    title: "Profile-name check",
+    body: "The check uses the profile name saved at the first completed top-up. It does not verify the payer.",
   },
   {
     title: "Approving widens one customer",
-    body: "It lets that one customer be paid to the reviewed name. It never edits the depositor record.",
+    body: "It lets that one customer be paid to the reviewed name. It never edits the saved profile-name record.",
   },
   {
     title: "Check the evidence first",

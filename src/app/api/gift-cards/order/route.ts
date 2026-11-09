@@ -1,6 +1,6 @@
 import { beginPurchase } from "@/lib/checkout/purchase";
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users } from "@/db/schema";
 import { findGiftCardDenomination } from "@/lib/services/gift-cards/brand-catalog";
@@ -39,12 +39,6 @@ export async function POST(request: Request) {
       bodyTooLarge: "Request payload too large.",
       invalidBody: "Invalid JSON.",
     },
-    // A mock feed is a closed shop: refusing here costs no catalogue read and
-    // matches the environment rule the financial gate applies to everything else.
-    supplierGate: {
-      open: () => process.env.FOXRELOAD_IS_MOCK !== "true",
-      message: "Gift card purchases are unavailable in this environment.",
-    },
   });
   if (!begun.ok) return begun.response;
   const { user, body } = begun;
@@ -70,49 +64,32 @@ export async function POST(request: Request) {
   }
   const requestId = rawRequestId.trim().toLowerCase();
 
-  // Real API requirement: ensure live fulfillment provider is configured
-  if (!isFoxreloadConfigured()) {
-    return Response.json(
-      { ok: false, error: "Live gift card purchases are currently unavailable. Provider API is not configured." },
-      { status: 503 },
-    );
-  }
-
-  // Check current wallet balance
+  // Resolve the request key before checking today's balance: an already-paid
+  // replay must not be rejected simply because the first debit reduced it.
   const [currentUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
-  if (!currentUser || currentUser.walletBalance < denomination.priceNgn) {
-    return Response.json({ ok: false, error: "Insufficient wallet balance." }, { status: 402 });
-  }
-
-  // Idempotency: check if already bought
-  const [existing] = await db
-    .select()
-    .from(orders)
-    .where(and(eq(orders.userId, user.id), eq(orders.requestId, requestId)))
-    .limit(1);
-
-  if (existing) {
+  const replay = (existing: typeof orders.$inferSelect) => {
+    if (existing.productSlug !== denomination.id || existing.provider !== FOXRELOAD_PROVIDER) {
+      return Response.json({ ok: false, error: "This request ID belongs to a different order." }, { status: 409 });
+    }
     if (existing.status === "delivered" && existing.referenceCode) {
-      return Response.json({
-        ok: true,
-        replayed: true,
-        balance: currentUser.walletBalance,
-        reference: existing.reference,
-        code: existing.referenceCode,
-        card: {
-          id: card.slug,
-          name: card.name,
-          denomination: `$${denomination.amountUsd} USD`,
-          instructions: card.redemptionGuide,
-        },
-      });
+      return Response.json({ ok: true, replayed: true, balance: currentUser?.walletBalance, reference: existing.reference,
+        code: existing.referenceCode, card: { id: card.slug, name: card.name, denomination: `$${denomination.amountUsd} USD`, instructions: card.redemptionGuide } });
     }
     if (existing.status === "refunded") {
-      return Response.json(
-        { ok: false, error: "This order was previously refunded. Please try again with a new request." },
-        { status: 409 },
-      );
+      return Response.json({ ok: false, safeToRetry: true, error: "This attempt was refunded. Check your wallet before starting a new purchase." }, { status: 409 });
     }
+    return Response.json({ ok: false, pending: true, reference: existing.reference,
+      error: "This purchase is still being checked. Contact support with the reference before buying again." }, { status: 409 });
+  };
+  const [existing] = await db.select().from(orders)
+    .where(and(eq(orders.userId, user.id), eq(orders.requestId, requestId))).limit(1);
+  if (existing) return replay(existing);
+  // Recovery of an existing order must work even while the provider is offline.
+  if (process.env.FOXRELOAD_IS_MOCK === "true" || !isFoxreloadConfigured()) {
+    return Response.json({ ok: false, error: "Live gift card purchases are currently unavailable. Provider API is not configured." }, { status: 503 });
+  }
+  if (!currentUser || currentUser.walletBalance < denomination.priceNgn) {
+    return Response.json({ ok: false, error: "Insufficient wallet balance." }, { status: 402 });
   }
 
   const orderId = randomUUID();
@@ -159,25 +136,10 @@ export async function POST(request: Request) {
       });
     });
   } catch (error: any) {
-    if (error?.message === "REPLAY_RACED") {
-      const [replayed] = await db
-        .select()
-        .from(orders)
-        .where(and(eq(orders.userId, user.id), eq(orders.requestId, requestId)))
-        .limit(1);
-      return Response.json({
-        ok: true,
-        replayed: true,
-        balance: currentUser.walletBalance,
-        reference: replayed.reference,
-        code: replayed.referenceCode,
-        card: {
-          id: card.slug,
-          name: card.name,
-          denomination: `$${denomination.amountUsd} USD`,
-          instructions: card.redemptionGuide,
-        },
-      });
+    if (error?.message === "REPLAY_RACED" || error?.code === "23505" || error?.cause?.code === "23505") {
+      const [replayed] = await db.select().from(orders)
+        .where(and(eq(orders.userId, user.id), eq(orders.requestId, requestId))).limit(1);
+      if (replayed) return replay(replayed);
     }
     console.error("Failed to commit gift card order debit", error);
     return Response.json({ ok: false, error: "Failed to process gift card purchase." }, { status: 500 });
@@ -190,6 +152,7 @@ export async function POST(request: Request) {
   // Step 2: Execute real FoxReload API purchase
   let voucherCode = "";
   let providerOrderId = "";
+  let providerCallStarted = false;
 
   try {
     const foxreloadItemId = await resolveFoxreloadProductId({
@@ -198,12 +161,28 @@ export async function POST(request: Request) {
       preferredId: denomination.foxreloadProductId || denomination.id,
     });
 
+    // Serialize the provider boundary with account suspension. The lock cannot
+    // undo a call already started, but suspension that wins first blocks it.
+    await db.transaction(async (tx) => {
+      const [account] = await tx.select({ suspendedAt: users.suspendedAt, deletedAt: users.deletedAt }).from(users)
+        .where(eq(users.id, user.id)).for("update").limit(1);
+      if (!account || account.suspendedAt || account.deletedAt) throw new Error("Account unavailable");
+      const [started] = await tx.update(orders).set({ status: "review", reconciliationNote: "Provider order creation started; outcome requires reconciliation." })
+        .where(and(eq(orders.id, orderId), eq(orders.status, "processing"))).returning({ id: orders.id });
+      if (!started) throw new Error("Purchase claim unavailable");
+    });
+    providerCallStarted = true;
     const upstreamOrder = await createFoxreloadOrder({
       itemId: foxreloadItemId,
       quantity: 1,
       idempotencyKey: requestId,
     });
     providerOrderId = upstreamOrder.id;
+    if (!providerOrderId) throw new Error("Provider did not return an order reference");
+    // Persist the provider identifier before any call that can spend.
+    const [recorded] = await db.update(orders).set({ providerRequestId: providerOrderId, reconciliationNote: "Provider order created; payment and delivery require reconciliation." })
+      .where(and(eq(orders.id, orderId), eq(orders.status, "review"))).returning({ id: orders.id });
+    if (!recorded) throw new Error("Purchase claim unavailable");
 
     await payFoxreloadOrder(upstreamOrder.id);
     const codes = await pollFoxreloadOrderCodes(upstreamOrder.id);
@@ -214,14 +193,16 @@ export async function POST(request: Request) {
     }
 
     // Step 3: Mark order delivered with code
-    await db
+    const [delivered] = await db
       .update(orders)
       .set({
         status: "delivered",
         providerRequestId: providerOrderId,
         referenceCode: voucherCode,
+        reconciliationNote: null,
       })
-      .where(eq(orders.id, orderId));
+      .where(and(eq(orders.id, orderId), eq(orders.status, "review"))).returning({ id: orders.id });
+    if (!delivered) throw new Error("Purchase claim unavailable");
     // Delivery can trigger the first-purchase milestone after the debit.
     scheduleWalletEmails();
 
@@ -239,7 +220,26 @@ export async function POST(request: Request) {
       },
     });
   } catch (err: any) {
-    console.error("FoxReload order fulfillment failed, rolling back wallet charge", err);
+    if (providerCallStarted) {
+      // A commit response can be lost after the code was saved. Re-read rather
+      // than turning an already delivered order back into review.
+      try {
+        const [saved] = await db.select().from(orders).where(and(eq(orders.userId, user.id), eq(orders.requestId, requestId))).limit(1);
+        if (saved?.status === "delivered" && saved.referenceCode) return replay(saved);
+      } catch { /* keep the original uncertain outcome */ }
+      // Once a provider request starts, neither a timeout nor a failed status
+      // read proves that it did not create or pay for a voucher. Keep the debit
+      // and order together for a human to reconcile; never auto-refund or retry.
+      try {
+        await db.update(orders).set({ status: "review", providerRequestId: providerOrderId || null,
+          ...(voucherCode ? { referenceCode: voucherCode } : {}),
+          reconciliationNote: "Provider outcome is uncertain; reconcile before refund or retry." })
+          .where(and(eq(orders.id, orderId), eq(orders.status, "review")));
+      } catch { console.error("Could not update gift card reconciliation status", { orderId }); }
+      return Response.json({ ok: false, pending: true, reference,
+        error: "The purchase outcome needs review. Your wallet was charged; contact support with the reference before trying again." }, { status: 502 });
+    }
+    console.error("Gift card preflight failed before provider purchase", { orderId });
     // Step 4: Reverse wallet debit and mark order as refunded
     const errorMessage =
       err instanceof FoxreloadError
@@ -253,6 +253,12 @@ export async function POST(request: Request) {
       // after left a refund the wallet had and the order did not, and the
       // "debit still stands" note below was then the opposite of the truth.
       await db.transaction(async (tx) => {
+        const [claimed] = await tx.update(orders).set({
+          status: "refunded", refundedAt: new Date(), providerRequestId: providerOrderId || null,
+          reconciliationNote: "Provider purchase was not started; preflight failed.",
+        }).where(and(eq(orders.id, orderId), inArray(orders.status, ["processing", "review"]), isNull(orders.refundedAt)))
+          .returning({ id: orders.id });
+        if (!claimed) throw new Error("Gift card refund claim unavailable");
         await creditWalletInTx(tx, {
           userId: user.id,
           amount: denomination.priceNgn,
@@ -261,16 +267,6 @@ export async function POST(request: Request) {
           orderId,
           reference: makeReference("RFB"),
         });
-
-        await tx
-          .update(orders)
-          .set({
-            status: "refunded",
-            refundedAt: new Date(),
-            providerRequestId: providerOrderId || null,
-            reconciliationNote: `Fulfillment failed: ${errorMessage}`,
-          })
-          .where(eq(orders.id, orderId));
       });
       // The refund committed inside the transaction above, so `creditWallet`'s
       // usual nudge never ran. Without this the receipt waits for the nightly backstop.
@@ -289,7 +285,7 @@ export async function POST(request: Request) {
             providerRequestId: providerOrderId || null,
             reconciliationNote: `Fulfillment failed: ${errorMessage}; automatic refund failed — debit still stands`.slice(0, 480),
           })
-          .where(eq(orders.id, orderId));
+          .where(and(eq(orders.id, orderId), eq(orders.status, "processing")));
       } catch (noteError) {
         console.error("Critical: could not flag gift card order for review", noteError);
       }
@@ -300,7 +296,7 @@ export async function POST(request: Request) {
         ok: false,
         error: refunded
           ? `Gift card fulfillment failed: ${errorMessage}. Your wallet has been refunded.`
-          : `Gift card delivery failed: ${errorMessage}. We could not return the money to your wallet automatically, so support has been flagged and will refund it. Quote reference ${reference}.`,
+          : `Gift card delivery could not be confirmed. We could not return the money automatically; contact support with reference ${reference}.`,
       },
       { status: err instanceof FoxreloadError && err.status >= 400 && err.status < 600 ? err.status : 502 },
     );

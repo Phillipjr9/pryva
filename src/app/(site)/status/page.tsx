@@ -92,11 +92,18 @@ export default function StatusPage() {
       detail: "Ordering is not connected for these categories, so no wallet charge can be made.",
     },
     {
-      name: "Bulk and scheduled number orders",
+      name: "Bulk number orders",
       status: availableNumbers ? "Ordering configured" : "Not available",
       detail: availableNumbers
-        ? "Eligible number plans can be ordered in bulk or scheduled. Schedules are checked nightly."
-        : "These tools need an available number ordering path before they can place an order.",
+        ? "Eligible number plans can be ordered in batches. Each unit is checked separately; uncertain outcomes require review."
+        : "Batch ordering requires a configured number ordering path.",
+    },
+    {
+      name: "Scheduled number orders",
+      status: availableNumbers ? "Ordering configured" : "Not available",
+      detail: availableNumbers
+        ? "Eligible number plans can be scheduled. Schedules are checked nightly."
+        : "Schedules need an available number ordering path before they can place an order.",
     },
     {
       name: "Automatic refunds",

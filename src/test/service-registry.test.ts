@@ -53,7 +53,10 @@ function orderServiceLiterals(): Array<{ file: string; tag: string }> {
 
 describe("the hub's shelves come from the registry", () => {
   it("presents every family exactly once, in the registry's order", () => {
-    expect(EXPLORER_CATEGORIES.map((category) => category.id)).toEqual([...SERVICE_IDS]);
+    const ids = EXPLORER_CATEGORIES.map((category) => category.id);
+    expect(ids).toEqual(SERVICES.map((service) => service.id));
+    expect([...ids].sort()).toEqual([...SERVICE_IDS].sort());
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it("keeps the customer-facing label identical in both places", () => {

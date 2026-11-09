@@ -63,8 +63,8 @@ vi.mock("@/lib/payments/wallet", async (importOriginal) => {
   return {
     ...actual,
     debitWalletInTx: async (_tx: unknown, entry: unknown) => {
-      state.debits.push(entry);
       if (state.txError) throw state.txError;
+      state.debits.push(entry);
       return state.balance;
     },
   };
@@ -74,6 +74,7 @@ function selectChain(result: unknown) {
   const api: Record<string, unknown> = {
     from: () => api,
     where: () => api,
+    for: () => api,
     limit: () => Promise.resolve(result),
   };
   return api;
@@ -115,10 +116,9 @@ vi.mock("@/db", () => ({
     insert: () => insertChain(),
     update: () => updateChain(),
     transaction: async (callback: (tx: unknown) => Promise<unknown>) => {
-      if (state.txError) throw state.txError;
       const before = state.existing ? { ...state.existing } : null;
       try {
-        return await callback({ update: () => updateChain() });
+        return await callback({ update: () => updateChain(), select: () => selectChain([{ suspendedAt: null, deletedAt: null }]) });
       } catch (error) {
         state.existing = before;
         throw error;
@@ -339,7 +339,7 @@ describe("POST /api/esim/purchase", () => {
     expect(response.status).toBe(502);
     expect((await response.json()).error).toMatch(/nothing was charged/i);
     expect(state.inserts[0]).toMatchObject({ status: "review" });
-    expect(state.updates[0]).toMatchObject({ status: "cancelled" });
+    expect(state.updates.at(-1)).toMatchObject({ status: "cancelled" });
     expect(state.debits).toEqual([]);
   });
 
@@ -352,7 +352,7 @@ describe("POST /api/esim/purchase", () => {
     expect(body.order.status).toBe("processing");
     expect(JSON.stringify(body)).not.toMatch(/bitcall|supplier/i);
     expect(state.inserts[0]).toMatchObject({ status: "review", provider: "bitcall", amount: 9_800 });
-    expect(state.updates[0]).toMatchObject({ status: "processing", providerRequestId: "prov-1" });
+    expect(state.updates.at(-1)).toMatchObject({ status: "processing", providerRequestId: "prov-1" });
     expect(state.debits).toEqual([]);
   });
 
@@ -367,7 +367,7 @@ describe("POST /api/esim/purchase", () => {
     expect(body.order.status).toBe("active");
     expect(JSON.stringify(body)).not.toMatch(/bitcall|supplier/i);
     expect(state.inserts[0]).toMatchObject({ status: "review", amount: 9_800, provider: "bitcall" });
-    expect(state.updates[0]).toMatchObject({
+    expect(state.updates.at(-1)).toMatchObject({
       status: "active",
       esimIccid: "8944000000000000001",
       esimActivationCode: "LPA:1$rsp.example$ABC",
@@ -388,7 +388,7 @@ describe("POST /api/esim/purchase", () => {
     expect(body.order.status).toBe("review");
     expect(JSON.stringify(body)).not.toMatch(/bitcall|supplier/i);
     expect(state.inserts[0]).toMatchObject({ status: "review", provider: "bitcall" });
-    expect(state.updates[0].reconciliationNote).toMatch(/unknown/i);
+    expect(state.updates.at(-1).reconciliationNote).toMatch(/unknown/i);
     expect(state.debits).toEqual([]);
     // An unknown outcome is never retried: exactly one purchase attempt happened.
     expect(state.purchased).toHaveLength(1);

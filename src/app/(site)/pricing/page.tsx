@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { plans, services, formatNaira } from "@/lib/services/catalog";
-import { isPlanFulfillable } from "@/lib/services/fulfillment";
+import { isNumberPlanOrderingConfigured } from "@/lib/services/numbers/number-availability";
 import { Check } from "@/components/icons";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { CountryFlag } from "@/components/CountryFlag";
@@ -26,6 +26,8 @@ export const metadata: Metadata = {
     url: "/pricing",
   },
 };
+
+export const dynamic = "force-dynamic";
 
 export default function PricingPage() {
   const serviceGroups = [
@@ -56,9 +58,9 @@ export default function PricingPage() {
               const count = plans.filter((plan) => plan.service === group.slug).length;
               return (
                 <div key={group.slug} className="rounded-xl border border-line bg-white/85 p-2.5 text-left shadow-[var(--shadow-card)] sm:rounded-2xl sm:p-3">
-                  <p className="text-[0.54rem] font-semibold uppercase tracking-[0.12em] text-ink-3 sm:text-[0.62rem]">{group.name}</p>
+                  <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.12em] text-ink-3 sm:text-[0.8125rem]">{group.name}</p>
                   <p className="mt-1.5 text-[0.95rem] font-semibold text-ink sm:mt-2 sm:text-[1.1rem]">{count}</p>
-                  <p className="text-[0.62rem] text-ink-2 sm:text-[0.7rem]">plans</p>
+                  <p className="text-[0.8125rem] text-ink-2 sm:text-[0.8125rem]">plans</p>
                 </div>
               );
             })}
@@ -96,15 +98,9 @@ export default function PricingPage() {
               </div>
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
                 {servicePlans.map((plan) => {
-                  // The fulfilment allowlist is the single source of truth for
-                  // what can be sold: the plan page offers no way to pay for a
-                  // plan outside it and /api/orders refuses it server-side. This
-                  // page advertised a signup funnel for those plans anyway, so a
-                  // visitor could be driven to create an account to buy something
-                  // that could never be delivered. Plans stay listed with their
-                  // price and details -- what is withdrawn is the promise to sell,
-                  // using the same wording the plan page already uses.
-                  const deliverable = isPlanFulfillable(plan.slug);
+                  // A static mapping is not a configured checkout, and a
+                  // configured checkout is not proof of stock or fulfilment.
+                  const deliverable = plan.service === "numbers" && isNumberPlanOrderingConfigured(plan.slug);
                   return (
                   <div
                     key={plan.slug}
@@ -116,21 +112,21 @@ export default function PricingPage() {
                   >
                     {plan.popular && (
                       <div className="mb-3 sm:mb-4">
-                        <span className="inline-block rounded-full bg-lav-100 px-2.5 py-1 text-[0.56rem] font-semibold text-lav-700 sm:text-meta">
+                        <span className="inline-block rounded-full bg-lav-100 px-2.5 py-1 text-[0.8125rem] font-semibold text-lav-700 sm:text-meta">
                           Most Popular
                         </span>
                       </div>
                     )}
                     <div className="mb-1.5 flex items-start justify-between gap-2 sm:mb-3">
-                      <h3 className="flex items-center gap-1.5 text-[0.7rem] font-semibold text-ink sm:gap-2 sm:text-[1.05rem]">
+                      <h3 className="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink sm:gap-2 sm:text-[1.05rem]">
                         {hasCountryFlag(plan.region) && <CountryFlag region={plan.region} size={15} decorative />}
                         {plan.name}
                       </h3>
-                      <span className="rounded-full bg-cream px-2 py-1 text-[0.53rem] font-semibold text-ink-3 sm:text-[0.7rem]">
+                      <span className="rounded-full bg-cream px-2 py-1 text-[0.8125rem] font-semibold text-ink-3 sm:text-[0.8125rem]">
                         {plan.duration}
                       </span>
                     </div>
-                    <p className="mb-2 text-[0.63rem] text-ink-2 sm:mb-4 sm:text-[0.86rem]">
+                    <p className="mb-2 text-[0.8125rem] text-ink-2 sm:mb-4 sm:text-[0.86rem]">
                       {plan.planLabel}
                     </p>
                     <div className="mb-2 sm:mb-4">
@@ -138,7 +134,7 @@ export default function PricingPage() {
                         {formatNaira(plan.price)}
                       </span>
                       {plan.compareAt && (
-                        <span className="ml-1.5 text-[0.56rem] text-ink-3 line-through sm:ml-2 sm:text-[0.9rem]">
+                        <span className="ml-1.5 text-[0.8125rem] text-ink-3 line-through sm:ml-2 sm:text-[0.9rem]">
                           {formatNaira(plan.compareAt)}
                         </span>
                       )}
@@ -148,7 +144,7 @@ export default function PricingPage() {
                       {plan.features.map((feature, index) => (
                         <li
                           key={index}
-                          className={`${index >= 1 ? "hidden sm:flex" : "flex"} items-start gap-1.5 text-[0.64rem] leading-relaxed text-ink-2 sm:gap-2 sm:text-[0.86rem]`}
+                          className={`${index >= 1 ? "hidden sm:flex" : "flex"} items-start gap-1.5 text-[0.8125rem] leading-relaxed text-ink-2 sm:gap-2 sm:text-[0.86rem]`}
                         >
                           <Check className="mt-0.5 h-3 w-3 shrink-0 text-lav-600 sm:h-4 sm:w-4" />
                           {feature}
@@ -158,7 +154,7 @@ export default function PricingPage() {
                     {deliverable ? (
                       <Link
                         href={`/signup?plan=${plan.slug}`}
-                        className={`block w-full rounded-lg px-3 py-2 text-center text-[0.72rem] font-semibold transition-colors sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.9rem] ${
+                        className={`block w-full rounded-lg px-3 py-2 text-center text-[0.8125rem] font-semibold transition-colors sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.9rem] ${
                           plan.popular
                             ? "bg-lav-700 text-white hover:bg-lav-800"
                             : "border border-line bg-white text-ink hover:bg-cream"
@@ -167,8 +163,8 @@ export default function PricingPage() {
                         Get Started
                       </Link>
                     ) : (
-                      <p className="block w-full rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-center text-[0.66rem] font-semibold leading-relaxed text-amber-900 sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.78rem]">
-                        This plan cannot be delivered yet, so it cannot be ordered or charged.
+                      <p className="block w-full rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-center text-[0.8125rem] font-semibold leading-relaxed text-amber-900 sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.8125rem]">
+                        Ordering is unavailable for this plan here; no charge can be made.
                       </p>
                     )}
                   </div>

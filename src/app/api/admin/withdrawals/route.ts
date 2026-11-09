@@ -95,10 +95,10 @@ export async function PUT(request: NextRequest) {
       const [existing] = await db.select().from(withdrawals).where(eq(withdrawals.id, id)).limit(1);
       if (!existing) return NextResponse.json({ error: "Withdrawal not found" }, { status: 404 });
       if (!existing.recipientCode) return NextResponse.json({ error: "Transfer recipient is missing" }, { status: 400 });
-      if (!["pending", "processing"].includes(existing.status)) {
+      if (existing.status !== "pending") {
         return NextResponse.json({ error: "This withdrawal is already settled or has been resolved. Reconcile it before retrying." }, { status: 409 });
       }
-      if (existing.status === "processing" && (existing.paystackReference || existing.transferReference)) {
+      if (existing.paystackReference || existing.transferReference) {
         return NextResponse.json({ error: "This payout has already been claimed for transfer and is awaiting confirmation. Reconcile it before retrying." }, { status: 409 });
       }
 
@@ -110,7 +110,7 @@ export async function PUT(request: NextRequest) {
         .set({ status: "processing", paystackReference: providerReference, processedAt: new Date(), failureReason: null })
         .where(and(
           eq(withdrawals.id, id),
-          inArray(withdrawals.status, ["pending", "processing"]),
+          eq(withdrawals.status, "pending"),
           isNull(withdrawals.paystackReference),
           isNull(withdrawals.transferReference),
         ))
@@ -184,7 +184,8 @@ export async function PUT(request: NextRequest) {
           .set({ status: "rejected", failureReason: typeof reason === "string" && reason.trim() ? reason.trim() : "Rejected by admin", processedAt: new Date() })
           .where(and(
             eq(withdrawals.id, id),
-            inArray(withdrawals.status, ["pending", "processing"]),
+            eq(withdrawals.status, "pending"),
+            isNull(withdrawals.paystackReference),
             isNull(withdrawals.transferReference),
           ))
           .returning();
@@ -207,7 +208,7 @@ export async function PUT(request: NextRequest) {
         });
         return claimed;
       });
-      if (!rejected) return NextResponse.json({ error: "Withdrawal is no longer pending or has a provider reference. Reconcile it before refunding." }, { status: 409 });
+      if (!rejected) return NextResponse.json({ error: "Withdrawal is no longer safely pending, or has a provider reference. Reconcile it before refunding." }, { status: 409 });
       logger.info("Withdrawal rejected", { withdrawalId: id, adminId: admin.id });
       await recordAdminAction({
         actor: admin,

@@ -123,15 +123,13 @@ describe("dashboard navigation", () => {
     expect(shell).not.toContain(">\n                Need help?\n");
   });
 
-  it("keeps the header controls in one row so they cannot overlap", () => {
-    // `flex-wrap` was the actual defect: between ~400px and 640px the controls
-    // could not fit beside the greeting, dropped to a second line, and the
-    // balance and bell ended up stacked and clipped.
+  it("keeps controls in one row on ordinary phones and can wrap on tiny screens", () => {
     const header = shell.slice(shell.indexOf("rounded-[1.25rem]"), shell.indexOf("<main"));
-    expect(header).not.toContain("flex-wrap");
-    // The greeting yields space instead of the controls.
+    expect(header).toContain("max-[340px]:flex-wrap");
+    expect(header).not.toMatch(/(?<!:)\bflex-wrap\b/);
+    // The greeting yields space instead of the controls at ordinary widths.
     expect(header).toContain("truncate text-[0.88rem]");
-    expect(header).toContain("flex shrink-0 items-center");
+    expect(header).toContain("shrink-0 items-center");
   });
 
   it("renders the bell icon-only in the header, with no label to wrap", () => {

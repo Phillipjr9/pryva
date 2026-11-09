@@ -28,7 +28,12 @@ function lockedResponse(remainingMs: number) {
 }
 
 export async function POST(request: Request) {
-  if (!isSameOriginMutation(request)) return Response.json({ ok: false, error: "Invalid origin." }, { status: 403 });
+  // Host matching alone does not establish where a browser mutation came from.
+  // Accept an explicit same-origin browser fetch as well as an Origin header;
+  // reject requests with neither signal on these session-creating endpoints.
+  if ((!request.headers.get("origin") && request.headers.get("sec-fetch-site") !== "same-origin") || !isSameOriginMutation(request)) {
+    return Response.json({ ok: false, error: "Invalid origin." }, { status: 403 });
+  }
   if (!isJsonRequest(request)) return Response.json({ ok: false, error: "Expected JSON." }, { status: 415 });
   let body: unknown;
   try {
@@ -69,7 +74,7 @@ export async function POST(request: Request) {
     // longer exists. Its password was replaced with a random hash, so the branch
     // below would refuse it anyway -- this says why, and keeps a deleted row out of
     // the lockout counters it has no business in.
-    if (user?.deletedAt) {
+    if (user?.deletedAt || user?.suspendedAt) {
       return Response.json({ ok: false, error: "Those details don't match an account." }, { status: 401 });
     }
 

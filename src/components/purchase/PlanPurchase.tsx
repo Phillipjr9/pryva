@@ -16,6 +16,7 @@ type Group = { label: string; plans: Plan[] };
 type Props = {
   groups: Group[];
   signedIn: boolean;
+  userId: string | null;
   walletBalance: number | null;
   nextPath: string;
   otpOfferId?: string;
@@ -37,7 +38,7 @@ function newRequestId(): string {
   return `${hex(8)}-${hex(4)}-4${hex(3)}-${variant}${hex(3)}-${hex(12)}`;
 }
 
-export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOfferId, unavailableSlugs = [] }: Props) {
+export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath, otpOfferId, unavailableSlugs = [] }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState(0);
   const plans = useMemo(() => groups[tab]?.plans ?? [], [groups, tab]);
@@ -55,20 +56,28 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOff
   const selected = plans.find((plan) => plan.slug === selectedSlug) ?? plans[0];
   const unavailable = selected ? unavailableSlugs.includes(selected.slug) : false;
 
-  // One key per purchase attempt. It is reused across a retry of the same attempt
-  // so a browser retry, a second tab, or a resubmit after a timeout whose first
-  // attempt actually succeeded cannot buy a second real number -- and it is
-  // regenerated only once an attempt succeeds or another plan is chosen. Keeping
-  // it across a failure is deliberate: if the request did reach the server, the
-  // retry replays that order instead of creating a second one.
-  const attempt = useRef<{ slug: string; requestId: string } | null>(null);
+  // Persist the request key before a paid call. A lost response or reload must
+  // replay the same attempt, not silently create a new supplier purchase.
+  const attempt = useRef<{ key: string; requestId: string } | null>(null);
+  const attemptKey = (slug: string) => `pryva.order.pending.v2.${userId}.${slug}.${otpOfferId ?? "generic"}`;
 
   function requestIdFor(slug: string): string {
+    if (!userId) throw new Error("Account identity is unavailable");
     const current = attempt.current;
-    if (current && current.slug === slug) return current.requestId;
-    const requestId = newRequestId();
-    attempt.current = { slug, requestId };
+    const key = attemptKey(slug);
+    if (current && current.key === key) return current.requestId;
+    const stored = window.localStorage.getItem(key);
+    const requestId = stored && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(stored)
+      ? stored : newRequestId();
+    window.localStorage.setItem(key, requestId);
+    if (window.localStorage.getItem(key) !== requestId) throw new Error("Could not save order recovery state");
+    attempt.current = { key, requestId };
     return requestId;
+  }
+
+  function clearAttempt(slug: string) {
+    window.localStorage.removeItem(attemptKey(slug));
+    attempt.current = null;
   }
 
   function changeTab(index: number) {
@@ -85,11 +94,24 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOff
     setPending(true);
     setError(null);
     setNeedsFunds(false);
+    let requestId: string;
+    try {
+      requestId = requestIdFor(selected.slug);
+    } catch (error) {
+      if (error instanceof Error && error.message === "prior attempt requires review") {
+        setReviewRequired(true);
+        setError("A previous purchase attempt may still be processing. Check your orders and contact support before trying again.");
+      } else {
+        setError("Order recovery storage is unavailable. Enable browser storage before ordering; nothing was purchased.");
+      }
+      setPending(false);
+      return;
+    }
     try {
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planSlug: selected.slug, requestId: requestIdFor(selected.slug), ...(otpOfferId ? { otpOfferId } : {}) }),
+        body: JSON.stringify({ planSlug: selected.slug, requestId, ...(otpOfferId ? { otpOfferId } : {}) }),
       });
       const data = (await response.json()) as {
         ok?: boolean;
@@ -104,7 +126,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOff
         return;
       }
       if (!response.ok || !data.ok || !data.order) {
-        if (data.safeToRetry) attempt.current = null;
+        if (data.safeToRetry) { try { clearAttempt(selected.slug); } catch { /* keep the existing key */ } }
         if (data.safeToRetry === false) setReviewRequired(true);
         setError(data.error ?? "We couldn't complete that order. Please try again.");
         if (response.status === 402) setNeedsFunds(true);
@@ -117,11 +139,14 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOff
         review: data.order.status === "review",
         reviewMessage: data.message ?? "This order needs review. Check the order status and wallet balance before retrying.",
       });
-      // The attempt is settled, so the next purchase is genuinely a new one.
-      attempt.current = null;
+      // A reviewed order is not settled: preserve its key across reloads.
+      if (data.order.status !== "review" && data.order.status !== "processing") {
+        try { clearAttempt(selected.slug); } catch { /* replay is safer than a second buy */ }
+      }
       router.refresh();
     } catch {
-      setError("Network hiccup. Please try again.");
+      setReviewRequired(true);
+      setError("The purchase outcome is uncertain. Check your order history and contact support before trying again.");
     } finally {
       setPending(false);
     }
@@ -251,7 +276,7 @@ export function PlanPurchase({ groups, signedIn, walletBalance, nextPath, otpOff
                     {plan.features.map((feature, index) => (
                       <li
                         key={feature}
-                        className={`${index >= 2 ? "hidden sm:flex" : "flex"} items-start gap-1.5 text-meta text-ink-2 sm:text-[0.78rem]`}
+                        className={`${index >= 2 ? "hidden sm:flex" : "flex"} items-start gap-1.5 text-meta text-ink-2 sm:text-[0.8125rem]`}
                       >
                         <Check className="mt-0.5 h-3 w-3 shrink-0 text-lav-500" />
                         {feature}

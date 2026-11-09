@@ -10,7 +10,6 @@ import { resendConfigured } from "@/lib/email/resend-config";
 export type AdminBanNotice = {
   to: string;
   when: Date;
-  confirmUrl: string;
   reason: string | null;
   bannedBy: string;
 };
@@ -24,19 +23,18 @@ export function buildAdminBanEmail(input: AdminBanNotice) {
   const at = input.when.toISOString().replace("T", " ").slice(0, 16) + " UTC";
   const reasonLine = input.reason ? `Reason: ${input.reason}` : "No reason was given.";
   return brandedNotificationEmail({
-    subject: "Your Pryva account is being closed",
-    eyebrow: "Account closure requested",
-    title: "Confirm account closure",
-    intro: `An administrator acting as ${input.bannedBy} has requested that your Pryva account be closed. To confirm, open this link:\n${input.confirmUrl}\n\nYour account will be closed and you will be signed out when you confirm. Financial and security records are retained as required for disputes and legal obligations. ${reasonLine}`,
+    subject: "Your Pryva account has been suspended",
+    eyebrow: "Account suspended",
+    title: "Your account has been suspended",
+    intro: `An administrator acting as ${input.bannedBy} suspended your Pryva account. Sign-in access has been disabled while the account is reviewed; your account and financial records have not been deleted. ${reasonLine}`,
     hero: "account-closed",
     heroAlt: "A closed door and privacy shield",
     rows: [
       { label: "Requested", value: at },
-      { label: "Confirm by", value: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().replace("T", " ").slice(0, 16) + " UTC" },
     ],
     ctaPath: "/contact",
     ctaLabel: "Contact support",
-    note: `Confirm the closure by clicking the link in this email. If you did not request this, contact support immediately and do not click the button. The link expires in 24 hours. Pryva will never ask for your password or security codes by email.`,
+    note: `Contact support if you have questions or believe this was a mistake. Pryva will never ask for your password or security codes by email.`,
   });
 }
 

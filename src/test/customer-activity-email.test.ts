@@ -21,7 +21,7 @@ let pg: PGlite;
 let database: ReturnType<typeof drizzle<typeof schema>>;
 let fetchMock: ReturnType<typeof vi.fn>;
 
-async function migrate(target: PGlite, through = "0035") {
+async function migrate(target: PGlite, through = "0040") {
   const files = (await readdir("migrations")).filter((file) => /^\d{4}_.*\.sql$/.test(file) && file.slice(0, 4) <= through).sort();
   for (const file of files) await target.exec(await readFile(`migrations/${file}`, "utf8"));
 }
@@ -235,6 +235,7 @@ describe("purchase receipts", () => {
 
   it("does not disclose a gift card code in the buyer receipt", async () => {
     await markHistoricalBuyer();
+    await database.insert(schema.giftCards).values({ code: "PRYVA-PRIVATECODE", amount: 2500, initialAmount: 2500, purchasedBy: USER, expiresAt: new Date(Date.now() + 86400000) });
     await database.insert(schema.walletTransactions).values({ userId: USER, type: "debit", amount: 2500, balanceAfter: 7500, reference: "GIFT-PRYVA-PRIVATECODE", description: "Gift card purchase: PRYVA-PRIVATECODE" });
     expect(await jobs("purchase_recorded")).toHaveLength(1);
     await pg.exec("UPDATE wallet_email_outbox SET available_at = now() + interval '1 day' WHERE event_kind = 'wallet'");

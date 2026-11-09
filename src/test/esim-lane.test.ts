@@ -199,7 +199,7 @@ describe("no public page says eSIM cannot be bought while it is being bought", (
     // revision of this change made /pricing link a signup funnel for all six and
     // the plan page render a purchase button that the API would reject.
     const pricing = read("app/(site)/pricing/page.tsx");
-    expect(pricing).toContain("const deliverable = isPlanFulfillable(plan.slug);");
+    expect(pricing).toContain('plan.service === "numbers" && isNumberPlanOrderingConfigured(plan.slug)');
     expect(pricing).not.toContain("catalogEsimSampleIsSellable(plan.slug)");
 
     const planPage = read("app/dashboard/services/plan/[slug]/page.tsx");

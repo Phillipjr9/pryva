@@ -22,9 +22,10 @@ import {
   Wallet,
 } from "@/components/icons";
 import { formatNaira, plansFor, serviceMap, services } from "@/lib/services/catalog";
-import { isPlanFulfillable } from "@/lib/services/fulfillment";
+import { isNumberPlanOrderingConfigured } from "@/lib/services/numbers/number-availability";
 import { CountryFlag } from "@/components/CountryFlag";
 import { hasCountryFlag } from "@/lib/platform/countries";
+import { StickyMobileCta } from "@/components/site/StickyMobileCta";
 import { BrandMark } from "@/components/brand/BrandLockup";
 import { getCurrentUser } from "@/lib/identity/auth";
 
@@ -66,7 +67,7 @@ const features = [
   },
   {
     title: "Delivered automatically",
-    body: "A verification number is provisioned the moment you pay, and the code appears in your dashboard.",
+    body: "Check the order page for delivery and contact support if an outcome needs review.",
     icon: Bolt,
     span: "md:col-span-2",
     tone: "white" as const,
@@ -110,24 +111,6 @@ const steps = [
   },
 ];
 
-/**
- * Derived from the same fulfilment allowlist /status uses, never typed in.
- *
- * This row said "Paused" long after numbers became deliverable, so the footer of
- * the busiest page on the site told visitors the core product was switched off
- * while /pricing offered ten purchasable number plans with working "Get Started"
- * links. A hardcoded availability claim goes stale in one direction only: it
- * keeps saying "no" after the answer has become "yes", and it costs sales rather
- * than causing a support complaint -- which is exactly why nobody reports it.
- *
- * Safe to compute at build time even though this page is prerendered:
- * `isPlanFulfillable` reads a constant allowlist, with no env and no network.
- */
-const numberPlans = plansFor("numbers");
-const deliverableNumbers = numberPlans.filter((plan) => isPlanFulfillable(plan.slug)).length;
-const numberFulfilment = deliverableNumbers > 0
-  ? `Automatic · ${deliverableNumbers} of ${numberPlans.length} plans`
-  : "Paused";
 
 const faqs = [
   {
@@ -148,7 +131,7 @@ const faqs = [
   },
   {
     q: "How quickly does delivery happen?",
-    a: "A number is provisioned immediately after payment. The code itself arrives when the platform sends it, and your order page keeps checking for it.",
+    a: "When a number is provisioned, your order page checks for a code. Delivery depends on the provider and the platform sending it.",
   },
   {
     q: "Which platforms work best with PryvaLogs numbers?",
@@ -170,6 +153,11 @@ export default async function HomePage() {
   // Only used to decide whether a dashboard-only service card links straight in
   // or sends a signed-out visitor to sign in and come back.
   const user = await getCurrentUser().catch(() => null);
+  const numberPlans = plansFor("numbers");
+  const configuredNumbers = numberPlans.filter((plan) => isNumberPlanOrderingConfigured(plan.slug)).length;
+  const numberFulfilment = configuredNumbers > 0
+    ? `Ordering configured · ${configuredNumbers} of ${numberPlans.length} plans`
+    : "Ordering unavailable";
 
   const serviceHref = (href: string) => {
     if (!href.startsWith("/dashboard")) return href;
@@ -195,7 +183,7 @@ export default async function HomePage() {
             {/* --- copy + action (first thing a phone shows) --- */}
             <div className="order-1 text-center lg:col-start-1 lg:row-start-1 lg:text-left">
               <Reveal>
-                <span className="inline-flex items-center gap-2 rounded-full border border-lav-200 bg-white/75 py-1 pl-1 pr-3 text-micro font-semibold uppercase tracking-[0.12em] text-lav-700 backdrop-blur sm:text-[0.68rem]">
+                <span className="inline-flex items-center gap-2 rounded-full border border-lav-200 bg-white/75 py-1 pl-1 pr-3 text-micro font-semibold uppercase tracking-[0.12em] text-lav-700 backdrop-blur sm:text-[0.8125rem]">
                   <BrandMark size="xs" />
                   PryvaLogs · Nigerian digital services
                 </span>
@@ -248,7 +236,6 @@ export default async function HomePage() {
                     width={900}
                     height={1100}
                     priority
-                    quality={72}
                     sizes="(max-width: 640px) 88vw, (max-width: 1024px) 26rem, 30rem"
                     className="aspect-[4/4.3] w-full object-cover sm:aspect-[4/4.25] lg:aspect-[4/4.6]"
                   />
@@ -350,7 +337,7 @@ export default async function HomePage() {
                     <div className="relative mt-5 flex items-end justify-between gap-3 border-t border-line/80 pt-4">
                       <div className="min-w-0">
                         <p className="text-meta text-ink-3">
-                          {service.slug === "accounts" ? "See live listings"
+                          {service.slug === "accounts" || service.slug === "esim" ? "See current listings"
                             : service.fromPrice === undefined ? <>
                             Free
                           </> : <>
@@ -370,7 +357,7 @@ export default async function HomePage() {
                         {inDashboard && (
                           <p className="mt-1 inline-flex items-center gap-1.5 text-micro font-medium text-ink-3">
                             <Lock className="h-3 w-3 text-lav-500" />
-                            {user ? "Open in your dashboard" : "In your dashboard — sign in to buy"}
+                            {service.slug === "data" ? "Data purchases not available yet" : user ? "Open in your dashboard" : "In your dashboard — sign in to check"}
                           </p>
                         )}
                       </div>
@@ -843,7 +830,7 @@ export default async function HomePage() {
           </Reveal>
         </div>
       </section>
-
+      <StickyMobileCta label="Explore the catalogue" targetId="final-cta" href={user ? "/dashboard" : "/signup"} />
     </>
   );
 }

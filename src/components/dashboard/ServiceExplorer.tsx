@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BrandIcon } from "@/components/BrandIcon";
 import { CountryFlag } from "@/components/CountryFlag";
@@ -208,12 +208,12 @@ export function ServiceCard({ item, countryName }: { item: ExplorerItem; country
               that look up the full price line would match both. */}
           {price !== null ? ` · ${formatNaira(price)}${item.priceFrom ? "+" : ""}` : item.category === "verification" && item.source === "live" ? " · Ordering unavailable" : item.category === "esim" && item.source === "live" ? " · Price unavailable" : item.source === "live" ? " · Price on request" : " · Price not listed"}
         </p>
-        {/* OTP stock comes directly from Bitcall's selected pool. Keep it visible
+        {/* OTP stock comes from the selected pool. Keep it visible
             on phones too; hiding UnitsStatus at the mobile breakpoint made a
             live listing look empty even when the supplier reported inventory. */}
         {item.category === "verification" && item.source === "live" && (
           <p className="mt-0.5 truncate text-micro text-ink-3 sm:hidden">
-            <span className="font-semibold">Bitcall stock:</span> {formatUnitCount(item.stock, "Not reported")}
+            <span className="font-semibold">Reported stock:</span> {formatUnitCount(item.stock, "Not reported")}
           </p>
         )}
         {/* Number-plan counts, when reported, must be visible on phones too.
@@ -284,8 +284,11 @@ type LiveState = {
   failed: boolean;
   reason: "environment" | "unconfigured" | "funding" | "throttled" | "error" | null;
   fetchedAt: string | null;
+  scope: string;
+  pending: boolean;
 };
 
+type FeedOutcome = { items: ExplorerItem[]; live: boolean; partial: boolean; reason: LiveState["reason"]; fetchedAt: string | null };
 type CatalogPayload = {
   ok?: boolean; country?: string; live?: boolean; partial?: boolean;
   reason?: string | null; fetchedAt?: string | null; items?: ExplorerItem[];
@@ -361,13 +364,18 @@ export function ServiceExplorer({
   const [groupVisible, setGroupVisible] = useState<Record<string, number>>({});
   const [liveState, setLiveState] = useState<LiveState | null>(null);
   const [liveRevision, setLiveRevision] = useState(0);
+  // A short, component-local cache avoids spending four rate-limit slots again
+  // when a customer switches from All to a category. Never shared across users.
+  const liveCache = useRef(new Map<string, { at: number; revision: number; value: FeedOutcome }>());
   const selectedCountry = explorerCountry(country);
+  const feedScope = category === "all" ? "all" : category === "email" ? "numbers" : category;
+  const currentLive = liveState?.country === country && liveState.scope === feedScope ? liveState : null;
   const selectedCategory = EXPLORER_CATEGORIES.find((entry) => entry.id === category);
   const items = useMemo(() => {
     const base = buildServiceExplorer(country);
-    return liveState?.country === country && liveState.items.length
-      ? interleaveExplorerItems([...liveState.items, ...base]) : base;
-  }, [country, liveState]);
+    return currentLive?.items.length
+      ? interleaveExplorerItems([...currentLive.items, ...base]) : base;
+  }, [country, currentLive]);
   const filtered = useMemo(() => filterExplorerItems(items, category, search, tag), [items, category, search, tag]);
   /**
    * Social promotion lists every offer the supplier sells, which is hundreds
@@ -418,37 +426,66 @@ export function ServiceExplorer({
   }, [readinessById]);
   const summary = readinessSummary(readiness);
 
-  // Live listings: boosts are purchasable, the others are read-only until their ordering is wired.
+  // Fetch independent live feeds separately so one slow feed cannot hide the
+  // others. Browsing one category contacts only its relevant live feed.
   useEffect(() => {
     if (!country) return;
     const controller = new AbortController();
-    fetch(`/api/services/catalog?country=${encodeURIComponent(country)}${liveRevision ? "&refresh=1" : ""}`, { cache: "no-store", signal: controller.signal })
-      .then(async (response) => {
-        const data = (await response.json().catch(() => null)) as CatalogPayload | null;
-        if (!response.ok || !data?.ok || data.country !== country || !Array.isArray(data.items)) {
-          // A throttled read is the one failure a customer can clear themselves.
-          const throttled = response.status === 429;
-          if (!controller.signal.aborted) {
-            setLiveState({ country, items: [], live: false, partial: false, failed: true, reason: throttled ? "throttled" : "error", fetchedAt: null });
+    const all = ["numbers", "verification", "esim", "social"];
+    const feeds = feedScope === "all" ? all : all.includes(feedScope) ? [feedScope] : [];
+    const results = new Map<string, FeedOutcome>();
+    const publish = () => {
+      if (controller.signal.aborted) return;
+      const complete = [...results.values()];
+      const successes = complete.filter((result) => result.live);
+      const failures = complete.filter((result) => result.reason === "error" || result.reason === "throttled");
+      const funded = complete.filter((result) => result.reason === "funding");
+      const waiting = complete.length < feeds.length;
+      const partial = waiting || failures.length > 0 || funded.length > 0 || complete.some((result) => result.partial)
+        || (successes.length > 0 && complete.some((result) => result.reason === "unconfigured" || result.reason === "environment"));
+      const reason: LiveState["reason"] = failures.some((result) => result.reason === "throttled") ? "throttled"
+        : failures.length ? "error"
+        : funded.length ? "funding"
+        : complete.length && complete.every((result) => result.reason === "environment") ? "environment"
+        : complete.length && complete.every((result) => result.reason === "unconfigured") ? "unconfigured" : null;
+      const fetchedAt = complete.map((result) => result.fetchedAt).filter((value): value is string => value !== null).sort().pop() ?? null;
+      setLiveState({ country, scope: feedScope, items: complete.flatMap((result) => result.items),
+        live: successes.length > 0, partial, failed: failures.length > 0 && successes.length === 0,
+        reason, fetchedAt, pending: waiting });
+    };
+    for (const feed of feeds) {
+      const key = `${country}:${feed}`;
+      const cached = liveCache.current.get(key);
+      if (cached && cached.revision === liveRevision && Date.now() - cached.at < 30_000) {
+        results.set(feed, cached.value);
+        continue;
+      }
+      fetch(`/api/services/catalog?country=${encodeURIComponent(country)}&feed=${feed}${liveRevision ? "&refresh=1" : ""}`, { cache: "no-store", signal: controller.signal })
+        .then(async (response) => {
+          const data = (await response.json().catch(() => null)) as CatalogPayload | null;
+          if (controller.signal.aborted) return;
+          if (!response.ok || !data?.ok || data.country !== country || !Array.isArray(data.items)) {
+            results.set(feed, { items: [], live: false, partial: true, reason: response.status === 429 ? "throttled" : "error", fetchedAt: null });
+          } else {
+            const reason = data.reason === "environment" || data.reason === "unconfigured" || data.reason === "funding" ? data.reason : null;
+            const fetchedAt = typeof data.fetchedAt === "string" && Number.isFinite(Date.parse(data.fetchedAt)) ? data.fetchedAt : null;
+            const value: FeedOutcome = { items: data.items, live: data.live !== false, partial: Boolean(data.partial), reason, fetchedAt };
+            results.set(feed, value);
+            // Do not hide an outage, funding gap or partial result behind cache.
+            if (!value.partial && (value.live || reason === "unconfigured" || reason === "environment")) {
+              liveCache.current.set(key, { at: Date.now(), revision: liveRevision, value });
+            }
           }
-          return;
-        }
-        const fetchedAt = typeof data.fetchedAt === "string" && Number.isFinite(Date.parse(data.fetchedAt)) ? data.fetchedAt : null;
-        // `live !== false` keeps older payloads (which predate the flag) working.
-        // "partial" travels as `partial: true`; `reason` names why, in the
-        // customer's terms: closed environment, no supplier, or out of funds.
-        const reason = data.reason === "environment" || data.reason === "unconfigured" || data.reason === "funding"
-          ? data.reason
-          : null;
-        if (!controller.signal.aborted) {
-          setLiveState({ country, items: data.items, live: data.live !== false, partial: Boolean(data.partial), failed: false, reason: data.live === false || data.partial ? reason : null, fetchedAt });
-        }
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setLiveState({ country, items: [], live: false, partial: false, failed: true, reason: "error", fetchedAt: null });
-      });
+          publish();
+        }).catch(() => {
+          if (controller.signal.aborted) return;
+          results.set(feed, { items: [], live: false, partial: true, reason: "error", fetchedAt: null });
+          publish();
+        });
+    }
+    queueMicrotask(publish);
     return () => controller.abort();
-  }, [country, liveRevision]);
+  }, [country, feedScope, liveRevision]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && country) {
@@ -615,7 +652,7 @@ export function ServiceExplorer({
 
           <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-meta leading-relaxed border-amber-200 bg-amber-50/70 text-amber-900`}>
             <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-            {liveState?.country === country && liveState.live && liveState.reason !== "funding" && !liveState.failed ? <p><strong>Live listings are current.</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. {liveState.partial && "Some listings may be missing. "}<Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).lead}</strong>{" "}{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).rest} <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
+            {currentLive && currentLive.live && !currentLive.failed ? <p><strong>{currentLive.pending ? "Live listings are still loading." : currentLive.partial ? "Live listings may be incomplete or out of date." : "Live listings are current."}</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. <Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>{liveUnavailableCopy(currentLive?.reason ?? null).lead}</strong>{" "}{liveUnavailableCopy(currentLive?.reason ?? null).rest} <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
           </div>
 
           <section aria-labelledby="services-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-3.5 sm:p-6">
@@ -624,7 +661,7 @@ export function ServiceExplorer({
                 <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Sparkle className="h-3.5 w-3.5" /> Step 03</p>
                 <h2 id="services-title" className="mt-1 text-[1.05rem] font-semibold text-ink">{selectedCategory ? `Explore ${selectedCategory.label}` : "Explore services"}</h2>
                 <p aria-live="polite" className="mt-1 text-meta text-ink-3">{filtered.length} {`listing${filtered.length === 1 ? "" : "s"}`} · {selectedCountry.name} selected</p>
-                {liveState?.country === country && liveState.fetchedAt && <p className="mt-1 text-micro text-ink-3">Live listings checked: <time dateTime={liveState.fetchedAt}>{new Date(liveState.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
+                {currentLive?.fetchedAt && <p className="mt-1 text-micro text-ink-3">Live listings checked: <time dateTime={currentLive.fetchedAt}>{new Date(currentLive.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
               </div>
               <div className="relative w-full sm:max-w-[260px]">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
@@ -649,11 +686,11 @@ export function ServiceExplorer({
               </div>
             )}
 
-            {liveState?.country === country && (liveState.reason === "funding" || liveState.reason === "throttled") && (
+            {currentLive && (currentLive.reason === "funding" || currentLive.reason === "throttled" || currentLive.reason === "error") && (
               <p role="status" className="mt-4 text-meta text-amber-800">
-                {liveState.reason === "throttled" ? "Live listings were refreshed too quickly." : "Live listings are paused while we restock."}{" "}
+                {currentLive.reason === "throttled" ? "Live listings were refreshed too quickly." : currentLive.reason === "funding" ? (currentLive.live ? "Some live listings are paused while we restock." : "Live listings are paused while we restock.") : "Some live listings could not be loaded."}{" "}
                 {/* No Retry on a funding gap: retrying cannot restock it. */}
-                {liveState.reason !== "funding" && <button type="button" className="font-semibold underline" onClick={() => setLiveRevision((value) => value + 1)}>Retry</button>}
+                {currentLive.reason !== "funding" && <button type="button" className="font-semibold underline" onClick={() => setLiveRevision((value) => value + 1)}>Retry</button>}
               </p>
             )}
             {platformGroups ? (
