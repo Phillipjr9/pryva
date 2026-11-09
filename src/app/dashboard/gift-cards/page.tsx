@@ -1,5 +1,6 @@
 import { GiftCardsManager } from "./GiftCardsManager";
 import { requireUser } from "@/lib/identity/auth";
+import { legacyBrandGiftCardSalesEnabled } from "@/lib/services/gift-cards/brand-readiness";
 import { ServiceTitle } from "@/components/ServiceTitle";
 
 export const dynamic = "force-dynamic";
@@ -12,10 +13,10 @@ export default async function GiftCardsPage() {
       <div>
         <ServiceTitle service="gift-cards">Gift Cards</ServiceTitle>
         <p className="mt-1 text-[0.86rem] text-ink-2">
-          Buy international digital gift cards (Steam, Apple, Google Play, PlayStation, Xbox, Amazon) with instant delivery, or send Pryva wallet credit.
+          Explore brand gift cards or send Pryva wallet credit. Brand gift card availability is shown below.
         </p>
       </div>
-      <GiftCardsManager user={user} />
+      <GiftCardsManager user={user} brandSalesEnabled={legacyBrandGiftCardSalesEnabled()} />
     </div>
   );
 }

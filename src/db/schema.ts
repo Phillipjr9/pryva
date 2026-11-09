@@ -402,6 +402,8 @@ export const foxreloadQuotes = pgTable("foxreload_quotes", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   orderId: uuid("order_id").references(() => orders.id),
   lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+  /** Durable one-at-a-time confirmation submission; never store the code. */
+  clientCodeState: varchar("client_code_state", { length: 16 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [index("foxreload_quotes_expiry_idx").on(table.expiresAt)]);
 

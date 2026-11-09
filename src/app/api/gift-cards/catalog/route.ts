@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getBrandGiftCards } from "@/lib/services/gift-cards/brand-catalog";
-import { isFoxreloadConfigured } from "@/lib/providers/foxreload";
+import { legacyBrandGiftCardSalesEnabled } from "@/lib/services/gift-cards/brand-readiness";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +9,6 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     cards,
-    liveFulfillmentConfigured: isFoxreloadConfigured(),
+    liveFulfillmentConfigured: legacyBrandGiftCardSalesEnabled(),
   });
 }

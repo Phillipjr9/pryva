@@ -10,7 +10,9 @@ import { CountryFlag } from "@/components/CountryFlag";
 import { formatNaira } from "@/lib/services/catalog";
 import Link from "next/link";
 import { ArrowLeft } from "@/components/icons";
+import { ClientConfirmation } from "./ClientConfirmation";
 import { TopupOrderSync } from "./TopupOrderSync";
+import { FoxEsimOrderSync } from "./FoxEsimOrderSync";
 import { CodeOrderSync } from "./CodeOrderSync";
 import { StarsOrderSync } from "./StarsOrderSync";
 import { FOXRELOAD_PROVIDER } from "@/lib/services/order-providers";
@@ -77,7 +79,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
 
   // Show the exact buyer-visible conditions accepted at checkout, not whatever
   // an operator happens to configure after the order was placed.
-  const topupTerms = order.provider === FOXRELOAD_PROVIDER && order.service === "subscriptions" && order.productSlug === "direct-topup"
+  const topupTerms = order.provider === FOXRELOAD_PROVIDER && ((order.service === "subscriptions" && ["direct-topup", "login-topup"].includes(order.productSlug)) || (order.service === "esim" && order.productSlug === "foxreload-esim"))
     ? (await db.select({ terms: foxreloadQuotes.customerTerms }).from(foxreloadQuotes).where(and(eq(foxreloadQuotes.orderId, order.id), eq(foxreloadQuotes.userId, user.id))).limit(1))[0]?.terms ?? null
     : null;
 
@@ -137,8 +139,9 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                     activationCode={order.esimActivationCode}
                     installUrl={order.esimInstallUrl}
                     iccid={order.esimIccid}
-                    pending={status === "processing"}
+                    pending={status === "processing" && order.provider !== FOXRELOAD_PROVIDER}
                   />
+                  {order.provider === FOXRELOAD_PROVIDER && order.productSlug === "foxreload-esim" && (status === "processing" || status === "review") && <FoxEsimOrderSync orderId={order.id} />}
                 </CardContent>
               </Card>
             ) : null}
@@ -266,7 +269,8 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                   {progress && <p className="mt-2 text-[0.88rem] font-medium text-ink">{progress}</p>}
                   {order.provider === FOXRELOAD_PROVIDER && order.service === "subscriptions" && order.productSlug === "telegram-stars" && <StarsOrderSync orderId={order.id} />}
                   {order.provider === FOXRELOAD_PROVIDER && order.service === "gift-cards" && order.productSlug === "digital-code" && <CodeOrderSync orderId={order.id} />}
-                  {order.provider === FOXRELOAD_PROVIDER && order.service === "subscriptions" && order.productSlug === "direct-topup" && <TopupOrderSync orderId={order.id} />}
+                  {order.provider === FOXRELOAD_PROVIDER && order.service === "subscriptions" && ["direct-topup", "login-topup"].includes(order.productSlug) && <TopupOrderSync orderId={order.id} />}
+                  {process.env.FOXRELOAD_CLIENT_CODES_ENABLED === "true" && order.provider === FOXRELOAD_PROVIDER && order.service === "subscriptions" && ["direct-topup", "login-topup", "telegram-stars"].includes(order.productSlug) && <ClientConfirmation orderId={order.id} />}
                 </CardContent>
               </Card>
             )}

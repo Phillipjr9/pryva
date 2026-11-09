@@ -22,7 +22,7 @@ export default async function DataPlansPage({ searchParams }: { searchParams: Pr
         </p>
       </div>
       <DataPlansForm key={initialPlan?.id ?? "all"} user={user} initialPlanId={initialPlan?.id} />
-      <Link href="/dashboard/digital-catalog" className="inline-block text-meta font-semibold text-lav-700 underline">Explore the digital catalogue (read-only)</Link>
+      <Link href="/dashboard/digital-catalog" className="inline-block text-meta font-semibold text-lav-700 underline">Explore the digital catalogue</Link>
     </div>
   );
 }

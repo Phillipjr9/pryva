@@ -6,6 +6,7 @@ import { processAutoRefunds } from "@/lib/services/auto-refund";
 import { sweepPendingNumberCodes } from "@/lib/services/numbers/number-code-sync";
 import { dispatchWalletEmails, walletEmailConfigured } from "@/lib/email/wallet-email-outbox";
 import { sweepTopupOrders } from "@/lib/services/foxreload/topup-orders";
+import { sweepEsimOrders } from "@/lib/services/foxreload/esim-orders";
 import { sweepCodeOrders } from "@/lib/services/foxreload/code-orders";
 import { sweepTelegramStars, pruneTelegramQuotes } from "@/lib/services/foxreload/stars-orders";
 import { sweepBoostDeliveries } from "@/lib/services/boosts/boost-status";
@@ -159,6 +160,11 @@ async function handler(request: NextRequest) {
     return { ok: true, detail: `checked ${checked}` };
   });
 
+  const foxEsims = await runStep("digital-esims", async () => {
+    if (isPreviewDatabase()) return { ok: true, detail: "skipped: preview database" };
+    return { ok: true, detail: `checked ${await sweepEsimOrders()}` };
+  });
+
   const topups = await runStep("direct-topups", async () => {
     if (isPreviewDatabase()) return { ok: true, detail: "skipped: preview database" };
     const checked = await sweepTopupOrders();
@@ -242,7 +248,7 @@ async function handler(request: NextRequest) {
     };
   });
 
-  const allOk = close.ok && emails.ok && onboarding.ok && boosts.ok && numberCodes.ok && stars.ok && codes.ok && topups.ok && refunds.ok && esim.ok && scheduled.ok && rentals.ok && referrals.ok && payouts.ok && webhookLog.ok && retention.ok;
+  const allOk = close.ok && emails.ok && onboarding.ok && boosts.ok && numberCodes.ok && stars.ok && codes.ok && foxEsims.ok && topups.ok && refunds.ok && esim.ok && scheduled.ok && rentals.ok && referrals.ok && payouts.ok && webhookLog.ok && retention.ok;
   logger.info("Nightly run finished", {
     day,
     allOk,
@@ -253,6 +259,7 @@ async function handler(request: NextRequest) {
     numberCodes: numberCodes.detail,
     stars: stars.detail,
     codes: codes.detail,
+    foxEsims: foxEsims.detail,
     topups: topups.detail,
     refunds: refunds.detail,
     esim: esim.detail,
@@ -263,7 +270,7 @@ async function handler(request: NextRequest) {
   });
 
   return NextResponse.json(
-    { ok: allOk, day, steps: { close, emails, onboarding, boosts, numberCodes, stars, codes, topups, refunds, esim, scheduled, rentals, referrals, retention } },
+    { ok: allOk, day, steps: { close, emails, onboarding, boosts, numberCodes, stars, codes, foxEsims, topups, refunds, esim, scheduled, rentals, referrals, retention } },
     { status: allOk ? 200 : 207, headers: { "Cache-Control": "no-store" } },
   );
 }

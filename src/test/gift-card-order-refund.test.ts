@@ -185,6 +185,7 @@ beforeEach(() => {
   // These tests exercise a mocked live database; no external database is contacted.
   vi.stubEnv("DATABASE_URL", "postgres://test.invalid/db");
   vi.stubEnv("VERCEL_ENV", "");
+  vi.stubEnv("FOXRELOAD_LEGACY_GIFT_CARDS_ENABLED", "true");
   state.balances = { u1: 20_000 };
   state.orderRows = [];
   state.ledger = [];
@@ -200,6 +201,13 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("POST /api/gift-cards/order refund", () => {
+  it("does not activate old gift card sales merely because a supplier key exists", async () => {
+    vi.stubEnv("FOXRELOAD_LEGACY_GIFT_CARDS_ENABLED", "false");
+    expect((await POST(request())).status).toBe(503);
+    expect(state.orderRows).toEqual([]);
+    expect(state.ledger).toEqual([]);
+    expect(state.providerCalls).toBe(0);
+  });
   it("refuses the legacy mock setting before a debit or supplier call", async () => {
     vi.stubEnv("FOXRELOAD_IS_MOCK", "true");
     expect((await POST(request())).status).toBe(503);
@@ -234,6 +242,7 @@ describe("POST /api/gift-cards/order refund", () => {
     state.fulfillError = null;
     expect((await POST(request())).status).toBe(200);
     vi.stubEnv("FOXRELOAD_IS_MOCK", "true");
+    vi.stubEnv("FOXRELOAD_LEGACY_GIFT_CARDS_ENABLED", "false");
     state.balances.u1 = 0;
     const replay = await POST(request());
     expect(replay.status).toBe(200);

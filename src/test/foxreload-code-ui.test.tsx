@@ -29,6 +29,16 @@ describe("digital code checkout", () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).requestId).toBe("original-key");
     expect(localStorage.getItem("pryva:code-attempt:buyer")).toBeNull();
   });
+  it("preselects a matching approved catalogue product and rejects unknown IDs", async () => {
+    const offers = [{ id: "a", name: "First", region: "US" }, { id: "b", name: "Second", region: "US" }];
+    const view = render(<CodePurchase userId="buyer" offers={offers} initialProduct="b" />);
+    expect((await screen.findByLabelText("Product and redemption region") as HTMLSelectElement).value).toBe("b");
+    view.unmount();
+    render(<CodePurchase userId="buyer" offers={offers} initialProduct="unapproved" />);
+    expect((await screen.findByLabelText("Product and redemption region") as HTMLSelectElement).value).toBe("");
+    expect(screen.getByText(/That product is no longer available/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Get current price" }) as HTMLButtonElement).disabled).toBe(true);
+  });
   it("does not sell unreviewed catalogue products", async () => {
     render(<CodePurchase userId="buyer" offers={[]} />);
     expect(await screen.findByText("No verified products are available to order right now.")).toBeTruthy();

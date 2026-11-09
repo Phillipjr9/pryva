@@ -8,11 +8,11 @@ import { orders, users, walletTransactions } from "@/db/schema";
 import type { Product } from "@/lib/services/foxreload/contract";
 import { approvedCodeOffers, priceCode, publicCodeId } from "@/lib/services/foxreload/code-offers";
 
-const mocks = vi.hoisted(() => ({ db: undefined as unknown, product: vi.fn(), create: vi.fn(), pay: vi.fn(), read: vi.fn() }));
+const mocks = vi.hoisted(() => ({ db: undefined as unknown, product: vi.fn(), create: vi.fn(), pay: vi.fn(), read: vi.fn(), find: vi.fn() }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
 vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
 vi.mock("@/lib/checkout/purchase", () => ({ afterPurchase: vi.fn() }));
-vi.mock("@/lib/providers/foxreload", () => ({ isFoxreloadConfigured: () => true, readFoxreloadProductContract: mocks.product, createFoxreloadContractOrder: mocks.create, payFoxreloadOrder: mocks.pay, readFoxreloadContractOrder: mocks.read }));
+vi.mock("@/lib/providers/foxreload", () => ({ isFoxreloadConfigured: () => true, readFoxreloadProductContract: mocks.product, createFoxreloadContractOrder: mocks.create, payFoxreloadOrder: mocks.pay, readFoxreloadContractOrder: mocks.read, findFoxreloadOrderId: mocks.find }));
 const USER = "11111111-1111-4111-8111-111111111111", OTHER = "11111111-1111-4111-8111-111111111112";
 const REQUEST = "22222222-2222-4222-8222-222222222222", PROVIDER = "0199a1c2-3d4e-7f50-8a6b-7c8d9e0f1a00";
 const OFFER = { id: "product_01kj6xhpn3e29bcw1n69p5mwc5", name: "Sample game key", region: "US", countryCode: "US", marketRegion: null };
@@ -30,7 +30,7 @@ beforeAll(async () => {
 afterAll(async () => { vi.unstubAllEnvs(); await pg?.close(); });
 beforeEach(async () => {
   vi.clearAllMocks(); vi.stubEnv("FOXRELOAD_USD_NGN_RATE", "1500"); vi.stubEnv("FOXRELOAD_IS_MOCK", "false"); vi.stubEnv("FOXRELOAD_CODES_ENABLED", "true"); vi.stubEnv("FOXRELOAD_CODE_OFFERS", JSON.stringify([OFFER]));
-  mocks.product.mockResolvedValue(PRODUCT);
+  mocks.find.mockResolvedValue(null); mocks.product.mockResolvedValue(PRODUCT);
   mocks.create.mockImplementation(async (input: { idempotencyKey: string }) => { supplierKey = input.idempotencyKey; return providerOrder("active", "active"); });
   mocks.pay.mockResolvedValue({}); mocks.read.mockImplementation(async () => providerOrder("completed", "completed", ["SECRET-CODE"]));
   await database.execute(sql`TRUNCATE TABLE foxreload_quotes, orders, wallet_transactions, users CASCADE`);
@@ -97,6 +97,23 @@ describe("reviewed FoxReload code orders", () => {
       await database.update(schema.foxreloadQuotes).set({ lastCheckedAt: new Date(0) }); mocks.read.mockResolvedValueOnce(raw); await service.syncCodeOrder(result.id, USER);
       const [row] = await database.select().from(orders); expect(row.status).toBe("review"); expect(row.referenceCode).toBeNull();
     }
+  });
+  it("recovers a lost supplier ID by verified lookup without another create or payment", async () => {
+    const q = await quote();
+    mocks.create.mockImplementationOnce(async (input: { idempotencyKey: string }) => { supplierKey = input.idempotencyKey;  throw new Error("timeout"); });
+    const result = await service.buyCode({ userId: USER, quoteId: q.id, requestId: REQUEST });
+    if (result.kind !== "order") throw new Error("order expected");
+    expect(result.status).toBe("review"); expect((await database.select().from(orders))[0].providerRequestId).toBeNull();
+    mocks.find.mockResolvedValue(PROVIDER);
+    await service.syncCodeOrder(result.id, OTHER); expect(mocks.find).not.toHaveBeenCalled();
+    mocks.read.mockResolvedValueOnce({ ...providerOrder("completed", "completed", ["SECRET-CODE"]), price: "999" });
+    await service.syncCodeOrder(result.id, USER); expect((await database.select().from(orders))[0].providerRequestId).toBeNull();
+    await database.update(schema.foxreloadQuotes).set({ lastCheckedAt: new Date(0) });
+    mocks.read.mockResolvedValueOnce(providerOrder("completed", "completed", ["SECRET-CODE"]));
+    expect(await service.sweepCodeOrders()).toBe(1);
+    expect((await database.select().from(orders))[0]).toMatchObject({ status: "delivered", providerRequestId: PROVIDER });
+    expect(mocks.find).toHaveBeenCalledWith(result.id); expect(mocks.create).toHaveBeenCalledTimes(1); expect(mocks.pay).not.toHaveBeenCalled();
+    expect((await database.select().from(walletTransactions)).filter((row) => row.type === "refund")).toHaveLength(0);
   });
   it("keeps recovery working after disabling new sales and protects another user's order", async () => {
     const q = await quote(); mocks.read.mockResolvedValueOnce(providerOrder("processing", "processing"));

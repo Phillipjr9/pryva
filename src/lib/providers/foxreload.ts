@@ -183,6 +183,27 @@ async function foxreloadFetch(
   return payload;
 }
 
+/** Authenticated, read-only readiness probe. Never return profile fields or balances. */
+export async function probeFoxreloadAccount(): Promise<{ active: boolean; funds: { usd: "positive" | "zero" | "unknown"; rub: "positive" | "zero" | "unknown" } }> {
+  const profile = await foxreloadFetch("/api/access/me");
+  if (!profile || typeof profile !== "object" || Array.isArray(profile) || typeof (profile as Record<string, unknown>).isActive !== "boolean") {
+    throw new FoxreloadError("Invalid account response", 502, "INVALID_RESPONSE");
+  }
+  const raw = await foxreloadFetch("/api/access/me/balances/");
+  if (!Array.isArray(raw) || raw.length > 10) throw new FoxreloadError("Invalid balance response", 502, "INVALID_RESPONSE");
+  const funds: { usd: "positive" | "zero" | "unknown"; rub: "positive" | "zero" | "unknown" } = { usd: "unknown", rub: "unknown" };
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new FoxreloadError("Invalid balance response", 502, "INVALID_RESPONSE");
+    const { currency, available } = entry as Record<string, unknown>;
+    if (currency !== "usd" && currency !== "rub") continue;
+    if (seen.has(currency) || typeof available !== "string" || !/^(?:0|[1-9]\d{0,20})(?:\.\d{1,18})?$/.test(available)) throw new FoxreloadError("Invalid balance response", 502, "INVALID_RESPONSE");
+    seen.add(currency);
+    funds[currency] = /[1-9]/.test(available) ? "positive" : "zero";
+  }
+  return { active: (profile as Record<string, boolean>).isActive, funds };
+}
+
 export async function getFoxreloadAccount(): Promise<FoxreloadAccount> {
   const data = (await foxreloadFetch("/api/access/me")) as Record<string, unknown>;
   return {
@@ -260,13 +281,22 @@ export async function searchFoxreloadProducts(query: string): Promise<FoxreloadP
  * checkout mapper this function does not invent a currency or delivery type.
  * Cursor mode walks the complete feed, while search is limited upstream to 50.
  */
-export async function readFoxreloadBrowsePage(options: { query?: string; cursor?: string } = {}): Promise<{ rows: unknown[]; nextCursor: string | null; searchLimited: boolean }> {
+/** Root categories only: descendants are browsed through the product cursor. */
+export async function readFoxreloadBrowseCategories(): Promise<unknown[]> {
+  const value = await foxreloadFetch("/api/categories/tree", { query: { depth: 1 } });
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new FoxreloadError("Invalid category response", 502, "INVALID_RESPONSE");
+  const rows = (value as Record<string, unknown>).items;
+  if (!Array.isArray(rows) || rows.length > 500) throw new FoxreloadError("Invalid category response", 502, "INVALID_RESPONSE");
+  return rows;
+}
+
+export async function readFoxreloadBrowsePage(options: { query?: string; cursor?: string; category?: string } = {}): Promise<{ rows: unknown[]; nextCursor: string | null; searchLimited: boolean }> {
   if (options.query) {
-    const value = await foxreloadFetch("/api/products/search", { query: { query: options.query, limit: 50 } });
+    const value = await foxreloadFetch("/api/products/search", { query: { query: options.query, categoryId: options.category, limit: 50 } });
     if (!Array.isArray(value) || value.length > 50) throw new FoxreloadError("Invalid catalog response", 502, "INVALID_RESPONSE");
     return { rows: value, nextCursor: null, searchLimited: value.length === 50 };
   }
-  const value = await foxreloadFetch("/api/products/", { query: { includeDescendants: true, limit: 50, cursor: options.cursor } });
+  const value = await foxreloadFetch("/api/products/", { query: { includeDescendants: true, categoryId: options.category, limit: 50, cursor: options.cursor } });
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new FoxreloadError("Invalid catalog response", 502, "INVALID_RESPONSE");
   const page = value as Record<string, unknown>;
   if (!Array.isArray(page.items) || page.items.length > 50 || !(page.nextCursor == null || (typeof page.nextCursor === "string" && page.nextCursor.length > 0 && page.nextCursor.length <= 512))) {
@@ -472,4 +502,18 @@ export async function readFoxreloadContractOrder(orderId: string): Promise<unkno
     throw new FoxreloadError("Invalid order ID", 400, "INVALID_ORDER");
   }
   return foxreloadFetch(`/api/orders/${encodeURIComponent(orderId)}`);
+}
+
+/** Find a unique supplier order by our own idempotency key, without retrying
+ * creation or payment. A listing is only a hint; callers must verify the full
+ * order against the durable quote and intent before linking or delivering. */
+export async function findFoxreloadOrderId(idempotencyKey: string): Promise<string | null> {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuid.test(idempotencyKey)) throw new FoxreloadError("Invalid order key", 400, "INVALID_ORDER");
+  const raw = await foxreloadFetch("/api/orders/", { query: { idempotencyKey, limit: 2, offset: 0 } });
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const page = raw as Record<string, unknown>;
+  if (page.total !== 1 || page.offset !== 0 || !Array.isArray(page.items) || page.items.length !== 1) return null;
+  const item = page.items[0] as Record<string, unknown> | null;
+  return item && typeof item.id === "string" && uuid.test(item.id) && item.idempotencyKey === idempotencyKey ? item.id : null;
 }

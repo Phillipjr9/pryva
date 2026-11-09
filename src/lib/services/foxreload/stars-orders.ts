@@ -1,13 +1,13 @@
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq, gt, inArray, isNull, isNotNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { foxreloadQuotes, orders, users, type Order } from "@/db/schema";
 import { debitWalletInTx, creditWalletInTx, InsufficientFundsError, makeReference } from "@/lib/payments/wallet";
 import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
 import { afterPurchase } from "@/lib/checkout/purchase";
 import { FOXRELOAD_PROVIDER } from "@/lib/services/order-providers";
-import { createFoxreloadContractOrder, isFoxreloadConfigured, payFoxreloadOrder, readFoxreloadContractOrder, readFoxreloadProductContract } from "@/lib/providers/foxreload";
+import { createFoxreloadContractOrder, findFoxreloadOrderId, isFoxreloadConfigured, payFoxreloadOrder, readFoxreloadContractOrder, readFoxreloadProductContract } from "@/lib/providers/foxreload";
 import { decimalUnits } from "./contract";
 import { priceStars, prepareStarsProduct, TELEGRAM_STARS_PRODUCT, telegramUsername } from "./telegram-stars";
 
@@ -21,13 +21,13 @@ export type StarsResult =
   | { kind: "order"; id: string; reference: string; status: string; replayed: boolean }
   | { kind: "error"; code: "invalid" | "unavailable" | "changed" | "insufficient" | "pending"; message: string; reference?: string };
 
-function configured() {
+export function starsSalesConfigured() {
   return process.env.FOXRELOAD_STARS_ENABLED === "true" && isFoxreloadConfigured() && process.env.FOXRELOAD_IS_MOCK !== "true" && Boolean(process.env.FOXRELOAD_USD_NGN_RATE?.trim());
 }
 
 export async function quoteTelegramStars(userId: string, quantity: number): Promise<StarsResult> {
   if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 1_000_000) return { kind: "error", code: "invalid", message: "Enter a valid number of Stars." };
-  if (!configured()) return { kind: "error", code: "unavailable", message: "Telegram Stars pricing is not available right now." };
+  if (!starsSalesConfigured()) return { kind: "error", code: "unavailable", message: "Telegram Stars pricing is not available right now." };
   const product = await readFoxreloadProductContract(TELEGRAM_STARS_PRODUCT).catch(() => null);
   const price = product && priceStars(product, quantity);
   if (!product || !price) return { kind: "error", code: "unavailable", message: "This Stars quantity is not available right now." };
@@ -50,7 +50,7 @@ class Pending extends Error { constructor(public reference: string) { super("pen
 class Changed extends Error {}
 
 /** Validate supplier response before spending or treating direct delivery as complete. */
-function verifyProviderOrder(raw: unknown, expected: { id?: string; total: string; quantity: number; requestId: string }, requireActive = false): { id: string; completed: boolean } | null {
+export function verifyStarsProviderOrder(raw: unknown, expected: { id?: string; total: string; quantity: number; requestId: string; quoteId: string; recipientIntent: string }, requireActive = false): { id: string; completed: boolean } | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const order = raw as Record<string, unknown>;
   if (typeof order.id !== "string" || !uuid.test(order.id) || (expected.id && order.id !== expected.id) ||
@@ -60,6 +60,9 @@ function verifyProviderOrder(raw: unknown, expected: { id?: string; total: strin
   const item = order.items[0] as Record<string, unknown> | null;
   const product = item?.product as Record<string, unknown> | null;
   if (!item || !product || product.id !== TELEGRAM_STARS_PRODUCT || product.deliveryType !== "direct_topup" || item.quantity !== expected.quantity) return null;
+  const note = item.note && typeof item.note === "object" && !Array.isArray(item.note) ? item.note as Record<string, unknown> : null;
+  const username = note && Object.keys(note).length === 1 ? telegramUsername(note.username) : null;
+  if (!username || intent(expected.quoteId, username) !== expected.recipientIntent) return null;
   if (requireActive && order.status !== "active") return null;
   return { id: order.id, completed: order.status === "completed" && item.fulfillmentStatus === "completed" };
 }
@@ -71,7 +74,7 @@ export async function buyTelegramStars(input: { userId: string; quoteId: string;
   const requestIntent = intent(quoteId, username);
   const [existing] = await db.select().from(orders).where(and(eq(orders.userId, input.userId), eq(orders.requestId, requestId))).limit(1);
   if (existing) return replay(existing, requestIntent);
-  if (!configured()) return { kind: "error", code: "unavailable", message: "Telegram Stars purchases are unavailable right now." };
+  if (!starsSalesConfigured()) return { kind: "error", code: "unavailable", message: "Telegram Stars purchases are unavailable right now." };
   const [quote] = await db.select().from(foxreloadQuotes).where(and(eq(foxreloadQuotes.id, quoteId), eq(foxreloadQuotes.userId, input.userId))).limit(1);
   if (!quote || quote.orderId || quote.expiresAt <= new Date()) return { kind: "error", code: "changed", message: "This quote has expired or was used. Get a new quote." };
   const product = await readFoxreloadProductContract(TELEGRAM_STARS_PRODUCT).catch(() => null);
@@ -132,7 +135,7 @@ export async function buyTelegramStars(input: { userId: string; quoteId: string;
       const [saved] = await db.update(orders).set({ providerRequestId: providerId, reconciliationNote: "Stars supplier order created; payment not yet confirmed." }).where(and(eq(orders.id, orderId), eq(orders.status, "processing"), isNull(orders.refundedAt))).returning({ id: orders.id });
       if (!saved) throw new Error("Order claim lost");
     }
-    const verified = verifyProviderOrder(created, { total: quote.wholesaleTotal, quantity: quote.quantity, requestId: orderId }, true);
+    const verified = verifyStarsProviderOrder(created, { total: quote.wholesaleTotal, quantity: quote.quantity, requestId: orderId, quoteId, recipientIntent: requestIntent }, true);
     if (!verified) throw new Error("Supplier order terms could not be verified");
     // Only this request can cross the payment boundary, and processing prevents
     // the admin refund path from racing the in-flight payment.
@@ -150,16 +153,24 @@ export async function buyTelegramStars(input: { userId: string; quoteId: string;
 /** Read-only provider sync. Unknown, failed and refunded supplier states need review. */
 export async function syncTelegramStars(orderId: string, userId: string): Promise<void> {
   const [order] = await db.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.userId, userId), eq(orders.service, SERVICE), eq(orders.productSlug, SLUG), eq(orders.provider, FOXRELOAD_PROVIDER), inArray(orders.status, ["review", "processing"]), isNull(orders.refundedAt))).limit(1);
-  if (!order?.providerRequestId || !order.requestId) return;
+  if (!order?.requestId || !order.requestIntent) return;
   const [quote] = await db.select().from(foxreloadQuotes).where(and(eq(foxreloadQuotes.orderId, order.id), eq(foxreloadQuotes.userId, userId))).limit(1);
   if (!quote) return;
   // Shared cooldown and fair sweep ordering; claim the check before network I/O.
   const [claim] = await db.update(foxreloadQuotes).set({ lastCheckedAt: new Date() }).where(and(eq(foxreloadQuotes.id, quote.id), or(isNull(foxreloadQuotes.lastCheckedAt), lte(foxreloadQuotes.lastCheckedAt, new Date(Date.now() - 20_000))))).returning({ id: foxreloadQuotes.id });
   if (!claim) return;
-  const raw = await readFoxreloadContractOrder(order.providerRequestId).catch(() => null);
-  const verified = verifyProviderOrder(raw, { id: order.providerRequestId, total: quote.wholesaleTotal, quantity: quote.quantity, requestId: order.id });
-  if (!verified?.completed) return;
-  const [saved] = await db.update(orders).set({ status: "delivered", reconciliationNote: null }).where(and(eq(orders.id, order.id), inArray(orders.status, ["review", "processing"]), eq(orders.providerRequestId, order.providerRequestId), isNull(orders.refundedAt))).returning({ id: orders.id });
+  const providerId = order.providerRequestId ?? await findFoxreloadOrderId(order.id).catch(() => null);
+  if (!providerId) return;
+  const raw = await readFoxreloadContractOrder(providerId).catch(() => null);
+  const verified = verifyStarsProviderOrder(raw, { id: providerId, total: quote.wholesaleTotal, quantity: quote.quantity, requestId: order.id, quoteId: quote.id, recipientIntent: order.requestIntent });
+  if (!verified) return;
+  if (!order.providerRequestId) {
+    const [linked] = await db.update(orders).set({ providerRequestId: verified.id, reconciliationNote: "Stars supplier order found; payment and delivery require verification." })
+      .where(and(eq(orders.id, order.id), eq(orders.userId, userId), inArray(orders.status, ["review", "processing"]), isNull(orders.providerRequestId), isNull(orders.refundedAt))).returning({ id: orders.id });
+    if (!linked) return;
+  }
+  if (!verified.completed) return;
+  const [saved] = await db.update(orders).set({ status: "delivered", reconciliationNote: null }).where(and(eq(orders.id, order.id), inArray(orders.status, ["review", "processing"]), eq(orders.providerRequestId, providerId), isNull(orders.refundedAt))).returning({ id: orders.id });
   if (saved) void afterPurchase(userId);
 }
 
@@ -169,7 +180,7 @@ export async function sweepTelegramStars(): Promise<number> {
   const candidates = await db.select({ id: orders.id, userId: orders.userId }).from(foxreloadQuotes)
     .innerJoin(orders, eq(orders.id, foxreloadQuotes.orderId))
     .where(and(eq(orders.provider, FOXRELOAD_PROVIDER), eq(orders.service, SERVICE), eq(orders.productSlug, SLUG),
-      inArray(orders.status, ["review", "processing"]), isNull(orders.refundedAt), isNotNull(orders.providerRequestId),
+      inArray(orders.status, ["review", "processing"]), isNull(orders.refundedAt),
       or(isNull(foxreloadQuotes.lastCheckedAt), lte(foxreloadQuotes.lastCheckedAt, new Date(Date.now() - 20_000)))))
     .orderBy(sql`${foxreloadQuotes.lastCheckedAt} ASC NULLS FIRST`, orders.createdAt, orders.id).limit(8);
   await Promise.allSettled(candidates.map((row) => syncTelegramStars(row.id, row.userId)));

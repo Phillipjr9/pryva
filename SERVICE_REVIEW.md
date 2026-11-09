@@ -165,3 +165,46 @@ Additional unauthenticated public product searches confirm that the catalogue is
 This exposed a real compatibility gap: the restricted direct-top-up flow did not allow `account_id`. It now does, and a test uses the real published Mobile Legends field shape while ensuring the observed RUB price is refused by the USD-only checkout. Product restrictions are now required as reviewed offer configuration, shown to the customer before payment and stored on the quote for the owner's order page. Migration 0042 adds the terms snapshot. An operator must verify detailed restrictions: a supplier's `WW`/Global label can still exclude specific countries. None of these examples has been added to the allowlist or verified/activated against the account. Product-specific checks and terms are not automatically derived from the entire live catalogue.
 
 This is still NOT all FoxReload service top-ups: dynamic/unreviewed SKU onboarding, many typed or select fields, login-based top-ups and confirmation-code workflows, prepaid card-backed subscriptions, account-specific inventory/prices, reconciliation of uncertain operations, and live end-to-end fulfillment remain incomplete. No live orders or deployment occurred. Final verification for the expanded slice: 268 test files / 2,644 tests passed; typecheck, lint, production build and `git diff --check` passed locally.
+
+### FoxReload eSIM checkout (implementation, disabled)
+
+A separate reviewed eSIM flow now quotes and rechecks one approved USD offer,
+records the buyer's accepted coverage and activation restrictions, debits the
+wallet atomically before supplier spending, verifies the created order before
+payment, and synchronizes delivery on the owner's order page and in a bounded
+nightly sweep. The existing Bitcall completion endpoint rejects other providers,
+so it cannot accidentally double-charge a FoxReload order. The activation code
+is shown only on the authenticated owner's order page and delivered through the
+existing eSIM email mechanism to the account email.
+
+This is **not verified supplier parity**. The OpenAPI describes LPA activation data and ICCID in `externalId`, and
+`externalData` as an array of strings, but does not establish that a real eSIM
+always returns exactly one LPA string in that array. The implementation
+accepts only that narrow assumed shape and a numeric ICCID; any other result
+remains in review rather than being delivered or automatically refunded. No
+supplier account request, actual paid order or device activation was tested.
+Do not enable sales until the account's real order and profile formats, price
+currency, product coverage, validity, installation requirements, email
+delivery, and recovery procedures have been independently verified. Other
+FoxReload delivery types and their remaining gaps are unchanged.
+
+The digital catalogue now supports account-visible root categories and cursor
+browsing with descendants, including categories added later by the supplier.
+Search is still capped by FoxReload at 50 results; browsing a category's pages
+is the way to go beyond that cap. Approved offers link to their matching quote
+flow; catalog presence alone is not proof of stock, price, or ability to order.
+
+### Additional account-top-up and recovery work
+
+Reviewed non-secret account fields now support supplier-declared string, email,
+integer, number and exact select choices. A separately disabled login-top-up
+slice supports products needing only those fields, including a test modeled on
+the public Brawl Stars email-login shape. Before buying it requires the separate
+confirmation-code gate; the user is told that the supplier signs in. Passwords
+and other secret fields are not accepted. Codes are only requested on an
+owner's verified action-required order; submissions are claimed durably and
+never stored, and ambiguous submissions block retry. Stars verification also
+checks the echoed username before payment or completion. Read-only lookup by
+local idempotency key can recover lost supplier IDs for Stars, codes, eSIMs and
+account top-ups without re-creating, re-paying or automatically refunding.
+This remains disabled and unverified against the account or real paid orders.

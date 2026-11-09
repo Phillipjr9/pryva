@@ -3,6 +3,9 @@ import { NextRequest } from "next/server";
 import { requireAuthApi } from "@/lib/identity/auth";
 import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import { catalogRateLimiter } from "@/lib/platform/rate-limit";
+import { listedCodeOffers } from "@/lib/services/foxreload/code-orders";
+import { listedTopupOffers } from "@/lib/services/foxreload/topup-orders";
+import { listedEsimOffers } from "@/lib/services/foxreload/esim-orders";
 import { isFoxreloadConfigured, readFoxreloadBrowsePage } from "@/lib/providers/foxreload";
 
 export const dynamic = "force-dynamic";
@@ -15,8 +18,9 @@ export async function GET(request: NextRequest) {
   if (financialActionsUnavailable()) return Response.json({ error: "This catalogue is unavailable in this environment." }, { status: 503 });
   const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   const cursor = request.nextUrl.searchParams.get("cursor") ?? "";
+  const category = request.nextUrl.searchParams.get("category") ?? "";
   if ((query && (query.length < 2 || query.length > 128 || /[\u0000-\u001f\u007f]/.test(query))) ||
-      (cursor && (cursor.length > 512 || /[\u0000-\u001f\u007f]/.test(cursor))) || (query && cursor)) {
+      (cursor && (cursor.length > 512 || /[\u0000-\u001f\u007f]/.test(cursor))) || (query && cursor) || (category && !/^[a-z0-9][a-z0-9-]{0,127}$/i.test(category))) {
     return Response.json({ error: "Invalid catalogue request." }, { status: 400 });
   }
   if (!isFoxreloadConfigured()) return Response.json({ error: "This catalogue is not connected yet." }, { status: 503 });
@@ -24,8 +28,11 @@ export async function GET(request: NextRequest) {
   if (limit.unavailable) return Response.json({ error: "Catalogue temporarily unavailable." }, { status: 503 });
   if (!limit.allowed) return Response.json({ error: "Too many requests. Try again shortly." }, { status: 429 });
   try {
-    const page = await readFoxreloadBrowsePage({ query: query || undefined, cursor: cursor || undefined });
-    const items: { id: string; name: string }[] = [];
+    const page = await readFoxreloadBrowsePage({ query: query || undefined, cursor: cursor || undefined, ...(category ? { category } : {}) });
+    const items: { id: string; name: string; checkout?: "codes" | "topups" | "esims" }[] = [];
+    const checkout = new Map<string, { name: string; kind: "codes" | "topups" | "esims" }>();
+    for (const [kind, offers] of [["codes", listedCodeOffers()], ["topups", listedTopupOffers()], ["esims", listedEsimOffers()]] as const)
+      for (const offer of offers) checkout.set(offer.id, { name: offer.name, kind });
     const seen = new Set<string>();
     let skipped = 0;
     for (const row of page.rows) {
@@ -37,7 +44,8 @@ export async function GET(request: NextRequest) {
       const publicId = `digital-${createHash("sha256").update(id).digest("hex").slice(0, 24)}`;
       if (seen.has(publicId)) { skipped++; continue; }
       seen.add(publicId);
-      items.push({ id: publicId, name });
+      const approved = checkout.get(publicId);
+      items.push({ id: publicId, name, ...(approved?.name === name ? { checkout: approved.kind } : {}) });
     }
     return Response.json({ ok: true, items, nextCursor: page.nextCursor, searchLimited: page.searchLimited, skipped: skipped > 0 }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {

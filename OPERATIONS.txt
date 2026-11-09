@@ -325,12 +325,17 @@ FOXRELOAD DIRECT TOP-UPS — LOCAL ONLY / NOT READY TO ENABLE
 The direct-top-up slice is disabled with FOXRELOAD_TOPUPS_ENABLED=false and has
 an empty FOXRELOAD_TOPUP_OFFERS allowlist. It accepts only explicitly reviewed
 product IDs with an exact supplier name, country_code/region attributes, display
-region, specific restrictions in terms, min/max quantity and one to eight non-secret string identifier fields.
+region, specific restrictions in terms, min/max quantity and one to eight reviewed non-secret identifier fields.
 The available field keys are username, login, account_id, user_id, userid, player_id,
 playerid, game_id, gameid, server, server_id, zone, zone_id, uid, email, phone,
 and phone_number. It refuses password, session, payment-card and unreviewed
-fields, login_topup, select/integer/other typed inputs and all banking products.
-There are no login-top-up or customer confirmation-code flows here.
+fields and all banking products. Optional reviewed field types are string, email,
+integer, number, and select (with exact approved choices); unspecified means
+string for backward compatibility. A changed supplier type or choice blocks sale.
+The separate FOXRELOAD_LOGIN_TOPUPS_ENABLED gate covers reviewed login_topup
+products that require only these non-secret fields. It also requires
+FOXRELOAD_CLIENT_CODES_ENABLED=true for possible confirmation challenges;
+password and other credential fields remain unsupported.
 
 FOXRELOAD_TOPUP_OFFERS is a JSON array. Shape example only, NOT a real SKU:
 [{"id":"product_0123456789abcdefghijklmnop","name":"Example game top-up","region":"United States","terms":"Only for US accounts.","countryCode":"US","marketRegion":null,"min":1,"max":1,"fields":[{"key":"player_id","label":"Player ID"}]}]
@@ -351,7 +356,9 @@ incorrect details limits recovery. Never log secrets or recipient details.
 The supplier may return note/status formats different from the examples. A
 mismatch on creation prevents payment; a mismatch while reading an order prevents
 delivery confirmation. In both cases a wallet debit may need evidence-based
-manual reconciliation. Interrupted processing remains unresolved; no automatic
+manual reconciliation. When the create response is lost, a read-only lookup by the original local
+order ID can recover a uniquely matching supplier order after full verification.
+Missing, ambiguous, mismatched or unpaid orders remain in review; no automatic
 create/pay/refund retry is safe. New sales remain off until migration 0041,
 account-authenticated product/contract verification, mock/live behavior and
 operator reconciliation are verified. Recheck the USD/NGN rate; the configured
@@ -362,3 +369,48 @@ exact buyer-visible restrictions with each quote/order. Include detailed
 country/account eligibility and exclusions in each offer's `terms`; a generic
 "global" label is not sufficient evidence of universal redemption. Operator
 review and account-specific verification remain mandatory before sales.
+
+FoxReload eSIM rollout (disabled by default)
+-------------------------------------------
+FOXRELOAD_ESIMS_ENABLED defaults to false and FOXRELOAD_ESIM_OFFERS to empty.
+Do not enable until supplier account access and exact eSIM fulfillment shape have
+been verified, alongside a reviewed USD price/rate and product terms. Each JSON
+allowlist entry needs exact id, name, region, terms, countryCode and marketRegion
+(the latter two may be null). Include device requirements, coverage, data,
+validity and activation constraints in buyer-visible terms. These are retained
+with the quote; changed terms invalidate it. The checkout currently accepts
+only a single LPA activation string in externalData plus a numeric ICCID in
+externalId. This is an unverified assumption, not a promise about all supplier
+products. Other formats, failures and uncertain payment results are held for
+manual reconciliation. Never retry create/pay or refund merely because a call
+timed out; verify upstream evidence and wallet state first. Disable new sales
+without removing credentials if existing orders still need status checks.
+
+FoxReload account confirmation codes (disabled by default)
+---------------------------------------------------------
+Migration 0043 adds a durable submission claim, not storage for the code.
+FOXRELOAD_CLIENT_CODES_ENABLED defaults to false. When explicitly enabled, an
+owner can check and submit a code only if a fresh matching non-mock supplier
+order and item are both action_required and the recipient intent, currency,
+quantity and price match. A single transactional claim moves the order to
+processing before sending; a crash stays blocked for review. Explicit supplier
+rejection permits a fresh code; a timeout, unexpected error or successful
+submission blocks another attempt until reconciled. Never retry a submitted or
+uncertain code, expose codes in logs, or refund without supplier evidence.
+A future repeated challenge after acceptance needs manual review. No real
+supplier account or code has been tested.
+
+FoxReload read-only account check (local until deployed)
+-------------------------------------------------------
+The administrator-only /admin/foxreload screen can call the account and balance
+GET endpoints using the key already stored on the server. It reports active state
+and whether available USD/RUB funds are positive, zero or unknown; it never
+shows the key, profile, amounts or raw supplier error. The check cannot create,
+pay, cancel or refund an order. It also reports the sales gates, configured
+reviewed-offer counts, rate/intent-secret presence and preview purchase guard.
+A key set in Vercel is applied only to new deployments. Do not interpret this
+check as evidence that any SKU can be fulfilled or that checkout is safe.
+The separate legacy brand-gift-card checkout now requires
+FOXRELOAD_LEGACY_GIFT_CARDS_ENABLED=true as well as the key and non-mock mode.
+Leave it disabled: its matching, pricing and reconciliation still require review.
+Existing requests can be replayed by request ID even while new sales are blocked.

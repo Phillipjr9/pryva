@@ -1,13 +1,13 @@
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq, gt, inArray, isNull, isNotNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { foxreloadQuotes, orders, users, type Order } from "@/db/schema";
 import { debitWalletInTx, creditWalletInTx, InsufficientFundsError, makeReference } from "@/lib/payments/wallet";
 import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
 import { afterPurchase } from "@/lib/checkout/purchase";
 import { FOXRELOAD_PROVIDER } from "@/lib/services/order-providers";
-import { createFoxreloadContractOrder, isFoxreloadConfigured, payFoxreloadOrder, readFoxreloadContractOrder, readFoxreloadProductContract } from "@/lib/providers/foxreload";
+import { createFoxreloadContractOrder, findFoxreloadOrderId, isFoxreloadConfigured, payFoxreloadOrder, readFoxreloadContractOrder, readFoxreloadProductContract } from "@/lib/providers/foxreload";
 import { decimalUnits } from "./contract";
 import { approvedCodeOffers, offerFingerprint, priceCode, publicCodeId } from "./code-offers";
 
@@ -124,21 +124,31 @@ export async function buyCode(input: { userId: string; quoteId: string; requestI
 }
 export async function syncCodeOrder(orderId: string, userId: string): Promise<void> {
   const [order] = await db.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.userId, userId), eq(orders.service, SERVICE), eq(orders.productSlug, SLUG), eq(orders.provider, FOXRELOAD_PROVIDER), inArray(orders.status, ["review", "processing"]), isNull(orders.refundedAt))).limit(1);
-  if (!order?.providerRequestId || !order.requestId) return;
+  if (!order?.requestId) return;
   const [quote] = await db.select().from(foxreloadQuotes).where(and(eq(foxreloadQuotes.orderId, order.id), eq(foxreloadQuotes.userId, userId))).limit(1);
   if (!quote) return;
   const [claim] = await db.update(foxreloadQuotes).set({ lastCheckedAt: new Date() }).where(and(eq(foxreloadQuotes.id, quote.id), or(isNull(foxreloadQuotes.lastCheckedAt), lte(foxreloadQuotes.lastCheckedAt, new Date(Date.now() - 20_000))))).returning({ id: foxreloadQuotes.id });
   if (!claim) return;
-  const raw = await readFoxreloadContractOrder(order.providerRequestId).catch(() => null);
-  const verified = verify(raw, { id: order.providerRequestId, productId: quote.productId, total: quote.wholesaleTotal, requestId: order.id });
-  if (!verified?.code) return;
-  const [saved] = await db.update(orders).set({ status: "delivered", referenceCode: verified.code, reconciliationNote: null }).where(and(eq(orders.id, order.id), inArray(orders.status, ["review", "processing"]), eq(orders.providerRequestId, order.providerRequestId), isNull(orders.refundedAt))).returning({ id: orders.id });
+  // If create timed out before its ID was saved, look up our unique key. This
+  // is read-only: never re-create, re-pay, or infer a refund from no result.
+  const providerId = order.providerRequestId ?? await findFoxreloadOrderId(order.id).catch(() => null);
+  if (!providerId) return;
+  const raw = await readFoxreloadContractOrder(providerId).catch(() => null);
+  const verified = verify(raw, { id: providerId, productId: quote.productId, total: quote.wholesaleTotal, requestId: order.id });
+  if (!verified) return;
+  if (!order.providerRequestId) {
+    const [linked] = await db.update(orders).set({ providerRequestId: verified.id, reconciliationNote: "Supplier order found; payment and delivery require verification." })
+      .where(and(eq(orders.id, order.id), eq(orders.userId, userId), inArray(orders.status, ["review", "processing"]), isNull(orders.providerRequestId), isNull(orders.refundedAt))).returning({ id: orders.id });
+    if (!linked) return;
+  }
+  if (!verified.code) return;
+  const [saved] = await db.update(orders).set({ status: "delivered", referenceCode: verified.code, reconciliationNote: null }).where(and(eq(orders.id, order.id), inArray(orders.status, ["review", "processing"]), eq(orders.providerRequestId, providerId), isNull(orders.refundedAt))).returning({ id: orders.id });
   if (saved) { scheduleWalletEmails(); void afterPurchase(userId); }
 }
 export async function sweepCodeOrders(): Promise<number> {
   if (!isFoxreloadConfigured()) return 0;
   const candidates = await db.select({ id: orders.id, userId: orders.userId }).from(foxreloadQuotes).innerJoin(orders, eq(orders.id, foxreloadQuotes.orderId))
-    .where(and(eq(orders.provider, FOXRELOAD_PROVIDER), eq(orders.service, SERVICE), eq(orders.productSlug, SLUG), inArray(orders.status, ["review", "processing"]), isNull(orders.refundedAt), isNotNull(orders.providerRequestId), or(isNull(foxreloadQuotes.lastCheckedAt), lte(foxreloadQuotes.lastCheckedAt, new Date(Date.now() - 20_000)))))
+    .where(and(eq(orders.provider, FOXRELOAD_PROVIDER), eq(orders.service, SERVICE), eq(orders.productSlug, SLUG), inArray(orders.status, ["review", "processing"]), isNull(orders.refundedAt), or(isNull(foxreloadQuotes.lastCheckedAt), lte(foxreloadQuotes.lastCheckedAt, new Date(Date.now() - 20_000)))))
     .orderBy(sql`${foxreloadQuotes.lastCheckedAt} ASC NULLS FIRST`, orders.createdAt, orders.id).limit(8);
   await Promise.allSettled(candidates.map((row) => syncCodeOrder(row.id, row.userId)));
   return candidates.length;

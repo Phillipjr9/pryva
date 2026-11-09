@@ -2,14 +2,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 type Offer = { id: string; name: string; region: string; min: number; max: number };
-type Field = { key: string; label: string };
-type Quote = { id: string; name: string; region: string; terms: string; quantity: number; fields: Field[]; amount: number; expiresAt: string };
+type Field = { key: string; label: string; type?: "string" | "integer" | "number" | "email" | "select"; options?: { value: string; label: string }[] };
+type Quote = { deliveryType?: "direct_topup" | "login_topup"; id: string; name: string; region: string; terms: string; quantity: number; fields: Field[]; amount: number; expiresAt: string };
 type Attempt = { quote: Quote; requestId: string };
 type Order = { id: string; reference: string; status: string };
-export function TopupPurchase({ userId, offers }: { userId: string; offers: Offer[] }) {
+export function TopupPurchase({ userId, offers, initialProduct }: { userId: string; offers: Offer[]; initialProduct?: string }) {
   const storageKey = `pryva:topup-attempt:${userId}`;
-  const [selected, setSelected] = useState(offers[0]?.id ?? "");
-  const [quantity, setQuantity] = useState(String(offers[0]?.min ?? 1));
+  const initial = initialProduct === undefined ? offers[0] : offers.find((item) => item.id === initialProduct);
+  const [selected, setSelected] = useState(initial?.id ?? "");
+  const [quantity, setQuantity] = useState(String(initial?.min ?? 1));
   const [note, setNote] = useState<Record<string, string>>({});
   const [quote, setQuote] = useState<Quote | null>(null), [attempt, setAttempt] = useState<Attempt | null>(null), [order, setOrder] = useState<Order | null>(null);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [message, setMessage] = useState<string | null>(null);
@@ -34,7 +35,16 @@ export function TopupPurchase({ userId, offers }: { userId: string; offers: Offe
     let current = existing;
     const activeQuote = current?.quote ?? quote;
     if (!activeQuote || activeQuote.fields.some((field) => !note[field.key]?.trim())) { setMessage("Enter all recipient details exactly as requested."); return; }
-    const details = Object.fromEntries(activeQuote.fields.map((field) => [field.key, note[field.key].trim()]));
+    const details: Record<string, string | number> = {};
+    for (const field of activeQuote.fields) {
+      const value = note[field.key].trim();
+      if (field.type === "integer" || field.type === "number") {
+        const pattern = field.type === "integer" ? /^-?(?:0|[1-9]\d*)$/ : /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
+        const numeric = Number(value);
+        if (!pattern.test(value) || !Number.isFinite(numeric) || Math.abs(numeric) > 1e15 || (field.type === "integer" && !Number.isSafeInteger(numeric))) { setMessage(`Enter a valid ${field.label}.`); return; }
+        details[field.key] = numeric;
+      } else details[field.key] = value;
+    }
     if (!current) {
       if (Date.parse(activeQuote.expiresAt) <= Date.now()) { setMessage("This quote expired. Get a new quote."); setQuote(null); return; }
       current = { quote: activeQuote, requestId: crypto.randomUUID() };
@@ -56,7 +66,8 @@ export function TopupPurchase({ userId, offers }: { userId: string; offers: Offe
     {ready && !attempt && !order && offers.length === 0 ? <p role="status">No verified top-ups are available to order right now.</p> : null}
     {ready && !attempt && !order && offers.length > 0 ? <>
       <label htmlFor="topup-product" className="block text-meta font-semibold">Product and account region</label>
-      <select id="topup-product" value={selected} onChange={(event) => { const item = offers.find((entry) => entry.id === event.target.value); setSelected(event.target.value); setQuantity(String(item?.min ?? 1)); setQuote(null); setNote({}); }} className="w-full rounded-xl border border-line px-3 py-2">{offers.map((item) => <option key={item.id} value={item.id}>{item.name} — {item.region}</option>)}</select>
+      {initialProduct !== undefined && !selected && <p role="status" className="text-meta text-ink-2">That product is no longer available. Select another product to continue.</p>}
+      <select id="topup-product" value={selected} onChange={(event) => { const item = offers.find((entry) => entry.id === event.target.value); setSelected(event.target.value); setQuantity(String(item?.min ?? 1)); setQuote(null); setNote({}); }} className="w-full rounded-xl border border-line px-3 py-2"><option value="" disabled>Choose a product</option>{offers.map((item) => <option key={item.id} value={item.id}>{item.name} — {item.region}</option>)}</select>
       <label htmlFor="topup-quantity" className="block text-meta font-semibold">Quantity</label>
       <input id="topup-quantity" type="number" min={offer?.min ?? 1} max={offer?.max ?? 1} step="1" value={quantity} onChange={(event) => { setQuantity(event.target.value); setQuote(null); }} className="w-full rounded-xl border border-line px-3 py-2" />
       <button type="button" disabled={busy || !selected} onClick={() => void getQuote()} className="rounded-xl bg-lav-700 px-4 py-3 font-semibold text-white disabled:opacity-50">Get current price</button>
@@ -64,8 +75,9 @@ export function TopupPurchase({ userId, offers }: { userId: string; offers: Offe
     {ready && !order && shown ? <div className="space-y-3 border-t border-line pt-4">
       <p className="font-semibold">{shown.name} · {shown.region} · {shown.quantity} unit(s) · ₦{shown.amount.toLocaleString("en-NG")}</p>
       <p className="text-meta text-ink-2"><strong>Restrictions:</strong> {shown.terms}</p>
+      {shown.deliveryType === "login_topup" && <p className="text-meta text-ink-2">This service signs in to the account identified below. You may be asked for an account confirmation code on your order page. Never provide your password here.</p>}
       {attempt ? <p className="text-meta text-ink-2">Re-enter exactly the same recipient details to recover this purchase. Do not order again while its outcome is unknown.</p> : <p className="text-meta text-ink-2">Quote expires {new Date(shown.expiresAt).toLocaleTimeString()}. Payment comes from your wallet; verify the recipient before paying.</p>}
-      {shown.fields.map((field) => <div key={field.key}><label htmlFor={`topup-${field.key}`} className="block text-meta font-semibold">{field.label}</label><input id={`topup-${field.key}`} value={note[field.key] ?? ""} maxLength={128} autoComplete="off" onChange={(event) => setNote({ ...note, [field.key]: event.target.value })} className="w-full rounded-xl border border-line px-3 py-2" /></div>)}
+      {shown.fields.map((field) => <div key={field.key}><label htmlFor={`topup-${field.key}`} className="block text-meta font-semibold">{field.label}</label>{field.type === "select" ? <select id={`topup-${field.key}`} value={note[field.key] ?? ""} onChange={(event) => setNote({ ...note, [field.key]: event.target.value })} className="w-full rounded-xl border border-line px-3 py-2"><option value="">Choose an option</option>{field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : <input id={`topup-${field.key}`} type={field.type === "email" ? "email" : "text"} inputMode={field.type === "integer" ? "numeric" : field.type === "number" ? "decimal" : undefined} value={note[field.key] ?? ""} maxLength={128} autoComplete="off" onChange={(event) => setNote({ ...note, [field.key]: event.target.value })} className="w-full rounded-xl border border-line px-3 py-2" />}</div>)}
       <p className="text-meta text-ink-2">Never enter a password or verification code. Recipient details are not saved in this browser.</p>
       <button type="button" disabled={busy} onClick={() => void submit(attempt ?? undefined)} className="rounded-xl bg-lav-700 px-4 py-3 font-semibold text-white disabled:opacity-50">{attempt ? "Recover purchase" : `Confirm and pay ₦${shown.amount.toLocaleString("en-NG")}`}</button>
       {attempt && <><p className="text-meta text-ink-2">If no order was created and the quote expired, check your orders before starting a new quote.</p><button type="button" disabled={busy} onClick={() => { localStorage.removeItem(storageKey); setAttempt(null); setQuote(null); setNote({}); setMessage(null); }} className="text-meta font-semibold text-lav-700 underline">I checked my orders; start a new quote</button></>}

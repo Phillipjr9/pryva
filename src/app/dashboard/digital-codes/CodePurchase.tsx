@@ -5,9 +5,10 @@ type Offer = { id: string; name: string; region: string };
 type Quote = { id: string; name: string; region: string; amount: number; expiresAt: string };
 type Attempt = { quote: Quote; requestId: string };
 type Order = { id: string; reference: string; status: string };
-export function CodePurchase({ userId, offers }: { userId: string; offers: Offer[] }) {
+export function CodePurchase({ userId, offers, initialProduct }: { userId: string; offers: Offer[]; initialProduct?: string }) {
   const storageKey = `pryva:code-attempt:${userId}`;
-  const [selected, setSelected] = useState(offers[0]?.id ?? "");
+  const initial = initialProduct === undefined ? offers[0] : offers.find((item) => item.id === initialProduct);
+  const [selected, setSelected] = useState(initial?.id ?? "");
   const [quote, setQuote] = useState<Quote | null>(null), [attempt, setAttempt] = useState<Attempt | null>(null), [order, setOrder] = useState<Order | null>(null);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [message, setMessage] = useState<string | null>(null);
   useEffect(() => {
@@ -47,7 +48,8 @@ export function CodePurchase({ userId, offers }: { userId: string; offers: Offer
     {ready && !attempt && !order && offers.length === 0 ? <p role="status">No verified products are available to order right now.</p> : null}
     {ready && !attempt && !order && offers.length > 0 ? <>
       <label htmlFor="code-product" className="block text-meta font-semibold">Product and redemption region</label>
-      <select id="code-product" value={selected} onChange={(event) => { setSelected(event.target.value); setQuote(null); }} className="w-full rounded-xl border border-line px-3 py-2">{offers.map((offer) => <option key={offer.id} value={offer.id}>{offer.name} — {offer.region}</option>)}</select>
+      {initialProduct !== undefined && !selected && <p role="status" className="text-meta text-ink-2">That product is no longer available. Select another product to continue.</p>}
+      <select id="code-product" value={selected} onChange={(event) => { setSelected(event.target.value); setQuote(null); }} className="w-full rounded-xl border border-line px-3 py-2"><option value="" disabled>Choose a product</option>{offers.map((offer) => <option key={offer.id} value={offer.id}>{offer.name} — {offer.region}</option>)}</select>
       <button type="button" disabled={busy || !selected} onClick={() => void getQuote()} className="rounded-xl bg-lav-700 px-4 py-3 font-semibold text-white disabled:opacity-50">Get current price</button>
       {quote && <div className="space-y-3 border-t border-line pt-4"><p className="font-semibold">{quote.name} · {quote.region} · ₦{quote.amount.toLocaleString("en-NG")}</p><p className="text-meta text-ink-2">One code. Confirm your account can redeem this region. Payment comes from your wallet; price and availability are rechecked.</p><p className="text-meta text-ink-3">Quote expires {new Date(quote.expiresAt).toLocaleTimeString()}.</p><button type="button" disabled={busy} onClick={() => void submit()} className="rounded-xl bg-lav-700 px-4 py-3 font-semibold text-white disabled:opacity-50">Confirm and pay ₦{quote.amount.toLocaleString("en-NG")}</button></div>}
     </> : null}

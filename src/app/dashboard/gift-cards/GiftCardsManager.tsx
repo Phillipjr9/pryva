@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { formatNaira } from "@/lib/services/catalog";
 import { Gift, Copy, Check, ShoppingCart, Shield } from "@/components/icons";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
 import { fireConfetti } from "@/components/ui/Confetti";
 import { BrandIcon } from "@/components/BrandIcon";
@@ -13,6 +14,7 @@ import type { PublicUser } from "@/lib/identity/auth";
 
 interface GiftCardsManagerProps {
   user: PublicUser;
+  brandSalesEnabled: boolean;
 }
 
 type Tab = "brands" | "create" | "redeem" | "history";
@@ -24,7 +26,7 @@ const TAB_LABELS: Record<Tab, string> = {
   history: "History",
 };
 
-export function GiftCardsManager({ user }: GiftCardsManagerProps) {
+export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerProps) {
   const router = useRouter();
   const creating = useRef(false);
   const redeeming = useRef(false);
@@ -284,6 +286,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
         {/* Brand Gift Cards Tab */}
         {activeTab === "brands" && (
           <div className="space-y-8">
+            {!brandSalesEnabled && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-meta text-amber-900">Brand gift card purchases are currently unavailable. <Link href="/dashboard/orders" className="font-semibold underline">View previous orders</Link>. You can still send or redeem wallet credit.</p>}
             {/* Brand Selection Grid */}
             <div>
               <label className="block text-[0.86rem] font-semibold text-ink mb-3">
@@ -323,7 +326,7 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
                   </div>
                 </div>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-micro font-semibold text-emerald-800 border border-emerald-200/60">
-                  <Shield className="h-3.5 w-3.5 text-emerald-600" /> Instant Code Delivery
+                  <Shield className="h-3.5 w-3.5 text-emerald-600" /> {brandSalesEnabled ? "Digital code delivery" : "Currently unavailable"}
                 </span>
               </div>
 
@@ -430,11 +433,13 @@ export function GiftCardsManager({ user }: GiftCardsManagerProps) {
                   <button
                     type="button"
                     onClick={handleBrandOrder}
-                    disabled={brandOrderLoading || user.walletBalance < selectedDenom.priceNgn}
+                    disabled={!brandSalesEnabled || brandOrderLoading || user.walletBalance < selectedDenom.priceNgn}
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-lav-700 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                   >
                     <ShoppingCart className="h-5 w-5" />
-                    {brandOrderLoading
+                    {!brandSalesEnabled
+                      ? "Currently unavailable"
+                      : brandOrderLoading
                       ? "Purchasing voucher..."
                       : user.walletBalance < selectedDenom.priceNgn
                       ? "Insufficient balance in wallet"

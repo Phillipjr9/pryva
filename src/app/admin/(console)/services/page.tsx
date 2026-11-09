@@ -140,6 +140,8 @@ export default async function AdminServicesPage() {
         </div>
       </div>
 
+      <Link href="/admin/foxreload" className="inline-block rounded-xl border border-line bg-white px-4 py-3 text-meta font-semibold text-lav-700 underline">Check FoxReload account and sales settings →</Link>
+
       <div className="space-y-3">
         {lanes.map((lane) => {
           const style = VERDICT_STYLES[lane.verdict];

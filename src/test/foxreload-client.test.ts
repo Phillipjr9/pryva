@@ -3,7 +3,10 @@ import {
   foxreloadApiKey,
   isFoxreloadConfigured,
   getFoxreloadAccount,
+  probeFoxreloadAccount,
   readFoxreloadBrowsePage,
+  readFoxreloadBrowseCategories,
+  findFoxreloadOrderId,
   readFoxreloadProductContract,
   createFoxreloadContractOrder,
   submitFoxreloadClientCode,
@@ -33,6 +36,25 @@ describe("FoxReload client", () => {
     vi.restoreAllMocks();
   });
 
+  it("checks authentication and balance availability without exposing account details or amounts", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ isActive: true, email: "private@example.test", referralCode: "private" })));
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify([{ currency: "usd", available: "1.0000", reserved: "0", pending: "0" }, { currency: "rub", available: "0.000", reserved: "0", pending: "0" }])));
+    expect(await probeFoxreloadAccount()).toEqual({ active: true, funds: { usd: "positive", rub: "zero" } });
+    expect(fetchMock.mock.calls.map(([url, init]) => [new URL(String(url)).pathname, init?.method])).toEqual([["/api/access/me", "GET"], ["/api/access/me/balances/", "GET"]]);
+    expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({ "X-API-Key": "fox_test_secret_key_12345" });
+  });
+  it("rejects malformed profile and balance responses rather than claiming success", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    fetchMock.mockResolvedValueOnce(new Response("{}"));
+    await expect(probeFoxreloadAccount()).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+    for (const balances of [[{ currency: "usd", available: "garbage" }], [{ currency: "usd", available: "1" }, { currency: "usd", available: "2" }], {}]) {
+      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ isActive: true })));
+      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(balances)));
+      await expect(probeFoxreloadAccount()).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+    }
+  });
+
   it("walks the documented catalogue with an opaque cursor and no inferred fields", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(JSON.stringify({ items: [{ id: "a", name: "Game", price: null }], nextCursor: "a+b/=" }), { status: 200 }))
@@ -48,6 +70,20 @@ describe("FoxReload client", () => {
     expect(new URL(String(fetchMock.mock.calls[1][0])).searchParams.get("cursor")).toBe("a+b/=");
   });
 
+  it("only returns a unique exact-idempotency-key lookup and never creates an order", async () => {
+    const key = "11111111-1111-4111-8111-111111111111", id = "22222222-2222-4222-8222-222222222222";
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ items: [{ id, idempotencyKey: key }], total: 1, offset: 0, limit: 2 })));
+    expect(await findFoxreloadOrderId(key)).toBe(id);
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.pathname).toBe("/api/orders/"); expect(url.searchParams.get("idempotencyKey")).toBe(key); expect(fetchMock.mock.calls[0][1]?.method).toBe("GET");
+    for (const body of [{ items: [], total: 0, offset: 0 }, { items: [{ id, idempotencyKey: "other" }], total: 1, offset: 0 }, { items: [{ id, idempotencyKey: key }], total: 2, offset: 0 }, { items: [{ id: "bad", idempotencyKey: key }], total: 1, offset: 0 }]) {
+      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(body)));
+      expect(await findFoxreloadOrderId(key)).toBeNull();
+    }
+    await expect(findFoxreloadOrderId("not-a-uuid")).rejects.toMatchObject({ code: "INVALID_ORDER" });
+  });
+
   it("uses the search endpoint and reports a potentially truncated result", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify(Array.from({ length: 50 }, (_, i) => ({ id: String(i), name: "Game" }))), { status: 200 }));
     const result = await readFoxreloadBrowsePage({ query: "Game" });
@@ -55,6 +91,20 @@ describe("FoxReload client", () => {
     const url = new URL(String(fetchMock.mock.calls[0][0]));
     expect(url.pathname).toBe("/api/products/search");
     expect(url.searchParams.get("query")).toBe("Game");
+  });
+
+  it("browses categories and forwards the category to both search and pagination", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ items: [{ slug: "esim", name: "eSIM" }] })));
+    expect(await readFoxreloadBrowseCategories()).toEqual([{ slug: "esim", name: "eSIM" }]);
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ items: [], nextCursor: null })));
+    await readFoxreloadBrowsePage({ category: "esim", cursor: "next" });
+    expect(new URL(String(fetchMock.mock.calls[1][0])).searchParams.get("categoryId")).toBe("esim");
+    fetchMock.mockResolvedValueOnce(new Response("[]"));
+    await readFoxreloadBrowsePage({ category: "esim", query: "United States" });
+    expect(new URL(String(fetchMock.mock.calls[2][0])).searchParams.get("categoryId")).toBe("esim");
+    fetchMock.mockResolvedValueOnce(new Response("[]"));
+    await expect(readFoxreloadBrowseCategories()).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
   });
 
   it("fails closed on malformed pages, excessive pages and a repeated cursor", async () => {

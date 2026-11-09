@@ -533,7 +533,7 @@ export function ServiceExplorer({
           <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">{selectedCategory?.label ?? "Your service hub"}</h1>
           <p className="mt-1.5 max-w-2xl text-[0.82rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Pick a country once, then browse the matched services.` : "Pick a country once and browse categories without redoing the choice every time."}</p>
         </div>
-        <Link href="/dashboard/digital-catalog" className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline">Explore digital catalogue</Link>
+        <Link href="/dashboard/digital-catalog" className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-lav-200 bg-white px-4 text-meta font-semibold text-lav-700 hover:underline">Shop digital products <ArrowRight className="h-3.5 w-3.5" /></Link>
         <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline">My orders <ArrowRight className="h-3.5 w-3.5" /></Link>
       </div>
 

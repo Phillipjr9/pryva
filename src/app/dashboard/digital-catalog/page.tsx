@@ -1,11 +1,23 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/identity/auth";
 import { DigitalCatalogBrowser } from "./DigitalCatalogBrowser";
+import { AvailableDigitalProducts } from "./AvailableDigitalProducts";
+import { listedCodeOffers } from "@/lib/services/foxreload/code-orders";
+import { listedTopupOffers } from "@/lib/services/foxreload/topup-orders";
+import { listedEsimOffers } from "@/lib/services/foxreload/esim-orders";
+import { starsSalesConfigured } from "@/lib/services/foxreload/stars-orders";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 
 export const dynamic = "force-dynamic";
 
 export default async function DigitalCatalogPage() {
   await requireUser("/dashboard/digital-catalog");
+  const canSell = !financialActionsUnavailable();
+  const offers = canSell ? [
+    ...listedCodeOffers().map(({ id, name, region }) => ({ id, name, region, kind: "codes" as const })),
+    ...listedTopupOffers().map(({ id, name, region }) => ({ id, name, region, kind: "topups" as const })),
+    ...listedEsimOffers().map(({ id, name, region }) => ({ id, name, region, kind: "esims" as const })),
+  ] : [];
   return (
     <div className="grid gap-5">
       <Link href="/dashboard/services" className="w-fit text-meta font-semibold text-lav-700 underline">← Service hub</Link>
@@ -14,11 +26,10 @@ export default async function DigitalCatalogPage() {
         <p className="mt-2 text-[0.9rem] text-ink-2">Browse or search the digital catalogue, including subscriptions, gaming products, telecom and more.</p>
       </div>
       <div role="note" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-meta text-amber-900">
-        These are listings for comparison only. Prices, coverage, delivery and ordering are not confirmed; no purchase can be made here.
+        Catalogue listings do not confirm price, coverage or availability. Only reviewed products link to a separate quote before payment.
       </div>
-      <Link href="/dashboard/telegram-stars" className="w-fit rounded-xl border border-line bg-white px-4 py-3 font-semibold text-lav-700 hover:underline">Get a Telegram Stars quote →</Link>
-      <Link href="/dashboard/digital-codes" className="w-fit rounded-xl border border-line bg-white px-4 py-3 font-semibold text-lav-700 hover:underline">Browse available digital codes and game keys →</Link>
-      <Link href="/dashboard/digital-topups" className="w-fit rounded-xl border border-line bg-white px-4 py-3 font-semibold text-lav-700 hover:underline">Browse available account top-ups →</Link>
+      <AvailableDigitalProducts offers={offers} starsEnabled={canSell && starsSalesConfigured()} />
+      <h2 className="text-xl font-semibold text-ink">Explore the full catalogue</h2>
       <DigitalCatalogBrowser />
     </div>
   );
