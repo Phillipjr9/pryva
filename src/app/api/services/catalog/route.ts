@@ -68,18 +68,27 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const limit = await catalogRateLimiter(`supplier-catalog:${user.id}`);
-  if (limit.unavailable) {
+  // A combined request costs one read from every feed. Scope the same 30/min
+  // budget per feed so the four independent calls do not quadruple a normal
+  // browsing session's rate-limit usage or increase per-feed upstream load.
+  const feed = request.nextUrl.searchParams.get("feed");
+  const validFeeds = ["numbers", "social", "esim", "verification"];
+  if (feed !== null && !validFeeds.includes(feed)) return NextResponse.json({ error: "Invalid catalogue feed" }, { status: 400 });
+  const limits = await Promise.all((feed ? [feed] : validFeeds).map((name) => catalogRateLimiter(`supplier-catalog:${user.id}:${name}`)));
+  if (limits.some((limit) => limit.unavailable)) {
     return NextResponse.json({ error: "Catalog temporarily unavailable", reason: "unavailable" }, { status: 503 });
   }
-  if (!limit.allowed) return NextResponse.json({ error: "Please try again shortly", reason: "throttled" }, { status: 429 });
+  if (limits.some((limit) => !limit.allowed)) return NextResponse.json({ error: "Please try again shortly", reason: "throttled" }, { status: 429 });
 
   const refresh = request.nextUrl.searchParams.get("refresh") === "1";
+  // The optional public category lets the explorer load independent feeds
+  // separately. Keep the original combined response for existing callers.
+  const include = (name: string) => feed === null || feed === name;
   const [supplier, boost, esim, otp] = await Promise.all([
-    attempt(isFleexaConfigured(), () => readSupplierSnapshot(refresh)),
-    attempt(isSmmPanelConfigured(), () => readBoostSnapshot(refresh)),
-    attempt(isBitcallConfigured(), () => readEsimCatalog(refresh)),
-    attempt(isBitcallConfigured(), async () => {
+    attempt(include("numbers") && isFleexaConfigured(), () => readSupplierSnapshot(refresh)),
+    attempt(include("social") && isSmmPanelConfigured(), () => readBoostSnapshot(refresh)),
+    attempt(include("esim") && isBitcallConfigured(), () => readEsimCatalog(refresh)),
+    attempt(include("verification") && isBitcallConfigured(), async () => {
       const read = await readOtpOffersForSupplier("bitcall", country.code, country.name, refresh);
       if (read.errorCode) throw otpCatalogProviderError(read.errorCode);
       return { offers: read.offers, partial: read.stale, degraded: read.stale ? "outage" as const : null, fetchedAt: read.stale ? null : new Date().toISOString() };

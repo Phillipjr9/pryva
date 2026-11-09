@@ -69,6 +69,31 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("supplier catalog endpoint", () => {
+  it("loads only the requested feed and rejects unknown feeds", async () => {
+    state.fleexaConfigured = true; state.boostConfigured = true; state.bitcallConfigured = true;
+    // A hung unrelated feed must not block the requested feed or be invoked.
+    state.otpRead.mockImplementation(() => new Promise(() => {}));
+    const response = await GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&feed=social"));
+    expect(await response.json()).toMatchObject({ live: true, partial: false, items: [BOOST] });
+    expect(state.limit).toHaveBeenCalledTimes(1);
+    expect(state.limit).toHaveBeenCalledWith("supplier-catalog:buyer:social");
+    expect(state.boostSnapshot).toHaveBeenCalledOnce();
+    expect(state.snapshot).not.toHaveBeenCalled();
+    expect(state.esimSnapshot).not.toHaveBeenCalled();
+    expect(state.otpRead).not.toHaveBeenCalled();
+    expect((await GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&feed=unknown"))).status).toBe(400);
+  });
+
+  it("charges a combined request against all feed budgets and fails closed if any is exhausted", async () => {
+    state.limit.mockImplementation(async (key: string) => ({ allowed: !key.endsWith(":verification") }));
+    expect((await GET(request())).status).toBe(429);
+    expect(state.limit.mock.calls.map(([key]) => key).sort()).toEqual([
+      "supplier-catalog:buyer:esim", "supplier-catalog:buyer:numbers", "supplier-catalog:buyer:social", "supplier-catalog:buyer:verification",
+    ]);
+    expect(state.snapshot).not.toHaveBeenCalled();
+    expect(state.otpRead).not.toHaveBeenCalled();
+  });
+
   it("does not query live catalogues from a Vercel preview with a persistent database", async () => {
     vi.stubEnv("DATABASE_URL", "postgres://mock.invalid/db");
     vi.stubEnv("VERCEL_ENV", "preview");
@@ -97,15 +122,16 @@ describe("supplier catalog endpoint", () => {
 
   it("validates country, fails closed on the limiter and keeps the result sanitized", async () => {
     expect((await GET(request("not-real"))).status).toBe(400);
-    state.limit.mockResolvedValueOnce({ allowed: false, unavailable: true }).mockResolvedValueOnce({ allowed: false });
+    state.limit.mockResolvedValueOnce({ allowed: false, unavailable: true });
     const down = await GET(request());
     expect(down.status).toBe(503);
     expect(await down.json()).toMatchObject({ reason: "unavailable" });
+    state.limit.mockResolvedValueOnce({ allowed: false });
     const throttled = await GET(request());
     expect(throttled.status).toBe(429);
     // The hub shows different copy for a throttle than for an outage.
     expect(await throttled.json()).toMatchObject({ reason: "throttled" });
-    expect(state.limit).toHaveBeenCalledWith("supplier-catalog:buyer");
+    expect(state.limit).toHaveBeenCalledWith("supplier-catalog:buyer:numbers");
     const response = await GET(request());
     const body = await response.text();
     expect(response.status).toBe(200);

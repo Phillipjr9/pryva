@@ -1,12 +1,65 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
 
 beforeEach(() => { window.localStorage.clear(); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.localStorage.clear(); });
 
 describe("service explorer live listings", () => {
+  it("renders a fast feed while another is pending, then reuses it when switching categories", async () => {
+    let finishOtp!: (response: unknown) => void;
+    const pending = new Promise((resolve) => { finishOtp = resolve; });
+    const fetchMock = vi.fn((url: string) => {
+      const feed = new URL(url, "https://pryva.test").searchParams.get("feed");
+      if (feed === "verification") return pending;
+      const items = feed === "social" ? [{
+        id: "live-boost-fast", category: "social", name: "Fast Instagram boost", description: "Followers boost", tag: "Followers",
+        artwork: { kind: "brand", name: "instagram" }, source: "live", coverage: "not-country-specific", stock: null, myUnits: null, price: 1600, action: null,
+      }] : [];
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true, country: "us", live: true, partial: false, items }) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="us" initialCategory={null} />);
+    expect(await screen.findByRole("heading", { name: "Fast Instagram boost" })).toBeTruthy();
+    expect(screen.getByText(/Live listings are still loading/)).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    await act(async () => { finishOtp({ ok: true, json: async () => ({ ok: true, country: "us", live: true, items: [] }) }); });
+    expect(await screen.findByText(/Live listings are current/)).toBeTruthy();
+    const social = screen.getAllByRole("button", { name: /Social promotion/i }).find((button) => button.hasAttribute("aria-pressed"));
+    expect(social).toBeTruthy();
+    fireEvent.click(social!);
+    expect(await screen.findByRole("heading", { name: "Fast Instagram boost" })).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("keeps successful listings visible and reports a failed feed", async () => {
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      const feed = new URL(url, "https://pryva.test").searchParams.get("feed");
+      if (feed === "verification") return Promise.resolve({ ok: false, status: 503, json: async () => ({}) });
+      const items = feed === "social" ? [{ id: "fast", category: "social", name: "Available boost", description: "Boost", tag: "Followers", artwork: { kind: "brand", name: "instagram" }, source: "live", coverage: "not-country-specific", stock: null, myUnits: null, price: null, action: null }] : [];
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true, country: "us", live: true, items }) });
+    }));
+    render(<ServiceExplorer initialCountry="us" initialCategory={null} />);
+    expect(await screen.findByRole("heading", { name: "Available boost" })).toBeTruthy();
+    expect(await screen.findByText(/Some live listings could not be loaded/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+    expect(screen.getByText(/Live listings may be incomplete or out of date/)).toBeTruthy();
+  });
+
+  it("ignores a response for the previous country even if fetch does not honor abort", async () => {
+    let finishOld!: (response: unknown) => void;
+    const pending = new Promise((resolve) => { finishOld = resolve; });
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (url.includes("country=us")) return pending;
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true, country: "ng", live: true, items: [] }) });
+    }));
+    render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
+    fireEvent.change(screen.getByRole("combobox", { name: "Country of service" }), { target: { value: "ng" } });
+    await act(async () => { finishOld({ ok: true, json: async () => ({ ok: true, country: "us", live: true, items: [{ id: "old", name: "Old country item", category: "verification" }] }) }); });
+    expect(screen.queryByRole("heading", { name: "Old country item" })).toBeNull();
+  });
+
   it("uses the saved default country and labels stock, indicative price and paused ordering", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
       ok: true, country: "us", partial: false, fetchedAt: "2026-01-01T12:34:56.000Z", items: [{
@@ -93,7 +146,7 @@ describe("service explorer live listings", () => {
     expect(await screen.findByRole("heading", { name: /Explore App verification/i })).toBeTruthy();
     expect(screen.queryByText(/couldn&apos;t be loaded/)).toBeNull();
     expect(screen.queryByText(/couldn't be loaded/)).toBeNull();
-    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(await screen.findByRole("button", { name: "Retry" })).toBeTruthy();
   });
 
   it("says we are restocking when the balance is the reason, and drops the retry", async () => {
