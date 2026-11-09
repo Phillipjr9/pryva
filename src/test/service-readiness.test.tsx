@@ -16,6 +16,7 @@ vi.mock("@/lib/services/accounts/marketplace-policy", () => ({ isMarketplaceChec
 vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => config.preview }));
 
 const { readServiceReadiness } = await import("@/lib/services/service-readiness");
+const { serviceConfigured, laneConfigured } = await import("@/lib/services/service-config");
 
 afterEach(() => {
   cleanup();
@@ -65,6 +66,18 @@ describe("service readiness", () => {
     config.bitcall = true;
     const live = readServiceReadiness().find((entry) => entry.id === "numbers")!;
     expect(live.state).toBe("buy");
+  });
+
+  it("does not mark disabled data, subscriptions, or proxies ready just because a key exists", () => {
+    config.preview = false;
+    config.fleexa = true;
+    const states = new Map(readServiceReadiness().map((entry) => [entry.id, entry]));
+    for (const id of ["proxies", "data", "subscriptions"] as const) {
+      expect(states.get(id)?.state).toBe("paused");
+      expect(states.get(id)?.detail).not.toMatch(/can be bought/i);
+      expect(serviceConfigured(id)).toBe(false);
+      expect(laneConfigured(id)).toBe(false);
+    }
   });
 
   it("does not advertise purchases or inboxes from a Vercel preview with live configuration", () => {
@@ -124,6 +137,15 @@ describe("the hub's arrangement", () => {
     const link = screen.getByRole("link", { name: "Ask about it" });
     expect(link.getAttribute("href")).toContain("/dashboard/support#ask=");
     expect(decodeURIComponent(link.getAttribute("href")!)).toContain("Mobile data");
+  });
+
+  it.each([
+    ["data", "View data service status", "/dashboard/data"],
+    ["subscriptions", "View subscription service status", "/dashboard/digital"],
+  ] as const)("explains the empty %s category without inventing listings", (category, label, href) => {
+    render(<ServiceExplorer initialCountry="ng" initialCategory={category} />);
+    expect(screen.getByText(/No plans or prices are available to order/i)).toBeTruthy();
+    expect(screen.getByRole("link", { name: label }).getAttribute("href")).toBe(href);
   });
 
   it("does not offer the request path for a category that can be bought", () => {

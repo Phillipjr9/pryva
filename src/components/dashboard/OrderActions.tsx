@@ -13,6 +13,8 @@ type Props = {
   referenceCode: string | null;
   otpCode: string | null;
   service: string;
+  /** Server-computed plan eligibility; the server still verifies the final status and debit. */
+  singleNumberRefundCandidate?: boolean;
   /** Server-computed: this order's code can be re-read while the window is open. */
   refreshableCode?: boolean;
   /** Server-computed: this order's supplier can send the code to the number again. */
@@ -26,8 +28,8 @@ type Props = {
  * decides whether to offer the button, then surfaces whatever the server says.
  * Duplicating the window here would let the two disagree.
  */
-function isSelfRefundCandidate(active: boolean, service: string, otpCode: string | null): boolean {
-  return active && service === "numbers" && !otpCode;
+function isSelfRefundCandidate(status: string, eligiblePlan: boolean, otpCode: string | null): boolean {
+  return (status === "active" || status === "expired") && eligiblePlan && !otpCode;
 }
 
 function timeLeft(target: string | null, now: number): string | null {
@@ -47,6 +49,7 @@ export function OrderActions({
   referenceCode,
   otpCode,
   service,
+  singleNumberRefundCandidate = false,
   refreshableCode = false,
   canResendCode = false,
   initialNow,
@@ -286,11 +289,11 @@ export function OrderActions({
             <Check className="h-4 w-4 text-emerald-600" />
             {formatNaira(amount)} was returned to your wallet. It&apos;s already spendable.
           </p>
-        ) : isSelfRefundCandidate(active, service, otpCode) ? (
+        ) : isSelfRefundCandidate(settledStatus, singleNumberRefundCandidate, liveOtp) ? (
           <div className="mt-2">
             <p className="text-[0.82rem] leading-relaxed text-ink-2">
-              No code arrived for this number? Once its delivery window has passed you can refund it
-              yourself — {formatNaira(amount)} goes straight back to your wallet.
+              No code arrived? After the delivery window, you can request a refund. We must confirm
+              the final delivery status and matching payment before {formatNaira(amount)} can be returned to your wallet.
             </p>
             <button
               type="button"
@@ -307,7 +310,7 @@ export function OrderActions({
         ) : active || settledStatus === "review" || settledStatus === "processing" ? (
           <p className="mt-2 flex items-center gap-2 text-[0.82rem] text-ink-2">
             <Shield className="h-4 w-4 text-lav-700" />
-            Your order is active and being monitored. If it stalls, the support assistant can review it with your order reference.
+            {active ? "Your order is active. If it stalls, contact support with your order reference." : "This order is not complete yet. Check its status and contact support with your order reference before trying again."}
           </p>
         ) : (
           <p className="mt-2 flex items-center gap-2 text-[0.82rem] text-ink-2">

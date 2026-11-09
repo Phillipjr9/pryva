@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
     // An unpriced catalogue is usually one missing number, not a broken panel, so
     // say which one before saying nothing is listed.
     if (currency === "USD" && fxRate === null) {
-      return "The supplier bills in USD and SMM_USD_NGN_RATE is not set, so no price can be computed. Nothing is listed rather than sold at a guessed exchange rate.";
+      return "The supplier bills in USD and SMM_USD_NGN_RATE is not set, so no price can be computed. Affected services are shown without a purchase action rather than sold at a guessed exchange rate.";
     }
     if (selection.listed === 0) {
       return "The supplier answered, but none of its services is a social boost Pryva lists. Check that this is the catalogue you expect.";

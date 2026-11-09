@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { requireUser } from "@/lib/identity/auth";
 import { db } from "@/db";
-import { orders } from "@/db/schema";
+import { foxreloadQuotes, orders } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -10,9 +10,14 @@ import { CountryFlag } from "@/components/CountryFlag";
 import { formatNaira } from "@/lib/services/catalog";
 import Link from "next/link";
 import { ArrowLeft } from "@/components/icons";
+import { TopupOrderSync } from "./TopupOrderSync";
+import { CodeOrderSync } from "./CodeOrderSync";
+import { StarsOrderSync } from "./StarsOrderSync";
+import { FOXRELOAD_PROVIDER } from "@/lib/services/order-providers";
 import { CredentialList } from "./CredentialList";
 import { EsimProfile } from "./EsimProfile";
 import { OrderActions } from "@/components/dashboard/OrderActions";
+import { isUndeliveredSingleNumber } from "@/lib/services/refund-policy";
 import { pollsForCode } from "@/lib/services/order-providers";
 import { canResendNumberCode } from "@/lib/services/numbers/otp-resend";
 import { syncBoostOrderStatus, type BoostSyncResult } from "@/lib/services/boosts/boost-status";
@@ -69,6 +74,12 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
     // already offers a way back to the dashboard.
     notFound();
   }
+
+  // Show the exact buyer-visible conditions accepted at checkout, not whatever
+  // an operator happens to configure after the order was placed.
+  const topupTerms = order.provider === FOXRELOAD_PROVIDER && order.service === "subscriptions" && order.productSlug === "direct-topup"
+    ? (await db.select({ terms: foxreloadQuotes.customerTerms }).from(foxreloadQuotes).where(and(eq(foxreloadQuotes.orderId, order.id), eq(foxreloadQuotes.userId, user.id))).limit(1))[0]?.terms ?? null
+    : null;
 
   // Ask the delivery side how far this order has got, for boosts only. Best
   // effort: an unreachable panel leaves the stored status in place rather than
@@ -204,6 +215,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                     </div>
                   )}
                 </div>
+                {topupTerms && <div className="rounded-xl border border-line bg-cream/60 p-3"><p className="text-meta font-semibold text-ink">Purchase restrictions</p><p className="mt-1 whitespace-pre-wrap text-meta text-ink-2">{topupTerms}</p></div>}
                 <p className="mt-3 text-meta">
                   {/* The order page is a live screen; a receipt is a document. */}
                   <Link href={`/dashboard/orders/${order.id}/receipt`} className="font-semibold text-lav-700 hover:underline">
@@ -252,6 +264,9 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                     {getOrderProgressMessage(status)}
                   </p>
                   {progress && <p className="mt-2 text-[0.88rem] font-medium text-ink">{progress}</p>}
+                  {order.provider === FOXRELOAD_PROVIDER && order.service === "subscriptions" && order.productSlug === "telegram-stars" && <StarsOrderSync orderId={order.id} />}
+                  {order.provider === FOXRELOAD_PROVIDER && order.service === "gift-cards" && order.productSlug === "digital-code" && <CodeOrderSync orderId={order.id} />}
+                  {order.provider === FOXRELOAD_PROVIDER && order.service === "subscriptions" && order.productSlug === "direct-topup" && <TopupOrderSync orderId={order.id} />}
                 </CardContent>
               </Card>
             )}
@@ -268,6 +283,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
               referenceCode={order.referenceCode ?? null}
               otpCode={order.otpCode ?? null}
               service={order.service}
+              singleNumberRefundCandidate={isUndeliveredSingleNumber(order)}
               refreshableCode={pollsForCode(order)}
               // Decided on the server: the browser gets a boolean, never a name.
               canResendCode={canResendNumberCode(order)}

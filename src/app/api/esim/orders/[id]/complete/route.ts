@@ -71,7 +71,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       delivered: false,
       message:
         result.kind === "unpaid"
-          ? "The profile is ready, but your wallet balance no longer covers it. Top up and check again — nothing was charged."
+          ? "The profile is ready, but your wallet balance no longer covers it. Contact support with your order reference; nothing was charged."
           : "This profile could not be delivered. Nothing was charged; support has been given the record.",
     },
     { status: 409 },

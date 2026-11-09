@@ -387,6 +387,24 @@ export const orders = pgTable(
   ],
 );
 
+/** Short-lived immutable retail quote; one quote can fund at most one order. */
+export const foxreloadQuotes = pgTable("foxreload_quotes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  productId: varchar("product_id", { length: 64 }).notNull(),
+  productName: varchar("product_name", { length: 160 }).notNull(),
+  quantity: integer("quantity").notNull(),
+  wholesaleTotal: varchar("wholesale_total", { length: 32 }).notNull(),
+  /** Immutable buyer-visible terms of a consumed quote, if applicable. */
+  customerTerms: varchar("customer_terms", { length: 500 }),
+  currency: varchar("currency", { length: 3 }).notNull(),
+  amount: integer("amount").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  orderId: uuid("order_id").references(() => orders.id),
+  lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("foxreload_quotes_expiry_idx").on(table.expiresAt)]);
+
 /**
  * Which `wallet_transactions.type` values move the balance which way.
  *

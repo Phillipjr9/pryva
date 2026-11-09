@@ -267,3 +267,98 @@ wallet credit and administrator audit entry commit together. It cannot settle a
 unit whose provider call started or whose outcome is ambiguous; check supplier
 records and use the separate confirmed-reconciliation process for those. Once
 all units are terminal, replaying the original batch closes it without spending.
+
+Telegram Stars (FoxReload): the new path is disabled by default and is not a
+blanket enablement of other FoxReload products. Before enabling, apply migration
+0041, configure FOXRELOAD_API_KEY and a current FOXRELOAD_USD_NGN_RATE (no
+fallback; digital retail markup is 40%), verify the current account-specific
+product and contract with the supplier, and verify a mock or otherwise approved
+test. Then explicitly set FOXRELOAD_STARS_ENABLED=true. Do not put supplier keys
+in client code. Preview and ephemeral databases refuse purchases. The supplier
+must be funded for live fulfillment. Provider create/pay timeouts or unexpected
+responses are held for reconciliation, not automatically retried or refunded.
+Review the reconciliation queue and provider evidence before taking action;
+never treat a missing response as proof of no supplier spend. An interrupted
+processing claim may need manual investigation and has no automatic rollback.
+The nightly job checks a bounded, rotating set of Stars orders; the order page
+also offers a status check. Unconsumed expired quotes are pruned by the nightly
+job; consumed quotes are retained as order evidence.
+
+FOXRELOAD DIGITAL CODE CHECKOUT — LOCAL ONLY / NOT READY TO ENABLE
+The digital-code slice is disabled by default with FOXRELOAD_CODES_ENABLED=false.
+It supports exactly one verified non-financial, no-note code per order, from an
+explicit operator-reviewed FOXRELOAD_CODE_OFFERS JSON array. Each entry must be
+{id, name, region, countryCode, marketRegion}, where id is the exact FoxReload product ID, name is the exact
+English product name returned to the configured account, and region describes its
+actual redemption restriction. countryCode and marketRegion must match the exact
+supplier attributes country_code and region, or be null when absent. A changed
+attribute invalidates the quote before debit. Example shape only (not a real offer):
+[{"id":"product_0123456789abcdefghijklmnop","name":"Example US game key","region":"United States","countryCode":"US","marketRegion":null}]
+Do not copy the example as inventory. Before approving any actual SKU, verify
+account access, currency, supplier price, stock, product type, redemption terms,
+regional restrictions, consumer compliance, and how the exact data is delivered.
+Never approve financial/card/crypto products here. The code path is not a banking
+card program and does not implement card ownership or credentials. Empty or
+malformed configuration allows no new products. Region and name changes
+invalidate existing unused quotes.
+
+A verified, current FOXRELOAD_USD_NGN_RATE is required; quotes use a 40% markup
+and expire in two minutes. This manually configured rate has no freshness alarm.
+Migration 0041 must be applied. Account-specific mock order/response behavior,
+provider idempotency, every approved SKU and the release procedure still require
+verification. A provider order is created and paid only after a wallet debit;
+ambiguous outcomes remain in review, are never automatically retried/refunded,
+and need supplier evidence. Interrupted processing requires audited operator
+reconciliation. The nightly sweep only reads provider status and only marks an
+order delivered for a consistent completed, non-mock single-code response.
+Multiple pieces, missing data, unrecognized status and returned errors remain in
+review; customers should not buy again while an outcome is unresolved. Codes are
+bearer secrets: they are stored for the owner's order page, not sent in purchase
+API responses. Do not put supplier data, API keys or codes in logs/tickets.
+
+The eight legacy brand gift-card routes remain separate and are not repaired by
+this slice. This work does not implement general direct/login top-ups, eSIM,
+card issuance/top-ups, all catalogue SKUs, automatic exchange-rate refresh, or
+production deployment. Obtain approval before live paid supplier orders.
+
+FOXRELOAD DIRECT TOP-UPS — LOCAL ONLY / NOT READY TO ENABLE
+The direct-top-up slice is disabled with FOXRELOAD_TOPUPS_ENABLED=false and has
+an empty FOXRELOAD_TOPUP_OFFERS allowlist. It accepts only explicitly reviewed
+product IDs with an exact supplier name, country_code/region attributes, display
+region, specific restrictions in terms, min/max quantity and one to eight non-secret string identifier fields.
+The available field keys are username, login, account_id, user_id, userid, player_id,
+playerid, game_id, gameid, server, server_id, zone, zone_id, uid, email, phone,
+and phone_number. It refuses password, session, payment-card and unreviewed
+fields, login_topup, select/integer/other typed inputs and all banking products.
+There are no login-top-up or customer confirmation-code flows here.
+
+FOXRELOAD_TOPUP_OFFERS is a JSON array. Shape example only, NOT a real SKU:
+[{"id":"product_0123456789abcdefghijklmnop","name":"Example game top-up","region":"United States","terms":"Only for US accounts.","countryCode":"US","marketRegion":null,"min":1,"max":1,"fields":[{"key":"player_id","label":"Player ID"}]}]
+Verify the actual account's offer, allowed region, precise unit/quantity meaning,
+required recipient fields, validation/prechecks and delivery behavior before
+adding an item. Unknown/malformed fields, price/currency/stock, region or bounds
+fail closed. Never substitute fixed marketing prices for wholesale data.
+
+A stable random FOXRELOAD_INTENT_SECRET of at least 32 characters (generate with
+a cryptographically secure random generator) is mandatory. It protects the retry
+binding and permits recipient verification without storing recipient data in the
+order or browser recovery record. Do not rotate or remove it while any orders
+are unresolved: old intents cannot then be checked or replayed automatically and
+must be manually reconciled. The user must re-enter the same recipient details to
+recover a lost response; losing browser storage, switching devices or re-entering
+incorrect details limits recovery. Never log secrets or recipient details.
+
+The supplier may return note/status formats different from the examples. A
+mismatch on creation prevents payment; a mismatch while reading an order prevents
+delivery confirmation. In both cases a wallet debit may need evidence-based
+manual reconciliation. Interrupted processing remains unresolved; no automatic
+create/pay/refund retry is safe. New sales remain off until migration 0041,
+account-authenticated product/contract verification, mock/live behavior and
+operator reconciliation are verified. Recheck the USD/NGN rate; the configured
+rate has no staleness alarm. No supplier funds or live orders have been touched.
+
+For the direct-top-up slice, apply migration 0042 as well as 0041: it stores the
+exact buyer-visible restrictions with each quote/order. Include detailed
+country/account eligibility and exclusions in each offer's `terms`; a generic
+"global" label is not sufficient evidence of universal redemption. Operator
+review and account-specific verification remain mandatory before sales.

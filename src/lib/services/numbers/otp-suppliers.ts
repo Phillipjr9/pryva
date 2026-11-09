@@ -619,7 +619,7 @@ function errorCodeOf(error: unknown): string {
 }
 
 /** Buy one offer. Every call here spends real supplier balance. */
-export async function buyOtpNumber(offer: OtpOffer): Promise<BoughtNumber> {
+export async function buyOtpNumber(offer: OtpOffer, onAccepted?: (providerRequestId: string) => Promise<void>): Promise<BoughtNumber> {
   if (offer.supplier === "fleexa") {
     const order = await buyFleexaSmsNumber({
       // Pass the app when the catalogue named one: it is the difference between
@@ -627,6 +627,7 @@ export async function buyOtpNumber(offer: OtpOffer): Promise<BoughtNumber> {
       app: offer.app ?? undefined,
       country: offer.country,
     });
+    if (order.requestId) await onAccepted?.(order.requestId);
     return {
       supplier: "fleexa",
       providerCostNgn: order.priceNgn ?? offer.costNgn,
@@ -638,6 +639,8 @@ export async function buyOtpNumber(offer: OtpOffer): Promise<BoughtNumber> {
   }
 
   const activation = await buyBitcallOtpActivation(offer.ref);
+  // Persist the accepted reference before any subsequent conversion can fail.
+  if (activation.activationId) await onAccepted?.(activation.activationId);
   // Once the activation was accepted, failures during conversion are ambiguous
   // regardless of their original error type: the paid call already succeeded.
   let costNgn = offer.costNgn;

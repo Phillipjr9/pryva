@@ -178,7 +178,7 @@ export function ServiceCard({ item, countryName }: { item: ExplorerItem; country
     ? `${item.source === "live" ? "Indicative" : "Listed"} ${item.priceFrom ? "from " : "price "}${formatNaira(price)}`
     : item.category === "verification" && item.source === "live"
       ? "Ordering unavailable"
-      : item.category === "esim" && item.source === "live" ? "Price unavailable" : "See details";
+      : (item.category === "esim" || item.category === "social") && item.source === "live" ? "Price unavailable" : "See details";
 
   /*
    * One card, two densities. On a phone this is a 68 px row: artwork, name,
@@ -206,7 +206,7 @@ export function ServiceCard({ item, countryName }: { item: ExplorerItem; country
           {/* Deliberately not the desktop wording: two visible-in-one-breakpoint
               copies of the same sentence would be read out twice, and the tests
               that look up the full price line would match both. */}
-          {price !== null ? ` · ${formatNaira(price)}${item.priceFrom ? "+" : ""}` : item.category === "verification" && item.source === "live" ? " · Ordering unavailable" : item.category === "esim" && item.source === "live" ? " · Price unavailable" : item.source === "live" ? " · Price on request" : " · Price not listed"}
+          {price !== null ? ` · ${formatNaira(price)}${item.priceFrom ? "+" : ""}` : item.category === "verification" && item.source === "live" ? " · Ordering unavailable" : (item.category === "esim" || item.category === "social") && item.source === "live" ? " · Price unavailable" : item.source === "live" ? " · Price on request" : " · Price not listed"}
         </p>
         {/* OTP stock comes from the selected pool. Keep it visible
             on phones too; hiding UnitsStatus at the mobile breakpoint made a
@@ -533,6 +533,7 @@ export function ServiceExplorer({
           <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">{selectedCategory?.label ?? "Your service hub"}</h1>
           <p className="mt-1.5 max-w-2xl text-[0.82rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Pick a country once, then browse the matched services.` : "Pick a country once and browse categories without redoing the choice every time."}</p>
         </div>
+        <Link href="/dashboard/digital-catalog" className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline">Explore digital catalogue</Link>
         <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline">My orders <ArrowRight className="h-3.5 w-3.5" /></Link>
       </div>
 
@@ -753,8 +754,20 @@ export function ServiceExplorer({
             )}
             {filtered.length === 0 && (
               <div className="rounded-2xl border border-dashed border-line bg-cream/50 p-8 text-center">
-                <p className="text-[0.88rem] font-semibold text-ink">No listings match these filters</p>
-                <p className="mt-1 text-meta text-ink-2">Try another search, category or country. This doesn&apos;t indicate live availability.</p>
+                {!search && tag === "all" && (category === "data" || category === "subscriptions") ? (
+                  <>
+                    <p className="text-[0.88rem] font-semibold text-ink">{category === "data" ? "Mobile data plans are not connected yet" : "Subscriptions are not connected yet"}</p>
+                    <p className="mt-1 text-meta text-ink-2">No plans or prices are available to order. Nothing will be charged.</p>
+                    <Link href={category === "data" ? "/dashboard/data" : "/dashboard/digital"} className="mt-3 inline-block text-meta font-semibold text-lav-700 underline underline-offset-2">
+                      {category === "data" ? "View data service status" : "View subscription service status"}
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[0.88rem] font-semibold text-ink">No listings match these filters</p>
+                    <p className="mt-1 text-meta text-ink-2">Try another search, category or country. This doesn&apos;t indicate live availability.</p>
+                  </>
+                )}
                 {(search || tag !== "all") && <button type="button" onClick={() => { setSearch(""); setTag("all"); setVisible(PAGE_SIZE); }} className="mt-3 text-meta font-semibold text-lav-700 underline underline-offset-2">Clear filters</button>}
               </div>
             )}

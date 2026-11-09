@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -222,7 +223,7 @@ describe("POST /api/esim/purchase", () => {
   });
 
   it("replays a duplicate request without buying anything", async () => {
-    state.existing = { id: "o1", reference: "PRY1", productName: "Nigeria Lite", planLabel: "1GB · 7 days", service: "esim", amount: 9_800, provider: "bitcall", status: "active" };
+    state.existing = { id: "o1", reference: "PRY1", productName: "Nigeria Lite", planLabel: "1GB · 7 days", service: "esim", productSlug: valid.offerId, amount: 9_800, provider: "bitcall", status: "active" };
     const response = await POST(request(valid));
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -230,6 +231,50 @@ describe("POST /api/esim/purchase", () => {
     expect(JSON.stringify(body)).not.toMatch(/bitcall|supplier/i);
     expect(state.purchased).toEqual([]);
     expect(state.debits).toEqual([]);
+  });
+
+  it("rejects reuse of a request key for a different service, offer, price, or terms", async () => {
+    const intent = `esim:v1:${createHash("sha256").update(JSON.stringify([valid.offerId, valid.expectedPriceNgn, valid.expectedTerms])).digest("hex")}`;
+    const order = { id: "o1", reference: "PRY1", status: "active", service: "esim", productSlug: valid.offerId, requestIntent: intent };
+    for (const [existing, body] of [
+      [{ ...order, service: "numbers" }, valid],
+      [{ ...order, productSlug: "another-offer" }, valid],
+      [order, { ...valid, expectedPriceNgn: 9_900 }],
+      [order, { ...valid, expectedTerms: "b".repeat(24) }],
+      [order, { offerId: valid.offerId, requestId: valid.requestId }],
+    ] as const) {
+      state.existing = existing;
+      const response = await POST(request(body));
+      expect(response.status).toBe(409);
+      expect((await response.json()).error).toMatch(/different order/i);
+    }
+    expect(state.purchased).toEqual([]);
+  });
+
+  it("checks a conflicting winner's intent after the unique claim loses", async () => {
+    state.recheck.mockImplementation(async () => {
+      state.existing = { id: "winner", status: "review", service: "esim", productSlug: valid.offerId, requestIntent: "esim:v1:different" };
+      return state.offer;
+    });
+    const response = await POST(request(valid));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toMatch(/different order/i);
+    expect(state.purchased).toEqual([]);
+  });
+
+  it("does not report a cancelled attempt as a successful purchase", async () => {
+    state.existing = { id: "o1", status: "cancelled", service: "esim", productSlug: valid.offerId, reconciliationNote: "Supplier refused the eSIM purchase; nothing was charged." };
+    const body = await (await POST(request(valid))).json();
+    expect(body).toMatchObject({ ok: false, safeToRetry: true });
+    expect(state.purchased).toEqual([]);
+  });
+
+  it("does not start an old attempt when a client requests recovery only", async () => {
+    const response = await POST(request({ ...valid, recoveryOnly: true }));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toMatch(/contact support/i);
+    expect(state.purchased).toEqual([]);
+    expect(state.inserts).toEqual([]);
   });
 
   it("requires a valid displayed price for a new purchase, but can replay old requests", async () => {
@@ -240,7 +285,7 @@ describe("POST /api/esim/purchase", () => {
     }
     expect(state.purchased).toEqual([]);
     expect(state.inserts).toEqual([]);
-    state.existing = { id: "o1", reference: "PRY1", status: "active", amount: 9_800 };
+    state.existing = { id: "o1", reference: "PRY1", status: "active", amount: 9_800, service: "esim", productSlug: valid.offerId };
     expect((await POST(request({ offerId: valid.offerId, requestId: valid.requestId }))).status).toBe(200);
     expect(state.purchased).toEqual([]);
   });

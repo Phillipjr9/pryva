@@ -38,6 +38,14 @@ describe("eSIM provisioning checks", () => {
     expect((await POST(request(), params)).status).toBe(503);
     expect(state.complete).not.toHaveBeenCalled();
   });
+  it("directs unpaid review orders to support rather than promising a retry", async () => {
+    state.result = { kind: "unpaid" };
+    const response = await POST(request(), params);
+    const body = await response.json();
+    expect(response.status).toBe(409);
+    expect(body.message).toMatch(/contact support/i);
+    expect(body.message).not.toMatch(/top up|check again/i);
+  });
   it("reports provisioning without exposing where stock comes from", async () => {
     const response = await POST(request(), params);
     const body = await response.json();

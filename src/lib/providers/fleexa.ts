@@ -473,7 +473,7 @@ export type FleexaRentOrder = {
 export async function buyFleexaRental(params: {
   area?: string;
   months?: number;
-}): Promise<FleexaRentOrder> {
+}, onAccepted?: (rentalId: string) => Promise<void>): Promise<FleexaRentOrder> {
   const body: Record<string, unknown> = {};
   if (params.area) body.area = params.area;
   if (params.months) body.months = params.months;
@@ -488,6 +488,9 @@ export async function buyFleexaRental(params: {
     ["phone_number"], ["phone"], ["number"], ["msisdn"], ["rental_number"],
   ]);
 
+  // Preserve a returned reference before rejecting a partially populated
+  // receipt. The call may already have spent supplier funds.
+  if (rentalId) await onAccepted?.(rentalId);
   if (!rentalId || !number) throw new FleexaError("Provider receipt is incomplete and needs reconciliation", 502, "INCOMPLETE_RECEIPT");
 
   return {

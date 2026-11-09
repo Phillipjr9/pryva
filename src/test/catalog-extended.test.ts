@@ -19,6 +19,13 @@ describe("Catalog Extended", () => {
     });
   });
 
+  it("does not advertise a data price or instant delivery without a connected supplier", () => {
+    const data = services.find((service) => service.slug === "data")!;
+    expect(data.fromPrice).toBeUndefined();
+    expect(JSON.stringify(data)).not.toMatch(/instant delivery|processed immediately/i);
+    expect(data.intro).toMatch(/not currently available/i);
+  });
+
   describe("services array", () => {
     it("should have at least 8 services", () => {
       expect(services.length).toBeGreaterThanOrEqual(8);

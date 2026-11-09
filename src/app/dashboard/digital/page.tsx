@@ -16,6 +16,7 @@ export default async function DigitalServicesPage() {
       </div>
       <div className="rounded-2xl border border-line bg-white p-6">
         <p className="text-[0.9rem] leading-relaxed text-ink-2">When a delivery service is connected, current plans and pricing will be shown here.</p>
+        <Link href="/dashboard/digital-catalog" className="mt-4 mr-5 inline-flex font-semibold text-lav-700 underline underline-offset-2">Explore the digital catalogue (read-only)</Link>
         <Link href="/dashboard/accounts" className="mt-4 inline-flex font-semibold text-lav-700 underline underline-offset-2">Browse account listings</Link>
       </div>
     </div>

@@ -11,7 +11,6 @@ import {
   buyOtpNumber,
   isAmbiguousOtpPurchase,
   matchesCountry,
-  otpOffersForSupplier,
   otpOfferPublicId,
   readOtpOffersForSupplier,
 } from "@/lib/services/numbers/otp-suppliers";
@@ -131,11 +130,9 @@ function providerExpiry(value: string | null, fallbackMs: number): Date {
 /**
  * Buy the real service before any wallet charge happens.
  *
- * The caller only debits once this resolves, and cancels upstream if the debit
- * then fails — so a rejected or malformed provider request costs the customer
- * nothing. That ordering is what makes it safe to attempt a purchase whose
- * exact parameter contract has not yet been confirmed against the live API:
- * the failure mode is a declined order, not a lost payment.
+ * The caller claims the order before spending and debits only after delivery.
+ * If a provider accepts but the debit cannot be confirmed, the order remains in
+ * review for reconciliation. A provider contract still needs live verification.
  */
 /**
  * Refuse a purchase whose cost is unknown or whose margin is below the floor.
@@ -209,13 +206,13 @@ async function fulfillNumber(plan: Plan, intent: SmsIntent, options: FulfillPlan
   // An app-specific selection bypasses the cache, then is matched against the
   // freshly published service ID. No customer-supplied identifier reaches the
   // provider API directly.
-  const read = options.otpOfferId
-    ? await readOtpOffersForSupplier("bitcall", intent.country, plan.region, true)
-    : null;
-  if (read?.errorCode) {
-    throw new FleexaError("The selected service could not be confirmed", read.errorCode === "INSUFFICIENT_BALANCE" ? 402 : 503, read.errorCode);
+  // A browsing cache may be stale. Every paid checkout, including a generic
+  // country plan, must use a fresh quote for its stock and margin check.
+  const read = await readOtpOffersForSupplier("bitcall", intent.country, plan.region, true);
+  if (read.errorCode || read.stale) {
+    throw new FleexaError("The selected service could not be confirmed", read.errorCode === "INSUFFICIENT_BALANCE" ? 402 : 503, read.errorCode ?? "STALE_CATALOG");
   }
-  const offers = read?.offers ?? await otpOffersForSupplier("bitcall", intent.country, plan.region);
+  const offers = read.offers;
   const selectedOffer = options.otpOfferId
     ? offers.find((offer) => otpOfferPublicId(intent.country, offer.ref, offer.app) === options.otpOfferId)
     : null;
@@ -269,10 +266,12 @@ async function fulfillNumber(plan: Plan, intent: SmsIntent, options: FulfillPlan
     let providerAccepted = false;
     try {
       await options.onOtpAttempt?.();
-      const bought = await buyOtpNumber(offer);
+      const bought = await buyOtpNumber(offer, async (providerRequestId) => {
+        providerAccepted = true;
+        await options.onOtpAccepted?.(providerRequestId);
+      });
       providerAccepted = true;
       if (!bought.providerRequestId) throw new Error("Provider accepted an activation without a durable reference");
-      await options.onOtpAccepted?.(bought.providerRequestId);
       if (!bought.number) throw new Error("Provider accepted an activation without a usable phone number");
       if (
         typeof bought.providerCostNgn === "number" &&
@@ -330,26 +329,41 @@ async function fulfillRental(plan: Plan, intent: RentalIntent, options: FulfillP
   }
 
   const areas = await listFleexaRentAreas();
-  const area = areas.find((entry) => entry.id && matchesCountry(entry.country, intent.country, plan.region));
-  if (!area?.id) {
-    throw new FleexaError(
-      "No rental coverage is confirmed for that destination",
-      503,
-      "SERVICE_UNAVAILABLE",
-    );
+  const matching = areas.filter((entry) => entry.id && matchesCountry(entry.country, intent.country, plan.region));
+  if (matching.length === 0) {
+    throw new FleexaError("No rental coverage is confirmed for that destination", 503, "SERVICE_UNAVAILABLE");
   }
-  if (typeof area.stock === "number" && area.stock <= 0) {
+  const available = matching.filter((entry) => entry.stock === null || entry.stock > 0);
+  if (available.length === 0) {
     throw new FleexaError("That rental is out of stock", 503, "SERVICE_UNAVAILABLE");
   }
-  guardMargin(plan, area.pricePerMonthNgn != null ? area.pricePerMonthNgn * intent.months : null);
+  // The catalogue may contain several areas for one destination. A sold-out,
+  // unpriced or unprofitable first row must not hide a later usable one.
+  const totalCost = (entry: (typeof areas)[number]) => entry.pricePerMonthNgn == null ? null : entry.pricePerMonthNgn * intent.months;
+  const area = available.find((entry) => checkMargin(plan.price, totalCost(entry)).ok);
+  if (!area) {
+    const priced = available.find((entry) => totalCost(entry) !== null);
+    guardMargin(plan, priced ? totalCost(priced) : null);
+    throw new FleexaError("That rental is unavailable", 503, "SERVICE_UNAVAILABLE");
+  }
 
+  // Filtering above requires an id; retain that check at the paid boundary.
+  const areaId = area.id;
+  if (!areaId) throw new FleexaError("Rental area is unavailable", 503, "SERVICE_UNAVAILABLE");
   if (!options.onRentalAttempt || !options.onRentalAccepted) {
     throw new FleexaError("A safe order claim is required for rental checkout", 400, "RENTAL_CLAIM_REQUIRED");
   }
   await options.onRentalAttempt();
-  const rental = await buyFleexaRental({ area: area.id, months: intent.months });
+  let recorded = false;
+  const recordAccepted = async (id: string) => {
+    await options.onRentalAccepted!(id);
+    recorded = true;
+  };
+  const rental = await buyFleexaRental({ area: areaId, months: intent.months }, recordAccepted);
   if (!rental.rentalId || !rental.number) throw new Error("Provider rental receipt is incomplete");
-  await options.onRentalAccepted(rental.rentalId);
+  // Also supports an adapter that returns a complete receipt without invoking
+  // the callback. The actual client invokes it before validating the number.
+  if (!recorded) await recordAccepted(rental.rentalId);
   const quotedRentalCost = area.pricePerMonthNgn != null ? area.pricePerMonthNgn * intent.months : null;
   return {
     provider: FLEEXA_PROVIDER,

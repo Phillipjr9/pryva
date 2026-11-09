@@ -232,8 +232,20 @@ describe("fulfilment", () => {
     const result = await fulfillPlan(findPlan("rent-ng-90")!, { onRentalAttempt, onRentalAccepted });
     expect(onRentalAccepted).toHaveBeenCalledWith("rent-1");
 
-    expect(provider.buyRental).toHaveBeenCalledWith({ area: "area-ng", months: 3 });
+    expect(provider.buyRental).toHaveBeenCalledWith({ area: "area-ng", months: 3 }, expect.any(Function));
     expect(result).toMatchObject({ provider: "fleexa", providerRequestId: "rent-1" });
+  });
+
+  it("does not let an unavailable first rental area hide a later usable area", async () => {
+    provider.listAreas.mockResolvedValue([
+      { id: "sold-out", country: "Nigeria", pricePerMonthNgn: 1000, stock: 0 },
+      { id: "unknown-cost", country: "Nigeria", pricePerMonthNgn: null, stock: 2 },
+      { id: "too-costly", country: "Nigeria", pricePerMonthNgn: 999999, stock: 2 },
+      { id: "available", country: "Nigeria", pricePerMonthNgn: 5000, stock: 2 },
+    ]);
+    provider.buyRental.mockResolvedValue({ rentalId: "rent-2", number: "+2348000000002", months: 1, expiresAt: null, raw: {} });
+    await fulfillPlan(findPlan("rent-ng-30")!, { onRentalAttempt: async () => undefined, onRentalAccepted: async () => undefined });
+    expect(provider.buyRental).toHaveBeenCalledWith({ area: "available", months: 1 }, expect.any(Function));
   });
 
   it("does not buy a rental without a durable claim callback", async () => {

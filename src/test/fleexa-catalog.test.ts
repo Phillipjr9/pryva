@@ -23,6 +23,17 @@ const snapshot: SupplierSnapshot = {
 beforeEach(() => { vi.resetModules(); vi.clearAllMocks(); supplier.configured.mockReturnValue(true); });
 
 describe("read-only supplier catalog", () => {
+  it("preserves all entries returned by both read-only feeds", async () => {
+    supplier.email.mockResolvedValue(Array.from({ length: 2001 }, (_, index) => ({ id: `mail-${index}`, name: `Inbox ${index}`, domain: null, priceNgn: null, stock: null })));
+    supplier.rentals.mockResolvedValue(Array.from({ length: 2001 }, (_, index) => ({ id: `rent-${index}`, country: "US", pricePerMonthNgn: null, stock: null })));
+    const { readSupplierSnapshot, supplierItemsForCountry } = await import("@/lib/services/numbers/fleexa-catalog");
+    const result = await readSupplierSnapshot();
+    expect(result.email).toHaveLength(2001);
+    expect(result.rentals).toHaveLength(2001);
+    expect(supplierItemsForCountry(result, "us")).toHaveLength(4002);
+    expect(result.partial).toBe(false);
+  });
+
   it("does not expose its legacy SMS feed as customer OTP availability", async () => {
     const { supplierItemsForCountry } = await import("@/lib/services/numbers/fleexa-catalog");
     const items = supplierItemsForCountry(snapshot, "us");

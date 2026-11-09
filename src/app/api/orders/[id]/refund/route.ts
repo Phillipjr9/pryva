@@ -18,9 +18,8 @@ export const dynamic = "force-dynamic";
  * POST /api/orders/:id/refund
  *
  * Self-service refund for a single-verification number order that timed out
- * without producing a code. Eligibility is provider-agnostic: if we took the
- * money and nothing was delivered within the window, the customer gets it back
- * without having to talk to us first.
+ * without producing a code. A refund requires a confirmed final provider state
+ * and a matching wallet debit; uncertain or historical cases need review.
  *
  * The claim repeats every eligibility condition inside the UPDATE so a code
  * landing mid-request — or a concurrent sweep — cannot credit the order twice.

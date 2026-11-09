@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { and, eq } from "drizzle-orm";
 
@@ -17,6 +17,33 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function intentFor(offerId: string, price: unknown, terms: unknown): string | null {
+  if (typeof price !== "number" || !Number.isSafeInteger(price) || price <= 0 ||
+      typeof terms !== "string" || !/^[a-f0-9]{24}$/.test(terms)) return null;
+  return `esim:v1:${createHash("sha256").update(JSON.stringify([offerId, price, terms])).digest("hex")}`;
+}
+
+function matchesRequest(order: Order, offerId: string, intent: string | null): boolean {
+  if (order.service !== "esim" || order.productSlug !== offerId) return false;
+  // Existing eSIM orders predate the intent fingerprint. They can still be
+  // recovered by their exact plan and user; never start another purchase.
+  return order.requestIntent == null || (intent !== null && order.requestIntent === intent);
+}
+
+function mismatch() {
+  return Response.json({ ok: false, error: "This request belongs to a different order. Check your orders before trying again." }, { status: 409 });
+}
+
+function replay(order: Order, balance: number, offerId: string, intent: string | null) {
+  if (!matchesRequest(order, offerId, intent)) return mismatch();
+  if (order.status === "cancelled") {
+    const refused = order.reconciliationNote === "Supplier refused the eSIM purchase; nothing was charged." ||
+      order.reconciliationNote === "Account unavailable before supplier purchase; nothing was charged.";
+    return Response.json({ ok: false, error: refused ? "This attempt was not completed. You can start a new purchase." : "This order was cancelled. Check your orders before trying again.", ...(refused ? { safeToRetry: true } : {}) }, { status: 409 });
+  }
+  return receipt(order, balance, true);
+}
 
 function receipt(order: Order, balance: number, replayed: boolean, extra: Record<string, unknown> = {}) {
   return Response.json({
@@ -91,7 +118,7 @@ export async function POST(request: Request) {
   const record = body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
   // Do not silently ignore a selected number (or any other unsupported option):
   // that could charge for a plan without honouring what the caller requested.
-  if (Object.keys(record).some((key) => key !== "offerId" && key !== "requestId" && key !== "expectedPriceNgn" && key !== "expectedTerms")) {
+  if (Object.keys(record).some((key) => key !== "offerId" && key !== "requestId" && key !== "expectedPriceNgn" && key !== "expectedTerms" && key !== "recoveryOnly")) {
     return Response.json(
       { ok: false, error: "Additional purchase options are not supported. Check your orders before trying again." },
       { status: 400 },
@@ -106,11 +133,18 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "Invalid purchase request. Please try again." }, { status: 400 });
   }
   const requestId = rawRequestId.toLowerCase();
+  const requestIntent = intentFor(offerId, record.expectedPriceNgn, record.expectedTerms);
 
   try {
     // Replay first: a resubmit after a timeout must not buy a second profile.
     const already = await findRequestOrder(user.id, requestId);
-    if (already) return receipt(already, await currentBalance(user.id), true);
+    if (already) return replay(already, await currentBalance(user.id), offerId, requestIntent);
+    if (record.recoveryOnly === true) {
+      return Response.json({ ok: false, error: "This earlier attempt was not found. Contact support before starting another purchase." }, { status: 409 });
+    }
+    if (record.recoveryOnly !== undefined && record.recoveryOnly !== false) {
+      return Response.json({ ok: false, error: "Invalid recovery request." }, { status: 400 });
+    }
 
     // A customer must never be charged a different price from the one they saw.
     // Older clients may replay an existing request above, but cannot start a new
@@ -161,6 +195,7 @@ export async function POST(request: Request) {
       reference,
       userId: user.id,
       requestId,
+      requestIntent,
       service: "esim",
       productSlug: shape.slug,
       productName: shape.name,
@@ -177,7 +212,7 @@ export async function POST(request: Request) {
     }).onConflictDoNothing({ target: [orders.userId, orders.requestId] }).returning({ id: orders.id });
     if (claimed.length === 0) {
       const winner = await findRequestOrder(user.id, requestId);
-      if (winner) return receipt(winner, await currentBalance(user.id), true);
+      if (winner) return replay(winner, await currentBalance(user.id), offerId, requestIntent);
       return Response.json({ ok: false, error: "Check your orders before trying again." }, { status: 409 });
     }
 
@@ -212,7 +247,7 @@ export async function POST(request: Request) {
       }).where(and(eq(orders.id, orderId), eq(orders.status, "review"))).returning({ id: orders.id });
       if (!cancelled) throw new Error("eSIM order is no longer awaiting a supplier outcome");
       return Response.json(
-        { ok: false, error: "We couldn't deliver that eSIM right now — nothing was charged. Reload the plan if you want to try again." },
+        { ok: false, error: "We couldn't deliver that eSIM right now — nothing was charged. Reload the plan if you want to try again.", safeToRetry: true },
         { status: 502 },
       );
     }

@@ -35,15 +35,13 @@ beforeEach(() => {
 });
 
 describe("boosting catalog listings", () => {
-  it("lists nothing from a USD panel until a naira rate exists", async () => {
+  it("shows an unpriced USD service without a buy action until a naira rate exists", async () => {
     const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
     const usdPanel = service({ currency: "USD", ratePer1000: 0.74, min: 10 });
 
-    // No rate means no defensible retail price. Rather than a shop full of cards
-    // that cannot be bought, the hub lists nothing and the admin checklist says
-    // why — inventing an exchange rate is how a platform sells below cost.
+    // A read-only listing does not invent a retail price or allow an order.
     delete process.env.SMM_USD_NGN_RATE;
-    expect(boostItems(snapshot([usdPanel]))).toHaveLength(0);
+    expect(boostItems(snapshot([usdPanel]))).toMatchObject([{ price: null, action: null, name: "Instagram Followers" }]);
 
     // With a rate the same service becomes a real listing: 0.74 USD per 1,000 at
     // ₦1,600 and a 35% margin is ₦1,598.40 per 1,000, and the panel's smallest
@@ -58,6 +56,19 @@ describe("boosting catalog listings", () => {
     } finally {
       delete process.env.SMM_USD_NGN_RATE;
     }
+  });
+
+  it("does not hide a returned listing solely because the supplier balance is zero", async () => {
+    const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
+    const feed = { ...snapshot([service()]), balance: 0 };
+    expect(boostItems(feed)).toHaveLength(1);
+  });
+
+  it("shows listings without a balance response, but never guesses a currency", async () => {
+    const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
+    delete process.env.SMM_USD_NGN_RATE;
+    const feed = { ...snapshot([service({ currency: null })]), balance: null, currency: null, balanceUnavailable: true };
+    expect(boostItems(feed)).toMatchObject([{ name: "Instagram Followers", price: null, action: null }]);
   });
 
   it("readies an NGN-billed service without any exchange rate", async () => {
@@ -362,15 +373,16 @@ describe("boosting snapshot", () => {
     });
   });
 
-  it("caps the catalog, caches briefly and deduplicates concurrent reads", async () => {
+  it("preserves all adapter results, caches briefly and deduplicates concurrent reads", async () => {
     panel.services.mockResolvedValue(Array.from({ length: 2500 }, (_, index) => service({ id: `svc-${index}` })));
     panel.balance.mockResolvedValue({ balance: 10, currency: "NGN" });
-    const { readBoostSnapshot } = await import("@/lib/services/boosts/smm-catalog");
+    const { readBoostSnapshot, boostItems } = await import("@/lib/services/boosts/smm-catalog");
 
     const [first, second] = await Promise.all([readBoostSnapshot(), readBoostSnapshot()]);
     expect(first).toBe(second);
     expect(panel.services).toHaveBeenCalledTimes(1);
-    expect(first.services).toHaveLength(2000);
+    expect(first.services).toHaveLength(2500);
+    expect(boostItems(first)).toHaveLength(2500);
 
     await readBoostSnapshot();
     expect(panel.services).toHaveBeenCalledTimes(1);

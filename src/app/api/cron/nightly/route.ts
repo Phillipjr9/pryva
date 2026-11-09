@@ -5,6 +5,9 @@ import { lagosDay, runDailyReconciliation } from "@/lib/payments/daily-reconcili
 import { processAutoRefunds } from "@/lib/services/auto-refund";
 import { sweepPendingNumberCodes } from "@/lib/services/numbers/number-code-sync";
 import { dispatchWalletEmails, walletEmailConfigured } from "@/lib/email/wallet-email-outbox";
+import { sweepTopupOrders } from "@/lib/services/foxreload/topup-orders";
+import { sweepCodeOrders } from "@/lib/services/foxreload/code-orders";
+import { sweepTelegramStars, pruneTelegramQuotes } from "@/lib/services/foxreload/stars-orders";
 import { sweepBoostDeliveries } from "@/lib/services/boosts/boost-status";
 import { expireFinishedRentals } from "@/lib/services/rental-expiry";
 import { runScheduledOrders } from "@/lib/services/scheduled-orders";
@@ -143,6 +146,25 @@ async function handler(request: NextRequest) {
     };
   });
 
+  const stars = await runStep("telegram-stars", async () => {
+    if (isPreviewDatabase()) return { ok: true, detail: "skipped: preview database" };
+    const checked = await sweepTelegramStars();
+    const pruned = await pruneTelegramQuotes();
+    return { ok: true, detail: `checked ${checked}, pruned ${pruned} expired quote(s)` };
+  });
+
+  const codes = await runStep("digital-codes", async () => {
+    if (isPreviewDatabase()) return { ok: true, detail: "skipped: preview database" };
+    const checked = await sweepCodeOrders();
+    return { ok: true, detail: `checked ${checked}` };
+  });
+
+  const topups = await runStep("direct-topups", async () => {
+    if (isPreviewDatabase()) return { ok: true, detail: "skipped: preview database" };
+    const checked = await sweepTopupOrders();
+    return { ok: true, detail: `checked ${checked}` };
+  });
+
   const refunds = await runStep("auto-refund", async () => {
     const { refunded, cancelled } = await processAutoRefunds();
     return { ok: true, detail: `refunded ${refunded}, released ${cancelled}` };
@@ -220,7 +242,7 @@ async function handler(request: NextRequest) {
     };
   });
 
-  const allOk = close.ok && emails.ok && onboarding.ok && boosts.ok && numberCodes.ok && refunds.ok && esim.ok && scheduled.ok && rentals.ok && referrals.ok && payouts.ok && webhookLog.ok && retention.ok;
+  const allOk = close.ok && emails.ok && onboarding.ok && boosts.ok && numberCodes.ok && stars.ok && codes.ok && topups.ok && refunds.ok && esim.ok && scheduled.ok && rentals.ok && referrals.ok && payouts.ok && webhookLog.ok && retention.ok;
   logger.info("Nightly run finished", {
     day,
     allOk,
@@ -229,6 +251,9 @@ async function handler(request: NextRequest) {
     onboarding: onboarding.detail,
     boosts: boosts.detail,
     numberCodes: numberCodes.detail,
+    stars: stars.detail,
+    codes: codes.detail,
+    topups: topups.detail,
     refunds: refunds.detail,
     esim: esim.detail,
     scheduled: scheduled.detail,
@@ -238,7 +263,7 @@ async function handler(request: NextRequest) {
   });
 
   return NextResponse.json(
-    { ok: allOk, day, steps: { close, emails, onboarding, boosts, numberCodes, refunds, esim, scheduled, rentals, referrals, retention } },
+    { ok: allOk, day, steps: { close, emails, onboarding, boosts, numberCodes, stars, codes, topups, refunds, esim, scheduled, rentals, referrals, retention } },
     { status: allOk ? 200 : 207, headers: { "Cache-Control": "no-store" } },
   );
 }

@@ -174,19 +174,19 @@ const serviceDefinitions: Service[] = [
   },
   {
     slug: "data", name: "Data Plans", shortName: "Data", href: "/dashboard/data",
-    eyebrow: "Data plans", tagline: "Explore data plans.",
-    description: "Browse mobile data plans by network, allowance and duration across MTN, Airtel, Glo and 9mobile.",
-    intro: "Explore local mobile data plans with instant network delivery.",
-    fromPrice: 500, unit: "per plan", icon: "phone",
+    eyebrow: "Data plans", tagline: "Mobile data ordering is not connected yet.",
+    description: "Mobile data plans and current prices will appear when a delivery service is connected.",
+    intro: "Mobile data plans are not currently available to order. No wallet charge will be made.",
+    unit: "per plan", icon: "phone",
     highlights: [
-      { title: "Plan comparison", body: "Review network, allowance and duration before ordering." },
-      { title: "Instant Delivery", body: "Mobile data plans are processed directly for local Nigerian networks." },
-      { title: "Support", body: "Contact support about an existing order with its reference." },
+      { title: "Not available yet", body: "A data delivery service is not connected, so no plans can be ordered." },
+      { title: "No charge", body: "The unavailable data service cannot debit your wallet." },
+      { title: "Support", body: "Contact support if you have a question about an existing order." },
     ],
-    included: ["Catalog plan comparisons", "Naira pricing", "Allowance comparison"], goodFor: ["Plan comparison", "Allowance comparison", "Order history"],
+    included: ["Service status", "Support for existing orders"], goodFor: ["Checking service status"],
     faqs: [
-      { q: "Which networks are listed?", a: "MTN, Airtel, Glo and 9mobile, with allowance, duration and price shown per plan." },
-      { q: "How fast is delivery?", a: "Orders are processed immediately once payment is confirmed." },
+      { q: "Can I buy a data plan now?", a: "No. Current plans and prices will be shown when delivery is connected." },
+      { q: "Will I be charged?", a: "No. Mobile data orders are not currently available." },
     ],
   },
   {
@@ -373,8 +373,8 @@ export const plans: Plan[] = planDefinitions.map((definition) => {
 /**
  * `fromPrice` is a promise to the customer — "you can buy this from ₦X" — so it
  * is computed from real plan prices wherever plans exist. Hand-set values remain
- * only for the services priced elsewhere: accounts (live marketplace listings),
- * data plans and gift cards (sold at face value — see pricing.ts), where a
+ * only for services priced elsewhere, such as accounts (live marketplace listings)
+ * and gift cards (sold at face value — see pricing.ts), where a
  * 30–50% markup above face value is not a thing the market allows.
  */
 export const services: Service[] = serviceDefinitions.map((service) => {

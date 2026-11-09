@@ -137,6 +137,7 @@ export default async function EsimPlanPage({ params }: { params: Promise<{ id: s
           {!confirmed ? <p role="status" className="text-meta leading-relaxed text-amber-800">Current plan details and price could not be confirmed. Reload this page or contact support before buying.</p> : null}
           <EsimBuy
             offerId={offer.id}
+            userId={user.id}
             name={offer.name}
             price={offer.priceNgn}
             expectedTerms={esimOfferTerms(offer)}

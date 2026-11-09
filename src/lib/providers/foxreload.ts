@@ -12,9 +12,16 @@ const MAX_BODY_BYTES = 2 * 1024 * 1024;
  * A sliding window rate limiter prevents 429 rejections before outbound calls fire.
  */
 const foxreloadBudget = createRateLimiter({ windowMs: 10_000, maxRequests: 50 });
+// Search has a lower documented per-key limit than ordinary catalogue reads.
+const foxreloadSearchBudget = createRateLimiter({ windowMs: 60_000, maxRequests: 50 });
+const foxreloadCreateBudget = createRateLimiter({ windowMs: 60_000, maxRequests: 25 });
+const foxreloadClientCodeBudget = createRateLimiter({ windowMs: 60_000, maxRequests: 25 });
 
 export async function resetFoxreloadRateBudget(): Promise<void> {
   await resetRateLimit("foxreload:edge");
+  await resetRateLimit("foxreload:search");
+  await resetRateLimit("foxreload:create");
+  await resetRateLimit("foxreload:client-code");
 }
 
 export class FoxreloadError extends ProviderError {
@@ -112,7 +119,18 @@ async function foxreloadFetch(
     throw new FoxreloadError("FOXRELOAD_API_KEY is not configured", 503, "NO_API_KEY");
   }
 
+  // Endpoint limits are shared across legacy and contract clients.
+  const special = path === "/api/products/search" ? [foxreloadSearchBudget, "foxreload:search"] as const
+    : path === "/api/orders/" && init.method === "POST" ? [foxreloadCreateBudget, "foxreload:create"] as const
+    : /^\/api\/orders\/[^/]+\/client-code$/.test(path) && init.method === "POST" ? [foxreloadClientCodeBudget, "foxreload:client-code"] as const
+    : null;
+  if (special) {
+    const specific = await special[0](special[1]);
+    if (specific.unavailable) throw new FoxreloadError("FoxReload endpoint budget unavailable", 503, "RATE_LIMIT_UNAVAILABLE");
+    if (!specific.allowed) throw new FoxreloadError("FoxReload endpoint rate budget exceeded", 429, "RATE_LIMITED");
+  }
   const budget = await foxreloadBudget("foxreload:edge");
+  if (budget.unavailable) throw new FoxreloadError("FoxReload rate budget unavailable", 503, "RATE_LIMIT_UNAVAILABLE");
   if (!budget.allowed) {
     throw new FoxreloadError("FoxReload rate budget exceeded", 429, "RATE_LIMITED");
   }
@@ -235,6 +253,27 @@ export async function searchFoxreloadProducts(query: string): Promise<FoxreloadP
     quantity: typeof item?.quantity === "number" ? item.quantity : 0,
     deliveryType: String(item?.deliveryType ?? "code"),
   }));
+}
+
+/**
+ * Read-only catalog access. Keep raw data server-side: unlike the legacy
+ * checkout mapper this function does not invent a currency or delivery type.
+ * Cursor mode walks the complete feed, while search is limited upstream to 50.
+ */
+export async function readFoxreloadBrowsePage(options: { query?: string; cursor?: string } = {}): Promise<{ rows: unknown[]; nextCursor: string | null; searchLimited: boolean }> {
+  if (options.query) {
+    const value = await foxreloadFetch("/api/products/search", { query: { query: options.query, limit: 50 } });
+    if (!Array.isArray(value) || value.length > 50) throw new FoxreloadError("Invalid catalog response", 502, "INVALID_RESPONSE");
+    return { rows: value, nextCursor: null, searchLimited: value.length === 50 };
+  }
+  const value = await foxreloadFetch("/api/products/", { query: { includeDescendants: true, limit: 50, cursor: options.cursor } });
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new FoxreloadError("Invalid catalog response", 502, "INVALID_RESPONSE");
+  const page = value as Record<string, unknown>;
+  if (!Array.isArray(page.items) || page.items.length > 50 || !(page.nextCursor == null || (typeof page.nextCursor === "string" && page.nextCursor.length > 0 && page.nextCursor.length <= 512))) {
+    throw new FoxreloadError("Invalid catalog response", 502, "INVALID_RESPONSE");
+  }
+  if (typeof page.nextCursor === "string" && page.nextCursor === options.cursor) throw new FoxreloadError("Catalog cursor did not advance", 502, "INVALID_RESPONSE");
+  return { rows: page.items, nextCursor: (page.nextCursor as string | null | undefined) ?? null, searchLimited: false };
 }
 
 export async function getFoxreloadProduct(id: string): Promise<FoxreloadProduct> {
@@ -382,4 +421,55 @@ export async function pollFoxreloadOrderCodes(
   // If order is still processing, return whatever has arrived so far
   const current = await getFoxreloadOrder(orderId);
   return current.items.flatMap((item) => item.externalData).filter(Boolean);
+}
+
+/**
+ * Strict contract functions for the next-generation integration. These are
+ * server-only primitives, NOT customer purchase endpoints. A caller must first
+ * commit a wallet claim and reconcile ambiguous create/payment outcomes.
+ */
+export async function readFoxreloadProductContract(productId: string): Promise<import("@/lib/services/foxreload/contract").Product> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(productId)) throw new FoxreloadError("Invalid product ID", 400, "INVALID_PRODUCT");
+  const { parseProduct } = await import("@/lib/services/foxreload/contract");
+  const product = parseProduct(await foxreloadFetch(`/api/products/${encodeURIComponent(productId)}`));
+  if (!product || product.id !== productId) throw new FoxreloadError("Invalid product response", 502, "INVALID_RESPONSE");
+  return product;
+}
+
+/**
+ * Exact decimal total, quantity and notes must be produced from a freshly read
+ * contract, not accepted from the browser. `mock` must be explicitly chosen.
+ * Once called, a timeout is ambiguous even for mock orders; do not retry a live
+ * order or refund the customer without independent provider evidence.
+ */
+export async function createFoxreloadContractOrder(input: {
+  product: import("@/lib/services/foxreload/contract").Product;
+  quantity: number;
+  note: Record<string, import("@/lib/services/foxreload/contract").NoteValue>;
+  idempotencyKey: string;
+  mock: boolean;
+}): Promise<unknown> {
+  const { buildOrderItem } = await import("@/lib/services/foxreload/contract");
+  const item = buildOrderItem(input.product, input.quantity, input.note);
+  if (!item || !/^[A-Za-z0-9_-]{1,64}$/.test(item.itemId) || !/^[A-Za-z0-9_-]{1,128}$/.test(input.idempotencyKey) || typeof input.mock !== "boolean") {
+    throw new FoxreloadError("Invalid order input", 400, "INVALID_ORDER");
+  }
+  return foxreloadFetch("/api/orders/", { method: "POST", body: { items: [item], idempotencyKey: input.idempotencyKey, isMock: input.mock } });
+}
+
+/** Login top-ups may require a buyer confirmation code after payment. */
+export async function submitFoxreloadClientCode(orderId: string, itemId: string, clientCode: string): Promise<unknown> {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuid.test(orderId) || !uuid.test(itemId) || !/^[A-Za-z0-9 ._-]{1,255}$/.test(clientCode)) {
+    throw new FoxreloadError("Invalid confirmation input", 400, "INVALID_CLIENT_CODE");
+  }
+  return foxreloadFetch(`/api/orders/${encodeURIComponent(orderId)}/client-code`, { method: "POST", body: { itemId, clientCode } });
+}
+
+/** Raw detail for contract-aware reconciliation. Keep on the server. */
+export async function readFoxreloadContractOrder(orderId: string): Promise<unknown> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)) {
+    throw new FoxreloadError("Invalid order ID", 400, "INVALID_ORDER");
+  }
+  return foxreloadFetch(`/api/orders/${encodeURIComponent(orderId)}`);
 }
