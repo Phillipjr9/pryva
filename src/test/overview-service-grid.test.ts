@@ -20,6 +20,11 @@ const overview = readFileSync(join(root, "app/dashboard/page.tsx"), "utf8");
 describe("overview service hub", () => {
   const grid = overview.match(/className="mt-3 grid[^"]*"/)?.[0] ?? "";
 
+  it("shows digital catalogue highlights directly on the overview", () => {
+    expect(overview).toContain("<DigitalCatalogHighlights />");
+    expect(overview.indexOf("<DigitalCatalogHighlights />")).toBeLessThan(overview.indexOf("Recent orders"));
+  });
+
   it("keeps quick actions balanced on a phone and stacks to one column on the wide sidebar", () => {
     expect(grid).toContain("grid-cols-2");
     expect(grid).toContain("sm:grid-cols-2");

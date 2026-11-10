@@ -11,6 +11,7 @@ import { ServiceIcon } from "@/components/ServiceIcon";
 import { LiveCodeCard, type LiveCode } from "@/components/dashboard/LiveCodeCard";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { BalanceHero } from "@/components/dashboard/BalanceHero";
+import { DigitalCatalogHighlights } from "@/components/dashboard/DigitalCatalogHighlights";
 import { readServiceReadiness } from "@/lib/services/service-readiness";
 import { orderByReadiness, SERVICE_STATE_DOT, SERVICE_STATE_LABEL } from "@/lib/services/service-states";
 
@@ -132,6 +133,8 @@ export default async function DashboardOverviewPage() {
           { label: "Refunded", value: formatNaira(refundedToWallet), note: "back to wallet" },
         ]}
       />
+
+      <DigitalCatalogHighlights />
 
       {/* Keep a live code card and a country hint near the active account state,
           while letting recent activity and quick actions lead the page. */}
