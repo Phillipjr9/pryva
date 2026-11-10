@@ -1,0 +1,5 @@
+AstroPay icon: OpenFinTech, resources/vendors/astropay/icon.png, commit 30980d2b4d22c863ae9594de18ba6b6d0789a82c. MIT license: see OPENFINTECH-LICENSE.txt. AstroPay's name and mark are trademarks of its owner.
+
+Call of Duty: Mobile logo: https://commons.wikimedia.org/wiki/File:Call_of_Duty_Mobile_2023_logo.svg — Wikimedia Commons attributes the logo to Call of Duty and describes it as PD-textlogo. This is a rasterized thumbnail of that file; trademarks remain with their owner.
+
+Fortnite, Google Play, PUBG and Valorant marks: Simple Icons, CC0-1.0. Names and logos are trademarks of their owners.

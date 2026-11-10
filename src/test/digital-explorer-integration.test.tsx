@@ -23,11 +23,11 @@ describe("digital listings in service categories", () => {
   it("renders curated artwork for generic denomination names on explorer cards", async () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       const root = new URL(url, "https://example.test").searchParams.get("category");
-      return response({ ok: true, items: root === "topups" ? [{ id: id("a"), name: "80 + 8 CP", stock: "reported", artwork: { kind: "category", key: "cod-mobile-activision" } }] : [], nextCursor: null });
+      return response({ ok: true, items: root === "topups" ? [{ id: id("a"), name: "80 + 8 CP", stock: "reported", artwork: { kind: "local", key: "call-of-duty-mobile" } }] : [], nextCursor: null });
     }));
     render(<ServiceExplorer initialCountry="ng" initialCategory="topups" enableDigitalCatalogue />);
     const card = (await screen.findByRole("heading", { name: "80 + 8 CP" })).closest("article")!;
-    expect(card.querySelector("img")?.getAttribute("src")).toContain("/digital-artwork/cod-mobile-activision");
+    expect(card.querySelector("img")?.getAttribute("src")).toContain("/digital-brand-icons/call-of-duty-mobile.png");
   });
   it("groups the actual game roots together and loads the next page without losing the first", async () => {
     const fetchMock = vi.fn(async (url: string) => {

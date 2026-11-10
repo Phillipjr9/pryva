@@ -59,7 +59,7 @@ describe("read-only digital catalogue route", () => {
       { id: "unknown", name: "Mystery product", slug: "unrelated-product" },
     ], nextCursor: null, searchLimited: false });
     const data = await (await GET(request())).json();
-    expect(data.items[0].artwork).toEqual({ kind: "category", key: "cod-mobile-activision" });
+    expect(data.items[0].artwork).toEqual({ kind: "local", key: "call-of-duty-mobile" });
     expect(data.items[1].artwork).toEqual({ kind: "category", key: "clash-royale" });
     expect(data.items[2]).not.toHaveProperty("artwork");
     expect(JSON.stringify(data)).not.toMatch(/evil|tracker|slug|activision-us-80/);
