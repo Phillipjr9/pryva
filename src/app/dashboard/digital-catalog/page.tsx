@@ -26,11 +26,11 @@ export default async function DigitalCatalogPage() {
         <p className="mt-2 text-[0.9rem] text-ink-2">Browse or search the digital catalogue, including subscriptions, gaming products, telecom and more.</p>
       </div>
       <div role="note" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-meta text-amber-900">
-        Catalogue listings do not confirm price, coverage or availability. Only reviewed products link to a separate quote before payment.
+        Reported stock can change and does not guarantee a product can be ordered. Only reviewed products link to a separate quote before payment.
       </div>
-      <AvailableDigitalProducts offers={offers} starsEnabled={canSell && starsSalesConfigured()} />
       <h2 className="text-xl font-semibold text-ink">Explore the full catalogue</h2>
       <DigitalCatalogBrowser />
+      <AvailableDigitalProducts offers={offers} starsEnabled={canSell && starsSalesConfigured()} />
     </div>
   );
 }

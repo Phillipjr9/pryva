@@ -33,6 +33,7 @@ describe("read-only digital catalogue route", () => {
   it("validates query and cursor and fails closed on configuration and rate limits", async () => {
     expect((await GET(request("?category=bad%2Fpath"))).status).toBe(400);
     expect((await GET(request("?q=a"))).status).toBe(400);
+    expect((await GET(request("?stock=invalid"))).status).toBe(400);
     expect((await GET(request("?q=game&cursor=x"))).status).toBe(400);
     expect((await GET(request(`?cursor=${"x".repeat(513)}`))).status).toBe(400);
     mocks.configured.mockReturnValueOnce(false);
@@ -42,12 +43,12 @@ describe("read-only digital catalogue route", () => {
     expect((await GET(request())).status).toBe(429);
     expect(mocks.page).not.toHaveBeenCalled();
   });
-  it("only returns names and hashed IDs, never costs, stock or fulfillment data", async () => {
+  it("only returns names, reported stock state and hashed IDs, never costs or fulfillment data", async () => {
     mocks.page.mockResolvedValueOnce({ rows: [{ id: "supplier-id", name: " Telegram Premium ", price: "5.00", currency: "usd", quantity: 40, requiredNoteFields: ["username"], userGuide: "private" }, {}, null], nextCursor: "next", searchLimited: false });
     const response = await GET(request("?cursor=previous"));
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     const data = await response.json();
-    expect(data).toEqual({ ok: true, items: [{ id: expect.stringMatching(/^digital-[a-f0-9]{24}$/), name: "Telegram Premium" }], nextCursor: "next", searchLimited: false, skipped: true });
+    expect(data).toEqual({ ok: true, items: [{ id: expect.stringMatching(/^digital-[a-f0-9]{24}$/), name: "Telegram Premium", stock: "reported" }], nextCursor: "next", searchLimited: false, skipped: true });
     expect(JSON.stringify(data)).not.toMatch(/supplier-id|5\.00|usd|username|private|quantity/);
     expect(mocks.page).toHaveBeenCalledWith({ query: undefined, cursor: "previous" });
   });
@@ -58,10 +59,21 @@ describe("read-only digital catalogue route", () => {
     mocks.page.mockResolvedValue({ rows: [{ id: "supplier-1", name: "Game" }, { id: "supplier-2", name: "Other" }], nextCursor: null, searchLimited: false });
     const response = await GET(request("?category=topups&q=game"));
     const data = await response.json();
-    expect(data.items).toEqual([{ id, name: "Game", checkout: "topups" }, { id: expect.any(String), name: "Other" }]);
+    expect(data.items).toEqual([{ id, name: "Game", stock: "unknown", checkout: "topups" }, { id: expect.any(String), name: "Other", stock: "unknown" }]);
     expect(mocks.page).toHaveBeenCalledWith({ query: "game", cursor: undefined, category: "topups" });
     mocks.topupOffers.mockReturnValue([{ id, name: "Different product", region: "US", min: 1, max: 1 }]);
     expect((await (await GET(request())).json()).items[0]).not.toHaveProperty("checkout");
+  });
+  it("passes an optional stock filter and reports zero and malformed quantities honestly", async () => {
+    mocks.page.mockResolvedValueOnce({ rows: [
+      { id: "a", name: "Available", quantity: 3 }, { id: "b", name: "Sold out", quantity: 0 },
+      { id: "c", name: "Missing" }, { id: "d", name: "Invalid", quantity: -1 },
+    ], nextCursor: null, searchLimited: false });
+    const data = await (await GET(request("?q=game&stock=available"))).json();
+    expect(mocks.page).toHaveBeenCalledWith({ query: "game", cursor: undefined, inStockOnly: true });
+    expect(data.items.map((item: { stock: string }) => item.stock)).toEqual(["reported", "out", "unknown", "unknown"]);
+    expect(data.items.every((item: object) => !Object.hasOwn(item, "quantity"))).toBe(true);
+    expect(data.items.every((item: object) => !Object.hasOwn(item, "checkout"))).toBe(true);
   });
   it("hides upstream errors", async () => {
     mocks.page.mockRejectedValueOnce(new Error("private provider secret"));

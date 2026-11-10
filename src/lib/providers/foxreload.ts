@@ -292,13 +292,13 @@ export async function readFoxreloadBrowseCategories(): Promise<unknown[]> {
   return rows;
 }
 
-export async function readFoxreloadBrowsePage(options: { query?: string; cursor?: string; category?: string } = {}): Promise<{ rows: unknown[]; nextCursor: string | null; searchLimited: boolean }> {
+export async function readFoxreloadBrowsePage(options: { query?: string; cursor?: string; category?: string; inStockOnly?: boolean } = {}): Promise<{ rows: unknown[]; nextCursor: string | null; searchLimited: boolean }> {
   if (options.query) {
-    const value = await foxreloadFetch("/api/products/search", { query: { query: options.query, categoryId: options.category, limit: 50 } });
+    const value = await foxreloadFetch("/api/products/search", { query: { query: options.query, categoryId: options.category, withStockOnly: options.inStockOnly || undefined, limit: 50 } });
     if (!Array.isArray(value) || value.length > 50) throw new FoxreloadError("Invalid catalog response", 502, "INVALID_RESPONSE");
     return { rows: value, nextCursor: null, searchLimited: value.length === 50 };
   }
-  const value = await foxreloadFetch("/api/products/", { query: { includeDescendants: true, categoryId: options.category, limit: 50, cursor: options.cursor } });
+  const value = await foxreloadFetch("/api/products/", { query: { includeDescendants: true, categoryId: options.category, withStockOnly: options.inStockOnly || undefined, limit: 50, cursor: options.cursor } });
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new FoxreloadError("Invalid catalog response", 502, "INVALID_RESPONSE");
   const page = value as Record<string, unknown>;
   if (!Array.isArray(page.items) || page.items.length > 50 || !(page.nextCursor == null || (typeof page.nextCursor === "string" && page.nextCursor.length > 0 && page.nextCursor.length <= 512))) {

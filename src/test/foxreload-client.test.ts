@@ -113,6 +113,21 @@ describe("FoxReload client", () => {
     await expect(readFoxreloadBrowseCategories()).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
   });
 
+  it("uses the documented stock filter for browsing and search only when requested", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ items: [], nextCursor: null })));
+    await readFoxreloadBrowsePage({ inStockOnly: true, category: "games" });
+    const browse = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(browse.searchParams.get("withStockOnly")).toBe("true");
+    expect(browse.searchParams.get("includeDescendants")).toBe("true");
+    fetchMock.mockResolvedValueOnce(new Response("[]"));
+    await readFoxreloadBrowsePage({ query: "Game", inStockOnly: true });
+    expect(new URL(String(fetchMock.mock.calls[1][0])).searchParams.get("withStockOnly")).toBe("true");
+    fetchMock.mockResolvedValueOnce(new Response("[]"));
+    await readFoxreloadBrowsePage({ query: "Game" });
+    expect(new URL(String(fetchMock.mock.calls[2][0])).searchParams.has("withStockOnly")).toBe(false);
+  });
+
   it("fails closed on malformed pages, excessive pages and a repeated cursor", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     for (const body of [[], { items: "wrong" }, { items: [], nextCursor: "x".repeat(513) }, { items: Array(51).fill({}), nextCursor: null }, { items: [], nextCursor: "same" }]) {

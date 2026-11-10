@@ -23,6 +23,7 @@ describe("digital catalogue page", () => {
     render(await DigitalCatalogPage());
     expect(mocks.auth).toHaveBeenCalledWith("/dashboard/digital-catalog");
     expect(screen.getByText("Game")).toBeTruthy();
+    expect(screen.getByText("Catalogue browser").compareDocumentPosition(screen.getByText("Shop digital products")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText("Telegram Stars")).toBeTruthy();
     expect(screen.getAllByRole("link", { name: "Check price and availability" }).map((link) => link.getAttribute("href"))).toEqual(["/dashboard/telegram-stars", "/dashboard/digital-codes?product=digital-123"]);
   });

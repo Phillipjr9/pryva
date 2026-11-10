@@ -11,7 +11,7 @@ import { isFoxreloadConfigured, readFoxreloadBrowsePage } from "@/lib/providers/
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-/** Read-only, customer-safe names: no supplier IDs, costs, stock or purchase action. */
+/** Read-only customer-safe names and reported stock state; no wholesale costs or purchase action. */
 export async function GET(request: NextRequest) {
   const user = await requireAuthApi();
   if (!user) return Response.json({ error: "Please sign in." }, { status: 401 });
@@ -19,8 +19,9 @@ export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   const cursor = request.nextUrl.searchParams.get("cursor") ?? "";
   const category = request.nextUrl.searchParams.get("category") ?? "";
+  const stock = request.nextUrl.searchParams.get("stock") ?? "all";
   if ((query && (query.length < 2 || query.length > 128 || /[\u0000-\u001f\u007f]/.test(query))) ||
-      (cursor && (cursor.length > 512 || /[\u0000-\u001f\u007f]/.test(cursor))) || (query && cursor) || (category && !/^[a-z0-9][a-z0-9-]{0,127}$/i.test(category))) {
+      (cursor && (cursor.length > 512 || /[\u0000-\u001f\u007f]/.test(cursor))) || (query && cursor) || !["all", "available"].includes(stock) || (category && !/^[a-z0-9][a-z0-9-]{0,127}$/i.test(category))) {
     return Response.json({ error: "Invalid catalogue request." }, { status: 400 });
   }
   if (!isFoxreloadConfigured()) return Response.json({ error: "This catalogue is not connected yet." }, { status: 503 });
@@ -28,8 +29,8 @@ export async function GET(request: NextRequest) {
   if (limit.unavailable) return Response.json({ error: "Catalogue temporarily unavailable." }, { status: 503 });
   if (!limit.allowed) return Response.json({ error: "Too many requests. Try again shortly." }, { status: 429 });
   try {
-    const page = await readFoxreloadBrowsePage({ query: query || undefined, cursor: cursor || undefined, ...(category ? { category } : {}) });
-    const items: { id: string; name: string; checkout?: "codes" | "topups" | "esims" }[] = [];
+    const page = await readFoxreloadBrowsePage({ query: query || undefined, cursor: cursor || undefined, ...(category ? { category } : {}), ...(stock === "available" ? { inStockOnly: true } : {}) });
+    const items: { id: string; name: string; stock: "reported" | "out" | "unknown"; checkout?: "codes" | "topups" | "esims" }[] = [];
     const checkout = new Map<string, { name: string; kind: "codes" | "topups" | "esims" }>();
     for (const [kind, offers] of [["codes", listedCodeOffers()], ["topups", listedTopupOffers()], ["esims", listedEsimOffers()]] as const)
       for (const offer of offers) checkout.set(offer.id, { name: offer.name, kind });
@@ -45,7 +46,9 @@ export async function GET(request: NextRequest) {
       if (seen.has(publicId)) { skipped++; continue; }
       seen.add(publicId);
       const approved = checkout.get(publicId);
-      items.push({ id: publicId, name, ...(approved?.name === name ? { checkout: approved.kind } : {}) });
+      const stock = typeof product.quantity === "number" && Number.isSafeInteger(product.quantity) && product.quantity >= 0
+        ? product.quantity > 0 ? "reported" : "out" : "unknown";
+      items.push({ id: publicId, name, stock, ...(approved?.name === name ? { checkout: approved.kind } : {}) });
     }
     return Response.json({ ok: true, items, nextCursor: page.nextCursor, searchLimited: page.searchLimited, skipped: skipped > 0 }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {

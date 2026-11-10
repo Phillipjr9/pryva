@@ -37,6 +37,23 @@ describe("digital catalogue browser", () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("category=esim"))).toBe(true);
     expect(fetchMock.mock.calls.every(([url]) => String(url).startsWith("/api/services/digital-catalog"))).toBe(true);
   });
+  it("shows reported stock separately from checkout and resets pagination when the stock filter changes", async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url.endsWith("/categories")) return reply({ ok: true, categories: [] });
+      const params = new URL(url, "https://example.test").searchParams;
+      if (params.has("cursor")) return reply({ ok: true, items: [{ id: "b", name: "Page two", stock: "reported" }], nextCursor: null, searchLimited: false, skipped: false });
+      return reply({ ok: true, items: [{ id: "a", name: "Game", stock: params.has("stock") ? "reported" : "out" }], nextCursor: "next", searchLimited: false, skipped: false });
+    });
+    vi.stubGlobal("fetch", fetchMock); render(<DigitalCatalogBrowser />);
+    expect(await screen.findByText("Stock reported")).toBeTruthy();
+    expect(screen.getByText("Not available to order")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Next page" })); await screen.findByText("Page two");
+    fireEvent.click(screen.getByLabelText("Show listings with reported stock only"));
+    expect(await screen.findByText("Out of stock (reported)")).toBeTruthy();
+    const last = String(fetchMock.mock.calls.at(-1)?.[0]);
+    expect(last).not.toContain("cursor="); expect(last).not.toContain("stock=");
+    expect((screen.getByRole("button", { name: "Previous" }) as HTMLButtonElement).disabled).toBe(true);
+  });
   it("links approved listings to the correct product quote", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(async (url: string) => url.endsWith("/categories")
       ? reply({ ok: true, categories: [] })
