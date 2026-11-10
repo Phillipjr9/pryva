@@ -20,6 +20,15 @@ describe("digital listings in service categories", () => {
     expect(within(digital).getByRole("button", { name: "Ordering paused" }).hasAttribute("disabled")).toBe(true);
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("category=esim") && String(url).includes("stock=available"))).toBe(true);
   });
+  it("renders curated artwork for generic denomination names on explorer cards", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const root = new URL(url, "https://example.test").searchParams.get("category");
+      return response({ ok: true, items: root === "topups" ? [{ id: id("a"), name: "80 + 8 CP", stock: "reported", artwork: { kind: "category", key: "cod-mobile-activision" } }] : [], nextCursor: null });
+    }));
+    render(<ServiceExplorer initialCountry="ng" initialCategory="topups" enableDigitalCatalogue />);
+    const card = (await screen.findByRole("heading", { name: "80 + 8 CP" })).closest("article")!;
+    expect(card.querySelector("img")?.getAttribute("src")).toContain("/digital-artwork/cod-mobile-activision");
+  });
   it("groups the actual game roots together and loads the next page without losing the first", async () => {
     const fetchMock = vi.fn(async (url: string) => {
       const params = new URL(url, "https://example.test").searchParams;

@@ -1,3 +1,4 @@
+import type { DigitalArtwork } from "@/lib/content/digital-artwork";
 import { plans, type Plan } from "@/lib/services/catalog";
 import { EXPLORER_COUNTRIES, type ExplorerCountry } from "@/lib/content/explorer-countries";
 import type { AirtimeProvider } from "@/lib/services/data/airtime";
@@ -20,6 +21,7 @@ export type ExplorerCategory = ServiceId;
 /** Platform vocabularies classify supplier listings. They are not offerings. */
 export type ExplorerFilter = ExplorerCategory | "all";
 export type ExplorerArtwork =
+  | { kind: "digital-product"; art: DigitalArtwork | null }
   | { kind: "brand"; name: BrandSlug | "disney-plus" }
   | { kind: "service"; name: "numbers" | "esim" | "proxies" | "email-otp" | "accounts" | "bulk" | "scheduled" | "social-promotion" | "gift-cards" | "subscriptions" | "data" | "games" | "topups" | "prepaid" }
   /**

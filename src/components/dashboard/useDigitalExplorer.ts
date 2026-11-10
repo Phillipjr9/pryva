@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { parseDigitalArtwork } from "@/lib/content/digital-artwork";
 import type { ExplorerFilter, ExplorerItem } from "@/lib/services/service-explorer";
 
 type Root = { slug: string; category: ExplorerItem["category"]; label: string; icon: "esim" | "bulk" | "data" | "gift-cards" | "subscriptions" | "games" | "topups" | "prepaid" };
@@ -44,7 +45,7 @@ async function load(root: Root, query: string, cursor: string | undefined, signa
       if (!value || typeof value !== "object" || typeof value.id !== "string" || !/^digital-[a-f0-9]{24}$/.test(value.id) || typeof value.name !== "string" || !value.name || !["reported", "out", "unknown"].includes(value.stock)) continue;
       const checkout = value.checkout === "codes" || value.checkout === "topups" || value.checkout === "esims" ? value.checkout : null;
       items.push({ id: value.id, category: root.category, name: value.name, description: root.label, tag: root.label,
-        artwork: { kind: "service", name: root.icon }, source: "catalog", coverage: "unconfirmed", stock: null, myUnits: null, price: null,
+        artwork: { kind: "digital-product", art: parseDigitalArtwork(value.artwork) }, source: "catalog", coverage: "unconfirmed", stock: null, myUnits: null, price: null,
         crossCategorySearch: query.length >= 2, detail: `${value.stock === "reported" ? "Stock reported" : value.stock === "out" ? "Out of stock (reported)" : "Stock unknown"} · region unconfirmed`, orderingPaused: !checkout || value.stock !== "reported", action: checkout && value.stock === "reported" ? { label: "Check price and availability", href: `/dashboard/digital-${checkout}?product=${encodeURIComponent(value.id)}` } : null });
     }
     return { root, items, next: data.nextCursor, limited: data.searchLimited === true, error: false };

@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { DigitalProductIcon } from "@/components/DigitalProductIcon";
+import type { DigitalArtwork } from "@/lib/content/digital-artwork";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
-type Result = { items: { id: string; name: string; stock: "reported" | "out" | "unknown"; checkout?: "codes" | "topups" | "esims" }[]; nextCursor: string | null; searchLimited: boolean; skipped: boolean };
+type Result = { items: { id: string; name: string; stock: "reported" | "out" | "unknown"; artwork?: DigitalArtwork; checkout?: "codes" | "topups" | "esims" }[]; nextCursor: string | null; searchLimited: boolean; skipped: boolean };
 
 export function DigitalCatalogBrowser({ fixedCategory }: { fixedCategory?: string } = {}) {
   const [input, setInput] = useState("");
@@ -94,7 +96,7 @@ export function DigitalCatalogBrowser({ fixedCategory }: { fixedCategory?: strin
       {result && !loading ? (
         <>
           <p className="mt-4 text-meta text-ink-3">{result.items.length} listings on this page{result.searchLimited ? " · more matches may exist; refine your search" : ""}{result.skipped ? " · some listings could not be read" : ""}</p>
-          {result.items.length ? <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{result.items.map((item) => <li key={item.id} className="min-w-0 rounded-2xl border border-line bg-white p-4"><p className="font-semibold text-ink">{item.name}</p><p className="mt-1 text-meta text-ink-3">{item.stock === "reported" ? "Stock reported" : item.stock === "out" ? "Out of stock (reported)" : "Stock unknown"}</p>{item.checkout ? <Link href={`/dashboard/digital-${item.checkout}?product=${encodeURIComponent(item.id)}`} className="mt-1 inline-block text-meta font-semibold text-lav-700 underline">Check price and availability</Link> : <p className="mt-1 text-meta text-ink-3">Not available to order</p>}</li>)}</ul> : <p className="mt-3 text-meta text-ink-2">No listings returned. This does not confirm availability.</p>}
+          {result.items.length ? <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{result.items.map((item) => <li key={item.id} className="min-w-0 rounded-2xl border border-line bg-white p-4"><div className="flex items-center gap-3"><DigitalProductIcon key={item.id} name={item.name} artwork={item.artwork} /><p className="min-w-0 font-semibold text-ink">{item.name}</p></div><p className="mt-1 text-meta text-ink-3">{item.stock === "reported" ? "Stock reported" : item.stock === "out" ? "Out of stock (reported)" : "Stock unknown"}</p>{item.checkout ? <Link href={`/dashboard/digital-${item.checkout}?product=${encodeURIComponent(item.id)}`} className="mt-1 inline-block text-meta font-semibold text-lav-700 underline">Check price and availability</Link> : <p className="mt-1 text-meta text-ink-3">Not available to order</p>}</li>)}</ul> : <p className="mt-3 text-meta text-ink-2">No listings returned. This does not confirm availability.</p>}
           {!query && result.nextCursor && cursorLoops && <p role="alert" className="mt-3 text-meta text-rose-700">The catalogue pagination did not advance. Please try again later.</p>}
           {!query && <div className="mt-4 flex gap-3"><button type="button" disabled={page === 0} onClick={() => { setLoading(true); setPage(page - 1); }} className="rounded-lg border border-line px-3 py-2 text-meta disabled:opacity-40">Previous</button><button type="button" disabled={!result.nextCursor || cursorLoops} onClick={() => { if (!result.nextCursor) return; setLoading(true); setCursors([...cursors.slice(0, page + 1), result.nextCursor]); setPage(page + 1); }} className="rounded-lg border border-line px-3 py-2 text-meta disabled:opacity-40">Next page</button></div>}
         </>

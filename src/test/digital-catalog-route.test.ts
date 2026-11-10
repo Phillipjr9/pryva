@@ -48,9 +48,21 @@ describe("read-only digital catalogue route", () => {
     const response = await GET(request("?cursor=previous"));
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     const data = await response.json();
-    expect(data).toEqual({ ok: true, items: [{ id: expect.stringMatching(/^digital-[a-f0-9]{24}$/), name: "Telegram Premium", stock: "reported" }], nextCursor: "next", searchLimited: false, skipped: true });
+    expect(data).toEqual({ ok: true, items: [{ id: expect.stringMatching(/^digital-[a-f0-9]{24}$/), name: "Telegram Premium", stock: "reported", artwork: { kind: "brand", key: "telegram" } }], nextCursor: "next", searchLimited: false, skipped: true });
     expect(JSON.stringify(data)).not.toMatch(/supplier-id|5\.00|usd|username|private|quantity/);
     expect(mocks.page).toHaveBeenCalledWith({ query: undefined, cursor: "previous" });
+  });
+  it("returns only curated artwork keys for supplier slugs, not slugs or arbitrary image URLs", async () => {
+    mocks.page.mockResolvedValueOnce({ rows: [
+      { id: "cod", name: "80 + 8 CP", slug: "call-of-duty-mobile-activision-us-80-plus-8-cp", imagePath: "https://evil.test/tracker" },
+      { id: "clash", name: "Clash Royale gems", slug: "clash-royale-gems" },
+      { id: "unknown", name: "Mystery product", slug: "unrelated-product" },
+    ], nextCursor: null, searchLimited: false });
+    const data = await (await GET(request())).json();
+    expect(data.items[0].artwork).toEqual({ kind: "category", key: "cod-mobile-activision" });
+    expect(data.items[1].artwork).toEqual({ kind: "category", key: "clash-royale" });
+    expect(data.items[2]).not.toHaveProperty("artwork");
+    expect(JSON.stringify(data)).not.toMatch(/evil|tracker|slug|activision-us-80/);
   });
   it("filters categories and links only exact approved products to checkout", async () => {
     const { createHash } = await import("node:crypto");

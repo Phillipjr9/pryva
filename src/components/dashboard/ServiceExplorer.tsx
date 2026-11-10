@@ -1,5 +1,7 @@
 "use client";
 
+import { DigitalProductIcon } from "@/components/DigitalProductIcon";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BrandIcon } from "@/components/BrandIcon";
@@ -153,6 +155,7 @@ function VerifiedBrandLogo({ slug, size }: { slug: string; size: number }) {
 function itemArt(item: ExplorerItem, size: "sm" | "md" = "md") {
   const pixels = size === "sm" ? 28 : 42;
   switch (item.artwork.kind) {
+    case "digital-product": return <DigitalProductIcon key={item.id} name={item.name} artwork={item.artwork.art} size={pixels} />;
     case "brand": return <BrandIcon brand={item.artwork.name} size={pixels} decorative />;
     case "network": return <NetworkBadge provider={item.artwork.name} size={pixels} />;
     case "service": return <ServiceIcon service={item.artwork.name} size={size} />;
