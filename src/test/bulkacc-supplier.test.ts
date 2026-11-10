@@ -229,6 +229,26 @@ describe("supplier client: money-spending safety", () => {
     expect(() => usdMicros("9".repeat(12))).toThrow();
   });
 
+  it("coalesces concurrent catalogue reads within one instance and retries failures", async () => {
+    let resolveFetch!: (response: Response) => void;
+    const pending = new Promise<Response>((resolve) => { resolveFetch = resolve; });
+    const fetchMock = vi.fn().mockReturnValueOnce(pending);
+    vi.stubGlobal("fetch", fetchMock);
+    const first = listAllProducts();
+    const second = listAllProducts();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    resolveFetch(jsonResponse({ data: { items: [{ code: "1", name: "Instagram", price: 1 }], totalPages: 1 } }));
+    expect((await first).map((p) => p.code)).toEqual(["1"]);
+    expect((await second).map((p) => p.code)).toEqual(["1"]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    clearBulkaccCache();
+    fetchMock.mockRejectedValueOnce(new Error("offline"));
+    await expect(listAllProducts()).rejects.toThrow();
+    fetchMock.mockResolvedValueOnce(jsonResponse({ data: { items: [{ code: "2", name: "TikTok", price: 1 }], totalPages: 1 } }));
+    expect((await listAllProducts()).map((p) => p.code)).toEqual(["2"]);
+  });
+
   it("walks the catalog once, de-duplicates codes and serves the second read from cache", async () => {
     const page = (items: unknown[], totalPages: number) =>
       jsonResponse({ data: { items, totalCount: items.length, pageIndex: 1, pageSize: 200, totalPages }, statusCode: 200, message: "success" });

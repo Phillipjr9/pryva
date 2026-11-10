@@ -273,6 +273,9 @@ const CATALOG_PAGE_SIZE = 200;
 
 type CacheEntry = { value: BulkaccProduct[]; expiresAt: number };
 let catalogCache: CacheEntry | null = null;
+/** Coalesce catalogue reads within one instance; the supplier budget is shared
+ * across instances, so this does not by itself limit distributed concurrency. */
+let catalogInFlight: Promise<BulkaccProduct[]> | null = null;
 
 export function clearBulkaccCache(): void {
   catalogCache = null;
@@ -326,24 +329,33 @@ export async function listProducts(pageIndex = 1, pageSize = CATALOG_PAGE_SIZE):
 export async function listAllProducts(): Promise<BulkaccProduct[]> {
   if (catalogCache && Date.now() < catalogCache.expiresAt) return catalogCache.value;
 
-  const products: BulkaccProduct[] = [];
-  const seen = new Set<string>();
-  let page = 1;
-  let totalPages = 1;
+  if (catalogInFlight) return catalogInFlight;
+  const read = (async () => {
+    const products: BulkaccProduct[] = [];
+    const seen = new Set<string>();
+    let page = 1;
+    let totalPages = 1;
 
-  do {
-    const result = await listProducts(page);
-    totalPages = Math.max(1, Math.min(result.totalPages, MAX_CATALOG_PAGES));
-    for (const product of result.items) {
-      if (seen.has(product.code)) continue;
-      seen.add(product.code);
-      products.push(product);
-    }
-    page += 1;
-  } while (page <= totalPages && page <= MAX_CATALOG_PAGES);
+    do {
+      const result = await listProducts(page);
+      totalPages = Math.max(1, Math.min(result.totalPages, MAX_CATALOG_PAGES));
+      for (const product of result.items) {
+        if (seen.has(product.code)) continue;
+        seen.add(product.code);
+        products.push(product);
+      }
+      page += 1;
+    } while (page <= totalPages && page <= MAX_CATALOG_PAGES);
 
-  catalogCache = { value: products, expiresAt: Date.now() + CATALOG_TTL_MS };
-  return products;
+    catalogCache = { value: products, expiresAt: Date.now() + CATALOG_TTL_MS };
+    return products;
+  })();
+  catalogInFlight = read;
+  try {
+    return await read;
+  } finally {
+    if (catalogInFlight === read) catalogInFlight = null;
+  }
 }
 
 export type CatalogProbe =
