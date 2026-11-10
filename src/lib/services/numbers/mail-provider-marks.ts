@@ -36,8 +36,8 @@ export type MailProviderMark = {
   /**
    * Lowercased needles that identify the provider in a listing name or domain.
    * A dotted needle (`mail.ru`, `web.de`) or short bare token (`qq`, `msn`)
-   * must match at a token boundary. Longer brand words are matched as
-   * substrings, so `protonmail` can be found inside a product label.
+   * must match at a token boundary. Brand names also require token boundaries;
+   * domain identities are checked separately against exact provider domains.
    */
   match: readonly string[];
 };
@@ -123,37 +123,48 @@ export const MAIL_PROVIDER_MARKS: readonly MailProviderMark[] = [
   },
 ];
 
-type Needle = { readonly text: string; readonly brand: BrandSlug; readonly wholeWord: boolean };
+/** Explicit provider-owned domains, including known mailbox aliases. A host is
+ * matched as a whole domain (or a true subdomain), never as a substring. */
+const PROVIDER_DOMAINS: Readonly<Record<string, BrandSlug>> = {
+  "gmail.com": "gmail", "googlemail.com": "gmail",
+  "outlook.com": "outlook", "hotmail.com": "outlook", "live.com": "outlook", "msn.com": "outlook",
+  "proton.me": "protonmail", "protonmail.com": "protonmail", "pm.me": "protonmail",
+  "mail.ru": "maildotru", "bk.ru": "maildotru", "list.ru": "maildotru", "inbox.ru": "maildotru",
+  "yahoo.com": "yahoo", "ymail.com": "yahoo", "rocketmail.com": "yahoo",
+  "zoho.com": "zoho", "gmx.com": "gmx", "gmx.de": "gmx", "gmx.net": "gmx",
+  "icloud.com": "icloud", "me.com": "icloud", "mac.com": "icloud",
+  "yandex.com": "yandex", "yandex.ru": "yandex", "ya.ru": "yandex",
+  "tuta.com": "tuta", "tutanota.com": "tuta", "tutanota.de": "tuta",
+  "qq.com": "qq", "mail.com": "maildotcom", "web.de": "webdotde", "naver.com": "naver",
+};
 
-const MATCH_INDEX: readonly Needle[] = MAIL_PROVIDER_MARKS.flatMap((provider) =>
-  provider.match.map((text) => ({
-    text,
-    brand: provider.brand,
-    // Dotted domains and short bare tokens need a boundary. Otherwise a domain
-    // like "10minutemail.com" falsely contains the mail.com logo in its name.
-    wholeWord: text.includes(".") || text.length <= 3,
-  })),
-);
-
-function present(haystack: string, needle: Needle): boolean {
-  if (!needle.wholeWord) return haystack.includes(needle.text);
-  const escaped = needle.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(haystack);
+function brandForHostname(hostname: string): BrandSlug | null {
+  for (const [root, brand] of Object.entries(PROVIDER_DOMAINS)) {
+    if (hostname === root || hostname.endsWith(`.${root}`)) return brand;
+  }
+  return null;
 }
 
-/**
- * The real mark for a provider named in `name` or `domain`, or null.
- *
- * Both fields are lowercased once and searched together: the feed sometimes
- * names a product only by its domain, so "outlook.com" has to resolve as surely
- * as "Outlook inbox". A miss returns null so the catalogue can try the listed
- * site's own favicon; it never guesses another provider's mark.
- */
+/** Resolve only explicit provider identities. A supplied hostname takes
+ * precedence over marketing text: a site called "incogmail.com" is not Gmail.
+ * Standalone names such as "Gmail inbox" remain supported when there is no
+ * hostname. Unknown domains use their own favicon, not a different brand. */
 export function mailProviderBrand(name: string | null, domain?: string | null): BrandSlug | null {
-  const haystack = `${name ?? ""} ${domain ?? ""}`.toLowerCase();
-  if (!haystack.trim()) return null;
-  for (const needle of MATCH_INDEX) {
-    if (present(haystack, needle)) return needle.brand;
+  const hostname = mailProviderFaviconDomain(null, domain) ?? mailProviderFaviconDomain(name, null);
+  if (hostname) return brandForHostname(hostname);
+
+  const text = (name ?? "").toLowerCase();
+  // A domain embedded in a descriptive label must also be evaluated as a
+  // whole. Never fall back to a word inside an unknown domain.
+  const embeddedHost = text.match(/\b[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+\b/)?.[0];
+  if (embeddedHost) return brandForHostname(embeddedHost);
+
+  for (const provider of MAIL_PROVIDER_MARKS) {
+    for (const needle of provider.match) {
+      if (needle.includes(".") || needle.startsWith("@")) continue;
+      const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(text)) return provider.brand;
+    }
   }
   return null;
 }

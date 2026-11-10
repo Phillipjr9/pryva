@@ -110,9 +110,9 @@ function SiteFavicon({ domain, size, verification = false }: { domain: string; s
       className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line/70 bg-white"
       style={{ width: size, height: size }}
     >
-      {/* The supplier lists destination sites as well as mail providers. Their
-          published favicons are the only honest logos for brands not bundled
-          with the app; this endpoint returns the site's real favicon. */}
+      {/* The supplier lists destination sites as well as mail providers. The
+          favicon service may have no icon or return a generic placeholder, so
+          requesting a favicon alone does not verify the site's artwork. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`}

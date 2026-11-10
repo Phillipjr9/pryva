@@ -105,6 +105,16 @@ describe("mail provider marks", () => {
     expect(mailProviderBrand("Inbox at mail.yandex.ru", null)).toBe("yandex");
   });
 
+  it("never assigns a provider logo to an unrelated domain containing its name", () => {
+    for (const domain of ["incogmail.com", "selfdestructingmail.com", "mymail-in.net", "mymailoasis.com", "proxymail.eu", "temporarymailaddress.com", "trash-mail.com", "trash-me.com", "temp-mail.ru", "fake-yahoo.com", "yahoo.com.evil.net"]) {
+      expect(mailProviderBrand(domain, domain), domain).toBeNull();
+      expect(mailProviderFaviconDomain(domain, domain), domain).toBe(domain);
+    }
+    expect(mailProviderBrand("Gmail inbox", "incogmail.com")).toBeNull();
+    expect(mailProviderBrand("gmail.com", "gmail.com")).toBe("gmail");
+    expect(mailProviderBrand("inbox.ru", "inbox.ru")).toBe("maildotru");
+  });
+
   it("resolves a safe site domain for its own published favicon", () => {
     for (const domain of ["10minutemail.com", "126.com", "163.com", "adobe.com", "airbnb.com", "alibaba.com"]) {
       expect(mailProviderFaviconDomain(domain, null), `${domain} should have its own favicon`).toBe(domain);

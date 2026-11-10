@@ -10,12 +10,12 @@ export function DigitalProductIcon({ name, artwork, size = 44 }: { name: string;
   const art = artwork === undefined ? digitalArtwork(name) : parseDigitalArtwork(artwork);
   if (art?.kind === "brand") return <BrandIcon brand={art.key} size={size} decorative />;
   const src = art?.kind === "local"
-    ? `/digital-brand-icons/${art.key}.png`
+    ? art.key === "likee" ? "/verification-logos/social-likee.png" : `/digital-brand-icons/${art.key}.png`
     : art?.kind === "indexed"
       ? `https://cdn.jsdelivr.net/npm/simple-icons@${DIGITAL_ICON_VERSION}/icons/${art.key}.svg`
     : art?.kind === "category" && Object.hasOwn(CATEGORY_ART, art.key)
     ? `/digital-artwork/${art.key}`
-    : art?.kind === "simple" && ["pubg", "fortnite", "valorant", "googleplay"].includes(art.key)
+    : art?.kind === "simple" && ["pubg", "fortnite", "valorant", "googleplay", "itunes"].includes(art.key)
       ? `/digital-brand-icons/${art.key}.svg` : null;
   return <span aria-hidden="true" className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line bg-white text-ink-3" style={{ width: size, height: size }}>
     {src && failedSrc !== src ? <>

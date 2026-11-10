@@ -15,6 +15,9 @@ const SOCIAL_MARKS: Readonly<Record<string, string>> = {
   "tidal": "tidal",
   "ok.ru": "odnoklassniki",
   "apple music": "applemusic",
+  // The supplier explicitly labels this shelf as the iTunes Store, not merely
+  // "Podcast". Generic or multi-platform podcast services remain unassigned.
+  "podcast [itunes store]": "applepodcasts",
   "shazam": "shazam",
   "bluesky": "bluesky",
   "rednote": "xiaohongshu",
@@ -31,6 +34,7 @@ const RASTER_MARKS: Readonly<Record<string, string>> = {
   "rutube.ru": "rutube",
   "line voom": "line-voom",
   "trovo": "trovo",
+  "coub": "coub",
 };
 
 const OTHER_PREFIXES: ReadonlyArray<readonly [RegExp, string]> = [

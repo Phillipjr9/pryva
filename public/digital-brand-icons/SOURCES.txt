@@ -3,3 +3,13 @@ AstroPay icon: OpenFinTech, resources/vendors/astropay/icon.png, commit 30980d2b
 Call of Duty: Mobile logo: https://commons.wikimedia.org/wiki/File:Call_of_Duty_Mobile_2023_logo.svg — Wikimedia Commons attributes the logo to Call of Duty and describes it as PD-textlogo. This is a rasterized thumbnail of that file; trademarks remain with their owner.
 
 Fortnite, Google Play, PUBG and Valorant marks: Simple Icons, CC0-1.0. Names and logos are trademarks of their owners.
+
+EA SPORTS FC 26 logo: Electronic Arts, resized raster thumbnail of https://commons.wikimedia.org/wiki/File:FC_26_Logo.svg, described there as PD-textlogo. Trademarks apply.
+
+Nintendo Switch Online logo: Nintendo, resized raster thumbnail of https://commons.wikimedia.org/wiki/File:Nintendo_Switch_Online_logo.svg, described there as PD-textlogo. Trademarks apply.
+
+Apex Legends logo photograph: dronepicr, https://commons.wikimedia.org/wiki/File:Apex_Legends_logo.jpg, cropped from https://www.flickr.com/photos/132646954@N02/48605673176/ and resized here. Licensed CC BY 2.0, https://creativecommons.org/licenses/by/2.0/ . The logo is a trademark of its owner.
+
+iTunes mark: Simple Icons 16.36.0, CC0-1.0; see ../verification-logos/social/LICENSE-simple-icons.txt. The iTunes name and mark are Apple trademarks.
+
+Nintendo eShop logo: Nintendo; resized raster image from https://commons.wikimedia.org/wiki/File:Nintendo_eShop_Logo_(2025).jpg, described there as PD-textlogo. Trademarks apply.

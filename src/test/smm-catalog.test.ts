@@ -398,7 +398,7 @@ describe("reviewed local social platform artwork", () => {
     const cases = [
       ["Shopee", "shopee"], ["Clubhouse", "clubhouse"], ["CoinMarketCap", "coinmarketcap"],
       ["Rumble", "rumble"], ["Tidal", "tidal"], ["Ok.ru", "odnoklassniki"],
-      ["Apple Music", "applemusic"], ["Shazam", "shazam"], ["BlueSky", "bluesky"],
+      ["Apple Music", "applemusic"], ["Podcast [iTunes Store]", "applepodcasts"], ["Shazam", "shazam"], ["BlueSky", "bluesky"],
       ["RedNote", "xiaohongshu"], ["Reverbenation", "reverbnation"], ["Line", "line"],
     ];
     for (const [platform, slug] of cases) {
@@ -422,7 +422,21 @@ describe("reviewed local social platform artwork", () => {
     expect(socialArtwork("Medium", "Medium quality followers")).toBeNull();
     expect(socialArtwork("Line Voom", "Line Voom Views")).toEqual({ kind: "verified-brand-logo", slug: "social-line-voom", format: "png" });
     expect(socialArtwork("Shopee partner", "Shopee partner followers")).toBeNull();
+    expect(socialArtwork("Podcast", "Podcast Subscribers")).toBeNull();
+    expect(socialArtwork("Podcast [Spotify]", "Podcast Subscribers")).toBeNull();
     expect(socialArtwork(null, "Rarible Followers")).toBeNull();
+  });
+
+  it("uses Apple Podcasts only for the explicitly named iTunes Store shelf", async () => {
+    const { describeBoost } = await import("@/lib/services/boosts/smm-catalog");
+    expect(describeBoost(service({ name: "Podcast Subscribers", category: "Podcast [iTunes Store]" }), "NGN"))
+      .toMatchObject({ platform: "Podcast [iTunes Store]", artwork: { kind: "verified-brand-logo", slug: "social-applepodcasts" } });
+    expect(describeBoost(service({ name: "Spotify Podcast Subscribers", category: "Podcast [iTunes Store]" }), "NGN"))
+      .toMatchObject({ platform: "Spotify", artwork: { kind: "brand", name: "spotify" } });
+    expect(describeBoost(service({ name: "Podcast Subscribers", category: "Podcast" }), "NGN").artwork)
+      .toEqual({ kind: "service", name: "social-promotion" });
+    expect(describeBoost(service({ name: "Coub Likes", category: "Coub Likes" }), "NGN"))
+      .toMatchObject({ platform: "Coub", artwork: { kind: "verified-brand-logo", slug: "social-coub", format: "png" } });
   });
 
   it("does not change classification, pricing or buy actions for an existing listing", async () => {
@@ -446,13 +460,23 @@ describe("social product identity takes precedence over supplier shelf", () => {
     const unnamed = describeBoost(service({ name: "Custom Comments", category: "Instagram - Comments" }), "NGN");
     expect(unnamed).toMatchObject({ platform: "Instagram", artwork: { kind: "brand", name: "instagram" } });
   });
+
+  it("identifies YouTube videos shared through another social network", async () => {
+    const { describeBoost } = await import("@/lib/services/boosts/smm-catalog");
+    for (const name of ["YouTube Social Shares [From Facebook]", "YouTube Social Shares from Linkedin", "Youtube Pinterest Shares", "YouTube Social Shares [From Vkontakte]"]) {
+      expect(describeBoost(service({ name, category: "YouTube" }), "NGN"))
+        .toMatchObject({ platform: "YouTube", artwork: { kind: "brand", name: "youtube" } });
+    }
+    expect(describeBoost(service({ name: "Facebook Shares", category: "YouTube" }), "NGN"))
+      .toMatchObject({ platform: "Facebook", artwork: { kind: "brand", name: "facebook" } });
+  });
 });
 
 describe("reviewed raster social artwork", () => {
   it("returns the correct local file format for the reviewed platforms", async () => {
     const { socialArtwork } = await import("@/lib/services/boosts/social-artwork");
     const { existsSync } = await import("node:fs");
-    for (const [platform, slug] of [["Likee", "likee"], ["Boomplay", "boomplay"], ["Rutube.ru", "rutube"], ["Line Voom", "line-voom"], ["Trovo", "trovo"]]) {
+    for (const [platform, slug] of [["Likee", "likee"], ["Boomplay", "boomplay"], ["Rutube.ru", "rutube"], ["Line Voom", "line-voom"], ["Trovo", "trovo"], ["Coub", "coub"]]) {
       expect(socialArtwork(platform, `${platform} Followers`)).toEqual({ kind: "verified-brand-logo", slug: `social-${slug}`, format: "png" });
       expect(existsSync(`public/verification-logos/social-${slug}.png`)).toBe(true);
     }

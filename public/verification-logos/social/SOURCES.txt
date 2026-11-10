@@ -26,3 +26,6 @@ Raster logos (not from Simple Icons):
 - social-yandex-zen.png: VK / Zen (formerly Yandex Zen); rasterized thumbnail of
   https://commons.wikimedia.org/wiki/File:Zen_logo_icon.svg, identified by
   Commons as simple geometry in the public domain; trademarks apply.
+- social-coub.png: Coub team; resized raster thumbnail of
+  https://commons.wikimedia.org/wiki/File:Coub.svg, sourced there from Coub's
+  brand assets and identified as PD-textlogo. Trademarks apply.

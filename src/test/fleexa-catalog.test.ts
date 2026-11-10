@@ -106,7 +106,7 @@ describe("read-only supplier catalog", () => {
 
   it("uses each listed website's own published favicon when the listing is a destination site", async () => {
     const { supplierItemsForCountry } = await import("@/lib/services/numbers/fleexa-catalog");
-    const domains = ["10minutemail.com", "126.com", "163.com", "adobe.com", "airbnb.com", "alibaba.com"];
+    const domains = ["10minutemail.com", "126.com", "163.com", "adobe.com", "airbnb.com", "alibaba.com", "incogmail.com", "mymail-in.net", "proxymail.eu", "trash-me.com", "temp-mail.ru", "trash-mail.com"];
     const items = supplierItemsForCountry(
       {
         ...snapshot,

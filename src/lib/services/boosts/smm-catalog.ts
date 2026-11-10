@@ -298,6 +298,12 @@ function fallbackPlatform(service: SmmService): DetectedPlatform {
 function detectPlatform(service: SmmService): DetectedPlatform | null {
   const text = `${service.name ?? ""} ${service.category ?? ""}`;
   if (NON_SOCIAL.test(text)) return null;
+  // These offerings promote a YouTube video *through* another network. The
+  // source network in the name is not the target service's identity.
+  if (/^\s*youtube\s+(?:social\s+shares?\s+(?:\[\s*)?from\b|(?:facebook|linkedin|pinterest|vkontakte)\s+shares?\b)/i.test(service.name ?? "")) {
+    const youtube = PLATFORM_MATCHERS.find((candidate) => candidate.platform.name === "YouTube");
+    if (youtube) return { name: youtube.platform.name, brand: youtube.platform.brand, rank: youtube.rank };
+  }
   // The actual listing is more specific than the supplier's broad shelf.
   // For example, Threads and TikTok products can be filed under Instagram.
   // Matching both strings together incorrectly gives them Instagram's logo.
