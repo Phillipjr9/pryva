@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { parseDigitalArtwork } from "@/lib/content/digital-artwork";
 import type { ExplorerFilter, ExplorerItem } from "@/lib/services/service-explorer";
 import { isNamedGiftCard } from "@/lib/services/digital-service-category";
+import { reportedGiftTerms } from "@/lib/services/gift-cards/reported-terms";
 
 type Root = { slug: string; category: ExplorerItem["category"]; label: string; icon: "esim" | "bulk" | "data" | "gift-cards" | "subscriptions" | "games" | "topups" | "prepaid"; giftCardsOnly?: boolean; allOnly?: boolean };
 // Only known real product families. Test-order listings are not a customer shelf.
@@ -55,9 +56,14 @@ async function load(root: Root, query: string, cursor: string | undefined, signa
       const checkout = value.checkout === "codes" || value.checkout === "topups" || value.checkout === "esims" ? value.checkout : null;
       const category = root === ALL_PRODUCTS && isNamedGiftCard(value.name) ? "gift-cards" : root.category;
       const label = category === "gift-cards" && root === ALL_PRODUCTS ? "Gift card" : root.label;
+      const rawTerms = value.reportedTerms && typeof value.reportedTerms === "object" && !Array.isArray(value.reportedTerms) ? value.reportedTerms : null;
+      const termValue = rawTerms?.value && typeof rawTerms.value === "object" && !Array.isArray(rawTerms.value) ? rawTerms.value : null;
+      const terms = category === "gift-cards" ? reportedGiftTerms({ country_code: rawTerms?.country, amount: termValue?.amount, currency: termValue?.currency }) : null;
+      const termDetails = [terms?.value ? `Reported value: ${terms.value.amount} ${terms.value.currency}` : null,
+        terms?.country ? `Reported country: ${terms.country}` : null].filter(Boolean);
       items.push({ id: value.id, category, name: value.name, description: label, tag: label, ...(root.allOnly ? { allOnly: true } : {}),
         artwork: { kind: "digital-product", art: parseDigitalArtwork(value.artwork) }, source: "catalog", coverage: "unconfirmed", stock: null, myUnits: null, price: null,
-        crossCategorySearch: query.length >= 2, detail: `${value.stock === "reported" ? "Stock reported" : value.stock === "out" ? "Out of stock (reported)" : "Stock unknown"} · region unconfirmed`, orderingPaused: !checkout || value.stock !== "reported", action: checkout && value.stock === "reported" ? { label: "Check price and availability", href: `/dashboard/digital-${checkout}?product=${encodeURIComponent(value.id)}` } : null });
+        crossCategorySearch: query.length >= 2, detail: [`${value.stock === "reported" ? "Stock reported" : value.stock === "out" ? "Out of stock (reported)" : "Stock unknown"}`, ...termDetails, terms?.country ? "Redemption eligibility unconfirmed" : "region unconfirmed"].join(" · "), orderingPaused: !checkout || value.stock !== "reported", action: checkout && value.stock === "reported" ? { label: "Check price and availability", href: `/dashboard/digital-${checkout}?product=${encodeURIComponent(value.id)}` } : null });
     }
     return { root, items, next: data.nextCursor, limited: data.searchLimited === true, error: false };
   } catch {

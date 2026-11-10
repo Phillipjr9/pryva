@@ -107,8 +107,8 @@ describe("dashboard sidebar coverage", () => {
         `/dashboard/services?category=${category.id}`,
       );
     }
-    // Wallet-credit actions live inside the same gift-card category.
-    expect(hrefs).not.toContain("/dashboard/gift-cards");
+    // Pryva-issued wallet credit is managed separately from third-party cards.
+    expect(hrefs).toContain("/dashboard/gift-cards");
   });
 });
 

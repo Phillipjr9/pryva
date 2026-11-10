@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { digitalArtwork, type DigitalArtwork } from "@/lib/content/digital-artwork";
+import { reportedGiftTerms, type ReportedGiftTerms } from "@/lib/services/gift-cards/reported-terms";
 import { NextRequest } from "next/server";
 import { requireAuthApi } from "@/lib/identity/auth";
 import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
@@ -12,7 +13,7 @@ import { isFoxreloadConfigured, readFoxreloadBrowsePage } from "@/lib/providers/
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-/** Read-only customer-safe names and reported stock state; no wholesale costs or purchase action. */
+/** Read-only customer-safe names, reported stock and optional product terms; never wholesale costs. */
 export async function GET(request: NextRequest) {
   const user = await requireAuthApi();
   if (!user) return Response.json({ error: "Please sign in." }, { status: 401 });
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
   if (!limit.allowed) return Response.json({ error: "Too many requests. Try again shortly." }, { status: 429 });
   try {
     const page = await readFoxreloadBrowsePage({ query: query || undefined, cursor: cursor || undefined, ...(category ? { category } : {}), ...(stock === "available" ? { inStockOnly: true } : {}) });
-    const items: { id: string; name: string; stock: "reported" | "out" | "unknown"; artwork?: DigitalArtwork; checkout?: "codes" | "topups" | "esims" }[] = [];
+    const items: { id: string; name: string; stock: "reported" | "out" | "unknown"; artwork?: DigitalArtwork; reportedTerms?: ReportedGiftTerms; checkout?: "codes" | "topups" | "esims" }[] = [];
     const checkout = new Map<string, { name: string; kind: "codes" | "topups" | "esims" }>();
     for (const [kind, offers] of [["codes", listedCodeOffers()], ["topups", listedTopupOffers()], ["esims", listedEsimOffers()]] as const)
       for (const offer of offers) checkout.set(offer.id, { name: offer.name, kind });
@@ -53,7 +54,8 @@ export async function GET(request: NextRequest) {
       const stock = typeof product.quantity === "number" && Number.isSafeInteger(product.quantity) && product.quantity >= 0
         ? product.quantity > 0 ? "reported" : "out" : "unknown";
       const artwork = digitalArtwork(name, typeof product.slug === "string" ? product.slug : undefined);
-      items.push({ id: publicId, name, stock, ...(artwork ? { artwork } : {}), ...(approved?.name === name ? { checkout: approved.kind } : {}) });
+      const terms = product.deliveryType === "code" ? reportedGiftTerms(product.attributes) : null;
+      items.push({ id: publicId, name, stock, ...(artwork ? { artwork } : {}), ...(terms ? { reportedTerms: terms } : {}), ...(approved?.name === name ? { checkout: approved.kind } : {}) });
     }
     return Response.json({ ok: true, items, nextCursor: page.nextCursor, searchLimited: page.searchLimited, skipped: skipped > 0 }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {

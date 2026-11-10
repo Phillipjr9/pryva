@@ -2,7 +2,7 @@
 
 import { DigitalProductIcon } from "@/components/DigitalProductIcon";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BrandIcon } from "@/components/BrandIcon";
 import { CountryFlag } from "@/components/CountryFlag";
@@ -29,6 +29,7 @@ import {
   explorerCountry,
   filterExplorerItems,
   mergeExplorerSources,
+  cheapestVerifiedGiftCards,
   type ExplorerFilter,
   type ExplorerItem,
 } from "@/lib/services/service-explorer";
@@ -357,7 +358,6 @@ export function ServiceExplorer({
   readiness = [],
   enableDigitalCatalogue = false,
   reviewedItems = [],
-  giftCardManager,
 }: {
   initialCountry: string | null;
   initialCategory: string | null;
@@ -373,7 +373,6 @@ export function ServiceExplorer({
   readiness?: ServiceReadinessEntry[];
   enableDigitalCatalogue?: boolean;
   reviewedItems?: ExplorerItem[];
-  giftCardManager?: ReactNode;
 }) {
   const [country, setCountry] = useState(() => resolveExplorerCountry(initialCountry));
   const [category, setCategory] = useState<ExplorerFilter>(() => explorerCategory(initialCategory));
@@ -402,7 +401,7 @@ export function ServiceExplorer({
     // browse record (including its stock status) without losing curated offers
     // that have not yet appeared on a loaded page.
     const browsedIds = new Set(digital.items.map((item) => item.id));
-    return mergeExplorerSources([currentLive?.items ?? [], digital.items, reviewedItems.filter((item) => !browsedIds.has(item.id)), base]);
+    return cheapestVerifiedGiftCards(mergeExplorerSources([currentLive?.items ?? [], digital.items, reviewedItems.filter((item) => !browsedIds.has(item.id)), base]));
   }, [country, currentLive, digital.items, reviewedItems]);
   const filtered = useMemo(() => filterExplorerItems(items, category, search, tag), [items, category, search, tag]);
   /**
@@ -831,14 +830,11 @@ export function ServiceExplorer({
               </div>
             )}
             {digital.hasMore && <div className="mt-4 text-center"><button type="button" disabled={digital.loading || digital.loadingMore} onClick={() => { void digital.loadMore(); }} className="rounded-full border border-line bg-white px-4 py-2.5 text-meta font-semibold text-ink-2 disabled:opacity-50">{digital.loadingMore ? "Loading listings…" : "Load more digital listings"}</button></div>}
+            {category === "gift-cards" && <p className="mt-4 text-micro text-ink-3">Some listings have unconfirmed terms or prices. They remain visible because the cheapest equivalent cannot yet be verified.</p>}
             {enableDigitalCatalogue && (category === "all" || ["esim", "subscriptions", "games", "topups", "gift-cards", "prepaid"].includes(category)) && <p className="mt-4 text-micro text-ink-3">Digital product stock is reported and may change. Country coverage and ordering eligibility must be confirmed separately. {category === "all" ? "Browse categories or load more listings to explore the catalogue." : ""}</p>}
             <p className="mt-5 border-t border-line pt-4 text-micro leading-relaxed text-ink-3">Stock means available inventory. My units means your remaining purchased units. Unknown and not tracked are not the same as zero. Listings do not guarantee platform support or verified coverage.</p>
           </section>
-          {category === "gift-cards" && giftCardManager && <section id="wallet-gifts" aria-labelledby="wallet-gifts-title" className="scroll-mt-6 rounded-[1.5rem] border border-line bg-[#fffdfa] p-4 sm:p-6">
-            <h2 id="wallet-gifts-title" className="text-lg font-semibold text-ink">Wallet gift cards and gift-card management</h2>
-            <p className="mt-1 mb-4 text-meta text-ink-2">Send or redeem Pryva wallet credit, review your history, or manage previously listed brand cards.</p>
-            {giftCardManager}
-          </section>}
+
         </>
       )}
     </div>

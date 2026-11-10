@@ -66,6 +66,8 @@ export type ExplorerItem = {
   myUnits: number | null;
   price: number | null;
   priceFrom?: boolean;
+  /** Verified identical product, denomination, currency and redemption region. */
+  giftCardEquivalenceKey?: string;
   action: { label: string; href: string } | null;
   /** This listing is browse-only until its checkout is enabled. */
   orderingPaused?: boolean;
@@ -304,12 +306,6 @@ function additionalItems(_country: ExplorerCountry): ExplorerItem[] {
       action: { label: "Open temporary inbox", href: "/dashboard/inbox" },
     },
     {
-      id: "wallet-gift-cards", category: "gift-cards", name: "Pryva wallet gift cards",
-      description: "Send or redeem Pryva wallet credit", tag: "Wallet credit", artwork: { kind: "service", name: "gift-cards" },
-      source: "tool", coverage: "not-country-specific", stock: null, myUnits: null, price: null,
-      action: { label: "Manage wallet gift cards", href: "/dashboard/services?category=gift-cards#wallet-gifts" },
-    },
-    {
       id: "account-marketplace", category: "accounts", name: "Account marketplace",
       description: "Browse live listings", tag: "Digital accounts", artwork: { kind: "service", name: "accounts" },
       source: "catalog", coverage: "unconfirmed", stock: null, myUnits: null, price: null,
@@ -346,6 +342,21 @@ export function mergeExplorerSources(sources: readonly ExplorerItem[][]): Explor
     }
   }
   return interleaveExplorerItems(combined);
+}
+
+/** Only compare priced, orderable offers with an explicitly verified identical
+ * product and terms. Unknown prices, coverage, or availability never hide an offer. */
+export function cheapestVerifiedGiftCards(items: ExplorerItem[]): ExplorerItem[] {
+  const best = new Map<string, ExplorerItem>();
+  for (const item of items) {
+    if (item.category !== "gift-cards" || !item.giftCardEquivalenceKey || item.price === null || !Number.isFinite(item.price) || item.price < 0 || item.priceFrom || !item.action || item.orderingPaused) continue;
+    const old = best.get(item.giftCardEquivalenceKey);
+    if (!old || item.price < old.price!) best.set(item.giftCardEquivalenceKey, item);
+  }
+  return items.filter((item) => {
+    if (item.category !== "gift-cards" || !item.giftCardEquivalenceKey || item.price === null || !Number.isFinite(item.price) || item.price < 0 || item.priceFrom || !item.action || item.orderingPaused) return true;
+    return best.get(item.giftCardEquivalenceKey) === item;
+  });
 }
 
 /** Interleave categories so the All view doesn't bury whole service families. */

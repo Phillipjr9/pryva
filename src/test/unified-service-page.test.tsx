@@ -21,12 +21,18 @@ beforeEach(() => {
 });
 
 describe("shared service page", () => {
-  it("includes reviewed offers and wallet gift-card management in the hub", async () => {
+  it("includes reviewed offers without embedding wallet gift-card management", async () => {
     const page = await DashboardServicesPage({ searchParams: Promise.resolve({ category: "gift-cards" }) });
     expect(mocks.auth).toHaveBeenCalledWith("/dashboard/services?category=gift-cards");
     expect(page.props.reviewedItems.map((item: { name: string }) => item.name)).toEqual(["Steam Gift Card", "Telegram Stars"]);
-    expect(page.props.giftCardManager.props).toMatchObject({ initialTab: "create", brandSalesEnabled: false });
+    expect(page.props.giftCardManager).toBeUndefined();
     expect(page.props.initialCategory).toBe("gift-cards");
+  });
+  it("puts enabled legacy brand denominations into the shared catalogue", async () => {
+    mocks.legacy.mockReturnValue(true);
+    const page = await DashboardServicesPage({ searchParams: Promise.resolve({ category: "gift-cards" }) });
+    const offer = page.props.reviewedItems.find((item: { id: string }) => item.id === "legacy-gift-steam-usd-10");
+    expect(offer).toMatchObject({ category: "gift-cards", price: 16500, action: { href: "/dashboard/gift-cards/brand?denomination=steam-usd-10" } });
   });
   it("does not expose reviewed purchases in financially blocked environments", async () => {
     mocks.blocked.mockReturnValue(true);

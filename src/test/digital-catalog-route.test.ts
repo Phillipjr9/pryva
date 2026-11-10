@@ -103,3 +103,23 @@ describe("read-only digital catalogue route", () => {
     expect(JSON.stringify(await response.json())).not.toContain("secret");
   });
 });
+
+describe("reported gift terms", () => {
+  it("returns only validated face value and country, never the supplier price", async () => {
+    mocks.page.mockResolvedValueOnce({ rows: [{ id: "gc", name: "Example Gift Card", deliveryType: "code", quantity: 1, price: "123.45", currency: "rub", attributes: { amount: 25, currency: "USD", face_value_amount: 25, face_value_currency: "USD", country_code: "US", private: "secret" } }], nextCursor: null, searchLimited: false });
+    const data = await (await GET(request())).json();
+    expect(data.items[0].reportedTerms).toEqual({ country: "US", value: { amount: 25, currency: "USD" } });
+    expect(JSON.stringify(data)).not.toMatch(/123\.45|rub|secret|private/);
+  });
+  it("does not report conflicting or unsafe terms or accept non-code product terms", async () => {
+    mocks.page.mockResolvedValueOnce({ rows: [
+      { id: "a", name: "Card", deliveryType: "code", attributes: { country_code: "US", amount: 10, currency: "USD", face_value_amount: 20 } },
+      { id: "b", name: "Bad", deliveryType: "code", attributes: { country_code: "<bad>", amount: -1, currency: "USD" } },
+      { id: "c", name: "Other", deliveryType: "direct_topup", attributes: { country_code: "US", amount: 10, currency: "USD" } },
+    ], nextCursor: null, searchLimited: false });
+    const data = await (await GET(request())).json();
+    expect(data.items[0].reportedTerms).toEqual({ country: "US" });
+    expect(data.items[1]).not.toHaveProperty("reportedTerms");
+    expect(data.items[2]).not.toHaveProperty("reportedTerms");
+  });
+});

@@ -3,8 +3,8 @@ import { requireUser } from "@/lib/identity/auth";
 import { ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
 import { explorerCategory, explorerCountry } from "@/lib/services/service-explorer";
 import { readServiceReadiness } from "@/lib/services/service-readiness";
-import { GiftCardsManager } from "@/app/dashboard/gift-cards/GiftCardsManager";
 import { legacyBrandGiftCardSalesEnabled } from "@/lib/services/gift-cards/brand-readiness";
+import { legacyGiftCardItems } from "@/lib/services/gift-cards/explorer-items";
 import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import { listedCodeOffers } from "@/lib/services/foxreload/code-orders";
 import { listedTopupOffers } from "@/lib/services/foxreload/topup-orders";
@@ -27,7 +27,7 @@ export default async function DashboardServicesPage({
   if (country && explorerCountry(country)) next.set("country", country);
   if (category && explorerCategory(category) !== "all") next.set("category", category);
   if (category === "esim" && params.allDestinations === "1") next.set("allDestinations", "1");
-  const user = await requireUser(`/dashboard/services${next.size ? `?${next}` : ""}`);
+  await requireUser(`/dashboard/services${next.size ? `?${next}` : ""}`);
   const canSell = !financialActionsUnavailable();
   const reviewed = reviewedDigitalItems(canSell ? [
     ...listedCodeOffers().map(({ id, name, region }) => ({ id, name, region, kind: "codes" as const })),
@@ -51,8 +51,7 @@ export default async function DashboardServicesPage({
       rejectedCountry={rejectedCountry}
       rejectedCategory={rejectedCategory}
       readiness={readiness}
-      reviewedItems={reviewed}
-      giftCardManager={<GiftCardsManager user={user} brandSalesEnabled={legacyBrandGiftCardSalesEnabled()} initialTab="create" />}
+      reviewedItems={[...reviewed, ...legacyGiftCardItems(legacyBrandGiftCardSalesEnabled())]}
       enableDigitalCatalogue
     />
   );

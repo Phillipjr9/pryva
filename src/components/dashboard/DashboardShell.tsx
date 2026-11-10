@@ -57,6 +57,7 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
       { href: "/dashboard", label: "Overview", nav: "overview" },
       { href: "/dashboard/orders", label: "Orders", nav: "orders" },
       { href: "/dashboard/wallet", label: "Wallet", nav: "wallet" },
+      { href: "/dashboard/gift-cards", label: "Pryva gift cards", art: "gift-cards" },
       // Free, and the only thing on this list that is: one inbox a day, nothing
       // retained. It sits under Manage rather than Buy because no money moves.
       { href: "/dashboard/inbox", label: "Temporary inbox", nav: "inbox" },

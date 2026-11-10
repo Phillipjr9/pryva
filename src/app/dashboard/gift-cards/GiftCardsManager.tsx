@@ -16,6 +16,7 @@ interface GiftCardsManagerProps {
   user: PublicUser;
   brandSalesEnabled: boolean;
   initialTab?: "brands" | "create" | "redeem" | "history";
+  checkoutDenominationId?: string;
 }
 
 type Tab = "brands" | "create" | "redeem" | "history";
@@ -27,7 +28,7 @@ const TAB_LABELS: Record<Tab, string> = {
   history: "History",
 };
 
-export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "brands" }: GiftCardsManagerProps) {
+export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create", checkoutDenominationId }: GiftCardsManagerProps) {
   const router = useRouter();
   const creating = useRef(false);
   const redeeming = useRef(false);
@@ -36,10 +37,10 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "brands
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
   // Brand Gift Card Store State
-  const [selectedBrandSlug, setSelectedBrandSlug] = useState<string>("steam");
+  const [selectedBrandSlug, setSelectedBrandSlug] = useState<string>(() => BRAND_GIFT_CARDS.find((brand) => brand.denominations.some((d) => d.id === checkoutDenominationId))?.slug ?? "steam");
   const selectedBrand = BRAND_GIFT_CARDS.find((b) => b.slug === selectedBrandSlug) ?? BRAND_GIFT_CARDS[0];
   const [selectedDenomId, setSelectedDenomId] = useState<string>(
-    selectedBrand.denominations.find((d) => d.popular)?.id ?? selectedBrand.denominations[0].id,
+    checkoutDenominationId ?? selectedBrand.denominations.find((d) => d.popular)?.id ?? selectedBrand.denominations[0].id,
   );
   const selectedDenom =
     selectedBrand.denominations.find((d) => d.id === selectedDenomId) ?? selectedBrand.denominations[0];
@@ -260,8 +261,8 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "brands
       <PaymentLoading show={loading || redeemLoading || brandOrderLoading} message="Processing your order..." />
       <div className="space-y-6">
         {/* Tabs */}
-        <div className="flex flex-wrap gap-2 border-b border-line">
-          {(["brands", "create", "redeem", "history"] as Tab[]).map((tab) => (
+        {!checkoutDenominationId && <div className="flex flex-wrap gap-2 border-b border-line">
+          {(["create", "redeem", "history"] as Tab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => {
@@ -282,14 +283,14 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "brands
               {TAB_LABELS[tab]}
             </button>
           ))}
-        </div>
+        </div>}
 
-        {/* Brand Gift Cards Tab */}
+        {/* Brand checkout is reached from the unified gift-card catalogue. */}
         {activeTab === "brands" && (
           <div className="space-y-8">
             {!brandSalesEnabled && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-meta text-amber-900">These legacy brand gift card purchases are currently unavailable. Other gift-card listings are shown above. <Link href="/dashboard/orders" className="font-semibold underline">View previous orders</Link>. You can still send or redeem wallet credit.</p>}
             {/* Brand Selection Grid */}
-            <div>
+            {!checkoutDenominationId && <div>
               <label className="block text-[0.875rem] font-semibold text-ink mb-3">
                 Select Gift Card Brand
               </label>
@@ -314,7 +315,7 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "brands
                   </button>
                 ))}
               </div>
-            </div>
+            </div>}
 
             {/* Selected Brand Details & Denomination Picker */}
             <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
@@ -337,7 +338,7 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "brands
                   Select Denomination
                 </label>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {selectedBrand.denominations.map((denom) => (
+                  {selectedBrand.denominations.filter((denom) => !checkoutDenominationId || denom.id === checkoutDenominationId).map((denom) => (
                     <button
                       key={denom.id}
                       type="button"

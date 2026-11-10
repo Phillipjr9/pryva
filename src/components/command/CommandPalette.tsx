@@ -45,6 +45,7 @@ const COMMANDS: Command[] = [
   { id: "digital", label: "Subscriptions", icon: Grid, group: "Navigate", href: "/dashboard/services?category=subscriptions" },
   { id: "data", label: "Data plans", icon: Grid, group: "Navigate", href: "/dashboard/data" },
   { id: "gift-cards", label: "Gift cards", icon: Gift, group: "Navigate", href: "/dashboard/services?category=gift-cards" },
+  { id: "pryva-gift-cards", label: "Pryva gift cards", icon: Gift, group: "Manage", href: "/dashboard/gift-cards" },
   { id: "bulk", label: "Bulk orders", icon: ShoppingCart, group: "Navigate", href: "/dashboard/bulk-orders" },
   { id: "scheduled", label: "Scheduled orders", icon: Calendar, group: "Navigate", href: "/dashboard/scheduled" },
   { id: "notifications", label: "Notifications", icon: Bell, group: "Manage", href: "/dashboard/notifications" },

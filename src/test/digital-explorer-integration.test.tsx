@@ -57,7 +57,7 @@ describe("digital listings in service categories", () => {
       const root = new URL(url, "https://example.test").searchParams.get("category");
       return response({ ok: true, items: root === "gift-cards" ? [{ id: id("a"), name: "Netflix Gift Card", stock: "out", checkout: "codes" }] : [], nextCursor: null });
     }));
-    render(<ServiceExplorer initialCountry="ng" initialCategory="gift-cards" enableDigitalCatalogue reviewedItems={reviewed} giftCardManager={<div>Wallet gift manager</div>} />);
+    render(<ServiceExplorer initialCountry="ng" initialCategory="gift-cards" enableDigitalCatalogue reviewedItems={reviewed} />);
     expect(await screen.findByRole("heading", { name: "Netflix Gift Card" })).toBeTruthy();
     expect(screen.getAllByRole("heading", { name: "Netflix Gift Card" })).toHaveLength(1);
     await waitFor(() => {
@@ -65,7 +65,7 @@ describe("digital listings in service categories", () => {
       expect(within(card).getByRole("button", { name: "Ordering paused" })).toHaveProperty("disabled", true);
     });
     expect(screen.queryByRole("heading", { name: "Mystery code" })).toBeNull();
-    expect(screen.getByText("Wallet gift manager")).toBeTruthy();
+    expect(screen.queryByText("Wallet gift manager")).toBeNull();
   });
   it("renders curated artwork for generic denomination names on explorer cards", async () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
@@ -176,7 +176,7 @@ describe("digital listings in service categories", () => {
     expect(screen.queryByRole("heading", { name: "Roblox 100 Robux" })).toBeNull();
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("q=Roblox"))).toBe(true);
   });
-  it("groups gift cards from game currency and the whole catalogue alongside wallet gifts, without treating all games as cards", async () => {
+  it("groups gift cards from game currency and the whole catalogue without treating all games as cards", async () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       const params = new URL(url, "https://example.test").searchParams;
       const root = params.get("category");
@@ -193,6 +193,19 @@ describe("digital listings in service categories", () => {
     expect(await screen.findByRole("heading", { name: "Other Store Gift Card" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Roblox 100 Robux" })).toBeNull();
     expect(screen.getAllByRole("heading", { name: "Roblox Gift Card 25 USD" })).toHaveLength(1);
-    expect(screen.getByRole("link", { name: "Manage wallet gift cards" }).getAttribute("href")).toBe("/dashboard/services?category=gift-cards#wallet-gifts");
+    expect(screen.queryByRole("link", { name: "Manage wallet gift cards" })).toBeNull();
   });
+});
+
+it("shows reported gift-card terms as unconfirmed, not a retail price or eligibility guarantee", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    const root = new URL(url, "https://example.test").searchParams.get("category");
+    return response({ ok: true, items: root === "gift-cards" ? [{ id: id("e"), name: "Example Gift Card", stock: "reported", reportedTerms: { country: "US", value: { amount: 25, currency: "USD" } } }] : [], nextCursor: null });
+  }));
+  render(<ServiceExplorer initialCountry="ng" initialCategory="gift-cards" enableDigitalCatalogue />);
+  const card = (await screen.findByRole("heading", { name: "Example Gift Card" })).closest("article")!;
+  expect(within(card).getAllByText(/Reported value: 25 USD/).length).toBeGreaterThan(0);
+  expect(within(card).getAllByText(/Reported country: US/).length).toBeGreaterThan(0);
+  expect(within(card).getAllByText(/Redemption eligibility unconfirmed/).length).toBeGreaterThan(0);
+  expect(within(card).getByText("See details")).toBeTruthy();
 });
