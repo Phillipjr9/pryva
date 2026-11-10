@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CommandPalette, CommandPaletteTrigger } from "@/components/command/CommandPalette";
 import { ArrowRight, Close, Logout, Menu, Wallet } from "@/components/icons";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { BrandIcon } from "@/components/BrandIcon";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { NavIcon, type NavArt } from "@/components/dashboard/NavIcon";
 import { ProfileAvatar } from "@/components/dashboard/ProfileAvatar";
@@ -26,6 +27,7 @@ type NavItem = {
   icon?: (props: { className?: string }) => ReactNode;
   /** A flat glyph for a dashboard destination (see `NavIcon`). */
   nav?: NavArt;
+  brand?: "telegram";
   art?:
     | "numbers"
     | "esim"
@@ -65,6 +67,8 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
     label: "Buy",
     items: [
       { href: "/dashboard/services", label: "All services", nav: "services" },
+      { href: "/dashboard/telegram-stars", label: "Telegram Stars", brand: "telegram" },
+      { href: "/dashboard/call-of-duty-mobile", label: "Call of Duty Mobile CP", art: "games" },
       { href: "/dashboard/services", label: "Number plans", art: "numbers", category: "numbers" },
       { href: "/dashboard/services", label: "eSIM", art: "esim", category: "esim" },
       { href: "/dashboard/services", label: "Data Plans", art: "data", category: "data" },
@@ -230,7 +234,9 @@ export function DashboardShell({
                     active ? "bg-lav-100/80 text-lav-800" : "text-ink-2 hover:bg-white hover:text-ink"
                   }`}
                 >
-                  {item.art ? (
+                  {item.brand ? (
+                    <BrandIcon brand={item.brand} size={20} decorative />
+                  ) : item.art ? (
                     <span aria-hidden="true"><ServiceIcon service={item.art} size="xs" className="overflow-hidden rounded-[5px]" /></span>
                   ) : item.nav ? (
                     <NavIcon name={item.nav} />

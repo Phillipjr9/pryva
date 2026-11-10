@@ -76,6 +76,16 @@ describe("dashboard sidebar coverage", () => {
     expect(glyphOf(subscriptions!.html)).not.toBe(glyphOf(accounts!.html));
   });
 
+  it("provides direct Stars and Call of Duty Mobile links", () => {
+    const nav = anchors(render());
+    const stars = nav.find((a) => a.href === "/dashboard/telegram-stars");
+    const cod = nav.find((a) => a.href === "/dashboard/call-of-duty-mobile");
+    expect(stars?.html).toContain("Telegram Stars");
+    expect(stars?.html).toContain("<svg");
+    expect(cod?.html).toContain("Call of Duty Mobile CP");
+    expect(cod?.html).toContain("<svg");
+  });
+
   it("links the review page that used to have no entry point", () => {
     const nav = anchors(render());
     const reviews = nav.find((anchor) => anchor.href === "/dashboard/reviews");

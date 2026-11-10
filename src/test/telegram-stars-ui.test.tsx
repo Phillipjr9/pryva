@@ -32,3 +32,12 @@ describe("Telegram Stars purchase UI", () => {
     expect(localStorage.getItem("pryva:stars-attempt:buyer")).toBeNull();
   });
 });
+
+describe("Stars availability", () => {
+  it("shows the username field even when purchasing is unavailable", async () => {
+    render(<StarsPurchase userId="buyer" available={false} />);
+    expect(await screen.findByLabelText("Recipient Telegram username")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toContain("ordering is not available");
+    expect((screen.getByRole("button", { name: "Get current price" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+});

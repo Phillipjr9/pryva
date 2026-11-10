@@ -6,7 +6,7 @@ type Quote = { id: string; amount: number; quantity: number; expiresAt: string }
 type Attempt = { quote: Quote; username: string; requestId: string };
 type Order = { id: string; reference: string; status: string };
 
-export function StarsPurchase({ userId }: { userId: string }) {
+export function StarsPurchase({ userId, available = true }: { userId: string; available?: boolean }) {
   const storageKey = `pryva:stars-attempt:${userId}`;
   const [quantity, setQuantity] = useState("100");
   const [username, setUsername] = useState("");
@@ -71,17 +71,19 @@ export function StarsPurchase({ userId }: { userId: string }) {
   return <section className="rounded-2xl border border-line bg-white p-5 space-y-4">
     {!storageReady ? <p className="text-meta text-ink-2">{message ?? "Preparing secure purchase recovery…"}</p> : null}
     {storageReady && !attempt && !order ? <>
+      {!available && <p role="status" className="rounded-xl bg-amber-50 p-3 text-meta text-amber-900">Telegram Stars ordering is not available right now. You can enter a username here, but pricing and checkout are not yet enabled.</p>}
       <form onSubmit={getQuote} className="space-y-3">
+        <label htmlFor="stars-username" className="block text-meta font-semibold">Recipient Telegram username</label>
+        <input id="stars-username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="@username" autoComplete="off" maxLength={33} className="w-full rounded-xl border border-line px-3 py-2" />
+        <p className="text-meta text-ink-2">Use the recipient’s public Telegram username, not their phone number. Double-check it before paying.</p>
         <label htmlFor="stars-quantity" className="block text-meta font-semibold">Number of Stars</label>
         <input id="stars-quantity" type="number" min="1" max="1000000" step="1" required value={quantity} onChange={(e) => { setQuantity(e.target.value); setQuote(null); }} className="w-full rounded-xl border border-line px-3 py-2" />
-        <button type="submit" disabled={busy} className="rounded-xl bg-lav-700 px-4 py-3 font-semibold text-white disabled:opacity-50">Get current price</button>
+        <button type="submit" disabled={busy || !available} className="rounded-xl bg-lav-700 px-4 py-3 font-semibold text-white disabled:opacity-50">Get current price</button>
       </form>
       {quote ? <div className="space-y-3 border-t border-line pt-4">
         <p className="font-semibold">{quote.quantity.toLocaleString("en-NG")} Stars · ₦{quote.amount.toLocaleString("en-NG")}</p>
         <p className="text-meta text-ink-3">Quote expires {new Date(quote.expiresAt).toLocaleTimeString()}. Availability and price are rechecked before charging.</p>
-        <label htmlFor="stars-username" className="block text-meta font-semibold">Recipient Telegram username</label>
-        <input id="stars-username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="@username" autoComplete="off" maxLength={33} className="w-full rounded-xl border border-line px-3 py-2" />
-        <p className="text-meta text-ink-2">Check the recipient carefully. Payment comes from your Pryva wallet.</p>
+        <p className="text-meta text-ink-2">Confirm the recipient above carefully. Payment comes from your Pryva wallet.</p>
         <button type="button" disabled={busy} onClick={() => void submit()} className="rounded-xl bg-lav-700 px-4 py-3 font-semibold text-white disabled:opacity-50">Confirm and pay ₦{quote.amount.toLocaleString("en-NG")}</button>
       </div> : null}
     </> : null}

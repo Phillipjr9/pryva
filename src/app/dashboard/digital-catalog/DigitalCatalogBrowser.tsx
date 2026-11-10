@@ -5,10 +5,10 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 type Result = { items: { id: string; name: string; stock: "reported" | "out" | "unknown"; checkout?: "codes" | "topups" | "esims" }[]; nextCursor: string | null; searchLimited: boolean; skipped: boolean };
 
-export function DigitalCatalogBrowser() {
+export function DigitalCatalogBrowser({ fixedCategory }: { fixedCategory?: string } = {}) {
   const [input, setInput] = useState("");
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState(fixedCategory ?? "");
   const [stockOnly, setStockOnly] = useState(true);
   const [categoryError, setCategoryError] = useState(false);
   const [query, setQuery] = useState("");
@@ -25,6 +25,7 @@ export function DigitalCatalogBrowser() {
   const cursorLoops = !!result?.nextCursor && cursors.slice(0, page + 1).includes(result.nextCursor);
 
   useEffect(() => {
+    if (fixedCategory) return;
     const controller = new AbortController();
     fetch("/api/services/digital-catalog/categories", { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
@@ -33,7 +34,7 @@ export function DigitalCatalogBrowser() {
         if (!controller.signal.aborted) setCategories(data.categories);
       }).catch(() => { if (!controller.signal.aborted) setCategoryError(true); });
     return () => controller.abort();
-  }, []);
+  }, [fixedCategory]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -71,7 +72,7 @@ export function DigitalCatalogBrowser() {
 
   return (
     <section aria-label="Digital catalogue" className="rounded-2xl border border-line bg-white p-4 sm:p-6">
-      <label htmlFor="digital-category" className="block text-meta font-semibold text-ink">Browse by category</label>
+      {!fixedCategory && <><label htmlFor="digital-category" className="block text-meta font-semibold text-ink">Browse by category</label>
       <select id="digital-category" value={category} onChange={(event) => {
         if (event.target.value === category && !query && !cursor) setRevision((value) => value + 1);
         setCategory(event.target.value); setInput(""); setQuery(""); setCursors([""]); setPage(0); setResult(null); setError(null); setLoading(true);
@@ -85,8 +86,9 @@ export function DigitalCatalogBrowser() {
         <input id="digital-search" type="search" value={input} maxLength={128} onChange={(event) => setInput(event.target.value)} placeholder="Search games, subscriptions or telecom" className="min-h-11 min-w-0 flex-1 rounded-xl border border-line px-3 py-2" />
         <button className="min-h-11 rounded-xl bg-lav-700 px-4 font-semibold text-white" type="submit">Search</button>
       </form>
+      </>}
       <label className="mt-4 flex items-center gap-2 text-meta font-semibold text-ink"><input type="checkbox" checked={stockOnly} onChange={(event) => { setStockOnly(event.target.checked); setCursors([""]); setPage(0); setResult(null); setError(null); setLoading(true); }} /> Show listings with reported stock only</label>
-      <p className="mt-3 text-meta text-ink-3">Stock is reported by the catalogue and may change. It does not guarantee checkout. Browse every page within a category; search covers all categories and returns up to 50 matches, so refine your search or clear it to browse more.</p>
+      <p className="mt-3 text-meta text-ink-3">Stock is reported by the catalogue and may change. It does not guarantee checkout. {!fixedCategory && "Browse every page within a category; search covers all categories and returns up to 50 matches, so refine your search or clear it to browse more."}</p>
       {loading ? <p role="status" className="mt-4 text-meta text-ink-2">Loading catalogue…</p> : null}
       {error ? <p role="alert" className="mt-4 text-meta text-rose-700">{error} <button type="button" className="font-semibold underline" onClick={() => { setLoading(true); setError(null); setRevision((value) => value + 1); }}>Retry</button></p> : null}
       {result && !loading ? (
