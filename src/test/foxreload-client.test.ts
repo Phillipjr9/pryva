@@ -4,6 +4,7 @@ import {
   isFoxreloadConfigured,
   getFoxreloadAccount,
   probeFoxreloadAccount,
+  hasFoxreloadUsdFunds,
   readFoxreloadBrowsePage,
   readFoxreloadBrowseCategories,
   readFoxreloadCategoryChildren,
@@ -44,6 +45,21 @@ describe("FoxReload client", () => {
     expect(await probeFoxreloadAccount()).toEqual({ active: true, funds: { usd: "positive", rub: "zero" }, returnedBalances: 2, returnedCurrencies: ["RUB", "USD"] });
     expect(fetchMock.mock.calls.map(([url, init]) => [new URL(String(url)).pathname, init?.method])).toEqual([["/api/access/me", "GET"], ["/api/access/me/balances/", "GET"]]);
     expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({ "X-API-Key": "fox_test_secret_key_12345" });
+  });
+  it("requires one valid USD available balance sufficient for the exact supplier total", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    for (const [data, expected] of [
+      [[{ currency: "usd", available: "3.100000000000000000" }], true],
+      [[{ currency: "usd", available: "3.099999999999999999" }], false],
+      [[{ currency: "rub", available: "1000" }], false],
+      [[], false],
+      [[{ currency: "usd", available: "3.1" }, { currency: "usd", available: "4" }], false],
+      [[{ currency: "usd", available: "invalid" }], false],
+    ] as const) {
+      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(data)));
+      expect(await hasFoxreloadUsdFunds("3.1000")).toBe(expected);
+    }
+    expect(await hasFoxreloadUsdFunds("0")).toBe(false);
   });
   it("does not assume missing balance rows mean zero", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");

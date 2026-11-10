@@ -7,11 +7,11 @@ import * as schema from "@/db/schema";
 import { orders, users, walletTransactions } from "@/db/schema";
 import { parseProduct, type Product } from "@/lib/services/foxreload/contract";
 import { approvedTopupOffers, publicTopupId, topupPrice, type TopupOffer } from "@/lib/services/foxreload/topup-offers";
-const mocks = vi.hoisted(() => ({ db: undefined as unknown, product: vi.fn(), create: vi.fn(), pay: vi.fn(), read: vi.fn(), find: vi.fn(), submit: vi.fn() }));
+const mocks = vi.hoisted(() => ({ db: undefined as unknown, product: vi.fn(), create: vi.fn(), pay: vi.fn(), read: vi.fn(), find: vi.fn(), submit: vi.fn(), funds: vi.fn() }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
 vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
 vi.mock("@/lib/checkout/purchase", () => ({ afterPurchase: vi.fn() }));
-vi.mock("@/lib/providers/foxreload", () => ({ isFoxreloadConfigured: () => true, readFoxreloadProductContract: mocks.product, createFoxreloadContractOrder: mocks.create, payFoxreloadOrder: mocks.pay, readFoxreloadContractOrder: mocks.read, findFoxreloadOrderId: mocks.find, submitFoxreloadClientCode: mocks.submit, FoxreloadError: class extends Error { status = 500; code = "unknown"; } }));
+vi.mock("@/lib/providers/foxreload", () => ({ isFoxreloadConfigured: () => true, hasFoxreloadUsdFunds: mocks.funds, readFoxreloadProductContract: mocks.product, createFoxreloadContractOrder: mocks.create, payFoxreloadOrder: mocks.pay, readFoxreloadContractOrder: mocks.read, findFoxreloadOrderId: mocks.find, submitFoxreloadClientCode: mocks.submit, FoxreloadError: class extends Error { status = 500; code = "unknown"; } }));
 const USER = "11111111-1111-4111-8111-111111111111", OTHER = "11111111-1111-4111-8111-111111111112";
 const REQUEST = "22222222-2222-4222-8222-222222222222", PROVIDER = "0199a1c2-3d4e-7f50-8a6b-7c8d9e0f1a00";
 const OFFER: TopupOffer = { id: "product_01kj6xhpn3e29bcw1n69p5mwc5", name: "Game top-up", region: "US", terms: "Only for US accounts.", countryCode: "US", marketRegion: null, min: 1, max: 10, fields: [{ key: "player_id", label: "Player ID" }, { key: "server", label: "Server" }] };
@@ -30,7 +30,7 @@ beforeAll(async () => {
 afterAll(async () => { vi.unstubAllEnvs(); await pg?.close(); });
 beforeEach(async () => {
   vi.clearAllMocks(); vi.stubEnv("FOXRELOAD_USD_NGN_RATE", "1500"); vi.stubEnv("FOXRELOAD_IS_MOCK", "false"); vi.stubEnv("FOXRELOAD_TOPUPS_ENABLED", "true"); vi.stubEnv("FOXRELOAD_LOGIN_TOPUPS_ENABLED", "false"); vi.stubEnv("FOXRELOAD_TOPUP_OFFERS", JSON.stringify([OFFER])); vi.stubEnv("FOXRELOAD_INTENT_SECRET", "01234567890123456789012345678901");
-  suppliedNote = NOTE; mocks.product.mockResolvedValue(PRODUCT);
+  suppliedNote = NOTE; mocks.product.mockResolvedValue(PRODUCT); mocks.funds.mockResolvedValue(true);
   mocks.create.mockImplementation(async (input: { idempotencyKey: string; note: Record<string, string | number> }) => { supplierKey = input.idempotencyKey; suppliedNote = input.note; return providerOrder("active", "active"); });
   mocks.pay.mockResolvedValue({}); mocks.read.mockImplementation(async () => providerOrder("completed", "completed"));
   await database.execute(sql`TRUNCATE TABLE foxreload_quotes, orders, wallet_transactions, users CASCADE`);
@@ -113,6 +113,16 @@ describe("reviewed direct top-ups", () => {
       { key: "server", label: "Server", type: "string", options: [{ value: "a", label: "A" }] },
       { key: "uid", label: "UID", type: "boolean" },
     ]) expect(approvedTopupOffers(mk(field))).toEqual([]);
+  });
+  it("does not debit customers when supplier funds are missing, insufficient or unreadable", async () => {
+    const q = await quote();
+    for (const answer of [false, new Error("unavailable")]) {
+      if (answer instanceof Error) mocks.funds.mockRejectedValueOnce(answer); else mocks.funds.mockResolvedValueOnce(answer);
+      expect(await service.buyTopup({ userId: USER, quoteId: q.id, requestId: REQUEST, note: NOTE })).toMatchObject({ code: "unavailable" });
+      expect(await balance()).toBe(20000); expect(mocks.create).not.toHaveBeenCalled();
+      expect((await database.select().from(walletTransactions)).filter((x) => x.type === "debit")).toHaveLength(0);
+    }
+    expect(mocks.funds).toHaveBeenCalledWith("3.1000");
   });
   it("quotes, debits once, verifies the recipient and confirms the matching supplier delivery", async () => {
     const q = await quote(); expect(q).toMatchObject({ amount: 6510, region: "US", quantity: 2, fields: OFFER.fields });

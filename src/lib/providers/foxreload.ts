@@ -183,6 +183,22 @@ async function foxreloadFetch(
   return payload;
 }
 
+/** A fresh USD balance snapshot, compared without floating point. It is not a reservation. */
+export async function hasFoxreloadUsdFunds(wholesaleTotal: string): Promise<boolean> {
+  if (!/^(?:0|[1-9]\d{0,11})(?:\.\d{1,4})?$/.test(wholesaleTotal)) return false;
+  const units = (value: string) => {
+    const [whole, fractional = ""] = value.split(".");
+    return BigInt(whole) * BigInt(10_000) + BigInt(fractional.padEnd(4, "0").slice(0, 4));
+  };
+  const required = units(wholesaleTotal);
+  if (required <= BigInt(0)) return false;
+  const raw = await foxreloadFetch("/api/access/me/balances/");
+  if (!Array.isArray(raw) || raw.length > 10) return false;
+  const usd = raw.filter((row) => row && typeof row === "object" && !Array.isArray(row) && row.currency === "usd");
+  if (usd.length !== 1 || typeof usd[0].available !== "string" || !/^(?:0|[1-9]\d{0,20})(?:\.\d{1,18})?$/.test(usd[0].available)) return false;
+  return units(usd[0].available) >= required;
+}
+
 /** Authenticated, read-only readiness probe. Never return profile fields or balances. */
 export async function probeFoxreloadAccount(): Promise<{ active: boolean; funds: { usd: "positive" | "zero" | "unknown"; rub: "positive" | "zero" | "unknown" }; returnedBalances: number; returnedCurrencies: string[] }> {
   const profile = await foxreloadFetch("/api/access/me");

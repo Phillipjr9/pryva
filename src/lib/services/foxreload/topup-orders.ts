@@ -7,7 +7,7 @@ import { debitWalletInTx, creditWalletInTx, InsufficientFundsError, makeReferenc
 import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
 import { afterPurchase } from "@/lib/checkout/purchase";
 import { FOXRELOAD_PROVIDER } from "@/lib/services/order-providers";
-import { createFoxreloadContractOrder, findFoxreloadOrderId, isFoxreloadConfigured, payFoxreloadOrder, readFoxreloadContractOrder, readFoxreloadProductContract } from "@/lib/providers/foxreload";
+import { createFoxreloadContractOrder, findFoxreloadOrderId, hasFoxreloadUsdFunds, isFoxreloadConfigured, payFoxreloadOrder, readFoxreloadContractOrder, readFoxreloadProductContract } from "@/lib/providers/foxreload";
 import { decimalUnits } from "./contract";
 import { foxreloadRate } from "./exchange-rate";
 import { approvedTopupOffers, normalizeTopupNote, prepareTopup, publicTopupId, topupFingerprint, topupIntent, topupPrice, type TopupField } from "./topup-offers";
@@ -75,6 +75,9 @@ export async function buyTopup(input: { userId: string; quoteId: string; request
   const rate = await foxreloadRate();
   const current = product && rate && topupPrice(product, offer, quote.quantity, { FOXRELOAD_USD_NGN_RATE: rate.value }), prepared = product && prepareTopup(product, offer);
   if (!prepared || !current || current.amount !== quote.amount || current.wholesaleTotal !== quote.wholesaleTotal) return { kind: "error", code: "changed", message: "Price or availability changed. Get a new quote." };
+  // A balance snapshot is not a reservation: the provider or another order can
+  // still spend it. But missing/insufficient funds must never start a new debit.
+  if (!await hasFoxreloadUsdFunds(quote.wholesaleTotal).catch(() => false)) return { kind: "error", code: "unavailable", message: "This top-up is temporarily unavailable. Your wallet was not charged." };
   const orderId = randomUUID(), reference = makeReference("TOPUP");
   try {
     await db.transaction(async (tx) => {
