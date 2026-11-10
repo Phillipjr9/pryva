@@ -51,6 +51,16 @@ describe("hydration-safe order countdowns", () => {
     expect(closed).not.toContain("Resend code");
   });
 
+  it("only offers a refund request for an eligible single-number plan", () => {
+    const props = { orderId: "order-4", status: "active", expiresAt, amount: 500, referenceCode: "ref", otpCode: null, service: "numbers", initialNow };
+    expect(renderToStaticMarkup(<OrderActions {...props} />)).not.toContain("Refund this order");
+    const eligible = renderToStaticMarkup(<OrderActions {...props} singleNumberRefundCandidate />);
+    expect(eligible).toContain("Refund this order");
+    expect(eligible).toContain("final delivery status");
+    expect(renderToStaticMarkup(<OrderActions {...props} status="expired" singleNumberRefundCandidate />)).toContain("Refund this order");
+    expect(renderToStaticMarkup(<OrderActions {...props} otpCode="123456" singleNumberRefundCandidate />)).not.toContain("Refund this order");
+  });
+
   it("does not call an order without an expiry window closed", () => {
     const html = renderToStaticMarkup(<OrderActions orderId="order-2" status="active" expiresAt={null} amount={500} referenceCode="ref" otpCode={null} service="numbers" initialNow={initialNow} />);
     expect(html).not.toContain("Window closed");

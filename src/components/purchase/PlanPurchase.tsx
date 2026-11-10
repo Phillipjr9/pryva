@@ -170,10 +170,10 @@ export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath
             <Check className="h-6 w-6" />
           </span>
           <h3 className="mt-5 text-2xl font-medium">{success.review ? "Order needs review." : "Order complete."}</h3>
-          <p className="mt-2 max-w-md text-[0.92rem] leading-relaxed text-ink-2">
+          <p className="mt-2 max-w-md text-[0.9375rem] leading-relaxed text-ink-2">
             {success.review ? <>{success.reviewMessage} </> : <><span className="font-semibold text-ink">{success.name}</span> is now in your dashboard. Your verification code appears in the order details as soon as it arrives. </>}
             Order reference{" "}
-            <span className="rounded-md bg-lav-50 px-1.5 py-0.5 font-mono text-[0.8rem] text-lav-700">
+            <span className="rounded-md bg-lav-50 px-1.5 py-0.5 font-mono text-[0.8125rem] text-lav-700">
               {success.reference}
             </span>
             .
@@ -205,7 +205,7 @@ export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath
                   key={group.label}
                   type="button"
                   onClick={() => changeTab(index)}
-                  className={`rounded-full px-3 py-1.5 text-meta font-semibold transition-all sm:px-4 sm:py-2 sm:text-[0.82rem] ${
+                  className={`rounded-full px-3 py-1.5 text-meta font-semibold transition-all sm:px-4 sm:py-2 sm:text-[0.8125rem] ${
                     tab === index
                       ? "bg-ink text-white shadow-sm"
                       : "text-ink-2 hover:bg-lav-50 hover:text-lav-700"
@@ -238,7 +238,7 @@ export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <span className="flex items-center gap-2 text-[0.95rem] font-semibold text-ink">
+                      <span className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
                         {hasCountryFlag(plan.region) && (
                           <CountryFlag region={plan.region} size={20} decorative />
                         )}
@@ -258,7 +258,7 @@ export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath
                   </div>
 
                   <div className="mt-2.5 flex items-end gap-2 sm:mt-4">
-                    <span className="text-[1.05rem] font-semibold leading-none tracking-tight sm:text-[1.55rem]">
+                    <span className="text-[1rem] font-semibold leading-none tracking-tight sm:text-[1.55rem]">
                       {formatNaira(plan.price)}
                     </span>
                     {plan.compareAt && (
@@ -300,7 +300,7 @@ export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath
               <p className="text-meta font-semibold uppercase tracking-[0.16em] text-ink-3">
                 Your selection
               </p>
-              <p className="mt-1 text-[0.95rem] font-semibold text-ink">
+              <p className="mt-1 text-[0.9375rem] font-semibold text-ink">
                 {selected ? `${selected.name} · ${selected.planLabel}` : "Choose a plan"}
               </p>
               <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-ink-3">

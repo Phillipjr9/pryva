@@ -42,9 +42,10 @@ const COMMANDS: Command[] = [
   { id: "orders", label: "Orders", icon: Receipt, group: "Navigate", href: "/dashboard/orders" },
   { id: "wallet", label: "Wallet", icon: Wallet, group: "Navigate", href: "/dashboard/wallet" },
   { id: "accounts", label: "Digital accounts", icon: ShoppingCart, group: "Navigate", href: "/dashboard/accounts" },
-  { id: "digital", label: "Subscriptions", icon: Grid, group: "Navigate", href: "/dashboard/digital" },
+  { id: "digital", label: "Subscriptions", icon: Grid, group: "Navigate", href: "/dashboard/services?category=subscriptions" },
   { id: "data", label: "Data plans", icon: Grid, group: "Navigate", href: "/dashboard/data" },
-  { id: "gift-cards", label: "Gift cards", icon: Gift, group: "Navigate", href: "/dashboard/gift-cards" },
+  { id: "gift-cards", label: "Gift cards", icon: Gift, group: "Navigate", href: "/dashboard/services?category=gift-cards" },
+  { id: "pryva-gift-cards", label: "Pryva gift cards", icon: Gift, group: "Manage", href: "/dashboard/gift-cards" },
   { id: "bulk", label: "Bulk orders", icon: ShoppingCart, group: "Navigate", href: "/dashboard/bulk-orders" },
   { id: "scheduled", label: "Scheduled orders", icon: Calendar, group: "Navigate", href: "/dashboard/scheduled" },
   { id: "notifications", label: "Notifications", icon: Bell, group: "Manage", href: "/dashboard/notifications" },
@@ -255,7 +256,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             }}
             placeholder="Search orders, transactions, gift cards or jump to a page…"
             aria-label="Search the dashboard"
-            className="min-w-0 flex-1 bg-transparent text-[0.95rem] text-ink outline-none placeholder:text-ink-3"
+            className="min-w-0 flex-1 bg-transparent text-[0.9375rem] text-ink outline-none placeholder:text-ink-3"
             autoFocus
           />
           <kbd className="hidden rounded border border-line bg-cream px-2 py-0.5 text-meta font-medium text-ink-2 sm:block">
@@ -265,17 +266,17 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
         <div ref={listRef} className="max-h-[min(26rem,60vh)] overflow-y-auto p-2" role="listbox" aria-label="Results">
           {searching && (
-            <p className="px-4 py-3 text-[0.84rem] text-ink-3" role="status">
+            <p className="px-4 py-3 text-[0.8125rem] text-ink-3" role="status">
               Searching your orders and wallet…
             </p>
           )}
           {!searching && failed && (
-            <p className="px-4 py-3 text-[0.84rem] text-rose-700" role="alert">
+            <p className="px-4 py-3 text-[0.8125rem] text-rose-700" role="alert">
               Search is unavailable right now. Navigation below still works.
             </p>
           )}
           {!searching && !failed && matches.length === 0 && (
-            <p className="px-4 py-8 text-center text-[0.9rem] text-ink-2">
+            <p className="px-4 py-8 text-center text-[0.875rem] text-ink-2">
               Nothing matches “{search.trim()}”. Try an order reference, a product name or a page.
             </p>
           )}
@@ -303,7 +304,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                   >
                     <Icon className="h-4 w-4 shrink-0 text-ink-2" />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[0.88rem] font-medium text-ink">{entry.label}</span>
+                      <span className="block truncate text-[0.875rem] font-medium text-ink">{entry.label}</span>
                       {entry.hint && (
                         <span className="block truncate text-meta text-ink-3">{entry.hint}</span>
                       )}
@@ -354,7 +355,7 @@ export function CommandPaletteTrigger({ onClick }: { onClick: () => void }) {
       <button
         type="button"
         onClick={onClick}
-        className="hidden items-center gap-2 rounded-full border border-line bg-white/70 px-3.5 py-2 text-[0.82rem] font-medium text-ink-2 transition-colors hover:bg-white lg:flex"
+        className="hidden items-center gap-2 rounded-full border border-line bg-white/70 px-3.5 py-2 text-[0.8125rem] font-medium text-ink-2 transition-colors hover:bg-white lg:flex"
       >
         <Search className="h-4 w-4" />
         <span>Search…</span>

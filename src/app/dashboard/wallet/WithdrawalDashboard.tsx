@@ -462,8 +462,8 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
     <section id="withdraw" className="grid gap-3 scroll-mt-24">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-[1.05rem] font-semibold">Withdraw to your bank</h2>
-          <p className="mt-0.5 text-[0.8rem] text-ink-2">
+          <h2 className="text-[1rem] font-semibold">Withdraw to your bank</h2>
+          <p className="mt-0.5 text-[0.8125rem] text-ink-2">
             {testMode
               ? "Test requests do not make real payouts; Paystack test transfers settle in its sandbox."
               : "Payouts are sent to your bank immediately through Paystack Transfers. If a transfer cannot be sent, the amount and fee return to your wallet automatically."}
@@ -475,7 +475,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
       </div>
 
       {emailVerificationNotice ? (
-        <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[0.82rem] leading-relaxed text-amber-900">
+        <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[0.8125rem] leading-relaxed text-amber-900">
           {emailVerificationNotice}{" "}
           <a href="/verify-email" className="font-semibold underline">
             Verify your email
@@ -518,7 +518,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                   Amount to withdraw
                 </label>
                 <div className="relative">
-                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[0.9rem] text-ink-3">
+                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[0.875rem] text-ink-3">
                     ₦
                   </span>
                   <input
@@ -594,7 +594,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                 type="button"
                 onClick={openWithdrawalReview}
                 disabled={loading || recoveryState !== "ready" || pendingIntents.length > 0 || !amount || !selectedBankAccountId}
-                className="btn btn-primary w-full !py-3 !text-[0.82rem] disabled:opacity-50"
+                className="btn btn-primary w-full !py-3 !text-[0.8125rem] disabled:opacity-50"
               >
                 {loading ? (
                   <>
@@ -650,7 +650,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[0.9rem] font-semibold text-ink">
+                      <p className="text-[0.875rem] font-semibold text-ink">
                         {formatNaira(withdrawal.amount)}
                       </p>
                       <p className="truncate text-meta text-ink-2">
@@ -686,7 +686,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
       {activeTab === "accounts" && (
         <div id="bank-accounts" className="grid gap-3 lg:grid-cols-2">
           <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
-            <p className="text-[0.95rem] font-semibold">Add a bank account</p>
+            <p className="text-[0.9375rem] font-semibold">Add a bank account</p>
             <p className="mt-0.5 text-meta text-ink-2">
               We verify the name on the account before saving it.
             </p>
@@ -786,7 +786,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                 type="button"
                 onClick={addBankAccount}
                 disabled={loading || !bankCode || !accountNumber || !accountName}
-                className="btn btn-primary w-full !py-2.5 !text-[0.8rem] disabled:opacity-50"
+                className="btn btn-primary w-full !py-2.5 !text-[0.8125rem] disabled:opacity-50"
               >
                 {loading ? (
                   <>
@@ -802,11 +802,11 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
           </div>
 
           <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
-            <p className="text-[0.95rem] font-semibold">Saved accounts</p>
+            <p className="text-[0.9375rem] font-semibold">Saved accounts</p>
             {!loaded ? (
-              <p className="mt-3 text-[0.8rem] text-ink-3">Loading…</p>
+              <p className="mt-3 text-[0.8125rem] text-ink-3">Loading…</p>
             ) : bankAccounts.length === 0 ? (
-              <p className="mt-3 rounded-xl border border-dashed border-line bg-cream/50 px-4 py-5 text-center text-[0.8rem] text-ink-3">
+              <p className="mt-3 rounded-xl border border-dashed border-line bg-cream/50 px-4 py-5 text-center text-[0.8125rem] text-ink-3">
                 Nothing saved yet. Add one and it can be used for every payout.
               </p>
             ) : (
@@ -817,7 +817,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                     className="flex items-start justify-between gap-3 rounded-xl border border-line bg-white px-3.5 py-3"
                   >
                     <div className="min-w-0">
-                      <p className="flex items-center gap-1.5 text-[0.84rem] font-semibold text-ink">
+                      <p className="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink">
                         {account.bankName}
                         {account.isDefault && (
                           <span className="rounded-full bg-lav-50 px-2 py-0.5 text-micro font-semibold text-lav-700">

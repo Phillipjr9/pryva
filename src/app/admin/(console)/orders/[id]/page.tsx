@@ -97,7 +97,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         ].map(([label, value]) => (
           <div key={label} className="rounded-2xl border border-line bg-white p-4">
             <p className="text-meta uppercase tracking-wide text-ink-3">{label}</p>
-            <p className="mt-2 text-[0.98rem] font-medium text-ink break-words">{value}</p>
+            <p className="mt-2 text-[1rem] font-medium text-ink break-words">{value}</p>
           </div>
         ))}
       </div>
@@ -105,7 +105,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
       <div className="grid gap-6 xl:grid-cols-2">
         <section className="rounded-2xl border border-line bg-white p-5">
           <h2 className="text-[1rem] font-semibold text-ink">Order details</h2>
-          <dl className="mt-4 space-y-3 text-[0.86rem]">
+          <dl className="mt-4 space-y-3 text-[0.875rem]">
             <div className="flex justify-between gap-4 border-b border-line pb-2">
               <dt className="text-ink-3">Provider</dt>
               <dd className="font-medium text-ink">{order.provider}</dd>
@@ -153,7 +153,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         <section className="rounded-2xl border border-line bg-white p-5">
           <h2 className="text-[1rem] font-semibold text-ink">Customer</h2>
           {customer ? (
-            <div className="mt-4 space-y-3 text-[0.86rem]">
+            <div className="mt-4 space-y-3 text-[0.875rem]">
               <div>
                 <p className="text-ink-3">Name</p>
                 <p className="font-medium text-ink">{customer.name}</p>

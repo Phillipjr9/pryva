@@ -40,12 +40,12 @@ export default async function AdminReviewsPage({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[1.4rem] font-medium tracking-tight">Review moderation</h1>
-          <p className="mt-1 text-[0.85rem] text-ink-2">
+          <p className="mt-1 text-[0.875rem] text-ink-2">
             Nothing on the public page without a decision here. Rejections can carry a note the
             customer will see.
           </p>
         </div>
-        <Link href="/reviews" className="text-[0.8rem] font-semibold text-lav-700 hover:underline">
+        <Link href="/reviews" className="text-[0.8125rem] font-semibold text-lav-700 hover:underline">
           See the public page
         </Link>
       </div>
@@ -58,8 +58,8 @@ export default async function AdminReviewsPage({
             aria-current={status === tab.key ? "page" : undefined}
             className={
               status === tab.key
-                ? "rounded-lg bg-lav-50 px-3 py-1.5 text-[0.82rem] font-medium text-lav-800"
-                : "rounded-lg px-3 py-1.5 text-[0.82rem] font-medium text-ink-2 hover:bg-cream"
+                ? "rounded-lg bg-lav-50 px-3 py-1.5 text-[0.8125rem] font-medium text-lav-800"
+                : "rounded-lg px-3 py-1.5 text-[0.8125rem] font-medium text-ink-2 hover:bg-cream"
             }
           >
             {tab.label}

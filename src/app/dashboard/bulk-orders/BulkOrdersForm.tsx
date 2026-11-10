@@ -132,7 +132,7 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
       {recovering && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">A previous batch is being recovered. Its items cannot be changed until its outcome is known.</p>}
       {/* Add Items */}
       <div>
-        <label className="block text-[0.86rem] font-medium text-ink mb-3">
+        <label className="block text-[0.875rem] font-medium text-ink mb-3">
           Select Products
         </label>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -142,8 +142,8 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
               className="rounded-xl border border-line bg-white p-4"
             >
               <div className="mb-3">
-                <p className="text-[0.9rem] font-semibold text-ink">{plan.name}</p>
-                <p className="text-[0.82rem] text-ink-2">{plan.planLabel}</p>
+                <p className="text-[0.875rem] font-semibold text-ink">{plan.name}</p>
+                <p className="text-[0.8125rem] text-ink-2">{plan.planLabel}</p>
                 <p className="text-[1rem] font-bold text-lav-600 mt-2">
                   {formatNaira(plan.price)}
                 </p>
@@ -151,7 +151,7 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
               <button
                 onClick={() => addItem(plan.slug)}
                 disabled={!ready || recovering}
-                className="w-full rounded-lg bg-lav-100 px-3 py-2 text-[0.82rem] font-semibold text-lav-700 transition-colors hover:bg-lav-200"
+                className="w-full rounded-lg bg-lav-100 px-3 py-2 text-[0.8125rem] font-semibold text-lav-700 transition-colors hover:bg-lav-200"
               >
                 Add to Order
               </button>
@@ -163,7 +163,7 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
       {/* Cart */}
       {items.length > 0 && (
         <div className="rounded-xl border border-line bg-white p-6">
-          <h2 className="text-[1.1rem] font-semibold text-ink mb-4">
+          <h2 className="text-[1.125rem] font-semibold text-ink mb-4">
             Your Order
           </h2>
           <div className="space-y-3 mb-6">
@@ -173,8 +173,8 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
               return (
                 <div key={item.productSlug} className="flex items-center gap-4 border-b border-line pb-3">
                   <div className="flex-1">
-                    <p className="text-[0.9rem] font-semibold text-ink">{plan.name}</p>
-                    <p className="text-[0.82rem] text-ink-2">{formatNaira(plan.price)} each</p>
+                    <p className="text-[0.875rem] font-semibold text-ink">{plan.name}</p>
+                    <p className="text-[0.8125rem] text-ink-2">{formatNaira(plan.price)} each</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -183,7 +183,7 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
                     >
                       -
                     </button>
-                    <span className="w-8 text-center text-[0.9rem] font-semibold text-ink">
+                    <span className="w-8 text-center text-[0.875rem] font-semibold text-ink">
                       {item.quantity}
                     </span>
                     <button
@@ -194,7 +194,7 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
                     </button>
                     <button
                       onClick={() => removeItem(item.productSlug)}
-                      className="ml-2 text-[0.82rem] text-red-600 hover:text-red-700"
+                      className="ml-2 text-[0.8125rem] text-red-600 hover:text-red-700"
                     >
                       Remove
                     </button>
@@ -207,7 +207,7 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
           {/* Discount Message */}
           {discountMessage && (
             <div className="rounded-lg bg-lav-50 p-3 mb-4">
-              <p className="text-[0.86rem] font-medium text-lav-700">
+              <p className="text-[0.875rem] font-medium text-lav-700">
                 {discountMessage}
               </p>
             </div>
@@ -215,17 +215,17 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
 
           {/* Order Summary */}
           <div className="space-y-2 border-t border-line pt-4">
-            <div className="flex justify-between text-[0.9rem] text-ink-2">
+            <div className="flex justify-between text-[0.875rem] text-ink-2">
               <span>Subtotal</span>
               <span>{formatNaira(result.subtotal)}</span>
             </div>
             {result.discount > 0 && (
-              <div className="flex justify-between text-[0.9rem] text-green-600">
+              <div className="flex justify-between text-[0.875rem] text-green-600">
                 <span>Discount ({result.discountPercent}%)</span>
                 <span>-{formatNaira(result.discount)}</span>
               </div>
             )}
-            <div className="flex justify-between text-[1.1rem] font-bold text-ink pt-2 border-t border-line">
+            <div className="flex justify-between text-[1.125rem] font-bold text-ink pt-2 border-t border-line">
               <span>Total</span>
               <span>{formatNaira(result.total)}</span>
             </div>
@@ -235,7 +235,7 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
 
       {/* Wallet Balance */}
       <div className="rounded-xl border border-line bg-cream p-4">
-        <p className="text-[0.86rem] text-ink-2">Wallet Balance</p>
+        <p className="text-[0.875rem] text-ink-2">Wallet Balance</p>
         <p className="text-[1.5rem] font-bold text-ink">
           {formatNaira(user.walletBalance)}
         </p>
@@ -243,12 +243,12 @@ export function BulkOrdersForm({ user, sellableSlugs, maxUnits }: BulkOrdersForm
 
       {/* Messages */}
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.9rem] text-red-700">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.875rem] text-red-700">
           {error}
         </div>
       )}
       {successMessage && (
-        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-[0.9rem] text-green-700">
+        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-[0.875rem] text-green-700">
           {successMessage}
         </div>
       )}

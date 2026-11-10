@@ -60,7 +60,7 @@ export function StickyMobileCta({
             </p>
             <p className="truncate text-micro text-ink-3">{label}</p>
           </div>
-          <Link href={href} className="btn btn-primary !px-5 !py-3 !text-[0.86rem]">
+          <Link href={href} className="btn btn-primary !px-5 !py-3 !text-[0.875rem]">
             Get started
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>

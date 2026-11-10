@@ -31,7 +31,7 @@ describe("choosing services", () => {
     expect(within(card).getByRole("link", { name: "Order" }).getAttribute("href")).toBe("/dashboard/boosts/item");
     expect(screen.queryByRole("heading", { name: "Instagram followers" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "App verification" }));
-    expect(screen.getByRole("heading", { name: "WhatsApp" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "WhatsApp" })).toBeTruthy();
     expect(window.location.search).toBe("?country=ng&category=verification");
     window.history.back();
     await waitFor(() => expect(window.location.search).toBe("?country=ng&category=social"));
@@ -39,7 +39,7 @@ describe("choosing services", () => {
     expect(screen.queryByRole("heading", { name: "WhatsApp" })).toBeNull();
     window.history.forward();
     await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "App verification" })).toBeTruthy());
-    expect(screen.getByRole("heading", { name: "WhatsApp" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "WhatsApp" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Number plans" }));
     expect(screen.getByRole("heading", { level: 1, name: "Number plans" })).toBeTruthy();
@@ -51,7 +51,7 @@ describe("choosing services", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Mobile data" }));
     expect(screen.getByRole("heading", { level: 1, name: "Mobile data" })).toBeTruthy();
-    expect(screen.getByText("No listings match these filters")).toBeTruthy();
+    expect(screen.getByText("Mobile data plans are not connected yet")).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "MTN 1GB" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Airtel 1GB" })).toBeNull();
   });

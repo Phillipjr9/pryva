@@ -1,6 +1,6 @@
 # Verification service brand marks
 
-These are unmodified brand SVGs from [theSVG](https://github.com/glincker/thesvg),
+The original verification-brand SVGs are from [theSVG](https://github.com/glincker/thesvg),
 commit `2e6109e60b391e777833f52b63571542b5446e49`. The per-logo source URL
 and declared license (MIT or CC0-1.0) are recorded in
 `src/lib/services/numbers/verified-brand-logos.json`. theSVG's MIT license is
@@ -13,3 +13,8 @@ The service names also occur in the independent SMS-Activate service list at
 That list is not Pryva's live catalogue; matching it does not establish how
 many of Pryva's currently listed services have logos. Do not add ambiguous
 names or assume that a matching name from another supplier proves identity.
+
+Social platform marks are separate from the verification-brand list above and
+are selected only by explicit mappings. The `social-*.svg` marks are from
+Simple Icons 16.36.0. The `social-*.png` marks come from Wikimedia Commons.
+See `social/SOURCES.txt` and the included CC0 licence for details.

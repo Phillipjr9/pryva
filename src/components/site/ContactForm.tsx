@@ -67,7 +67,7 @@ export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = fa
           <Check className="h-6 w-6" />
         </span>
         <h3 className="mt-5 text-2xl font-medium">Message received.</h3>
-        <p className="mt-2 max-w-md text-[0.92rem] leading-relaxed text-ink-2">
+        <p className="mt-2 max-w-md text-[0.9375rem] leading-relaxed text-ink-2">
           Thanks for the idea. We will review it and use it to improve PryvaLogs.
         </p>
         <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
@@ -152,7 +152,7 @@ export function ContactForm({ defaultName = "", defaultEmail = "", signedIn = fa
         />
       </div>
 
-      {error && <p className="mt-3 text-[0.8rem] font-medium text-rose-600">{error}</p>}
+      {error && <p className="mt-3 text-[0.8125rem] font-medium text-rose-600">{error}</p>}
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="inline-flex items-center gap-1.5 text-meta text-ink-3">

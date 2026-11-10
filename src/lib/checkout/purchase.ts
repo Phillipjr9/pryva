@@ -121,7 +121,11 @@ export async function beginPurchase<T = Record<string, unknown>>(
   }
 
   if (options.velocity !== false) {
-    const velocity = await purchaseVelocity(user.id).catch(() => ({ allowed: true, count: 0, limit: 0 }));
+    const velocity = await purchaseVelocity(user.id).catch(() => null);
+    if (!velocity) {
+      logger.error("Purchase velocity check unavailable");
+      return refuse(copy.limiterDown, 503);
+    }
     if (!velocity.allowed) {
       // Best effort: the ceiling has already refused the purchase. Failing to
       // record why must not turn a 429 into a 500.

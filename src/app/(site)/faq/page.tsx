@@ -112,7 +112,7 @@ export default function FAQPage() {
           <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem]">
             Frequently Asked Questions
           </h1>
-          <p className="mt-4 text-[1.1rem] text-ink-2 max-w-2xl mx-auto">
+          <p className="mt-4 text-[1.125rem] text-ink-2 max-w-2xl mx-auto">
             Find answers to common questions about PryvaLogs and our services.
           </p>
         </div>
@@ -147,12 +147,12 @@ export default function FAQPage() {
             <h2 className="text-[1.5rem] font-semibold text-ink mb-3">
               Still have questions?
             </h2>
-            <p className="text-[0.95rem] text-ink-2 mb-6">
+            <p className="text-[0.9375rem] text-ink-2 mb-6">
               Can&apos;t find what you&apos;re looking for? Our support team is here to help.
             </p>
             <Link
               href="/contact"
-              className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-800"
+              className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.9375rem] font-semibold text-white hover:bg-lav-800"
             >
               Contact Support
             </Link>

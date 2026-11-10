@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import { orders } from "@/db/schema";
 import { getCurrentUser } from "@/lib/identity/auth";
+import { ESIM_PROVIDER } from "@/lib/services/order-providers";
 import { completeEsimOrder } from "@/lib/services/esim/esim-fulfilment";
 import { isSameOriginMutation } from "@/lib/platform/net";
 import { purchaseRateLimiter } from "@/lib/platform/rate-limit";
@@ -40,7 +41,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .from(orders)
     .where(and(eq(orders.id, id), eq(orders.userId, user.id)))
     .limit(1);
-  if (!order || order.service !== "esim") {
+  if (!order || order.service !== "esim" || order.provider !== ESIM_PROVIDER) {
     return Response.json({ ok: false, error: "Order not found." }, { status: 404 });
   }
 
@@ -71,7 +72,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       delivered: false,
       message:
         result.kind === "unpaid"
-          ? "The profile is ready, but your wallet balance no longer covers it. Top up and check again — nothing was charged."
+          ? "The profile is ready, but your wallet balance no longer covers it. Contact support with your order reference; nothing was charged."
           : "This profile could not be delivered. Nothing was charged; support has been given the record.",
     },
     { status: 409 },

@@ -271,7 +271,8 @@ export async function purchaseVelocity(userId: string): Promise<{ allowed: boole
     .select({ count: sql<number>`count(*)` })
     .from(orders)
     .where(and(eq(orders.userId, userId), gte(orders.createdAt, new Date(Date.now() - HOUR_MS))));
-  const count = Number(row?.count ?? 0);
+  const count = Number(row?.count);
+  if (row?.count == null || !Number.isSafeInteger(count) || count < 0) throw new Error("Invalid purchase velocity count");
   return { allowed: count < PURCHASES_PER_HOUR, count, limit: PURCHASES_PER_HOUR };
 }
 
@@ -281,7 +282,8 @@ export async function giftCardVelocity(userId: string): Promise<{ allowed: boole
     .select({ count: sql<number>`count(*)` })
     .from(giftCards)
     .where(and(eq(giftCards.redeemedBy, userId), gte(giftCards.redeemedAt, new Date(Date.now() - DAY_MS))));
-  const count = Number(row?.count ?? 0);
+  const count = Number(row?.count);
+  if (row?.count == null || !Number.isSafeInteger(count) || count < 0) throw new Error("Invalid gift card velocity count");
   return { allowed: count < GIFT_CARDS_PER_DAY, count, limit: GIFT_CARDS_PER_DAY };
 }
 

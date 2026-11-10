@@ -47,7 +47,7 @@ export function EmailChangeCard({ currentEmail }: { currentEmail: string }) {
   return (
     <section className="rounded-2xl border border-line bg-white p-5">
       <h2 className="text-[1rem] font-semibold text-ink">Sign-in email</h2>
-      <p className="mt-1 text-[0.88rem] text-ink-2">
+      <p className="mt-1 text-[0.875rem] text-ink-2">
         You sign in with <strong className="text-ink">{currentEmail}</strong>. A new address only takes over once you
         open the link we send to it.
       </p>
@@ -61,18 +61,18 @@ export function EmailChangeCard({ currentEmail }: { currentEmail: string }) {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           placeholder="new@example.com"
-          className="min-w-0 flex-1 rounded-xl border border-line bg-white px-3 py-2 text-[0.9rem] text-ink outline-none focus:border-lav-400"
+          className="min-w-0 flex-1 rounded-xl border border-line bg-white px-3 py-2 text-[0.875rem] text-ink outline-none focus:border-lav-400"
         />
         <button
           type="submit"
           disabled={busy || email.trim().length === 0}
-          className="rounded-xl bg-lav-700 px-4 py-2 text-[0.85rem] font-semibold text-white hover:bg-lav-800 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-xl bg-lav-700 px-4 py-2 text-[0.875rem] font-semibold text-white hover:bg-lav-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy ? "Sending…" : "Send confirmation"}
         </button>
       </form>
       {message && (
-        <p role="status" aria-live="polite" className={`mt-2 text-[0.82rem] ${failed ? "text-rose-600" : "text-emerald-700"}`}>
+        <p role="status" aria-live="polite" className={`mt-2 text-[0.8125rem] ${failed ? "text-rose-600" : "text-emerald-700"}`}>
           {message}
         </p>
       )}

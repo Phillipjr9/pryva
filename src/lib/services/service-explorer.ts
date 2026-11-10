@@ -1,3 +1,4 @@
+import type { DigitalArtwork } from "@/lib/content/digital-artwork";
 import { plans, type Plan } from "@/lib/services/catalog";
 import { EXPLORER_COUNTRIES, type ExplorerCountry } from "@/lib/content/explorer-countries";
 import type { AirtimeProvider } from "@/lib/services/data/airtime";
@@ -20,8 +21,9 @@ export type ExplorerCategory = ServiceId;
 /** Platform vocabularies classify supplier listings. They are not offerings. */
 export type ExplorerFilter = ExplorerCategory | "all";
 export type ExplorerArtwork =
+  | { kind: "digital-product"; art: DigitalArtwork | null }
   | { kind: "brand"; name: BrandSlug | "disney-plus" }
-  | { kind: "service"; name: "numbers" | "esim" | "proxies" | "email-otp" | "accounts" | "bulk" | "scheduled" | "social-promotion" }
+  | { kind: "service"; name: "numbers" | "esim" | "proxies" | "email-otp" | "accounts" | "bulk" | "scheduled" | "social-promotion" | "gift-cards" | "subscriptions" | "data" | "games" | "topups" | "prepaid" }
   /**
    * An inbox whose provider we could not identify. It is deliberately not
    * `email-otp`: that glyph belongs to the "Temporary inbox" card, and a grid
@@ -36,8 +38,8 @@ export type ExplorerArtwork =
   | { kind: "site-favicon"; domain: string }
   /** A real, pinned Simple Icons mark matched by its exact published title. */
   | { kind: "simple-icon"; slug: string; hex: string; version: string }
-  /** Official App Store artwork, selected from a fixed list of app IDs. */
-  | { kind: "verified-brand-logo"; slug: string }
+  /** A locally bundled, reviewed brand mark from an allowlisted source. */
+  | { kind: "verified-brand-logo"; slug: string; format?: "png" }
   | { kind: "network"; name: AirtimeProvider };
 export type ExplorerItem = {
   id: string;
@@ -47,6 +49,8 @@ export type ExplorerItem = {
   tag: string;
   /** Platform identity is separate from the selected promotion type. */
   platform?: string;
+  /** Additional verified catalogue metadata for search, not a coverage promise. */
+  searchTerms?: string;
   /**
    * What distinguishes this listing from others of the same type on the same
    * platform — refill, order bounds, rate per thousand. Shown in place of the
@@ -62,7 +66,15 @@ export type ExplorerItem = {
   myUnits: number | null;
   price: number | null;
   priceFrom?: boolean;
+  /** Verified identical product, denomination, currency and redemption region. */
+  giftCardEquivalenceKey?: string;
   action: { label: string; href: string } | null;
+  /** This listing is browse-only until its checkout is enabled. */
+  orderingPaused?: boolean;
+  /** An explicitly labelled result from a search across all digital categories. */
+  crossCategorySearch?: boolean;
+  /** A reviewed product whose service family is not established; All view only. */
+  allOnly?: boolean;
 };
 
 export const VERIFICATION_EXAMPLES: Array<{ name: string; brand: BrandSlug; tag: string }> = [
@@ -315,6 +327,38 @@ function additionalItems(_country: ExplorerCountry): ExplorerItem[] {
   return other;
 }
 
+/**
+ * Mix independent catalogue feeds within each service family before mixing
+ * the families themselves. A large feed must not push another supplier's
+ * offers behind hundreds of cards. Keep the original offers and checkout
+ * links: similar names do not prove that two plans are interchangeable.
+ */
+export function mergeExplorerSources(sources: readonly ExplorerItem[][]): ExplorerItem[] {
+  const combined: ExplorerItem[] = [];
+  for (const { id } of EXPLORER_CATEGORIES) {
+    const groups = sources.map((source) => source.filter((item) => item.category === id));
+    for (let index = 0; groups.some((group) => index < group.length); index++) {
+      for (const group of groups) if (group[index]) combined.push(group[index]);
+    }
+  }
+  return interleaveExplorerItems(combined);
+}
+
+/** Only compare priced, orderable offers with an explicitly verified identical
+ * product and terms. Unknown prices, coverage, or availability never hide an offer. */
+export function cheapestVerifiedGiftCards(items: ExplorerItem[]): ExplorerItem[] {
+  const best = new Map<string, ExplorerItem>();
+  for (const item of items) {
+    if (item.category !== "gift-cards" || !item.giftCardEquivalenceKey || item.price === null || !Number.isFinite(item.price) || item.price < 0 || item.priceFrom || !item.action || item.orderingPaused) continue;
+    const old = best.get(item.giftCardEquivalenceKey);
+    if (!old || item.price < old.price!) best.set(item.giftCardEquivalenceKey, item);
+  }
+  return items.filter((item) => {
+    if (item.category !== "gift-cards" || !item.giftCardEquivalenceKey || item.price === null || !Number.isFinite(item.price) || item.price < 0 || item.priceFrom || !item.action || item.orderingPaused) return true;
+    return best.get(item.giftCardEquivalenceKey) === item;
+  });
+}
+
 /** Interleave categories so the All view doesn't bury whole service families. */
 export function interleaveExplorerItems(items: ExplorerItem[]): ExplorerItem[] {
   const groups = EXPLORER_CATEGORIES.map((category) => items.filter((item) => item.category === category.id));
@@ -334,11 +378,11 @@ export function buildServiceExplorer(countryCode: string | null): ExplorerItem[]
 export function filterExplorerItems(items: ExplorerItem[], category: ExplorerFilter, search: string, tag = "all"): ExplorerItem[] {
   const query = search.trim().toLocaleLowerCase();
   return items.filter((item) => {
-    if (category !== "all" && item.category !== category) return false;
+    if (category !== "all" && (item.allOnly || (item.category !== category && !item.crossCategorySearch))) return false;
     if (tag !== "all" && item.tag !== tag) return false;
     if (!query) return true;
-    const categoryLabel = categoryById.get(item.category)?.label ?? "";
-    return [item.name, item.description, item.tag, item.platform ?? "", item.detail ?? "", categoryLabel]
+    const categoryLabel = item.crossCategorySearch ? "" : categoryById.get(item.category)?.label ?? "";
+    return [item.name, item.description, item.tag, item.platform ?? "", item.detail ?? "", item.searchTerms ?? "", categoryLabel]
       .some((value) => value.toLocaleLowerCase().includes(query));
   });
 }

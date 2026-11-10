@@ -18,8 +18,8 @@ type Size = "xs" | "sm" | "md" | "lg" | "xl";
 
 const MARK_PX: Record<Size, number> = { xs: 26, sm: 34, md: 42, lg: 52, xl: 72 };
 const TEXT_CLASS: Record<Size, string> = {
-  xs: "text-[0.92rem]",
-  sm: "text-[1.15rem]",
+  xs: "text-[0.9375rem]",
+  sm: "text-[1.125rem]",
   md: "text-[1.35rem]",
   lg: "text-[1.7rem]",
   xl: "text-[2.2rem]",

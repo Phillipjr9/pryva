@@ -1,0 +1,31 @@
+Social platform marks from Simple Icons 16.36.0:
+https://github.com/simple-icons/simple-icons/tree/16.36.0/icons
+Path data is distributed under CC0 1.0 (see LICENSE-simple-icons.txt).
+Names and logos are trademarks of their respective owners. A licence to the
+icon data is not an endorsement or a grant of trademark rights.
+RedNote is the international name of Xiaohongshu; ok.ru is Odnoklassniki.
+These marks are cosmetic and do not imply affiliation with the named platforms.
+
+Raster logos (not from Simple Icons):
+- social-likee.png: Likee / LIKEME PTE. LTD.; raster thumbnail of
+  https://commons.wikimedia.org/wiki/File:Likee_new_logo.png
+  Commons identifies it as PD-textlogo / simple geometry; trademarks apply.
+- social-rutube.png: Rutube; rasterized thumbnail of
+  https://commons.wikimedia.org/wiki/File:Rutube_icon.svg
+  Commons identifies it as PD-textlogo; trademarks apply.
+- social-boomplay.png: Boomplay Music, via Wikimedia Commons, raster thumbnail
+  resized from https://commons.wikimedia.org/wiki/File:Boomplay_Music_Logo.png.
+  Commons describes this work as CC BY-SA 4.0:
+  https://creativecommons.org/licenses/by-sa/4.0/ (resizing is the change).
+- social-line-voom.png: LINE Corporation; cropped the symbol from a rasterized
+  thumbnail of https://commons.wikimedia.org/wiki/File:Line_Voom_Logo.svg.
+  Commons identifies it as PD-textlogo; trademarks apply.
+- social-trovo.png: Trovo Live; rasterized thumbnail of
+  https://commons.wikimedia.org/wiki/File:Trovo_logo.svg, identified by Commons
+  as PD-textlogo; trademarks apply.
+- social-yandex-zen.png: VK / Zen (formerly Yandex Zen); rasterized thumbnail of
+  https://commons.wikimedia.org/wiki/File:Zen_logo_icon.svg, identified by
+  Commons as simple geometry in the public domain; trademarks apply.
+- social-coub.png: Coub team; resized raster thumbnail of
+  https://commons.wikimedia.org/wiki/File:Coub.svg, sourced there from Coub's
+  brand assets and identified as PD-textlogo. Trademarks apply.

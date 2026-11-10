@@ -65,7 +65,7 @@ export default function HelpPage() {
             <Shield className="h-3.5 w-3.5" /> Support centre
           </div>
           <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem]">How can we help you?</h1>
-          <p className="mx-auto mt-4 max-w-2xl text-[1.1rem] text-ink-2">Find guides, policies, and fast help for your account, orders, wallet, payouts, and service issues.</p>
+          <p className="mx-auto mt-4 max-w-2xl text-[1.125rem] text-ink-2">Find guides, policies, and fast help for your account, orders, wallet, payouts, and service issues.</p>
         </div>
       </section>
 
@@ -74,10 +74,10 @@ export default function HelpPage() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {quickActions.map((item) => (
               <Link key={item.title} href={item.href} className="rounded-2xl border border-line bg-white p-5 text-left transition-colors hover:border-lav-200 hover:bg-lav-50/30">
-                <p className="text-[0.8rem] font-semibold uppercase tracking-[0.12em] text-lav-700">Quick help</p>
-                <h2 className="mt-3 text-[1.02rem] font-semibold text-ink">{item.title}</h2>
-                <p className="mt-2 text-[0.86rem] leading-relaxed text-ink-2">{item.text}</p>
-                <span className="mt-4 inline-flex items-center gap-2 text-[0.8rem] font-medium text-lav-700">
+                <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.12em] text-lav-700">Quick help</p>
+                <h2 className="mt-3 text-[1rem] font-semibold text-ink">{item.title}</h2>
+                <p className="mt-2 text-[0.875rem] leading-relaxed text-ink-2">{item.text}</p>
+                <span className="mt-4 inline-flex items-center gap-2 text-[0.8125rem] font-medium text-lav-700">
                   Open <ArrowRight className="h-3.5 w-3.5" />
                 </span>
               </Link>
@@ -95,14 +95,14 @@ export default function HelpPage() {
                 <div className="mb-4 flex items-start gap-4">
                   <div className="grid h-12 w-12 place-items-center rounded-xl bg-lav-100 text-lav-600"><Icon className="h-6 w-6" /></div>
                   <div>
-                    <h2 className="text-[1.1rem] font-semibold text-ink">{category.title}</h2>
-                    <p className="text-[0.86rem] text-ink-2">{category.description}</p>
+                    <h2 className="text-[1.125rem] font-semibold text-ink">{category.title}</h2>
+                    <p className="text-[0.875rem] text-ink-2">{category.description}</p>
                   </div>
                 </div>
                 <ul className="space-y-3">
                   {category.links.map((link) => (
                     <li key={link.href}>
-                      <Link href={link.href} className="flex items-center gap-2 text-[0.86rem] text-ink-2 hover:text-lav-600">
+                      <Link href={link.href} className="flex items-center gap-2 text-[0.875rem] text-ink-2 hover:text-lav-600">
                         <ArrowRight className="h-3 w-3" />
                         {link.label}
                       </Link>
@@ -120,18 +120,18 @@ export default function HelpPage() {
           <div className="rounded-2xl border border-line bg-white p-8">
             <div className="mb-6 text-center">
               <h2 className="text-[1.6rem] font-semibold text-ink">Common questions</h2>
-              <p className="mt-2 text-[0.92rem] text-ink-2">Answers to the problems customers ask about most often.</p>
+              <p className="mt-2 text-[0.9375rem] text-ink-2">Answers to the problems customers ask about most often.</p>
             </div>
             <div className="grid gap-4">
               {faqs.map((item) => (
                 <details key={item.question} className="group rounded-xl border border-line bg-cream px-4 py-3 open:border-lav-200 open:bg-white">
-                  <summary className="cursor-pointer list-none text-left text-[0.96rem] font-medium text-ink marker:hidden">
+                  <summary className="cursor-pointer list-none text-left text-[0.9375rem] font-medium text-ink marker:hidden">
                     <span className="flex items-center justify-between gap-4">
                       {item.question}
                       <ArrowRight className="h-4 w-4 text-ink-3 transition-transform group-open:rotate-90" />
                     </span>
                   </summary>
-                  <p className="mt-3 max-w-3xl text-[0.9rem] leading-relaxed text-ink-2">{item.answer}</p>
+                  <p className="mt-3 max-w-3xl text-[0.875rem] leading-relaxed text-ink-2">{item.answer}</p>
                 </details>
               ))}
             </div>
@@ -143,10 +143,10 @@ export default function HelpPage() {
         <div className="shell">
           <div className="rounded-2xl border border-line bg-white p-8 text-center">
             <h2 className="mb-3 text-[1.5rem] font-semibold text-ink">Still need help?</h2>
-            <p className="mx-auto mb-6 max-w-md text-[0.95rem] text-ink-2">Contact support with your order or wallet reference and our team will review the case.</p>
+            <p className="mx-auto mb-6 max-w-md text-[0.9375rem] text-ink-2">Contact support with your order or wallet reference and our team will review the case.</p>
             <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link href="/contact" className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-800">Contact support <ArrowRight className="h-4 w-4" /></Link>
-              <Link href="/faq" className="inline-flex items-center gap-2 rounded-xl border border-line px-6 py-3 text-[0.95rem] font-semibold text-ink hover:bg-cream">Browse FAQ</Link>
+              <Link href="/contact" className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.9375rem] font-semibold text-white hover:bg-lav-800">Contact support <ArrowRight className="h-4 w-4" /></Link>
+              <Link href="/faq" className="inline-flex items-center gap-2 rounded-xl border border-line px-6 py-3 text-[0.9375rem] font-semibold text-ink hover:bg-cream">Browse FAQ</Link>
             </div>
           </div>
         </div>

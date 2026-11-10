@@ -56,8 +56,8 @@ export async function SecuritySection({ user }: { user: PublicUser }) {
   return (
     <section id="security" className="scroll-mt-24 space-y-4">
       <div>
-        <h2 className="text-[1.15rem] font-medium tracking-tight text-ink">Security</h2>
-        <p className="mt-1 text-[0.86rem] text-ink-2">
+        <h2 className="text-[1.125rem] font-medium tracking-tight text-ink">Security</h2>
+        <p className="mt-1 text-[0.875rem] text-ink-2">
           How this account is protected, and how to keep it that way.
         </p>
       </div>
@@ -74,10 +74,10 @@ export async function SecuritySection({ user }: { user: PublicUser }) {
       <PasskeysCard passkeys={passkeys} available={passkeysAvailableHere} />
 
       <div className="rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
-        <h3 className="flex items-center gap-2 text-[0.95rem] font-semibold">
+        <h3 className="flex items-center gap-2 text-[0.9375rem] font-semibold">
           <Shield className="h-4 w-4 text-lav-700" /> What we do on our side
         </h3>
-        <ul className="mt-2.5 grid gap-2 text-[0.8rem] text-ink-2 sm:grid-cols-2">
+        <ul className="mt-2.5 grid gap-2 text-[0.8125rem] text-ink-2 sm:grid-cols-2">
           {[
             "Session cookies are http-only and expire after 30 days.",
             "Sign-in is rate limited per connection and per account, and locks for 30 minutes after 8 wrong passwords.",
@@ -93,10 +93,10 @@ export async function SecuritySection({ user }: { user: PublicUser }) {
       </div>
 
       <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
-        <h3 className="flex items-center gap-2 text-[0.95rem] font-semibold">
+        <h3 className="flex items-center gap-2 text-[0.9375rem] font-semibold">
           <User className="h-4 w-4 text-lav-700" /> Habits that keep an account safe
         </h3>
-        <ul className="mt-2.5 grid gap-2 text-[0.8rem] text-ink-2">
+        <ul className="mt-2.5 grid gap-2 text-[0.8125rem] text-ink-2">
           {[
             "Don't reuse this password on other sites.",
             "Never share a verification code — we never ask for one.",

@@ -37,6 +37,14 @@ describe("purchase-sensitive eSIM rates", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("can bypass another service's manual override to get a fresh reference rate", async () => {
+    vi.stubEnv("USD_NGN_RATE", "2000");
+    const fetchMock = vi.fn().mockResolvedValue(response({ base_code: "USD", rates: { NGN: 1500 } }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await getFreshNgnRate("USD", { allowOverride: false })).toMatchObject({ rate: 1500, source: "live" });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("does not silently ignore an invalid or implausibly low configured rate", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);

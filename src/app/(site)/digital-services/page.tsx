@@ -27,7 +27,7 @@ export default function DigitalServicesPage() {
             <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3.5rem]">
               Digital subscriptions
             </h1>
-            <p className="mt-6 text-[1.1rem] leading-relaxed text-ink-2">
+            <p className="mt-6 text-[1.125rem] leading-relaxed text-ink-2">
               Streaming, AI tools and productivity subscriptions are not available to order yet.
               No price or product is being advertised until a delivery path is connected.
             </p>
@@ -55,14 +55,14 @@ export default function DigitalServicesPage() {
                   <Check className="mt-0.5 h-4 w-4 shrink-0 text-lav-600" />
                   <div>
                     <h3 className="text-[1rem] font-semibold text-ink">{item.name}</h3>
-                    <p className="mt-1 text-[0.88rem] leading-relaxed text-ink-2">{item.detail}</p>
+                    <p className="mt-1 text-[0.875rem] leading-relaxed text-ink-2">{item.detail}</p>
                   </div>
                 </div>
               </div>
             ))}
           </div>
           <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
-            <p className="text-[0.9rem] leading-relaxed text-amber-900">
+            <p className="text-[0.875rem] leading-relaxed text-amber-900">
               <strong>Not available yet.</strong> These categories are listed for planning purposes only.
               Nothing here can be ordered or charged until a delivery service is connected.
             </p>

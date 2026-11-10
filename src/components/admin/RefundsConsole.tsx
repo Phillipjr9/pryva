@@ -211,7 +211,7 @@ export function RefundsConsole() {
                       type="button"
                       onClick={() => void refund(order)}
                       disabled={acting === order.id}
-                      className="rounded-lg bg-lav-700 px-3.5 py-2 text-[0.8rem] font-semibold text-white transition-colors hover:bg-lav-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-lg bg-lav-700 px-3.5 py-2 text-[0.8125rem] font-semibold text-white transition-colors hover:bg-lav-800 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {acting === order.id ? "Refunding…" : `Refund ${naira(order.amount)}`}
                     </button>

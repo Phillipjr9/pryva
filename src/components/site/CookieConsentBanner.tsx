@@ -78,8 +78,8 @@ export function CookieConsentBanner() {
     <div className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-white/95 px-4 py-4 shadow-[0_-12px_40px_rgba(18,16,12,0.12)] backdrop-blur-sm">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="max-w-3xl">
-          <p className="text-[0.96rem] font-semibold text-ink">We use cookies to keep your session secure and remember your consent.</p>
-          <p className="mt-1 text-[0.82rem] leading-relaxed text-ink-2">
+          <p className="text-[0.9375rem] font-semibold text-ink">We use cookies to keep your session secure and remember your consent.</p>
+          <p className="mt-1 text-[0.8125rem] leading-relaxed text-ink-2">
             Essential session cookies keep you signed in and protect authentication. We also remember your consent choice in the browser so you are not asked again.
             Review the <Link href="/cookie-policy" className="font-semibold text-lav-700 underline underline-offset-2">Cookie policy</Link> and <Link href="/privacy" className="font-semibold text-lav-700 underline underline-offset-2">Privacy policy</Link>.
           </p>
@@ -89,14 +89,14 @@ export function CookieConsentBanner() {
           <button
             type="button"
             onClick={() => saveConsent(true)}
-            className="rounded-xl bg-lav-700 px-4 py-2.5 text-[0.82rem] font-semibold text-white transition-colors hover:bg-lav-800"
+            className="rounded-xl bg-lav-700 px-4 py-2.5 text-[0.8125rem] font-semibold text-white transition-colors hover:bg-lav-800"
           >
             Yes, I accept
           </button>
           <button
             type="button"
             onClick={() => saveConsent(false)}
-            className="rounded-xl border border-line bg-white px-4 py-2.5 text-[0.82rem] font-semibold text-ink transition-colors hover:border-lav-300 hover:text-lav-700"
+            className="rounded-xl border border-line bg-white px-4 py-2.5 text-[0.8125rem] font-semibold text-ink transition-colors hover:border-lav-300 hover:text-lav-700"
           >
             Only essentials
           </button>

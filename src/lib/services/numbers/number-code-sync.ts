@@ -38,7 +38,9 @@ export type NumberCodeRead = {
  */
 function normalise(status: string | null, hasCode: boolean): NumberCodeRead["status"] {
   const value = (status ?? "").toLowerCase();
-  if (hasCode || value === "delivered" || value === "received" || value === "completed") return "delivered";
+  // Provider status alone is not a customer-visible code. Keep polling and
+  // require reconciliation rather than marking a codeless order delivered.
+  if (hasCode) return "delivered";
   if (value === "cancelled" || value === "canceled" || value === "refunded") return "cancelled";
   if (value === "expired") return "expired";
   return "pending";

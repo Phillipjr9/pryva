@@ -70,7 +70,7 @@ export function HeaderNav({ user }: { user: NavUser }) {
                 key={link.href}
                 href={link.href}
                 aria-current={isActive(link.href) ? "page" : undefined}
-                className={`rounded-full px-3.5 py-2 text-[0.86rem] font-medium transition-colors ${
+                className={`rounded-full px-3.5 py-2 text-[0.875rem] font-medium transition-colors ${
                   isActive(link.href) ? "text-lav-700" : "text-ink-2 hover:text-ink"
                 }`}
               >
@@ -84,12 +84,12 @@ export function HeaderNav({ user }: { user: NavUser }) {
               <>
                 <Link
                   href="/dashboard/wallet"
-                  className="hidden items-center gap-2 rounded-full border border-line bg-white/70 px-3.5 py-2 text-[0.8rem] font-semibold text-ink-2 xl:flex"
+                  className="hidden items-center gap-2 rounded-full border border-line bg-white/70 px-3.5 py-2 text-[0.8125rem] font-semibold text-ink-2 xl:flex"
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                   {formatNaira(user.walletBalance)}
                 </Link>
-                <Link href="/dashboard" className="btn btn-dark !px-5 !py-2.5 !text-[0.83rem]">
+                <Link href="/dashboard" className="btn btn-dark !px-5 !py-2.5 !text-[0.8125rem]">
                   Dashboard
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
@@ -98,11 +98,11 @@ export function HeaderNav({ user }: { user: NavUser }) {
               <>
                 <Link
                   href="/login"
-                  className="rounded-full px-3.5 py-2 text-[0.86rem] font-medium text-ink-2 transition-colors hover:text-ink"
+                  className="rounded-full px-3.5 py-2 text-[0.875rem] font-medium text-ink-2 transition-colors hover:text-ink"
                 >
                   Sign in
                 </Link>
-                <Link href="/signup" className="btn btn-primary !px-5 !py-2.5 !text-[0.83rem]">
+                <Link href="/signup" className="btn btn-primary !px-5 !py-2.5 !text-[0.8125rem]">
                   Get started
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>

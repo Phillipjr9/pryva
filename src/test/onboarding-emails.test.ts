@@ -51,7 +51,7 @@ beforeAll(async () => {
     "0020_webauthn.sql", "0021_referrals.sql", "0022_fraud.sql", "0023_boost_orders.sql",
     "0024_account_deletions.sql", "0025_account_deletion_forfeiture.sql", "0026_webhook_events.sql",
     "0027_esim_credentials.sql", "0028_esim_delivery_email.sql", "0029_notification_gaps.sql",
-    "0030_payout_name_approvals.sql", "0031_email_delivery_events.sql", "0032_welcome_verified_emails.sql", "0033_account_activity_emails.sql", "0034_customer_activity_emails.sql", "0035_admin_bans.sql", "0035_code_received_at.sql", "0036_account_suspension.sql", "0037_gift_card_request_id.sql", "0038_referral_credit_provenance.sql", "0039_refund_check_fairness.sql", "0040_bulk_batch_claims.sql",
+    "0030_payout_name_approvals.sql", "0031_email_delivery_events.sql", "0032_welcome_verified_emails.sql", "0033_account_activity_emails.sql", "0034_customer_activity_emails.sql", "0035_admin_bans.sql", "0035_code_received_at.sql", "0036_account_suspension.sql", "0037_gift_card_request_id.sql", "0038_referral_credit_provenance.sql", "0039_refund_check_fairness.sql", "0040_bulk_batch_claims.sql", "0041_foxreload_quotes.sql", "0042_foxreload_quote_terms.sql", "0043_foxreload_client_code.sql",
   ]) {
     await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   }

@@ -311,8 +311,8 @@ export function InboxManager() {
         {!active ? (
           <div className="space-y-4">
             <div>
-              <h2 className="text-[1.05rem] font-medium text-ink">Create a disposable email</h2>
-              <p className="mt-1 text-[0.84rem] leading-relaxed text-ink-2">
+              <h2 className="text-[1rem] font-medium text-ink">Create a disposable email</h2>
+              <p className="mt-1 text-[0.8125rem] leading-relaxed text-ink-2">
                 Generate a temporary address for verification emails. The app checks it for new
                 messages automatically; how long the address and messages remain available depends
                 on the mailbox provider.
@@ -322,7 +322,7 @@ export function InboxManager() {
               type="button"
               onClick={() => void handleCreate()}
               disabled={creating}
-              className="btn btn-primary !py-2.5 !text-[0.84rem] disabled:opacity-50"
+              className="btn btn-primary !py-2.5 !text-[0.8125rem] disabled:opacity-50"
             >
               {creating ? (
                 <>
@@ -345,7 +345,7 @@ export function InboxManager() {
                     Live
                   </span>
                 </div>
-                <p className="mt-1 [overflow-wrap:anywhere] font-mono text-[1rem] font-medium text-ink sm:text-[1.15rem]">
+                <p className="mt-1 [overflow-wrap:anywhere] font-mono text-[1rem] font-medium text-ink sm:text-[1.125rem]">
                   {active.address}
                 </p>
               </div>
@@ -354,7 +354,7 @@ export function InboxManager() {
                 <button
                   type="button"
                   onClick={() => void copyAddress(active.address, active.id)}
-                  className="btn border border-line bg-white !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.84rem] text-ink hover:border-lav-200"
+                  className="btn border border-line bg-white !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.8125rem] text-ink hover:border-lav-200"
                 >
                   {copiedId === active.id ? (
                     <Check className="h-3.5 w-3.5 text-emerald-600" />
@@ -367,7 +367,7 @@ export function InboxManager() {
                   type="button"
                   onClick={() => void checkForMail(active.id)}
                   disabled={checking}
-                  className="btn border border-line bg-white !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.84rem] text-ink hover:border-lav-200 disabled:opacity-50"
+                  className="btn border border-line bg-white !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.8125rem] text-ink hover:border-lav-200 disabled:opacity-50"
                 >
                   {checking ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -380,7 +380,7 @@ export function InboxManager() {
                   type="button"
                   onClick={() => void handleCreate()}
                   disabled={creating}
-                  className="btn btn-primary !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.84rem] disabled:opacity-50"
+                  className="btn btn-primary !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.8125rem] disabled:opacity-50"
                 >
                   {creating ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -418,7 +418,7 @@ export function InboxManager() {
 
             {/* Messages List */}
             {messages.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-[0.8rem] text-ink-3">
+              <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-[0.8125rem] text-ink-3">
                 Nothing has arrived yet. Send an email to the address above and it will appear here
                 automatically.
               </p>
@@ -439,7 +439,7 @@ export function InboxManager() {
                           className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left hover:bg-lav-50/40"
                         >
                           <span className="min-w-0">
-                            <span className="block truncate text-[0.84rem] font-medium text-ink">
+                            <span className="block truncate text-[0.8125rem] font-medium text-ink">
                               {message.subject ?? "(no subject)"}
                             </span>
                             <span className="mt-0.5 block truncate text-meta text-ink-3">
@@ -485,7 +485,7 @@ export function InboxManager() {
       {error && (
         <p
           role="alert"
-          className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[0.8rem] leading-relaxed text-rose-700"
+          className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[0.8125rem] leading-relaxed text-rose-700"
         >
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           {error}
@@ -497,7 +497,7 @@ export function InboxManager() {
         <div className="rounded-2xl border border-line bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="text-[0.95rem] font-medium text-ink">Saved inboxes</h2>
+              <h2 className="text-[0.9375rem] font-medium text-ink">Saved inboxes</h2>
               <p className="mt-0.5 text-meta text-ink-3">
                 Your email addresses are saved here. Click &ldquo;Use this inbox&rdquo; to switch back
                 to any saved email.
@@ -530,7 +530,7 @@ export function InboxManager() {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <span className="min-w-0 [overflow-wrap:anywhere] font-mono text-[0.88rem] font-medium text-ink">
+                      <span className="min-w-0 [overflow-wrap:anywhere] font-mono text-[0.875rem] font-medium text-ink">
                         {inbox.address}
                       </span>
                       {isActive && (
@@ -708,7 +708,7 @@ function EmailContentViewer({ body }: { body: string }) {
           />
         </div>
       ) : (
-        <pre className="max-h-80 overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] rounded-xl border border-line bg-white p-4 font-mono text-[0.8rem] leading-relaxed text-ink-2">
+        <pre className="max-h-80 overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] rounded-xl border border-line bg-white p-4 font-mono text-[0.8125rem] leading-relaxed text-ink-2">
           {isHtml
             ? body.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim()
             : body}

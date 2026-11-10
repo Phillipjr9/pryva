@@ -100,12 +100,12 @@ export function FraudQueue() {
           <h2 className="flex items-center gap-2 text-[1rem] font-semibold text-ink">
             <Shield className="h-4 w-4 text-lav-700" /> Fraud signals
           </h2>
-          <p className="mt-1 max-w-2xl text-[0.84rem] leading-relaxed text-ink-2">
+          <p className="mt-1 max-w-2xl text-[0.8125rem] leading-relaxed text-ink-2">
             Risk assessments and velocity ceilings. Advisory only — no automated action reads this queue,
             and nothing here moves money. Mark a row reviewed once you have judged it.
           </p>
         </div>
-        <label className="flex items-center gap-2 text-[0.8rem] text-ink-2">
+        <label className="flex items-center gap-2 text-[0.8125rem] text-ink-2">
           <input
             type="checkbox"
             checked={openOnly}
@@ -120,17 +120,17 @@ export function FraudQueue() {
       </div>
 
       {error ? (
-        <p role="alert" className="mt-3 flex items-start gap-1.5 text-[0.82rem] font-medium text-rose-700">
+        <p role="alert" className="mt-3 flex items-start gap-1.5 text-[0.8125rem] font-medium text-rose-700">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {error}
         </p>
       ) : null}
 
       {loading ? (
-        <p className="mt-4 flex items-center gap-2 text-[0.84rem] text-ink-2">
+        <p className="mt-4 flex items-center gap-2 text-[0.8125rem] text-ink-2">
           <Loader2 className="h-4 w-4 animate-spin" /> Reading the queue…
         </p>
       ) : events.length === 0 ? (
-        <p className="mt-4 rounded-xl border border-dashed border-line bg-cream/40 px-3 py-3 text-[0.84rem] text-ink-3">
+        <p className="mt-4 rounded-xl border border-dashed border-line bg-cream/40 px-3 py-3 text-[0.8125rem] text-ink-3">
           {openOnly ? "Nothing waiting. Every signal has been reviewed." : "No signals have been recorded."}
         </p>
       ) : (
@@ -139,7 +139,7 @@ export function FraudQueue() {
             <li key={event.id} className="rounded-xl border border-line bg-[#fffdfa] px-3 py-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="flex flex-wrap items-center gap-2 text-[0.86rem] font-semibold text-ink">
+                  <p className="flex flex-wrap items-center gap-2 text-[0.875rem] font-semibold text-ink">
                     {KIND_LABEL[event.kind] ?? event.kind}
                     <span
                       className={`rounded-full border px-2 py-0.5 text-micro font-medium ${
@@ -154,7 +154,7 @@ export function FraudQueue() {
                       </span>
                     ) : null}
                   </p>
-                  <p className="mt-1 text-[0.8rem] text-ink-2">{event.reasons}</p>
+                  <p className="mt-1 text-[0.8125rem] text-ink-2">{event.reasons}</p>
                   <p className="mt-1 text-micro text-ink-3">
                     {event.userEmail ?? "account deleted"}
                     {event.amount ? ` · ${formatNaira(event.amount)}` : ""}
@@ -172,7 +172,7 @@ export function FraudQueue() {
                     type="button"
                     onClick={() => void review(event.id)}
                     disabled={pending === event.id}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-white px-2.5 py-1.5 text-[0.8rem] font-medium text-ink-2 hover:bg-lav-50 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-white px-2.5 py-1.5 text-[0.8125rem] font-medium text-ink-2 hover:bg-lav-50 disabled:opacity-50"
                   >
                     {pending === event.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />

@@ -47,6 +47,15 @@ describe("supplier client safety", () => {
     });
   });
 
+  it("records a rental reference before rejecting an incomplete paid receipt", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { rental_id: "rent-incomplete" } }), { status: 200 })));
+    const accepted = vi.fn().mockResolvedValue(undefined);
+    await expect(buyFleexaRental({ area: "ng", months: 1 }, accepted))
+      .rejects.toMatchObject({ code: "INCOMPLETE_RECEIPT" });
+    expect(accepted).toHaveBeenCalledOnce();
+    expect(accepted).toHaveBeenCalledWith("rent-incomplete");
+  });
+
   it("polls the purchased inbox and extracts an OTP from HTML when the API omits a code field", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       data: {

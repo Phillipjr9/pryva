@@ -128,7 +128,7 @@ function Bubble({ message }: { message: ChatMessage }) {
         {message.pending ? <span className="text-micro text-white/60">· sending…</span> : null}
       </div>
       <div
-        className={`mt-1.5 whitespace-pre-line text-[0.86rem] leading-relaxed ${
+        className={`mt-1.5 whitespace-pre-line text-[0.875rem] leading-relaxed ${
           mine ? "text-white/90" : "text-ink-2"
         }`}
       >
@@ -277,7 +277,7 @@ export function SupportChat({
         aria-label="Support conversation"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-[0.95rem] font-semibold text-ink">
+          <h2 className="text-[0.9375rem] font-semibold text-ink">
             {ticketId ? "Conversation" : "What is going wrong?"}
           </h2>
           {status ? <SupportStatusPill status={status} /> : null}
@@ -295,7 +295,7 @@ export function SupportChat({
                 <Sparkle className="h-3.5 w-3.5 text-lav-700" />
                 <span className="text-micro font-semibold text-lav-800">PryvaLogs assistant</span>
               </div>
-              <p className="mt-1.5 text-[0.86rem] leading-relaxed text-ink-2">
+              <p className="mt-1.5 text-[0.875rem] leading-relaxed text-ink-2">
                 Describe it the way you would to a person. I read your account and can settle most problems
                 without waiting — and when I cannot, I say so and a person takes over with the details already in
                 hand.
@@ -381,7 +381,7 @@ export function SupportChat({
               <button
                 type="submit"
                 disabled={sending || draft.trim().length < 2}
-                className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-[0.84rem] font-semibold text-white hover:bg-ink-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-[0.8125rem] font-semibold text-white hover:bg-ink-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 {messages.length === 0 ? "Ask the assistant" : "Send"}
@@ -392,7 +392,7 @@ export function SupportChat({
                   type="button"
                   onClick={() => void askForPerson()}
                   disabled={escalating || sending}
-                  className="rounded-xl border border-line px-3 py-2 text-[0.8rem] font-semibold text-ink-2 hover:border-lav-300 disabled:opacity-50"
+                  className="rounded-xl border border-line px-3 py-2 text-[0.8125rem] font-semibold text-ink-2 hover:border-lav-300 disabled:opacity-50"
                 >
                   {escalating ? "Passing it on…" : "Ask for a person instead"}
                 </button>

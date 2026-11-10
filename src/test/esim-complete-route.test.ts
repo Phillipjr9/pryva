@@ -5,6 +5,7 @@ const state = vi.hoisted(() => ({
   preview: false,
   allowed: true,
   unavailable: false,
+  provider: "bitcall",
   result: { kind: "pending" } as { kind: string },
   complete: vi.fn(),
 }));
@@ -19,13 +20,13 @@ vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
 });
 vi.mock("@/lib/services/esim/esim-fulfilment", () => ({ completeEsimOrder: async (...args: unknown[]) => { state.complete(...args); return state.result; } }));
 vi.mock("@/db", () => ({
-  db: { select: () => ({ from: () => ({ where: () => ({ limit: async () => [{ service: "esim", status: "processing" }] }) }) }) },
+  db: { select: () => ({ from: () => ({ where: () => ({ limit: async () => [{ service: "esim", status: "processing", provider: state.provider }] }) }) }) },
 }));
 
 const { POST } = await import("@/app/api/esim/orders/[id]/complete/route");
 const params = { params: Promise.resolve({ id: "b1a6f0e2-3c4d-4e5f-8a9b-0c1d2e3f4a5b" }) };
 const request = () => new NextRequest("https://pryva.test/api/esim/orders/test/complete", { method: "POST" });
-beforeEach(() => { state.preview = false; state.allowed = true; state.unavailable = false; state.result = { kind: "pending" }; state.complete.mockReset(); });
+beforeEach(() => { state.provider = "bitcall"; state.preview = false; state.allowed = true; state.unavailable = false; state.result = { kind: "pending" }; state.complete.mockReset(); });
 
 describe("eSIM provisioning checks", () => {
   it("does not contact the network from an in-memory preview", async () => {
@@ -33,10 +34,23 @@ describe("eSIM provisioning checks", () => {
     expect((await POST(request(), params)).status).toBe(503);
     expect(state.complete).not.toHaveBeenCalled();
   });
+  it("never sends another provider’s eSIM to Bitcall completion", async () => {
+    state.provider = "foxreload";
+    expect((await POST(request(), params)).status).toBe(404);
+    expect(state.complete).not.toHaveBeenCalled();
+  });
   it("fails closed when rate limiting is unavailable", async () => {
     state.unavailable = true;
     expect((await POST(request(), params)).status).toBe(503);
     expect(state.complete).not.toHaveBeenCalled();
+  });
+  it("directs unpaid review orders to support rather than promising a retry", async () => {
+    state.result = { kind: "unpaid" };
+    const response = await POST(request(), params);
+    const body = await response.json();
+    expect(response.status).toBe(409);
+    expect(body.message).toMatch(/contact support/i);
+    expect(body.message).not.toMatch(/top up|check again/i);
   });
   it("reports provisioning without exposing where stock comes from", async () => {
     const response = await POST(request(), params);

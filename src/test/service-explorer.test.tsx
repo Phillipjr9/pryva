@@ -8,7 +8,7 @@ import { formatUnitCount, safeUnitCount } from "@/lib/services/service-units";
 import { EXPLORER_COUNTRIES } from "@/lib/content/explorer-countries";
 import {
   buildServiceExplorer, canPreviewPlan, EXPLORER_CATEGORIES, explorerCategory, explorerCountry,
-  filterExplorerItems, planMatchesCountry, type ExplorerItem,
+  filterExplorerItems, mergeExplorerSources, planMatchesCountry, type ExplorerItem,
 } from "@/lib/services/service-explorer";
 
 describe("country-first service explorer", () => {
@@ -35,6 +35,17 @@ describe("country-first service explorer", () => {
     expect(items.filter((item) => item.category === "verification")).toEqual([]);
   });
 
+  it("mixes sources within each category while retaining distinct offers", () => {
+    const base: ExplorerItem = { id: "a", category: "esim", name: "Same plan name", description: "", tag: "", artwork: { kind: "service", name: "esim" }, source: "live", coverage: "unconfirmed", stock: null, myUnits: null, price: 100, action: { label: "Buy", href: "/one" } };
+    const source1 = [base, { ...base, id: "b", action: { label: "Buy", href: "/two" } }];
+    const source2 = [{ ...base, id: "c", price: 200, action: { label: "Quote", href: "/three" } }, { ...base, id: "d" }];
+    const mixed = mergeExplorerSources([source1, source2]);
+    expect(mixed.map((item) => item.id)).toEqual(["a", "c", "b", "d"]);
+    expect(mixed[0].action?.href).toBe("/one");
+    expect(mixed[1]).toMatchObject({ price: 200, action: { href: "/three" } });
+    expect(mergeExplorerSources([[], source2]).map((item) => item.id)).toEqual(["c", "d"]);
+  });
+
   it("validates country and category parameters rather than guessing", () => {
     expect(explorerCountry("NG")?.name).toBe("Nigeria");
     expect(explorerCountry("Nigeria")).toBeNull();
@@ -45,7 +56,7 @@ describe("country-first service explorer", () => {
 
   it("keeps service categories without fabricating supplier listings", () => {
     const ids = EXPLORER_CATEGORIES.map((category) => category.id);
-    expect(ids).toEqual(["verification", "social", "numbers", "esim", "proxies", "email", "accounts", "subscriptions", "data", "tools"]);
+    expect(ids).toEqual(["verification", "social", "numbers", "esim", "proxies", "email", "accounts", "subscriptions", "games", "topups", "gift-cards", "prepaid", "data", "tools"]);
     const items = buildServiceExplorer("ng");
     expect(new Set(items.map((item) => item.id)).size).toBe(items.length);
     for (const category of ["verification", "social", "esim", "subscriptions", "data"]) {
@@ -53,7 +64,7 @@ describe("country-first service explorer", () => {
     }
     // Supplier-backed entries arrive separately; a platform vocabulary is not a listing.
     expect(items.some((item) => item.id.startsWith("verification-") || item.id.startsWith("social-"))).toBe(false);
-    expect(ids).not.toContain("gift-cards");
+    expect(ids).toContain("gift-cards");
   });
 
   it("never inserts synthetic platform records into a country catalog", () => {

@@ -45,7 +45,7 @@ export default function PricingPage() {
           <h1 className="text-[1.7rem] font-medium tracking-tight text-ink sm:text-[3rem]">
             Simple, transparent pricing
           </h1>
-          <p className="mx-auto mt-3 max-w-2xl text-[0.88rem] text-ink-2 sm:mt-4 sm:text-[1.1rem]">
+          <p className="mx-auto mt-3 max-w-2xl text-[0.875rem] text-ink-2 sm:mt-4 sm:text-[1.125rem]">
             Compare catalog prices in Naira. Availability varies, so review the final amount and terms before confirming an order.
           </p>
         </div>
@@ -59,7 +59,7 @@ export default function PricingPage() {
               return (
                 <div key={group.slug} className="rounded-xl border border-line bg-white/85 p-2.5 text-left shadow-[var(--shadow-card)] sm:rounded-2xl sm:p-3">
                   <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.12em] text-ink-3 sm:text-[0.8125rem]">{group.name}</p>
-                  <p className="mt-1.5 text-[0.95rem] font-semibold text-ink sm:mt-2 sm:text-[1.1rem]">{count}</p>
+                  <p className="mt-1.5 text-[0.9375rem] font-semibold text-ink sm:mt-2 sm:text-[1.125rem]">{count}</p>
                   <p className="text-[0.8125rem] text-ink-2 sm:text-[0.8125rem]">plans</p>
                 </div>
               );
@@ -78,7 +78,7 @@ export default function PricingPage() {
                 <div className="mb-6 flex items-center gap-3 sm:mb-8 sm:gap-4"><ServiceIcon service="esim" size="lg" /><h2 className="text-[1.35rem] font-semibold text-ink sm:text-[1.75rem]">eSIM</h2></div>
                 <div className="rounded-2xl border border-line bg-white p-6">
                   <p className="text-ink-2">{live ? "Current eSIM plans, prices and coverage are listed in the dashboard." : "eSIM ordering is currently unavailable; prices and coverage cannot be confirmed."}</p>
-                  {live && <Link href="/dashboard/esim" className="mt-4 inline-flex font-semibold text-lav-700 underline underline-offset-2">Browse current eSIM plans</Link>}
+                  {live && <Link href="/dashboard/services?category=esim" className="mt-4 inline-flex font-semibold text-lav-700 underline underline-offset-2">Browse current eSIM plans</Link>}
                 </div>
               </div>
             </section>
@@ -92,7 +92,7 @@ export default function PricingPage() {
             <div className="shell">
               <div className="mb-4 flex items-center gap-3 sm:mb-8 sm:gap-4">
                 <ServiceIcon service={group.slug as any} size="lg" />
-                <h2 className="text-[1.2rem] font-semibold text-ink sm:text-[1.75rem]">
+                <h2 className="text-[1.25rem] font-semibold text-ink sm:text-[1.75rem]">
                   {group.name}
                 </h2>
               </div>
@@ -118,7 +118,7 @@ export default function PricingPage() {
                       </div>
                     )}
                     <div className="mb-1.5 flex items-start justify-between gap-2 sm:mb-3">
-                      <h3 className="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink sm:gap-2 sm:text-[1.05rem]">
+                      <h3 className="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink sm:gap-2 sm:text-[1rem]">
                         {hasCountryFlag(plan.region) && <CountryFlag region={plan.region} size={15} decorative />}
                         {plan.name}
                       </h3>
@@ -126,15 +126,15 @@ export default function PricingPage() {
                         {plan.duration}
                       </span>
                     </div>
-                    <p className="mb-2 text-[0.8125rem] text-ink-2 sm:mb-4 sm:text-[0.86rem]">
+                    <p className="mb-2 text-[0.8125rem] text-ink-2 sm:mb-4 sm:text-[0.875rem]">
                       {plan.planLabel}
                     </p>
                     <div className="mb-2 sm:mb-4">
-                      <span className="text-[0.96rem] font-bold leading-none text-ink sm:text-[1.9rem]">
+                      <span className="text-[0.9375rem] font-bold leading-none text-ink sm:text-[1.9rem]">
                         {formatNaira(plan.price)}
                       </span>
                       {plan.compareAt && (
-                        <span className="ml-1.5 text-[0.8125rem] text-ink-3 line-through sm:ml-2 sm:text-[0.9rem]">
+                        <span className="ml-1.5 text-[0.8125rem] text-ink-3 line-through sm:ml-2 sm:text-[0.875rem]">
                           {formatNaira(plan.compareAt)}
                         </span>
                       )}
@@ -144,7 +144,7 @@ export default function PricingPage() {
                       {plan.features.map((feature, index) => (
                         <li
                           key={index}
-                          className={`${index >= 1 ? "hidden sm:flex" : "flex"} items-start gap-1.5 text-[0.8125rem] leading-relaxed text-ink-2 sm:gap-2 sm:text-[0.86rem]`}
+                          className={`${index >= 1 ? "hidden sm:flex" : "flex"} items-start gap-1.5 text-[0.8125rem] leading-relaxed text-ink-2 sm:gap-2 sm:text-[0.875rem]`}
                         >
                           <Check className="mt-0.5 h-3 w-3 shrink-0 text-lav-600 sm:h-4 sm:w-4" />
                           {feature}
@@ -154,7 +154,7 @@ export default function PricingPage() {
                     {deliverable ? (
                       <Link
                         href={`/signup?plan=${plan.slug}`}
-                        className={`block w-full rounded-lg px-3 py-2 text-center text-[0.8125rem] font-semibold transition-colors sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.9rem] ${
+                        className={`block w-full rounded-lg px-3 py-2 text-center text-[0.8125rem] font-semibold transition-colors sm:rounded-xl sm:px-4 sm:py-3 sm:text-[0.875rem] ${
                           plan.popular
                             ? "bg-lav-700 text-white hover:bg-lav-800"
                             : "border border-line bg-white text-ink hover:bg-cream"
@@ -187,7 +187,7 @@ export default function PricingPage() {
               <h3 className="text-[1rem] font-semibold text-ink mb-2">
                 Are there any hidden fees?
               </h3>
-              <p className="text-[0.9rem] text-ink-2">
+              <p className="text-[0.875rem] text-ink-2">
                 Review the final amount and any provider fees before confirming a payment.
               </p>
             </div>
@@ -195,7 +195,7 @@ export default function PricingPage() {
               <h3 className="text-[1rem] font-semibold text-ink mb-2">
                 What payment methods do you accept?
               </h3>
-              <p className="text-[0.9rem] text-ink-2">
+              <p className="text-[0.875rem] text-ink-2">
                 Top-ups use Paystack. Paystack shows the payment methods available to you at checkout.
               </p>
             </div>
@@ -203,7 +203,7 @@ export default function PricingPage() {
               <h3 className="text-[1rem] font-semibold text-ink mb-2">
                 Can I get a refund?
               </h3>
-              <p className="text-[0.9rem] text-ink-2">
+              <p className="text-[0.875rem] text-ink-2">
                 Contact support with your order reference. Refunds require review of the delivery and provider status.
               </p>
             </div>

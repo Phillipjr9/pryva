@@ -55,7 +55,7 @@ export function AnalyticsDashboard({ stats }: AnalyticsDashboardProps) {
                 <Icon className="h-6 w-6" />
               </span>
             </div>
-            <p className="text-[0.86rem] text-ink-2 mb-1">{card.label}</p>
+            <p className="text-[0.875rem] text-ink-2 mb-1">{card.label}</p>
             <p className="text-[2rem] font-bold text-ink">{card.value}</p>
           </div>
         );

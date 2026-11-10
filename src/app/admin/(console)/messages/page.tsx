@@ -95,7 +95,7 @@ export default async function AdminMessagesPage({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-[1.5rem] font-medium tracking-tight">Support messages</h1>
-          <p className="mt-1 text-[0.86rem] text-ink-2">
+          <p className="mt-1 text-[0.875rem] text-ink-2">
             {Number(total).toLocaleString("en-NG")} {Number(total) === 1 ? "message" : "messages"}
             {status ? ` · ${status.replace("_", " ")}` : ""}
             {query ? ` · matching “${query}”` : ""}
@@ -118,8 +118,8 @@ export default async function AdminMessagesPage({
             aria-current={filter.value === status ? "page" : undefined}
             className={
               filter.value === status
-                ? "rounded-full border border-lav-600 bg-lav-700 px-3.5 py-1.5 text-[0.8rem] font-medium text-white"
-                : "rounded-full border border-line bg-white px-3.5 py-1.5 text-[0.8rem] font-medium text-ink-2 hover:border-lav-300"
+                ? "rounded-full border border-lav-600 bg-lav-700 px-3.5 py-1.5 text-[0.8125rem] font-medium text-white"
+                : "rounded-full border border-line bg-white px-3.5 py-1.5 text-[0.8125rem] font-medium text-ink-2 hover:border-lav-300"
             }
           >
             {filter.label}
@@ -134,7 +134,7 @@ export default async function AdminMessagesPage({
             defaultValue={query}
             placeholder="Search name, email or message"
             aria-label="Search messages"
-            className="w-64 rounded-xl border border-line bg-white px-3.5 py-2 text-[0.84rem] outline-none focus:border-lav-400"
+            className="w-64 rounded-xl border border-line bg-white px-3.5 py-2 text-[0.8125rem] outline-none focus:border-lav-400"
           />
           <button type="submit" className="btn btn-primary btn-sm">
             Search
@@ -144,7 +144,7 @@ export default async function AdminMessagesPage({
 
       <div className="grid gap-3">
         {rows.length === 0 && (
-          <p className="rounded-2xl border border-dashed border-line bg-white px-4 py-10 text-center text-[0.86rem] text-ink-2">
+          <p className="rounded-2xl border border-dashed border-line bg-white px-4 py-10 text-center text-[0.875rem] text-ink-2">
             No messages match those filters.
           </p>
         )}
@@ -153,7 +153,7 @@ export default async function AdminMessagesPage({
           <article key={row.id} className="rounded-2xl border border-line bg-white p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="flex flex-wrap items-center gap-2 text-[0.9rem] font-semibold text-ink">
+                <p className="flex flex-wrap items-center gap-2 text-[0.875rem] font-semibold text-ink">
                   {row.topic}
                   <span
                     className={`rounded-full px-2 py-0.5 text-micro font-semibold capitalize ${
@@ -172,7 +172,7 @@ export default async function AdminMessagesPage({
               </div>
               <MessageStatusControl id={row.id} status={row.status} />
             </div>
-            <p className="mt-3 whitespace-pre-wrap break-words text-[0.84rem] leading-relaxed text-ink-2">
+            <p className="mt-3 whitespace-pre-wrap break-words text-[0.8125rem] leading-relaxed text-ink-2">
               {row.message}
             </p>
           </article>
@@ -180,7 +180,7 @@ export default async function AdminMessagesPage({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-[0.82rem] text-ink-2">
+        <div className="flex items-center justify-between text-[0.8125rem] text-ink-2">
           <span>
             Page {page} of {totalPages}
           </span>

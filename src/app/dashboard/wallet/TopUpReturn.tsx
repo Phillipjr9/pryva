@@ -96,7 +96,7 @@ export function TopUpReturn({ status, reference, userId, testMode = false }: { s
     ].join("\n"));
   }
 
-  if (!open) return <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-lav-200 bg-lav-50 px-4 py-3 text-[0.8rem] text-lav-900">
+  if (!open) return <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-lav-200 bg-lav-50 px-4 py-3 text-[0.8125rem] text-lav-900">
     <span>{state === "credited" ? (testMode ? "Test payment confirmed and credited." : "Payment confirmed and credited.") : state === "verifying" ? "Payment verification is still in progress." : "Payment needs attention before paying again."}{reference ? ` Reference: ${reference}` : ""}</span>
     <button type="button" className="font-semibold underline" onClick={() => setOpen(true)}>{state === "credited" ? "View receipt" : "Review payment"}</button>
   </div>;

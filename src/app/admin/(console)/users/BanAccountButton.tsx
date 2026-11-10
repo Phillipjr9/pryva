@@ -39,7 +39,7 @@ export function BanAccountButton({ userId, email, suspended }: {
       <div className="flex items-start gap-2.5">
         <AlertTriangle className="h-5 w-5 text-rose-700" />
         <div>
-          <h2 className="text-[0.95rem] font-semibold text-ink">{suspended ? "Account suspended" : "Suspend account"}</h2>
+          <h2 className="text-[0.9375rem] font-semibold text-ink">{suspended ? "Account suspended" : "Suspend account"}</h2>
           <p className="mt-1 text-meta text-ink-2">
             {suspended ? "Sign-in is disabled. Reinstatement does not restart paused schedules." :
               `Suspension immediately revokes sessions and pauses active schedules for ${email}. Account identity, orders and financial records are retained. A notice to a verified email is best effort.`}

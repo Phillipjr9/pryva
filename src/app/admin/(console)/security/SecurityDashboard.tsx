@@ -27,11 +27,12 @@ export function SecurityDashboard() {
   const [metrics, setMetrics] = useState<SecurityMetrics | null>(null);
   const [violations, setViolations] = useState<ViolationLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/admin/security/metrics", { signal: controller.signal })
-      .then(async (response) => response.ok ? response.json() : null)
+      .then(async (response) => { if (!response.ok) throw new Error("Request failed"); return response.json(); })
       .then((data) => {
         if (data && !controller.signal.aborted) {
           setMetrics(data.metrics);
@@ -39,7 +40,7 @@ export function SecurityDashboard() {
         }
       })
       .catch((error) => {
-        if (!controller.signal.aborted) console.error("Failed to fetch security data:", error instanceof Error ? error.message : String(error));
+        if (!controller.signal.aborted) { setError(true); console.error("Failed to fetch security data:", error instanceof Error ? error.message : String(error)); }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -60,14 +61,15 @@ export function SecurityDashboard() {
     return (
       <div className="card p-8 text-center">
         <Shield className="h-16 w-16 text-ink-3 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-ink mb-2">No Security Data</h2>
-        <p className="text-ink-2">No security violations have been reported yet.</p>
+        <h2 className="text-xl font-semibold text-ink mb-2">App telemetry unavailable</h2>
+        <p className="text-ink-2">{error ? "Could not load app reports. Please try again." : "App reports are unavailable."}</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      <div><h2 className="text-lg font-semibold text-ink">Pryva app reports</h2><p className="text-sm text-ink-2">Untrusted browser reports from signed-in users, not Cloudflare traffic or proof of an attack. Empty results do not mean there is no hostile traffic.</p></div>
       {/* Metrics Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <MetricCard
@@ -153,52 +155,7 @@ export function SecurityDashboard() {
         )}
       </div>
 
-      {/* Protection Status */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold text-ink mb-4">Active Protections</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <ProtectionStatus
-            name="DevTools Detection"
-            enabled={true}
-            description="Detects when browser DevTools are open"
-          />
-          <ProtectionStatus
-            name="Debugger Detection"
-            enabled={true}
-            description="Detects attached debuggers"
-          />
-          <ProtectionStatus
-            name="Code Injection Detection"
-            enabled={true}
-            description="Detects code tampering attempts"
-          />
-          <ProtectionStatus
-            name="Iframe Detection"
-            enabled={true}
-            description="Protects against clickjacking"
-          />
-          <ProtectionStatus
-            name="Scraping Detection"
-            enabled={true}
-            description="Detects automated scraping"
-          />
-          <ProtectionStatus
-            name="Honeypot Traps"
-            enabled={true}
-            description="Detects code analysis attempts"
-          />
-          <ProtectionStatus
-            name="Browser Fingerprinting"
-            enabled={true}
-            description="Tracks unique browser signatures"
-          />
-          <ProtectionStatus
-            name="Rate Limiting"
-            enabled={true}
-            description="Prevents abuse and DoS attacks"
-          />
-        </div>
-      </div>
+
     </div>
   );
 }
@@ -223,37 +180,6 @@ function MetricCard({
       </div>
       <p className="text-sm text-ink-2 mb-1">{label}</p>
       <p className="text-3xl font-bold text-ink">{value}</p>
-    </div>
-  );
-}
-
-function ProtectionStatus({
-  name,
-  enabled,
-  description,
-}: {
-  name: string;
-  enabled: boolean;
-  description: string;
-}) {
-  return (
-    <div className="flex items-start gap-3 p-4 rounded-lg bg-cream border border-line">
-      <div
-        className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
-          enabled ? "bg-green-500" : "bg-gray-300"
-        }`}
-      />
-      <div className="flex-1">
-        <p className="font-medium text-ink">{name}</p>
-        <p className="text-sm text-ink-2">{description}</p>
-      </div>
-      <span
-        className={`text-xs font-medium px-2 py-1 rounded ${
-          enabled ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-        }`}
-      >
-        {enabled ? "Active" : "Disabled"}
-      </span>
     </div>
   );
 }

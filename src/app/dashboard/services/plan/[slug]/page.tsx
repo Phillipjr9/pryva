@@ -43,7 +43,7 @@ export default async function DashboardPlanPage({
           <CountryFlag code={country.code} size={20} decorative radius={10} /> {country.name} selected
         </p>
         <h1 className="mt-2 text-[1.6rem] font-semibold text-ink">{plan.name}</h1>
-        <p className="mt-1 text-[0.84rem] text-ink-2">{plan.planLabel} · {plan.duration}</p>
+        <p className="mt-1 text-[0.8125rem] text-ink-2">{plan.planLabel} · {plan.duration}</p>
       </div>
 
       {fulfillable ? (
@@ -66,7 +66,7 @@ export default async function DashboardPlanPage({
           <div role="note" className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-meta leading-relaxed text-amber-900">
             This plan cannot be delivered yet, so it cannot be ordered or charged.
           </div>
-          <div className="rounded-2xl border border-line bg-white p-6 text-[0.84rem] text-ink-2">
+          <div className="rounded-2xl border border-line bg-white p-6 text-[0.8125rem] text-ink-2">
             <Link href="/virtual-numbers" className="font-semibold text-lav-700 hover:underline">
               See the number plans available now →
             </Link>

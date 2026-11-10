@@ -24,7 +24,7 @@ export default async function DashboardReviewsPage() {
     <div className="grid gap-5">
       <div>
         <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Reviews</h1>
-        <p className="mt-1 text-[0.86rem] text-ink-2">
+        <p className="mt-1 text-[0.875rem] text-ink-2">
           Only an order that was delivered can be reviewed, once. Reviews are checked before they
           appear publicly; yours is never edited.
         </p>
@@ -42,9 +42,9 @@ export default async function DashboardReviewsPage() {
       />
 
       <section>
-        <h2 className="text-[0.95rem] font-semibold">Your reviews</h2>
+        <h2 className="text-[0.9375rem] font-semibold">Your reviews</h2>
         {reviews.length === 0 ? (
-          <p className="mt-2 text-[0.88rem] text-ink-2">You have not written one yet.</p>
+          <p className="mt-2 text-[0.875rem] text-ink-2">You have not written one yet.</p>
         ) : (
           <ul className="mt-3 grid gap-3">
             {reviews.map((review) => {
@@ -55,7 +55,7 @@ export default async function DashboardReviewsPage() {
               return (
                 <li key={review.id} className="rounded-2xl border border-line bg-white p-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-[0.9rem] font-semibold text-ink">
+                    <span className="text-[0.875rem] font-semibold text-ink">
                       {review.productName}
                       <span className="ml-2 font-normal text-ink-3">{review.rating} / 5</span>
                     </span>
@@ -64,9 +64,9 @@ export default async function DashboardReviewsPage() {
                     </span>
                   </div>
                   {review.headline && (
-                    <p className="mt-2 text-[0.88rem] font-medium text-ink">{review.headline}</p>
+                    <p className="mt-2 text-[0.875rem] font-medium text-ink">{review.headline}</p>
                   )}
-                  <p className="mt-1 whitespace-pre-line text-[0.88rem] leading-relaxed text-ink-2">
+                  <p className="mt-1 whitespace-pre-line text-[0.875rem] leading-relaxed text-ink-2">
                     {review.body}
                   </p>
                   {review.status === "rejected" && review.moderatorNote && (

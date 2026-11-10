@@ -1,6 +1,6 @@
 import { ShieldCheck } from "@/components/icons";
 
-import { AdminCard, StatusBadge } from "@/components/admin/AdminUi";
+import { StatusBadge } from "@/components/admin/AdminUi";
 import { isTurnstileConfigured, turnstileBuildGap, turnstileSiteKey } from "@/lib/platform/turnstile";
 
 /**
@@ -61,32 +61,27 @@ export function SignupProtection() {
   ];
 
   return (
-    <AdminCard
-      title="Signup protection"
-      subtitle="What stands between an automated script and a new account"
-      actions={<ShieldCheck aria-hidden="true" />}
-    >
-      <div className="table-wrap relative overflow-x-auto">
-        <table>
-          <caption className="sr-only">Current signup defences and their configuration state</caption>
-          <thead>
-            <tr>
-              <th scope="col">Protection</th>
-              <th scope="col">State</th>
-              <th scope="col">Detail</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.label}>
-                <td>{row.label}</td>
-                <td><StatusBadge status={row.tone} label={row.status} /></td>
-                <td>{row.detail}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <section className="min-w-0 rounded-2xl border border-line bg-white p-5 sm:p-6" aria-labelledby="signup-protection-title">
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lav-50 text-lav-700">
+          <ShieldCheck width={20} height={20} className="h-5 w-5 shrink-0" aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h2 id="signup-protection-title" className="text-lg font-semibold text-ink">Signup protection</h2>
+          <p className="mt-1 text-sm text-ink-2">What stands between an automated script and a new account.</p>
+        </div>
       </div>
-    </AdminCard>
+      <ul className="mt-5 grid gap-3 md:grid-cols-2" aria-label="Current signup defences and their configuration state">
+        {rows.map((row) => (
+          <li key={row.label} className="min-w-0 rounded-xl border border-line bg-cream p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-ink">{row.label}</h3>
+              <StatusBadge status={row.tone} label={row.status} />
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-ink-2">{row.detail}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

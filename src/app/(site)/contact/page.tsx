@@ -29,7 +29,7 @@ export default async function ContactPage() {
           <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem]">
             Get in touch
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-[1.1rem] text-ink-2">
+          <p className="mx-auto mt-4 max-w-2xl text-[1.125rem] text-ink-2">
             Tell us what you want to see next, what service you would like more of, or what we can improve.
             We want your advice.
           </p>
@@ -44,7 +44,7 @@ export default async function ContactPage() {
                 <Mail className="h-6 w-6" />
               </div>
               <h2 className="mb-2 text-[1rem] font-semibold text-ink">Share an idea</h2>
-              <p className="text-[0.86rem] text-ink-2">
+              <p className="text-[0.875rem] text-ink-2">
                 <a href="#contact-form" className="text-lav-700 underline underline-offset-2">
                   Send us feedback or a service request
                 </a>
@@ -55,7 +55,7 @@ export default async function ContactPage() {
                 <MessageCircle className="h-6 w-6" />
               </div>
               <h2 className="mb-2 text-[1rem] font-semibold text-ink">Tell us more</h2>
-              <p className="text-[0.86rem] text-ink-2">
+              <p className="text-[0.875rem] text-ink-2">
                 Add your idea, request, or improvement below
               </p>
             </div>
@@ -64,7 +64,7 @@ export default async function ContactPage() {
                 <Clock className="h-6 w-6" />
               </div>
               <h2 className="mb-2 text-[1rem] font-semibold text-ink">Response time</h2>
-              <p className="text-[0.86rem] text-ink-2">May vary · we reply to the email you give</p>
+              <p className="text-[0.875rem] text-ink-2">May vary · we reply to the email you give</p>
             </div>
           </div>
 

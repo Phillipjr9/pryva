@@ -65,7 +65,7 @@ export function EsimProfile({
   if (pending) {
     return (
       <div className="grid gap-3">
-        <p className="text-[0.92rem] leading-relaxed text-ink-2">
+        <p className="text-[0.9375rem] leading-relaxed text-ink-2">
           Your eSIM is being provisioned. Nothing has been charged yet — the charge is made when the
           profile arrives, and its activation code appears here.
         </p>
@@ -85,7 +85,7 @@ export function EsimProfile({
 
   if (!activationCode) {
     return (
-      <p className="text-[0.92rem] text-ink-2">
+      <p className="text-[0.9375rem] text-ink-2">
         This order has no activation code on file. Contact support with the reference above and we will recover it for
         you.
       </p>
@@ -104,7 +104,7 @@ export function EsimProfile({
             height={176}
             className="h-[176px] w-[176px] rounded-lg"
           />
-          <p className="text-[0.86rem] leading-relaxed text-ink-2">
+          <p className="text-[0.875rem] leading-relaxed text-ink-2">
             Point your phone&apos;s camera at this code and follow the prompt — that is the whole
             install. If the camera will not read it, paste the activation code instead.
           </p>
@@ -114,7 +114,7 @@ export function EsimProfile({
       <div>
         <p className="text-micro font-semibold uppercase tracking-[0.14em] text-ink-3">Activation code</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          <code className="min-w-0 flex-1 break-all rounded-xl border border-line bg-cream/60 px-3 py-2 font-mono text-[0.8rem] text-ink">
+          <code className="min-w-0 flex-1 break-all rounded-xl border border-line bg-cream/60 px-3 py-2 font-mono text-[0.8125rem] text-ink">
             {activationCode}
           </code>
           <button
@@ -128,7 +128,7 @@ export function EsimProfile({
         </div>
       </div>
 
-      <ol className="grid list-decimal gap-1.5 pl-5 text-[0.9rem] leading-relaxed text-ink-2">
+      <ol className="grid list-decimal gap-1.5 pl-5 text-[0.875rem] leading-relaxed text-ink-2">
         <li>Scan the QR above, or open Settings → Mobile data and choose “Add eSIM”.</li>
         <li>Without a scanner, pick “Enter details manually” and paste the code above.</li>
         <li>Label the line eSIM and turn on data roaming while you travel.</li>

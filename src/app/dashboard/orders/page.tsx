@@ -97,7 +97,7 @@ export default async function OrdersPage({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[1.5rem] font-medium tracking-tight sm:text-[1.7rem]">Orders</h1>
-          <p className="mt-1 text-[0.86rem] text-ink-2">
+          <p className="mt-1 text-[0.875rem] text-ink-2">
             Every number, eSIM, proxy pack and inbox you&apos;ve bought — with codes kept safe.
           </p>
         </div>
@@ -183,7 +183,7 @@ export default async function OrdersPage({
                         className="grid gap-1.5 px-4 py-3.5 transition-colors hover:bg-lav-50/40 md:grid-cols-[1.45fr_0.9fr_0.7fr_0.75fr_0.25fr] md:items-center md:gap-3 md:px-5"
                       >
                         <div className="min-w-0">
-                          <p className="truncate text-[0.87rem] font-semibold text-ink">
+                          <p className="truncate text-[0.875rem] font-semibold text-ink">
                             {order.productName}
                           </p>
                           <p className="truncate text-meta text-ink-3">
@@ -192,11 +192,11 @@ export default async function OrdersPage({
                         </div>
                         <div className="flex items-center justify-between gap-2 md:block">
                           <p className="text-meta text-ink-2">{dayLabel(new Date(order.createdAt))}</p>
-                          <p className="text-[0.82rem] font-semibold text-ink md:hidden">
+                          <p className="text-[0.8125rem] font-semibold text-ink md:hidden">
                             {formatNaira(order.amount)}
                           </p>
                         </div>
-                        <p className="hidden text-[0.82rem] font-semibold text-ink md:block">
+                        <p className="hidden text-[0.8125rem] font-semibold text-ink md:block">
                           {formatNaira(order.amount)}
                         </p>
                         <div className="flex flex-wrap items-center gap-2">

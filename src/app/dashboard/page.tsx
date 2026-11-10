@@ -23,6 +23,11 @@ const quickBuys = [
   { label: "eSIM data", note: "Travel data plans", href: "/dashboard/services?country=ng&category=esim", service: "esim" as const, category: "esim" },
   { label: "Residential proxies", note: "Clean rotating IP pools", href: "/dashboard/services?country=ng&category=proxies", service: "proxies" as const, category: "proxies" },
   { label: "Digital accounts", note: "Streaming & AI subscriptions", href: "/dashboard/services?country=ng&category=accounts", service: "accounts" as const, category: "accounts" },
+  { label: "Games & gaming", note: "Games, keys & credits", href: "/dashboard/services?category=games", service: "games" as const, category: "games" },
+  { label: "Account top-ups", note: "Game & account credits", href: "/dashboard/services?category=topups", service: "topups" as const, category: "topups" },
+  { label: "Gift cards", note: "Vouchers & app stores", href: "/dashboard/services?category=gift-cards", service: "gift-cards" as const, category: "gift-cards" },
+  { label: "Subscriptions", note: "Entertainment & tools", href: "/dashboard/services?category=subscriptions", service: "subscriptions" as const, category: "subscriptions" },
+  { label: "Prepaid & finance", note: "Prepaid products & cards", href: "/dashboard/services?category=prepaid", service: "prepaid" as const, category: "prepaid" },
   { label: "Mobile data", note: "MTN, Airtel, Glo & 9mobile", href: "/dashboard/data", service: "data" as const, category: "data" },
   { label: "Temporary inbox", note: "Free disposable email", href: "/dashboard/inbox", service: "email-otp" as const, category: "email" },
   { label: "Bulk orders", note: "Volume basket discounts", href: "/dashboard/bulk-orders", service: "bulk" as const, category: "tools" },
@@ -161,7 +166,7 @@ export default async function DashboardOverviewPage() {
           </div>
 
           {recentOrders.length === 0 ? (
-            <p className="mt-3 rounded-xl border border-dashed border-line bg-cream/50 px-4 py-6 text-center text-[0.82rem] text-ink-3">
+            <p className="mt-3 rounded-xl border border-dashed border-line bg-cream/50 px-4 py-6 text-center text-[0.8125rem] text-ink-3">
               Orders and their references will appear here.
             </p>
           ) : (
@@ -173,7 +178,7 @@ export default async function DashboardOverviewPage() {
                   className="flex items-center justify-between gap-3 py-3 transition-colors hover:bg-lav-50/40"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-[0.86rem] font-semibold text-ink">
+                    <p className="truncate text-[0.875rem] font-semibold text-ink">
                       {order.productName} · {order.planLabel}
                     </p>
                     <p className="truncate text-meta text-ink-3">
@@ -185,7 +190,7 @@ export default async function DashboardOverviewPage() {
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2.5">
-                    <span className="text-[0.82rem] font-semibold">{formatNaira(order.amount)}</span>
+                    <span className="text-[0.8125rem] font-semibold">{formatNaira(order.amount)}</span>
                     <span
                       className={`rounded-full px-2 py-0.5 text-micro font-semibold capitalize ${statusStyle(order.status)}`}
                     >
@@ -223,7 +228,7 @@ export default async function DashboardOverviewPage() {
                 <span className="min-w-0 flex-1">
                   <span className="flex min-w-0 items-center justify-center gap-1.5 sm:justify-start">
                     <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${SERVICE_STATE_DOT[item.state]}`} />
-                    <span className="block min-w-0 text-[0.8125rem] font-semibold leading-tight text-ink group-hover:text-lav-700 sm:truncate sm:text-[0.82rem]">{item.label}</span>
+                    <span className="block min-w-0 text-[0.8125rem] font-semibold leading-tight text-ink group-hover:text-lav-700 sm:truncate sm:text-[0.8125rem]">{item.label}</span>
                   </span>
                   <span className="hidden truncate text-micro text-ink-3 sm:block">{item.note}</span>
                   <span className="sr-only"> — {SERVICE_STATE_LABEL[item.state]}</span>
@@ -258,19 +263,19 @@ export default async function DashboardOverviewPage() {
             </Link>
           </div>
           {recentTx.length === 0 ? (
-            <p className="mt-3 text-[0.8rem] text-ink-3">No transactions yet.</p>
+            <p className="mt-3 text-[0.8125rem] text-ink-3">No transactions yet.</p>
           ) : (
             <div className="mt-2 divide-y divide-line/80">
               {recentTx.map((tx) => (
                 <div key={tx.id} className="flex items-start justify-between gap-2 py-2.5">
                   <div className="min-w-0">
-                    <p className="truncate text-[0.8rem] font-medium text-ink">{tx.description}</p>
+                    <p className="truncate text-[0.8125rem] font-medium text-ink">{tx.description}</p>
                     <p className="text-micro text-ink-3">
                       {tx.reference} · Bal. {formatNaira(tx.balanceAfter)}
                     </p>
                   </div>
                   <span
-                    className={`shrink-0 text-[0.8rem] font-semibold ${
+                    className={`shrink-0 text-[0.8125rem] font-semibold ${
                       walletEntryDirection(tx.type) === "in" ? "text-emerald-600" : "text-ink-2"
                     }`}
                   >
@@ -284,10 +289,10 @@ export default async function DashboardOverviewPage() {
         </section>
 
         <section className="grid gap-2.5 rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
-          <p className="flex items-center gap-2 text-[0.92rem] font-semibold text-ink">
+          <p className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
             <Shield className="h-4 w-4 text-lav-700" /> Need help with an order?
           </p>
-          <p className="text-[0.8rem] leading-relaxed text-ink-2">
+          <p className="text-[0.8125rem] leading-relaxed text-ink-2">
             If a code doesn&apos;t arrive, contact support with your order reference. Refund eligibility
             and the delivery outcome need to be reviewed.
           </p>

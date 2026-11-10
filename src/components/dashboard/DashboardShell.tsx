@@ -6,6 +6,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CommandPalette, CommandPaletteTrigger } from "@/components/command/CommandPalette";
 import { ArrowRight, Close, Logout, Menu, Wallet } from "@/components/icons";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { DigitalProductIcon } from "@/components/DigitalProductIcon";
+import { BrandIcon } from "@/components/BrandIcon";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { NavIcon, type NavArt } from "@/components/dashboard/NavIcon";
 import { ProfileAvatar } from "@/components/dashboard/ProfileAvatar";
@@ -26,12 +28,17 @@ type NavItem = {
   icon?: (props: { className?: string }) => ReactNode;
   /** A flat glyph for a dashboard destination (see `NavIcon`). */
   nav?: NavArt;
+  brand?: "telegram";
+  digitalArtwork?: string;
   art?:
     | "numbers"
     | "esim"
     | "email-otp"
     | "accounts"
     | "data"
+    | "games"
+    | "topups"
+    | "prepaid"
     | "gift-cards"
     | "bulk"
     | "scheduled"
@@ -50,6 +57,7 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
       { href: "/dashboard", label: "Overview", nav: "overview" },
       { href: "/dashboard/orders", label: "Orders", nav: "orders" },
       { href: "/dashboard/wallet", label: "Wallet", nav: "wallet" },
+      { href: "/dashboard/gift-cards", label: "Pryva gift cards", art: "gift-cards" },
       // Free, and the only thing on this list that is: one inbox a day, nothing
       // retained. It sits under Manage rather than Buy because no money moves.
       { href: "/dashboard/inbox", label: "Temporary inbox", nav: "inbox" },
@@ -62,18 +70,21 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
     label: "Buy",
     items: [
       { href: "/dashboard/services", label: "All services", nav: "services" },
+      { href: "/dashboard/telegram-stars", label: "Telegram Stars", brand: "telegram" },
+      { href: "/dashboard/call-of-duty-mobile", label: "Call of Duty Mobile CP", digitalArtwork: "Call of Duty Mobile" },
       { href: "/dashboard/services", label: "Number plans", art: "numbers", category: "numbers" },
       { href: "/dashboard/services", label: "eSIM", art: "esim", category: "esim" },
       { href: "/dashboard/services", label: "Data Plans", art: "data", category: "data" },
       { href: "/dashboard/services", label: "Accounts", art: "accounts", category: "accounts" },
       { href: "/dashboard/services", label: "Subscriptions", art: "subscriptions", category: "subscriptions" },
+      { href: "/dashboard/services", label: "Games & gaming", art: "games", category: "games" },
+      { href: "/dashboard/services", label: "Account top-ups", art: "topups", category: "topups" },
+      { href: "/dashboard/services", label: "Gift cards", art: "gift-cards", category: "gift-cards" },
+      { href: "/dashboard/services", label: "Prepaid & finance", art: "prepaid", category: "prepaid" },
       { href: "/dashboard/services", label: "App verification", art: "app-verification", category: "verification" },
       { href: "/dashboard/services", label: "Social promotion", art: "social-promotion", category: "social" },
       { href: "/dashboard/services", label: "Proxies", art: "proxies", category: "proxies" },
       { href: "/dashboard/services", label: "Email OTP", art: "email-otp", category: "email" },
-      // Gift cards are wallet credit Pryva issues itself, not a service in the
-      // catalogue, so this links straight at the page instead of the hub.
-      { href: "/dashboard/gift-cards", label: "Gift cards", art: "gift-cards" },
       { href: "/dashboard/bulk-orders", label: "Bulk Orders", art: "bulk" },
       { href: "/dashboard/scheduled", label: "Scheduled", art: "scheduled" },
     ],
@@ -220,11 +231,15 @@ export function DashboardShell({
                   key={`${item.href}:${item.category ?? "all"}`}
                   href={href}
                   onClick={() => setOpen(false)}
-                  className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-[0.84rem] font-medium transition-colors ${
+                  className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-[0.8125rem] font-medium transition-colors ${
                     active ? "bg-lav-100/80 text-lav-800" : "text-ink-2 hover:bg-white hover:text-ink"
                   }`}
                 >
-                  {item.art ? (
+                  {item.digitalArtwork ? (
+                    <DigitalProductIcon name={item.digitalArtwork} size={20} />
+                  ) : item.brand ? (
+                    <BrandIcon brand={item.brand} size={20} decorative />
+                  ) : item.art ? (
                     <span aria-hidden="true"><ServiceIcon service={item.art} size="xs" className="overflow-hidden rounded-[5px]" /></span>
                   ) : item.nav ? (
                     <NavIcon name={item.nav} />
@@ -252,7 +267,7 @@ export function DashboardShell({
               itself, so it is stable without pretending to be a photograph. */}
           <ProfileAvatar seed={user.email} size={36} />
           <div className="min-w-0">
-            <p className="truncate text-[0.82rem] font-semibold text-ink">{user.name}</p>
+            <p className="truncate text-[0.8125rem] font-semibold text-ink">{user.name}</p>
             <p className="truncate text-micro text-ink-3">{user.email}</p>
           </div>
         </div>
@@ -301,7 +316,7 @@ export function DashboardShell({
               </span>
               <div className="hidden min-w-0 lg:block">
                 <p className="text-micro uppercase tracking-[0.16em] text-ink-3">Dashboard</p>
-                <p className="truncate text-[0.88rem] font-semibold leading-tight text-ink">
+                <p className="truncate text-[0.875rem] font-semibold leading-tight text-ink">
                   Hello, {user.name.split(" ")[0]}
                 </p>
               </div>

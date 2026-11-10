@@ -45,7 +45,7 @@ interface CardTitleProps {
 
 export function CardTitle({ children, className }: CardTitleProps) {
   return (
-    <h3 className={cn("text-[1.1rem] font-semibold text-ink", className)}>
+    <h3 className={cn("text-[1.125rem] font-semibold text-ink", className)}>
       {children}
     </h3>
   );
@@ -58,7 +58,7 @@ interface CardDescriptionProps {
 
 export function CardDescription({ children, className }: CardDescriptionProps) {
   return (
-    <p className={cn("text-[0.86rem] text-ink-2", className)}>
+    <p className={cn("text-[0.875rem] text-ink-2", className)}>
       {children}
     </p>
   );

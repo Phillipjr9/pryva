@@ -27,7 +27,7 @@ export function FaqAccordion({
               className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left transition-colors hover:bg-lav-50/60 sm:px-7"
             >
               <span
-                className={`text-[0.95rem] font-semibold transition-colors ${
+                className={`text-[0.9375rem] font-semibold transition-colors ${
                   isOpen ? "text-lav-700" : "text-ink"
                 }`}
               >
@@ -49,7 +49,7 @@ export function FaqAccordion({
               }`}
             >
               <div className="overflow-hidden">
-                <p className="max-w-2xl px-5 pb-6 text-[0.9rem] leading-relaxed text-ink-2 sm:px-7">
+                <p className="max-w-2xl px-5 pb-6 text-[0.875rem] leading-relaxed text-ink-2 sm:px-7">
                   {item.a}
                 </p>
               </div>

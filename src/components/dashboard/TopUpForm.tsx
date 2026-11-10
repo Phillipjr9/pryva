@@ -36,8 +36,8 @@ function LiveTopUp({ balance, userId, testMode }: { balance: number; userId: str
 
   return <>
     <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 sm:p-6">
-      <div className="flex items-center justify-between gap-3"><h2 className="text-[1.05rem] font-semibold">Fund your wallet</h2><span className="rounded-full bg-cream px-2.5 py-1 text-micro font-medium text-ink-2">Balance {formatNaira(balance)}</span></div>
-      <p className="mt-3 text-[0.82rem] leading-relaxed text-ink-2">Review your top-up, then pay securely on Paystack. Choose from the payment methods available in its checkout.</p>
+      <div className="flex items-center justify-between gap-3"><h2 className="text-[1rem] font-semibold">Fund your wallet</h2><span className="rounded-full bg-cream px-2.5 py-1 text-micro font-medium text-ink-2">Balance {formatNaira(balance)}</span></div>
+      <p className="mt-3 text-[0.8125rem] leading-relaxed text-ink-2">Review your top-up, then pay securely on Paystack. Choose from the payment methods available in its checkout.</p>
       {storageState === "unavailable" && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">Payment recovery storage is unavailable or unreadable. Enable browser storage or contact support before starting a new payment.</p>}
       {pending.length > 0 && <div role="alert" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-meta leading-relaxed text-amber-900">
         <p>A previous payment needs attention. Check its reference before paying again; clearing a reference does not cancel a payment.</p>

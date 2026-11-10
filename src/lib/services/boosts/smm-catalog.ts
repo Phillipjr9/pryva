@@ -11,6 +11,7 @@ import {
 import type { BrandSlug } from "@/lib/content/brand-marks";
 import { formatNaira } from "@/lib/services/catalog";
 import { PROMOTION_EXAMPLES, type ExplorerItem } from "@/lib/services/service-explorer";
+import { socialArtwork } from "@/lib/services/boosts/social-artwork";
 import { normalizeCurrency, retailPerThousand, totalForQuantity } from "@/lib/services/boosts/smm-pricing";
 
 export type BoostSnapshot = {
@@ -29,10 +30,8 @@ export type BoostSnapshot = {
   /**
    * The balance read failed, so the panel's billing currency is unknown.
    *
-   * Kept apart from `partial` on purpose: a missing balance does not remove a
-   * single listing, and every boost price is null by policy anyway, so reporting
-   * it as an incomplete catalogue told customers something was missing when
-   * nothing was.
+   * Kept apart from `partial`: a failed balance read does not remove service
+   * listings. Without a service-specific currency, prices remain unavailable.
    */
   balanceUnavailable: boolean;
   fetchedAt: string;
@@ -57,7 +56,9 @@ export async function readBoostSnapshot(refresh = false): Promise<BoostSnapshot>
     }
     const settled = balance.status === "fulfilled" ? balance.value : null;
     const snapshot: BoostSnapshot = {
-      services: services.value.slice(0, 2000),
+      // The adapter already has a bounded input limit. A second 2,000-row
+      // slice here silently hid valid listings returned by that adapter.
+      services: services.value,
       currency: settled?.currency ?? null,
       balance: settled?.balance ?? null,
       partial: false,
@@ -297,9 +298,20 @@ function fallbackPlatform(service: SmmService): DetectedPlatform {
 function detectPlatform(service: SmmService): DetectedPlatform | null {
   const text = `${service.name ?? ""} ${service.category ?? ""}`;
   if (NON_SOCIAL.test(text)) return null;
-  for (const candidate of PLATFORM_MATCHERS) {
-    if (candidate.terms.some((term) => matchesPlatform(text, term))) {
-      return { name: candidate.platform.name, brand: candidate.platform.brand, rank: candidate.rank };
+  // These offerings promote a YouTube video *through* another network. The
+  // source network in the name is not the target service's identity.
+  if (/^\s*youtube\s+(?:social\s+shares?\s+(?:\[\s*)?from\b|(?:facebook|linkedin|pinterest|vkontakte)\s+shares?\b)/i.test(service.name ?? "")) {
+    const youtube = PLATFORM_MATCHERS.find((candidate) => candidate.platform.name === "YouTube");
+    if (youtube) return { name: youtube.platform.name, brand: youtube.platform.brand, rank: youtube.rank };
+  }
+  // The actual listing is more specific than the supplier's broad shelf.
+  // For example, Threads and TikTok products can be filed under Instagram.
+  // Matching both strings together incorrectly gives them Instagram's logo.
+  for (const part of [service.name ?? "", service.category ?? ""]) {
+    for (const candidate of PLATFORM_MATCHERS) {
+      if (candidate.terms.some((term) => matchesPlatform(part, term))) {
+        return { name: candidate.platform.name, brand: candidate.platform.brand, rank: candidate.rank };
+      }
     }
   }
   // Unknown platform: only list it when it is genuinely selling a social intent.
@@ -383,7 +395,7 @@ export function describeBoost(service: SmmService, snapshotCurrency: string | nu
     // platform's logo and not a blank tile.
     artwork: platform?.brand
       ? { kind: "brand", name: platform.brand }
-      : { kind: "service", name: "social-promotion" },
+      : socialArtwork(platform?.name ?? null, cleanName) ?? { kind: "service", name: "social-promotion" },
     perThousand,
     min: service.min,
     max: service.max,
@@ -432,7 +444,8 @@ export type BoostSelection = {
  *     set we ship logos for, and an unknown one is grouped under its category;
  *   • one of the intents the chips filter by (`LISTED_TAGS`);
  *   • not traffic, SEO or reviews, which Pryva does not sell;
- *   • priced, because an unpriced card cannot take money.
+ *   • priced by default, because an unpriced card cannot take money; the
+ *     explorer can opt into displaying these entries without a purchase action.
  *
  * Nothing is collapsed. The only rows dropped are duplicates of a service id
  * already listed, which are the same product rather than a variant of it.
@@ -440,7 +453,7 @@ export type BoostSelection = {
  * The panel's identity is irrelevant to every rule here, so the same selection
  * works for any supplier.
  */
-export function selectBoostServices(services: SmmService[], snapshotCurrency: string | null): BoostSelection {
+export function selectBoostServices(services: SmmService[], snapshotCurrency: string | null, options: { includeUnpriced?: boolean } = {}): BoostSelection {
   const eligible: Array<{ service: SmmService; listing: BoostListing }> = [];
   const seen = new Set<string>();
 
@@ -449,7 +462,7 @@ export function selectBoostServices(services: SmmService[], snapshotCurrency: st
     const listing = describeBoost(service, snapshotCurrency);
     if (!listing.platform) continue;
     if (!LISTED_TAGS.has(listing.tag)) continue;
-    if (listing.perThousand === null) continue;
+    if (listing.perThousand === null && !options.includeUnpriced) continue;
     seen.add(service.id);
     eligible.push({ service, listing });
   }
@@ -464,7 +477,7 @@ export function selectBoostServices(services: SmmService[], snapshotCurrency: st
     if (platform !== 0) return platform;
     const tag = left.tag.localeCompare(right.tag);
     if (tag !== 0) return tag;
-    const price = (left.perThousand ?? 0) - (right.perThousand ?? 0);
+    const price = (left.perThousand ?? Number.MAX_SAFE_INTEGER) - (right.perThousand ?? Number.MAX_SAFE_INTEGER);
     if (price !== 0) return price;
     const min = (left.min ?? 0) - (right.min ?? 0);
     if (min !== 0) return min;
@@ -487,7 +500,7 @@ export function boostItems(snapshot: BoostSnapshot): ExplorerItem[] {
   const items: ExplorerItem[] = [];
   const ids = new Set<string>();
 
-  for (const service of selectBoostServices(snapshot.services, snapshot.currency).services) {
+  for (const service of selectBoostServices(snapshot.services, snapshot.currency, { includeUnpriced: true }).services) {
     const listing = describeBoost(service, snapshot.currency);
     if (ids.has(listing.id)) continue;
     ids.add(listing.id);

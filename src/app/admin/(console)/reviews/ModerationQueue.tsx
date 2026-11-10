@@ -61,7 +61,7 @@ export function ModerationQueue({ items }: { items: QueueItem[] }) {
 
   if (items.length === 0) {
     return (
-      <p className="rounded-2xl border border-line bg-white p-5 text-[0.9rem] text-ink-2">
+      <p className="rounded-2xl border border-line bg-white p-5 text-[0.875rem] text-ink-2">
         Nothing in this queue. Reviews appear here the moment a customer writes one.
       </p>
     );
@@ -70,7 +70,7 @@ export function ModerationQueue({ items }: { items: QueueItem[] }) {
   return (
     <div className="grid gap-3">
       {error && (
-        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-[0.8rem] font-medium text-red-700">
+        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-[0.8125rem] font-medium text-red-700">
           {error}
         </p>
       )}
@@ -80,7 +80,7 @@ export function ModerationQueue({ items }: { items: QueueItem[] }) {
           <article key={item.id} className="rounded-2xl border border-line bg-white p-5">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <h2 className="text-[0.95rem] font-semibold">
+                <h2 className="text-[0.9375rem] font-semibold">
                   {item.productName}
                   <span className="ml-2 font-normal text-ink-3">{item.rating} / 5</span>
                 </h2>
@@ -93,8 +93,8 @@ export function ModerationQueue({ items }: { items: QueueItem[] }) {
               </span>
             </div>
 
-            {item.headline && <p className="mt-3 text-[0.9rem] font-medium">{item.headline}</p>}
-            <p className="mt-1 whitespace-pre-line text-[0.88rem] leading-relaxed text-ink-2">{item.body}</p>
+            {item.headline && <p className="mt-3 text-[0.875rem] font-medium">{item.headline}</p>}
+            <p className="mt-1 whitespace-pre-line text-[0.875rem] leading-relaxed text-ink-2">{item.body}</p>
             {item.moderatorNote && (
               <p className="mt-2 text-meta text-ink-3">Note on record: {item.moderatorNote}</p>
             )}

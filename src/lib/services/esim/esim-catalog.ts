@@ -432,6 +432,28 @@ export function catalogueItems(offers: EsimListing[], limit = ESIM_CATALOGUE_LIM
   }));
 }
 
+/** All destinations from the bounded catalogue, without asserting country coverage. */
+export function esimItemsForAllDestinations(offers: EsimListing[]): ExplorerItem[] {
+  return offers.slice(0, ESIM_CATALOGUE_LIMIT).map((offer) => {
+    const countries = offer.countries.flatMap((value) => {
+      const code = value.trim().toLowerCase();
+      const canonical = code === "uk" ? "gb" : code === "usa" ? "us" : code === "uae" ? "ae" : code;
+      const name = explorerCountry(canonical)?.name;
+      return name ? [value, name] : [value];
+    });
+    const features = [offer.supportsVoice === true ? "Voice listed" : null, offer.supportsSms === true ? "SMS listed" : null, offer.includesPhoneNumber === true ? "Phone number listed" : null].filter(Boolean);
+    return {
+      id: offer.id, category: "esim", name: offer.name,
+      description: `${offer.dataLabel} · ${offer.validityLabel}`, tag: offer.region,
+      detail: [offer.region, ...features, "Confirm destination coverage"].join(" · "),
+      searchTerms: countries.join(" "),
+      artwork: { kind: "service", name: "esim" }, source: "live", coverage: "unconfirmed",
+      stock: null, myUnits: null, price: offer.priceNgn,
+      action: offer.purchasable && offer.priceNgn !== null ? { label: "Buy eSIM", href: `/dashboard/esim/${encodeURIComponent(offer.id)}` } : null,
+    };
+  });
+}
+
 /**
  * Listings for one destination.
  *

@@ -73,6 +73,10 @@ export const SERVICE_IDS = [
   "data",
   "accounts",
   "subscriptions",
+  "games",
+  "topups",
+  "gift-cards",
+  "prepaid",
   "verification",
   "social",
   "proxies",
@@ -222,6 +226,22 @@ export const SERVICES: readonly ServiceDefinition[] = [
     orderServices: ["subscriptions"],
     deliveryMinutes: 1_440,
     retry: { attempts: 1, delayMs: 60_000 },
+  },
+  {
+    id: "games", label: "Games & gaming", description: "Games, keys & game currency",
+    sale: { kind: "catalogue" }, lane: null, orderServices: ["gift-cards", "subscriptions"], deliveryMinutes: null, retry: null,
+  },
+  {
+    id: "topups", label: "Account top-ups", description: "Game & account credits",
+    sale: { kind: "catalogue" }, lane: null, orderServices: ["subscriptions"], deliveryMinutes: null, retry: null,
+  },
+  {
+    id: "gift-cards", label: "Gift cards", description: "Digital vouchers & app stores",
+    sale: { kind: "catalogue" }, lane: null, orderServices: ["gift-cards"], deliveryMinutes: null, retry: null,
+  },
+  {
+    id: "prepaid", label: "Prepaid & finance", description: "Prepaid products & cards",
+    sale: { kind: "catalogue" }, lane: null, orderServices: [], deliveryMinutes: null, retry: null,
   },
   {
     id: "data",

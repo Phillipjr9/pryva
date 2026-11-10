@@ -48,7 +48,7 @@ export function PaymentSuccess({
         </div>
         <p className="mt-6 text-micro font-bold uppercase tracking-[0.18em] text-lav-700">All done</p>
         <h2 id="payment-success-title" className="mt-2 text-[1.45rem] font-semibold text-ink">{title}</h2>
-        <p id="payment-success-message" className="mt-2 text-[0.84rem] leading-relaxed text-ink-2">{message}</p>
+        <p id="payment-success-message" className="mt-2 text-[0.8125rem] leading-relaxed text-ink-2">{message}</p>
         {autoRedirect ? (
           <div className="mt-6">
             <p className="text-meta text-ink-3">Opening your details…</p>

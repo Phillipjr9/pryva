@@ -74,14 +74,14 @@ function Section({
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-[1.05rem] font-medium tracking-tight">{title}</h2>
-        <span className="text-[0.8rem] text-ink-3">
+        <h2 className="text-[1rem] font-medium tracking-tight">{title}</h2>
+        <span className="text-[0.8125rem] text-ink-3">
           {count} {count === 1 ? "item" : "items"}
         </span>
       </div>
-      <p className="max-w-3xl text-[0.82rem] text-ink-2">{description}</p>
+      <p className="max-w-3xl text-[0.8125rem] text-ink-2">{description}</p>
       <div className="overflow-x-auto rounded-2xl border border-line bg-white">
-        <table className="w-full min-w-[36rem] text-left text-[0.84rem]">
+        <table className="w-full min-w-[36rem] text-left text-[0.8125rem]">
           <thead className="bg-cream/70 text-meta uppercase tracking-wide text-ink-3">
             <tr>
               <th className="px-4 py-3 font-semibold">Reference</th>
@@ -192,7 +192,7 @@ export default async function AdminReconciliationPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-[1.5rem] font-medium tracking-tight">Reconciliation</h1>
-          <p className="mt-1 max-w-3xl text-[0.86rem] text-ink-2">
+          <p className="mt-1 max-w-3xl text-[0.875rem] text-ink-2">
             Money and orders whose outcome no code can decide. Check each one with the provider
             before changing anything; an unknown outcome is not a failure.
           </p>
@@ -222,7 +222,7 @@ export default async function AdminReconciliationPage() {
         ))}
       </Section>
 
-      <div className="flex flex-wrap items-center gap-3 text-[0.82rem] text-ink-2">
+      <div className="flex flex-wrap items-center gap-3 text-[0.8125rem] text-ink-2">
         <Link href="/admin/withdrawals" className="btn btn-ghost btn-sm">Open withdrawals</Link>
         <span>{pendingWithdrawals.length >= 1_000 ? "1,000+" : pendingWithdrawals.length} still queued from before payouts became instant (not listed here)</span>
       </div>
@@ -276,7 +276,7 @@ export default async function AdminReconciliationPage() {
         {staleTopups.map((row) => (
           <tr key={row.reference} className="border-t border-line/70 align-top">
             <td className="px-4 py-3 font-mono text-meta text-ink-2">{row.reference}</td>
-            <td className="px-4 py-3 text-[0.8rem] text-ink-3">
+            <td className="px-4 py-3 text-[0.8125rem] text-ink-3">
               Check this reference in the Paystack dashboard before doing anything
             </td>
             <td className="px-4 py-3 whitespace-nowrap">{formatNaira(row.amount)}</td>
@@ -288,10 +288,10 @@ export default async function AdminReconciliationPage() {
 
       <section className="space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-[1.05rem] font-medium tracking-tight">Daily close</h2>
-          <span className="text-[0.8rem] text-ink-3">last {dailyRuns.length} days</span>
+          <h2 className="text-[1rem] font-medium tracking-tight">Daily close</h2>
+          <span className="text-[0.8125rem] text-ink-3">last {dailyRuns.length} days</span>
         </div>
-        <p className="max-w-3xl text-[0.82rem] text-ink-2">
+        <p className="max-w-3xl text-[0.8125rem] text-ink-2">
           The nightly job records each day&apos;s totals and checks every account&apos;s ledger for
           continuity: each transaction&apos;s balance must follow from the one before it, and the last
           one must equal the balance on the account. A day marked{" "}
@@ -299,7 +299,7 @@ export default async function AdminReconciliationPage() {
           not add up and needs a person.
         </p>
         <div className="overflow-x-auto rounded-2xl border border-line bg-white">
-          <table className="w-full min-w-[44rem] text-left text-[0.84rem]">
+          <table className="w-full min-w-[44rem] text-left text-[0.8125rem]">
             <thead className="bg-cream/70 text-meta uppercase tracking-wide text-ink-3">
               <tr>
                 <th className="px-4 py-3 font-semibold">Day</th>
@@ -357,7 +357,7 @@ export default async function AdminReconciliationPage() {
             </tbody>
           </table>
         </div>
-        <p className="text-[0.8rem] text-ink-3">
+        <p className="text-[0.8125rem] text-ink-3">
           The external side is not automated: compare the deposits figure with the payment
           provider&apos;s settled total for the same day. That comparison is the operator&apos;s step,
           not the job&apos;s.
@@ -366,10 +366,10 @@ export default async function AdminReconciliationPage() {
 
       {breaks.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-[1.05rem] font-medium tracking-tight text-red-700">
+          <h2 className="text-[1rem] font-medium tracking-tight text-red-700">
             Accounts whose ledger does not add up
           </h2>
-          <p className="max-w-3xl text-[0.82rem] text-ink-2">
+          <p className="max-w-3xl text-[0.8125rem] text-ink-2">
             The balance on the account row and the balance the ledger ends at disagree. Do not
             &ldquo;fix&rdquo; this by editing a balance: find the transaction that is wrong, and read{" "}
             <Link href="/admin/transactions" className="font-semibold underline underline-offset-2">
@@ -378,7 +378,7 @@ export default async function AdminReconciliationPage() {
             for that account first.
           </p>
           <div className="overflow-x-auto rounded-2xl border border-red-200 bg-white">
-            <table className="w-full min-w-[36rem] text-left text-[0.84rem]">
+            <table className="w-full min-w-[36rem] text-left text-[0.8125rem]">
               <thead className="bg-red-50/60 text-meta uppercase tracking-wide text-red-700">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Account</th>
@@ -404,7 +404,7 @@ export default async function AdminReconciliationPage() {
         </section>
       )}
 
-      <p className="rounded-xl border border-line bg-cream/60 px-4 py-3 text-[0.8rem] text-ink-2">
+      <p className="rounded-xl border border-line bg-cream/60 px-4 py-3 text-[0.8125rem] text-ink-2">
         There is no automatic resolver for any row on this page. Paystack now settles payouts
         through the same signed webhook as top-ups — a successful transfer completes the row and a
         failed or reversed one refunds the wallet — so what reaches this page is what the provider

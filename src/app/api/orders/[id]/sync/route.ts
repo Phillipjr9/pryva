@@ -88,7 +88,7 @@ export async function GET(
       if (!order.codeReceivedAt) updates.codeReceivedAt = new Date();
     }
     // A rental can receive more than one message; one code must not end it.
-    if (!order.duration.startsWith("Rent") && (upstreamStatus === "delivered" || code)) updates.status = "delivered";
+    if (!order.duration.startsWith("Rent") && code) updates.status = "delivered";
     if ((upstreamStatus === "cancelled" || upstreamStatus === "expired") && order.expiresAt && order.expiresAt < new Date()) {
       updates.status = "expired";
     }

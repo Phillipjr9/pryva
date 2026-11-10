@@ -39,7 +39,7 @@ vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
 });
 
 const { cancelUpstream, fulfillPlan } = await import("@/lib/services/fulfillment");
-const { otpSupplierOrder, otpSupplierProbe, clearOtpCatalogueCache, otpOfferPublicId } = await import("@/lib/services/numbers/otp-suppliers");
+const { otpSupplierOrder, otpSupplierProbe, clearOtpCatalogueCache, otpOfferPublicId, readOtpOffersForSupplier } = await import("@/lib/services/numbers/otp-suppliers");
 const { FleexaError } = await import("@/lib/providers/fleexa");
 const { BitcallError } = await import("@/lib/providers/bitcall");
 const { isAmbiguousOtpPurchase } = await import("@/lib/services/numbers/otp-suppliers");
@@ -255,8 +255,25 @@ describe("Bitcall-only fulfilment", () => {
     bitcall.list.mockRejectedValue(new FleexaError("Rate limited", 429, "RATE_LIMITED"));
     vi.spyOn(console, "error").mockImplementation(() => undefined);
 
-    await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
+    await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "RATE_LIMITED" });
     expect(fleexa.buy).not.toHaveBeenCalled();
+    expect(bitcall.buy).not.toHaveBeenCalled();
+  });
+
+  it("does not spend on a cached quote when the fresh checkout read fails", async () => {
+    bitcall.list.mockResolvedValue(bitcallQuote());
+    expect((await readOtpOffersForSupplier("bitcall", "ng", "Nigeria")).offers).toHaveLength(1);
+    bitcall.list.mockRejectedValue(new Error("feed unavailable"));
+    await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "UNKNOWN_ERROR" });
+    expect(bitcall.buy).not.toHaveBeenCalled();
+  });
+
+  it("uses the new quote rather than the cached quote at checkout", async () => {
+    bitcall.list.mockResolvedValue(bitcallQuote());
+    await readOtpOffersForSupplier("bitcall", "ng", "Nigeria");
+    bitcall.list.mockResolvedValue(bitcallQuote({ price: 2 }));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "UNPROFITABLE" });
     expect(bitcall.buy).not.toHaveBeenCalled();
   });
 
@@ -293,6 +310,17 @@ describe("Bitcall-only fulfilment", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     await expect(fulfillPlan(plan)).rejects.toMatchObject({ code: "AMBIGUOUS_PURCHASE" });
     expect(bitcall.buy).toHaveBeenCalledTimes(1);
+  });
+
+  it("records an activation reference even when its phone number is missing", async () => {
+    bitcall.list.mockResolvedValue(bitcallQuote());
+    bitcall.buy.mockResolvedValue({ ...activation, phoneNumber: null });
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const accepted = vi.fn().mockResolvedValue(undefined);
+    await expect(fulfillPlan(plan, { onOtpAttempt: async () => undefined, onOtpAccepted: accepted }))
+      .rejects.toMatchObject({ code: "AMBIGUOUS_PURCHASE" });
+    expect(accepted).toHaveBeenCalledOnce();
+    expect(accepted).toHaveBeenCalledWith("act-1");
   });
 
   it("never repeats or fails over after an ambiguous Bitcall purchase", async () => {

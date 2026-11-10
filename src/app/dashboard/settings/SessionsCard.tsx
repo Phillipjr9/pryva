@@ -79,8 +79,8 @@ export function SessionsCard() {
             <Shield className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="text-[0.95rem] font-semibold">Active sessions</h2>
-            <p className="mt-0.5 text-[0.8rem] text-ink-2">
+            <h2 className="text-[0.9375rem] font-semibold">Active sessions</h2>
+            <p className="mt-0.5 text-[0.8125rem] text-ink-2">
               Showing up to 200 recent active sessions for this account.
             </p>
           </div>
@@ -104,10 +104,10 @@ export function SessionsCard() {
       </div>
 
       <div className="mt-4 space-y-2">
-        {loading && <p className="text-[0.82rem] text-ink-3">Loading…</p>}
+        {loading && <p className="text-[0.8125rem] text-ink-3">Loading…</p>}
 
         {!loading && sessions.length === 0 && (
-          <p className="text-[0.82rem] text-ink-3">No active sessions found.</p>
+          <p className="text-[0.8125rem] text-ink-3">No active sessions found.</p>
         )}
 
         {sessions.map((session) => (
@@ -116,7 +116,7 @@ export function SessionsCard() {
             className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-cream/50 px-3 py-2.5"
           >
             <div className="min-w-0">
-              <p className="text-[0.82rem] font-medium text-ink">
+              <p className="text-[0.8125rem] font-medium text-ink">
                 {session.isCurrent ? "This device" : "Another device"}
                 {session.isCurrent && (
                   <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-micro font-semibold text-emerald-700">

@@ -35,7 +35,7 @@ export function EmptyState({
         <Icon className="h-5 w-5" />
       </span>
       <p className="mt-3.5 text-[1rem] font-semibold text-ink">{title}</p>
-      <p className="mx-auto mt-1.5 max-w-sm text-[0.82rem] leading-relaxed text-ink-2">{body}</p>
+      <p className="mx-auto mt-1.5 max-w-sm text-[0.8125rem] leading-relaxed text-ink-2">{body}</p>
       {(action || secondary) && (
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
           {action && (action.onClick ? (

@@ -6,7 +6,7 @@ import type { EsimOffer } from "@/lib/services/esim/esim-catalog";
 const findOffer = vi.hoisted(() => vi.fn());
 const recheckOffer = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/services/esim/esim-catalog", () => ({ findEsimOffer: findOffer, recheckEsimOffer: recheckOffer, esimOfferTerms: () => "a".repeat(24) }));
-vi.mock("@/lib/identity/auth", () => ({ requireUser: async () => ({ walletBalance: 50_000 }) }));
+vi.mock("@/lib/identity/auth", () => ({ requireUser: async () => ({ id: "user-1", walletBalance: 50_000 }) }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("not found"); },
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
@@ -51,6 +51,7 @@ afterEach(() => {
   findOffer.mockReset();
   recheckOffer.mockReset();
   vi.unstubAllGlobals();
+  window.localStorage.clear();
 });
 
 describe("eSIM plan information before purchase", () => {
@@ -116,6 +117,42 @@ describe("eSIM plan information before purchase", () => {
     fireEvent.click(screen.getByRole("button", { name: /Buy Nigeria 1GB/ }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(JSON.parse(fetchMock.mock.calls[1][1].body).requestId).toBe(first.requestId);
+  });
+
+  it("retains the same request and confirmed terms across reload after a lost response", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("network"));
+    vi.stubGlobal("fetch", fetchMock);
+    const firstPage = await renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /Buy Nigeria 1GB/ }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/uncertain/i));
+    const original = JSON.parse(fetchMock.mock.calls[0][1].body);
+    firstPage.unmount();
+    await renderPage({ priceNgn: 7_000 });
+    fireEvent.click(screen.getByRole("button", { name: /Buy Nigeria 1GB/ }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ ...original, recoveryOnly: true });
+  });
+
+  it("fails closed when recovery storage is corrupt or unavailable", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    window.localStorage.setItem("pryva.esim.pending.v1.user-1.live-esim-0123456789abcdef0123", "bad-data");
+    await renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /Buy Nigeria 1GB/ }));
+    expect(screen.getByRole("alert").textContent).toMatch(/contact support/i);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("clears a confirmed refusal", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: false, safeToRetry: true, error: "Not completed" }), { status: 502 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /Buy Nigeria 1GB/ }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/not completed/i));
+    const first = JSON.parse(fetchMock.mock.calls[0][1].body);
+    fireEvent.click(screen.getByRole("button", { name: /Buy Nigeria 1GB/ }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).requestId).not.toBe(first.requestId);
   });
 
   it("shows reported features without promising number delivery or free calls", async () => {

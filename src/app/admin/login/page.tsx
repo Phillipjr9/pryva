@@ -74,7 +74,7 @@ export default async function AdminLoginPage({
             <Shield className="h-3.5 w-3.5" /> Operator console
           </span>
           <h1 className="mt-4 text-[1.5rem] font-medium tracking-tight">Sign in to operate</h1>
-          <p className="mx-auto mt-1 max-w-sm text-[0.86rem] leading-relaxed text-ink-2">
+          <p className="mx-auto mt-1 max-w-sm text-[0.875rem] leading-relaxed text-ink-2">
             This door is for administrators. Customers sign in from the main site.
           </p>
         </div>
@@ -83,10 +83,10 @@ export default async function AdminLoginPage({
 
           <div
             role="alert"
-            className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.84rem] text-amber-900"
+            className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8125rem] text-amber-900"
           >
             <strong className="font-semibold">This account is not an administrator.</strong> Sign in
-            with an address listed in <code className="text-[0.8rem]">ADMIN_EMAILS</code>, or use{" "}
+            with an address listed in <code className="text-[0.8125rem]">ADMIN_EMAILS</code>, or use{" "}
             <Link href="/dashboard" className="font-medium underline underline-offset-2">
               the customer dashboard
             </Link>

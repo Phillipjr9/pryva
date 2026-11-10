@@ -86,7 +86,7 @@ export function ExportTransactionsButton() {
               type="button"
               role="menuitem"
               onClick={() => void handleExport("csv")}
-              className="flex w-full items-center gap-3 px-4 py-3 text-left text-[0.82rem] font-medium text-ink transition-colors hover:bg-cream"
+              className="flex w-full items-center gap-3 px-4 py-3 text-left text-[0.8125rem] font-medium text-ink transition-colors hover:bg-cream"
             >
               <FileText className="h-4 w-4 text-ink-2" />
               Export as CSV
@@ -95,7 +95,7 @@ export function ExportTransactionsButton() {
               type="button"
               role="menuitem"
               onClick={() => void handleExport("json")}
-              className="flex w-full items-center gap-3 px-4 py-3 text-left text-[0.82rem] font-medium text-ink transition-colors hover:bg-cream"
+              className="flex w-full items-center gap-3 px-4 py-3 text-left text-[0.8125rem] font-medium text-ink transition-colors hover:bg-cream"
             >
               <FileJson className="h-4 w-4 text-ink-2" />
               Export as JSON

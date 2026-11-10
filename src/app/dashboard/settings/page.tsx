@@ -37,7 +37,7 @@ export default async function SettingsPage({
         <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">
           Settings
         </h1>
-        <p className="mt-2 text-[0.95rem] text-ink-2">
+        <p className="mt-2 text-[0.9375rem] text-ink-2">
           Manage your account, and how it is protected.
         </p>
       </div>
@@ -47,7 +47,7 @@ export default async function SettingsPage({
       {needsSecondFactor && (
         <div
           role="status"
-          className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.86rem] text-amber-900"
+          className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.875rem] text-amber-900"
         >
           <p className="font-semibold">Administrator tools are locked until two-factor is on.</p>
           <p className="mt-1">

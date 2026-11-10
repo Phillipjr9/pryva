@@ -123,7 +123,7 @@ export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconO
         onClick={toggle}
         aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : "Notifications"}
         aria-expanded={open}
-        className={`inline-flex items-center gap-1.5 rounded-xl border border-line bg-white text-[0.8rem] font-semibold text-ink-2 hover:border-lav-300 focus:outline-none focus:ring-2 focus:ring-lav-400 ${
+        className={`inline-flex items-center gap-1.5 rounded-xl border border-line bg-white text-[0.8125rem] font-semibold text-ink-2 hover:border-lav-300 focus:outline-none focus:ring-2 focus:ring-lav-400 ${
           iconOnly
             ? // A square with no padding of its own: the size comes from the
               // caller's `h-9 w-9`, and `!p-0` is needed because the shared `.btn`
@@ -203,7 +203,7 @@ export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconO
                         <Bell className="h-3 w-3" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[0.82rem] font-semibold leading-tight">
+                        <p className="text-[0.8125rem] font-semibold leading-tight">
                           {notification.title}
                           {!notification.read && (
                             <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-lav-500" />

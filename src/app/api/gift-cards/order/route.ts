@@ -4,9 +4,9 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users } from "@/db/schema";
 import { findGiftCardDenomination } from "@/lib/services/gift-cards/brand-catalog";
+import { legacyBrandGiftCardSalesEnabled } from "@/lib/services/gift-cards/brand-readiness";
 import {
   createFoxreloadOrder,
-  isFoxreloadConfigured,
   payFoxreloadOrder,
   pollFoxreloadOrderCodes,
   resolveFoxreloadProductId,
@@ -85,8 +85,8 @@ export async function POST(request: Request) {
     .where(and(eq(orders.userId, user.id), eq(orders.requestId, requestId))).limit(1);
   if (existing) return replay(existing);
   // Recovery of an existing order must work even while the provider is offline.
-  if (process.env.FOXRELOAD_IS_MOCK === "true" || !isFoxreloadConfigured()) {
-    return Response.json({ ok: false, error: "Live gift card purchases are currently unavailable. Provider API is not configured." }, { status: 503 });
+  if (!legacyBrandGiftCardSalesEnabled()) {
+    return Response.json({ ok: false, error: "Brand gift card purchases are currently unavailable. Check your orders for previous purchases." }, { status: 503 });
   }
   if (!currentUser || currentUser.walletBalance < denomination.priceNgn) {
     return Response.json({ ok: false, error: "Insufficient wallet balance." }, { status: 402 });

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: "Instrument Serif", "Iowan Old Style", "Times New Roman", serif;
 
   --color-cream: #faf7f1;
@@ -131,7 +131,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.22em;
     text-transform: uppercase;
@@ -139,22 +139,26 @@
   }
 
   /*
+   * UI type scale: 0.75rem (micro), 0.8125rem (meta), 0.875rem,
+   * 0.9375rem, 1rem, 1.125rem and 1.25rem. Larger display headings
+   * intentionally retain their responsive sizes.
+   *
    * Two type steps for the small print, and a floor on phones.
    *
    * The UI had 369 separate `text-[0.5…0.79rem]` declarations — down to 9.3 px —
    * which is why a phone needed pinch-zoom to read a badge, a table header or a
    * price note. They are now two named steps: `text-micro` for the smallest
-   * labels and `text-meta` for the secondary line. Desktop keeps the sizes the
-   * design was drawn at; below the `sm` breakpoint both rise to 13 px, which is
-   * the smallest size that is comfortable without zooming.
+   * labels and `text-meta` for the secondary line. On desktop these are 12
+   * and 13 px; below the `sm` breakpoint both
+   * rise to 13 px to keep secondary text legible on a phone.
    */
   .text-micro {
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     line-height: 1.45;
   }
 
   .text-meta {
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     line-height: 1.45;
   }
 
@@ -166,7 +170,7 @@
     }
 
     .eyebrow {
-      font-size: 0.72rem;
+      font-size: 0.75rem;
       letter-spacing: 0.18em;
     }
   }
@@ -177,7 +181,7 @@
     justify-content: center;
     gap: 0.5rem;
     border-radius: 999px;
-    font-size: 0.9rem;
+    font-size: 0.875rem;
     font-weight: 600;
     line-height: 1;
     padding: 0.9rem 1.35rem;
@@ -240,7 +244,7 @@
     border: 1px solid var(--color-line);
     background: #fff;
     padding: 0.8rem 1rem;
-    font-size: 0.92rem;
+    font-size: 0.9375rem;
     color: var(--color-ink);
     transition: border-color 160ms ease, box-shadow 160ms ease;
   }
@@ -257,7 +261,7 @@
 
   .field-label {
     display: block;
-    font-size: 0.78rem;
+    font-size: 0.8125rem;
     font-weight: 600;
     letter-spacing: 0.02em;
     color: var(--color-ink-2);
@@ -267,7 +271,7 @@
   /*
    * iOS Safari zooms the entire page in when a form control is focused and its
    * text is smaller than 16px, and it does not zoom back out when the field
-   * blurs. `.field` is 14.7px, so every tap on the login form left the visitor
+   * blurs. `.field` is 15px, so every tap on the login form left the visitor
    * on a zoomed page that had to be pinched back. 16px is the threshold, not a
    * style preference, which is why it is a media query and not a design token.
    */

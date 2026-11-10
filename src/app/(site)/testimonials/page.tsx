@@ -44,12 +44,12 @@ export default async function TestimonialsPage() {
           <h1 className="mt-4 text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem]">
             What customers say
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-[1.05rem] leading-relaxed text-ink-2">
+          <p className="mx-auto mt-4 max-w-2xl text-[1rem] leading-relaxed text-ink-2">
             Every review here is tied to a real delivered order. No names are published, and nothing
             is written by PryvaLogs.
           </p>
           {average !== null && (
-            <p className="mt-5 flex flex-wrap items-center justify-center gap-3 text-[0.9rem] text-ink-2">
+            <p className="mt-5 flex flex-wrap items-center justify-center gap-3 text-[0.875rem] text-ink-2">
               <Stars rating={Math.round(average)} />
               <span>
                 <strong className="text-ink">{average.toFixed(1)}</strong> from{" "}
@@ -64,8 +64,8 @@ export default async function TestimonialsPage() {
         <div className="shell">
           {reviews.length === 0 ? (
             <div className="mx-auto max-w-2xl rounded-2xl border border-line bg-white p-8 text-center">
-              <h2 className="text-[1.2rem] font-semibold">No reviews published yet.</h2>
-              <p className="mx-auto mt-2 max-w-xl text-[0.92rem] leading-relaxed text-ink-2">
+              <h2 className="text-[1.25rem] font-semibold">No reviews published yet.</h2>
+              <p className="mx-auto mt-2 max-w-xl text-[0.9375rem] leading-relaxed text-ink-2">
                 Reviews appear here once a customer with a delivered order writes one and an operator
                 publishes it.
               </p>
@@ -84,9 +84,9 @@ export default async function TestimonialsPage() {
                       <span className="text-meta text-ink-3">{formatDate(review.publishedAt)}</span>
                     </div>
                     {review.headline && (
-                      <h2 className="mt-3 text-[1.02rem] font-semibold text-ink">{review.headline}</h2>
+                      <h2 className="mt-3 text-[1rem] font-semibold text-ink">{review.headline}</h2>
                     )}
-                    <p className="mt-2 whitespace-pre-line text-[0.92rem] leading-relaxed text-ink-2">
+                    <p className="mt-2 whitespace-pre-line text-[0.9375rem] leading-relaxed text-ink-2">
                       {review.body}
                     </p>
                     <p className="mt-4 flex items-center gap-1.5 text-meta font-medium text-lav-700">
@@ -97,7 +97,7 @@ export default async function TestimonialsPage() {
                 ))}
               </ul>
               <div className="mt-8 rounded-3xl border border-lav-200 bg-lav-50/60 p-6 sm:flex sm:items-center sm:justify-between">
-                <p className="text-[0.92rem] leading-relaxed text-ink-2">
+                <p className="text-[0.9375rem] leading-relaxed text-ink-2">
                   Bought something? You can review any delivered order from your dashboard.
                 </p>
                 <Link href="/login?next=%2Fdashboard%2Freviews" className="btn btn-primary mt-4 sm:mt-0">

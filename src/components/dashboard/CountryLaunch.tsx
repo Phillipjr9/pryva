@@ -15,7 +15,7 @@ export function CountryLaunch() {
           <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700">
             <Sparkle className="h-3.5 w-3.5" /> Your service hub
           </p>
-          <h2 id="country-launch-title" className="mt-1.5 text-[1.2rem] font-semibold leading-tight text-ink sm:mt-2 sm:text-[1.6rem]">
+          <h2 id="country-launch-title" className="mt-1.5 text-[1.25rem] font-semibold leading-tight text-ink sm:mt-2 sm:text-[1.6rem]">
             Find what you need, <span className="text-display italic text-lav-700">where you need it.</span>
           </h2>
           <p className="mt-1.5 max-w-md text-meta leading-relaxed text-ink-2 sm:mt-2">
@@ -25,7 +25,7 @@ export function CountryLaunch() {
         <form action="/dashboard/services" method="get" className="rounded-2xl border border-white/80 bg-white/60 p-3 shadow-sm sm:p-4">
           <input type="hidden" name="country" value={country || "ng"} />
           <CountrySelector id="dashboard-country" value={country} onChange={setCountry} />
-          <button type="submit" className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-meta font-semibold text-white transition-colors hover:bg-lav-800 sm:mt-4 sm:py-3 sm:text-[0.85rem]">
+          <button type="submit" className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-meta font-semibold text-white transition-colors hover:bg-lav-800 sm:mt-4 sm:py-3 sm:text-[0.875rem]">
             <Globe className="h-4 w-4" /> {country ? "Explore services for selected country" : "Explore all services (Nigeria default)"} <ArrowRight className="h-4 w-4" />
           </button>
         </form>

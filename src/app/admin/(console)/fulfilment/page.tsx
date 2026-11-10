@@ -66,7 +66,7 @@ export default async function AdminFulfilmentPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-[1.5rem] font-medium tracking-tight">Fulfilment queue</h1>
-          <p className="mt-1 text-[0.86rem] text-ink-2">
+          <p className="mt-1 text-[0.875rem] text-ink-2">
             {rows.length.toLocaleString("en-NG")} {rows.length === 1 ? "order" : "orders"} need a hand
             {waiting ? ` · ${waiting} waiting for credentials` : ""}
             {blocked ? ` · ${blocked} could not be sourced` : ""}
@@ -80,7 +80,7 @@ export default async function AdminFulfilmentPage() {
         </div>
       </div>
 
-      <p className="rounded-xl border border-line bg-white px-4 py-3 text-[0.8rem] leading-relaxed text-ink-2">
+      <p className="rounded-xl border border-line bg-white px-4 py-3 text-[0.8125rem] leading-relaxed text-ink-2">
         These items are prepared by hand, so every order here is already paid for. Paste one credential
         per line — the count must match the order exactly — or move it to review and refund it from the{" "}
         <Link href="/admin/orders" className="font-medium text-lav-700 underline underline-offset-2">orders page</Link>{" "}
@@ -89,7 +89,7 @@ export default async function AdminFulfilmentPage() {
 
       <div className="grid gap-3">
         {rows.length === 0 && (
-          <p className="rounded-2xl border border-dashed border-line bg-white px-4 py-10 text-center text-[0.86rem] text-ink-2">
+          <p className="rounded-2xl border border-dashed border-line bg-white px-4 py-10 text-center text-[0.875rem] text-ink-2">
             Nothing waiting. Orders for hand-prepared items appear here as soon as they are paid for.
           </p>
         )}
@@ -101,7 +101,7 @@ export default async function AdminFulfilmentPage() {
             <article key={row.id} className="rounded-2xl border border-line bg-white p-4">
               <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
                 <div className="min-w-0">
-                  <p className="flex flex-wrap items-center gap-2 text-[0.92rem] font-semibold text-ink">
+                  <p className="flex flex-wrap items-center gap-2 text-[0.9375rem] font-semibold text-ink">
                     <span className="min-w-0 break-words">{row.productName}</span>
                     <span
                       className={

@@ -48,7 +48,7 @@ function Meta({ label, value, mono = false }: { label: string; value: string; mo
     <div className="min-w-0">
       <dt className="text-micro font-semibold uppercase tracking-[0.12em] text-ink-3">{label}</dt>
       <dd
-        className={`mt-1 text-[0.86rem] leading-snug text-ink ${mono ? "font-mono tabular-nums break-all" : ""}`}
+        className={`mt-1 text-[0.875rem] leading-snug text-ink ${mono ? "font-mono tabular-nums break-all" : ""}`}
       >
         {value}
       </dd>
@@ -74,7 +74,7 @@ export function ReceiptBody({ receipt }: { receipt: ReceiptData }) {
         <div className="flex min-w-0 items-center gap-3">
           <BrandMark size="md" />
           <div className="min-w-0">
-            <p className="text-[1.05rem] font-semibold leading-tight tracking-tight text-ink">PryvaLogs</p>
+            <p className="text-[1rem] font-semibold leading-tight tracking-tight text-ink">PryvaLogs</p>
             <p className="text-meta leading-tight text-ink-3">pryvalogs.com</p>
           </div>
         </div>
@@ -87,7 +87,7 @@ export function ReceiptBody({ receipt }: { receipt: ReceiptData }) {
           >
             {RECEIPT_DOCUMENT_TITLE}
           </h1>
-          <p className="mt-1 font-mono text-[0.95rem] font-semibold tabular-nums text-ink">
+          <p className="mt-1 font-mono text-[0.9375rem] font-semibold tabular-nums text-ink">
             {receipt.reference}
           </p>
           <p className="mt-1 text-meta text-ink-3 [text-wrap:pretty]">{receipt.createdAt}</p>
@@ -101,14 +101,14 @@ export function ReceiptBody({ receipt }: { receipt: ReceiptData }) {
       <section className="grid gap-4 border-b border-line px-5 py-5 sm:grid-cols-2 sm:px-8">
         <div className="min-w-0">
           <p className="text-micro font-semibold uppercase tracking-[0.12em] text-ink-3">Billed to</p>
-          <p className="mt-1 break-words text-[0.92rem] font-semibold leading-snug text-ink">
+          <p className="mt-1 break-words text-[0.9375rem] font-semibold leading-snug text-ink">
             {receipt.customerName}
           </p>
           <p className="break-words text-meta leading-snug text-ink-2">{receipt.customerEmail}</p>
         </div>
         <div className="min-w-0 sm:text-right">
           <p className="text-micro font-semibold uppercase tracking-[0.12em] text-ink-3">Paid with</p>
-          <p className="mt-1 text-[0.92rem] font-semibold leading-snug text-ink">{receipt.paidWith}</p>
+          <p className="mt-1 text-[0.9375rem] font-semibold leading-snug text-ink">{receipt.paidWith}</p>
           <p className="text-meta leading-snug text-ink-2">Amount charged in Nigerian Naira</p>
         </div>
       </section>
@@ -137,14 +137,14 @@ export function ReceiptBody({ receipt }: { receipt: ReceiptData }) {
               {items.map((item) => (
                 <tr key={item.description} className="align-top">
                   <td className="py-3 pr-4">
-                    <p className="text-[0.92rem] font-semibold leading-snug text-ink">{item.description}</p>
+                    <p className="text-[0.9375rem] font-semibold leading-snug text-ink">{item.description}</p>
                     {item.detail ? (
                       <p className="mt-1 max-w-[42ch] break-words text-meta leading-relaxed text-ink-2">
                         {item.detail}
                       </p>
                     ) : null}
                   </td>
-                  <td className="w-[1%] whitespace-nowrap py-3 text-right text-[0.92rem] font-semibold tabular-nums text-ink">
+                  <td className="w-[1%] whitespace-nowrap py-3 text-right text-[0.9375rem] font-semibold tabular-nums text-ink">
                     {item.amountLabel}
                   </td>
                 </tr>
@@ -152,10 +152,10 @@ export function ReceiptBody({ receipt }: { receipt: ReceiptData }) {
             </tbody>
             <tfoot>
               <tr className="print-keep border-t border-ink/15">
-                <th scope="row" className="py-3 pr-4 text-left text-[0.92rem] font-semibold text-ink">
+                <th scope="row" className="py-3 pr-4 text-left text-[0.9375rem] font-semibold text-ink">
                   Total charged
                 </th>
-                <td className="py-3 text-right text-[1.15rem] font-semibold tabular-nums text-ink">
+                <td className="py-3 text-right text-[1.125rem] font-semibold tabular-nums text-ink">
                   {amountLabel}
                 </td>
               </tr>

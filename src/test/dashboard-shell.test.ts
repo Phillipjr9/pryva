@@ -93,12 +93,10 @@ describe("dashboard navigation", () => {
   });
 
   it("exposes the major shopping categories through the country-first hub", () => {
-    for (const category of ["verification", "social", "numbers", "esim", "proxies", "email", "accounts", "subscriptions", "data"]) {
-      // Gift cards are deliberately absent: they are wallet credit Pryva issues
-      // itself, not a service in the catalogue.
+    for (const category of ["verification", "social", "numbers", "esim", "proxies", "email", "accounts", "subscriptions", "data", "games", "topups", "gift-cards", "prepaid"]) {
       expect(shell, `${category} should have a hub shortcut`).toContain(`category: "${category}"`);
     }
-    expect(shell).not.toContain('category: "gift-cards"');
+    expect(shell).toContain('href: "/dashboard/gift-cards", label: "Pryva gift cards"');
     // Every row, including this one, carries a real image rather than a glyph.
     expect(shell).toContain('label: "All services", nav: "services"');
   });
@@ -128,7 +126,7 @@ describe("dashboard navigation", () => {
     expect(header).toContain("max-[340px]:flex-wrap");
     expect(header).not.toMatch(/(?<!:)\bflex-wrap\b/);
     // The greeting yields space instead of the controls at ordinary widths.
-    expect(header).toContain("truncate text-[0.88rem]");
+    expect(header).toContain("truncate text-[0.875rem]");
     expect(header).toContain("shrink-0 items-center");
   });
 

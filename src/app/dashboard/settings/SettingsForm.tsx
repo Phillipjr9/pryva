@@ -57,7 +57,7 @@ function Section({
           </span>
         )}
         <div>
-          <h2 className="text-[0.95rem] font-semibold">{title}</h2>
+          <h2 className="text-[0.9375rem] font-semibold">{title}</h2>
           <p className="mt-0.5 text-meta text-ink-2">{note}</p>
         </div>
       </div>
@@ -180,7 +180,7 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
           type="button"
           onClick={handleProfileUpdate}
           disabled={savingProfile || name.trim() === user.name}
-          className="btn btn-primary w-fit !px-4 !py-2.5 !text-[0.8rem] disabled:opacity-50"
+          className="btn btn-primary w-fit !px-4 !py-2.5 !text-[0.8125rem] disabled:opacity-50"
         >
           {savingProfile ? (
             <>
@@ -239,7 +239,7 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
           type="button"
           onClick={handlePasswordChange}
           disabled={savingPassword || !currentPassword || !newPassword || !confirmPassword}
-          className="btn w-fit border border-ink bg-ink !px-4 !py-2.5 !text-[0.8rem] text-white hover:bg-ink/90 disabled:opacity-50"
+          className="btn w-fit border border-ink bg-ink !px-4 !py-2.5 !text-[0.8125rem] text-white hover:bg-ink/90 disabled:opacity-50"
         >
           {savingPassword ? (
             <>
@@ -257,7 +257,7 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
         note="Proof that you control this address, and where a password reset would be sent."
       >
         {user.emailVerifiedAt ? (
-          <p className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-[0.8rem] font-medium text-emerald-800">
+          <p className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-[0.8125rem] font-medium text-emerald-800">
             <Check className="h-3.5 w-3.5 shrink-0" />
             {user.email} was verified on{" "}
             {new Date(user.emailVerifiedAt).toLocaleDateString("en-NG", {
@@ -274,7 +274,7 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
             {canSendVerification ? (
               <Link
                 href="/verify-email"
-                className="btn w-fit border border-lav-300 bg-lav-50 !px-4 !py-2.5 !text-[0.8rem] font-semibold text-lav-700 hover:bg-lav-100"
+                className="btn w-fit border border-lav-300 bg-lav-50 !px-4 !py-2.5 !text-[0.8125rem] font-semibold text-lav-700 hover:bg-lav-100"
               >
                 Send the confirmation link
               </Link>
@@ -293,7 +293,7 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
       </Section>
 
       <Section icon={Shield} title="Account" note="Read-only details. Your data can be downloaded below.">
-        <dl className="grid gap-2 text-[0.82rem] sm:grid-cols-2">
+        <dl className="grid gap-2 text-[0.8125rem] sm:grid-cols-2">
           <div className="flex items-center justify-between rounded-xl border border-line bg-white px-3.5 py-2.5">
             <dt className="text-ink-2">Member since</dt>
             <dd className="font-semibold text-ink">

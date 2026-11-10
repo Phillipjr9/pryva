@@ -181,6 +181,22 @@ describe("eSIM offers", () => {
     expect(items[0].action).toBeNull();
   });
 
+  it("browses all destinations without claiming selected-country coverage or exposing provider IDs", async () => {
+    const { listings } = await catalog([
+      plan({ planId: "pln_safe", countries: ["NG"], supportsVoice: true }),
+      plan({ planId: "pln_no_price", name: "Unpriced plan", countries: ["GB"], price: null }),
+    ]);
+    const { esimItemsForAllDestinations } = await import("@/lib/services/esim/esim-catalog");
+    const items = esimItemsForAllDestinations(listings);
+    expect(items).toHaveLength(2);
+    expect(items.every((item) => item.coverage === "unconfirmed")).toBe(true);
+    expect(items.find((item) => item.name === "Unpriced plan")).toMatchObject({ action: null, price: null, searchTerms: expect.stringContaining("United Kingdom") });
+    const priced = items.find((item) => item.name === "Nigeria Lite")!;
+    expect(priced).toMatchObject({ detail: expect.stringContaining("Voice listed"), action: { label: "Buy eSIM" }, searchTerms: expect.stringContaining("Nigeria") });
+    expect(JSON.stringify(items)).not.toContain("pln_safe");
+    expect(esimItemsForAllDestinations(Array.from({ length: 1001 }, () => listings[0]))).toHaveLength(1000);
+  });
+
   it("sells the priced plans and links them to their own page", async () => {
     const { offers, partial } = await catalog([plan()]);
     const { esimItemsForCountry } = await import("@/lib/services/esim/esim-catalog");

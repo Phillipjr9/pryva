@@ -32,7 +32,7 @@ export default async function ReferralsPage() {
     <div className="grid gap-5">
       <div>
         <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Refer a friend</h1>
-        <p className="mt-1 text-[0.86rem] text-ink-2">
+        <p className="mt-1 text-[0.875rem] text-ink-2">
           Share your link. When a friend joins and their first order is delivered, part of it comes back
           to your wallet.
         </p>

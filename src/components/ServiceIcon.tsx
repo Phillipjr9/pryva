@@ -4,6 +4,8 @@ import type { ComponentType, SVGProps } from "react";
 import { BrandIcon, type BrandIconProps } from "@/components/BrandIcon";
 import {
   Calendar,
+  Card,
+  Plus,
   Gamepad,
   Gift,
   Globe,
@@ -25,6 +27,9 @@ type DigitalServiceType = "netflix" | "spotify" | "youtube" | "disney" | "chatgp
 type CoreServiceType = "numbers" | "esim" | "proxies" | "email-otp";
 type AdditionalServiceType =
   | "data"
+  | "games"
+  | "topups"
+  | "prepaid"
   | "gift-cards"
   | "bulk"
   | "scheduled"
@@ -94,6 +99,9 @@ const serviceGlyphs: Record<CoreServiceType | AdditionalServiceType, Glyph> = {
   "email-otp": Mail,
   accounts: IdCard,
   data: Signal,
+  games: Gamepad,
+  topups: Plus,
+  prepaid: Card,
   "gift-cards": Gift,
   bulk: Layers,
   scheduled: Calendar,
@@ -115,6 +123,9 @@ const serviceNames: Record<ServiceType, string> = {
   "email-otp": "Email OTP",
   accounts: "Digital Accounts",
   data: "Data Plans",
+  games: "Games and gaming",
+  topups: "Account top-ups",
+  prepaid: "Prepaid products",
   "gift-cards": "Gift Cards",
   bulk: "Bulk Orders",
   scheduled: "Scheduled Purchases",

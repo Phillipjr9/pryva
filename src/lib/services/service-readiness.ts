@@ -46,14 +46,9 @@ const DETAIL: Record<ServiceId, Copy> = {
     preview
       ? "eSIM ordering is unavailable in this environment."
       : supplier("bitcall")
-        ? "Travel data plans are read live from the network, priced in naira and issued as an activation code."
-        : "eSIM ordering is not connected yet, so no plans can be ordered.",
-  proxies: ({ preview, supplier }) =>
-    supplier("fleexa")
-      ? "Proxy bandwidth plans are priced in naira and can be bought from your wallet."
-      : preview
-        ? "Ordering is unavailable in this environment."
-        : "Proxy ordering is not connected yet, so no proxy plan can be ordered or charged.",
+        ? "Some travel data plans are priced live and issued as an activation code; check each listing before ordering."
+        : "Some travel data listings can be browsed, but ordering is not currently available for every plan.",
+  proxies: () => "Proxy plans cannot be delivered yet. The catalogue is for comparison only; ordering is paused.",
   email: ({ preview }) =>
     preview
       ? "The temporary inbox is unavailable in this environment."
@@ -64,18 +59,12 @@ const DETAIL: Record<ServiceId, Copy> = {
       : preview
         ? "Ordering is unavailable in this environment."
         : "Marketplace ordering is not connected, so there are no available listings to buy.",
-  subscriptions: ({ preview, supplier }) =>
-    supplier("fleexa")
-      ? "Entertainment and tool subscriptions can be bought from your wallet."
-      : preview
-        ? "Ordering is unavailable in this environment."
-        : "Subscriptions are not connected yet, so plans and prices are not currently shown.",
-  data: ({ preview, supplier }) =>
-    supplier("fleexa")
-      ? "Mobile data plans for MTN, Airtel, Glo and 9mobile are priced in naira and can be bought from your wallet."
-      : preview
-        ? "Ordering is unavailable in this environment."
-        : "Mobile data ordering is not connected yet, so plans and prices are not currently shown.",
+  subscriptions: () => "Browse subscription listings; ordering depends on the individual product and may be paused.",
+  games: () => "Browse games and game currency; ordering depends on the individual product and may be paused.",
+  topups: () => "Browse account top-ups; ordering depends on the individual product and may be paused.",
+  "gift-cards": () => "Browse digital vouchers; ordering depends on the individual product and may be paused.",
+  prepaid: () => "Browse prepaid products and cards; these products are not currently available to order.",
+  data: () => "Mobile data delivery is not connected, so plans and prices are not currently shown.",
   tools: ({ preview, supplier }) =>
     supplier("fleexa")
       ? "Bulk orders buy the same units as a single order. Eligible schedules run nightly."
@@ -117,7 +106,10 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
   const entries: ServiceReadinessEntry[] = SERVICES.map((service) => ({
     id: service.id,
     label: service.label,
-    state: stateFor(service.sale, context),
+    // A credential alone cannot make a service buyable: these pages and
+    // purchase paths are currently disabled even when Fleexa is configured.
+    state: service.id === "proxies" || service.id === "data" || service.id === "subscriptions"
+      ? "paused" : stateFor(service.sale, context),
     detail: DETAIL[service.id](context),
   }));
 

@@ -35,15 +35,13 @@ beforeEach(() => {
 });
 
 describe("boosting catalog listings", () => {
-  it("lists nothing from a USD panel until a naira rate exists", async () => {
+  it("shows an unpriced USD service without a buy action until a naira rate exists", async () => {
     const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
     const usdPanel = service({ currency: "USD", ratePer1000: 0.74, min: 10 });
 
-    // No rate means no defensible retail price. Rather than a shop full of cards
-    // that cannot be bought, the hub lists nothing and the admin checklist says
-    // why — inventing an exchange rate is how a platform sells below cost.
+    // A read-only listing does not invent a retail price or allow an order.
     delete process.env.SMM_USD_NGN_RATE;
-    expect(boostItems(snapshot([usdPanel]))).toHaveLength(0);
+    expect(boostItems(snapshot([usdPanel]))).toMatchObject([{ price: null, action: null, name: "Instagram Followers" }]);
 
     // With a rate the same service becomes a real listing: 0.74 USD per 1,000 at
     // ₦1,600 and a 35% margin is ₦1,598.40 per 1,000, and the panel's smallest
@@ -58,6 +56,19 @@ describe("boosting catalog listings", () => {
     } finally {
       delete process.env.SMM_USD_NGN_RATE;
     }
+  });
+
+  it("does not hide a returned listing solely because the supplier balance is zero", async () => {
+    const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
+    const feed = { ...snapshot([service()]), balance: 0 };
+    expect(boostItems(feed)).toHaveLength(1);
+  });
+
+  it("shows listings without a balance response, but never guesses a currency", async () => {
+    const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
+    delete process.env.SMM_USD_NGN_RATE;
+    const feed = { ...snapshot([service({ currency: null })]), balance: null, currency: null, balanceUnavailable: true };
+    expect(boostItems(feed)).toMatchObject([{ name: "Instagram Followers", price: null, action: null }]);
   });
 
   it("readies an NGN-billed service without any exchange rate", async () => {
@@ -362,19 +373,117 @@ describe("boosting snapshot", () => {
     });
   });
 
-  it("caps the catalog, caches briefly and deduplicates concurrent reads", async () => {
+  it("preserves all adapter results, caches briefly and deduplicates concurrent reads", async () => {
     panel.services.mockResolvedValue(Array.from({ length: 2500 }, (_, index) => service({ id: `svc-${index}` })));
     panel.balance.mockResolvedValue({ balance: 10, currency: "NGN" });
-    const { readBoostSnapshot } = await import("@/lib/services/boosts/smm-catalog");
+    const { readBoostSnapshot, boostItems } = await import("@/lib/services/boosts/smm-catalog");
 
     const [first, second] = await Promise.all([readBoostSnapshot(), readBoostSnapshot()]);
     expect(first).toBe(second);
     expect(panel.services).toHaveBeenCalledTimes(1);
-    expect(first.services).toHaveLength(2000);
+    expect(first.services).toHaveLength(2500);
+    expect(boostItems(first)).toHaveLength(2500);
 
     await readBoostSnapshot();
     expect(panel.services).toHaveBeenCalledTimes(1);
     await readBoostSnapshot(true);
     expect(panel.services).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("reviewed local social platform artwork", () => {
+  it("maps exact platform labels to their own bundled logos", async () => {
+    const { socialArtwork } = await import("@/lib/services/boosts/social-artwork");
+    const { existsSync } = await import("node:fs");
+    const cases = [
+      ["Shopee", "shopee"], ["Clubhouse", "clubhouse"], ["CoinMarketCap", "coinmarketcap"],
+      ["Rumble", "rumble"], ["Tidal", "tidal"], ["Ok.ru", "odnoklassniki"],
+      ["Apple Music", "applemusic"], ["Podcast [iTunes Store]", "applepodcasts"], ["Shazam", "shazam"], ["BlueSky", "bluesky"],
+      ["RedNote", "xiaohongshu"], ["Reverbenation", "reverbnation"], ["Line", "line"],
+    ];
+    for (const [platform, slug] of cases) {
+      const art = socialArtwork(platform, `${platform} Followers`);
+      expect(art).toEqual({ kind: "verified-brand-logo", slug: `social-${slug}` });
+      expect(existsSync(`public/verification-logos/social-${slug}.svg`)).toBe(true);
+    }
+    expect(socialArtwork("Medium", "Medium Followers")).toEqual({ kind: "verified-brand-logo", slug: "social-medium" });
+    expect(existsSync("public/verification-logos/social-medium.svg")).toBe(true);
+  });
+
+  it("handles explicitly named catch-all products but never guesses from similar words", async () => {
+    const { socialArtwork } = await import("@/lib/services/boosts/social-artwork");
+    const { existsSync } = await import("node:fs");
+    for (const [name, slug] of [["Rarible Followers", "rarible"], ["OpenSea Views", "opensea"], ["CoinMarketCap Trending Page", "coinmarketcap"]]) {
+      expect(socialArtwork("Other platforms", name)).toEqual({ kind: "verified-brand-logo", slug: `social-${slug}` });
+      expect(existsSync(`public/verification-logos/social-${slug}.svg`)).toBe(true);
+    }
+    expect(socialArtwork("Other platforms", "OpenSeas Views")).toBeNull();
+    expect(socialArtwork("Other platforms", "Some other platform promoting OpenSea")).toBeNull();
+    expect(socialArtwork("Medium", "Medium quality followers")).toBeNull();
+    expect(socialArtwork("Line Voom", "Line Voom Views")).toEqual({ kind: "verified-brand-logo", slug: "social-line-voom", format: "png" });
+    expect(socialArtwork("Shopee partner", "Shopee partner followers")).toBeNull();
+    expect(socialArtwork("Podcast", "Podcast Subscribers")).toBeNull();
+    expect(socialArtwork("Podcast [Spotify]", "Podcast Subscribers")).toBeNull();
+    expect(socialArtwork(null, "Rarible Followers")).toBeNull();
+  });
+
+  it("uses Apple Podcasts only for the explicitly named iTunes Store shelf", async () => {
+    const { describeBoost } = await import("@/lib/services/boosts/smm-catalog");
+    expect(describeBoost(service({ name: "Podcast Subscribers", category: "Podcast [iTunes Store]" }), "NGN"))
+      .toMatchObject({ platform: "Podcast [iTunes Store]", artwork: { kind: "verified-brand-logo", slug: "social-applepodcasts" } });
+    expect(describeBoost(service({ name: "Spotify Podcast Subscribers", category: "Podcast [iTunes Store]" }), "NGN"))
+      .toMatchObject({ platform: "Spotify", artwork: { kind: "brand", name: "spotify" } });
+    expect(describeBoost(service({ name: "Podcast Subscribers", category: "Podcast" }), "NGN").artwork)
+      .toEqual({ kind: "service", name: "social-promotion" });
+    expect(describeBoost(service({ name: "Coub Likes", category: "Coub Likes" }), "NGN"))
+      .toMatchObject({ platform: "Coub", artwork: { kind: "verified-brand-logo", slug: "social-coub", format: "png" } });
+  });
+
+  it("does not change classification, pricing or buy actions for an existing listing", async () => {
+    const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
+    const [item] = boostItems(snapshot([service({ name: "Shopee Followers", category: "Shopee" })]));
+    expect(item).toMatchObject({
+      platform: "Shopee", name: "Shopee Followers", tag: "Followers",
+      artwork: { kind: "verified-brand-logo", slug: "social-shopee" },
+      price: 203, action: { label: "Buy boost" },
+    });
+  });
+});
+
+describe("social product identity takes precedence over supplier shelf", () => {
+  it("does not give Threads or TikTok products the Instagram logo", async () => {
+    const { describeBoost } = await import("@/lib/services/boosts/smm-catalog");
+    const threads = describeBoost(service({ name: "Threads Followers", category: "Instagram" }), "NGN");
+    expect(threads).toMatchObject({ platform: "Threads", artwork: { kind: "brand", name: "threads" }, tag: "Followers" });
+    const tiktok = describeBoost(service({ name: "Tiktok Followers", category: "Instagram" }), "NGN");
+    expect(tiktok).toMatchObject({ platform: "TikTok", artwork: { kind: "brand", name: "tiktok" }, tag: "Followers" });
+    const unnamed = describeBoost(service({ name: "Custom Comments", category: "Instagram - Comments" }), "NGN");
+    expect(unnamed).toMatchObject({ platform: "Instagram", artwork: { kind: "brand", name: "instagram" } });
+  });
+
+  it("identifies YouTube videos shared through another social network", async () => {
+    const { describeBoost } = await import("@/lib/services/boosts/smm-catalog");
+    for (const name of ["YouTube Social Shares [From Facebook]", "YouTube Social Shares from Linkedin", "Youtube Pinterest Shares", "YouTube Social Shares [From Vkontakte]"]) {
+      expect(describeBoost(service({ name, category: "YouTube" }), "NGN"))
+        .toMatchObject({ platform: "YouTube", artwork: { kind: "brand", name: "youtube" } });
+    }
+    expect(describeBoost(service({ name: "Facebook Shares", category: "YouTube" }), "NGN"))
+      .toMatchObject({ platform: "Facebook", artwork: { kind: "brand", name: "facebook" } });
+  });
+});
+
+describe("reviewed raster social artwork", () => {
+  it("returns the correct local file format for the reviewed platforms", async () => {
+    const { socialArtwork } = await import("@/lib/services/boosts/social-artwork");
+    const { existsSync } = await import("node:fs");
+    for (const [platform, slug] of [["Likee", "likee"], ["Boomplay", "boomplay"], ["Rutube.ru", "rutube"], ["Line Voom", "line-voom"], ["Trovo", "trovo"], ["Coub", "coub"]]) {
+      expect(socialArtwork(platform, `${platform} Followers`)).toEqual({ kind: "verified-brand-logo", slug: `social-${slug}`, format: "png" });
+      expect(existsSync(`public/verification-logos/social-${slug}.png`)).toBe(true);
+    }
+    expect(socialArtwork("Yandex", "Yandex Zen Likes")).toEqual({ kind: "verified-brand-logo", slug: "social-yandex-zen", format: "png" });
+    expect(existsSync("public/verification-logos/social-yandex-zen.png")).toBe(true);
+    expect(socialArtwork("Yandex", "Yandex Q Likes")).toBeNull();
+    expect(socialArtwork("Yandex", "Yandex plays")).toBeNull();
+    expect(socialArtwork("Likee partner", "Likee partner followers")).toBeNull();
   });
 });

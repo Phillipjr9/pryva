@@ -1,18 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-// Self-hosted webfonts, imported per weight so the build ships only the cuts
-// the design actually uses. These replace the two <link> tags to
-// fonts.googleapis.com that used to sit in <head>: that stylesheet was a
-// third-party request on the critical path, and it was the only reason the
-// Content-Security-Policy had to allow Google's style and font hosts.
-// Each @fontsource file declares its own `unicode-range`, so a browser fetches
-// latin, plus latin-ext only when a glyph like the naira sign (U+20A6) appears.
-import "@fontsource/plus-jakarta-sans/300.css";
-import "@fontsource/plus-jakarta-sans/400.css";
-import "@fontsource/plus-jakarta-sans/500.css";
-import "@fontsource/plus-jakarta-sans/600.css";
-import "@fontsource/plus-jakarta-sans/700.css";
-import "@fontsource/plus-jakarta-sans/800.css";
+// One self-hosted variable font covers Jakarta's full weight range. The browser
+// loads only the character subsets it needs (including latin-ext for ₦).
+import "@fontsource-variable/plus-jakarta-sans";
 import "@fontsource/instrument-serif/400.css";
 import "@fontsource/instrument-serif/400-italic.css";
 import "./globals.css";

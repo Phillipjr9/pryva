@@ -50,14 +50,14 @@ export default async function AdminBoostingPage() {
       <div>
         <p className="eyebrow">Social promotion</p>
         <h1 className="mt-1.5 text-[1.6rem] font-semibold text-ink">Boosting</h1>
-        <p className="mt-1.5 max-w-2xl text-[0.86rem] leading-relaxed text-ink-2">
+        <p className="mt-1.5 max-w-2xl text-[0.875rem] leading-relaxed text-ink-2">
           Followers, likes, views and subscribers, sold from the wallet and fulfilled by your supplier. This screen
           shows what is configured and what is still missing. It never displays a key.
         </p>
       </div>
 
       <p
-        className={`rounded-2xl border px-4 py-3 text-[0.86rem] leading-relaxed ${
+        className={`rounded-2xl border px-4 py-3 text-[0.875rem] leading-relaxed ${
           readiness.configured
             ? "border-emerald-200 bg-emerald-50/70 text-emerald-900"
             : "border-amber-200 bg-amber-50/70 text-amber-900"
@@ -74,7 +74,7 @@ export default async function AdminBoostingPage() {
 
       <BoostingLiveCheck />
 
-      <section className="rounded-2xl border border-line bg-[#fffdfa] p-5 text-[0.84rem] leading-relaxed text-ink-2">
+      <section className="rounded-2xl border border-line bg-[#fffdfa] p-5 text-[0.8125rem] leading-relaxed text-ink-2">
         <h2 className="text-[1rem] font-semibold text-ink">What happens when a customer buys</h2>
         <ol className="mt-2 grid list-decimal gap-1.5 pl-4">
           <li>The wallet is debited and the order is written in the same transaction, as <code>processing</code>.</li>
@@ -90,10 +90,10 @@ export default async function AdminBoostingPage() {
           rules live in <code>src/lib/services/boosts/smm-pricing.ts</code>; the purchase flow in <code>src/lib/services/boosts/boost-orders.ts</code>.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
-          <Link href="/dashboard/services?category=social" className="btn btn-ghost !px-4 !py-2.5 !text-[0.8rem]">
+          <Link href="/dashboard/services?category=social" className="btn btn-ghost !px-4 !py-2.5 !text-[0.8125rem]">
             See the storefront <ArrowRight className="h-3.5 w-3.5" />
           </Link>
-          <Link href="/admin/orders" className="btn btn-ghost !px-4 !py-2.5 !text-[0.8rem]">
+          <Link href="/admin/orders" className="btn btn-ghost !px-4 !py-2.5 !text-[0.8125rem]">
             Boost orders
           </Link>
         </div>
@@ -124,7 +124,7 @@ function Step({ step }: { step: ReadinessStep }) {
   return (
     <div className={`flex flex-wrap items-start justify-between gap-3 rounded-2xl border px-4 py-3.5 ${tone}`}>
       <div className="min-w-0">
-        <p className="flex flex-wrap items-center gap-2 text-[0.9rem] font-semibold text-ink">
+        <p className="flex flex-wrap items-center gap-2 text-[0.875rem] font-semibold text-ink">
           {step.label}
           {step.env && (
             <code className="rounded bg-white/70 px-1.5 py-0.5 text-micro font-medium text-ink-3">{step.env}</code>

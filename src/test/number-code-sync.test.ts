@@ -26,12 +26,13 @@ vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
 let db: typeof import("@/db").db;
 let schema: typeof import("@/db/schema");
 let sweep: typeof import("@/lib/services/numbers/number-code-sync").sweepPendingNumberCodes;
+let readNumberCode: typeof import("@/lib/services/numbers/number-code-sync").readNumberCode;
 
 beforeAll(async () => {
   vi.stubEnv("DATABASE_URL", "");
   ({ db } = await import("@/db"));
   schema = await import("@/db/schema");
-  ({ sweepPendingNumberCodes: sweep } = await import("@/lib/services/numbers/number-code-sync"));
+  ({ sweepPendingNumberCodes: sweep, readNumberCode } = await import("@/lib/services/numbers/number-code-sync"));
 });
 const IDS = [
   "sweep-live", "sweep-gateway", "sweep-waiting", "sweep-broken",
@@ -105,6 +106,11 @@ describe("number code sweep", () => {
     expect(mocks.activation).toHaveBeenCalledWith("act-9");
     expect(mocks.checkSms).not.toHaveBeenCalled();
     expect(await readOrder("sweep-gateway")).toMatchObject({ otpCode: "778899", status: "delivered" });
+  });
+
+  it.each(["delivered", "received", "completed"])("does not report %s without an actual code", async (status) => {
+    mocks.activation.mockResolvedValue({ code: null, status });
+    expect(await readNumberCode({ provider: "bitcall", providerRequestId: "act-9" })).toMatchObject({ code: null, status: "pending" });
   });
 
   it("leaves the order open while the supplier has no code yet", async () => {
