@@ -58,7 +58,7 @@ export default function ESIMPage() {
                 : "eSIM ordering is not connected yet. Current plans and prices will appear when ordering is available."}
             </p>
             <div className="mt-8 flex flex-wrap gap-3 sm:gap-4">
-              <Link href={live ? "/dashboard/esim" : "/signup"} className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.9375rem] font-semibold text-white hover:bg-lav-800">{live ? "Browse eSIM plans" : "Create an account"} <ArrowRight className="h-4 w-4" /></Link>
+              <Link href={live ? "/dashboard/services?category=esim" : "/signup"} className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.9375rem] font-semibold text-white hover:bg-lav-800">{live ? "Browse eSIM plans" : "Create an account"} <ArrowRight className="h-4 w-4" /></Link>
               <Link href="/pricing" className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-6 py-3 text-[0.9375rem] font-semibold text-ink hover:bg-cream">View pricing</Link>
             </div>
           </div>
@@ -85,7 +85,7 @@ export default function ESIMPage() {
                 ? "Browse current plans for your destination, including their data allowance, validity and price. Availability can change."
                 : "Ordering is currently unavailable. Coverage, plans and prices cannot be confirmed on this deployment."}
             </p>
-            {live && <Link href="/dashboard/esim" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-lav-700 px-5 py-2.5 text-[0.875rem] font-semibold text-white hover:bg-lav-800">See current eSIM plans <ArrowRight className="h-4 w-4" /></Link>}
+            {live && <Link href="/dashboard/services?category=esim" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-lav-700 px-5 py-2.5 text-[0.875rem] font-semibold text-white hover:bg-lav-800">See current eSIM plans <ArrowRight className="h-4 w-4" /></Link>}
           </div>
         </div>
       </section>

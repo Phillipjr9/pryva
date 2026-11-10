@@ -78,7 +78,7 @@ export default function PricingPage() {
                 <div className="mb-6 flex items-center gap-3 sm:mb-8 sm:gap-4"><ServiceIcon service="esim" size="lg" /><h2 className="text-[1.35rem] font-semibold text-ink sm:text-[1.75rem]">eSIM</h2></div>
                 <div className="rounded-2xl border border-line bg-white p-6">
                   <p className="text-ink-2">{live ? "Current eSIM plans, prices and coverage are listed in the dashboard." : "eSIM ordering is currently unavailable; prices and coverage cannot be confirmed."}</p>
-                  {live && <Link href="/dashboard/esim" className="mt-4 inline-flex font-semibold text-lav-700 underline underline-offset-2">Browse current eSIM plans</Link>}
+                  {live && <Link href="/dashboard/services?category=esim" className="mt-4 inline-flex font-semibold text-lav-700 underline underline-offset-2">Browse current eSIM plans</Link>}
                 </div>
               </div>
             </section>

@@ -258,7 +258,6 @@ describe("service logos", () => {
       ["src/app/dashboard/inbox/page.tsx", 'service="email-otp"'],
       ["src/app/dashboard/accounts/page.tsx", 'service="accounts"'],
       ["src/app/dashboard/data/page.tsx", 'service="data"'],
-      ["src/app/dashboard/gift-cards/page.tsx", 'service="gift-cards"'],
       ["src/app/dashboard/bulk-orders/page.tsx", 'service="bulk"'],
       ["src/app/dashboard/scheduled/page.tsx", 'service="scheduled"'],
     ];

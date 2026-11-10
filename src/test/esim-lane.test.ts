@@ -127,21 +127,14 @@ describe("eSIM is a lane the console is accountable for", () => {
   });
 });
 
-describe("an empty storefront says which kind of empty it is", () => {
-  it("does not dress an empty catalogue up as a failed search", () => {
-    // The list component's zero state offers "Clear filters" when filters match
-    // nothing. Reusing it for zero plans told a customer their search was at
-    // fault when no filters were ever applied -- and gave "the listing is empty"
-    // as the only bug report available.
+describe("eSIM catalogue entry point", () => {
+  it("opens all destinations in the shared eSIM category", () => {
     const page = read("app/dashboard/esim/page.tsx");
-    expect(page).toContain("No eSIM plan is on sale right now.");
-    expect(page).toMatch(/total === 0/);
-  });
-
-  it("distinguishes a supplier outage from not being connected at all", () => {
-    const page = read("app/dashboard/esim/page.tsx");
-    expect(page).toContain("eSIM ordering is not connected yet");
-    expect(page).toContain("The eSIM catalogue could not be read just now.");
+    expect(page).toContain("/dashboard/services?category=esim&allDestinations=1");
+    const route = read("app/api/services/catalog/route.ts");
+    expect(route).toContain("esimItemsForAllDestinations");
+    expect(route).toContain("unreadable");
+    expect(route).toContain("truncated");
   });
 });
 
@@ -213,7 +206,7 @@ describe("no public page says eSIM cannot be bought while it is being bought", (
     // eSIM, so it points at the live catalogue.
     const pricing = read("app/(site)/pricing/page.tsx");
     expect(pricing).toContain("isEsimOrderingAvailable()");
-    expect(pricing).toContain('href="/dashboard/esim"');
+    expect(pricing).toContain('href="/dashboard/services?category=esim"');
     expect(pricing).not.toContain("Example only");
   });
 });

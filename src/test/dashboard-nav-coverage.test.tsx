@@ -107,9 +107,8 @@ describe("dashboard sidebar coverage", () => {
         `/dashboard/services?category=${category.id}`,
       );
     }
-    // Gift cards are wallet credit rather than a catalogue service, so they link
-    // straight at their own page rather than the hub.
-    expect(hrefs).toContain("/dashboard/gift-cards");
+    // Wallet-credit actions live inside the same gift-card category.
+    expect(hrefs).not.toContain("/dashboard/gift-cards");
   });
 });
 

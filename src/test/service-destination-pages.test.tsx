@@ -12,10 +12,11 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("service destinations", () => {
-  it("shows subscriptions as unavailable without invented prices or listings", async () => {
+  it("directs subscriptions to the shared category without inventing prices or listings", async () => {
     expect(buildServiceExplorer("ng").filter((item) => item.category === "subscriptions")).toEqual([]);
     const markup = renderToStaticMarkup(await DigitalServicesPage());
-    expect(markup).toContain("Subscriptions are not currently available to order");
+    expect(markup).toContain("/dashboard/services?category=subscriptions");
+    expect(markup).toContain("Ordering depends on the individual listing");
     expect(markup).not.toContain("Spotify Premium - 1 Month");
     expect(markup).not.toContain("Netflix Premium - 1 Month");
   });

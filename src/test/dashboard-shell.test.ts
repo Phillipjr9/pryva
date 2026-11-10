@@ -96,7 +96,7 @@ describe("dashboard navigation", () => {
     for (const category of ["verification", "social", "numbers", "esim", "proxies", "email", "accounts", "subscriptions", "data", "games", "topups", "gift-cards", "prepaid"]) {
       expect(shell, `${category} should have a hub shortcut`).toContain(`category: "${category}"`);
     }
-    expect(shell).toContain('href: "/dashboard/gift-cards"');
+    expect(shell).not.toContain('href: "/dashboard/gift-cards"');
     // Every row, including this one, carries a real image rather than a glyph.
     expect(shell).toContain('label: "All services", nav: "services"');
   });

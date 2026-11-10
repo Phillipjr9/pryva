@@ -1,38 +1,15 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), blocked: vi.fn(), codes: vi.fn(), topups: vi.fn(), esims: vi.fn(), stars: vi.fn() }));
-vi.mock("@/lib/identity/auth", () => ({ requireUser: mocks.auth }));
-vi.mock("@/lib/platform/financial-environment", () => ({ financialActionsUnavailable: mocks.blocked }));
-vi.mock("@/lib/services/foxreload/code-orders", () => ({ listedCodeOffers: mocks.codes }));
-vi.mock("@/lib/services/foxreload/topup-orders", () => ({ listedTopupOffers: mocks.topups }));
-vi.mock("@/lib/services/foxreload/esim-orders", () => ({ listedEsimOffers: mocks.esims }));
-vi.mock("@/lib/services/foxreload/stars-orders", () => ({ starsSalesConfigured: mocks.stars }));
-vi.mock("@/app/dashboard/digital-catalog/DigitalCatalogBrowser", () => ({ DigitalCatalogBrowser: () => <div>Catalogue browser</div> }));
-import DigitalCatalogPage from "@/app/dashboard/digital-catalog/page";
+import { describe, expect, it, vi } from "vitest";
 
-beforeEach(() => {
-  vi.resetAllMocks();
-  mocks.auth.mockResolvedValue({ id: "user" }); mocks.blocked.mockReturnValue(false);
-  mocks.codes.mockReturnValue([{ id: "digital-123", name: "Game", region: "US" }]);
-  mocks.topups.mockReturnValue([]); mocks.esims.mockReturnValue([]); mocks.stars.mockReturnValue(true);
-});
-afterEach(cleanup);
-describe("digital catalogue page", () => {
-  it("shows enabled reviewed products and their quote links to signed-in users", async () => {
-    render(await DigitalCatalogPage());
-    expect(mocks.auth).toHaveBeenCalledWith("/dashboard/digital-catalog");
-    expect(screen.getByText("Game")).toBeTruthy();
-    expect(screen.getByText("Catalogue browser").compareDocumentPosition(screen.getByText("Shop digital products")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText("Telegram Stars")).toBeTruthy();
-    expect(screen.getAllByRole("link", { name: "Check price and availability" }).map((link) => link.getAttribute("href"))).toEqual(["/dashboard/telegram-stars", "/dashboard/digital-codes?product=digital-123"]);
+const redirect = vi.hoisted(() => vi.fn((path: string): never => { throw new Error(`redirect:${path}`); }));
+vi.mock("next/navigation", () => ({ redirect }));
+import DigitalCatalogPage from "@/app/dashboard/digital-catalog/page";
+import GiftCardsPage from "@/app/dashboard/gift-cards/page";
+
+describe("legacy catalogue entry points", () => {
+  it("opens the shared service hub from old digital catalogue links", () => {
+    expect(() => DigitalCatalogPage()).toThrow("redirect:/dashboard/services");
   });
-  it("does not advertise checkout in environments where financial actions are blocked", async () => {
-    mocks.blocked.mockReturnValue(true);
-    render(await DigitalCatalogPage());
-    expect(screen.getByText(/No digital products are currently configured for checkout/)).toBeTruthy();
-    expect(screen.queryByRole("link", { name: "Check price and availability" })).toBeNull();
-    expect(mocks.codes).not.toHaveBeenCalled();
-    expect(mocks.stars).not.toHaveBeenCalled();
+  it("preserves wallet-card links by opening gift-card management inside the category", () => {
+    expect(() => GiftCardsPage()).toThrow("redirect:/dashboard/services?category=gift-cards#wallet-gifts");
   });
 });

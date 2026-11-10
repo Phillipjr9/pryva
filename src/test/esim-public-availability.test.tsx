@@ -27,7 +27,7 @@ describe("eSIM availability shown to customers", () => {
     connected();
     const html = renderToStaticMarkup(<EsimPage />);
     expect(html).toContain("eSIM ordering is configured.");
-    expect(html).toContain("/dashboard/esim");
+    expect(html).toContain("/dashboard/services?category=esim");
     expect(html).toContain("Can I choose a phone number with my eSIM?");
     expect(html).toContain("you cannot select a specific phone number");
     expect(html).not.toContain("eSIM plans are not available for purchase yet.");

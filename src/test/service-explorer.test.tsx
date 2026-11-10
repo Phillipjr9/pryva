@@ -8,7 +8,7 @@ import { formatUnitCount, safeUnitCount } from "@/lib/services/service-units";
 import { EXPLORER_COUNTRIES } from "@/lib/content/explorer-countries";
 import {
   buildServiceExplorer, canPreviewPlan, EXPLORER_CATEGORIES, explorerCategory, explorerCountry,
-  filterExplorerItems, planMatchesCountry, type ExplorerItem,
+  filterExplorerItems, mergeExplorerSources, planMatchesCountry, type ExplorerItem,
 } from "@/lib/services/service-explorer";
 
 describe("country-first service explorer", () => {
@@ -33,6 +33,17 @@ describe("country-first service explorer", () => {
     const items = buildServiceExplorer("bj");
     expect(items.every((item) => ["catalog", "tool", "live"].includes(item.source))).toBe(true);
     expect(items.filter((item) => item.category === "verification")).toEqual([]);
+  });
+
+  it("mixes sources within each category while retaining distinct offers", () => {
+    const base: ExplorerItem = { id: "a", category: "esim", name: "Same plan name", description: "", tag: "", artwork: { kind: "service", name: "esim" }, source: "live", coverage: "unconfirmed", stock: null, myUnits: null, price: 100, action: { label: "Buy", href: "/one" } };
+    const source1 = [base, { ...base, id: "b", action: { label: "Buy", href: "/two" } }];
+    const source2 = [{ ...base, id: "c", price: 200, action: { label: "Quote", href: "/three" } }, { ...base, id: "d" }];
+    const mixed = mergeExplorerSources([source1, source2]);
+    expect(mixed.map((item) => item.id)).toEqual(["a", "c", "b", "d"]);
+    expect(mixed[0].action?.href).toBe("/one");
+    expect(mixed[1]).toMatchObject({ price: 200, action: { href: "/three" } });
+    expect(mergeExplorerSources([[], source2]).map((item) => item.id)).toEqual(["c", "d"]);
   });
 
   it("validates country and category parameters rather than guessing", () => {

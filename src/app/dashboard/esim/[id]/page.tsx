@@ -42,7 +42,7 @@ export default async function EsimPlanPage({ params }: { params: Promise<{ id: s
   } catch {
     return (
       <div className="grid gap-3">
-        <Link href="/dashboard/esim" className="w-fit text-meta font-semibold text-lav-700 hover:underline">← Back to eSIM plans</Link>
+        <Link href="/dashboard/services?category=esim" className="w-fit text-meta font-semibold text-lav-700 hover:underline">← Back to eSIM plans</Link>
         <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-meta text-amber-900">We couldn&apos;t load this plan right now. Please try again or contact support. Nothing has been charged.</p>
       </div>
     );
@@ -58,7 +58,7 @@ export default async function EsimPlanPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="grid gap-5">
-      <Link href="/dashboard/esim" className="w-fit text-meta font-semibold text-lav-700 hover:underline">
+      <Link href="/dashboard/services?category=esim" className="w-fit text-meta font-semibold text-lav-700 hover:underline">
         ← Back to eSIM plans
       </Link>
 

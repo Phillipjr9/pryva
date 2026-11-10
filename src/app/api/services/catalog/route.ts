@@ -6,7 +6,7 @@ import { readSupplierSnapshot, supplierItemsForCountry } from "@/lib/services/nu
 import { isSmmPanelConfigured } from "@/lib/providers/smm-panel";
 import { boostItems, readBoostSnapshot } from "@/lib/services/boosts/smm-catalog";
 import { isBitcallConfigured } from "@/lib/providers/bitcall";
-import { esimItemsForCountry, readEsimCatalog } from "@/lib/services/esim/esim-catalog";
+import { ESIM_CATALOGUE_LIMIT, esimItemsForAllDestinations, esimItemsForCountry, readEsimCatalog } from "@/lib/services/esim/esim-catalog";
 import { explorerCountry } from "@/lib/services/service-explorer";
 import { catalogRateLimiter } from "@/lib/platform/rate-limit";
 import { isFundingFailure } from "@/lib/providers/types";
@@ -74,6 +74,9 @@ export async function GET(request: NextRequest) {
   const feed = request.nextUrl.searchParams.get("feed");
   const validFeeds = ["numbers", "social", "esim", "verification"];
   if (feed !== null && !validFeeds.includes(feed)) return NextResponse.json({ error: "Invalid catalogue feed" }, { status: 400 });
+  const allDestinationsParam = request.nextUrl.searchParams.get("allDestinations");
+  if (allDestinationsParam !== null && (allDestinationsParam !== "1" || feed !== "esim")) return NextResponse.json({ error: "Invalid catalogue scope" }, { status: 400 });
+  const allDestinations = allDestinationsParam === "1";
   const limits = await Promise.all((feed ? [feed] : validFeeds).map((name) => catalogRateLimiter(`supplier-catalog:${user.id}:${name}`)));
   if (limits.some((limit) => limit.unavailable)) {
     return NextResponse.json({ error: "Catalog temporarily unavailable", reason: "unavailable" }, { status: 503 });
@@ -133,7 +136,7 @@ export async function GET(request: NextRequest) {
   const items = [
     ...(supplier.snapshot ? supplierItemsForCountry(supplier.snapshot, country.code) : []),
     ...(otp.snapshot ? bitcallOtpItemsForCountry(otp.snapshot.offers, country.code, country.name) : []),
-    ...(esim.snapshot ? esimItemsForCountry(esim.snapshot.listings, country.code) : []),
+    ...(esim.snapshot ? allDestinations ? esimItemsForAllDestinations(esim.snapshot.listings) : esimItemsForCountry(esim.snapshot.listings, country.code) : []),
     ...(boost.snapshot ? boostItems(boost.snapshot) : []),
   ];
   // Partial means "this may be incomplete": a configured source that failed, or
@@ -145,9 +148,11 @@ export async function GET(request: NextRequest) {
     if (!source.snapshot) gaps.push(source.failure ?? "outage");
     else if (source.snapshot.partial) gaps.push(source.snapshot.degraded ?? "outage");
   }
-  const partial = gaps.length > 0;
-  // Incomplete, and every gap is a funding gap: still not retryable.
-  const fundingGap = partial && gaps.every((gap) => gap === "funding");
+  const truncated = allDestinations && !!esim.snapshot && esim.snapshot.listings.length > ESIM_CATALOGUE_LIMIT;
+  const unreadable = allDestinations && !!esim.snapshot && esim.snapshot.listings.length === 0 && (esim.snapshot.stats?.returned ?? 0) > 0;
+  const partial = gaps.length > 0 || truncated || unreadable;
+  // Incomplete solely because of funding is not retryable.
+  const fundingGap = !truncated && !unreadable && gaps.length > 0 && gaps.every((gap) => gap === "funding");
   const fetchedAt = sources
     .map((source) => source.snapshot?.fetchedAt)
     .filter((value): value is string => typeof value === "string" && Number.isFinite(Date.parse(value)))
@@ -155,7 +160,7 @@ export async function GET(request: NextRequest) {
     .pop() ?? null;
 
   return NextResponse.json(
-    { ok: true, country: country.code, live: true, reason: fundingGap ? "funding" : partial ? "partial" : null, partial, fetchedAt, items },
+    { ok: true, country: country.code, live: true, reason: fundingGap ? "funding" : partial ? "partial" : null, partial, ...(truncated ? { truncated: true } : {}), ...(unreadable ? { unreadable: true } : {}), fetchedAt, items },
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }

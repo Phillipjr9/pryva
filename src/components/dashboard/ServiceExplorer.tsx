@@ -2,7 +2,7 @@
 
 import { DigitalProductIcon } from "@/components/DigitalProductIcon";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { BrandIcon } from "@/components/BrandIcon";
 import { CountryFlag } from "@/components/CountryFlag";
@@ -28,7 +28,7 @@ import {
   explorerCategory,
   explorerCountry,
   filterExplorerItems,
-  interleaveExplorerItems,
+  mergeExplorerSources,
   type ExplorerFilter,
   type ExplorerItem,
 } from "@/lib/services/service-explorer";
@@ -268,10 +268,11 @@ export function ServiceCard({ item, countryName }: { item: ExplorerItem; country
 }
 
 /** Keep country and category shareable, and allow Back to restore the choice. */
-function writeSelection(country: string, category: ExplorerFilter) {
+function writeSelection(country: string, category: ExplorerFilter, allEsimDestinations = false) {
   const params = new URLSearchParams();
   if (country) params.set("country", country);
   if (category !== "all") params.set("category", category);
+  if (category === "esim" && allEsimDestinations) params.set("allDestinations", "1");
   const query = params.toString();
   const next = `${window.location.pathname}${query ? `?${query}` : ""}`;
   if (next !== `${window.location.pathname}${window.location.search}`) window.history.pushState(null, "", next);
@@ -295,11 +296,13 @@ type LiveState = {
   fetchedAt: string | null;
   scope: string;
   pending: boolean;
+  truncated: boolean;
+  unreadable: boolean;
 };
 
-type FeedOutcome = { items: ExplorerItem[]; live: boolean; partial: boolean; reason: LiveState["reason"]; fetchedAt: string | null };
+type FeedOutcome = { items: ExplorerItem[]; live: boolean; partial: boolean; reason: LiveState["reason"]; fetchedAt: string | null; truncated?: boolean; unreadable?: boolean };
 type CatalogPayload = {
-  ok?: boolean; country?: string; live?: boolean; partial?: boolean;
+  ok?: boolean; country?: string; live?: boolean; partial?: boolean; truncated?: boolean; unreadable?: boolean;
   reason?: string | null; fetchedAt?: string | null; items?: ExplorerItem[];
 };
 
@@ -348,13 +351,17 @@ function resolveExplorerCountry(initialCountry: string | null) {
 export function ServiceExplorer({
   initialCountry,
   initialCategory,
+  initialAllEsimDestinations = false,
   rejectedCountry = null,
   rejectedCategory = null,
   readiness = [],
   enableDigitalCatalogue = false,
+  reviewedItems = [],
+  giftCardManager,
 }: {
   initialCountry: string | null;
   initialCategory: string | null;
+  initialAllEsimDestinations?: boolean;
   /** Link values the server could not honour, echoed so the reset is visible. */
   rejectedCountry?: string | null;
   rejectedCategory?: string | null;
@@ -365,13 +372,16 @@ export function ServiceExplorer({
    */
   readiness?: ServiceReadinessEntry[];
   enableDigitalCatalogue?: boolean;
+  reviewedItems?: ExplorerItem[];
+  giftCardManager?: ReactNode;
 }) {
   const [country, setCountry] = useState(() => resolveExplorerCountry(initialCountry));
   const [category, setCategory] = useState<ExplorerFilter>(() => explorerCategory(initialCategory));
+  const [allEsimDestinations, setAllEsimDestinations] = useState(initialAllEsimDestinations);
   const [search, setSearch] = useState("");
   const [digitalStockOnly, setDigitalStockOnly] = useState(true);
   const [pickerRevision, setPickerRevision] = useState(0);
-  const [digitalBrowse, setDigitalBrowse] = useState<{ category: ExplorerFilter; entry: { id: string; name: string } } | null>(null);
+  const [digitalBrowse, setDigitalBrowse] = useState<{ category: ExplorerFilter; entry: { id: string; name: string; root?: string } } | null>(null);
   const [tag, setTag] = useState("all");
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [platformOpen, setPlatformOpen] = useState<Record<string, boolean>>({});
@@ -382,14 +392,18 @@ export function ServiceExplorer({
   // when a customer switches from All to a category. Never shared across users.
   const liveCache = useRef(new Map<string, { at: number; revision: number; value: FeedOutcome }>());
   const selectedCountry = explorerCountry(country);
-  const feedScope = category === "all" ? "all" : category === "email" ? "numbers" : category;
+  const feedScope = category === "all" ? "all" : category === "email" ? "numbers" : category === "esim" && allEsimDestinations ? "esim-all" : category;
   const currentLive = liveState?.country === country && liveState.scope === feedScope ? liveState : null;
   const selectedCategory = EXPLORER_CATEGORIES.find((entry) => entry.id === category);
   const digital = useDigitalExplorer(enableDigitalCatalogue, category, search, digitalStockOnly, digitalBrowse?.category === category ? digitalBrowse.entry : null);
   const items = useMemo(() => {
     const base = buildServiceExplorer(country);
-    return interleaveExplorerItems([...digital.items, ...(currentLive?.items ?? []), ...base]);
-  }, [country, currentLive, digital.items]);
+    // A reviewed item may also appear in the live browse feed. Prefer the
+    // browse record (including its stock status) without losing curated offers
+    // that have not yet appeared on a loaded page.
+    const browsedIds = new Set(digital.items.map((item) => item.id));
+    return mergeExplorerSources([currentLive?.items ?? [], digital.items, reviewedItems.filter((item) => !browsedIds.has(item.id)), base]);
+  }, [country, currentLive, digital.items, reviewedItems]);
   const filtered = useMemo(() => filterExplorerItems(items, category, search, tag), [items, category, search, tag]);
   /**
    * Social promotion lists every offer the supplier sells, which is hundreds
@@ -446,7 +460,7 @@ export function ServiceExplorer({
     if (!country) return;
     const controller = new AbortController();
     const all = ["numbers", "verification", "esim", "social"];
-    const feeds = feedScope === "all" ? all : all.includes(feedScope) ? [feedScope] : [];
+    const feeds = feedScope === "all" ? all : feedScope === "esim-all" ? ["esim"] : all.includes(feedScope) ? [feedScope] : [];
     const results = new Map<string, FeedOutcome>();
     const publish = () => {
       if (controller.signal.aborted) return;
@@ -465,16 +479,16 @@ export function ServiceExplorer({
       const fetchedAt = complete.map((result) => result.fetchedAt).filter((value): value is string => value !== null).sort().pop() ?? null;
       setLiveState({ country, scope: feedScope, items: complete.flatMap((result) => result.items),
         live: successes.length > 0, partial, failed: failures.length > 0 && successes.length === 0,
-        reason, fetchedAt, pending: waiting });
+        reason, fetchedAt, pending: waiting, truncated: complete.some((result) => result.truncated), unreadable: complete.some((result) => result.unreadable) });
     };
     for (const feed of feeds) {
-      const key = `${country}:${feed}`;
+      const key = `${country}:${feedScope === "esim-all" ? "esim-all" : feed}`;
       const cached = liveCache.current.get(key);
       if (cached && cached.revision === liveRevision && Date.now() - cached.at < 30_000) {
         results.set(feed, cached.value);
         continue;
       }
-      fetch(`/api/services/catalog?country=${encodeURIComponent(country)}&feed=${feed}${liveRevision ? "&refresh=1" : ""}`, { cache: "no-store", signal: controller.signal })
+      fetch(`/api/services/catalog?country=${encodeURIComponent(country)}&feed=${feed}${feedScope === "esim-all" ? "&allDestinations=1" : ""}${liveRevision ? "&refresh=1" : ""}`, { cache: "no-store", signal: controller.signal })
         .then(async (response) => {
           const data = (await response.json().catch(() => null)) as CatalogPayload | null;
           if (controller.signal.aborted) return;
@@ -483,7 +497,7 @@ export function ServiceExplorer({
           } else {
             const reason = data.reason === "environment" || data.reason === "unconfigured" || data.reason === "funding" ? data.reason : null;
             const fetchedAt = typeof data.fetchedAt === "string" && Number.isFinite(Date.parse(data.fetchedAt)) ? data.fetchedAt : null;
-            const value: FeedOutcome = { items: data.items, live: data.live !== false, partial: Boolean(data.partial), reason, fetchedAt };
+            const value: FeedOutcome = { items: data.items, live: data.live !== false, partial: Boolean(data.partial), reason, fetchedAt, truncated: data.truncated === true, unreadable: data.unreadable === true };
             results.set(feed, value);
             // Do not hide an outage, funding gap or partial result behind cache.
             if (!value.partial && (value.live || reason === "unconfigured" || reason === "environment")) {
@@ -513,6 +527,7 @@ export function ServiceExplorer({
       const params = new URLSearchParams(window.location.search);
       setCountry(explorerCountry(params.get("country"))?.code ?? resolveExplorerCountry(null));
       setCategory(explorerCategory(params.get("category")));
+      setAllEsimDestinations(params.get("category") === "esim" && params.get("allDestinations") === "1");
       setDigitalBrowse(null);
       setPickerRevision((value) => value + 1);
       setSearch("");
@@ -530,7 +545,7 @@ export function ServiceExplorer({
     setTag("all");
     setSearch("");
     setVisible(PAGE_SIZE);
-    writeSelection(next, category);
+    writeSelection(next, category, allEsimDestinations);
   }
 
   function chooseCategory(next: ExplorerFilter) {
@@ -539,7 +554,13 @@ export function ServiceExplorer({
     setTag("all");
     setSearch("");
     setVisible(PAGE_SIZE);
-    writeSelection(country, next);
+    writeSelection(country, next, allEsimDestinations);
+  }
+
+  function chooseEsimScope(all: boolean) {
+    setAllEsimDestinations(all);
+    setVisible(PAGE_SIZE);
+    writeSelection(country, "esim", all);
   }
 
   return (
@@ -548,7 +569,7 @@ export function ServiceExplorer({
         <div>
           <p className="text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Explore PryvaLogs</p>
           <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">{selectedCategory?.label ?? "Your service hub"}</h1>
-          <p className="mt-1.5 max-w-2xl text-[0.8125rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Pick a country once, then browse the matched services.` : "Pick a country once and browse categories without redoing the choice every time."}</p>
+          <p className="mt-1.5 max-w-2xl text-[0.8125rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Browse offers together by service; check each listing's coverage before ordering.` : "Pick a country once and browse services from available catalogues together by category."}</p>
         </div>
         <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline">My orders <ArrowRight className="h-3.5 w-3.5" /></Link>
       </div>
@@ -669,7 +690,7 @@ export function ServiceExplorer({
 
           <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-meta leading-relaxed border-amber-200 bg-amber-50/70 text-amber-900`}>
             <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-            {currentLive && currentLive.live && !currentLive.failed ? <p><strong>{currentLive.pending ? "Live listings are still loading." : currentLive.partial ? "Live listings may be incomplete or out of date." : "Live listings are current."}</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. <Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>{liveUnavailableCopy(currentLive?.reason ?? null).lead}</strong>{" "}{liveUnavailableCopy(currentLive?.reason ?? null).rest} <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
+            {currentLive && currentLive.live && !currentLive.failed ? <p><strong>{currentLive.pending ? "Live listings are still loading." : currentLive.partial ? "Live listings may be incomplete or out of date." : "Live listings are current."}</strong> Offers are grouped by service, and prices and coverage can change. Check each listing before ordering, or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>{liveUnavailableCopy(currentLive?.reason ?? null).lead}</strong>{" "}{liveUnavailableCopy(currentLive?.reason ?? null).rest} <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
           </div>
 
           <section aria-labelledby="services-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-3.5 sm:p-6">
@@ -677,7 +698,7 @@ export function ServiceExplorer({
               <div>
                 <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Sparkle className="h-3.5 w-3.5" /> Step 03</p>
                 <h2 id="services-title" className="mt-1 text-[1rem] font-semibold text-ink">{selectedCategory ? `Explore ${selectedCategory.label}` : "Explore services"}</h2>
-                <p aria-live="polite" className="mt-1 text-meta text-ink-3">{filtered.length} {`listing${filtered.length === 1 ? "" : "s"}`} · {selectedCountry.name} selected</p>
+                <p aria-live="polite" className="mt-1 text-meta text-ink-3">{filtered.length} {`listing${filtered.length === 1 ? "" : "s"}`} · {category === "esim" && allEsimDestinations ? "all destinations" : `${selectedCountry.name} selected`}</p>
                 {currentLive?.fetchedAt && <p className="mt-1 text-micro text-ink-3">Live listings checked: <time dateTime={currentLive.fetchedAt}>{new Date(currentLive.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
               </div>
               <div className="relative w-full sm:max-w-[260px]">
@@ -686,13 +707,19 @@ export function ServiceExplorer({
               </div>
             </div>
 
-            {enableDigitalCatalogue && <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-meta text-ink-2">
-              <label className="flex items-center gap-2"><input type="checkbox" checked={digitalStockOnly} onChange={(event) => { setDigitalStockOnly(event.target.checked); setVisible(PAGE_SIZE); }} /> Show digital products with reported stock only</label>
-              <Link href="/dashboard/digital-catalog" className="font-semibold text-lav-700 underline">Browse all product categories</Link>
+            {currentLive?.unreadable && <p role="status" className="mt-3 text-meta text-amber-800">Plans were returned by one catalogue, but their details could not be read. Please try again later or contact support.</p>}
+            {currentLive?.truncated && <p role="status" className="mt-3 text-meta text-amber-800">The all-destinations list is limited to the first 1,000 plans from one catalogue; more plans may exist.</p>}
+            {category === "esim" && <div className="mt-4 rounded-xl border border-line bg-white p-3 text-meta text-ink-2">
+              <label className="flex items-center gap-2 font-semibold"><input type="checkbox" checked={allEsimDestinations} onChange={(event) => chooseEsimScope(event.target.checked)} /> Browse all destinations</label>
+              <p className="mt-1">{allEsimDestinations ? "Plans may cover different destinations. Check each listing before ordering." : "Country-matched plans and digital listings with unconfirmed coverage appear together. Check each listing before ordering."}</p>
             </div>}
-            {enableDigitalCatalogue && search.trim().length >= 2 && <p className="mt-3 text-micro text-ink-3">Digital search results include all product categories, not only the selected service.</p>}
+            {enableDigitalCatalogue && <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-meta text-ink-2">
+              <label className="flex items-center gap-2"><input type="checkbox" checked={digitalStockOnly} onChange={(event) => { setDigitalStockOnly(event.target.checked); setVisible(PAGE_SIZE); }} /> Show catalogue listings with reported stock only</label>
+            </div>}
+            {enableDigitalCatalogue && search.trim().length >= 2 && <p className="mt-3 text-micro text-ink-3">{category === "all" && !digitalBrowse ? "Digital search covers all categories and may be limited to 50 results." : category === "gift-cards" && !digitalBrowse ? "Search includes loaded gift-card listings and up to 50 catalogue-wide matches. Load more listings to search further pages." : "Search filters the listings loaded in this category. Load more listings to search further pages."}</p>}
 
             {enableDigitalCatalogue && <DigitalCategoryPicker key={`${category}:${pickerRevision}`} category={category} onSelect={(entry) => { setDigitalBrowse(entry ? { category, entry } : null); setSearch(""); setVisible(PAGE_SIZE); }} />}
+            {digitalBrowse?.category === category && <p className="mt-2 text-micro text-ink-3">This product-type selection filters digital catalogue listings only; other service offers remain visible.</p>}
 
             {category === "numbers" && (
               <div className="mt-4 rounded-xl border border-line bg-white px-3.5 py-3 text-meta leading-relaxed text-ink-2">
@@ -781,7 +808,7 @@ export function ServiceExplorer({
             {digital.limited && <p className="mt-4 text-meta text-ink-3">Digital search is limited to 50 listings across all categories; refine your search to find more.</p>}
             {filtered.length === 0 && !digital.loading && !digital.error && (
               <div className="rounded-2xl border border-dashed border-line bg-cream/50 p-8 text-center">
-                {!search && tag === "all" && (category === "data" || category === "subscriptions") ? (
+                {!search && tag === "all" && (category === "data" || (category === "subscriptions" && !enableDigitalCatalogue)) ? (
                   <>
                     <p className="text-[0.875rem] font-semibold text-ink">{category === "data" ? "Mobile data plans are not connected yet" : "Subscriptions are not connected yet"}</p>
                     <p className="mt-1 text-meta text-ink-2">No plans or prices are available to order. Nothing will be charged.</p>
@@ -807,6 +834,11 @@ export function ServiceExplorer({
             {enableDigitalCatalogue && (category === "all" || ["esim", "subscriptions", "games", "topups", "gift-cards", "prepaid"].includes(category)) && <p className="mt-4 text-micro text-ink-3">Digital product stock is reported and may change. Country coverage and ordering eligibility must be confirmed separately. {category === "all" ? "Browse categories or load more listings to explore the catalogue." : ""}</p>}
             <p className="mt-5 border-t border-line pt-4 text-micro leading-relaxed text-ink-3">Stock means available inventory. My units means your remaining purchased units. Unknown and not tracked are not the same as zero. Listings do not guarantee platform support or verified coverage.</p>
           </section>
+          {category === "gift-cards" && giftCardManager && <section id="wallet-gifts" aria-labelledby="wallet-gifts-title" className="scroll-mt-6 rounded-[1.5rem] border border-line bg-[#fffdfa] p-4 sm:p-6">
+            <h2 id="wallet-gifts-title" className="text-lg font-semibold text-ink">Wallet gift cards and gift-card management</h2>
+            <p className="mt-1 mb-4 text-meta text-ink-2">Send or redeem Pryva wallet credit, review your history, or manage previously listed brand cards.</p>
+            {giftCardManager}
+          </section>}
         </>
       )}
     </div>

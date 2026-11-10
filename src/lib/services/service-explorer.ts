@@ -49,6 +49,8 @@ export type ExplorerItem = {
   tag: string;
   /** Platform identity is separate from the selected promotion type. */
   platform?: string;
+  /** Additional verified catalogue metadata for search, not a coverage promise. */
+  searchTerms?: string;
   /**
    * What distinguishes this listing from others of the same type on the same
    * platform — refill, order bounds, rate per thousand. Shown in place of the
@@ -69,6 +71,8 @@ export type ExplorerItem = {
   orderingPaused?: boolean;
   /** An explicitly labelled result from a search across all digital categories. */
   crossCategorySearch?: boolean;
+  /** A reviewed product whose service family is not established; All view only. */
+  allOnly?: boolean;
 };
 
 export const VERIFICATION_EXAMPLES: Array<{ name: string; brand: BrandSlug; tag: string }> = [
@@ -300,6 +304,12 @@ function additionalItems(_country: ExplorerCountry): ExplorerItem[] {
       action: { label: "Open temporary inbox", href: "/dashboard/inbox" },
     },
     {
+      id: "wallet-gift-cards", category: "gift-cards", name: "Pryva wallet gift cards",
+      description: "Send or redeem Pryva wallet credit", tag: "Wallet credit", artwork: { kind: "service", name: "gift-cards" },
+      source: "tool", coverage: "not-country-specific", stock: null, myUnits: null, price: null,
+      action: { label: "Manage wallet gift cards", href: "/dashboard/services?category=gift-cards#wallet-gifts" },
+    },
+    {
       id: "account-marketplace", category: "accounts", name: "Account marketplace",
       description: "Browse live listings", tag: "Digital accounts", artwork: { kind: "service", name: "accounts" },
       source: "catalog", coverage: "unconfirmed", stock: null, myUnits: null, price: null,
@@ -321,6 +331,23 @@ function additionalItems(_country: ExplorerCountry): ExplorerItem[] {
   return other;
 }
 
+/**
+ * Mix independent catalogue feeds within each service family before mixing
+ * the families themselves. A large feed must not push another supplier's
+ * offers behind hundreds of cards. Keep the original offers and checkout
+ * links: similar names do not prove that two plans are interchangeable.
+ */
+export function mergeExplorerSources(sources: readonly ExplorerItem[][]): ExplorerItem[] {
+  const combined: ExplorerItem[] = [];
+  for (const { id } of EXPLORER_CATEGORIES) {
+    const groups = sources.map((source) => source.filter((item) => item.category === id));
+    for (let index = 0; groups.some((group) => index < group.length); index++) {
+      for (const group of groups) if (group[index]) combined.push(group[index]);
+    }
+  }
+  return interleaveExplorerItems(combined);
+}
+
 /** Interleave categories so the All view doesn't bury whole service families. */
 export function interleaveExplorerItems(items: ExplorerItem[]): ExplorerItem[] {
   const groups = EXPLORER_CATEGORIES.map((category) => items.filter((item) => item.category === category.id));
@@ -340,11 +367,11 @@ export function buildServiceExplorer(countryCode: string | null): ExplorerItem[]
 export function filterExplorerItems(items: ExplorerItem[], category: ExplorerFilter, search: string, tag = "all"): ExplorerItem[] {
   const query = search.trim().toLocaleLowerCase();
   return items.filter((item) => {
-    if (category !== "all" && item.category !== category && !item.crossCategorySearch) return false;
+    if (category !== "all" && (item.allOnly || (item.category !== category && !item.crossCategorySearch))) return false;
     if (tag !== "all" && item.tag !== tag) return false;
     if (!query) return true;
     const categoryLabel = item.crossCategorySearch ? "" : categoryById.get(item.category)?.label ?? "";
-    return [item.name, item.description, item.tag, item.platform ?? "", item.detail ?? "", categoryLabel]
+    return [item.name, item.description, item.tag, item.platform ?? "", item.detail ?? "", item.searchTerms ?? "", categoryLabel]
       .some((value) => value.toLocaleLowerCase().includes(query));
   });
 }

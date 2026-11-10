@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
   boostItems: vi.fn(),
   esimSnapshot: vi.fn(),
   esimItems: vi.fn(),
+  esimAllItems: vi.fn(),
   otpRead: vi.fn(),
   otpItems: vi.fn(),
   fleexaConfigured: true,
@@ -39,7 +40,7 @@ vi.mock("@/lib/services/numbers/otp-catalog", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/services/numbers/otp-catalog")>();
   return { ...actual, bitcallOtpItemsForCountry: state.otpItems };
 });
-vi.mock("@/lib/services/esim/esim-catalog", () => ({ readEsimCatalog: state.esimSnapshot, esimItemsForCountry: state.esimItems }));
+vi.mock("@/lib/services/esim/esim-catalog", () => ({ readEsimCatalog: state.esimSnapshot, esimItemsForCountry: state.esimItems, esimItemsForAllDestinations: state.esimAllItems, ESIM_CATALOGUE_LIMIT: 1000 }));
 
 import { ProviderError } from "@/lib/providers/types";
 
@@ -62,6 +63,7 @@ beforeEach(() => {
   state.boostItems.mockReturnValue([BOOST]);
   state.esimSnapshot.mockResolvedValue({ partial: false, fetchedAt: "2026-01-03T00:00:00Z", offers: [], listings: [] });
   state.esimItems.mockReturnValue([ESIM]);
+  state.esimAllItems.mockReturnValue([ESIM]);
   state.otpRead.mockResolvedValue({ offers: [], errorCode: null });
   state.otpItems.mockReturnValue([]);
 });
@@ -69,6 +71,23 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("supplier catalog endpoint", () => {
+  it("offers a bounded all-destinations eSIM view without contacting unrelated feeds", async () => {
+    state.bitcallConfigured = true;
+    const listings = Array.from({ length: 1001 }, (_, index) => ({ id: `plan-${index}` }));
+    state.esimSnapshot.mockResolvedValue({ partial: false, fetchedAt: "2026-01-03T00:00:00Z", listings });
+    const response = await GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&feed=esim&allDestinations=1"));
+    expect(await response.json()).toMatchObject({ live: true, partial: true, truncated: true, items: [ESIM] });
+    expect(state.esimAllItems).toHaveBeenCalledWith(listings);
+    expect(state.esimItems).not.toHaveBeenCalled();
+    expect(state.snapshot).not.toHaveBeenCalled();
+    expect((await GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&feed=social&allDestinations=1"))).status).toBe(400);
+  });
+  it("reports unreadable eSIM rows instead of treating them as an empty catalogue", async () => {
+    state.bitcallConfigured = true;
+    state.esimSnapshot.mockResolvedValue({ partial: false, fetchedAt: "2026-01-03T00:00:00Z", listings: [], stats: { returned: 4 } });
+    const response = await GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&feed=esim&allDestinations=1"));
+    expect(await response.json()).toMatchObject({ partial: true, unreadable: true });
+  });
   it("loads only the requested feed and rejects unknown feeds", async () => {
     state.fleexaConfigured = true; state.boostConfigured = true; state.bitcallConfigured = true;
     // A hung unrelated feed must not block the requested feed or be invoked.

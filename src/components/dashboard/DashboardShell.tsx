@@ -84,8 +84,6 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
       { href: "/dashboard/services", label: "Social promotion", art: "social-promotion", category: "social" },
       { href: "/dashboard/services", label: "Proxies", art: "proxies", category: "proxies" },
       { href: "/dashboard/services", label: "Email OTP", art: "email-otp", category: "email" },
-      // Wallet credit remains its own flow, distinct from digital vouchers.
-      { href: "/dashboard/gift-cards", label: "Wallet gift cards", art: "gift-cards" },
       { href: "/dashboard/bulk-orders", label: "Bulk Orders", art: "bulk" },
       { href: "/dashboard/scheduled", label: "Scheduled", art: "scheduled" },
     ],

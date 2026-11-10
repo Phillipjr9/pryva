@@ -15,6 +15,7 @@ import type { PublicUser } from "@/lib/identity/auth";
 interface GiftCardsManagerProps {
   user: PublicUser;
   brandSalesEnabled: boolean;
+  initialTab?: "brands" | "create" | "redeem" | "history";
 }
 
 type Tab = "brands" | "create" | "redeem" | "history";
@@ -26,13 +27,13 @@ const TAB_LABELS: Record<Tab, string> = {
   history: "History",
 };
 
-export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerProps) {
+export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "brands" }: GiftCardsManagerProps) {
   const router = useRouter();
   const creating = useRef(false);
   const redeeming = useRef(false);
   const orderingBrand = useRef(false);
 
-  const [activeTab, setActiveTab] = useState<Tab>("brands");
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
   // Brand Gift Card Store State
   const [selectedBrandSlug, setSelectedBrandSlug] = useState<string>("steam");
@@ -286,7 +287,7 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
         {/* Brand Gift Cards Tab */}
         {activeTab === "brands" && (
           <div className="space-y-8">
-            {!brandSalesEnabled && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-meta text-amber-900">Brand gift card purchases are currently unavailable. <Link href="/dashboard/orders" className="font-semibold underline">View previous orders</Link>. You can still send or redeem wallet credit.</p>}
+            {!brandSalesEnabled && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-meta text-amber-900">These legacy brand gift card purchases are currently unavailable. Other gift-card listings are shown above. <Link href="/dashboard/orders" className="font-semibold underline">View previous orders</Link>. You can still send or redeem wallet credit.</p>}
             {/* Brand Selection Grid */}
             <div>
               <label className="block text-[0.875rem] font-semibold text-ink mb-3">
