@@ -35,6 +35,40 @@ describe("digital listings in service categories", () => {
     expect(screen.getByRole("heading", { name: "Game one" })).toBeTruthy();
     expect(within(card).getByRole("link", { name: "Check price and availability" }).getAttribute("href")).toBe(`/dashboard/digital-codes?product=${id("b")}`);
   });
+  it("allows the whole catalogue to be paged, including out-of-stock products", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      const params = new URL(url, "https://example.test").searchParams;
+      const whole = !params.has("category");
+      const items = whole && !params.has("stock") ? [{ id: id("d"), name: "Call of Duty Xbox 500 Points (GLOBAL)", stock: "out" }] : [];
+      return response({ ok: true, items, nextCursor: whole && !params.has("cursor") ? "next" : null });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="ng" initialCategory={null} enableDigitalCatalogue />);
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes("digital-catalog?") && !String(url).includes("category="))).toBe(true));
+    fireEvent.click(screen.getByLabelText("Show digital products with reported stock only"));
+    const card = (await screen.findByRole("heading", { name: "Call of Duty Xbox 500 Points (GLOBAL)" })).closest("article")!;
+    expect(within(card).getAllByText(/Out of stock \(reported\)/i).length).toBeGreaterThan(0);
+    expect(within(card).getByRole("button", { name: "Ordering paused" }).hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Load more digital listings" }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes("cursor=next") && !String(url).includes("category="))).toBe(true));
+  });
+  it("navigates real product types and lists their descendant products in the relevant service", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      const parsed = new URL(url, "https://example.test");
+      const params = parsed.searchParams;
+      if (parsed.pathname.endsWith("subcategories")) return response({ ok: true, categories: params.get("parent") === "topups" && params.get("name") === "Call of Duty" ? [{ id: "topups-call-of-duty-mobile-activision", name: "Call of Duty Mobile (Activision)" }] : [], nextCursor: null });
+      return response({ ok: true, items: params.get("category") === "topups-call-of-duty-mobile-activision" ? [{ id: id("e"), name: "80 + 8 CP", stock: "reported" }] : [], nextCursor: null });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="ng" initialCategory="topups" enableDigitalCatalogue />);
+    fireEvent.click(within(screen.getByRole("group", { name: "Browse product types" })).getByRole("button", { name: "Account top-ups" }));
+    fireEvent.change(screen.getByLabelText("Find a product type"), { target: { value: "Call of Duty" } });
+    fireEvent.click(screen.getByRole("button", { name: "Find" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Call of Duty Mobile (Activision)" }));
+    const card = (await screen.findByRole("heading", { name: "80 + 8 CP" })).closest("article")!;
+    expect(within(card).getByRole("button", { name: "Ordering paused" }).hasAttribute("disabled")).toBe(true);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("category=topups-call-of-duty-mobile-activision"))).toBe(true);
+  });
   it("keeps partial results and reports failures without inventing stock", async () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       const root = new URL(url, "https://example.test").searchParams.get("category");
@@ -44,7 +78,7 @@ describe("digital listings in service categories", () => {
     expect(await screen.findByRole("heading", { name: "Game one" })).toBeTruthy();
     expect((await screen.findByText(/Some listings could not be loaded/)).textContent).not.toContain("secret");
   });
-  it("searches the relevant catalogue roots instead of only the first page", async () => {
+  it("searches across all catalogue categories instead of only the exact root", async () => {
     const fetchMock = vi.fn(async (url: string) => {
       const params = new URL(url, "https://example.test").searchParams;
       return response({ ok: true, items: params.get("q") === "Roblox" ? [{ id: id("c"), name: "Roblox credit", stock: "reported" }] : [], nextCursor: null, searchLimited: true });
@@ -54,6 +88,9 @@ describe("digital listings in service categories", () => {
     fireEvent.change(screen.getByLabelText("Search services"), { target: { value: "Roblox" } });
     expect(await screen.findByRole("heading", { name: "Roblox credit" })).toBeTruthy();
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("q=Roblox"))).toBe(true);
-    expect(screen.getByText(/Search is limited to 50/)).toBeTruthy();
+    expect(screen.getByText(/search is limited to 50/i)).toBeTruthy();
+    const searchUrl = String(fetchMock.mock.calls.find(([url]) => String(url).includes("q=Roblox"))?.[0]);
+    expect(new URL(searchUrl, "https://example.test").searchParams.has("category")).toBe(false);
+    expect(screen.getByText(/include all product categories/)).toBeTruthy();
   });
 });

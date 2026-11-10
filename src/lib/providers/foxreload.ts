@@ -292,6 +292,15 @@ export async function readFoxreloadBrowseCategories(): Promise<unknown[]> {
   return rows;
 }
 
+/** Bounded, paginated direct children for navigating deep catalogue trees. */
+export async function readFoxreloadCategoryChildren(options: { parent: string; name?: string; cursor?: string }): Promise<{ rows: unknown[]; nextCursor: string | null }> {
+  const value = await foxreloadFetch("/api/categories/", { query: { parentId: options.parent, name: options.name, cursor: options.cursor, limit: 50 } });
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new FoxreloadError("Invalid category response", 502, "INVALID_RESPONSE");
+  const page = value as Record<string, unknown>;
+  if (!Array.isArray(page.items) || page.items.length > 50 || !(page.nextCursor == null || (typeof page.nextCursor === "string" && page.nextCursor.length > 0 && page.nextCursor.length <= 512 && page.nextCursor !== options.cursor))) throw new FoxreloadError("Invalid category response", 502, "INVALID_RESPONSE");
+  return { rows: page.items, nextCursor: (page.nextCursor as string | null | undefined) ?? null };
+}
+
 export async function readFoxreloadBrowsePage(options: { query?: string; cursor?: string; category?: string; inStockOnly?: boolean } = {}): Promise<{ rows: unknown[]; nextCursor: string | null; searchLimited: boolean }> {
   if (options.query) {
     const value = await foxreloadFetch("/api/products/search", { query: { query: options.query, categoryId: options.category, withStockOnly: options.inStockOnly || undefined, limit: 50 } });

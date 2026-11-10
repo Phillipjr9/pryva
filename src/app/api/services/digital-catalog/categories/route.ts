@@ -24,7 +24,7 @@ export async function GET() {
     for (const row of rows) {
       if (!row || typeof row !== "object" || Array.isArray(row)) continue;
       const { slug, name } = row as Record<string, unknown>;
-      if (typeof slug !== "string" || !/^[a-z0-9][a-z0-9-]{0,127}$/i.test(slug) || seen.has(slug)) continue;
+      if (typeof slug !== "string" || !/^[a-z0-9][a-z0-9-]{0,127}$/i.test(slug) || slug === "test-orders" || seen.has(slug)) continue;
       const cleaned = typeof name === "string" ? name.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 100) : "";
       if (!cleaned) continue;
       seen.add(slug);

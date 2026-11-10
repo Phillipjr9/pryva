@@ -39,6 +39,9 @@ export async function GET(request: NextRequest) {
     for (const row of page.rows) {
       if (!row || typeof row !== "object" || Array.isArray(row)) { skipped++; continue; }
       const product = row as Record<string, unknown>;
+      // These are supplier test orders, not real customer products.
+      if (product.categoryId === "019ec7d3-db8f-7541-90a6-97469404a7df" ||
+          (typeof product.slug === "string" && (product.slug === "test-orders" || product.slug.startsWith("test-orders-")))) { skipped++; continue; }
       const id = typeof product.id === "string" && product.id.length <= 256 ? product.id.trim() : "";
       const name = typeof product.name === "string" ? product.name.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 160) : "";
       if (!id || !name) { skipped++; continue; }

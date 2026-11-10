@@ -6,6 +6,7 @@ import {
   probeFoxreloadAccount,
   readFoxreloadBrowsePage,
   readFoxreloadBrowseCategories,
+  readFoxreloadCategoryChildren,
   findFoxreloadOrderId,
   readFoxreloadProductContract,
   createFoxreloadContractOrder,
@@ -59,6 +60,13 @@ describe("FoxReload client", () => {
       fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(balances)));
       await expect(probeFoxreloadAccount()).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
     }
+  });
+
+  it("uses documented direct-child category name filtering and opaque cursors", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({ items: [{ slug: "topups-call-of-duty", name: "Call of Duty" }], nextCursor: "next" })));
+    expect(await readFoxreloadCategoryChildren({ parent: "topups", name: "Call of Duty", cursor: "old" })).toEqual({ rows: [{ slug: "topups-call-of-duty", name: "Call of Duty" }], nextCursor: "next" });
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.pathname).toBe("/api/categories/"); expect(url.searchParams.get("parentId")).toBe("topups"); expect(url.searchParams.get("name")).toBe("Call of Duty"); expect(url.searchParams.get("cursor")).toBe("old");
   });
 
   it("walks the documented catalogue with an opaque cursor and no inferred fields", async () => {

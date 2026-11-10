@@ -65,6 +65,8 @@ export type ExplorerItem = {
   action: { label: string; href: string } | null;
   /** This listing is browse-only until its checkout is enabled. */
   orderingPaused?: boolean;
+  /** An explicitly labelled result from a search across all digital categories. */
+  crossCategorySearch?: boolean;
 };
 
 export const VERIFICATION_EXAMPLES: Array<{ name: string; brand: BrandSlug; tag: string }> = [
@@ -336,10 +338,10 @@ export function buildServiceExplorer(countryCode: string | null): ExplorerItem[]
 export function filterExplorerItems(items: ExplorerItem[], category: ExplorerFilter, search: string, tag = "all"): ExplorerItem[] {
   const query = search.trim().toLocaleLowerCase();
   return items.filter((item) => {
-    if (category !== "all" && item.category !== category) return false;
+    if (category !== "all" && item.category !== category && !item.crossCategorySearch) return false;
     if (tag !== "all" && item.tag !== tag) return false;
     if (!query) return true;
-    const categoryLabel = categoryById.get(item.category)?.label ?? "";
+    const categoryLabel = item.crossCategorySearch ? "" : categoryById.get(item.category)?.label ?? "";
     return [item.name, item.description, item.tag, item.platform ?? "", item.detail ?? "", categoryLabel]
       .some((value) => value.toLocaleLowerCase().includes(query));
   });

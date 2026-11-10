@@ -438,10 +438,14 @@ DIGITAL DISCOVERY IN THE SERVICE HUB
 Customer discovery is interleaved into the regular service cards. eSIM and
 subscriptions share their existing shelves; games/game currency/gaming services,
 account top-ups, gift cards/app-store credits/vouchers, and prepaid/finance have
-shelves in the same hub and sidebar. The initial all-category view samples one
-root per shelf; selecting a shelf loads its mapped roots, with per-root cursor
-paging and a maximum of 50 matches per root search. New supplier root categories
-need an explicit mapping; test-order root products are not shown in this hub.
-The selected hub country does not establish digital product coverage. Stock and
-ordering are separate: no checkout is exposed without the existing reviewed
-product and service gates. Wallet-credit gift cards retain their separate page.
+shelves in the same hub and sidebar. All services also pages through the whole
+catalogue, so future unmapped families remain browsable. Known supplier test
+orders are excluded. A product-type picker walks direct children with a name
+filter and cursor pages; selecting one pages through all descendant products.
+Global search is deliberately across categories: supplier category search does
+not search descendants, and caps results at 50. Names without their category
+name may require product-type browsing; users can opt to include reported out-of-
+stock and unknown-stock products. The selected hub country does not establish
+digital product coverage. Stock and ordering are separate: no checkout is exposed
+without the existing reviewed product and service gates. Wallet-credit gift cards
+retain their separate page.

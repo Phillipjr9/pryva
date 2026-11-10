@@ -17,17 +17,21 @@ const ROOTS: Root[] = [
   { slug: "rewarble", category: "gift-cards", label: "Digital voucher", icon: "gift-cards" },
   { slug: "prepaid-finance", category: "prepaid", label: "Prepaid product", icon: "prepaid" },
 ];
+const ALL_PRODUCTS: Root = { slug: "", category: "tools", label: "Digital product · all categories", icon: "subscriptions" };
+
 type Page = { root: Root; items: ExplorerItem[]; next: string | null; limited: boolean; error: boolean };
 type State = { scope: string; pages: Page[]; loading: boolean; loadingMore: boolean };
 
 function rootsFor(category: ExplorerFilter): Root[] {
   if (category !== "all") return ROOTS.filter((root) => root.category === category);
-  // A sample from each shelf on the overview; selecting a shelf loads all of
-  // its subcategories. Bounded to one request per family, not the entire tree.
-  return ROOTS.filter((root, index) => ROOTS.findIndex((other) => other.category === root.category) === index);
+  // Sample each shelf, plus a cursor-paged whole-catalogue stream so new or
+  // unmapped families remain browsable in All services.
+  return [...ROOTS.filter((root, index) => ROOTS.findIndex((other) => other.category === root.category) === index), ALL_PRODUCTS];
 }
-async function load(root: Root, query: string, cursor: string | undefined, signal: AbortSignal): Promise<Page> {
-  const params = new URLSearchParams({ category: root.slug, stock: "available" });
+async function load(root: Root, query: string, cursor: string | undefined, signal: AbortSignal, stockOnly: boolean): Promise<Page> {
+  const params = new URLSearchParams();
+  if (root.slug) params.set("category", root.slug);
+  if (stockOnly) params.set("stock", "available");
   if (query.length >= 2) params.set("q", query);
   else if (cursor) params.set("cursor", cursor);
   try {
@@ -37,11 +41,11 @@ async function load(root: Root, query: string, cursor: string | undefined, signa
         !(data.nextCursor === null || (typeof data.nextCursor === "string" && data.nextCursor.length <= 512 && data.nextCursor !== cursor))) throw new Error("Unavailable");
     const items: ExplorerItem[] = [];
     for (const value of data.items) {
-      if (!value || typeof value !== "object" || typeof value.id !== "string" || !/^digital-[a-f0-9]{24}$/.test(value.id) || typeof value.name !== "string" || !value.name || value.stock !== "reported") continue;
+      if (!value || typeof value !== "object" || typeof value.id !== "string" || !/^digital-[a-f0-9]{24}$/.test(value.id) || typeof value.name !== "string" || !value.name || !["reported", "out", "unknown"].includes(value.stock)) continue;
       const checkout = value.checkout === "codes" || value.checkout === "topups" || value.checkout === "esims" ? value.checkout : null;
       items.push({ id: value.id, category: root.category, name: value.name, description: root.label, tag: root.label,
         artwork: { kind: "service", name: root.icon }, source: "catalog", coverage: "unconfirmed", stock: null, myUnits: null, price: null,
-        detail: "Stock reported · region unconfirmed", orderingPaused: !checkout, action: checkout ? { label: "Check price and availability", href: `/dashboard/digital-${checkout}?product=${encodeURIComponent(value.id)}` } : null });
+        crossCategorySearch: query.length >= 2, detail: `${value.stock === "reported" ? "Stock reported" : value.stock === "out" ? "Out of stock (reported)" : "Stock unknown"} · region unconfirmed`, orderingPaused: !checkout || value.stock !== "reported", action: checkout && value.stock === "reported" ? { label: "Check price and availability", href: `/dashboard/digital-${checkout}?product=${encodeURIComponent(value.id)}` } : null });
     }
     return { root, items, next: data.nextCursor, limited: data.searchLimited === true, error: false };
   } catch {
@@ -49,20 +53,25 @@ async function load(root: Root, query: string, cursor: string | undefined, signa
   }
 }
 
-export function useDigitalExplorer(enabled: boolean, category: ExplorerFilter, search: string) {
+export function useDigitalExplorer(enabled: boolean, category: ExplorerFilter, search: string, stockOnly = true, subcategory: { id: string; name: string } | null = null) {
   const query = search.trim().slice(0, 128);
   const [revision, setRevision] = useState(0);
-  const scope = `${enabled}:${category}:${query}:${revision}`;
+  const scope = `${enabled}:${category}:${query}:${stockOnly}:${subcategory?.id ?? ""}:${revision}`;
   const [state, setState] = useState<State>({ scope: "", pages: [], loading: false, loadingMore: false });
   const controllerRef = useRef<AbortController | null>(null);
   useEffect(() => {
     const controller = new AbortController(); controllerRef.current = controller;
-    const roots = enabled ? rootsFor(category) : [];
+    // Supplier search only matches the exact category, not descendants. Search
+    // across the catalogue once and label those matches as cross-category.
+    const categoryRoots = rootsFor(category);
+    const chosen = subcategory && category !== "all" && categoryRoots.length
+      ? [{ ...categoryRoots[0], slug: subcategory.id, label: subcategory.name }] : categoryRoots;
+    const roots = enabled ? (query.length >= 2 ? [ALL_PRODUCTS] : chosen) : [];
     if (roots.length) {
       const timer = setTimeout(() => {
         const results = new Map<string, Page>();
         for (const root of roots) {
-          void load(root, query, undefined, controller.signal).then((page) => {
+          void load(root, query, undefined, controller.signal, stockOnly).then((page) => {
             if (controller.signal.aborted) return;
             results.set(root.slug, page);
             const pages = roots.flatMap((item) => results.has(item.slug) ? [results.get(item.slug)!] : []);
@@ -73,16 +82,16 @@ export function useDigitalExplorer(enabled: boolean, category: ExplorerFilter, s
       return () => { clearTimeout(timer); controller.abort(); };
     }
     return () => controller.abort();
-  }, [enabled, category, query, scope, revision]);
+  }, [enabled, category, query, scope, revision, stockOnly, subcategory]);
 
-  const current = state.scope === scope ? state : { scope, pages: [], loading: enabled && rootsFor(category).length > 0, loadingMore: false };
+  const current = state.scope === scope ? state : { scope, pages: [], loading: enabled && (query.length >= 2 || rootsFor(category).length > 0), loadingMore: false };
   const loadMore = useCallback(async () => {
     const signal = controllerRef.current?.signal;
     if (!signal || signal.aborted || state.scope !== scope || state.loading || state.loadingMore || query.length >= 2) return;
     const pending = state.pages.filter((page) => page.next && !page.error);
     if (!pending.length) return;
     setState((previous) => ({ ...previous, loadingMore: true }));
-    const nextPages = await Promise.all(pending.map((page) => load(page.root, query, page.next!, signal)));
+    const nextPages = await Promise.all(pending.map((page) => load(page.root, query, page.next!, signal, stockOnly)));
     if (signal.aborted) return;
     setState((previous) => {
       if (previous.scope !== scope) return previous;
@@ -95,7 +104,7 @@ export function useDigitalExplorer(enabled: boolean, category: ExplorerFilter, s
       });
       return { ...previous, pages, loadingMore: false };
     });
-  }, [state, scope, query]);
+  }, [state, scope, query, stockOnly]);
   const seen = new Set<string>();
   const items = current.pages.flatMap((page) => page.items).filter((item) => {
     if (seen.has(item.id)) return false;

@@ -39,7 +39,9 @@ export function DigitalCatalogBrowser() {
     const controller = new AbortController();
     const token = ++request.current;
     const params = new URLSearchParams();
-    if (category) params.set("category", category);
+    // Category search upstream is exact-category only; search the whole catalogue
+    // instead of silently omitting descendant products.
+    if (category && !query) params.set("category", category);
     if (stockOnly) params.set("stock", "available");
     if (query) params.set("q", query);
     else if (cursor) params.set("cursor", cursor);
@@ -84,7 +86,7 @@ export function DigitalCatalogBrowser() {
         <button className="min-h-11 rounded-xl bg-lav-700 px-4 font-semibold text-white" type="submit">Search</button>
       </form>
       <label className="mt-4 flex items-center gap-2 text-meta font-semibold text-ink"><input type="checkbox" checked={stockOnly} onChange={(event) => { setStockOnly(event.target.checked); setCursors([""]); setPage(0); setResult(null); setError(null); setLoading(true); }} /> Show listings with reported stock only</label>
-      <p className="mt-3 text-meta text-ink-3">Stock is reported by the catalogue and may change. It does not guarantee checkout. Browse every page within a category; search returns up to 50 matches, so refine your search or clear it to browse more.</p>
+      <p className="mt-3 text-meta text-ink-3">Stock is reported by the catalogue and may change. It does not guarantee checkout. Browse every page within a category; search covers all categories and returns up to 50 matches, so refine your search or clear it to browse more.</p>
       {loading ? <p role="status" className="mt-4 text-meta text-ink-2">Loading catalogue…</p> : null}
       {error ? <p role="alert" className="mt-4 text-meta text-rose-700">{error} <button type="button" className="font-semibold underline" onClick={() => { setLoading(true); setError(null); setRevision((value) => value + 1); }}>Retry</button></p> : null}
       {result && !loading ? (

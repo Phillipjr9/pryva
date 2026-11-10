@@ -75,6 +75,15 @@ describe("read-only digital catalogue route", () => {
     expect(data.items.every((item: object) => !Object.hasOwn(item, "quantity"))).toBe(true);
     expect(data.items.every((item: object) => !Object.hasOwn(item, "checkout"))).toBe(true);
   });
+  it("does not expose known supplier test orders as products", async () => {
+    mocks.page.mockResolvedValueOnce({ rows: [
+      { id: "test-1", name: "Test order", categoryId: "019ec7d3-db8f-7541-90a6-97469404a7df" },
+      { id: "test-2", name: "Test order 2", slug: "test-orders-2" },
+      { id: "real", name: "Real product", quantity: 1 },
+    ], nextCursor: null, searchLimited: false });
+    const data = await (await GET(request())).json();
+    expect(data.items.map((item: { name: string }) => item.name)).toEqual(["Real product"]);
+  });
   it("hides upstream errors", async () => {
     mocks.page.mockRejectedValueOnce(new Error("private provider secret"));
     const response = await GET(request("?q=game"));
