@@ -7,7 +7,7 @@ const AUTH_PATH = /^\/(?:signup|login)(?:\/|$)|^\/api\/auth\/(?:signup|login|goo
 const selectClass = "rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink";
 
 function GroupList({ title, rows }: { title: string; rows: CountGroup[] }) {
-  return <div className="rounded-xl border border-line bg-cream p-3">
+  return <div className="min-w-0 rounded-xl border border-line bg-cream p-3">
     <h4 className="font-semibold text-ink">{title}</h4>
     {rows.length === 0 ? <p className="mt-2 text-sm text-ink-2">No data returned.</p> : <ul className="mt-2 space-y-1 text-sm">{rows.map((row, i) => <li key={`${row.label}-${i}`} className="flex justify-between gap-3"><span className="min-w-0 break-all text-ink-2">{row.label}</span><span className="shrink-0 font-medium text-ink">{row.count.toLocaleString()}</span></li>)}</ul>}
   </div>;
@@ -49,7 +49,7 @@ export function CloudflareSecurity() {
       (!term || [event.ip, event.path, event.source].some((value) => value.toLowerCase().includes(term)));
   });
   return (
-    <section className="rounded-2xl border border-line bg-white p-5" aria-labelledby="cloudflare-title">
+    <section className="min-w-0 rounded-2xl border border-line bg-white p-5 sm:p-6" aria-labelledby="cloudflare-title">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 id="cloudflare-title" className="text-lg font-semibold text-ink">Cloudflare edge activity</h2>
@@ -98,7 +98,7 @@ export function CloudflareSecurity() {
             </div>
             {authOnly && <p className="mt-2 text-xs text-ink-2">Includes Google auth, which serves signup and login. Events are requests, not successful signups or proof of abuse.</p>}
             <p className="mt-3 text-sm text-ink-2">Showing {filtered?.length ?? 0} of {events.length} loaded events.</p>
-            {!filtered?.length ? <p className="mt-3 text-sm text-ink-2">No loaded events match these filters.</p> : <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-line text-ink-2"><th className="p-2">Time (UTC)</th><th className="p-2">Action</th><th className="p-2">Service</th><th className="p-2">Country</th><th className="p-2">IP</th><th className="p-2">Path</th></tr></thead><tbody>{filtered.map((event, i) => <tr className="border-b border-line" key={`${event.datetime}-${i}`}><td className="whitespace-nowrap p-2">{event.datetime}</td><td className="p-2">{event.action}</td><td className="p-2">{event.source}</td><td className="p-2">{event.country || "—"}</td><td className="p-2">{event.ip || "—"}</td><td className="max-w-xs break-all p-2">{event.path || "—"}</td></tr>)}</tbody></table></div>}
+            {!filtered?.length ? <p className="mt-3 text-sm text-ink-2">No loaded events match these filters.</p> : <div className="mt-3 max-w-full overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-line text-ink-2"><th className="p-2">Time (UTC)</th><th className="p-2">Action</th><th className="p-2">Service</th><th className="p-2">Country</th><th className="p-2">IP</th><th className="p-2">Path</th></tr></thead><tbody>{filtered.map((event, i) => <tr className="border-b border-line" key={`${event.datetime}-${i}`}><td className="whitespace-nowrap p-2">{event.datetime}</td><td className="p-2">{event.action}</td><td className="p-2">{event.source}</td><td className="p-2">{event.country || "—"}</td><td className="p-2">{event.ip || "—"}</td><td className="max-w-xs break-all p-2">{event.path || "—"}</td></tr>)}</tbody></table></div>}
           </>}
         </div>
         <p className="text-sm text-ink-2">Blocking controls are not connected. Review and change IP or country rules in Cloudflare; broad rules may block you, legitimate users or payment webhooks. Direct Vercel access may bypass Cloudflare.</p>
