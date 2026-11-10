@@ -92,6 +92,14 @@ beforeEach(() => {
 afterEach(() => vi.clearAllMocks());
 
 describe("what the storefront actually receives", () => {
+  it("uses the browse-only category while preserving the priced listing fields", async () => {
+    runtime.listings = [{ ...API_LISTING, title: "Instagram account", group: "Other", browseGroup: "Social", warrantyDays: 30 }];
+    const response = await GET(request());
+    const body = await response.json();
+    expect(body.listings[0]).toMatchObject({ title: "Instagram account", category: "Social", warrantyDays: 30, priceNgn: 2500 });
+    expect(body.listings[0]).not.toHaveProperty("browseGroup");
+  });
+
   it("returns Naira prices only, with no wholesale cost or source identity", async () => {
     const response = await GET(request());
     expect(response.status).toBe(200);

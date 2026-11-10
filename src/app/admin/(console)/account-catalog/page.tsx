@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/identity/auth";
-import { probeCatalog } from "@/lib/providers/bulkacc";
+import { listProducts, probeCatalog } from "@/lib/providers/bulkacc";
 import { isAccsZoneConfigured } from "@/lib/providers/accszone";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +8,17 @@ export const dynamic = "force-dynamic";
 export default async function AccountCatalogHealthPage() {
   await requireAdmin("/admin/account-catalog");
   const catalog = await probeCatalog();
+  // A single read using the same page size as the storefront, not a full walk.
+  // It reveals whether the supplier's pagination exceeds our existing limit
+  // without returning product data, credentials or arbitrary supplier messages.
+  const firstPage = catalog.state === "serving"
+    ? await listProducts(1).then((page) => ({
+        accepted: page.items.length,
+        pageSize: page.pageSize,
+        totalPages: page.totalPages,
+        totalCount: page.totalCount,
+      })).catch(() => null)
+    : null;
   const fallbackConfigured = isAccsZoneConfigured();
   const descriptions = {
     not_configured: "The primary account feed is not configured.",
@@ -32,6 +43,14 @@ export default async function AccountCatalogHealthPage() {
           <p className="mt-1 text-sm text-ink-2">Products reported by the feed: {catalog.totalCount}</p>
         )}
         {errorCode && <p className="mt-1 text-sm text-ink-2">Error code: {errorCode}</p>}
+        {catalog.state === "serving" && firstPage && (
+          <div className="mt-3 text-sm text-ink-2">
+            <p>Storefront-size probe: {firstPage.accepted} valid listings on the first page.</p>
+            <p>Feed-reported page size: {firstPage.pageSize}; total pages: {firstPage.totalPages}; total products: {firstPage.totalCount}.</p>
+            <p>The current storefront reader stops after 25 pages. Invalid rows can also be skipped.</p>
+          </div>
+        )}
+        {catalog.state === "serving" && !firstPage && <p className="mt-3 text-sm text-ink-2">The storefront-size page could not be checked.</p>}
       </section>
       <section className="rounded-2xl border border-line bg-white p-4">
         <h2 className="font-semibold">Fallback account feed</h2>

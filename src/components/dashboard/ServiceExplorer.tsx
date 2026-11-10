@@ -650,6 +650,15 @@ export function ServiceExplorer({
               </button>
               {orderedCategories.map((entry) => {
                 const state = readinessById.get(entry.id);
+                // Accounts have their own live browser, not a country-filtered
+                // catalogue. Both this chip and the sidebar lead to that browser.
+                if (entry.id === "accounts") return (
+                  <Link key={entry.id} href="/dashboard/accounts" title={entry.description}
+                    className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-white px-3 py-1.5 text-meta font-semibold text-ink-2 transition-colors hover:border-lav-300 sm:px-3.5 sm:py-2">
+                    <span aria-hidden="true">{CATEGORY_ICONS[entry.id]}</span> {entry.label}
+                    {state ? <><span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${SERVICE_STATE_DOT[state.state]}`} /><span className="sr-only">— {SERVICE_STATE_LABEL[state.state]}</span></> : null}
+                  </Link>
+                );
                 return (
                   <button
                     key={entry.id}

@@ -246,6 +246,22 @@ describe("sourcing order", () => {
     expect(searched.listings.map((listing) => listing.title)).toContain("Warmed Up Gmail With 2FA");
   });
 
+  it("includes recognized social products filed as Other without changing checkout terms", async () => {
+    runtime.products.push({ code: "203412", name: "Australia (AU) Instagram with 2FA and Email Access", description: null,
+      groupName: "Unrecognized", categoryName: "Aged Australia Instagram", inStock: 23, min: 1,
+      priceMicros: 800_000, priceUsd: "0.800000" });
+    runtime.products.push({ code: "203413", name: "Instagram access to Gmail", description: null,
+      groupName: "Google", categoryName: "Gmail", inStock: 5, min: 1,
+      priceMicros: 800_000, priceUsd: "0.800000" });
+    const social = await listMarketplaceListings({ categoryId: labelId("Social"), perPage: 60 });
+    const instagram = social.listings.find((listing) => listing.slug === "p1:203412");
+    expect(instagram).toMatchObject({ group: "Other", browseGroup: "Social", warrantyDays: 30, priceUsd: "0.800000", stock: 23 });
+    expect(social.listings.some((listing) => listing.slug === "p1:203413")).toBe(false);
+    const checkout = await getMarketplaceListing("p1:203412");
+    expect(checkout).toMatchObject({ group: "Other", warrantyDays: 30, priceUsd: "0.800000", stock: 23 });
+    expect(checkout.browseGroup).toBeUndefined();
+  });
+
   it("groups hand-sourced streaming items with API-sourced ones under one label", async () => {
     const { categories } = await listMarketplaceCategories();
     const titles = categories.map((category) => category.title);

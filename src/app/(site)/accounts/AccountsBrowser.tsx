@@ -55,6 +55,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
   const [configured, setConfigured] = useState(true);
   const [activeCategory, setActiveCategory] = useState<number | null>(null);
   const [activeSubcategory, setActiveSubcategory] = useState<number | null>(null);
+  const [showAllSubcategories, setShowAllSubcategories] = useState(false);
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -108,7 +109,10 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
         setCategoryError(null);
         setConfigured(data.configured !== false);
         if (data.categories) setCategories(data.categories);
-        setSubcategories(data.subcategories ?? []);
+        // The root response may contain hundreds of product lines. They are
+        // not a useful filter until a category is selected and can push all
+        // actual listings far below the fold.
+        setSubcategories(activeCategory ? data.subcategories ?? [] : []);
       })
       .catch(() => {
         if (!cancelled) setCategoryError("Could not load all categories. Refresh the page to retry.");
@@ -174,6 +178,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
   function selectCategory(id: number | null) {
     setActiveCategory(id);
     setActiveSubcategory(null);
+    setShowAllSubcategories(false);
     setPage(1);
   }
 
@@ -406,7 +411,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
           ))}
         </div>
 
-        {subcategories.length > 0 && (
+        {activeCategory !== null && subcategories.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 border-t border-line/60 pt-3">
             <button
               type="button"
@@ -420,7 +425,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
             >
               All
             </button>
-            {subcategories.map((subcategory) => (
+            {(showAllSubcategories ? subcategories : subcategories.slice(0, 8)).map((subcategory) => (
               <button
                 key={subcategory.id}
                 type="button"
@@ -435,6 +440,12 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                 {subcategory.title}
               </button>
             ))}
+            {subcategories.length > 8 && !showAllSubcategories && (
+              <button type="button" onClick={() => setShowAllSubcategories(true)}
+                className="rounded-full border border-line bg-white px-3 py-1 text-meta font-semibold text-lav-700">
+                Show all {subcategories.length} types
+              </button>
+            )}
           </div>
         )}
 

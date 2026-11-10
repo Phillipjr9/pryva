@@ -24,7 +24,7 @@ export default async function DashboardAccountsPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <ServiceTitle service="accounts">
-            Digital accounts
+            Accounts
           </ServiceTitle>
           <p className="mt-1 text-[0.875rem] text-ink-2">
             Browse live listings priced in Naira. Country coverage is not provided or filtered here, and stock can change.

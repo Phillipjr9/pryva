@@ -68,8 +68,8 @@ describe("dashboard navigation", () => {
     expect(broken).toEqual([]);
   });
 
-  it("routes accounts through the country-first dashboard hub instead of the marketing page", () => {
-    expect(shell).toContain('{ href: "/dashboard/services", label: "Accounts", art: "accounts", category: "accounts"');
+  it("routes accounts directly to the dashboard browser instead of an extra hub step", () => {
+    expect(shell).toContain('{ href: "/dashboard/accounts", label: "Accounts", art: "accounts"');
     expect(shell).not.toContain('{ href: "/accounts"');
     const explorer = readFileSync(join(root, "lib/services/service-explorer.ts"), "utf8");
     expect(explorer).toContain('href: "/dashboard/accounts"');
@@ -93,7 +93,7 @@ describe("dashboard navigation", () => {
   });
 
   it("exposes the major shopping categories through the country-first hub", () => {
-    for (const category of ["verification", "social", "numbers", "esim", "proxies", "email", "accounts", "subscriptions", "data", "games", "topups", "gift-cards", "prepaid"]) {
+    for (const category of ["verification", "social", "numbers", "esim", "proxies", "email", "subscriptions", "data", "games", "topups", "gift-cards", "prepaid"]) {
       expect(shell, `${category} should have a hub shortcut`).toContain(`category: "${category}"`);
     }
     expect(shell).toContain('href: "/dashboard/gift-cards", label: "Pryva gift cards"');

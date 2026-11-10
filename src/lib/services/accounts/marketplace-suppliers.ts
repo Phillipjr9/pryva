@@ -74,6 +74,8 @@ export type MarketplaceListing = {
   title: string;
   /** Pryva-facing group label. Never a supplier's own taxonomy. */
   group: string | null;
+  /** Browse-only grouping; does not alter the checkout group or warranty. */
+  browseGroup?: string | null;
   category: string | null;
   subcategory: string | null;
   /** Canonical six-decimal USD wholesale price. Server-side only. */
@@ -209,6 +211,16 @@ export function groupLabelFor(product: { groupName?: string | null; name?: strin
   if (fromGroup) return fromGroup;
   if (AI_KEYWORDS.some((needle) => haystack.includes(needle))) return "AI tools";
   return "Other";
+}
+
+/** Browse known social platforms even when the feed labels the group "Other".
+ * The original group still determines order records and warranty. Never
+ * override an explicit non-social group, such as email or streaming. */
+function browseGroupFor(listing: MarketplaceListing): string | null {
+  if (listing.group !== "Other") return listing.group;
+  const text = `${listing.title} ${listing.category ?? ""} ${listing.subcategory ?? ""}`;
+  return /\b(?:facebook|instagram|tiktok|twitter|reddit|discord|telegram|whatsapp|threads|snapchat|linkedin|pinterest)\b/i.test(text)
+    ? "Social" : listing.group;
 }
 
 /**
@@ -362,7 +374,10 @@ async function primaryListings(): Promise<MarketplaceListing[] | null> {
   try {
     const products = await listAllProducts();
     if (!products.length) return null;
-    return products.map(toListing);
+    return products.map((product) => {
+      const listing = toListing(product);
+      return { ...listing, browseGroup: browseGroupFor(listing) };
+    });
   } catch (error) {
     // A primary catalog failure is exactly when the fallback earns its place.
     logger.warn("Primary account catalog unavailable, falling back", {
@@ -399,7 +414,8 @@ export async function listMarketplaceCategories(): Promise<{
     const groups = new Map<string, number>();
     const lines = new Map<string, number>();
     for (const listing of [...manual, ...(primary ?? [])]) {
-      if (listing.group) groups.set(listing.group, labelId(listing.group));
+      const group = listing.browseGroup ?? listing.group;
+      if (group) groups.set(group, labelId(group));
       if (listing.category) lines.set(listing.category, labelId(listing.category));
     }
     return {
@@ -483,9 +499,9 @@ function pageInMemory(
   let filtered = listings;
 
   if (query.categoryId) {
-    const labels = new Set(filtered.map((listing) => listing.group).filter(Boolean) as string[]);
+    const labels = new Set(filtered.map((listing) => listing.browseGroup ?? listing.group).filter(Boolean) as string[]);
     const wanted = [...labels].find((label) => labelId(label) === query.categoryId);
-    filtered = wanted ? filtered.filter((listing) => listing.group === wanted) : [];
+    filtered = wanted ? filtered.filter((listing) => (listing.browseGroup ?? listing.group) === wanted) : [];
   }
   if (query.subcategoryId) {
     const names = new Set(filtered.map((listing) => listing.category).filter(Boolean) as string[]);

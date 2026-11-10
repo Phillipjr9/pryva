@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
           // A missing or malformed inventory figure is unknown, not zero.
           stock: safeUnitCount(listing.stock),
           sold: safeUnitCount(listing.sold),
-          category: listing.group,
+          category: listing.browseGroup ?? listing.group,
           subcategory: listing.category,
           priceNgn: breakdown.unitNgn,
           warrantyDays: listing.warrantyDays,

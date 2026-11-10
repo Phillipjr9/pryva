@@ -5,10 +5,11 @@ import { cleanup, render, screen } from "@testing-library/react";
 const checks = vi.hoisted(() => ({
   admin: vi.fn(),
   probe: vi.fn(),
+  list: vi.fn(),
   fallback: vi.fn(),
 }));
 vi.mock("@/lib/identity/auth", () => ({ requireAdmin: checks.admin }));
-vi.mock("@/lib/providers/bulkacc", () => ({ probeCatalog: checks.probe }));
+vi.mock("@/lib/providers/bulkacc", () => ({ probeCatalog: checks.probe, listProducts: checks.list }));
 vi.mock("@/lib/providers/accszone", () => ({ isAccsZoneConfigured: checks.fallback }));
 
 import AccountCatalogHealthPage from "@/app/admin/(console)/account-catalog/page";
@@ -20,6 +21,7 @@ describe("admin account catalog health", () => {
     checks.admin.mockRejectedValue(new Error("not authorized"));
     await expect(AccountCatalogHealthPage()).rejects.toThrow("not authorized");
     expect(checks.probe).not.toHaveBeenCalled();
+    expect(checks.list).not.toHaveBeenCalled();
     expect(checks.fallback).not.toHaveBeenCalled();
   });
 
@@ -27,10 +29,14 @@ describe("admin account catalog health", () => {
     checks.admin.mockResolvedValue({ id: "admin" });
     checks.probe.mockResolvedValue({ state: "serving", totalCount: 412 });
     checks.fallback.mockReturnValue(true);
+    checks.list.mockResolvedValue({ items: [{ code: "not-shown" }], pageSize: 100, totalPages: 37, totalCount: 3671 });
     render(await AccountCatalogHealthPage());
     expect(checks.admin).toHaveBeenCalledWith("/admin/account-catalog");
     expect(screen.getByText("serving")).toBeTruthy();
     expect(screen.getByText(/Products reported by the feed: 412/)).toBeTruthy();
+    expect(checks.list).toHaveBeenCalledWith(1);
+    expect(screen.getByText(/total pages: 37/)).toBeTruthy();
+    expect(screen.queryByText(/not-shown/)).toBeNull();
     expect(screen.getByText(/does not confirm that the feed is working/)).toBeTruthy();
   });
 

@@ -23,6 +23,11 @@ describe("country-first service explorer", () => {
     expect(markup).not.toContain("Start with a country.");
   });
 
+  it("links the Accounts category directly to the same account browser", () => {
+    const html = renderToStaticMarkup(<ServiceExplorer initialCountry="ng" initialCategory="all" />);
+    expect(html).toMatch(/<a[^>]*href="\/dashboard\/accounts"[^>]*>[^]*?Accounts/);
+  });
+
   it("offers the ISO country and territory directory without treating it as supplier coverage", () => {
     expect(EXPLORER_COUNTRIES.length).toBe(249);
     expect(new Set(EXPLORER_COUNTRIES.map((country) => country.code)).size).toBe(249);
