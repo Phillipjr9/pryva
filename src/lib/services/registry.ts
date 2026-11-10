@@ -209,7 +209,7 @@ export const SERVICES: readonly ServiceDefinition[] = [
   },
   {
     id: "accounts",
-    label: "Digital accounts",
+    label: "Accounts",
     description: "Account marketplace",
     sale: { kind: "supplier", source: "marketplace" },
     lane: "accounts",

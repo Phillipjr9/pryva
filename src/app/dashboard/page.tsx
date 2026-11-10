@@ -22,7 +22,7 @@ const quickBuys = [
   { label: "Social boosts", note: "Followers, likes & views", href: "/dashboard/services?country=ng&category=social", service: "social-promotion" as const, category: "social" },
   { label: "eSIM data", note: "Travel data plans", href: "/dashboard/services?country=ng&category=esim", service: "esim" as const, category: "esim" },
   { label: "Residential proxies", note: "Clean rotating IP pools", href: "/dashboard/services?country=ng&category=proxies", service: "proxies" as const, category: "proxies" },
-  { label: "Digital accounts", note: "Streaming & AI subscriptions", href: "/dashboard/services?country=ng&category=accounts", service: "accounts" as const, category: "accounts" },
+  { label: "Accounts", note: "Social, email & streaming", href: "/dashboard/accounts", service: "accounts" as const, category: "accounts" },
   { label: "Games & gaming", note: "Games, keys & credits", href: "/dashboard/services?category=games", service: "games" as const, category: "games" },
   { label: "Account top-ups", note: "Game & account credits", href: "/dashboard/services?category=topups", service: "topups" as const, category: "topups" },
   { label: "Gift cards", note: "Vouchers & app stores", href: "/dashboard/services?category=gift-cards", service: "gift-cards" as const, category: "gift-cards" },

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/identity/auth";
 import { ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
 import { explorerCategory, explorerCountry } from "@/lib/services/service-explorer";
@@ -28,6 +29,9 @@ export default async function DashboardServicesPage({
   if (category && explorerCategory(category) !== "all") next.set("category", category);
   if (category === "esim" && params.allDestinations === "1") next.set("allDestinations", "1");
   await requireUser(`/dashboard/services${next.size ? `?${next}` : ""}`);
+  // Legacy category links lead to the same account browser as the sidebar.
+  // Account coverage is not country-filtered, so do not pretend to carry it.
+  if (category === "accounts") redirect("/dashboard/accounts");
   const canSell = !financialActionsUnavailable();
   const reviewed = reviewedDigitalItems(canSell ? [
     ...listedCodeOffers().map(({ id, name, region }) => ({ id, name, region, kind: "codes" as const })),

@@ -48,7 +48,7 @@ describe("dashboard sidebar coverage", () => {
   it("gives every Buy row its own artwork instead of a generic glyph", () => {
     // "All services" is a signpost, not a shelf: it keeps the sparkle glyph.
     const rows = anchors(render()).filter(
-      (anchor) => anchor.href.includes("/dashboard/services") && anchor.href !== "/dashboard/services",
+      (anchor) => (anchor.href.includes("/dashboard/services") && anchor.href !== "/dashboard/services") || anchor.href === "/dashboard/accounts",
     );
     expect(rows.length).toBeGreaterThanOrEqual(
       EXPLORER_CATEGORIES.filter((category) => category.id !== "tools").length,
@@ -63,7 +63,7 @@ describe("dashboard sidebar coverage", () => {
   it("does not dress two shelves in the same glyph", () => {
     // "All services" is a signpost, not a shelf: it keeps the sparkle glyph.
     const rows = anchors(render()).filter(
-      (anchor) => anchor.href.includes("/dashboard/services") && anchor.href !== "/dashboard/services",
+      (anchor) => (anchor.href.includes("/dashboard/services") && anchor.href !== "/dashboard/services") || anchor.href === "/dashboard/accounts",
     );
     const subscriptions = rows.find((row) => row.html.includes("Subscriptions"));
     const accounts = rows.find((row) => row.html.includes("Accounts"));
@@ -96,6 +96,10 @@ describe("dashboard sidebar coverage", () => {
   it("keeps every hub category reachable from the sidebar", () => {
     const hrefs = anchors(render()).map((anchor) => anchor.href);
     for (const category of EXPLORER_CATEGORIES) {
+      if (category.id === "accounts") {
+        expect(hrefs).toContain("/dashboard/accounts");
+        continue;
+      }
       if (category.id === "tools") {
         // The two order tools have pages of their own, which are better than a
         // filtered hub: the link goes straight there.
