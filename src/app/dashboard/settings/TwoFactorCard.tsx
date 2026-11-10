@@ -132,7 +132,7 @@ export function TwoFactorCard({
         </span>
       </div>
 
-      <h2 className="mt-3 text-[0.95rem] font-semibold">Two-factor authentication</h2>
+      <h2 className="mt-3 text-[0.9375rem] font-semibold">Two-factor authentication</h2>
 
       {notice && (
         <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-meta text-emerald-800">
@@ -141,7 +141,7 @@ export function TwoFactorCard({
       )}
 
       {!available && (
-        <p className="mt-1 text-[0.8rem] leading-relaxed text-ink-2">
+        <p className="mt-1 text-[0.8125rem] leading-relaxed text-ink-2">
           Not available on this deployment: the server has no encryption key configured for
           authenticator secrets, so turning it on would store them in a form we will not accept.
         </p>
@@ -155,7 +155,7 @@ export function TwoFactorCard({
 
       {available && phase === "idle" && (
         <>
-          <p className="mt-1 text-[0.8rem] leading-relaxed text-ink-2">
+          <p className="mt-1 text-[0.8125rem] leading-relaxed text-ink-2">
             {enabled
               ? `Sign-in asks for a code from your authenticator app. ${remainingCodes} recovery code${remainingCodes === 1 ? "" : "s"} left.`
               : "Add a second step to sign-in: your password plus a rotating code from an authenticator app."}
@@ -174,11 +174,11 @@ export function TwoFactorCard({
 
       {available && phase === "setup" && (
         <div className="mt-2 grid gap-3">
-          <p className="text-[0.8rem] leading-relaxed text-ink-2">
+          <p className="text-[0.8125rem] leading-relaxed text-ink-2">
             Add this key to your authenticator app (Google Authenticator, Authy, 1Password or any
             TOTP app), then enter the six-digit code it shows. <strong>This key is shown once.</strong>
           </p>
-          <code className="block break-all rounded-lg border border-line bg-white px-3 py-2 font-mono text-[0.8rem] tracking-[0.12em]">
+          <code className="block break-all rounded-lg border border-line bg-white px-3 py-2 font-mono text-[0.8125rem] tracking-[0.12em]">
             {secret}
           </code>
           <details className="text-meta text-ink-2">
@@ -217,7 +217,7 @@ export function TwoFactorCard({
             Save these now. They are the only way back in if you lose your authenticator, and they
             will never be shown again.
           </p>
-          <ul className="grid grid-cols-2 gap-1.5 font-mono text-[0.8rem]">
+          <ul className="grid grid-cols-2 gap-1.5 font-mono text-[0.8125rem]">
             {recoveryCodes.map((value) => (
               <li key={value} className="rounded-lg border border-line bg-white px-2 py-1.5 text-center">{value}</li>
             ))}
@@ -234,7 +234,7 @@ export function TwoFactorCard({
 
       {available && phase === "disable" && (
         <div className="mt-2 grid gap-3">
-          <p className="text-[0.8rem] leading-relaxed text-ink-2">
+          <p className="text-[0.8125rem] leading-relaxed text-ink-2">
             Turning this off deletes your recovery codes. Confirm with your password and a current
             code (or one recovery code).
           </p>

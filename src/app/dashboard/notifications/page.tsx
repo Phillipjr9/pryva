@@ -25,7 +25,7 @@ export default async function NotificationsPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Notifications</h1>
-          <p className="mt-1 text-[0.86rem] text-ink-2">
+          <p className="mt-1 text-[0.875rem] text-ink-2">
             {unreadCount > 0
               ? `You have ${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
               : "All caught up! No unread notifications"}
@@ -37,8 +37,8 @@ export default async function NotificationsPage() {
       {userNotifications.length === 0 ? (
         <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-12 text-center">
           <Bell className="mx-auto h-16 w-16 text-ink-3 mb-4" />
-          <h2 className="text-[1.1rem] font-semibold text-ink mb-2">No notifications yet</h2>
-          <p className="text-[0.9rem] text-ink-2 max-w-md mx-auto">
+          <h2 className="text-[1.125rem] font-semibold text-ink mb-2">No notifications yet</h2>
+          <p className="text-[0.875rem] text-ink-2 max-w-md mx-auto">
 There are no notifications stored for this account.
           </p>
         </div>
@@ -69,13 +69,13 @@ There are no notifications stored for this account.
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <p className="text-[0.88rem] font-semibold text-ink">
+                        <p className="text-[0.875rem] font-semibold text-ink">
                           {notification.title}
                           {!notification.read && (
                             <span className="ml-2 inline-block h-2 w-2 rounded-full bg-lav-500" />
                           )}
                         </p>
-                        <p className="mt-0.5 text-[0.82rem] text-ink-2">{notification.message}</p>
+                        <p className="mt-0.5 text-[0.8125rem] text-ink-2">{notification.message}</p>
                       </div>
                     </div>
                     <div className="mt-2 flex items-center gap-3 text-meta text-ink-3">

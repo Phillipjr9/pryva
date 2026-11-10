@@ -191,7 +191,7 @@ export default async function AdminUsersPage({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-[1.5rem] font-medium tracking-tight">Users</h1>
-          <p className="mt-1 text-[0.86rem] text-ink-2">
+          <p className="mt-1 text-[0.875rem] text-ink-2">
             {Number(total).toLocaleString("en-NG")} registered {Number(total) === 1 ? "account" : "accounts"}
             {query ? ` matching “${query}”` : ""}.
           </p>
@@ -210,20 +210,20 @@ export default async function AdminUsersPage({
           defaultValue={query}
           placeholder="Search by name or email"
           aria-label="Search users"
-          className="w-full max-w-sm rounded-xl border border-line bg-white px-3.5 py-2 text-[0.86rem] outline-none focus:border-lav-400"
+          className="w-full max-w-sm rounded-xl border border-line bg-white px-3.5 py-2 text-[0.875rem] outline-none focus:border-lav-400"
         />
         <button type="submit" className="btn btn-primary btn-sm">
           Search
         </button>
         {query && (
-          <Link href="/admin/users" className="text-[0.82rem] text-ink-3 underline">
+          <Link href="/admin/users" className="text-[0.8125rem] text-ink-3 underline">
             Clear
           </Link>
         )}
       </form>
 
       <div className="overflow-x-auto rounded-2xl border border-line bg-white">
-        <table className="w-full min-w-[36rem] text-left text-[0.84rem]">
+        <table className="w-full min-w-[36rem] text-left text-[0.8125rem]">
           <thead className="bg-cream/70 text-meta uppercase tracking-wide text-ink-3">
             <tr>
               <th className="px-4 py-3 font-semibold">User · access</th>
@@ -273,10 +273,10 @@ export default async function AdminUsersPage({
                   <td className="px-4 py-3">
                     <SignInState lockedUntil={row.lockedUntil} attempts={row.failedLoginAttempts} />
                   </td>
-                  <td className="px-4 py-3 text-[0.8rem] text-ink-2">
+                  <td className="px-4 py-3 text-[0.8125rem] text-ink-2">
                     {lastSignIn.get(row.id) ? formatDateTime(lastSignIn.get(row.id)!) : "—"}
                   </td>
-                  <td className="px-4 py-3 text-[0.8rem] text-ink-2">
+                  <td className="px-4 py-3 text-[0.8125rem] text-ink-2">
                     {signInFrom.get(row.id) ? shortenHash(signInFrom.get(row.id)!.ipHash) : "—"}
                   </td>
                   <td className="px-4 py-3 text-ink-2">{formatDate(row.createdAt)}</td>
@@ -288,7 +288,7 @@ export default async function AdminUsersPage({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-[0.82rem] text-ink-2">
+        <div className="flex items-center justify-between text-[0.8125rem] text-ink-2">
           <span>
             Page {page} of {totalPages}
           </span>

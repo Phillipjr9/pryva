@@ -70,7 +70,7 @@ export default async function EsimPlanPage({ params }: { params: Promise<{ id: s
             <span>{offer.region}</span>
           </div>
           <h1 className="mt-1 text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">{offer.name}</h1>
-          <p className="mt-1 text-[0.9rem] text-ink-2">
+          <p className="mt-1 text-[0.875rem] text-ink-2">
             {offer.dataLabel} · {offer.validityLabel} · eSIM
           </p>
           <p className="mt-2 inline-flex rounded-full border border-lav-200 bg-lav-50 px-3 py-1.5 text-meta font-semibold text-lav-800">
@@ -84,16 +84,16 @@ export default async function EsimPlanPage({ params }: { params: Promise<{ id: s
 
       <div className="grid gap-5 lg:grid-cols-3">
         <section className="rounded-[1.5rem] border border-line bg-white p-5 lg:col-span-2">
-          <h2 className="text-[1.05rem] font-semibold text-ink">What you get</h2>
-          <ul className="mt-3 grid gap-2 text-[0.92rem] leading-relaxed text-ink-2">
+          <h2 className="text-[1rem] font-semibold text-ink">What you get</h2>
+          <ul className="mt-3 grid gap-2 text-[0.9375rem] leading-relaxed text-ink-2">
             <li>• {offer.dataLabel} · {offer.validityLabel}.</li>
             <li>• Install using the activation code on your order. A one-tap link may also be available on compatible devices.</li>
             <li>• Check that your phone supports eSIM and is unlocked before buying.</li>
             <li>• The activation code appears on your order once issued; your wallet is charged when it arrives.</li>
           </ul>
 
-          <h2 className="mt-6 text-[1.05rem] font-semibold text-ink">Plan features and services</h2>
-          <p className="mt-2 text-[0.9rem] leading-relaxed text-ink-2">
+          <h2 className="mt-6 text-[1rem] font-semibold text-ink">Plan features and services</h2>
+          <p className="mt-2 text-[0.875rem] leading-relaxed text-ink-2">
             These are the capabilities reported for this specific plan. “Not specified” means the listing did not confirm the feature; do not assume it is included. You cannot choose a specific phone number before buying.
           </p>
           <dl className="mt-3 grid gap-2 sm:grid-cols-3">
@@ -112,11 +112,11 @@ export default async function EsimPlanPage({ params }: { params: Promise<{ id: s
             These details come from the plan listing. We have not confirmed how an included number is provided or any call and SMS charges. If you need a number, calls or SMS, <Link href="/contact" className="font-semibold text-lav-700 underline underline-offset-2">contact support</Link> before buying.
           </p>
 
-          <h2 className="mt-6 text-[1.05rem] font-semibold text-ink">
+          <h2 className="mt-6 text-[1rem] font-semibold text-ink">
             {offer.coverage === "not-country-specific" ? "Where it works" : "Coverage"}
           </h2>
           {countries.length ? (
-            <p className="mt-2 text-[0.9rem] leading-relaxed text-ink-2">
+            <p className="mt-2 text-[0.875rem] leading-relaxed text-ink-2">
               {countries.join(", ")}
               {offer.countries.length > countries.length
                 ? ` and ${offer.countries.length - countries.length} more`
@@ -124,7 +124,7 @@ export default async function EsimPlanPage({ params }: { params: Promise<{ id: s
               .
             </p>
           ) : (
-            <p className="mt-2 text-[0.9rem] text-ink-2">Coverage is not listed. <Link href="/contact" className="font-semibold text-lav-700 underline underline-offset-2">Contact support</Link> before buying.</p>
+            <p className="mt-2 text-[0.875rem] text-ink-2">Coverage is not listed. <Link href="/contact" className="font-semibold text-lav-700 underline underline-offset-2">Contact support</Link> before buying.</p>
           )}
         </section>
 

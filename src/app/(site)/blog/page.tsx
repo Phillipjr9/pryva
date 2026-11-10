@@ -13,7 +13,7 @@ export default function BlogPage() {
       <section className="py-16">
         <div className="shell text-center">
           <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3rem]">PryvaLogs Blog</h1>
-          <p className="mx-auto mt-4 max-w-2xl text-[1.1rem] text-ink-2">
+          <p className="mx-auto mt-4 max-w-2xl text-[1.125rem] text-ink-2">
             Practical guides to digital services and account security.
           </p>
         </div>
@@ -29,10 +29,10 @@ export default function BlogPage() {
               <span className="inline-block rounded-full bg-lav-100 px-3 py-1 text-meta font-semibold text-lav-700">
                 {post.category}
               </span>
-              <h2 className="mb-3 mt-4 text-[1.1rem] font-semibold text-ink group-hover:text-lav-600">
+              <h2 className="mb-3 mt-4 text-[1.125rem] font-semibold text-ink group-hover:text-lav-600">
                 {post.title}
               </h2>
-              <p className="text-[0.86rem] text-ink-2">{post.excerpt}</p>
+              <p className="text-[0.875rem] text-ink-2">{post.excerpt}</p>
               <span className="mt-5 inline-block text-sm font-semibold text-lav-700">Read guide →</span>
             </Link>
           ))}

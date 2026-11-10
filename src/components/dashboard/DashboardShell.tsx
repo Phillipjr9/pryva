@@ -230,7 +230,7 @@ export function DashboardShell({
                   key={`${item.href}:${item.category ?? "all"}`}
                   href={href}
                   onClick={() => setOpen(false)}
-                  className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-[0.84rem] font-medium transition-colors ${
+                  className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-[0.8125rem] font-medium transition-colors ${
                     active ? "bg-lav-100/80 text-lav-800" : "text-ink-2 hover:bg-white hover:text-ink"
                   }`}
                 >
@@ -264,7 +264,7 @@ export function DashboardShell({
               itself, so it is stable without pretending to be a photograph. */}
           <ProfileAvatar seed={user.email} size={36} />
           <div className="min-w-0">
-            <p className="truncate text-[0.82rem] font-semibold text-ink">{user.name}</p>
+            <p className="truncate text-[0.8125rem] font-semibold text-ink">{user.name}</p>
             <p className="truncate text-micro text-ink-3">{user.email}</p>
           </div>
         </div>
@@ -313,7 +313,7 @@ export function DashboardShell({
               </span>
               <div className="hidden min-w-0 lg:block">
                 <p className="text-micro uppercase tracking-[0.16em] text-ink-3">Dashboard</p>
-                <p className="truncate text-[0.88rem] font-semibold leading-tight text-ink">
+                <p className="truncate text-[0.875rem] font-semibold leading-tight text-ink">
                   Hello, {user.name.split(" ")[0]}
                 </p>
               </div>

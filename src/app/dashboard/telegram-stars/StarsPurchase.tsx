@@ -73,7 +73,7 @@ export function StarsPurchase({ userId, available = true, prices = [], loadingPr
     {storageReady && !attempt && !order ? <>
       {!available && <p role="status" className="rounded-xl bg-amber-50 p-3 text-meta text-amber-900">Telegram Stars ordering is not available right now. Indicative prices may be shown, but checkout is not yet enabled.</p>}
       <form onSubmit={getQuote} className="space-y-3">
-        <h2 className="text-[1.05rem] font-semibold text-ink">Recipient and Stars</h2>
+        <h2 className="text-[1rem] font-semibold text-ink">Recipient and Stars</h2>
         <label htmlFor="stars-username" className="block text-meta font-semibold">Recipient Telegram username</label>
         <input id="stars-username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="@username" autoComplete="off" maxLength={33} className="min-h-11 w-full rounded-xl border border-line bg-white px-3 py-2 text-ink" />
         <p className="text-meta text-ink-2">Use the recipient’s public Telegram username, not their phone number. Double-check it before paying.</p>

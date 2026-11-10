@@ -22,7 +22,7 @@ export function CredentialList({ accounts }: { accounts: string[] }) {
 
   if (accounts.length === 0) {
     return (
-      <p className="text-[0.85rem] text-ink-2">
+      <p className="text-[0.875rem] text-ink-2">
         No credentials were returned for this order. Contact support with your reference and we&apos;ll
         fix it.
       </p>

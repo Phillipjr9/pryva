@@ -59,7 +59,7 @@ export function EsimCatalogue({ items, truncated }: { items: EsimCatalogueItem[]
               setVisible(PAGE);
             }}
             placeholder="Search a country, region or data allowance"
-            className="min-h-11 w-full rounded-xl border border-line bg-white px-3 py-2 text-[0.86rem] text-ink outline-none placeholder:text-ink-3 focus:border-lav-400 focus:ring-4 focus:ring-lav-100"
+            className="min-h-11 w-full rounded-xl border border-line bg-white px-3 py-2 text-[0.875rem] text-ink outline-none placeholder:text-ink-3 focus:border-lav-400 focus:ring-4 focus:ring-lav-100"
           />
         </label>
         <label className="block">
@@ -70,7 +70,7 @@ export function EsimCatalogue({ items, truncated }: { items: EsimCatalogueItem[]
               setRegion(event.target.value);
               setVisible(PAGE);
             }}
-            className="min-h-11 w-full rounded-xl border border-line bg-white px-3 py-2 text-[0.86rem] text-ink sm:w-auto"
+            className="min-h-11 w-full rounded-xl border border-line bg-white px-3 py-2 text-[0.875rem] text-ink sm:w-auto"
           >
             <option value="all">All regions ({items.length})</option>
             {regions.map(([name, count]) => (
@@ -88,7 +88,7 @@ export function EsimCatalogue({ items, truncated }: { items: EsimCatalogueItem[]
               setUsage(event.target.value as UsageFilter);
               setVisible(PAGE);
             }}
-            className="min-h-11 w-full rounded-xl border border-line bg-white px-3 py-2 text-[0.86rem] text-ink sm:w-auto"
+            className="min-h-11 w-full rounded-xl border border-line bg-white px-3 py-2 text-[0.875rem] text-ink sm:w-auto"
           >
             <option value="all">All plan types</option>
             {(Object.entries(ESIM_USAGE_LABELS) as [EsimUsageCategory, string][]).map(([value, label]) => (
@@ -106,7 +106,7 @@ export function EsimCatalogue({ items, truncated }: { items: EsimCatalogueItem[]
 
       {filtered.length === 0 ? (
         <div className="rounded-xl border border-dashed border-line bg-cream/50 p-8 text-center">
-          <p className="text-[0.9rem] font-semibold text-ink">No plan matches that</p>
+          <p className="text-[0.875rem] font-semibold text-ink">No plan matches that</p>
           <p className="mt-1 text-meta text-ink-2">
             Try a country name, a region or another plan type — this does not mean the destination is unsupported.
           </p>
@@ -131,7 +131,7 @@ export function EsimCatalogue({ items, truncated }: { items: EsimCatalogueItem[]
             <li key={item.id} className="flex flex-col justify-between rounded-xl border border-line bg-white p-4">
               <div>
                 <p className="text-micro font-semibold uppercase tracking-[0.12em] text-lav-700">{item.region}</p>
-                <p className="mt-1 text-[0.9rem] font-semibold text-ink">{item.name}</p>
+                <p className="mt-1 text-[0.875rem] font-semibold text-ink">{item.name}</p>
                 <p className="mt-1 text-meta text-ink-2">
                   {item.dataLabel} · {item.validityLabel} ·{" "}
                   {item.global ? "Global plan" : item.destinations > 0 ? `${item.destinations} destination${item.destinations === 1 ? "" : "s"}` : "Coverage not listed"}

@@ -163,7 +163,7 @@ export default async function AdminTransactionsPage({
     <div className="space-y-5">
       <div>
         <h1 className="text-[1.35rem] font-medium tracking-tight">Wallet ledger</h1>
-        <p className="mt-1 max-w-3xl text-[0.85rem] text-ink-2">
+        <p className="mt-1 max-w-3xl text-[0.875rem] text-ink-2">
           Every wallet movement, newest first, with the balance it produced. Read-only: corrections
           are made by the code that owns the money, never by editing this table.
         </p>
@@ -173,7 +173,7 @@ export default async function AdminTransactionsPage({
         {tiles.map((card) => (
           <div key={card.label} className="rounded-2xl border border-line bg-white p-4">
             <p className="text-meta uppercase tracking-wide text-ink-3">{card.label}</p>
-            <p className={`mt-1 text-[1.15rem] font-semibold ${card.tone}`}>{formatNaira(card.value)}</p>
+            <p className={`mt-1 text-[1.125rem] font-semibold ${card.tone}`}>{formatNaira(card.value)}</p>
           </div>
         ))}
       </div>
@@ -185,7 +185,7 @@ export default async function AdminTransactionsPage({
             name="q"
             defaultValue={query}
             placeholder="Reference, description or email"
-            className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-[0.86rem] font-normal normal-case tracking-normal text-ink outline-none focus:border-lav-400"
+            className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-[0.875rem] font-normal normal-case tracking-normal text-ink outline-none focus:border-lav-400"
           />
         </label>
         <label className="text-meta font-semibold uppercase tracking-wide text-ink-3">
@@ -193,7 +193,7 @@ export default async function AdminTransactionsPage({
           <select
             name="type"
             defaultValue={type}
-            className="mt-1 block rounded-xl border border-line px-3 py-2 text-[0.86rem] font-normal normal-case tracking-normal text-ink outline-none focus:border-lav-400"
+            className="mt-1 block rounded-xl border border-line px-3 py-2 text-[0.875rem] font-normal normal-case tracking-normal text-ink outline-none focus:border-lav-400"
           >
             <option value="">All</option>
             {LEDGER_TYPES.map((option) => (
@@ -209,21 +209,21 @@ export default async function AdminTransactionsPage({
             type="date"
             name="day"
             defaultValue={day}
-            className="mt-1 block rounded-xl border border-line px-3 py-2 text-[0.86rem] font-normal normal-case tracking-normal text-ink outline-none focus:border-lav-400"
+            className="mt-1 block rounded-xl border border-line px-3 py-2 text-[0.875rem] font-normal normal-case tracking-normal text-ink outline-none focus:border-lav-400"
           />
         </label>
         <button type="submit" className="btn btn-primary btn-sm">
           Filter
         </button>
         {(query || type || day) && (
-          <Link href="/admin/transactions" className="text-[0.82rem] text-ink-3 underline">
+          <Link href="/admin/transactions" className="text-[0.8125rem] text-ink-3 underline">
             Clear
           </Link>
         )}
       </form>
 
       <div className="overflow-x-auto rounded-2xl border border-line bg-white">
-        <table className="w-full min-w-[48rem] text-left text-[0.84rem]">
+        <table className="w-full min-w-[48rem] text-left text-[0.8125rem]">
           <thead className="bg-cream/70 text-meta uppercase tracking-wide text-ink-3">
             <tr>
               <th className="px-4 py-3 font-semibold">When</th>
@@ -286,7 +286,7 @@ export default async function AdminTransactionsPage({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-[0.82rem] text-ink-2">
+        <div className="flex items-center justify-between text-[0.8125rem] text-ink-2">
           <span>
             Page {page} of {totalPages} · {Number(total).toLocaleString("en-NG")} transactions
           </span>

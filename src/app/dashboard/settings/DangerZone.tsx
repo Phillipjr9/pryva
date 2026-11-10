@@ -119,7 +119,7 @@ export function DangerZone({
             <CheckCircle className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="text-[0.95rem] font-semibold text-emerald-900">Your account is closed</h2>
+            <h2 className="text-[0.9375rem] font-semibold text-emerald-900">Your account is closed</h2>
             <p className="mt-1 text-meta leading-relaxed text-emerald-900/80">
               You have been signed out on every device, and your sign-in address was removed from the account.
               The records below were kept and may still contain identifying information, such as payout details or support conversations.
@@ -151,7 +151,7 @@ export function DangerZone({
             </p>
             <Link
               href="/"
-              className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-ink px-4 py-2 text-[0.82rem] font-semibold text-white hover:bg-ink-2"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-ink px-4 py-2 text-[0.8125rem] font-semibold text-white hover:bg-ink-2"
             >
               <Logout className="h-3.5 w-3.5" /> Leave
             </Link>
@@ -168,7 +168,7 @@ export function DangerZone({
           <AlertTriangle className="h-4 w-4" />
         </span>
         <div className="min-w-0">
-          <h2 className="text-[0.95rem] font-semibold">Close my account</h2>
+          <h2 className="text-[0.9375rem] font-semibold">Close my account</h2>
           <p className="mt-0.5 text-meta leading-relaxed text-ink-2">
             You can close your account here, without asking anyone. Your details are removed; the record of what
             the account paid for and was paid is kept, because a bank or a payment provider can ask about it
@@ -181,7 +181,7 @@ export function DangerZone({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="btn mt-3.5 w-fit border border-rose-300 bg-white !px-4 !py-2.5 !text-[0.8rem] text-rose-800 hover:border-rose-400"
+          className="btn mt-3.5 w-fit border border-rose-300 bg-white !px-4 !py-2.5 !text-[0.8125rem] text-rose-800 hover:border-rose-400"
         >
           <Trash2 className="h-3.5 w-3.5" /> Show me what happens
         </button>
@@ -189,7 +189,7 @@ export function DangerZone({
         <div className="mt-4 grid gap-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-line bg-white p-3.5">
-              <p className="flex items-center gap-1.5 text-[0.82rem] font-semibold text-ink">
+              <p className="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink">
                 <XCircle className="h-3.5 w-3.5 text-rose-600" /> Removed
               </p>
               <ul className="mt-2 grid gap-1.5 text-meta text-ink-2">
@@ -205,7 +205,7 @@ export function DangerZone({
             </div>
 
             <div className="rounded-xl border border-line bg-white p-3.5">
-              <p className="flex items-center gap-1.5 text-[0.82rem] font-semibold text-ink">
+              <p className="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink">
                 <Shield className="h-3.5 w-3.5 text-emerald-600" /> Records kept
               </p>
               <ul className="mt-2 grid gap-2 text-meta text-ink-2">
@@ -318,7 +318,7 @@ export function DangerZone({
               type="button"
               onClick={() => void submit()}
               disabled={!canSubmit}
-              className="btn w-fit !px-4 !py-2.5 !text-[0.8rem] bg-rose-700 text-white hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="btn w-fit !px-4 !py-2.5 !text-[0.8125rem] bg-rose-700 text-white hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy ? (
                 <>
@@ -334,7 +334,7 @@ export function DangerZone({
               type="button"
               onClick={keepAccount}
               disabled={busy}
-              className="btn w-fit border border-line bg-white !px-4 !py-2.5 !text-[0.8rem] text-ink-2 hover:border-lav-300 disabled:opacity-50"
+              className="btn w-fit border border-line bg-white !px-4 !py-2.5 !text-[0.8125rem] text-ink-2 hover:border-lav-300 disabled:opacity-50"
             >
               Keep my account
             </button>

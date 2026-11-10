@@ -23,7 +23,7 @@ export default function CookiePolicyPage() {
           <h1 className="text-[1.9rem] font-semibold tracking-tight text-ink sm:text-[2.5rem]">
             Cookie Policy
           </h1>
-          <p className="mt-3 max-w-2xl text-[0.94rem] leading-relaxed text-ink-2 sm:text-[0.98rem]">
+          <p className="mt-3 max-w-2xl text-[0.9375rem] leading-relaxed text-ink-2 sm:text-[1rem]">
             PryvaLogs uses essential session and sign-in cookies. We also remember your consent choice in a browser cookie so the website does not keep asking after you click “Yes, I accept.” Third-party services may use their own cookies under their policies.
           </p>
         </div>
@@ -43,14 +43,14 @@ export default function CookiePolicyPage() {
             <tbody className="divide-y divide-line/70">
               {cookies.map((cookie) => (
                 <tr key={cookie.name} className="align-top">
-                  <td className="px-3 py-4 font-mono text-[0.8125rem] text-ink sm:px-4 sm:text-[0.8rem]">{cookie.name}</td>
+                  <td className="px-3 py-4 font-mono text-[0.8125rem] text-ink sm:px-4 sm:text-[0.8125rem]">{cookie.name}</td>
                   <td className="px-3 py-4 sm:px-4">
                     <span className="inline-flex rounded-full bg-lav-50 px-2.5 py-1 text-[0.8125rem] font-semibold text-lav-700 sm:text-meta">
                       {cookie.type}
                     </span>
                   </td>
-                  <td className="px-3 py-4 text-[0.8125rem] text-ink-2 sm:px-4 sm:text-[0.84rem]">{cookie.duration}</td>
-                  <td className="hidden px-3 py-4 text-[0.8rem] leading-relaxed text-ink-2 md:table-cell sm:px-4 sm:text-[0.84rem]">
+                  <td className="px-3 py-4 text-[0.8125rem] text-ink-2 sm:px-4 sm:text-[0.8125rem]">{cookie.duration}</td>
+                  <td className="hidden px-3 py-4 text-[0.8125rem] leading-relaxed text-ink-2 md:table-cell sm:px-4 sm:text-[0.8125rem]">
                     {cookie.purpose}
                   </td>
                 </tr>
@@ -62,28 +62,28 @@ export default function CookiePolicyPage() {
         <div className="mt-8 space-y-6">
           <div className="rounded-2xl border border-line bg-white p-5">
             <h2 className="text-[1rem] font-semibold text-ink">Consent tracking</h2>
-            <p className="mt-2 max-w-3xl text-[0.88rem] leading-relaxed text-ink-2">
+            <p className="mt-2 max-w-3xl text-[0.875rem] leading-relaxed text-ink-2">
               When you click “Yes, I accept,” we save a consent record in your browser so the website remembers your choice. The record indicates whether you accepted cookies, and it is used only to suppress the consent prompt on later visits.
             </p>
           </div>
 
           <div className="rounded-2xl border border-line bg-white p-5">
             <h2 className="text-[1rem] font-semibold text-ink">Payments</h2>
-            <p className="mt-2 max-w-3xl text-[0.88rem] leading-relaxed text-ink-2">
+            <p className="mt-2 max-w-3xl text-[0.875rem] leading-relaxed text-ink-2">
               Configured live wallet top-ups open a Paystack checkout. Paystack and other third-party services may use their own cookies; consult their policies for details.
             </p>
           </div>
 
           <div className="rounded-2xl border border-line bg-white p-5">
             <h2 className="text-[1rem] font-semibold text-ink">Managing cookies</h2>
-            <p className="mt-2 max-w-3xl text-[0.88rem] leading-relaxed text-ink-2">
+            <p className="mt-2 max-w-3xl text-[0.875rem] leading-relaxed text-ink-2">
               You can clear or block cookies in your browser settings. Blocking session cookies can prevent sign-in and authenticated features. Browser local storage holds the “pryva-theme” preference and, during an unresolved withdrawal request, a user-scoped request ID, amount and internal bank-account ID to support safe retries. It does not store bank details there. Clearing this recovery record does not cancel a withdrawal; check your requests or contact support before submitting another. Clearing the consent record will cause the banner to reappear.
             </p>
           </div>
 
           <div className="rounded-2xl border border-line bg-white p-5">
             <h2 className="text-[1rem] font-semibold text-ink">Questions</h2>
-            <p className="mt-2 text-[0.88rem] leading-relaxed text-ink-2">
+            <p className="mt-2 text-[0.875rem] leading-relaxed text-ink-2">
               Ask us anything about data handling via{" "}
               <Link href="/contact" className="font-semibold text-lav-700 underline underline-offset-2">
                 support

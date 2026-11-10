@@ -340,10 +340,10 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
     // Checkout is not configured, so offer a way onward rather than a dead end.
     return (
       <div className="rounded-2xl border border-line bg-white p-8 text-center">
-        <h2 className="text-[1.05rem] font-semibold text-ink">
+        <h2 className="text-[1rem] font-semibold text-ink">
           Accounts are almost ready
         </h2>
-        <p className="mx-auto mt-2 max-w-md text-[0.88rem] leading-relaxed text-ink-2">
+        <p className="mx-auto mt-2 max-w-md text-[0.875rem] leading-relaxed text-ink-2">
           Our account marketplace is being prepared. You can explore the other services in the
           meantime.
         </p>
@@ -360,7 +360,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
   return (
     <div>
       {!purchaseEnabled && (
-        <div role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.85rem] text-amber-900">
+        <div role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.875rem] text-amber-900">
           Account purchases are temporarily paused. You can browse listings, but checkout is unavailable.
         </div>
       )}
@@ -368,20 +368,20 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
           customer sees "Paused" on some cards and no reason anywhere. Wording
           stays customer-facing: why they are paused is not their concern. */}
       {purchaseEnabled && listings.some((listing) => listing.fulfilment === "manual" && !listing.purchasable) && (
-        <div role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.85rem] text-amber-900">
+        <div role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.875rem] text-amber-900">
           Items marked <strong>Prepared for you</strong> cannot be ordered right now. Every other listing is
           available as normal.
         </div>
       )}
       {/* Filters */}
       <div className="flex flex-col gap-4">
-        {categoryError && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8rem] text-amber-900">{categoryError}</p>}
+        {categoryError && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8125rem] text-amber-900">{categoryError}</p>}
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => selectCategory(null)}
             className={cn(
-              "rounded-full border px-3.5 py-1.5 text-[0.8rem] font-medium transition-colors",
+              "rounded-full border px-3.5 py-1.5 text-[0.8125rem] font-medium transition-colors",
               activeCategory === null
                 ? "border-lav-600 bg-lav-700 text-white"
                 : "border-line bg-white text-ink-2 hover:border-lav-300",
@@ -395,7 +395,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
               type="button"
               onClick={() => selectCategory(category.id)}
               className={cn(
-                "rounded-full border px-3.5 py-1.5 text-[0.8rem] font-medium transition-colors",
+                "rounded-full border px-3.5 py-1.5 text-[0.8125rem] font-medium transition-colors",
                 activeCategory === category.id
                   ? "border-lav-600 bg-lav-700 text-white"
                   : "border-line bg-white text-ink-2 hover:border-lav-300",
@@ -446,7 +446,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
               onChange={(event) => setSearchInput(event.target.value)}
               placeholder="Search accounts (e.g. facebook, gmail)"
               aria-label="Search accounts"
-              className="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[0.88rem] text-ink outline-none placeholder:text-ink-3 focus:border-lav-400"
+              className="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[0.875rem] text-ink outline-none placeholder:text-ink-3 focus:border-lav-400"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -460,7 +460,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                 setSort(event.target.value as (typeof SORTS)[number]["value"]);
                 setPage(1);
               }}
-              className="rounded-xl border border-line bg-white px-3 py-2 text-[0.82rem] text-ink outline-none focus:border-lav-400"
+              className="rounded-xl border border-line bg-white px-3 py-2 text-[0.8125rem] text-ink outline-none focus:border-lav-400"
             >
               {SORTS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -479,7 +479,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
           <button type="button" disabled={loading} onClick={() => void loadListings()} className="font-semibold text-lav-700 hover:underline disabled:opacity-50">Refresh stock</button>
         </div>
         {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[0.85rem] text-red-800">
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[0.875rem] text-red-800">
             {error}{" "}
             <button type="button" onClick={() => void loadListings()} className="font-semibold underline">
               Retry
@@ -497,8 +497,8 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
 
         {!loading && !error && listings.length === 0 && (
           <div className="rounded-2xl border border-line bg-white p-10 text-center">
-            <p className="text-[0.92rem] font-semibold text-ink">No accounts match those filters</p>
-            <p className="mt-1 text-[0.84rem] text-ink-2">
+            <p className="text-[0.9375rem] font-semibold text-ink">No accounts match those filters</p>
+            <p className="mt-1 text-[0.8125rem] text-ink-2">
               Try a different category, or clear your search to see everything.
             </p>
           </div>
@@ -514,7 +514,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                       platform={platformFor(listing.title, listing.category, listing.subcategory)}
                       size={34}
                     />
-                    <h3 className="text-[0.9rem] font-semibold leading-snug text-ink">{listing.title}</h3>
+                    <h3 className="text-[0.875rem] font-semibold leading-snug text-ink">{listing.title}</h3>
                   </div>
                 </div>
 
@@ -550,7 +550,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
 
                 <div className="mt-4 flex items-end justify-between gap-3">
                   <div>
-                    <p className="text-[1.05rem] font-semibold text-ink">{formatNaira(listing.priceNgn)}</p>
+                    <p className="text-[1rem] font-semibold text-ink">{formatNaira(listing.priceNgn)}</p>
                     <p className="text-meta text-ink-3">per account</p>
                   </div>
                   <Button
@@ -621,9 +621,9 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                   <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
                     ✓
                   </span>
-                  <h3 className="text-[1.02rem] font-semibold text-ink">Delivered — {result.accounts.length} account(s)</h3>
+                  <h3 className="text-[1rem] font-semibold text-ink">Delivered — {result.accounts.length} account(s)</h3>
                 </div>
-                <p className="mt-1 text-[0.8rem] text-ink-2">
+                <p className="mt-1 text-[0.8125rem] text-ink-2">
                   Reference <span className="font-semibold text-ink">{result.reference}</span> ·{" "}
                   {formatNaira(result.totalNgn)} charged to your wallet
                 </p>
@@ -649,7 +649,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                   Save these now and treat them like passwords.
                 </p>
                 {result.warning && (
-                  <p role="alert" className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[0.8rem] text-amber-900">
+                  <p role="alert" className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[0.8125rem] text-amber-900">
                     {result.warning}
                   </p>
                 )}
@@ -670,12 +670,12 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
               </div>
             ) : preparing ? (
               <div>
-                <h3 className="text-[1.02rem] font-semibold text-ink">Order confirmed — being prepared</h3>
-                <p role="status" className="mt-3 text-[0.85rem] leading-relaxed text-ink-2">
+                <h3 className="text-[1rem] font-semibold text-ink">Order confirmed — being prepared</h3>
+                <p role="status" className="mt-3 text-[0.875rem] leading-relaxed text-ink-2">
                   {preparing.message}
                 </p>
                 {preparing.reference && (
-                  <p className="mt-2 break-all text-[0.8rem] font-semibold text-ink">
+                  <p className="mt-2 break-all text-[0.8125rem] font-semibold text-ink">
                     Reference: {preparing.reference}
                   </p>
                 )}
@@ -687,9 +687,9 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
               </div>
             ) : pending ? (
               <div>
-                <h3 className="text-[1.02rem] font-semibold text-ink">Purchase needs review</h3>
-                <p role="status" className="mt-3 text-[0.85rem] text-ink-2">{pending.message}</p>
-                {pending.reference && <p className="mt-2 break-all text-[0.8rem] font-semibold text-ink">Reference: {pending.reference}</p>}
+                <h3 className="text-[1rem] font-semibold text-ink">Purchase needs review</h3>
+                <p role="status" className="mt-3 text-[0.875rem] text-ink-2">{pending.message}</p>
+                {pending.reference && <p className="mt-2 break-all text-[0.8125rem] font-semibold text-ink">Reference: {pending.reference}</p>}
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link href="/dashboard/orders" className="btn btn-primary inline-flex items-center">View orders</Link>
                   <Link href="/dashboard/support" className="btn btn-secondary inline-flex items-center">Contact support</Link>
@@ -698,8 +698,8 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
               </div>
             ) : (
               <div>
-                <h3 className="text-[1.02rem] font-semibold text-ink">{selected.title}</h3>
-                <p className="mt-1 text-[0.8rem] text-ink-2">
+                <h3 className="text-[1rem] font-semibold text-ink">{selected.title}</h3>
+                <p className="mt-1 text-[0.8125rem] text-ink-2">
                   {formatNaira(selected.priceNgn)} per account ·{" "}
                   {selected.stock === null
                     ? selected.fulfilment === "manual"
@@ -720,7 +720,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                 )}
 
                 <div className="mt-4 flex items-center justify-between gap-3">
-                  <label htmlFor="quantity" className="text-[0.84rem] font-medium text-ink">
+                  <label htmlFor="quantity" className="text-[0.8125rem] font-medium text-ink">
                     Quantity
                   </label>
                   <div className="flex items-center gap-2">
@@ -751,7 +751,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                           setQuantity(Math.min(selected.maxQuantity, Math.max(selected.minQuantity, Math.floor(next))));
                         }
                       }}
-                      className="w-16 rounded-lg border border-line bg-white px-2 py-1.5 text-center text-[0.85rem] text-ink outline-none focus:border-lav-400"
+                      className="w-16 rounded-lg border border-line bg-white px-2 py-1.5 text-center text-[0.875rem] text-ink outline-none focus:border-lav-400"
                     />
                     <Button
                       variant="secondary"
@@ -780,7 +780,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                       onChange={(event) => setPromoInput(event.target.value.toUpperCase())}
                       placeholder="Optional"
                       autoComplete="off"
-                      className="min-w-0 flex-1 rounded-lg border border-line bg-white px-2.5 py-1.5 text-[0.82rem] uppercase tracking-wide text-ink outline-none placeholder:normal-case placeholder:tracking-normal placeholder:text-ink-3 focus:border-lav-400"
+                      className="min-w-0 flex-1 rounded-lg border border-line bg-white px-2.5 py-1.5 text-[0.8125rem] uppercase tracking-wide text-ink outline-none placeholder:normal-case placeholder:tracking-normal placeholder:text-ink-3 focus:border-lav-400"
                     />
                     <Button
                       variant="secondary"
@@ -797,7 +797,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                 </div>
 
                 <div className="mt-4 rounded-xl border border-line bg-cream/70 p-3">
-                  <div className="flex items-center justify-between text-[0.85rem]">
+                  <div className="flex items-center justify-between text-[0.875rem]">
                     <span className="text-ink-2">Total</span>
                     <span className="font-semibold text-ink">{formatNaira(estimatedTotal)}</span>
                   </div>
@@ -813,7 +813,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
                 </div>
 
                 {buyError && (
-                  <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[0.8rem] text-red-800">
+                  <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[0.8125rem] text-red-800">
                     {buyError}
                     {needsSignIn && (
                       <>

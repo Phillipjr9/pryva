@@ -63,20 +63,20 @@ export default async function VirtualNumbersPage() {
             <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3.5rem]">
               {service.tagline}
             </h1>
-            <p className="mt-6 text-[1.1rem] text-ink-2 leading-relaxed">
+            <p className="mt-6 text-[1.125rem] text-ink-2 leading-relaxed">
               {service.description}
             </p>
             <div className="mt-8 flex flex-wrap gap-3 sm:gap-4">
               <Link
                 href="/signup"
-                className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-800"
+                className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.9375rem] font-semibold text-white hover:bg-lav-800"
               >
                 Get Started
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
                 href="/pricing"
-                className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-6 py-3 text-[0.95rem] font-semibold text-ink hover:bg-cream"
+                className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-6 py-3 text-[0.9375rem] font-semibold text-ink hover:bg-cream"
               >
                 View Pricing
               </Link>
@@ -94,10 +94,10 @@ export default async function VirtualNumbersPage() {
                 key={index}
                 className="rounded-2xl border border-line bg-white p-6"
               >
-                <h3 className="text-[1.1rem] font-semibold text-ink mb-3">
+                <h3 className="text-[1.125rem] font-semibold text-ink mb-3">
                   {highlight.title}
                 </h3>
-                <p className="text-[0.9rem] text-ink-2 leading-relaxed">
+                <p className="text-[0.875rem] text-ink-2 leading-relaxed">
                   {highlight.body}
                 </p>
               </div>
@@ -110,7 +110,7 @@ export default async function VirtualNumbersPage() {
       <section className="pb-16">
         <div className="shell">
           <h2 className="mb-3 text-[1.75rem] font-semibold text-ink">Countries</h2>
-          <p className="mb-6 max-w-2xl text-[0.95rem] text-ink-2">
+          <p className="mb-6 max-w-2xl text-[0.9375rem] text-ink-2">
             Explore number plans for these destinations. Current stock and availability must be confirmed before ordering.
           </p>
           <CountryChips codes={[...SUPPORTED_VIRTUAL_NUMBER_COUNTRIES]} />
@@ -127,7 +127,7 @@ export default async function VirtualNumbersPage() {
             {service.included.map((item, index) => (
               <div key={index} className="flex items-start gap-3">
                 <Check className="h-5 w-5 text-lav-600 shrink-0 mt-0.5" />
-                <p className="text-[0.95rem] text-ink-2">{item}</p>
+                <p className="text-[0.9375rem] text-ink-2">{item}</p>
               </div>
             ))}
           </div>
@@ -157,20 +157,20 @@ export default async function VirtualNumbersPage() {
                     </span>
                   </div>
                 )}
-                <h3 className="flex items-center gap-2 text-[1.1rem] font-semibold text-ink mb-2">
+                <h3 className="flex items-center gap-2 text-[1.125rem] font-semibold text-ink mb-2">
                   {hasCountryFlag(plan.region) && <CountryFlag region={plan.region} size={20} decorative />}
                   {plan.name}
                 </h3>
-                <p className="text-[0.86rem] text-ink-2 mb-4">{plan.planLabel}</p>
+                <p className="text-[0.875rem] text-ink-2 mb-4">{plan.planLabel}</p>
                 <div className="mb-4">
                   <span className="text-[2rem] font-bold text-ink">
                     {formatNaira(plan.price)}
                   </span>
                 </div>
-                <p className="text-[0.86rem] text-ink-2 mb-6">{plan.duration}</p>
+                <p className="text-[0.875rem] text-ink-2 mb-6">{plan.duration}</p>
                 <Link
                   href={`/signup?plan=${plan.slug}`}
-                  className={`block w-full rounded-xl px-4 py-3 text-center text-[0.9rem] font-semibold transition-colors ${
+                  className={`block w-full rounded-xl px-4 py-3 text-center text-[0.875rem] font-semibold transition-colors ${
                     plan.popular
                       ? "bg-lav-700 text-white hover:bg-lav-800"
                       : "border border-line bg-white text-ink hover:bg-cream"
@@ -184,7 +184,7 @@ export default async function VirtualNumbersPage() {
           <div className="mt-8 text-center">
             <Link
               href="/pricing"
-              className="text-[0.95rem] font-semibold text-lav-600 hover:text-lav-700"
+              className="text-[0.9375rem] font-semibold text-lav-600 hover:text-lav-700"
             >
               View all pricing options →
             </Link>
@@ -222,7 +222,7 @@ export default async function VirtualNumbersPage() {
                 className="rounded-2xl border border-line bg-white p-6"
               >
                 <h3 className="text-[1rem] font-semibold text-ink mb-3">{faq.q}</h3>
-                <p className="text-[0.9rem] text-ink-2 leading-relaxed">{faq.a}</p>
+                <p className="text-[0.875rem] text-ink-2 leading-relaxed">{faq.a}</p>
               </div>
             ))}
           </div>

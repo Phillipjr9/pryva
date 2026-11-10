@@ -32,7 +32,7 @@ export default function NotFound() {
               <br />
               <span className="text-display italic text-lav-700">Your account didn&rsquo;t.</span>
             </h1>
-            <p className="mx-auto mt-2.5 max-w-sm text-[0.88rem] leading-relaxed text-ink-2">
+            <p className="mx-auto mt-2.5 max-w-sm text-[0.875rem] leading-relaxed text-ink-2">
               The link may be old or mistyped. Your wallet, orders and boosts are exactly where you left them.
             </p>
           </div>

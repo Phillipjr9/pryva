@@ -216,7 +216,7 @@ export function OrderActions({
         {referenceCode ? (
           <div className="mt-3.5 rounded-2xl border border-line bg-cream/60 p-4">
             <div className="flex items-start justify-between gap-3">
-              <pre className="whitespace-pre-wrap break-words font-sans text-[0.88rem] leading-relaxed text-ink">
+              <pre className="whitespace-pre-wrap break-words font-sans text-[0.875rem] leading-relaxed text-ink">
                 {referenceCode}
               </pre>
               <button
@@ -230,7 +230,7 @@ export function OrderActions({
             </div>
           </div>
         ) : (
-          <p className="mt-3 text-[0.84rem] text-ink-3">
+          <p className="mt-3 text-[0.8125rem] text-ink-3">
             Delivery details are being prepared. Refresh in a moment.
           </p>
         )}
@@ -255,7 +255,7 @@ export function OrderActions({
             </div>
             <button type="button" onClick={() => setRevealed(true)} aria-label={revealed ? `Verification code ${liveOtp}` : "Reveal verification code"} className="mt-3 flex w-full gap-1.5 text-left">
               {(revealed ? liveOtp : "••••••").split("").map((digit, index) => (
-                <span key={index} aria-hidden="true" className="otp-arrive grid h-11 min-w-0 flex-1 place-items-center rounded-lg border border-lav-200 bg-white font-mono text-[1.15rem] font-semibold text-lav-800" style={{ animationDelay: `${index * 70}ms` }}>{digit}</span>
+                <span key={index} aria-hidden="true" className="otp-arrive grid h-11 min-w-0 flex-1 place-items-center rounded-lg border border-lav-200 bg-white font-mono text-[1.125rem] font-semibold text-lav-800" style={{ animationDelay: `${index * 70}ms` }}>{digit}</span>
               ))}
             </button>
             {!revealed && <p className="mt-2 text-meta text-ink-3">Tap the code to reveal it.</p>}
@@ -285,13 +285,13 @@ export function OrderActions({
 
       <div className="rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
         {refundedNow || settledStatus === "refunded" ? (
-          <p className="mt-2 flex items-center gap-2 text-[0.82rem] text-ink-2">
+          <p className="mt-2 flex items-center gap-2 text-[0.8125rem] text-ink-2">
             <Check className="h-4 w-4 text-emerald-600" />
             {formatNaira(amount)} was returned to your wallet. It&apos;s already spendable.
           </p>
         ) : isSelfRefundCandidate(settledStatus, singleNumberRefundCandidate, liveOtp) ? (
           <div className="mt-2">
-            <p className="text-[0.82rem] leading-relaxed text-ink-2">
+            <p className="text-[0.8125rem] leading-relaxed text-ink-2">
               No code arrived? After the delivery window, you can request a refund. We must confirm
               the final delivery status and matching payment before {formatNaira(amount)} can be returned to your wallet.
             </p>
@@ -308,12 +308,12 @@ export function OrderActions({
             )}
           </div>
         ) : active || settledStatus === "review" || settledStatus === "processing" ? (
-          <p className="mt-2 flex items-center gap-2 text-[0.82rem] text-ink-2">
+          <p className="mt-2 flex items-center gap-2 text-[0.8125rem] text-ink-2">
             <Shield className="h-4 w-4 text-lav-700" />
             {active ? "Your order is active. If it stalls, contact support with your order reference." : "This order is not complete yet. Check its status and contact support with your order reference before trying again."}
           </p>
         ) : (
-          <p className="mt-2 flex items-center gap-2 text-[0.82rem] text-ink-2">
+          <p className="mt-2 flex items-center gap-2 text-[0.8125rem] text-ink-2">
             <ArrowRight className="h-4 w-4 text-lav-600" />
             This order is settled. Buy another from the pricing page whenever you need one.
           </p>

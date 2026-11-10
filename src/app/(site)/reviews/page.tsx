@@ -67,7 +67,7 @@ export default async function ReviewsPage() {
               and no account details — just the service, the words and the score.
             </p>
             {average !== null && (
-              <p className="mt-5 flex flex-wrap items-center gap-3 text-[0.9rem] text-ink-2">
+              <p className="mt-5 flex flex-wrap items-center gap-3 text-[0.875rem] text-ink-2">
                 <Stars rating={Math.round(average)} />
                 <span>
                   <strong className="text-ink">{average.toFixed(1)}</strong> from{" "}
@@ -82,8 +82,8 @@ export default async function ReviewsPage() {
       <section className="shell py-12">
         {reviews.length === 0 ? (
           <div className="rounded-3xl border border-line bg-white p-8 text-center">
-            <h2 className="text-[1.2rem] font-semibold">No reviews published yet.</h2>
-            <p className="mx-auto mt-2 max-w-xl text-[0.92rem] leading-relaxed text-ink-2">
+            <h2 className="text-[1.25rem] font-semibold">No reviews published yet.</h2>
+            <p className="mx-auto mt-2 max-w-xl text-[0.9375rem] leading-relaxed text-ink-2">
               That is the honest state, not an empty design. Reviews appear here once a customer
               with a delivered order writes one and an operator publishes it. We do not fill this
               page with examples, quotes or borrowed testimonials.
@@ -106,9 +106,9 @@ export default async function ReviewsPage() {
                     <span className="text-meta text-ink-3">{formatDate(review.publishedAt)}</span>
                   </div>
                   {review.headline && (
-                    <h2 className="mt-3 text-[1.02rem] font-semibold text-ink">{review.headline}</h2>
+                    <h2 className="mt-3 text-[1rem] font-semibold text-ink">{review.headline}</h2>
                   )}
-                  <p className="mt-2 whitespace-pre-line text-[0.92rem] leading-relaxed text-ink-2">
+                  <p className="mt-2 whitespace-pre-line text-[0.9375rem] leading-relaxed text-ink-2">
                     {review.body}
                   </p>
                   <p className="mt-4 flex items-center gap-1.5 text-meta font-medium text-lav-700">
@@ -119,7 +119,7 @@ export default async function ReviewsPage() {
               ))}
             </ul>
             <div className="mt-8 rounded-3xl border border-lav-200 bg-lav-50/60 p-6 sm:flex sm:items-center sm:justify-between">
-              <p className="text-[0.92rem] leading-relaxed text-ink-2">
+              <p className="text-[0.9375rem] leading-relaxed text-ink-2">
                 Bought something and have an opinion? You can review any delivered order.
               </p>
               <Link href="/login?next=%2Fdashboard%2Freviews" className="btn btn-primary mt-4 sm:mt-0">

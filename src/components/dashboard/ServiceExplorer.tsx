@@ -201,7 +201,7 @@ export function ServiceCard({ item, countryName }: { item: ExplorerItem; country
       <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-lav-50/70 sm:rounded-xl">{itemArt(item)}</div>
       <div className="min-w-0 flex-1 sm:mt-3">
         <div className="flex min-w-0 items-start justify-between gap-2">
-          <h3 className="min-w-0 truncate text-[0.86rem] font-semibold leading-snug text-ink sm:whitespace-normal sm:break-words sm:text-[0.92rem]">{item.name}</h3>
+          <h3 className="min-w-0 truncate text-[0.875rem] font-semibold leading-snug text-ink sm:whitespace-normal sm:break-words sm:text-[0.9375rem]">{item.name}</h3>
           <span className={`hidden shrink-0 rounded-full px-2.5 py-1 text-micro font-bold uppercase tracking-[0.08em] sm:inline-flex ${sourceTone}`}>
             {sourceLabel}
           </span>
@@ -545,7 +545,7 @@ export function ServiceExplorer({
         <div>
           <p className="text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Explore PryvaLogs</p>
           <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">{selectedCategory?.label ?? "Your service hub"}</h1>
-          <p className="mt-1.5 max-w-2xl text-[0.82rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Pick a country once, then browse the matched services.` : "Pick a country once and browse categories without redoing the choice every time."}</p>
+          <p className="mt-1.5 max-w-2xl text-[0.8125rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Pick a country once, then browse the matched services.` : "Pick a country once and browse categories without redoing the choice every time."}</p>
         </div>
         <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline">My orders <ArrowRight className="h-3.5 w-3.5" /></Link>
       </div>
@@ -567,7 +567,7 @@ export function ServiceExplorer({
         <div className="relative grid gap-3 md:grid-cols-[1fr_1.1fr] md:items-center md:gap-4">
           <div>
             <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Globe className="h-3.5 w-3.5" /> Country</p>
-            <h2 id="choose-country-title" className="mt-1.5 text-[1.1rem] font-semibold text-ink sm:mt-2 sm:text-[1.25rem]">Pick a country once.</h2>
+            <h2 id="choose-country-title" className="mt-1.5 text-[1.125rem] font-semibold text-ink sm:mt-2 sm:text-[1.25rem]">Pick a country once.</h2>
             <p className="mt-1.5 max-w-sm text-meta leading-relaxed text-ink-2">Your selection stays saved for this service hub, so you do not need to rechoose it for every category or browse session.</p>
           </div>
           <div className="rounded-2xl border border-white/80 bg-white/60 p-3 shadow-sm sm:p-4">
@@ -580,7 +580,7 @@ export function ServiceExplorer({
         <div className="rounded-[1.5rem] border border-dashed border-lav-200 bg-white/70 px-4 py-8 text-center sm:px-6 sm:py-10">
           <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-lav-50 text-lav-700"><Globe className="h-5 w-5" /></span>
           <h2 className="mt-3 text-[1rem] font-semibold text-ink">Choose a country to explore</h2>
-          <p className="mx-auto mt-1.5 max-w-md text-[0.8rem] leading-relaxed text-ink-2">We&apos;ll show service categories and available listings after you make your selection.</p>
+          <p className="mx-auto mt-1.5 max-w-md text-[0.8125rem] leading-relaxed text-ink-2">We&apos;ll show service categories and available listings after you make your selection.</p>
           <div className="mx-auto mt-5 grid max-w-xl grid-cols-2 gap-2 sm:mt-6 sm:grid-cols-3 sm:gap-3">
             {POPULAR_COUNTRIES.map((c) => (
               <button
@@ -590,7 +590,7 @@ export function ServiceExplorer({
                 className="flex flex-col items-center justify-center rounded-2xl border border-line bg-white p-3 transition-all hover:-translate-y-0.5 hover:border-lav-300 hover:shadow-xs sm:p-3.5"
               >
                 <CountryFlag code={c.code} size={28} decorative />
-                <span className="mt-2 text-[0.85rem] font-semibold text-ink">{c.name}</span>
+                <span className="mt-2 text-[0.875rem] font-semibold text-ink">{c.name}</span>
                 <span className="mt-0.5 text-micro text-ink-3">{c.desc}</span>
               </button>
             ))}
@@ -602,7 +602,7 @@ export function ServiceExplorer({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Step 02</p>
-                <h2 id="categories-title" className="mt-1 text-[1.05rem] font-semibold text-ink">Choose a category</h2>
+                <h2 id="categories-title" className="mt-1 text-[1rem] font-semibold text-ink">Choose a category</h2>
               </div>
               <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-meta font-semibold text-ink-2">
                 <CountryFlag code={selectedCountry.code} size={18} decorative radius={9} /> {selectedCountry.name}
@@ -673,7 +673,7 @@ export function ServiceExplorer({
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Sparkle className="h-3.5 w-3.5" /> Step 03</p>
-                <h2 id="services-title" className="mt-1 text-[1.05rem] font-semibold text-ink">{selectedCategory ? `Explore ${selectedCategory.label}` : "Explore services"}</h2>
+                <h2 id="services-title" className="mt-1 text-[1rem] font-semibold text-ink">{selectedCategory ? `Explore ${selectedCategory.label}` : "Explore services"}</h2>
                 <p aria-live="polite" className="mt-1 text-meta text-ink-3">{filtered.length} {`listing${filtered.length === 1 ? "" : "s"}`} · {selectedCountry.name} selected</p>
                 {currentLive?.fetchedAt && <p className="mt-1 text-micro text-ink-3">Live listings checked: <time dateTime={currentLive.fetchedAt}>{new Date(currentLive.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
               </div>
@@ -738,7 +738,7 @@ export function ServiceExplorer({
                           <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-lav-50/70">
                             {itemArt(group.items[0], "sm")}
                           </span>
-                          <span className="min-w-0 flex-1 truncate text-[0.92rem] font-semibold text-ink">{group.platform}</span>
+                          <span className="min-w-0 flex-1 truncate text-[0.9375rem] font-semibold text-ink">{group.platform}</span>
                           <span className="shrink-0 rounded-full bg-cream px-2 py-0.5 text-micro font-semibold text-ink-2">
                             {group.items.length}
                             <span className="sr-only"> {group.items.length === 1 ? "listing" : "listings"}</span>
@@ -780,7 +780,7 @@ export function ServiceExplorer({
               <div className="rounded-2xl border border-dashed border-line bg-cream/50 p-8 text-center">
                 {!search && tag === "all" && (category === "data" || category === "subscriptions") ? (
                   <>
-                    <p className="text-[0.88rem] font-semibold text-ink">{category === "data" ? "Mobile data plans are not connected yet" : "Subscriptions are not connected yet"}</p>
+                    <p className="text-[0.875rem] font-semibold text-ink">{category === "data" ? "Mobile data plans are not connected yet" : "Subscriptions are not connected yet"}</p>
                     <p className="mt-1 text-meta text-ink-2">No plans or prices are available to order. Nothing will be charged.</p>
                     <Link href={category === "data" ? "/dashboard/data" : "/dashboard/digital"} className="mt-3 inline-block text-meta font-semibold text-lav-700 underline underline-offset-2">
                       {category === "data" ? "View data service status" : "View subscription service status"}
@@ -788,7 +788,7 @@ export function ServiceExplorer({
                   </>
                 ) : (
                   <>
-                    <p className="text-[0.88rem] font-semibold text-ink">No listings match these filters</p>
+                    <p className="text-[0.875rem] font-semibold text-ink">No listings match these filters</p>
                     <p className="mt-1 text-meta text-ink-2">Try another search, category or country. This doesn&apos;t indicate live availability.</p>
                   </>
                 )}

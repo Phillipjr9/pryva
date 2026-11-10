@@ -26,7 +26,7 @@ export default async function DashboardAccountsPage() {
           <ServiceTitle service="accounts">
             Digital accounts
           </ServiceTitle>
-          <p className="mt-1 text-[0.86rem] text-ink-2">
+          <p className="mt-1 text-[0.875rem] text-ink-2">
             Browse live listings priced in Naira. Country coverage is not provided or filtered here, and stock can change.
           </p>
         </div>

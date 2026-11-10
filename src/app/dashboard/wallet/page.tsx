@@ -65,14 +65,14 @@ export default async function WalletPage({
     <div className="grid min-w-0 grid-cols-1 gap-4">
       <div>
         <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">Wallet</h1>
-        <p className="mt-1 text-[0.86rem] text-ink-2">
+        <p className="mt-1 text-[0.875rem] text-ink-2">
           Manage your balance and review your wallet activity.
         </p>
       </div>
 
-      {paystackTestMode && <p role="note" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8rem] leading-relaxed text-amber-900"><strong>Paystack test mode.</strong> A test key cannot take real payments. Production checkout is disabled with this key; use an isolated staging database for testing.</p>}
-      {!provenanceKnown && <p role="note" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8rem] text-amber-900">Your wallet funds need a source-of-funds review before withdrawal. Your balance remains available for eligible purchases and refunds. Contact support for help.</p>}
-      {provenanceKnown && source.referral > 0 && <p role="note" className="rounded-2xl border border-lav-200 bg-lav-50 px-4 py-3 text-[0.8rem] text-lav-900">{formatNaira(source.referral)} of your balance is nonwithdrawable referral credit. Withdrawable balance: {formatNaira(withdrawable)} before fees.</p>}
+      {paystackTestMode && <p role="note" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8125rem] leading-relaxed text-amber-900"><strong>Paystack test mode.</strong> A test key cannot take real payments. Production checkout is disabled with this key; use an isolated staging database for testing.</p>}
+      {!provenanceKnown && <p role="note" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8125rem] text-amber-900">Your wallet funds need a source-of-funds review before withdrawal. Your balance remains available for eligible purchases and refunds. Contact support for help.</p>}
+      {provenanceKnown && source.referral > 0 && <p role="note" className="rounded-2xl border border-lav-200 bg-lav-50 px-4 py-3 text-[0.8125rem] text-lav-900">{formatNaira(source.referral)} of your balance is nonwithdrawable referral credit. Withdrawable balance: {formatNaira(withdrawable)} before fees.</p>}
       <TopUpReturn key={`${params.topup ?? ""}:${params.reference ?? params.trxref ?? ""}`} status={params.topup} reference={params.reference ?? params.trxref} userId={user.id} testMode={paystackTestMode} />
 
       <div className="grid gap-2.5 sm:grid-cols-3">
@@ -113,14 +113,14 @@ export default async function WalletPage({
         <div className="grid min-w-0 grid-cols-1 gap-4">
           <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-[1.05rem] font-semibold">Transaction history</h2>
+              <h2 className="text-[1rem] font-semibold">Transaction history</h2>
               <div className="flex items-center gap-2.5">
                 <span className="text-micro text-ink-3">{transactions.length} newest entries</span>
                 {transactions.length > 0 && <ExportTransactionsButton />}
               </div>
             </div>
             {transactions.length === 0 ? (
-              <p className="mt-4 rounded-xl border border-dashed border-line bg-cream/50 px-4 py-6 text-center text-[0.82rem] text-ink-3">
+              <p className="mt-4 rounded-xl border border-dashed border-line bg-cream/50 px-4 py-6 text-center text-[0.8125rem] text-ink-3">
                 Your first top-up will show up here.
               </p>
             ) : (
@@ -128,7 +128,7 @@ export default async function WalletPage({
                 {transactions.map((tx: { id: string; description: string; amount: number; type: string; balanceAfter: number; reference: string; createdAt: Date | string }) => (
                   <div key={tx.id} className="flex items-start justify-between gap-3 py-2.5">
                     <div className="min-w-0">
-                      <p className="truncate text-[0.82rem] font-medium text-ink">{tx.description}</p>
+                      <p className="truncate text-[0.8125rem] font-medium text-ink">{tx.description}</p>
                       <p className="truncate text-micro text-ink-3">
                         {tx.reference} ·{" "}
                         {new Date(tx.createdAt).toLocaleString("en-NG", {
@@ -141,7 +141,7 @@ export default async function WalletPage({
                     </div>
                     <div className="shrink-0 text-right">
                       <p
-                        className={`text-[0.82rem] font-semibold ${
+                        className={`text-[0.8125rem] font-semibold ${
                           walletEntryDirection(tx.type) === "in" ? "text-emerald-600" : "text-ink-2"
                         }`}
                       >
@@ -157,10 +157,10 @@ export default async function WalletPage({
           </div>
 
           <div className="rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
-            <p className="flex items-center gap-2 text-[0.85rem] font-semibold text-ink">
+            <p className="flex items-center gap-2 text-[0.875rem] font-semibold text-ink">
               <Shield className="h-4 w-4 text-lav-700" /> How money moves
             </p>
-            <ul className="mt-2.5 grid gap-2 text-[0.8rem] text-ink-2">
+            <ul className="mt-2.5 grid gap-2 text-[0.8125rem] text-ink-2">
               <li className="flex items-start gap-2">
                 <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
                 Top-ups use Paystack checkout.

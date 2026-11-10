@@ -227,7 +227,7 @@ export function PayoutNameManager() {
         role="alert"
         className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-10 text-center text-amber-900"
       >
-        <p className="text-[0.95rem] font-semibold">The queue could not be read.</p>
+        <p className="text-[0.9375rem] font-semibold">The queue could not be read.</p>
         <p className="mx-auto mt-1 max-w-md text-meta leading-relaxed">
           {loadError} — this is not the same as nobody being blocked, so do not treat the queue as
           clear.
@@ -235,7 +235,7 @@ export function PayoutNameManager() {
         <button
           type="button"
           onClick={() => void refresh()}
-          className="mt-4 inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-[0.82rem] font-medium text-amber-900 hover:bg-amber-100"
+          className="mt-4 inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-[0.8125rem] font-medium text-amber-900 hover:bg-amber-100"
         >
           <Loader2 className="h-3.5 w-3.5" /> Try again
         </button>
@@ -249,7 +249,7 @@ export function PayoutNameManager() {
         <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
           ✓
         </span>
-        <p className="mt-3 text-[0.95rem] font-medium text-ink">Nothing is blocked</p>
+        <p className="mt-3 text-[0.9375rem] font-medium text-ink">Nothing is blocked</p>
         <p className="mx-auto mt-1 max-w-md text-meta leading-relaxed text-ink-2">
           Every saved bank account passes the current profile-name or approved-name check. This does not verify the payer. Re-run this page after a
           customer updates their payout account.
@@ -257,7 +257,7 @@ export function PayoutNameManager() {
         <button
           type="button"
           onClick={() => void refresh()}
-          className="mt-4 inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-1.5 text-[0.82rem] font-medium text-ink hover:border-lav-300"
+          className="mt-4 inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-1.5 text-[0.8125rem] font-medium text-ink hover:border-lav-300"
         >
           <Loader2 className="h-3.5 w-3.5" /> Check again
         </button>
@@ -284,7 +284,7 @@ export function PayoutNameManager() {
       {loadError && (
         <div
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.84rem] text-amber-900"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8125rem] text-amber-900"
         >
           <span>
             <strong className="font-semibold">The queue could not be read.</strong> {loadError} — an
@@ -307,7 +307,7 @@ export function PayoutNameManager() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search name, email, bank or account name"
-            className="field !py-2 !text-[0.84rem] w-full"
+            className="field !py-2 !text-[0.8125rem] w-full"
           />
         </label>
 
@@ -323,7 +323,7 @@ export function PayoutNameManager() {
                 onClick={() => setFilter(option.value)}
                 aria-pressed={active}
                 className={cn(
-                  "rounded-md px-3 py-1.5 text-[0.82rem] font-medium transition-colors",
+                  "rounded-md px-3 py-1.5 text-[0.8125rem] font-medium transition-colors",
                   active ? "bg-lav-50 text-lav-800" : "text-ink-2 hover:bg-cream",
                 )}
               >
@@ -337,14 +337,14 @@ export function PayoutNameManager() {
         <button
           type="button"
           onClick={() => void refresh()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-2 text-[0.82rem] font-medium text-ink hover:border-lav-300"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-2 text-[0.8125rem] font-medium text-ink hover:border-lav-300"
         >
           <Loader2 className="h-3.5 w-3.5" /> Refresh
         </button>
       </div>
 
       {visible.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-line bg-white px-5 py-10 text-center text-[0.86rem] text-ink-3">
+        <p className="rounded-2xl border border-dashed border-line bg-white px-5 py-10 text-center text-[0.875rem] text-ink-3">
           Nothing matches this search.
         </p>
       ) : (
@@ -374,14 +374,14 @@ export function PayoutNameManager() {
                     <span
                       aria-hidden="true"
                       className={cn(
-                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[0.8rem] font-semibold",
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[0.8125rem] font-semibold",
                         row.approvedName ? "bg-emerald-100 text-emerald-800" : "bg-lav-100 text-lav-800",
                       )}
                     >
                       {initials(row.userName)}
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-[0.95rem] font-semibold text-ink">{row.userName}</p>
+                      <p className="truncate text-[0.9375rem] font-semibold text-ink">{row.userName}</p>
                       <p className="truncate text-meta text-ink-2">{row.userEmail}</p>
                     </div>
                   </div>
@@ -449,7 +449,7 @@ export function PayoutNameManager() {
                         onChange={(event) => setDraft(row.userId, { name: event.target.value })}
                         maxLength={200}
                         placeholder="Name exactly as the bank has it"
-                        className="field !py-2 !text-[0.84rem]"
+                        className="field !py-2 !text-[0.8125rem]"
                         aria-label={`Reviewed payout name for ${row.userEmail}`}
                       />
                     </label>
@@ -460,7 +460,7 @@ export function PayoutNameManager() {
                         onChange={(event) => setDraft(row.userId, { reason: event.target.value })}
                         maxLength={500}
                         placeholder="Bank statement checked, ticket #1234"
-                        className="field !py-2 !text-[0.84rem]"
+                        className="field !py-2 !text-[0.8125rem]"
                         aria-label={`Reason for approving a payout name for ${row.userEmail}`}
                       />
                       <span className="text-micro text-ink-3">
@@ -484,7 +484,7 @@ export function PayoutNameManager() {
                       onClick={() => void approve(row)}
                       disabled={working}
                       className={cn(
-                        "btn btn-primary inline-flex items-center gap-1.5 !px-4 !py-2.5 !text-[0.8rem] disabled:opacity-50",
+                        "btn btn-primary inline-flex items-center gap-1.5 !px-4 !py-2.5 !text-[0.8125rem] disabled:opacity-50",
                         !ready && "opacity-60",
                       )}
                       aria-describedby={ready ? undefined : `approve-hint-${row.userId}`}
@@ -497,7 +497,7 @@ export function PayoutNameManager() {
                         type="button"
                         onClick={() => void revoke(row)}
                         disabled={working}
-                        className="btn border border-line bg-white !px-4 !py-2.5 !text-[0.8rem] text-ink hover:border-rose-200 disabled:opacity-50"
+                        className="btn border border-line bg-white !px-4 !py-2.5 !text-[0.8125rem] text-ink hover:border-rose-200 disabled:opacity-50"
                       >
                         Revoke
                       </button>

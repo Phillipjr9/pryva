@@ -399,16 +399,16 @@ export default function TermsPage() {
     <div className="min-h-screen bg-cream">
       <header className="border-b border-line bg-white">
         <div className="shell flex h-16 items-center justify-between">
-          <Link href="/" className="text-[0.95rem] font-semibold tracking-tight text-ink">
+          <Link href="/" className="text-[0.9375rem] font-semibold tracking-tight text-ink">
             PryvaLogs
           </Link>
           <div className="flex items-center gap-3">
-            <Link href="/login" className="text-[0.86rem] font-medium text-ink-2 hover:text-ink">
+            <Link href="/login" className="text-[0.875rem] font-medium text-ink-2 hover:text-ink">
               Sign in
             </Link>
             <Link
               href="/signup"
-              className="rounded-xl bg-lav-700 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-800"
+              className="rounded-xl bg-lav-700 px-4 py-2 text-[0.875rem] font-semibold text-white hover:bg-lav-800"
             >
               Get Started
             </Link>
@@ -422,18 +422,18 @@ export default function TermsPage() {
           <h1 className="mt-3 text-[2rem] font-medium tracking-tight text-ink sm:text-[2.5rem]">
             Terms of Service
           </h1>
-          <p className="mt-3 max-w-2xl text-[0.95rem] leading-relaxed text-ink-2">
+          <p className="mt-3 max-w-2xl text-[0.9375rem] leading-relaxed text-ink-2">
             The agreement between you and PryvaLogs. It is written to match what the product does
             today, including the parts that are deliberately switched off.
           </p>
-          <p className="mt-2 text-[0.8rem] text-ink-3">
+          <p className="mt-2 text-[0.8125rem] text-ink-3">
             Version in force from <time dateTime="2026-10-30">{LAST_UPDATED}</time>
           </p>
 
           <div className="mt-8 grid gap-10 lg:grid-cols-[16rem_1fr] lg:items-start">
             <nav aria-label="Contents" className="lg:sticky lg:top-24">
               <p className="text-meta font-semibold uppercase tracking-wide text-ink-3">On this page</p>
-              <ol className="mt-3 space-y-1.5 text-[0.85rem]">
+              <ol className="mt-3 space-y-1.5 text-[0.875rem]">
                 {clauses.map((clause) => (
                   <li key={clause.id}>
                     <a href={`#${clause.id}`} className="text-ink-2 transition hover:text-ink">
@@ -449,7 +449,7 @@ export default function TermsPage() {
                 <p className="text-meta font-semibold uppercase tracking-wide text-ink-3">
                   In plain words
                 </p>
-                <ul className="mt-3 space-y-2 text-[0.9rem] leading-relaxed text-ink-2">
+                <ul className="mt-3 space-y-2 text-[0.875rem] leading-relaxed text-ink-2">
                   <li>Your wallet holds Naira you have already paid, and orders come out of it.</li>
                   <li>
                     You buy our effort, not a guarantee: a platform can refuse a number or restrict
@@ -470,10 +470,10 @@ export default function TermsPage() {
 
               {clauses.map((clause) => (
                 <section key={clause.id} id={clause.id} className="scroll-mt-24">
-                  <h2 className="text-[1.15rem] font-medium tracking-tight text-ink">
+                  <h2 className="text-[1.125rem] font-medium tracking-tight text-ink">
                     {clause.title}
                   </h2>
-                  <div className="mt-3 space-y-3 text-[0.92rem] leading-relaxed text-ink-2 [&_a]:font-medium [&_a]:text-lav-700 [&_a]:underline [&_a]:underline-offset-2 [&_li]:pl-1 [&_strong]:font-semibold [&_strong]:text-ink [&_ul]:list-disc [&_ul]:space-y-1.5 [&_ul]:pl-5">
+                  <div className="mt-3 space-y-3 text-[0.9375rem] leading-relaxed text-ink-2 [&_a]:font-medium [&_a]:text-lav-700 [&_a]:underline [&_a]:underline-offset-2 [&_li]:pl-1 [&_strong]:font-semibold [&_strong]:text-ink [&_ul]:list-disc [&_ul]:space-y-1.5 [&_ul]:pl-5">
                     {clause.body}
                   </div>
                 </section>
@@ -481,7 +481,7 @@ export default function TermsPage() {
 
               <section className="rounded-2xl border border-line bg-white p-5">
                 <h2 className="text-[1rem] font-medium text-ink">Earlier versions</h2>
-                <ul className="mt-2 space-y-1 text-[0.85rem] text-ink-2">
+                <ul className="mt-2 space-y-1 text-[0.875rem] text-ink-2">
                   <li>
                     <time dateTime="2026-10-30">{LAST_UPDATED}</time> — rewritten to cover gift
                     cards, two-factor sign-in, account lockout, purchase-verified reviews,

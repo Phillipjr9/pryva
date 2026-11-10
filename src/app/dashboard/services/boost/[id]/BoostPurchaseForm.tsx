@@ -118,7 +118,7 @@ export function BoostPurchaseForm({ listing, walletBalance, userId }: { listing:
   if (receipt) {
     return (
       <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50/60 p-5">
-        <p className="flex items-center gap-2 text-[0.95rem] font-semibold text-emerald-900">
+        <p className="flex items-center gap-2 text-[0.9375rem] font-semibold text-emerald-900">
           <Check className="h-4 w-4" /> Boost started
         </p>
         <p className="mt-1 text-meta text-emerald-900">
@@ -130,13 +130,13 @@ export function BoostPurchaseForm({ listing, walletBalance, userId }: { listing:
           <p className="mt-1 text-micro text-emerald-800">That was already placed — this is the same order, not a second charge.</p>
         )}
         <div className="mt-3 flex flex-wrap gap-3">
-          <Link href="/dashboard/orders" className="btn btn-primary !px-4 !py-2.5 !text-[0.8rem]">
+          <Link href="/dashboard/orders" className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem]">
             View orders <ArrowRight className="h-3.5 w-3.5" />
           </Link>
           <button
             type="button"
             onClick={() => { setReceipt(null); setLink(""); setQuantity(listing.min); }}
-            className="btn border border-line bg-white !px-4 !py-2.5 !text-[0.8rem] text-ink"
+            className="btn border border-line bg-white !px-4 !py-2.5 !text-[0.8125rem] text-ink"
           >
             Buy another
           </button>
@@ -187,7 +187,7 @@ export function BoostPurchaseForm({ listing, walletBalance, userId }: { listing:
 
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-white px-3.5 py-3">
         <span className="text-meta text-ink-2">Total</span>
-        <span className="text-[1.05rem] font-semibold text-ink">{formatNaira(total)}</span>
+        <span className="text-[1rem] font-semibold text-ink">{formatNaira(total)}</span>
       </div>
 
       {shortfall > 0 && (
@@ -203,7 +203,7 @@ export function BoostPurchaseForm({ listing, walletBalance, userId }: { listing:
         type="button"
         onClick={buy}
         disabled={pending || !quantityValid || total <= 0 || shortfall > 0}
-        className="btn btn-primary w-fit !px-5 !py-2.5 !text-[0.82rem] disabled:opacity-50"
+        className="btn btn-primary w-fit !px-5 !py-2.5 !text-[0.8125rem] disabled:opacity-50"
       >
         {pending ? "Placing order…" : <>Pay {formatNaira(total)} from wallet</>}
       </button>

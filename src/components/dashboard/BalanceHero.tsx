@@ -60,13 +60,13 @@ export function BalanceHero({
           <div className="flex w-full flex-wrap gap-2 sm:w-auto">
             <Link
               href="/dashboard/wallet"
-              className="btn flex-1 bg-white !px-4 !py-2.5 !text-[0.8rem] font-semibold text-ink shadow-sm hover:bg-white/90 sm:flex-none"
+              className="btn flex-1 bg-white !px-4 !py-2.5 !text-[0.8125rem] font-semibold text-ink shadow-sm hover:bg-white/90 sm:flex-none"
             >
               <Plus className="h-3.5 w-3.5" /> Top up
             </Link>
             <Link
               href="/dashboard/wallet#withdraw"
-              className="btn flex-1 border border-white/25 !px-4 !py-2.5 !text-[0.8rem] font-semibold text-white hover:bg-white/10 sm:flex-none"
+              className="btn flex-1 border border-white/25 !px-4 !py-2.5 !text-[0.8125rem] font-semibold text-white hover:bg-white/10 sm:flex-none"
             >
               <ArrowUpRight className="h-3.5 w-3.5" /> Withdraw
             </Link>
@@ -81,7 +81,7 @@ export function BalanceHero({
               <dt className="text-micro uppercase tracking-[0.12em] text-white/45">
                 {stat.label}
               </dt>
-              <dd className="mt-1 truncate text-[0.95rem] font-semibold tabular-nums">
+              <dd className="mt-1 truncate text-[0.9375rem] font-semibold tabular-nums">
                 {stat.value}
               </dd>
               {stat.note && <p className="mt-0.5 truncate text-micro text-white/40">{stat.note}</p>}

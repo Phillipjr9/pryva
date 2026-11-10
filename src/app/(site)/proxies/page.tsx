@@ -28,19 +28,19 @@ export default function ProxiesPage() {
               Coming soon
             </span>
             <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3.5rem]">{service.tagline}</h1>
-            <p className="mt-6 text-[1.1rem] leading-relaxed text-ink-2">{service.description}</p>
+            <p className="mt-6 text-[1.125rem] leading-relaxed text-ink-2">{service.description}</p>
             <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-[0.9rem] leading-relaxed text-amber-900">
+              <p className="text-[0.875rem] leading-relaxed text-amber-900">
                 <strong>Not available yet.</strong> Proxy plans are listed with their catalog prices
                 so you can compare options, but nothing here can be ordered or charged until a
                 delivery path is connected.
               </p>
             </div>
             <div className="mt-6 flex flex-wrap gap-3 sm:gap-4">
-              <Link href="/status" className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-800">
+              <Link href="/status" className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.9375rem] font-semibold text-white hover:bg-lav-800">
                 Check availability <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href="/contact" className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-6 py-3 text-[0.95rem] font-semibold text-ink hover:bg-cream">
+              <Link href="/contact" className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-6 py-3 text-[0.9375rem] font-semibold text-ink hover:bg-cream">
                 <Bell className="h-4 w-4" /> Get notified
               </Link>
             </div>
@@ -53,8 +53,8 @@ export default function ProxiesPage() {
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {service.highlights.map((highlight, index) => (
               <div key={index} className="rounded-2xl border border-line bg-white p-6">
-                <h3 className="text-[1.1rem] font-semibold text-ink mb-3">{highlight.title}</h3>
-                <p className="text-[0.9rem] text-ink-2 leading-relaxed">{highlight.body}</p>
+                <h3 className="text-[1.125rem] font-semibold text-ink mb-3">{highlight.title}</h3>
+                <p className="text-[0.875rem] text-ink-2 leading-relaxed">{highlight.body}</p>
               </div>
             ))}
           </div>
@@ -64,21 +64,21 @@ export default function ProxiesPage() {
       <section className="pb-16">
         <div className="shell">
           <h2 className="text-[1.75rem] font-semibold text-ink mb-3">Catalog pricing</h2>
-          <p className="mb-8 max-w-2xl text-[0.92rem] leading-relaxed text-ink-2">
+          <p className="mb-8 max-w-2xl text-[0.9375rem] leading-relaxed text-ink-2">
             Proxy plans are not available yet, so they cannot be ordered or charged. They stay
             listed with their prices so you can see what is planned and what it costs.
           </p>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {plans.slice(0, 6).map((plan) => (
               <div key={plan.slug} className={`rounded-2xl border p-6 ${plan.popular ? "border-lav-600 bg-white shadow-[var(--shadow-card)]" : "border-line bg-white"}`}>
-                <h3 className="mb-2 flex items-center gap-2 text-[1.1rem] font-semibold text-ink">
+                <h3 className="mb-2 flex items-center gap-2 text-[1.125rem] font-semibold text-ink">
                   {hasCountryFlag(plan.region) && <CountryFlag region={plan.region} size={20} decorative />}
                   {plan.name}
                 </h3>
-                <p className="text-[0.86rem] text-ink-2 mb-4">{plan.planLabel}</p>
+                <p className="text-[0.875rem] text-ink-2 mb-4">{plan.planLabel}</p>
                 <div className="mb-4"><span className="text-[2rem] font-bold text-ink">{formatNaira(plan.price)}</span></div>
                 {isPlanFulfillable(plan.slug) ? (
-                  <Link href={`/signup?plan=${plan.slug}`} className="block w-full rounded-xl bg-lav-700 px-4 py-3 text-center text-[0.9rem] font-semibold text-white hover:bg-lav-800">Get Started</Link>
+                  <Link href={`/signup?plan=${plan.slug}`} className="block w-full rounded-xl bg-lav-700 px-4 py-3 text-center text-[0.875rem] font-semibold text-white hover:bg-lav-800">Get Started</Link>
                 ) : (
                   <p className="block w-full rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-center text-meta font-semibold leading-relaxed text-amber-900">
                     This plan cannot be delivered yet, so it cannot be ordered or charged.
@@ -97,7 +97,7 @@ export default function ProxiesPage() {
             {service.faqs.map((faq, index) => (
               <div key={index} className="rounded-2xl border border-line bg-white p-6">
                 <h3 className="text-[1rem] font-semibold text-ink mb-3">{faq.q}</h3>
-                <p className="text-[0.9rem] text-ink-2 leading-relaxed">{faq.a}</p>
+                <p className="text-[0.875rem] text-ink-2 leading-relaxed">{faq.a}</p>
               </div>
             ))}
           </div>

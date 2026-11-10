@@ -37,7 +37,7 @@ export default async function AdminPayoutNamesPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-[1.5rem] font-medium tracking-tight">Payout names</h1>
-          <p className="mt-1 max-w-2xl text-[0.86rem] leading-relaxed text-ink-2">
+          <p className="mt-1 max-w-2xl text-[0.875rem] leading-relaxed text-ink-2">
             Saved accounts the depositor-name rule would refuse. Approve a name to let one customer be
             paid to it, or revoke to put the rule back.
           </p>

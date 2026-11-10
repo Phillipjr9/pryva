@@ -13,7 +13,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         <BrandLockup size="sm" priority />
         <Link
           href="/"
-          className="text-[0.8rem] font-medium text-ink-2 transition-colors hover:text-lav-700"
+          className="text-[0.8125rem] font-medium text-ink-2 transition-colors hover:text-lav-700"
         >
           Back to site
         </Link>
@@ -30,7 +30,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
               <br />
               <span className="text-display italic text-lav-700">Simple experience.</span>
             </h2>
-            <p className="mt-3 max-w-sm text-[0.88rem] leading-relaxed text-ink-2">
+            <p className="mt-3 max-w-sm text-[0.875rem] leading-relaxed text-ink-2">
               Numbers, eSIM data, residential proxies and temporary inboxes — one Naira wallet, one
               calm dashboard.
             </p>
@@ -49,7 +49,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
                     <Check className="h-3.5 w-3.5" />
                   </span>
                   <div>
-                    <p className="text-[0.84rem] font-semibold text-ink">{item.title}</p>
+                    <p className="text-[0.8125rem] font-semibold text-ink">{item.title}</p>
                     <p className="text-meta text-ink-2">{item.body}</p>
                   </div>
                 </div>

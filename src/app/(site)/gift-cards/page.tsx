@@ -143,11 +143,11 @@ export default function GiftCardsPage() {
         <div className="grid gap-4 md:grid-cols-3">
           {steps.map((step, index) => (
             <article key={step.title} className="rounded-3xl border border-line bg-white p-6">
-              <span className="grid h-8 w-8 place-items-center rounded-full bg-lav-100 text-[0.8rem] font-semibold text-lav-800">
+              <span className="grid h-8 w-8 place-items-center rounded-full bg-lav-100 text-[0.8125rem] font-semibold text-lav-800">
                 {index + 1}
               </span>
-              <h2 className="mt-4 text-[1.05rem] font-semibold text-ink">{step.title}</h2>
-              <p className="mt-2 text-[0.9rem] leading-relaxed text-ink-2">{step.body}</p>
+              <h2 className="mt-4 text-[1rem] font-semibold text-ink">{step.title}</h2>
+              <p className="mt-2 text-[0.875rem] leading-relaxed text-ink-2">{step.body}</p>
             </article>
           ))}
         </div>
@@ -162,10 +162,10 @@ export default function GiftCardsPage() {
           <dl className="mt-8 grid gap-4 sm:grid-cols-2">
             {facts.map((fact) => (
               <div key={fact.term} className="rounded-2xl border border-line bg-white/80 p-5">
-                <dt className="text-[0.82rem] font-semibold uppercase tracking-[0.12em] text-lav-800">
+                <dt className="text-[0.8125rem] font-semibold uppercase tracking-[0.12em] text-lav-800">
                   {fact.term}
                 </dt>
-                <dd className="mt-2 text-[0.9rem] leading-relaxed text-ink-2">{fact.detail}</dd>
+                <dd className="mt-2 text-[0.875rem] leading-relaxed text-ink-2">{fact.detail}</dd>
               </div>
             ))}
           </dl>
@@ -175,8 +175,8 @@ export default function GiftCardsPage() {
       <section className="shell grid gap-6 py-14 md:grid-cols-2">
         <div className="rounded-3xl border border-line bg-white p-6">
           <Shield className="h-5 w-5 text-lav-700" />
-          <h2 className="mt-3 text-[1.1rem] font-semibold">Treat the code like cash</h2>
-          <p className="mt-2 text-[0.92rem] leading-relaxed text-ink-2">
+          <h2 className="mt-3 text-[1.125rem] font-semibold">Treat the code like cash</h2>
+          <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-2">
             Whoever redeems it first keeps the value, and we cannot reverse a redemption once it has
             happened. Send it in a message to one person rather than posting it in a group, and do
             not paste it into a support chat — nobody at PryvaLogs needs it to help you, because your
@@ -184,8 +184,8 @@ export default function GiftCardsPage() {
           </p>
         </div>
         <div className="rounded-3xl border border-line bg-white p-6">
-          <h3 className="text-[1.1rem] font-semibold">What it is not</h3>
-          <ul className="mt-3 space-y-2 text-[0.92rem] leading-relaxed text-ink-2">
+          <h3 className="text-[1.125rem] font-semibold">What it is not</h3>
+          <ul className="mt-3 space-y-2 text-[0.9375rem] leading-relaxed text-ink-2">
             {[
               "Not a discount: the full amount is paid from your wallet.",
               "Not reloadable: buy a new card instead of topping one up.",
@@ -208,17 +208,17 @@ export default function GiftCardsPage() {
         <div className="mt-6 divide-y divide-line rounded-3xl border border-line bg-white">
           {faqs.map((faq) => (
             <details key={faq.q} className="group px-5 py-4">
-              <summary className="cursor-pointer list-none text-[0.95rem] font-semibold text-ink">
+              <summary className="cursor-pointer list-none text-[0.9375rem] font-semibold text-ink">
                 {faq.q}
               </summary>
-              <p className="mt-2 text-[0.9rem] leading-relaxed text-ink-2">{faq.a}</p>
+              <p className="mt-2 text-[0.875rem] leading-relaxed text-ink-2">{faq.a}</p>
             </details>
           ))}
         </div>
         <div className="mt-8 rounded-3xl border border-lav-200 bg-lav-50/60 p-6 sm:flex sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-[1.05rem] font-semibold">Ready when the balance is</h3>
-            <p className="mt-1 text-[0.9rem] leading-relaxed text-ink-2">
+            <h3 className="text-[1rem] font-semibold">Ready when the balance is</h3>
+            <p className="mt-1 text-[0.875rem] leading-relaxed text-ink-2">
               Gift cards are bought from your PryvaLogs wallet. Top up first if the balance is short.
             </p>
           </div>

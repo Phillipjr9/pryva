@@ -48,7 +48,7 @@ export default async function BoostPage({ params }: { params: Promise<{ id: stri
           )}
           {listing.name}
         </h1>
-        <p className="mt-1 text-[0.84rem] text-ink-2">
+        <p className="mt-1 text-[0.8125rem] text-ink-2">
           {listing.tag}
           {priceFrom !== null && <> · from {formatNaira(priceFrom)}</>}
           {listing.min !== null && listing.max !== null && (

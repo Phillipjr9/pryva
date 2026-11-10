@@ -26,7 +26,7 @@ export default async function AdminSuppliersPage({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-[1.5rem] font-medium tracking-tight">Supplier health</h1>
-          <p className="mt-1 max-w-3xl text-[0.86rem] text-ink-2">
+          <p className="mt-1 max-w-3xl text-[0.875rem] text-ink-2">
             Read-only supplier checks for the countries we sell. Bitcall is the single-use OTP purchase route; Fleexa remains
             visible for diagnostics and rentals. This highlights missing keys, low balance or a Bitcall offer below our margin floor.
           </p>
@@ -59,7 +59,7 @@ export default async function AdminSuppliersPage({
 
       <section className="rounded-2xl border border-line bg-white p-4">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-[0.8rem] font-semibold uppercase tracking-[0.12em] text-ink-3">Filter</span>
+          <span className="text-[0.8125rem] font-semibold uppercase tracking-[0.12em] text-ink-3">Filter</span>
           <Link
             href="/admin/suppliers"
             className={`rounded-full px-2.5 py-1 text-xs font-medium ${selectedCountry ? "bg-cream text-ink" : "bg-lav-50 text-lav-800"}`}
@@ -83,8 +83,8 @@ export default async function AdminSuppliersPage({
           <section key={destination.country} className="rounded-2xl border border-line bg-white p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h2 className="text-[1.05rem] font-medium text-ink">{destination.name}</h2>
-                <p className="text-[0.8rem] text-ink-3">{destination.country.toUpperCase()}</p>
+                <h2 className="text-[1rem] font-medium text-ink">{destination.name}</h2>
+                <p className="text-[0.8125rem] text-ink-3">{destination.country.toUpperCase()}</p>
               </div>
               <span
                 className={`rounded-full px-2.5 py-0.5 text-meta font-semibold ${destination.sellable ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}
@@ -94,7 +94,7 @@ export default async function AdminSuppliersPage({
             </div>
 
             <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[40rem] text-left text-[0.82rem]">
+              <table className="w-full min-w-[40rem] text-left text-[0.8125rem]">
                 <thead>
                   <tr className="border-b border-line text-meta uppercase tracking-[0.12em] text-ink-3">
                     <th className="px-3 py-2 font-semibold">Supplier</th>
@@ -130,9 +130,9 @@ export default async function AdminSuppliersPage({
       </div>
 
       <section className="rounded-2xl border border-line bg-white p-4">
-        <h2 className="text-[1.05rem] font-medium text-ink">Margin check</h2>
+        <h2 className="text-[1rem] font-medium text-ink">Margin check</h2>
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[42rem] text-left text-[0.82rem]">
+          <table className="w-full min-w-[42rem] text-left text-[0.8125rem]">
             <thead>
               <tr className="border-b border-line text-meta uppercase tracking-[0.12em] text-ink-3">
                 <th className="px-3 py-2 font-semibold">Plan</th>

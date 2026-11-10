@@ -69,7 +69,7 @@ export function FulfilmentControl({ orderId, reference, quantity, status }: Prop
 
   if (status !== "processing") {
     return (
-      <p className="text-[0.8rem] text-ink-3">
+      <p className="text-[0.8125rem] text-ink-3">
         Waiting on a refund decision. Use the orders page to refund it with a reconciliation reason.
       </p>
     );
@@ -77,22 +77,22 @@ export function FulfilmentControl({ orderId, reference, quantity, status }: Prop
 
   return (
     <div className="min-w-0 space-y-3">
-      {done && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[0.8rem] text-emerald-800">{done}</p>}
-      {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[0.8rem] text-rose-800">{error}</p>}
+      {done && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[0.8125rem] text-emerald-800">{done}</p>}
+      {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[0.8125rem] text-rose-800">{error}</p>}
 
       {mode === null && (
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setMode("deliver")}
-            className="rounded-lg bg-lav-700 px-3 py-1.5 text-[0.82rem] font-semibold text-white hover:bg-lav-800"
+            className="rounded-lg bg-lav-700 px-3 py-1.5 text-[0.8125rem] font-semibold text-white hover:bg-lav-800"
           >
             Add credentials
           </button>
           <button
             type="button"
             onClick={() => setMode("unavailable")}
-            className="rounded-lg border border-line px-3 py-1.5 text-[0.82rem] font-medium text-ink-2 hover:border-rose-300 hover:text-rose-700"
+            className="rounded-lg border border-line px-3 py-1.5 text-[0.8125rem] font-medium text-ink-2 hover:border-rose-300 hover:text-rose-700"
           >
             Cannot source
           </button>
@@ -119,7 +119,7 @@ export function FulfilmentControl({ orderId, reference, quantity, status }: Prop
               type="button"
               disabled={busy || !ready}
               onClick={() => void submit()}
-              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[0.82rem] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[0.8125rem] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
               {busy ? "Delivering…" : `Deliver ${quantity}`}
             </button>
@@ -127,7 +127,7 @@ export function FulfilmentControl({ orderId, reference, quantity, status }: Prop
               type="button"
               disabled={busy}
               onClick={() => { setMode(null); setError(null); }}
-              className="rounded-lg border border-line px-3 py-1.5 text-[0.82rem] font-medium text-ink-2"
+              className="rounded-lg border border-line px-3 py-1.5 text-[0.8125rem] font-medium text-ink-2"
             >
               Cancel
             </button>
@@ -144,7 +144,7 @@ export function FulfilmentControl({ orderId, reference, quantity, status }: Prop
             id={`reason-${orderId}`}
             value={reason}
             onChange={(event) => setReason(event.target.value.slice(0, 180))}
-            className="w-full min-w-0 rounded-xl border border-line bg-white px-3 py-2 text-[0.82rem] text-ink"
+            className="w-full min-w-0 rounded-xl border border-line bg-white px-3 py-2 text-[0.8125rem] text-ink"
             placeholder="Out of stock, customer refunded"
           />
           <div className="flex flex-wrap gap-2">
@@ -152,7 +152,7 @@ export function FulfilmentControl({ orderId, reference, quantity, status }: Prop
               type="button"
               disabled={busy || !ready}
               onClick={() => void submit()}
-              className="rounded-lg bg-rose-600 px-3 py-1.5 text-[0.82rem] font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
+              className="rounded-lg bg-rose-600 px-3 py-1.5 text-[0.8125rem] font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
             >
               {busy ? "Updating…" : "Move to review"}
             </button>
@@ -160,7 +160,7 @@ export function FulfilmentControl({ orderId, reference, quantity, status }: Prop
               type="button"
               disabled={busy}
               onClick={() => { setMode(null); setError(null); }}
-              className="rounded-lg border border-line px-3 py-1.5 text-[0.82rem] font-medium text-ink-2"
+              className="rounded-lg border border-line px-3 py-1.5 text-[0.8125rem] font-medium text-ink-2"
             >
               Cancel
             </button>

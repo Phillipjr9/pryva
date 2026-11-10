@@ -137,7 +137,7 @@ export function AssistantPresence({ state = "idle" }: { state?: PresenceState })
       </span>
 
       <div className="min-w-0">
-        <p className="flex items-center gap-1.5 text-[0.86rem] font-semibold text-ink">
+        <p className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-ink">
           <Sparkle className="h-3.5 w-3.5 text-lav-700" aria-hidden="true" />
           PryvaLogs assistant
         </p>

@@ -64,7 +64,7 @@ export function AdminTicketControls({
 
   return (
     <form onSubmit={submit} className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-4">
-      <label htmlFor="admin-reply" className="text-[0.86rem] font-semibold text-ink">
+      <label htmlFor="admin-reply" className="text-[0.875rem] font-semibold text-ink">
         Reply on this ticket
       </label>
       <textarea
@@ -111,13 +111,13 @@ export function AdminTicketControls({
         </label>
       </div>
 
-      {error ? <p className="mt-2 text-[0.8rem] font-medium text-rose-700">{error}</p> : null}
-      {saved ? <p className="mt-2 text-[0.8rem] font-medium text-emerald-700">Saved.</p> : null}
+      {error ? <p className="mt-2 text-[0.8125rem] font-medium text-rose-700">{error}</p> : null}
+      {saved ? <p className="mt-2 text-[0.8125rem] font-medium text-emerald-700">Saved.</p> : null}
 
       <button
         type="submit"
         disabled={pending}
-        className="mt-3 inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-[0.82rem] font-semibold text-white hover:bg-ink-2 disabled:opacity-50"
+        className="mt-3 inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-[0.8125rem] font-semibold text-white hover:bg-ink-2 disabled:opacity-50"
       >
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         {pending ? "Saving…" : "Save"}

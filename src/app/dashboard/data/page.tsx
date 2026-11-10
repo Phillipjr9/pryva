@@ -17,7 +17,7 @@ export default async function DataPlansPage({ searchParams }: { searchParams: Pr
     <div className="space-y-6">
       <div>
         <ServiceTitle service="data">Data Plans</ServiceTitle>
-        <p className="mt-1 text-[0.86rem] text-ink-2">
+        <p className="mt-1 text-[0.875rem] text-ink-2">
           Mobile data purchases are not available yet. No wallet charge will be made.
         </p>
       </div>

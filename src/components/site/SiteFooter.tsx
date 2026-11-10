@@ -72,7 +72,7 @@ export function SiteFooter() {
                 <br />
                 <span className="text-display italic text-lav-700">connect and scale.</span>
               </h2>
-              <p className="mt-3 max-w-md text-[0.94rem] leading-relaxed text-ink-2">
+              <p className="mt-3 max-w-md text-[0.9375rem] leading-relaxed text-ink-2">
                 Create an account to explore the dashboard and get instant access to our services.
               </p>
             </div>
@@ -97,7 +97,7 @@ export function SiteFooter() {
 
         <div className="mt-14 grid gap-10 pb-12 md:grid-cols-[1.3fr_2fr]">
           <div>
-            <p className="mt-4 max-w-xs text-[0.88rem] leading-relaxed text-ink-3">
+            <p className="mt-4 max-w-xs text-[0.875rem] leading-relaxed text-ink-3">
               PryvaLogs is a Nigerian digital services platform for virtual numbers, eSIM data,
               residential proxies and email OTP. Built for people who value calm, reliable access.
             </p>
@@ -143,7 +143,7 @@ export function SiteFooter() {
           <div className="mt-10 flex flex-col gap-3 border-t border-line/70 pt-8 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <BrandLockup size="md" />
-              <p className="mt-2 max-w-xs text-[0.82rem] leading-relaxed text-ink-2">
+              <p className="mt-2 max-w-xs text-[0.8125rem] leading-relaxed text-ink-2">
                 Nigerian digital services — numbers, data, proxies and accounts, priced in Naira.
               </p>
             </div>
@@ -170,7 +170,7 @@ export function SiteFooter() {
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        className="text-[0.86rem] text-ink-2 transition-colors hover:text-lav-700"
+                        className="text-[0.875rem] text-ink-2 transition-colors hover:text-lav-700"
                       >
                         {link.label}
                       </Link>

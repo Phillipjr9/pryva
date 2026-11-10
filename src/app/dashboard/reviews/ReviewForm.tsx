@@ -37,7 +37,7 @@ export function ReviewForm({ orders }: { orders: ReviewableOrder[] }) {
 
   if (orders.length === 0) {
     return (
-      <p className="rounded-2xl border border-line bg-white p-5 text-[0.9rem] leading-relaxed text-ink-2">
+      <p className="rounded-2xl border border-line bg-white p-5 text-[0.875rem] leading-relaxed text-ink-2">
         Nothing to review yet. An order becomes reviewable once it has been delivered.
       </p>
     );
@@ -75,7 +75,7 @@ export function ReviewForm({ orders }: { orders: ReviewableOrder[] }) {
     return (
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
         <h2 className="text-[1rem] font-semibold text-emerald-900">Thank you — it is in the queue.</h2>
-        <p className="mt-1 text-[0.88rem] leading-relaxed text-emerald-800">
+        <p className="mt-1 text-[0.875rem] leading-relaxed text-emerald-800">
           An operator reads it before it is published, usually within a day. You can see its status
           below; it will not appear on the public page until then.
         </p>

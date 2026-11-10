@@ -125,7 +125,7 @@ export default async function AdminServicesPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-[1.5rem] font-medium tracking-tight">Service coverage</h1>
-          <p className="mt-1 max-w-2xl text-[0.86rem] text-ink-2">
+          <p className="mt-1 max-w-2xl text-[0.875rem] text-ink-2">
             Every lane is judged by what happened to customers, not by whether a key is set. A lane
             is <strong>delivering</strong> when an order reached someone in the last 7 days,
             <strong> untested</strong> when it has never sold anything, and
@@ -148,14 +148,14 @@ export default async function AdminServicesPage() {
           return (
             <section key={lane.id} className="rounded-2xl border border-line bg-white p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-[1.05rem] font-medium text-ink">{lane.label}</h2>
+                <h2 className="text-[1rem] font-medium text-ink">{lane.label}</h2>
                 <span className={`rounded-full px-2.5 py-0.5 text-meta font-semibold ${style.chip}`}>
                   {style.label}
                 </span>
               </div>
-              <p className="mt-1 text-[0.86rem] text-ink-2">{lane.headline}</p>
+              <p className="mt-1 text-[0.875rem] text-ink-2">{lane.headline}</p>
 
-              <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[0.82rem] sm:grid-cols-6">
+              <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[0.8125rem] sm:grid-cols-6">
                 <div>
                   <dt className="text-meta uppercase tracking-wide text-ink-3">Orders</dt>
                   <dd className="font-semibold text-ink">{countLabel(lane.orders)}</dd>
@@ -184,7 +184,7 @@ export default async function AdminServicesPage() {
                 </div>
               </dl>
 
-              <div className="mt-3 grid gap-2 text-[0.82rem] text-ink-2 sm:grid-cols-2">
+              <div className="mt-3 grid gap-2 text-[0.8125rem] text-ink-2 sm:grid-cols-2">
                 <p>
                   <span className="font-medium text-ink">Delivery: </span>
                   {lane.delivery}
@@ -200,12 +200,12 @@ export default async function AdminServicesPage() {
       </div>
 
       <section className="rounded-2xl border border-line bg-white p-4">
-        <h2 className="text-[1.05rem] font-medium text-ink">Not for sale, on purpose</h2>
-        <p className="mt-1 text-[0.86rem] text-ink-2">
+        <h2 className="text-[1rem] font-medium text-ink">Not for sale, on purpose</h2>
+        <p className="mt-1 text-[0.875rem] text-ink-2">
           These appear in the catalogue as information. There is no purchase path, so nobody can pay
           for one.
         </p>
-        <ul className="mt-3 space-y-1.5 text-[0.84rem] text-ink-2">
+        <ul className="mt-3 space-y-1.5 text-[0.8125rem] text-ink-2">
           {NOT_FOR_SALE.map((entry) => (
             <li key={entry.label}>
               <span className="font-medium text-ink">{entry.label}</span> — {entry.reason}
@@ -215,8 +215,8 @@ export default async function AdminServicesPage() {
       </section>
 
       <section className="rounded-2xl border border-line bg-white p-4">
-        <h2 className="text-[1.05rem] font-medium text-ink">What this page cannot tell you</h2>
-        <p className="mt-1 max-w-3xl text-[0.86rem] text-ink-2">
+        <h2 className="text-[1rem] font-medium text-ink">What this page cannot tell you</h2>
+        <p className="mt-1 max-w-3xl text-[0.875rem] text-ink-2">
           It reads the order history, so a supplier that is down right now still reads
           <em> delivering</em> until a purchase fails. To ask a supplier about itself, use
           <Link href="/admin/boosting" className="mx-1 underline">
@@ -226,7 +226,7 @@ export default async function AdminServicesPage() {
           (bearer <code className="font-mono text-micro">DIAGNOSTICS_SECRET</code>) for balance and
           catalog probes on the rest.
         </p>
-        <p className="mt-2 text-[0.84rem] text-ink-2">
+        <p className="mt-2 text-[0.8125rem] text-ink-2">
           Gift cards are not a lane here: they are Pryva-issued wallet credit, and the code comes back
           from the purchase call itself — there is no supplier to be late. A row of them lives in
           <Link href="/admin/transactions" className="mx-1 underline">
@@ -234,12 +234,12 @@ export default async function AdminServicesPage() {
           </Link>
           , not in the orders table.
         </p>
-        <p className="mt-2 text-[0.84rem] text-ink-2">
+        <p className="mt-2 text-[0.8125rem] text-ink-2">
           Scheduled purchases are not a lane either: a run buys the same plan a manual order buys and
           writes the same supplier, so its outcome is counted inside the lane that sold it. A lane of
           its own would read &quot;nothing has ever been bought&quot; forever while the runs delivered.
         </p>
-        <p className="mt-2 text-[0.84rem] text-ink-2">
+        <p className="mt-2 text-[0.8125rem] text-ink-2">
           Hand-prepared fulfilment is{" "}
           <span className="font-semibold text-ink">{manualReachable ? "reachable" : "unreachable"}</span>
           {manualReachable

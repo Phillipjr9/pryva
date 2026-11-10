@@ -11,7 +11,7 @@ export default async function AdminWithdrawalsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-[1.5rem] font-medium tracking-tight">Payouts</h1>
-        <p className="mt-1 text-[0.86rem] text-ink-2">
+        <p className="mt-1 text-[0.875rem] text-ink-2">
           Payouts are sent the moment a customer confirms one, so this page is the exception queue, not a gate.
           The provider&rsquo;s signed events settle them — a `processing` row that stays here for more than an hour is
           something to read: check Paystack by reference, amount and recipient before refunding or retrying.

@@ -45,22 +45,22 @@ function ConfirmEmailChange() {
       <div className={card}>
         {!token && (
           <>
-            <h1 className="text-[1.2rem] font-semibold text-slate-900">This link is incomplete</h1>
-            <p className="mt-2 text-[0.9rem] text-slate-600">
+            <h1 className="text-[1.25rem] font-semibold text-slate-900">This link is incomplete</h1>
+            <p className="mt-2 text-[0.875rem] text-slate-600">
               Open the confirmation link from your email again, or start the change from your settings page.
             </p>
           </>
         )}
         {outcome?.status === "working" && (
           <>
-            <h1 className="text-[1.2rem] font-semibold text-slate-900">Confirming your new address…</h1>
-            <p className="mt-2 text-[0.9rem] text-slate-600">This takes a second.</p>
+            <h1 className="text-[1.25rem] font-semibold text-slate-900">Confirming your new address…</h1>
+            <p className="mt-2 text-[0.875rem] text-slate-600">This takes a second.</p>
           </>
         )}
         {outcome?.status === "confirmed" && (
           <>
-            <h1 className="text-[1.2rem] font-semibold text-slate-900">Address confirmed</h1>
-            <p className="mt-2 text-[0.9rem] text-slate-600">
+            <h1 className="text-[1.25rem] font-semibold text-slate-900">Address confirmed</h1>
+            <p className="mt-2 text-[0.875rem] text-slate-600">
               <strong>{outcome.email}</strong> is now the email you sign in with. We told your previous address it changed.
             </p>
             <Link href="/dashboard/settings" className="mt-4 inline-flex rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">
@@ -70,8 +70,8 @@ function ConfirmEmailChange() {
         )}
         {outcome?.status === "invalid" && (
           <>
-            <h1 className="text-[1.2rem] font-semibold text-slate-900">That link didn&apos;t work</h1>
-            <p className="mt-2 text-[0.9rem] text-slate-600">{outcome.message}</p>
+            <h1 className="text-[1.25rem] font-semibold text-slate-900">That link didn&apos;t work</h1>
+            <p className="mt-2 text-[0.875rem] text-slate-600">{outcome.message}</p>
             <Link href="/dashboard/settings" className="mt-4 inline-flex rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">
               Try again from settings
             </Link>

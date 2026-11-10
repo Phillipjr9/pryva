@@ -163,7 +163,7 @@ export function EsimBuy({
         type="button"
         onClick={buy}
         disabled={pending || !purchasable}
-        className="inline-flex items-center justify-center gap-2 rounded-xl bg-lav-700 px-5 py-3 text-[0.95rem] font-semibold text-white transition-colors hover:bg-lav-800 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex items-center justify-center gap-2 rounded-xl bg-lav-700 px-5 py-3 text-[0.9375rem] font-semibold text-white transition-colors hover:bg-lav-800 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {pending ? "Buying…" : `Buy ${name} · ${formatNaira(price)}`}
         {pending ? null : <ArrowRight className="h-4 w-4" />}

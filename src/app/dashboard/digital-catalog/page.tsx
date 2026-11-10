@@ -23,7 +23,7 @@ export default async function DigitalCatalogPage() {
       <Link href="/dashboard/services" className="w-fit text-meta font-semibold text-lav-700 underline">← Service hub</Link>
       <div>
         <h1 className="text-[1.6rem] font-semibold text-ink">Explore digital products</h1>
-        <p className="mt-2 text-[0.9rem] text-ink-2">Browse or search the digital catalogue, including subscriptions, gaming products, telecom and more.</p>
+        <p className="mt-2 text-[0.875rem] text-ink-2">Browse or search the digital catalogue, including subscriptions, gaming products, telecom and more.</p>
       </div>
       <div role="note" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-meta text-amber-900">
         Reported stock can change and does not guarantee a product can be ordered. Only reviewed products link to a separate quote before payment.

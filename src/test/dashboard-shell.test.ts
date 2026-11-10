@@ -126,7 +126,7 @@ describe("dashboard navigation", () => {
     expect(header).toContain("max-[340px]:flex-wrap");
     expect(header).not.toMatch(/(?<!:)\bflex-wrap\b/);
     // The greeting yields space instead of the controls at ordinary widths.
-    expect(header).toContain("truncate text-[0.88rem]");
+    expect(header).toContain("truncate text-[0.875rem]");
     expect(header).toContain("shrink-0 items-center");
   });
 

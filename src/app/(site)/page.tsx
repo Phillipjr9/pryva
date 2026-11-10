@@ -198,7 +198,7 @@ export default async function HomePage() {
               </Reveal>
 
               <Reveal delay={130}>
-                <p className="mx-auto mt-4 max-w-xl text-[0.95rem] leading-relaxed text-ink-2 sm:mt-6 sm:text-[1.05rem] lg:mx-0">
+                <p className="mx-auto mt-4 max-w-xl text-[0.9375rem] leading-relaxed text-ink-2 sm:mt-6 sm:text-[1rem] lg:mx-0">
                   Virtual numbers for SMS verification, priced in Naira and provisioned the moment
                   you pay. Every order lands in one calm dashboard.
                 </p>
@@ -208,14 +208,14 @@ export default async function HomePage() {
                 <div className="mt-6 flex flex-col gap-2.5 sm:mt-7 sm:flex-row sm:items-center sm:justify-center lg:justify-start">
                   <Link
                     href="/signup"
-                    className="btn btn-primary w-full !py-4 !text-[0.95rem] sm:w-auto sm:!px-6 sm:!py-3.5"
+                    className="btn btn-primary w-full !py-4 !text-[0.9375rem] sm:w-auto sm:!px-6 sm:!py-3.5"
                   >
                     Create your account
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                   <Link
                     href="/pricing"
-                    className="btn btn-ghost w-full !py-4 !text-[0.95rem] sm:w-auto sm:!px-6 sm:!py-3.5"
+                    className="btn btn-ghost w-full !py-4 !text-[0.9375rem] sm:w-auto sm:!px-6 sm:!py-3.5"
                   >
                     See the price list
                     <ArrowUpRight className="h-4 w-4" />
@@ -247,7 +247,7 @@ export default async function HomePage() {
             {/* --- proof: under the photo on phones, under the copy on desktop --- */}
             <div className="order-3 lg:col-start-1 lg:row-start-2">
               <Reveal delay={220}>
-                <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-meta text-ink-2 sm:gap-x-5 sm:text-[0.8rem] lg:justify-start">
+                <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-meta text-ink-2 sm:gap-x-5 sm:text-[0.8125rem] lg:justify-start">
                   {["Naira pricing", "Support for delivery issues", "Explore number plans"].map((item) => (
                     <li key={item} className="inline-flex items-center gap-1.5">
                       <Check className="h-3.5 w-3.5 shrink-0 text-lav-600" />
@@ -279,7 +279,7 @@ export default async function HomePage() {
                 </h2>
               </Reveal>
               <Reveal delay={120}>
-                <p className="mt-4 max-w-lg text-[0.95rem] leading-relaxed text-ink-2">
+                <p className="mt-4 max-w-lg text-[0.9375rem] leading-relaxed text-ink-2">
                   Browse the catalog in one dashboard, with your balance, orders and delivered codes in the same place.
                 </p>
               </Reveal>
@@ -287,7 +287,7 @@ export default async function HomePage() {
             <Reveal delay={160}>
               <Link
                 href="/pricing"
-                className="inline-flex items-center gap-2 rounded-full border border-line bg-white/70 px-4 py-2.5 text-[0.82rem] font-semibold text-ink transition-colors hover:border-lav-300"
+                className="inline-flex items-center gap-2 rounded-full border border-line bg-white/70 px-4 py-2.5 text-[0.8125rem] font-semibold text-ink transition-colors hover:border-lav-300"
               >
                 Compare all pricing
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -318,8 +318,8 @@ export default async function HomePage() {
                     </div>
 
                     <div className="relative mt-4 flex-1">
-                      <h3 className="text-[1.2rem] font-medium tracking-tight">{service.name}</h3>
-                      <p className="mt-2 text-[0.86rem] leading-relaxed text-ink-2">
+                      <h3 className="text-[1.25rem] font-medium tracking-tight">{service.name}</h3>
+                      <p className="mt-2 text-[0.875rem] leading-relaxed text-ink-2">
                         {service.description}
                       </p>
                       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -387,7 +387,7 @@ export default async function HomePage() {
                     Aged Facebook, Instagram
                     <br className="hidden sm:block" /> and TikTok accounts.
                   </h2>
-                  <p className="mt-3 text-[0.92rem] leading-relaxed text-ink-2">
+                  <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink-2">
                     Browse listings priced in Naira. Stock and price are shown up front, and
                     delivery issues are reviewed by support.
                   </p>
@@ -453,7 +453,7 @@ export default async function HomePage() {
               </h2>
             </Reveal>
             <Reveal delay={120}>
-              <p className="mt-4 max-w-xl text-[0.95rem] leading-relaxed text-ink-2">
+              <p className="mt-4 max-w-xl text-[0.9375rem] leading-relaxed text-ink-2">
                 Most verification platforms assume you have a dollar card and endless patience.
                 PryvaLogs is Naira-first from the first screen to the refund.
               </p>
@@ -477,8 +477,8 @@ export default async function HomePage() {
                     <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/80 text-lav-700 shadow-sm">
                       <Icon className="h-4 w-4" />
                     </span>
-                    <h3 className="mt-4 text-[0.98rem] font-semibold">{feature.title}</h3>
-                    <p className="mt-1.5 text-[0.82rem] leading-relaxed text-ink-2">{feature.body}</p>
+                    <h3 className="mt-4 text-[1rem] font-semibold">{feature.title}</h3>
+                    <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-ink-2">{feature.body}</p>
                   </div>
                 </Reveal>
               );
@@ -504,7 +504,7 @@ export default async function HomePage() {
                   </h2>
                 </Reveal>
                 <Reveal delay={120}>
-                  <p className="mt-4 max-w-xl text-[0.95rem] leading-relaxed text-ink-2">
+                  <p className="mt-4 max-w-xl text-[0.9375rem] leading-relaxed text-ink-2">
                     Your dashboard brings wallet transactions, order references and delivered codes together.
                   </p>
                 </Reveal>
@@ -518,7 +518,7 @@ export default async function HomePage() {
                     ].map((item) => (
                       <li
                         key={item}
-                        className="flex items-start gap-2.5 rounded-xl border border-line/70 bg-white/60 px-3.5 py-3 text-[0.86rem] text-ink-2"
+                        className="flex items-start gap-2.5 rounded-xl border border-line/70 bg-white/60 px-3.5 py-3 text-[0.875rem] text-ink-2"
                       >
                         <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white text-lav-700 shadow-sm">
                           <Check className="h-3 w-3" />
@@ -535,7 +535,7 @@ export default async function HomePage() {
                 <div className="mx-auto w-full max-w-sm">
                   <div className="rounded-[1.5rem] border border-line bg-white p-5 shadow-[var(--shadow-card)]">
                     <p className="text-micro font-semibold uppercase tracking-[0.12em] text-lav-700">Your dashboard</p>
-                    <h3 className="mt-2 text-[1.2rem] font-semibold text-ink">Keep track in one place</h3>
+                    <h3 className="mt-2 text-[1.25rem] font-semibold text-ink">Keep track in one place</h3>
                     <div className="mt-4 space-y-3">
                       {[
                         { title: "Explore services", detail: "Check availability and pricing before you order.", icon: Sparkle },
@@ -604,8 +604,8 @@ export default async function HomePage() {
                   <span className="text-display text-[2.4rem] leading-none text-lav-300">
                     {step.n}
                   </span>
-                  <h3 className="mt-3 text-[0.98rem] font-semibold">{step.title}</h3>
-                  <p className="mt-1.5 text-[0.84rem] leading-relaxed text-ink-2">{step.body}</p>
+                  <h3 className="mt-3 text-[1rem] font-semibold">{step.title}</h3>
+                  <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-ink-2">{step.body}</p>
                   {index < steps.length - 1 && (
                     <span className="absolute -right-2.5 top-1/2 hidden h-5 w-5 -translate-y-1/2 place-items-center rounded-full bg-white text-lav-500 shadow-sm lg:grid">
                       <ArrowRight className="h-3 w-3" />
@@ -618,14 +618,14 @@ export default async function HomePage() {
 
           <Reveal delay={120}>
             <div className="mt-6 flex flex-col items-start justify-between gap-4 rounded-2xl border border-line bg-cream-2/60 px-5 py-5 sm:flex-row sm:items-center">
-              <p className="flex items-start gap-3 text-[0.86rem] text-ink-2">
+              <p className="flex items-start gap-3 text-[0.875rem] text-ink-2">
                 <Shield className="mt-0.5 h-5 w-5 shrink-0 text-lav-600" />
                 <span>
                   <span className="font-semibold text-ink">Refund review:</span> contact support
                   with your order reference when delivery cannot be confirmed.
                 </span>
               </p>
-              <Link href="/signup" className="btn btn-primary shrink-0 !px-5 !py-2.5 !text-[0.82rem]">
+              <Link href="/signup" className="btn btn-primary shrink-0 !px-5 !py-2.5 !text-[0.8125rem]">
                 Try it now
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
@@ -650,7 +650,7 @@ export default async function HomePage() {
               </Reveal>
             </div>
             <Reveal delay={100}>
-              <p className="max-w-sm text-[0.88rem] leading-relaxed text-ink-3">
+              <p className="max-w-sm text-[0.875rem] leading-relaxed text-ink-3">
                 Catalog prices are quoted in Naira. Review provider payment terms and service availability before confirming.
               </p>
             </Reveal>
@@ -669,7 +669,7 @@ export default async function HomePage() {
                     ].map((item) => (
                       <li
                         key={item}
-                        className="flex items-start gap-2 text-[0.86rem] leading-snug text-ink-2"
+                        className="flex items-start gap-2 text-[0.875rem] leading-snug text-ink-2"
                       >
                         <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
                         {item}
@@ -690,11 +690,11 @@ export default async function HomePage() {
             <Reveal delay={120}>
               <div className="flex h-full flex-col justify-between rounded-[1.75rem] border border-line bg-white/70 p-6">
                 <div>
-                  <h3 className="text-[1.15rem] font-semibold text-ink">The full price list</h3>
-                  <p className="mt-2 text-[0.88rem] leading-relaxed text-ink-2">
+                  <h3 className="text-[1.125rem] font-semibold text-ink">The full price list</h3>
+                  <p className="mt-2 text-[0.875rem] leading-relaxed text-ink-2">
                     Every plan in the catalog, in Naira, with whether it can be delivered today.
                   </p>
-                  <p className="mt-2 text-[0.8rem] leading-relaxed text-ink-3">
+                  <p className="mt-2 text-[0.8125rem] leading-relaxed text-ink-3">
                     This page shows only what the catalog prices. Plans sold inside the dashboard
                     are quoted there, before you confirm.
                   </p>
@@ -729,7 +729,7 @@ export default async function HomePage() {
               </h2>
             </Reveal>
             <Reveal delay={120}>
-              <p className="mt-4 max-w-sm text-[0.9rem] leading-relaxed text-ink-2">
+              <p className="mt-4 max-w-sm text-[0.875rem] leading-relaxed text-ink-2">
                 Still unsure? Contact support with your question or order reference.
               </p>
             </Reveal>
@@ -769,7 +769,7 @@ export default async function HomePage() {
                     can take{" "}
                     <span className="text-display italic text-lav-200">two minutes.</span>
                   </h2>
-                  <p className="mt-4 max-w-md text-[0.92rem] leading-relaxed text-white/70">
+                  <p className="mt-4 max-w-md text-[0.9375rem] leading-relaxed text-white/70">
                     Create an account to fund your wallet, order a number and keep every
                     delivered code in one place.
                   </p>

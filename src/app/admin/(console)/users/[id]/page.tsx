@@ -107,7 +107,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
         ].map(([label, value]) => (
           <div key={label} className="rounded-2xl border border-line bg-white p-4">
             <p className="text-meta uppercase tracking-wide text-ink-3">{label}</p>
-            <p className="mt-2 text-[0.98rem] font-medium text-ink">{value}</p>
+            <p className="mt-2 text-[1rem] font-medium text-ink">{value}</p>
           </div>
         ))}
       </div>

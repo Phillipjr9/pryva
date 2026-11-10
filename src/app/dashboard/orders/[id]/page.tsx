@@ -117,7 +117,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
             <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">
               Order Details
             </h1>
-            <p className="text-[0.9rem] text-ink-2">{order.reference}</p>
+            <p className="text-[0.875rem] text-ink-2">{order.reference}</p>
           </div>
         </div>
 
@@ -152,42 +152,42 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 mb-1">Product</p>
-                    <p className="text-[0.95rem] font-medium text-ink">
+                    <p className="text-[0.8125rem] text-ink-3 mb-1">Product</p>
+                    <p className="text-[0.9375rem] font-medium text-ink">
                       {order.productName}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 mb-1">Service</p>
-                    <p className="text-[0.95rem] font-medium text-ink capitalize">
+                    <p className="text-[0.8125rem] text-ink-3 mb-1">Service</p>
+                    <p className="text-[0.9375rem] font-medium text-ink capitalize">
                       {order.service}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 mb-1">Plan / package</p>
-                    <p className="text-[0.95rem] font-medium text-ink">{order.planLabel}</p>
+                    <p className="text-[0.8125rem] text-ink-3 mb-1">Plan / package</p>
+                    <p className="text-[0.9375rem] font-medium text-ink">{order.planLabel}</p>
                   </div>
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 mb-1">Region</p>
-                    <div className="inline-flex items-center gap-2 text-[0.95rem] font-medium text-ink">
+                    <p className="text-[0.8125rem] text-ink-3 mb-1">Region</p>
+                    <div className="inline-flex items-center gap-2 text-[0.9375rem] font-medium text-ink">
                       <CountryFlag region={order.region} size={16} decorative radius={8} />
                       <span>{order.region}</span>
                     </div>
                   </div>
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 mb-1">Duration</p>
-                    <p className="text-[0.95rem] font-medium text-ink">
+                    <p className="text-[0.8125rem] text-ink-3 mb-1">Duration</p>
+                    <p className="text-[0.9375rem] font-medium text-ink">
                       {order.duration}
                     </p>
                   </div>
                   {order.targetLink && (
                     <div className="sm:col-span-2">
-                      <p className="text-[0.82rem] text-ink-3 mb-1">Boosted link</p>
+                      <p className="text-[0.8125rem] text-ink-3 mb-1">Boosted link</p>
                       <a
                         href={order.targetLink}
                         target="_blank"
                         rel="noopener noreferrer nofollow"
-                        className="break-all text-[0.9rem] font-medium text-lav-700 underline underline-offset-2"
+                        className="break-all text-[0.875rem] font-medium text-lav-700 underline underline-offset-2"
                       >
                         {order.targetLink}
                       </a>
@@ -195,21 +195,21 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                     </div>
                   )}
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 mb-1">Amount</p>
-                    <p className="text-[0.95rem] font-medium text-ink">
+                    <p className="text-[0.8125rem] text-ink-3 mb-1">Amount</p>
+                    <p className="text-[0.9375rem] font-medium text-ink">
                       {formatNaira(order.amount)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 mb-1">Status</p>
+                    <p className="text-[0.8125rem] text-ink-3 mb-1">Status</p>
                     <Badge variant={statusColors[status as keyof typeof statusColors] || "default"}>
                       {status}
                     </Badge>
                   </div>
                   {order.codeReceivedAt && (
                     <div>
-                      <p className="text-[0.82rem] text-ink-3 mb-1">Code confirmed</p>
-                      <p className="text-[0.95rem] font-medium text-ink">
+                      <p className="text-[0.8125rem] text-ink-3 mb-1">Code confirmed</p>
+                      <p className="text-[0.9375rem] font-medium text-ink">
                         {new Date(order.codeReceivedAt).toLocaleString("en-NG", {
                           dateStyle: "medium",
                           timeStyle: "short",
@@ -245,7 +245,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                   <CardTitle>Refunded</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-[0.88rem] text-ink-2">
+                  <p className="text-[0.875rem] text-ink-2">
                     {formatNaira(order.amount)} was returned to your wallet.
                   </p>
                   {credentials.length > 0 && (
@@ -263,10 +263,10 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                   <CardTitle>{status === "review" ? "Order needs review" : "Delivery in progress"}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-[0.88rem] text-ink-2">
+                  <p className="text-[0.875rem] text-ink-2">
                     {getOrderProgressMessage(status)}
                   </p>
-                  {progress && <p className="mt-2 text-[0.88rem] font-medium text-ink">{progress}</p>}
+                  {progress && <p className="mt-2 text-[0.875rem] font-medium text-ink">{progress}</p>}
                   {order.provider === FOXRELOAD_PROVIDER && order.service === "subscriptions" && order.productSlug === "telegram-stars" && <StarsOrderSync orderId={order.id} />}
                   {order.provider === FOXRELOAD_PROVIDER && order.service === "gift-cards" && order.productSlug === "digital-code" && <CodeOrderSync orderId={order.id} />}
                   {order.provider === FOXRELOAD_PROVIDER && order.service === "subscriptions" && ["direct-topup", "login-topup"].includes(order.productSlug) && <TopupOrderSync orderId={order.id} />}
@@ -299,23 +299,23 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-[0.82rem] text-ink-3 mb-1">Created</p>
-                  <p className="text-[0.9rem] text-ink">
+                  <p className="text-[0.8125rem] text-ink-3 mb-1">Created</p>
+                  <p className="text-[0.875rem] text-ink">
                     {new Date(order.createdAt).toLocaleString()}
                   </p>
                 </div>
                 {order.expiresAt && (
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 mb-1">Expires</p>
-                    <p className="text-[0.9rem] text-ink">
+                    <p className="text-[0.8125rem] text-ink-3 mb-1">Expires</p>
+                    <p className="text-[0.875rem] text-ink">
                       {new Date(order.expiresAt).toLocaleString()}
                     </p>
                   </div>
                 )}
                 {order.refundedAt && (
                   <div>
-                    <p className="text-[0.82rem] text-ink-3 mb-1">Refunded</p>
-                    <p className="text-[0.9rem] text-ink">
+                    <p className="text-[0.8125rem] text-ink-3 mb-1">Refunded</p>
+                    <p className="text-[0.875rem] text-ink">
                       {new Date(order.refundedAt).toLocaleString()}
                     </p>
                   </div>

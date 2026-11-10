@@ -46,7 +46,7 @@ export default function EmailOTPPage() {
             <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3.5rem]">
               {service.tagline}
             </h1>
-            <p className="mt-6 text-[1.1rem] text-ink-2 leading-relaxed">{service.description}</p>
+            <p className="mt-6 text-[1.125rem] text-ink-2 leading-relaxed">{service.description}</p>
           </div>
         </div>
       </section>
@@ -61,13 +61,13 @@ export default function EmailOTPPage() {
             <h2 className="mt-3 text-[1.5rem] font-semibold text-emerald-950">
               A temporary inbox is free
             </h2>
-            <p className="mt-3 text-[0.95rem] leading-relaxed text-emerald-900 max-w-2xl">
+            <p className="mt-3 text-[0.9375rem] leading-relaxed text-emerald-900 max-w-2xl">
               Disposable email is not something we sell. You will never see an inbox price here,
               in pricing, or at checkout, because there is nothing to buy. Everything we do charge
               for — verification numbers, rentals, eSIM, proxies, accounts — keeps its own price,
               and this being free does not change any of it.
             </p>
-            <ul className="mt-5 space-y-2 text-[0.9rem] text-emerald-900">
+            <ul className="mt-5 space-y-2 text-[0.875rem] text-emerald-900">
               <li>One active inbox at a time, per account.</li>
               <li>Read what arrives, then discard the inbox whenever you want.</li>
               <li>No wallet debit and no order reference — a free tool creates neither.</li>
@@ -89,18 +89,18 @@ export default function EmailOTPPage() {
             <h2 className="text-[1.25rem] font-semibold text-ink">
               Create your inbox from the dashboard
             </h2>
-            <p className="mt-3 text-[0.95rem] leading-relaxed text-ink-2 max-w-2xl">
+            <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink-2 max-w-2xl">
               One free inbox per day for a signed-in account, alive until you discard it. Nothing is
               kept afterwards, so read your code while the inbox is open — retaining messages is what
               the paid inbox is for.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <Link href="/dashboard/inbox" className="btn btn-primary !px-5 !py-2.5 !text-[0.85rem]">
+              <Link href="/dashboard/inbox" className="btn btn-primary !px-5 !py-2.5 !text-[0.875rem]">
                 Open your inbox
               </Link>
               <Link
                 href="/status"
-                className="btn border border-line bg-white !px-5 !py-2.5 !text-[0.85rem] text-ink"
+                className="btn border border-line bg-white !px-5 !py-2.5 !text-[0.875rem] text-ink"
               >
                 Service status
               </Link>
@@ -114,8 +114,8 @@ export default function EmailOTPPage() {
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {service.highlights.map((highlight, index) => (
               <div key={index} className="rounded-2xl border border-line bg-white p-6">
-                <h3 className="text-[1.1rem] font-semibold text-ink mb-3">{highlight.title}</h3>
-                <p className="text-[0.9rem] text-ink-2 leading-relaxed">{highlight.body}</p>
+                <h3 className="text-[1.125rem] font-semibold text-ink mb-3">{highlight.title}</h3>
+                <p className="text-[0.875rem] text-ink-2 leading-relaxed">{highlight.body}</p>
               </div>
             ))}
           </div>
@@ -126,10 +126,10 @@ export default function EmailOTPPage() {
       <section className="pb-16">
         <div className="shell max-w-3xl">
           <div className="rounded-2xl border border-line bg-white p-6">
-            <h2 className="text-[1.15rem] font-semibold text-ink mb-3">
+            <h2 className="text-[1.125rem] font-semibold text-ink mb-3">
               Read this before using any temporary address
             </h2>
-            <p className="text-[0.9rem] text-ink-2 leading-relaxed">
+            <p className="text-[0.875rem] text-ink-2 leading-relaxed">
               A temporary inbox is for a code you need once. It is not a mailbox you will get back:
               when it is discarded, or when it expires, anything sent to that address is gone and
               there is no way to recover it. Do not use one for a bank, a primary email account, or
@@ -148,7 +148,7 @@ export default function EmailOTPPage() {
             {service.faqs.map((faq, index) => (
               <div key={index} className="rounded-2xl border border-line bg-white p-6">
                 <h3 className="text-[1rem] font-semibold text-ink mb-3">{faq.q}</h3>
-                <p className="text-[0.9rem] text-ink-2 leading-relaxed">{faq.a}</p>
+                <p className="text-[0.875rem] text-ink-2 leading-relaxed">{faq.a}</p>
               </div>
             ))}
           </div>

@@ -272,7 +272,7 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
                 }
                 setActiveTab(tab);
               }}
-              className={`px-4 py-2 text-[0.9rem] font-medium transition-colors ${
+              className={`px-4 py-2 text-[0.875rem] font-medium transition-colors ${
                 activeTab === tab
                   ? "border-b-2 border-lav-600 text-lav-600 font-semibold"
                   : "text-ink-2 hover:text-ink"
@@ -289,7 +289,7 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
             {!brandSalesEnabled && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-meta text-amber-900">Brand gift card purchases are currently unavailable. <Link href="/dashboard/orders" className="font-semibold underline">View previous orders</Link>. You can still send or redeem wallet credit.</p>}
             {/* Brand Selection Grid */}
             <div>
-              <label className="block text-[0.86rem] font-semibold text-ink mb-3">
+              <label className="block text-[0.875rem] font-semibold text-ink mb-3">
                 Select Gift Card Brand
               </label>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -307,7 +307,7 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
                   >
                     <BrandIcon brand={brand.brand} size={44} variant="tile" decorative />
                     <div>
-                      <p className="text-[0.92rem] font-bold text-ink">{brand.name}</p>
+                      <p className="text-[0.9375rem] font-bold text-ink">{brand.name}</p>
                       <p className="text-meta text-ink-3 uppercase tracking-wider font-medium">{brand.region}</p>
                     </div>
                   </button>
@@ -321,8 +321,8 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
                 <div className="flex items-center gap-3">
                   <BrandIcon brand={selectedBrand.brand} size={42} variant="tile" decorative />
                   <div>
-                    <h2 className="text-[1.2rem] font-bold text-ink">{selectedBrand.name}</h2>
-                    <p className="text-[0.82rem] text-ink-2">{selectedBrand.tagline}</p>
+                    <h2 className="text-[1.25rem] font-bold text-ink">{selectedBrand.name}</h2>
+                    <p className="text-[0.8125rem] text-ink-2">{selectedBrand.tagline}</p>
                   </div>
                 </div>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-micro font-semibold text-emerald-800 border border-emerald-200/60">
@@ -332,7 +332,7 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
 
               {/* Denominations */}
               <div className="mt-6">
-                <label className="block text-[0.86rem] font-semibold text-ink mb-3">
+                <label className="block text-[0.875rem] font-semibold text-ink mb-3">
                   Select Denomination
                 </label>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -357,8 +357,8 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
                         </span>
                       )}
                       <div>
-                        <p className="text-[1.15rem] font-extrabold text-ink">${denom.amountUsd} USD</p>
-                        <p className="text-[0.8rem] text-ink-3">Digital Voucher</p>
+                        <p className="text-[1.125rem] font-extrabold text-ink">${denom.amountUsd} USD</p>
+                        <p className="text-[0.8125rem] text-ink-3">Digital Voucher</p>
                       </div>
                       <p className="mt-3 text-[1rem] font-bold text-lav-700">
                         {formatNaira(denom.priceNgn)}
@@ -370,7 +370,7 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
 
               {/* Order Error */}
               {brandOrderError && (
-                <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-[0.88rem] text-red-700">
+                <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-[0.875rem] text-red-700">
                   {brandOrderError}
                 </div>
               )}
@@ -379,10 +379,10 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
               {brandOrderSuccess && (
                 <div className="flow-arrive mt-6 rounded-xl border border-green-200 bg-green-50 p-6 text-center">
                   <Gift className="mx-auto h-12 w-12 text-green-600 mb-2" />
-                  <p className="text-[1.15rem] font-bold text-green-800 mb-1">
+                  <p className="text-[1.125rem] font-bold text-green-800 mb-1">
                     {brandOrderSuccess.cardName} Delivered!
                   </p>
-                  <p className="text-[0.85rem] text-green-700 mb-4">
+                  <p className="text-[0.875rem] text-green-700 mb-4">
                     Your code is ready to use immediately. It has also been saved to your orders.
                   </p>
                   <div className="flex items-center justify-center gap-3 rounded-xl bg-white border border-green-200 p-4">
@@ -404,7 +404,7 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
                   </div>
                   <div className="mt-4 rounded-xl bg-white/70 border border-green-100 p-3 text-left">
                     <p className="text-meta font-bold uppercase tracking-wider text-green-900 mb-1">How to redeem:</p>
-                    <p className="text-[0.84rem] text-ink-2 leading-relaxed">{brandOrderSuccess.instructions}</p>
+                    <p className="text-[0.8125rem] text-ink-2 leading-relaxed">{brandOrderSuccess.instructions}</p>
                   </div>
                   <button
                     type="button"
@@ -421,11 +421,11 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
                 <div className="mt-6 border-t border-line/60 pt-5">
                   <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                     <div>
-                      <span className="text-[0.82rem] text-ink-3">Your Wallet Balance</span>
+                      <span className="text-[0.8125rem] text-ink-3">Your Wallet Balance</span>
                       <p className="text-[1.3rem] font-bold text-ink">{formatNaira(user.walletBalance)}</p>
                     </div>
                     <div className="text-right">
-                      <span className="text-[0.82rem] text-ink-3">Total Due</span>
+                      <span className="text-[0.8125rem] text-ink-3">Total Due</span>
                       <p className="text-[1.4rem] font-extrabold text-lav-700">{formatNaira(selectedDenom.priceNgn)}</p>
                     </div>
                   </div>
@@ -459,7 +459,7 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
         {activeTab === "create" && (
           <div className="space-y-6">
             <div>
-              <label className="block text-[0.86rem] font-medium text-ink mb-3">
+              <label className="block text-[0.875rem] font-medium text-ink mb-3">
                 Select Amount
               </label>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -481,7 +481,7 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
             </div>
 
             <div>
-              <label className="block text-[0.86rem] font-medium text-ink mb-2">
+              <label className="block text-[0.875rem] font-medium text-ink mb-2">
                 Custom Amount (₦1,000 - ₦500,000)
               </label>
               <input
@@ -491,12 +491,12 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
                 step={100}
                 value={amount}
                 onChange={(e) => setAmount(Number(e.target.value))}
-                className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.95rem] text-ink outline-none transition-colors focus:border-lav-600"
+                className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.9375rem] text-ink outline-none transition-colors focus:border-lav-600"
               />
             </div>
 
             <div>
-              <label className="block text-[0.86rem] font-medium text-ink mb-2">
+              <label className="block text-[0.875rem] font-medium text-ink mb-2">
                 Recipient Email (Optional)
               </label>
               <input
@@ -504,12 +504,12 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
                 value={recipientEmail}
                 onChange={(e) => setRecipientEmail(e.target.value)}
                 placeholder="recipient@example.com"
-                className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.95rem] text-ink outline-none transition-colors focus:border-lav-600"
+                className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.9375rem] text-ink outline-none transition-colors focus:border-lav-600"
               />
             </div>
 
             <div>
-              <label className="block text-[0.86rem] font-medium text-ink mb-2">
+              <label className="block text-[0.875rem] font-medium text-ink mb-2">
                 Personal Message (Optional)
               </label>
               <textarea
@@ -517,19 +517,19 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
                 onChange={(e) => setMessage(e.target.value)}
                 rows={3}
                 placeholder="Add a friendly note..."
-                className="w-full rounded-xl border border-line bg-white p-4 text-[0.95rem] text-ink outline-none transition-colors focus:border-lav-600"
+                className="w-full rounded-xl border border-line bg-white p-4 text-[0.9375rem] text-ink outline-none transition-colors focus:border-lav-600"
               />
             </div>
 
             <div className="rounded-xl border border-line bg-cream p-4">
-              <p className="text-[0.86rem] text-ink-2">Wallet Balance</p>
+              <p className="text-[0.875rem] text-ink-2">Wallet Balance</p>
               <p className="text-[1.5rem] font-bold text-ink">
                 {formatNaira(user.walletBalance)}
               </p>
             </div>
 
             {error && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.9rem] text-red-700">
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.875rem] text-red-700">
                 {error}
               </div>
             )}
@@ -537,14 +537,14 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
             {success && (
               <div className="flow-arrive rounded-xl border border-green-200 bg-green-50 p-6 text-center">
                 <Gift className="mx-auto h-12 w-12 text-green-600 mb-3" />
-                <p className="text-[1.1rem] font-semibold text-green-700 mb-2">
+                <p className="text-[1.125rem] font-semibold text-green-700 mb-2">
                   Gift Card Created!
                 </p>
-                <p className="text-[0.9rem] text-green-600 mb-4">
+                <p className="text-[0.875rem] text-green-600 mb-4">
                   Copy and share this code privately. No email is sent automatically.
                 </p>
                 <div className="flex items-center justify-center gap-2 rounded-xl bg-white p-4">
-                  <code className="text-[1.2rem] font-bold text-ink">
+                  <code className="text-[1.25rem] font-bold text-ink">
                     {success.code}
                   </code>
                   <button
@@ -560,7 +560,7 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
                     )}
                   </button>
                 </div>
-                <p className="mt-3 text-[0.82rem] text-green-600">
+                <p className="mt-3 text-[0.8125rem] text-green-600">
                   Amount: {formatNaira(success.amount)}
                 </p>
                 <button type="button" onClick={() => setSuccess(null)} className="mt-3 text-sm font-semibold underline">
@@ -585,7 +585,7 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
         {activeTab === "redeem" && (
           <div className="space-y-6">
             <div>
-              <label className="block text-[0.86rem] font-medium text-ink mb-2">
+              <label className="block text-[0.875rem] font-medium text-ink mb-2">
                 Gift Card Code
               </label>
               <input
@@ -593,12 +593,12 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
                 value={redeemCode}
                 onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
                 placeholder="PRYVA-XXXX-XXXX-XXXX"
-                className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.95rem] text-ink outline-none transition-colors focus:border-lav-600"
+                className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[0.9375rem] text-ink outline-none transition-colors focus:border-lav-600"
               />
             </div>
 
             {error && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.9rem] text-red-700">
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[0.875rem] text-red-700">
                 {error}
               </div>
             )}
@@ -606,13 +606,13 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
             {redeemSuccess && (
               <div className="flow-arrive rounded-xl border border-green-200 bg-green-50 p-6 text-center">
                 <Check className="mx-auto h-12 w-12 text-green-600 mb-3" />
-                <p className="text-[1.1rem] font-semibold text-green-700 mb-2">
+                <p className="text-[1.125rem] font-semibold text-green-700 mb-2">
                   Gift Card Redeemed!
                 </p>
                 <p className="text-[1.5rem] font-bold text-green-600">
                   {formatNaira(redeemSuccess)}
                 </p>
-                <p className="mt-2 text-[0.86rem] text-green-600">
+                <p className="mt-2 text-[0.875rem] text-green-600">
                   Added to your wallet balance
                 </p>
                 <button type="button" onClick={() => setRedeemSuccess(null)} className="mt-3 text-sm font-semibold underline">
@@ -655,7 +655,7 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
             ) : cards.length === 0 ? (
               <div className="rounded-xl border border-line bg-white p-8 text-center">
                 <Gift className="mx-auto h-12 w-12 text-ink-3 mb-3" />
-                <p className="text-[0.95rem] text-ink-2">
+                <p className="text-[0.9375rem] text-ink-2">
                   No wallet gift cards purchased yet
                 </p>
               </div>
@@ -682,7 +682,7 @@ export function GiftCardsManager({ user, brandSalesEnabled }: GiftCardsManagerPr
                           )}
                         </button>
                       </div>
-                      <p className="text-[0.82rem] text-ink-2 mt-1">
+                      <p className="text-[0.8125rem] text-ink-2 mt-1">
                         Expires {new Date(card.expiresAt).toLocaleDateString()}
                       </p>
                     </div>

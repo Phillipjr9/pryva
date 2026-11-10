@@ -27,7 +27,7 @@ export function TelegramProducts({ userId, available }: { userId: string; availa
     <p className="max-w-2xl text-meta leading-relaxed text-ink-3">{loading ? "Checking current prices…" : "Displayed prices are indicative and may change. A confirmed quote is required before payment."}</p>
     <div hidden={tab !== "stars"}><StarsPurchase userId={userId} available={available} prices={prices.stars} loadingPrices={loading} /></div>
     <section hidden={tab !== "premium"} className="w-full max-w-2xl space-y-4 rounded-[1.5rem] border border-line bg-[#fffdfa] p-4 sm:p-6">
-      <h2 className="text-[1.05rem] font-semibold text-ink">Telegram Premium</h2>
+      <h2 className="text-[1rem] font-semibold text-ink">Telegram Premium</h2>
       <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-meta leading-relaxed text-amber-900">Premium ordering is not available yet. Prices shown are indicative, not a guarantee of availability.</p>
       <div><label htmlFor="premium-recipient" className="block text-meta font-semibold text-ink">Recipient Telegram username</label>
         <input id="premium-recipient" value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="@username" autoComplete="off" maxLength={33} className="mt-2 min-h-11 w-full rounded-xl border border-line bg-white px-3 py-2 text-ink" />

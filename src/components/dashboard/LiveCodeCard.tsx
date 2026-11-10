@@ -103,7 +103,7 @@ export function LiveCodeCard({ codes, initialNow }: { codes: LiveCode[]; initial
               <div className="flex min-w-0 items-center gap-2.5">
                 <CountryFlag region={code.region} size={24} decorative />
                 <div className="min-w-0">
-                  <p className="truncate text-[0.88rem] font-semibold text-ink">
+                  <p className="truncate text-[0.875rem] font-semibold text-ink">
                     {code.referenceCode ?? code.planLabel}
                   </p>
                   <p className="truncate text-meta text-ink-3">
@@ -138,7 +138,7 @@ export function LiveCodeCard({ codes, initialNow }: { codes: LiveCode[]; initial
                   {code.otpCode.split("").map((digit, index) => (
                     <span
                       key={`${code.id}-${index}`}
-                      className="otp-arrive grid h-10 flex-1 place-items-center rounded-lg border border-line bg-white text-[1.05rem] font-semibold tabular-nums text-ink"
+                      className="otp-arrive grid h-10 flex-1 place-items-center rounded-lg border border-line bg-white text-[1rem] font-semibold tabular-nums text-ink"
                       style={{ animationDelay: `${index * 70}ms` }}
                     >
                       {digit}

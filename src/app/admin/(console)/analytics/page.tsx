@@ -216,7 +216,7 @@ export default async function AdminAnalyticsPage() {
           <h1 className="text-[2rem] font-medium tracking-tight text-ink">
             Admin Analytics
           </h1>
-          <p className="mt-2 text-[0.95rem] text-ink-2">
+          <p className="mt-2 text-[0.9375rem] text-ink-2">
             Platform overview and key metrics
           </p>
         </div>
@@ -227,25 +227,25 @@ export default async function AdminAnalyticsPage() {
 
         <div className="grid gap-6 sm:grid-cols-4">
           <div className="rounded-2xl border border-line bg-white p-6">
-            <p className="text-[0.86rem] text-ink-2 mb-1">Total accounts</p>
+            <p className="text-[0.875rem] text-ink-2 mb-1">Total accounts</p>
             <p className="text-[2rem] font-bold text-ink">
               {totalUsers.toLocaleString("en-NG")}
             </p>
           </div>
           <div className="rounded-2xl border border-line bg-white p-6">
-            <p className="text-[0.86rem] text-ink-2 mb-1">Verified email</p>
+            <p className="text-[0.875rem] text-ink-2 mb-1">Verified email</p>
             <p className="text-[2rem] font-bold text-ink">
               {verifiedUsers.toLocaleString("en-NG")}
             </p>
           </div>
           <div className="rounded-2xl border border-line bg-white p-6">
-            <p className="text-[0.86rem] text-ink-2 mb-1">Unverified</p>
+            <p className="text-[0.875rem] text-ink-2 mb-1">Unverified</p>
             <p className="text-[2rem] font-bold text-ink">
               {unverifiedUsers.toLocaleString("en-NG")}
             </p>
           </div>
           <div className="rounded-2xl border border-line bg-white p-6">
-            <p className="text-[0.86rem] text-ink-2 mb-1">Closed accounts</p>
+            <p className="text-[0.875rem] text-ink-2 mb-1">Closed accounts</p>
             <p className="text-[2rem] font-bold text-ink">
               {closedUsers.toLocaleString("en-NG")}
             </p>
@@ -276,13 +276,13 @@ export default async function AdminAnalyticsPage() {
                     )}
                   </span>
                 </div>
-                <p className="text-[0.86rem] text-ink-2 mb-1">
+                <p className="text-[0.875rem] text-ink-2 mb-1">
                   {outcome.label} orders
                 </p>
                 <p className="text-[2rem] font-bold text-ink mb-1">
                   {outcome.count.toLocaleString("en-NG")}
                 </p>
-                <p className="text-[0.86rem] font-medium text-ink-2">
+                <p className="text-[0.875rem] font-medium text-ink-2">
                   {formatCurrency(outcome.revenue)}
                 </p>
               </Link>
@@ -299,7 +299,7 @@ export default async function AdminAnalyticsPage() {
             </h2>
             <Link
               href="/admin/users"
-              className="text-[0.82rem] font-medium text-lav-700 underline underline-offset-2 hover:text-lav-800"
+              className="text-[0.8125rem] font-medium text-lav-700 underline underline-offset-2 hover:text-lav-800"
             >
               View all users <ArrowRight className="h-3.5 w-3.5 ml-1" />
             </Link>
@@ -320,7 +320,7 @@ export default async function AdminAnalyticsPage() {
           </p>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[52rem] text-left text-[0.84rem]">
+            <table className="w-full min-w-[52rem] text-left text-[0.8125rem]">
               <thead className="bg-cream/70 text-meta uppercase tracking-wide text-ink-3">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Account</th>
@@ -361,7 +361,7 @@ export default async function AdminAnalyticsPage() {
                     <td className="px-4 py-3 font-mono text-meta text-ink-2 truncate max-w-[24rem]" title={row.email}>
                       {row.email}
                     </td>
-                    <td className="px-4 py-3 text-[0.8rem] text-ink-2">
+                    <td className="px-4 py-3 text-[0.8125rem] text-ink-2">
                       {formatDateTime(row.createdAt)}
                     </td>
                     <td className="px-4 py-3">
@@ -398,14 +398,14 @@ export default async function AdminAnalyticsPage() {
             </h2>
             <Link
               href="/admin/orders"
-              className="text-[0.82rem] font-medium text-lav-700 underline underline-offset-2 hover:text-lav-800"
+              className="text-[0.8125rem] font-medium text-lav-700 underline underline-offset-2 hover:text-lav-800"
             >
               View all orders <ArrowRight className="h-3.5 w-3.5 ml-1" />
             </Link>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[44rem] text-left text-[0.84rem]">
+            <table className="w-full min-w-[44rem] text-left text-[0.8125rem]">
               <thead className="bg-cream/70 text-meta uppercase tracking-wide text-ink-3">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Product</th>
@@ -438,7 +438,7 @@ export default async function AdminAnalyticsPage() {
                     <td className="px-4 py-3 font-medium text-ink">
                       {formatCurrency(product.revenue)}
                     </td>
-                    <td className="px-4 py-3 text-[0.8rem] text-ink-3 capitalize">
+                    <td className="px-4 py-3 text-[0.8125rem] text-ink-3 capitalize">
                       {product.service.replace(/_/g, " ")}
                     </td>
                   </tr>

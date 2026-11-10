@@ -52,14 +52,14 @@ export default function ESIMPage() {
             <ServiceIcon service="esim" size="lg" className="mb-5" />
             <span className="mb-4 inline-block rounded-full bg-lav-100 px-4 py-1.5 text-meta font-semibold text-lav-700">{service.eyebrow}</span>
             <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3.5rem]">{service.tagline}</h1>
-            <p className="mt-6 text-[1.1rem] leading-relaxed text-ink-2">
+            <p className="mt-6 text-[1.125rem] leading-relaxed text-ink-2">
               {live
                 ? "eSIM ordering is configured. Check the dashboard for current plans, prices and availability."
                 : "eSIM ordering is not connected yet. Current plans and prices will appear when ordering is available."}
             </p>
             <div className="mt-8 flex flex-wrap gap-3 sm:gap-4">
-              <Link href={live ? "/dashboard/esim" : "/signup"} className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-lav-800">{live ? "Browse eSIM plans" : "Create an account"} <ArrowRight className="h-4 w-4" /></Link>
-              <Link href="/pricing" className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-6 py-3 text-[0.95rem] font-semibold text-ink hover:bg-cream">View pricing</Link>
+              <Link href={live ? "/dashboard/esim" : "/signup"} className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.9375rem] font-semibold text-white hover:bg-lav-800">{live ? "Browse eSIM plans" : "Create an account"} <ArrowRight className="h-4 w-4" /></Link>
+              <Link href="/pricing" className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-6 py-3 text-[0.9375rem] font-semibold text-ink hover:bg-cream">View pricing</Link>
             </div>
           </div>
         </div>
@@ -69,8 +69,8 @@ export default function ESIMPage() {
         <div className="shell grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {highlights.map((highlight) => (
             <div key={highlight.title} className="rounded-2xl border border-line bg-white p-6">
-              <h2 className="mb-3 text-[1.1rem] font-semibold text-ink">{highlight.title}</h2>
-              <p className="text-[0.9rem] leading-relaxed text-ink-2">{highlight.body}</p>
+              <h2 className="mb-3 text-[1.125rem] font-semibold text-ink">{highlight.title}</h2>
+              <p className="text-[0.875rem] leading-relaxed text-ink-2">{highlight.body}</p>
             </div>
           ))}
         </div>
@@ -80,12 +80,12 @@ export default function ESIMPage() {
         <div className="shell">
           <h2 className="mb-6 text-[1.75rem] font-semibold text-ink">Current plans and destinations</h2>
           <div className="rounded-2xl border border-line bg-white p-6">
-            <p className="text-[0.95rem] leading-relaxed text-ink-2">
+            <p className="text-[0.9375rem] leading-relaxed text-ink-2">
               {live
                 ? "Browse current plans for your destination, including their data allowance, validity and price. Availability can change."
                 : "Ordering is currently unavailable. Coverage, plans and prices cannot be confirmed on this deployment."}
             </p>
-            {live && <Link href="/dashboard/esim" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-lav-700 px-5 py-2.5 text-[0.9rem] font-semibold text-white hover:bg-lav-800">See current eSIM plans <ArrowRight className="h-4 w-4" /></Link>}
+            {live && <Link href="/dashboard/esim" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-lav-700 px-5 py-2.5 text-[0.875rem] font-semibold text-white hover:bg-lav-800">See current eSIM plans <ArrowRight className="h-4 w-4" /></Link>}
           </div>
         </div>
       </section>
@@ -97,7 +97,7 @@ export default function ESIMPage() {
             {faqs.map((faq) => (
               <div key={faq.q} className="rounded-2xl border border-line bg-white p-6">
                 <h3 className="mb-3 text-[1rem] font-semibold text-ink">{faq.q}</h3>
-                <p className="text-[0.9rem] leading-relaxed text-ink-2">{faq.a}</p>
+                <p className="text-[0.875rem] leading-relaxed text-ink-2">{faq.a}</p>
               </div>
             ))}
           </div>

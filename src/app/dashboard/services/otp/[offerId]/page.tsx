@@ -41,7 +41,7 @@ export default async function AppOtpCheckoutPage({
           <CountryFlag code={listing.countryCode} size={20} decorative radius={10} /> {listing.countryName} · app verification
         </p>
         <h1 className="mt-2 text-[1.6rem] font-semibold text-ink">{listing.app}</h1>
-        <p className="mt-1 text-[0.84rem] text-ink-2">Single-use SMS number · {listing.plan.duration}</p>
+        <p className="mt-1 text-[0.8125rem] text-ink-2">Single-use SMS number · {listing.plan.duration}</p>
       </div>
 
       {listing.purchasable ? (

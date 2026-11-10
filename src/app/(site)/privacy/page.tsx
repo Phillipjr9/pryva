@@ -15,13 +15,13 @@ export default function PrivacyPage() {
           <div className="ml-auto flex items-center gap-3">
             <Link
               href="/login"
-              className="text-[0.86rem] font-medium text-ink-2 hover:text-ink"
+              className="text-[0.875rem] font-medium text-ink-2 hover:text-ink"
             >
               Sign in
             </Link>
             <Link
               href="/signup"
-              className="rounded-xl bg-lav-700 px-4 py-2 text-[0.86rem] font-semibold text-white hover:bg-lav-800"
+              className="rounded-xl bg-lav-700 px-4 py-2 text-[0.875rem] font-semibold text-white hover:bg-lav-800"
             >
               Get Started
             </Link>

@@ -43,7 +43,7 @@ export default async function OperatorAccountPage({
     <div className="mx-auto max-w-2xl space-y-5">
       <div>
         <h1 className="text-[1.4rem] font-medium tracking-tight">Operator account</h1>
-        <p className="mt-1 text-[0.86rem] leading-relaxed text-ink-2">
+        <p className="mt-1 text-[0.875rem] leading-relaxed text-ink-2">
           Signing in as <span className="font-medium text-ink">{operator.email}</span>.
         </p>
       </div>
@@ -51,7 +51,7 @@ export default async function OperatorAccountPage({
       {required === "2fa" && !enabled && (
         <div
           role="alert"
-          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.85rem] text-amber-900"
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.875rem] text-amber-900"
         >
           <strong className="font-semibold">A second factor is required before you can operate.</strong>{" "}
           Set it up below, then continue — you will be returned to{" "}
@@ -60,12 +60,12 @@ export default async function OperatorAccountPage({
       )}
 
       {!twoFactorAvailable() && (
-        <div className="rounded-xl border border-line bg-white px-4 py-3 text-[0.85rem] text-ink-2">
+        <div className="rounded-xl border border-line bg-white px-4 py-3 text-[0.875rem] text-ink-2">
           <p className="flex items-center gap-1.5 font-medium text-ink">
             <Shield className="h-4 w-4 text-lav-700" /> Two-factor cannot be enrolled on this deployment
           </p>
           <p className="mt-1 leading-relaxed">
-            <code className="text-[0.8rem]">TWO_FACTOR_KEY</code> is not configured, so no secret can be
+            <code className="text-[0.8125rem]">TWO_FACTOR_KEY</code> is not configured, so no secret can be
             encrypted. The requirement is skipped rather than locking every operator out of a site with
             no way to fix itself — treat this as a deployment defect.
           </p>
@@ -77,7 +77,7 @@ export default async function OperatorAccountPage({
       {enabled && required === "2fa" && (
         <Link
           href={back}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-lav-700 px-4 py-2 text-[0.84rem] font-semibold text-white hover:bg-lav-800"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-lav-700 px-4 py-2 text-[0.8125rem] font-semibold text-white hover:bg-lav-800"
         >
           Continue to {back}
         </Link>

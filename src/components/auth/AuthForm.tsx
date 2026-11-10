@@ -176,7 +176,7 @@ export function AuthForm({
           <br />
           <span className="text-display italic text-lav-700">your authenticator.</span>
         </h1>
-        <p className="mt-3 text-[0.9rem] leading-relaxed text-ink-2">
+        <p className="mt-3 text-[0.875rem] leading-relaxed text-ink-2">
           Your password was accepted. This sign-in needs the six-digit code, or one of your saved
           recovery codes.
         </p>
@@ -254,7 +254,7 @@ export function AuthForm({
             </>
           )}
         </h1>
-        <p className="mt-3 text-[0.9rem] leading-relaxed text-ink-2">
+        <p className="mt-3 text-[0.875rem] leading-relaxed text-ink-2">
           {mode === "signup"
             ? "Create an account to buy number plans and track every order in one dashboard."
             : "Your wallet, orders, codes and refunds are waiting exactly where you left them."}
@@ -310,7 +310,7 @@ export function AuthForm({
         </div>
 
         {error && (
-          <p className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-[0.8rem] font-medium text-rose-700">
+          <p className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-[0.8125rem] font-medium text-rose-700">
             {error}
           </p>
         )}
@@ -416,7 +416,7 @@ export function AuthForm({
         )}
       </div>
 
-      <p className="mt-6 text-center text-[0.85rem] text-ink-2">
+      <p className="mt-6 text-center text-[0.875rem] text-ink-2">
         {mode === "signup" ? (
           <>
             Already have an account?{" "}

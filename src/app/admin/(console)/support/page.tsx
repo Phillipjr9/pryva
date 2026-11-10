@@ -80,14 +80,14 @@ export default async function AdminSupportPage({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[1.5rem] font-semibold text-ink">Support queue</h1>
-          <p className="mt-1 text-[0.86rem] text-ink-2">
+          <p className="mt-1 text-[0.875rem] text-ink-2">
             The assistant answers every ticket first. These are the ones that need a person, plus everything it
             handled so you can read what it did.
           </p>
         </div>
         <Link
           href={leastSureFirst ? "/admin/support" : "/admin/support?sort=confidence"}
-          className="rounded-xl border border-line px-3 py-2 text-[0.8rem] font-medium text-ink-2 hover:border-lav-300"
+          className="rounded-xl border border-line px-3 py-2 text-[0.8125rem] font-medium text-ink-2 hover:border-lav-300"
         >
           {leastSureFirst ? "Sort by latest activity" : "Sort by least confident first"}
         </Link>
@@ -126,7 +126,7 @@ export default async function AdminSupportPage({
       </div>
 
       <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-[#fffdfa]">
-        <table className="w-full min-w-[46rem] text-left text-[0.84rem]">
+        <table className="w-full min-w-[46rem] text-left text-[0.8125rem]">
           <thead className="border-b border-line text-micro uppercase tracking-wide text-ink-3">
             <tr>
               <th className="px-3 py-2.5 font-medium">Ticket</th>

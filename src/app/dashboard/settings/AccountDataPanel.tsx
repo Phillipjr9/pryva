@@ -49,7 +49,7 @@ export function AccountDataPanel() {
           <Download className="h-4 w-4" />
         </span>
         <div>
-          <h2 className="text-[0.95rem] font-semibold">Your data</h2>
+          <h2 className="text-[0.9375rem] font-semibold">Your data</h2>
           <p className="mt-0.5 text-meta text-ink-2">
             Download a JSON copy of your profile, orders, wallet activity, gift cards and schedules.
           </p>
@@ -61,7 +61,7 @@ export function AccountDataPanel() {
           type="button"
           onClick={() => void download()}
           disabled={busy}
-          className="btn w-fit border border-line bg-white !px-4 !py-2.5 !text-[0.8rem] text-ink hover:border-lav-300 disabled:opacity-50"
+          className="btn w-fit border border-line bg-white !px-4 !py-2.5 !text-[0.8125rem] text-ink hover:border-lav-300 disabled:opacity-50"
         >
           {busy ? (
             <>

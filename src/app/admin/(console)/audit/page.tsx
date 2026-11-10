@@ -114,7 +114,7 @@ export default async function AdminAuditPage({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-[1.5rem] font-medium tracking-tight">Audit log</h1>
-          <p className="mt-1 max-w-2xl text-[0.86rem] text-ink-2">
+          <p className="mt-1 max-w-2xl text-[0.875rem] text-ink-2">
             Every privileged action that moved money or changed an account, newest first.{" "}
             <span className="text-ink-3">
               Append-only. A missing row means its insert failed and was logged — the wallet
@@ -135,8 +135,8 @@ export default async function AdminAuditPage({
             href={buildHref({ action: filter.value, page: 1 })}
             className={
               filter.value === action
-                ? "rounded-full border border-lav-600 bg-lav-700 px-3.5 py-1.5 text-[0.8rem] font-medium text-white"
-                : "rounded-full border border-line bg-white px-3.5 py-1.5 text-[0.8rem] font-medium text-ink-2 hover:border-lav-300"
+                ? "rounded-full border border-lav-600 bg-lav-700 px-3.5 py-1.5 text-[0.8125rem] font-medium text-white"
+                : "rounded-full border border-line bg-white px-3.5 py-1.5 text-[0.8125rem] font-medium text-ink-2 hover:border-lav-300"
             }
           >
             {filter.label}
@@ -151,7 +151,7 @@ export default async function AdminAuditPage({
             defaultValue={query}
             placeholder="Search actor, target or summary"
             aria-label="Search the audit log"
-            className="w-64 rounded-xl border border-line bg-white px-3.5 py-2 text-[0.84rem] outline-none focus:border-lav-400"
+            className="w-64 rounded-xl border border-line bg-white px-3.5 py-2 text-[0.8125rem] outline-none focus:border-lav-400"
           />
           <button type="submit" className="btn btn-primary btn-sm">
             Search
@@ -160,7 +160,7 @@ export default async function AdminAuditPage({
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-line bg-white">
-        <table className="w-full min-w-[36rem] text-left text-[0.84rem]">
+        <table className="w-full min-w-[36rem] text-left text-[0.8125rem]">
           <thead className="bg-cream/70 text-meta uppercase tracking-wide text-ink-3">
             <tr>
               <th className="px-4 py-3 font-semibold">When</th>
@@ -180,14 +180,14 @@ export default async function AdminAuditPage({
             {rows.map((row) => (
               <tr key={row.id} className="border-t border-line/70 align-top">
                 <td className="whitespace-nowrap px-4 py-3 text-meta text-ink-3">{formatDate(row.createdAt)}</td>
-                <td className="px-4 py-3 text-[0.8rem] text-ink-2">{row.actorEmail}</td>
+                <td className="px-4 py-3 text-[0.8125rem] text-ink-2">{row.actorEmail}</td>
                 <td className="px-4 py-3">
                   <p className="font-medium text-ink">{ACTION_LABELS[row.action] ?? row.action}</p>
                   <p className="font-mono text-meta text-ink-3">
                     {row.targetType}:{row.targetId}
                   </p>
                 </td>
-                <td className="px-4 py-3 text-[0.82rem] text-ink-2">{row.summary}</td>
+                <td className="px-4 py-3 text-[0.8125rem] text-ink-2">{row.summary}</td>
               </tr>
             ))}
           </tbody>
@@ -195,7 +195,7 @@ export default async function AdminAuditPage({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-[0.82rem] text-ink-2">
+        <div className="flex items-center justify-between text-[0.8125rem] text-ink-2">
           <span>
             Page {page} of {totalPages}
           </span>

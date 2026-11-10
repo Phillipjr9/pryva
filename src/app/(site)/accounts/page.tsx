@@ -64,7 +64,7 @@ export default function AccountsPage() {
               ]}
             />
 
-            <div className="mt-6 flex flex-wrap items-center gap-3 text-[0.82rem] text-ink-3">
+            <div className="mt-6 flex flex-wrap items-center gap-3 text-[0.8125rem] text-ink-3">
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-lav-600" /> Digital listings
               </span>
@@ -100,8 +100,8 @@ export default function AccountsPage() {
             },
           ].map((item) => (
             <div key={item.title} className="rounded-2xl border border-line bg-white p-5">
-              <h2 className="text-[0.95rem] font-semibold text-ink">{item.title}</h2>
-              <p className="mt-2 text-[0.85rem] leading-relaxed text-ink-2">{item.body}</p>
+              <h2 className="text-[0.9375rem] font-semibold text-ink">{item.title}</h2>
+              <p className="mt-2 text-[0.875rem] leading-relaxed text-ink-2">{item.body}</p>
             </div>
           ))}
         </div>
@@ -109,8 +109,8 @@ export default function AccountsPage() {
 
       <section className="shell py-12">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
-          <h2 className="text-[0.95rem] font-semibold text-amber-900">Before you buy</h2>
-          <p className="mt-2 max-w-3xl text-[0.85rem] leading-relaxed text-amber-900/80">
+          <h2 className="text-[0.9375rem] font-semibold text-amber-900">Before you buy</h2>
+          <p className="mt-2 max-w-3xl text-[0.875rem] leading-relaxed text-amber-900/80">
             Accounts are delivered exactly as described and are not screened by PryvaLogs beyond the
             checks described here. Use them in line with each platform&apos;s terms — some platforms restrict
             account transfers, and you accept that risk when you buy. Save your credentials on delivery;

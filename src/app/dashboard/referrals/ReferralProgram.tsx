@@ -57,7 +57,7 @@ export function ReferralProgram({ code, link, earned, invited, pending, percent,
   if (!code || !link) {
     return (
       <div className="rounded-2xl border border-line bg-white p-5">
-        <p className="flex items-start gap-2 text-[0.86rem] text-ink-2">
+        <p className="flex items-start gap-2 text-[0.875rem] text-ink-2">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
           Invite codes are unavailable right now. Please try again in a moment.
         </p>
@@ -73,7 +73,7 @@ export function ReferralProgram({ code, link, earned, invited, pending, percent,
             <h2 className="flex items-center gap-2 text-[1rem] font-semibold text-ink">
               <Gift className="h-4 w-4 text-lav-700" /> Your invite link
             </h2>
-            <p className="mt-1 max-w-xl text-[0.85rem] leading-relaxed text-ink-2">
+            <p className="mt-1 max-w-xl text-[0.875rem] leading-relaxed text-ink-2">
               When someone joins with your link and their first order is delivered, you earn{" "}
               <strong className="text-ink">{percent}%</strong> of that order in your wallet — up to{" "}
               <strong className="text-ink">{formatNaira(capNgn)}</strong>. Once per friend.
@@ -86,20 +86,20 @@ export function ReferralProgram({ code, link, earned, invited, pending, percent,
         </div>
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <code className="flex-1 select-all truncate rounded-xl border border-line bg-white px-3 py-2.5 font-mono text-[0.82rem] text-ink">
+          <code className="flex-1 select-all truncate rounded-xl border border-line bg-white px-3 py-2.5 font-mono text-[0.8125rem] text-ink">
             {link}
           </code>
           <button
             type="button"
             onClick={() => void copy(link, "link")}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-[0.82rem] font-semibold text-white hover:bg-ink-2"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-[0.8125rem] font-semibold text-white hover:bg-ink-2"
           >
             {copied === "link" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             {copied === "link" ? "Copied" : "Copy link"}
           </button>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-[0.8rem] text-ink-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-[0.8125rem] text-ink-2">
           <span className="text-ink-3">Or share the code</span>
           <code className="select-all rounded-lg border border-line bg-white px-2 py-1 font-mono tracking-[0.18em]">
             {code}
@@ -115,7 +115,7 @@ export function ReferralProgram({ code, link, earned, invited, pending, percent,
         </div>
 
         {error ? (
-          <p role="alert" className="mt-3 flex items-start gap-1.5 text-[0.8rem] font-medium text-rose-700">
+          <p role="alert" className="mt-3 flex items-start gap-1.5 text-[0.8125rem] font-medium text-rose-700">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {error}
           </p>
         ) : null}
@@ -129,17 +129,17 @@ export function ReferralProgram({ code, link, earned, invited, pending, percent,
         ].map((stat) => (
           <div key={stat.label} className="rounded-2xl border border-line bg-white px-4 py-3">
             <p className="text-micro uppercase tracking-[0.12em] text-ink-3">{stat.label}</p>
-            <p className="mt-1 text-[1.1rem] font-semibold text-ink">{stat.value}</p>
+            <p className="mt-1 text-[1.125rem] font-semibold text-ink">{stat.value}</p>
           </div>
         ))}
       </div>
 
       <section className="rounded-2xl border border-line bg-white p-5">
-        <h2 className="flex items-center gap-2 text-[0.95rem] font-semibold text-ink">
+        <h2 className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
           <Users className="h-4 w-4 text-lav-700" /> People you invited
         </h2>
         {invites.length === 0 ? (
-          <p className="mt-2 text-[0.86rem] text-ink-2">
+          <p className="mt-2 text-[0.875rem] text-ink-2">
             Nobody yet. Share the link above — the reward arrives after their first order is delivered.
           </p>
         ) : (
@@ -155,12 +155,12 @@ export function ReferralProgram({ code, link, earned, invited, pending, percent,
                   className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-[#fffdfa] px-3 py-2.5"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-[0.85rem] font-medium text-ink">{invite.refereeLabel}</p>
+                    <p className="truncate text-[0.875rem] font-medium text-ink">{invite.refereeLabel}</p>
                     <p className="text-micro text-ink-3">Joined {shortDate(invite.createdAt)}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {invite.status === "credited" && invite.rewardAmount ? (
-                      <span className="text-[0.85rem] font-semibold text-emerald-700">
+                      <span className="text-[0.875rem] font-semibold text-emerald-700">
                         +{formatNaira(invite.rewardAmount)}
                       </span>
                     ) : null}
@@ -176,10 +176,10 @@ export function ReferralProgram({ code, link, earned, invited, pending, percent,
       </section>
 
       <section className="rounded-2xl border border-line bg-[#fffdfa] p-5">
-        <h2 className="flex items-center gap-2 text-[0.95rem] font-semibold text-ink">
+        <h2 className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
           <Send className="h-4 w-4 text-lav-700" /> How it works
         </h2>
-        <ol className="mt-2 grid gap-1.5 text-[0.84rem] leading-relaxed text-ink-2">
+        <ol className="mt-2 grid gap-1.5 text-[0.8125rem] leading-relaxed text-ink-2">
           <li>1. Share your link or code — wherever you like.</li>
           <li>2. They create an account with it. Codes are counted once per person.</li>
           <li>

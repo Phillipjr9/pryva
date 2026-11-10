@@ -77,17 +77,11 @@ describe("sitewide structured data", () => {
 });
 
 describe("self-hosted webfonts", () => {
-  const weights = ["300", "400", "500", "600", "700", "800"];
-
-  it("imports every weight the design uses from @fontsource", () => {
-    for (const weight of weights) {
-      expect(layout, `weight ${weight} is not imported`).toContain(
-        `@fontsource/plus-jakarta-sans/${weight}.css`,
-      );
-    }
+  it("uses one variable Jakarta family for every weight", () => {
+    expect(layout).toContain("@fontsource-variable/plus-jakarta-sans");
     expect(layout).toContain("@fontsource/instrument-serif/400.css");
     expect(layout).toContain("@fontsource/instrument-serif/400-italic.css");
-    expect(pkg.dependencies["@fontsource/plus-jakarta-sans"]).toBeTruthy();
+    expect(pkg.dependencies["@fontsource-variable/plus-jakarta-sans"]).toBeTruthy();
     expect(pkg.dependencies["@fontsource/instrument-serif"]).toBeTruthy();
   });
 
@@ -96,7 +90,7 @@ describe("self-hosted webfonts", () => {
     expect(layout).not.toContain("preconnect");
     // The family names the CSS variables promise must still be the ones the
     // packages declare, or the self-hosted files would never be selected.
-    expect(globals).toContain('"Plus Jakarta Sans"');
+    expect(globals).toContain('"Plus Jakarta Sans Variable"');
     expect(globals).toContain('"Instrument Serif"');
   });
 });

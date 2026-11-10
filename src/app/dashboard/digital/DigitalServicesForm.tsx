@@ -39,7 +39,7 @@ export function DigitalServicesForm({ user, service, countryCode, backHref = "/d
 
       {/* Plans */}
       <div>
-        <label className="block text-[0.86rem] font-medium text-ink mb-3">
+        <label className="block text-[0.875rem] font-medium text-ink mb-3">
           Select Plan
         </label>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

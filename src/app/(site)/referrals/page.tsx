@@ -80,7 +80,7 @@ export default function ReferralsPage() {
               Invite friends.{" "}
               <span className="text-display italic text-lav-700">Earn wallet credit.</span>
             </h1>
-            <p className="mx-auto mt-5 max-w-xl text-[1.05rem] leading-relaxed text-ink-2">
+            <p className="mx-auto mt-5 max-w-xl text-[1rem] leading-relaxed text-ink-2">
               Share your unique invite link. When a friend joins and their first order is delivered,{" "}
               <strong className="text-ink">{DEFAULT_REWARD_PERCENT}%</strong> of that order lands in
               your wallet — up to{" "}
@@ -113,7 +113,7 @@ export default function ReferralsPage() {
               ].map((stat) => (
                 <div key={stat.label}>
                   <p className="text-[2rem] font-semibold tracking-tight text-lav-700">{stat.value}</p>
-                  <p className="mt-1 text-[0.86rem] text-ink-2">{stat.label}</p>
+                  <p className="mt-1 text-[0.875rem] text-ink-2">{stat.label}</p>
                 </div>
               ))}
             </div>
@@ -138,9 +138,9 @@ export default function ReferralsPage() {
                   <span className="text-display text-[2.4rem] leading-none text-lav-300">{step.n}</span>
                   <div className="mt-3 flex items-center gap-2">
                     <Icon className="h-4 w-4 text-lav-600" />
-                    <h3 className="text-[0.98rem] font-semibold">{step.title}</h3>
+                    <h3 className="text-[1rem] font-semibold">{step.title}</h3>
                   </div>
-                  <p className="mt-2 text-[0.84rem] leading-relaxed text-ink-2">{step.body}</p>
+                  <p className="mt-2 text-[0.8125rem] leading-relaxed text-ink-2">{step.body}</p>
                   {index < steps.length - 1 && (
                     <span className="absolute -right-2.5 top-1/2 hidden h-5 w-5 -translate-y-1/2 place-items-center rounded-full bg-white text-lav-500 shadow-sm lg:grid">
                       <ArrowRight className="h-3 w-3" />
@@ -156,7 +156,7 @@ export default function ReferralsPage() {
       <section className="pb-16">
         <div className="shell">
           <div className="mx-auto max-w-3xl rounded-2xl border border-line bg-white p-6 sm:p-8">
-            <h2 className="flex items-center gap-2 text-[1.2rem] font-semibold text-ink">
+            <h2 className="flex items-center gap-2 text-[1.25rem] font-semibold text-ink">
               <Shield className="h-5 w-5 text-lav-600" /> Program rules
             </h2>
             <ul className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -170,7 +170,7 @@ export default function ReferralsPage() {
                 "The reward rate and cap can change with a deployment update.",
                 "PryvaLogs may void rewards that appear to abuse the program.",
               ].map((rule) => (
-                <li key={rule} className="flex items-start gap-2 text-[0.86rem] text-ink-2">
+                <li key={rule} className="flex items-start gap-2 text-[0.875rem] text-ink-2">
                   <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
                   {rule}
                 </li>
@@ -187,7 +187,7 @@ export default function ReferralsPage() {
             {faqs.map((faq) => (
               <div key={faq.q} className="rounded-2xl border border-line bg-white p-6">
                 <h3 className="text-[1rem] font-semibold text-ink">{faq.q}</h3>
-                <p className="mt-2 text-[0.9rem] leading-relaxed text-ink-2">{faq.a}</p>
+                <p className="mt-2 text-[0.875rem] leading-relaxed text-ink-2">{faq.a}</p>
               </div>
             ))}
           </div>
@@ -200,7 +200,7 @@ export default function ReferralsPage() {
             <h2 className="text-[1.8rem] font-medium leading-[1.08] sm:text-[2.2rem]">
               Ready to start earning?
             </h2>
-            <p className="mx-auto mt-3 max-w-md text-[0.95rem] leading-relaxed text-white/70">
+            <p className="mx-auto mt-3 max-w-md text-[0.9375rem] leading-relaxed text-white/70">
               Sign in to get your invite link. It takes less than a minute.
             </p>
             <Link

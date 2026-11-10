@@ -125,7 +125,7 @@ export function PasskeysCard({ passkeys, available }: Props) {
     <div className="rounded-2xl border border-line bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="flex items-center gap-1.5 text-[0.9rem] font-semibold text-ink">
+          <p className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-ink">
             <Lock className="h-4 w-4 text-lav-600" /> Passkeys
           </p>
           <p className="mt-1 text-meta leading-relaxed text-ink-2">
@@ -197,7 +197,7 @@ export function PasskeysCard({ passkeys, available }: Props) {
           type="button"
           onClick={() => void addPasskey()}
           disabled={pending !== null}
-          className="mt-3 inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-[0.82rem] font-semibold text-white hover:bg-ink-2 disabled:opacity-50"
+          className="mt-3 inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-[0.8125rem] font-semibold text-white hover:bg-ink-2 disabled:opacity-50"
         >
           {pending === "add" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
           {pending === "add" ? "Waiting for your device…" : "Add a passkey"}

@@ -57,7 +57,7 @@ export default async function EsimCataloguePage() {
     <div className="space-y-6">
       <div>
         <ServiceTitle service="esim">eSIM plans</ServiceTitle>
-        <p className="mt-1 text-[0.86rem] leading-relaxed text-ink-2">
+        <p className="mt-1 text-[0.875rem] leading-relaxed text-ink-2">
           Browse current plans by data allowance, validity, naira price and listed calling/texting support.
           Plans are labeled only when the listing confirms those features; missing details stay unconfirmed.
           Availability can change; your wallet is charged when the profile is issued. You cannot select a
@@ -73,7 +73,7 @@ export default async function EsimCataloguePage() {
          * catalogue from a broken filter, so "the listing is empty" was the
          * only thing they could report. Say which of the two it is.
          */
-        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.86rem] leading-relaxed text-amber-900">
+        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.875rem] leading-relaxed text-amber-900">
           <p className="font-semibold">No eSIM plan is on sale right now.</p>
           <p className="mt-1">
             {stats && stats.returned > 0
@@ -84,7 +84,7 @@ export default async function EsimCataloguePage() {
           </p>
         </div>
       ) : failure ? (
-        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.86rem] leading-relaxed text-amber-900">
+        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.875rem] leading-relaxed text-amber-900">
           {failure}{" "}
           <Link href="/dashboard/services?category=esim" className="font-semibold underline">
             Browse by destination instead

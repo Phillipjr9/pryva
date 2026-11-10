@@ -12,7 +12,7 @@ export default async function GiftCardsPage() {
     <div className="space-y-6">
       <div>
         <ServiceTitle service="gift-cards">Gift Cards</ServiceTitle>
-        <p className="mt-1 text-[0.86rem] text-ink-2">
+        <p className="mt-1 text-[0.875rem] text-ink-2">
           Explore brand gift cards or send Pryva wallet credit. Brand gift card availability is shown below.
         </p>
       </div>

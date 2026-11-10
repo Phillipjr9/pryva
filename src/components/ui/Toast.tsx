@@ -138,7 +138,7 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
         })}
       />
       <p
-        className={cn("flex-1 text-[0.86rem]", {
+        className={cn("flex-1 text-[0.875rem]", {
           "text-green-700": toast.type === "success",
           "text-red-700": toast.type === "error",
           "text-yellow-700": toast.type === "warning",

@@ -126,7 +126,7 @@ export default async function AdminOrdersPage({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-[1.5rem] font-medium tracking-tight">Orders</h1>
-          <p className="mt-1 text-[0.86rem] text-ink-2">
+          <p className="mt-1 text-[0.875rem] text-ink-2">
             {Number(total).toLocaleString("en-NG")} {Number(total) === 1 ? "order" : "orders"}
             {status ? ` · ${status}` : ""}
             {query ? ` · matching “${query}”` : ""}
@@ -145,8 +145,8 @@ export default async function AdminOrdersPage({
             href={buildHref({ status: filter.value, page: 1 })}
             className={
               filter.value === status
-                ? "rounded-full border border-lav-600 bg-lav-700 px-3.5 py-1.5 text-[0.8rem] font-medium text-white"
-                : "rounded-full border border-line bg-white px-3.5 py-1.5 text-[0.8rem] font-medium text-ink-2 hover:border-lav-300"
+                ? "rounded-full border border-lav-600 bg-lav-700 px-3.5 py-1.5 text-[0.8125rem] font-medium text-white"
+                : "rounded-full border border-line bg-white px-3.5 py-1.5 text-[0.8125rem] font-medium text-ink-2 hover:border-lav-300"
             }
           >
             {filter.label}
@@ -161,7 +161,7 @@ export default async function AdminOrdersPage({
             defaultValue={query}
             placeholder="Search reference, product or service"
             aria-label="Search orders"
-            className="w-64 rounded-xl border border-line bg-white px-3.5 py-2 text-[0.84rem] outline-none focus:border-lav-400"
+            className="w-64 rounded-xl border border-line bg-white px-3.5 py-2 text-[0.8125rem] outline-none focus:border-lav-400"
           />
           <button type="submit" className="btn btn-primary btn-sm">
             Search
@@ -172,7 +172,7 @@ export default async function AdminOrdersPage({
       <div className="overflow-x-auto rounded-2xl border border-line bg-white">
         {/* Six columns do not fit a phone. Scroll them rather than clipping the
             last two, which `overflow-hidden` used to do. */}
-        <table className="w-full min-w-[40rem] text-left text-[0.84rem]">
+        <table className="w-full min-w-[40rem] text-left text-[0.8125rem]">
           <thead className="bg-cream/70 text-meta uppercase tracking-wide text-ink-3">
             <tr>
               <th className="px-4 py-3 font-semibold">Order</th>
@@ -198,7 +198,7 @@ export default async function AdminOrdersPage({
                     {row.reference}
                   </Link>
                 </td>
-                <td className="px-4 py-3 text-[0.8rem] text-ink-2">
+                <td className="px-4 py-3 text-[0.8125rem] text-ink-2">
                   {emailById.get(row.userId) ?? "—"}
                 </td>
                 <td className="px-4 py-3">
@@ -238,7 +238,7 @@ export default async function AdminOrdersPage({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-[0.82rem] text-ink-2">
+        <div className="flex items-center justify-between text-[0.8125rem] text-ink-2">
           <span>
             Page {page} of {totalPages}
           </span>

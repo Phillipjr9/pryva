@@ -66,7 +66,7 @@ export default function RefundPolicyPage() {
           <h1 className="text-[1.9rem] font-semibold tracking-tight text-ink sm:text-[2.5rem]">
             Refund Policy
           </h1>
-          <p className="mt-3 max-w-2xl text-[0.94rem] leading-relaxed text-ink-2 sm:text-[0.98rem]">
+          <p className="mt-3 max-w-2xl text-[0.9375rem] leading-relaxed text-ink-2 sm:text-[1rem]">
             Eligible number refunds require confirmation of the delivery outcome; uncertain cases need review.
             Contact support with your order reference if you need assistance.
           </p>
@@ -86,7 +86,7 @@ export default function RefundPolicyPage() {
             <tbody className="divide-y divide-line/70">
               {rows.map((row) => (
                 <tr key={row.product} className="align-top">
-                  <td className="px-3 py-4 text-[0.8rem] font-medium text-ink sm:px-4 sm:text-[0.88rem]">{row.product}</td>
+                  <td className="px-3 py-4 text-[0.8125rem] font-medium text-ink sm:px-4 sm:text-[0.875rem]">{row.product}</td>
                   <td className="px-3 py-4 sm:px-4">
                     <span
                       className={`inline-flex rounded-full px-2.5 py-1 text-[0.8125rem] font-semibold sm:text-meta ${
@@ -100,7 +100,7 @@ export default function RefundPolicyPage() {
                       {row.refund}
                     </span>
                   </td>
-                  <td className="hidden px-3 py-4 text-[0.8rem] leading-relaxed text-ink-2 md:table-cell sm:px-4 sm:text-[0.84rem]">
+                  <td className="hidden px-3 py-4 text-[0.8125rem] leading-relaxed text-ink-2 md:table-cell sm:px-4 sm:text-[0.8125rem]">
                     {row.detail}
                   </td>
                 </tr>
@@ -111,15 +111,15 @@ export default function RefundPolicyPage() {
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
           <div className="rounded-2xl border border-line bg-white p-5">
-            <h2 className="text-[0.95rem] font-semibold text-ink">How fast are refunds?</h2>
-            <p className="mt-2 text-[0.85rem] leading-relaxed text-ink-2">
+            <h2 className="text-[0.9375rem] font-semibold text-ink">How fast are refunds?</h2>
+            <p className="mt-2 text-[0.875rem] leading-relaxed text-ink-2">
               A refund is recorded in your wallet after it has been approved and processed. Timing
               depends on the provider review. Contact support if you need help with a payment.
             </p>
           </div>
           <div className="rounded-2xl border border-line bg-white p-5">
-            <h2 className="text-[0.95rem] font-semibold text-ink">What isn&apos;t covered</h2>
-            <p className="mt-2 text-[0.85rem] leading-relaxed text-ink-2">
+            <h2 className="text-[0.9375rem] font-semibold text-ink">What isn&apos;t covered</h2>
+            <p className="mt-2 text-[0.875rem] leading-relaxed text-ink-2">
               Products that were delivered and then misused, accounts banned by the platform they belong
               to, and gift cards. We can&apos;t reverse a delivered credential or a consumed data bundle.
             </p>
@@ -127,8 +127,8 @@ export default function RefundPolicyPage() {
         </div>
 
         <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-5">
-          <h2 className="text-[0.95rem] font-semibold text-amber-900">Disputes</h2>
-          <p className="mt-2 max-w-3xl text-[0.85rem] leading-relaxed text-amber-900/80">
+          <h2 className="text-[0.9375rem] font-semibold text-amber-900">Disputes</h2>
+          <p className="mt-2 max-w-3xl text-[0.875rem] leading-relaxed text-amber-900/80">
             If you believe a charge was wrong, message us with your order reference within 14 days via{" "}
             <Link href="/contact" className="font-semibold underline underline-offset-2">
               support

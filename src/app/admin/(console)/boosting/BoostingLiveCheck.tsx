@@ -57,7 +57,7 @@ export function BoostingLiveCheck() {
           type="button"
           onClick={run}
           disabled={state.status === "running"}
-          className="btn btn-primary !px-4 !py-2.5 !text-[0.8rem] disabled:opacity-60"
+          className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem] disabled:opacity-60"
         >
           {state.status === "running" ? "Asking…" : "Run live check"}
         </button>
@@ -117,7 +117,7 @@ function Fact({ label, value, tone }: { label: string; value: string; tone: "goo
   return (
     <div className={`rounded-xl border px-3.5 py-2.5 ${toneClass}`}>
       <p className="text-micro font-semibold uppercase tracking-[0.12em] opacity-70">{label}</p>
-      <p className="mt-1 text-[0.95rem] font-medium">{value}</p>
+      <p className="mt-1 text-[0.9375rem] font-medium">{value}</p>
     </div>
   );
 }

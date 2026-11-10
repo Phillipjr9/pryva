@@ -29,7 +29,7 @@ export function AccordionItem({ title, children, defaultOpen = false, className 
         onClick={() => setIsOpen(!isOpen)}
         className="flex w-full items-center justify-between px-4 py-3 text-left"
       >
-        <span className="text-[0.95rem] font-semibold text-ink">{title}</span>
+        <span className="text-[0.9375rem] font-semibold text-ink">{title}</span>
         <ChevronDown
           className={cn(
             "h-5 w-5 text-ink-2 transition-transform",
@@ -38,7 +38,7 @@ export function AccordionItem({ title, children, defaultOpen = false, className 
         />
       </button>
       {isOpen && (
-        <div className="px-4 pb-4 text-[0.9rem] text-ink-2 leading-relaxed">
+        <div className="px-4 pb-4 text-[0.875rem] text-ink-2 leading-relaxed">
           {children}
         </div>
       )}

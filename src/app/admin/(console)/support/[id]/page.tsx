@@ -101,7 +101,7 @@ export default async function AdminSupportTicketPage({ params }: { params: Promi
                 </span>
               </div>
 
-              <div className="mt-1.5 whitespace-pre-line text-[0.86rem] leading-relaxed text-ink-2">{message.body}</div>
+              <div className="mt-1.5 whitespace-pre-line text-[0.875rem] leading-relaxed text-ink-2">{message.body}</div>
 
               {message.authorRole === "assistant" ? (
                 <details className="mt-2.5 rounded-xl border border-lav-200 bg-white/70 px-3 py-2">
