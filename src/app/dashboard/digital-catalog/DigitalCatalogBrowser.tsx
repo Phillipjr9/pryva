@@ -71,7 +71,7 @@ export function DigitalCatalogBrowser({ fixedCategory }: { fixedCategory?: strin
   }
 
   return (
-    <section aria-label="Digital catalogue" className="rounded-2xl border border-line bg-white p-4 sm:p-6">
+    <section aria-label="Digital catalogue" className="min-w-0 rounded-[1.5rem] border border-line bg-[#fffdfa] p-4 sm:p-6">
       {!fixedCategory && <><label htmlFor="digital-category" className="block text-meta font-semibold text-ink">Browse by category</label>
       <select id="digital-category" value={category} onChange={(event) => {
         if (event.target.value === category && !query && !cursor) setRevision((value) => value + 1);
@@ -84,7 +84,7 @@ export function DigitalCatalogBrowser({ fixedCategory }: { fixedCategory?: strin
       <form onSubmit={search} className="flex flex-wrap gap-2">
         <label className="sr-only" htmlFor="digital-search">Search digital products</label>
         <input id="digital-search" type="search" value={input} maxLength={128} onChange={(event) => setInput(event.target.value)} placeholder="Search games, subscriptions or telecom" className="min-h-11 min-w-0 flex-1 rounded-xl border border-line px-3 py-2" />
-        <button className="min-h-11 rounded-xl bg-lav-700 px-4 font-semibold text-white" type="submit">Search</button>
+        <button className="btn btn-primary min-h-11" type="submit">Search</button>
       </form>
       </>}
       <label className="mt-4 flex items-center gap-2 text-meta font-semibold text-ink"><input type="checkbox" checked={stockOnly} onChange={(event) => { setStockOnly(event.target.checked); setCursors([""]); setPage(0); setResult(null); setError(null); setLoading(true); }} /> Show listings with reported stock only</label>
@@ -94,7 +94,7 @@ export function DigitalCatalogBrowser({ fixedCategory }: { fixedCategory?: strin
       {result && !loading ? (
         <>
           <p className="mt-4 text-meta text-ink-3">{result.items.length} listings on this page{result.searchLimited ? " · more matches may exist; refine your search" : ""}{result.skipped ? " · some listings could not be read" : ""}</p>
-          {result.items.length ? <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{result.items.map((item) => <li key={item.id} className="rounded-xl border border-line p-3"><p className="font-semibold text-ink">{item.name}</p><p className="mt-1 text-meta text-ink-3">{item.stock === "reported" ? "Stock reported" : item.stock === "out" ? "Out of stock (reported)" : "Stock unknown"}</p>{item.checkout ? <Link href={`/dashboard/digital-${item.checkout}?product=${encodeURIComponent(item.id)}`} className="mt-1 inline-block text-meta font-semibold text-lav-700 underline">Check price and availability</Link> : <p className="mt-1 text-meta text-ink-3">Not available to order</p>}</li>)}</ul> : <p className="mt-3 text-meta text-ink-2">No listings returned. This does not confirm availability.</p>}
+          {result.items.length ? <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{result.items.map((item) => <li key={item.id} className="min-w-0 rounded-2xl border border-line bg-white p-4"><p className="font-semibold text-ink">{item.name}</p><p className="mt-1 text-meta text-ink-3">{item.stock === "reported" ? "Stock reported" : item.stock === "out" ? "Out of stock (reported)" : "Stock unknown"}</p>{item.checkout ? <Link href={`/dashboard/digital-${item.checkout}?product=${encodeURIComponent(item.id)}`} className="mt-1 inline-block text-meta font-semibold text-lav-700 underline">Check price and availability</Link> : <p className="mt-1 text-meta text-ink-3">Not available to order</p>}</li>)}</ul> : <p className="mt-3 text-meta text-ink-2">No listings returned. This does not confirm availability.</p>}
           {!query && result.nextCursor && cursorLoops && <p role="alert" className="mt-3 text-meta text-rose-700">The catalogue pagination did not advance. Please try again later.</p>}
           {!query && <div className="mt-4 flex gap-3"><button type="button" disabled={page === 0} onClick={() => { setLoading(true); setPage(page - 1); }} className="rounded-lg border border-line px-3 py-2 text-meta disabled:opacity-40">Previous</button><button type="button" disabled={!result.nextCursor || cursorLoops} onClick={() => { if (!result.nextCursor) return; setLoading(true); setCursors([...cursors.slice(0, page + 1), result.nextCursor]); setPage(page + 1); }} className="rounded-lg border border-line px-3 py-2 text-meta disabled:opacity-40">Next page</button></div>}
         </>

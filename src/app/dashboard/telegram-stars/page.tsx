@@ -8,9 +8,16 @@ import { StarsPurchase } from "./StarsPurchase";
 export const dynamic = "force-dynamic";
 export default async function TelegramStarsPage() {
   const user = await requireUser("/dashboard/telegram-stars");
-  return <div className="space-y-5">
-    <Link href="/dashboard/digital-catalog" className="text-meta font-semibold text-lav-700 underline">← Digital catalogue</Link>
-    <div className="flex items-start gap-4"><BrandIcon brand="telegram" size={56} decorative /><div><h1 className="text-[1.6rem] font-semibold text-ink">Telegram Stars</h1><p className="mt-2 text-[0.9rem] text-ink-2">Send Stars to a Telegram username. Confirm the username carefully before paying.</p></div></div>
+  return <div className="grid min-w-0 gap-4">
+    <Link href="/dashboard/digital-catalog" className="w-fit text-meta font-semibold text-lav-700 hover:underline">← Digital catalogue</Link>
+    <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+      <BrandIcon brand="telegram" size={52} decorative />
+      <div className="min-w-0">
+        <p className="text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Account top-up</p>
+        <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">Telegram Stars</h1>
+        <p className="mt-1.5 max-w-2xl text-[0.82rem] leading-relaxed text-ink-2">Send Stars to a Telegram username. Confirm the username carefully before paying.</p>
+      </div>
+    </div>
     <StarsPurchase userId={user.id} available={!financialActionsUnavailable() && starsSalesConfigured()} />
   </div>;
 }

@@ -68,26 +68,27 @@ export function StarsPurchase({ userId, available = true }: { userId: string; av
     finally { setBusy(false); }
   }
 
-  return <section className="rounded-2xl border border-line bg-white p-5 space-y-4">
+  return <section className="w-full max-w-2xl space-y-4 rounded-[1.5rem] border border-line bg-[#fffdfa] p-4 sm:p-6">
     {!storageReady ? <p className="text-meta text-ink-2">{message ?? "Preparing secure purchase recovery…"}</p> : null}
     {storageReady && !attempt && !order ? <>
       {!available && <p role="status" className="rounded-xl bg-amber-50 p-3 text-meta text-amber-900">Telegram Stars ordering is not available right now. You can enter a username here, but pricing and checkout are not yet enabled.</p>}
       <form onSubmit={getQuote} className="space-y-3">
+        <h2 className="text-[1.05rem] font-semibold text-ink">Recipient and Stars</h2>
         <label htmlFor="stars-username" className="block text-meta font-semibold">Recipient Telegram username</label>
-        <input id="stars-username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="@username" autoComplete="off" maxLength={33} className="w-full rounded-xl border border-line px-3 py-2" />
+        <input id="stars-username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="@username" autoComplete="off" maxLength={33} className="min-h-11 w-full rounded-xl border border-line bg-white px-3 py-2 text-ink" />
         <p className="text-meta text-ink-2">Use the recipient’s public Telegram username, not their phone number. Double-check it before paying.</p>
         <label htmlFor="stars-quantity" className="block text-meta font-semibold">Number of Stars</label>
-        <input id="stars-quantity" type="number" min="1" max="1000000" step="1" required value={quantity} onChange={(e) => { setQuantity(e.target.value); setQuote(null); }} className="w-full rounded-xl border border-line px-3 py-2" />
-        <button type="submit" disabled={busy || !available} className="rounded-xl bg-lav-700 px-4 py-3 font-semibold text-white disabled:opacity-50">Get current price</button>
+        <input id="stars-quantity" type="number" min="1" max="1000000" step="1" required value={quantity} onChange={(e) => { setQuantity(e.target.value); setQuote(null); }} className="min-h-11 w-full rounded-xl border border-line bg-white px-3 py-2 text-ink" />
+        <button type="submit" disabled={busy || !available} className="btn btn-primary min-h-11 disabled:cursor-not-allowed disabled:opacity-50">Get current price</button>
       </form>
       {quote ? <div className="space-y-3 border-t border-line pt-4">
         <p className="font-semibold">{quote.quantity.toLocaleString("en-NG")} Stars · ₦{quote.amount.toLocaleString("en-NG")}</p>
         <p className="text-meta text-ink-3">Quote expires {new Date(quote.expiresAt).toLocaleTimeString()}. Availability and price are rechecked before charging.</p>
         <p className="text-meta text-ink-2">Confirm the recipient above carefully. Payment comes from your Pryva wallet.</p>
-        <button type="button" disabled={busy} onClick={() => void submit()} className="rounded-xl bg-lav-700 px-4 py-3 font-semibold text-white disabled:opacity-50">Confirm and pay ₦{quote.amount.toLocaleString("en-NG")}</button>
+        <button type="button" disabled={busy} onClick={() => void submit()} className="btn btn-primary min-h-11 disabled:cursor-not-allowed disabled:opacity-50">Confirm and pay ₦{quote.amount.toLocaleString("en-NG")}</button>
       </div> : null}
     </> : null}
-    {attempt && !order ? <div className="space-y-3"><p className="font-semibold">Purchase attempt saved</p><p className="text-meta text-ink-2">{attempt.quote.quantity} Stars for @{attempt.username}. Recover this attempt using its original request before placing another.</p><button type="button" disabled={busy} onClick={() => void submit(attempt)} className="rounded-xl bg-lav-700 px-4 py-3 font-semibold text-white disabled:opacity-50">Recover purchase</button><p className="text-meta text-ink-2">If no order was created and the quote expired, check your orders before starting a new quote.</p><button type="button" disabled={busy} onClick={() => { localStorage.removeItem(storageKey); setAttempt(null); setQuote(null); setMessage(null); }} className="text-meta font-semibold text-lav-700 underline">I checked my orders; start a new quote</button></div> : null}
+    {attempt && !order ? <div className="space-y-3"><p className="font-semibold">Purchase attempt saved</p><p className="text-meta text-ink-2">{attempt.quote.quantity} Stars for @{attempt.username}. Recover this attempt using its original request before placing another.</p><button type="button" disabled={busy} onClick={() => void submit(attempt)} className="btn btn-primary min-h-11 disabled:cursor-not-allowed disabled:opacity-50">Recover purchase</button><p className="text-meta text-ink-2">If no order was created and the quote expired, check your orders before starting a new quote.</p><button type="button" disabled={busy} onClick={() => { localStorage.removeItem(storageKey); setAttempt(null); setQuote(null); setMessage(null); }} className="text-meta font-semibold text-lav-700 underline">I checked my orders; start a new quote</button></div> : null}
     {order ? <div className="space-y-3"><p className="font-semibold">{order.status === "delivered" ? "Delivery confirmed" : order.status === "refunded" ? "Purchase refunded" : "Delivery not yet confirmed"}</p><p className="text-meta text-ink-2">Reference: {order.reference}. {order.status === "review" || order.status === "processing" ? "Check the order for updates; do not buy again while the outcome is being checked." : ""}</p><Link href={`/dashboard/orders/${order.id}`} className="text-meta font-semibold text-lav-700 underline">View order</Link></div> : null}
     {message && storageReady ? <p role="alert" className="text-meta text-rose-700">{message}</p> : null}
     <p className="text-meta text-ink-3"><Link href="/dashboard/orders" className="underline">My orders</Link> · Prices and availability can change.</p>
