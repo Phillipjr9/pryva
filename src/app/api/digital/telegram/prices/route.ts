@@ -7,7 +7,7 @@ export const maxDuration = 30;
 const reply = (body: object, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "private, no-store" } });
 export async function GET() {
   const user = await requireAuthApi();
-  if (!user) return reply({ ok: false, error: "Please sign in." }, 401);
+  if (!user) return Response.json({ ok: false, error: "Please sign in." }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
   const limit = await catalogRateLimiter(`telegram-prices:${user.id}`);
   if (limit.unavailable) return reply({ ok: false, error: "Prices temporarily unavailable." }, 503);
   if (!limit.allowed) return reply({ ok: false, error: "Try again shortly." }, 429);

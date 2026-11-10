@@ -27,7 +27,11 @@ export async function POST(request: NextRequest) {
     // A stolen card is monetised by redeeming it, so redemptions have a daily
     // ceiling as well as an attempt budget. Counted from the database: an
     // in-memory counter would be per-instance.
-    const velocity = await giftCardVelocity(user.id).catch(() => ({ allowed: true, count: 0, limit: 0 }));
+    const velocity = await giftCardVelocity(user.id).catch(() => null);
+    if (!velocity) {
+      console.error("Gift card redemption velocity check unavailable");
+      return NextResponse.json({ error: "Redemption temporarily unavailable. Please try again later." }, { status: 503 });
+    }
     if (!velocity.allowed) {
       await recordFraudEvent({
         userId: user.id,

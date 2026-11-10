@@ -8,11 +8,11 @@ import { orders, users, walletTransactions } from "@/db/schema";
 import type { Product } from "@/lib/services/foxreload/contract";
 import { TELEGRAM_STARS_PRODUCT, priceStars } from "@/lib/services/foxreload/telegram-stars";
 
-const mocks = vi.hoisted(() => ({ db: undefined as unknown, product: vi.fn(), create: vi.fn(), pay: vi.fn(), read: vi.fn(), find: vi.fn() }));
+const mocks = vi.hoisted(() => ({ db: undefined as unknown, product: vi.fn(), create: vi.fn(), pay: vi.fn(), read: vi.fn(), find: vi.fn(), funds: vi.fn() }));
 vi.mock("@/db", () => ({ get db() { return mocks.db; } }));
 vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: vi.fn() }));
 vi.mock("@/lib/checkout/purchase", () => ({ afterPurchase: vi.fn() }));
-vi.mock("@/lib/providers/foxreload", () => ({ isFoxreloadConfigured: () => true, readFoxreloadProductContract: mocks.product, createFoxreloadContractOrder: mocks.create, payFoxreloadOrder: mocks.pay, readFoxreloadContractOrder: mocks.read, findFoxreloadOrderId: mocks.find }));
+vi.mock("@/lib/providers/foxreload", () => ({ isFoxreloadConfigured: () => true, hasFoxreloadUsdFunds: mocks.funds, readFoxreloadProductContract: mocks.product, createFoxreloadContractOrder: mocks.create, payFoxreloadOrder: mocks.pay, readFoxreloadContractOrder: mocks.read, findFoxreloadOrderId: mocks.find }));
 
 const USER = "11111111-1111-4111-8111-111111111111", OTHER = "11111111-1111-4111-8111-111111111112";
 const REQUEST = "22222222-2222-4222-8222-222222222222", PROVIDER = "0199a1c2-3d4e-7f50-8a6b-7c8d9e0f1a00";
@@ -31,7 +31,7 @@ beforeAll(async () => {
 afterAll(async () => { vi.unstubAllEnvs(); await pg?.close(); });
 beforeEach(async () => {
   vi.clearAllMocks(); vi.stubEnv("FOXRELOAD_USD_NGN_RATE", "1500"); vi.stubEnv("FOXRELOAD_IS_MOCK", "false"); vi.stubEnv("FOXRELOAD_STARS_ENABLED", "true");
-  mocks.find.mockResolvedValue(null); mocks.product.mockResolvedValue(PRODUCT);
+  mocks.find.mockResolvedValue(null); mocks.funds.mockResolvedValue(true); mocks.product.mockResolvedValue(PRODUCT);
   mocks.create.mockImplementation(async (input: { idempotencyKey: string; note: { username: string } }) => { supplierKey = input.idempotencyKey; recipient = input.note.username; return providerOrder("active", "active"); });
   mocks.pay.mockResolvedValue({}); mocks.read.mockImplementation(async () => providerOrder("completed", "completed"));
   await database.execute(sql`TRUNCATE TABLE foxreload_quotes, orders, wallet_transactions, users CASCADE`);
@@ -41,6 +41,19 @@ async function quote() { const result = await service.quoteTelegramStars(USER, 1
 async function balance() { const [row] = await database.select({ balance: users.walletBalance }).from(users).where(eq(users.id, USER)); return row.balance; }
 
 describe("Telegram Stars end-to-end order claims", () => {
+  it("does not debit or create an order when supplier funds are insufficient or unreadable", async () => {
+    const q = await quote();
+    for (const outcome of [false, "error"] as const) {
+      if (outcome === "error") mocks.funds.mockRejectedValueOnce(new Error("offline"));
+      else mocks.funds.mockResolvedValue(false);
+      expect(await service.buyTelegramStars({ userId: USER, quoteId: q.id, requestId: REQUEST, username: "valid_user" })).toMatchObject({ code: "unavailable" });
+      expect(await balance()).toBe(20_000);
+      expect(await database.select().from(walletTransactions)).toHaveLength(0);
+      expect(await database.select().from(orders)).toHaveLength(0);
+      expect(mocks.create).not.toHaveBeenCalled();
+    }
+    expect(mocks.funds).toHaveBeenCalledWith("1.5500");
+  });
   it("uses a fresh live rate when not pinned and refuses checkout if the rate becomes unavailable", async () => {
     const { clearRateCache } = await import("@/lib/payments/exchange-rate");
     clearRateCache(); vi.stubEnv("FOXRELOAD_USD_NGN_RATE", ""); vi.stubEnv("USD_NGN_RATE", "");
@@ -88,7 +101,9 @@ describe("Telegram Stars end-to-end order claims", () => {
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ quantity: 100, note: { username: "monk_123" }, mock: false, idempotencyKey: expect.stringMatching(/^[a-f0-9-]{36}$/) }));
     expect(supplierKey).not.toBe(REQUEST);
     expect(mocks.pay).toHaveBeenCalledWith(PROVIDER);
+    mocks.funds.mockResolvedValue(false);
     const again = await service.buyTelegramStars({ userId: USER, quoteId: q.id, requestId: REQUEST, username: "monk_123" });
+    expect(mocks.funds).toHaveBeenCalledTimes(1);
     expect(again).toMatchObject({ kind: "order", replayed: true, status: "delivered" });
     expect(mocks.create).toHaveBeenCalledTimes(1);
     expect((await database.select().from(walletTransactions)).filter((x) => x.type === "debit")).toHaveLength(1);

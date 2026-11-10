@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
   blocked: false,
   limit: { allowed: true, remaining: 4, resetTime: Date.now() + 30_000, unavailable: false },
   velocity: { allowed: true, count: 0, limit: 30 },
+  velocityFails: false,
   recorded: [] as unknown[],
   emails: 0,
   settled: [] as string[],
@@ -35,7 +36,7 @@ vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
   return { ...actual, purchaseRateLimiter: async () => state.limit };
 });
 vi.mock("@/lib/admin/fraud", () => ({
-  purchaseVelocity: async () => state.velocity,
+  purchaseVelocity: async () => { if (state.velocityFails) throw new Error("database unavailable"); return state.velocity; },
   recordFraudEvent: async (event: unknown) => {
     state.recorded.push(event);
   },
@@ -74,6 +75,7 @@ beforeEach(() => {
   state.blocked = false;
   state.limit = { allowed: true, remaining: 4, resetTime: Date.now() + 30_000, unavailable: false };
   state.velocity = { allowed: true, count: 0, limit: 30 };
+  state.velocityFails = false;
   state.recorded = [];
   state.emails = 0;
   state.settled = [];
@@ -153,6 +155,15 @@ describe("the gates, in order", () => {
     expect(begun.ok).toBe(false);
     if (begun.ok) return;
     expect((await begun.response.json()).error).toMatch(/Try again in \d+s\./);
+  });
+
+  it("fails closed when the purchase velocity check fails", async () => {
+    state.velocityFails = true;
+    const begun = await beginPurchase(request(), gates);
+    expect(begun.ok).toBe(false);
+    if (!begun.ok) expect(begun.response.status).toBe(503);
+    const readOnlyQuote = await beginPurchase(request(), { ...gates, velocity: false });
+    expect(readOnlyQuote.ok).toBe(true);
   });
 
   it("stops a paced script at the hourly ceiling, and records why", async () => {

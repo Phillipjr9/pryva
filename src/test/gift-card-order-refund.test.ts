@@ -65,6 +65,8 @@ vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
   return { ...actual, purchaseRateLimiter: async () => ({ allowed: true, unavailable: false }) };
 });
 vi.mock("@/lib/email/schedule-wallet-emails", () => ({ scheduleWalletEmails: mocks.scheduleWalletEmails }));
+// This test exercises the order and refund transaction, not the fraud counter.
+vi.mock("@/lib/admin/fraud", () => ({ purchaseVelocity: async () => ({ allowed: true, count: 0, limit: 30 }), recordFraudEvent: vi.fn() }));
 
 vi.mock("@/db", () => {
   const dialect = new PgDialect();

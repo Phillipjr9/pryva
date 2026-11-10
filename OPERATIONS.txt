@@ -452,7 +452,7 @@ retain their separate page.
 
 Direct top-up funding preflight
 -------------------------------
-Before a new direct/login top-up wallet debit, the app checks the authenticated
+Before a new direct/login top-up or Telegram Stars wallet debit, the app checks the authenticated
 supplier USD available-balance row against the exact quoted USD wholesale total.
 A missing, malformed, duplicate, insufficient or unreadable USD balance blocks
 the debit. The balance check is only a snapshot, not a supplier reservation:
@@ -460,3 +460,9 @@ other orders or external spending can change it immediately afterwards. A
 failed or ambiguous supplier order after debit still requires reconciliation;
 this check is not a replacement for funding, monitored operations, or a proven
 live delivery. Catalogue browsing never depends on the supplier balance.
+
+Purchase velocity failures: checkout using the shared purchase gate now returns
+503 if the hourly purchase-count query fails, rather than bypassing the guard.
+Investigate the database and application logs; do not disable the guard to clear
+the symptom. Read-only quote routes that deliberately skip velocity are unaffected.
+Gift card redemptions similarly return 503 when their velocity check fails.

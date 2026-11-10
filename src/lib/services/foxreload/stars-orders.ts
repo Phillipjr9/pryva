@@ -7,7 +7,7 @@ import { debitWalletInTx, creditWalletInTx, InsufficientFundsError, makeReferenc
 import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
 import { afterPurchase } from "@/lib/checkout/purchase";
 import { FOXRELOAD_PROVIDER } from "@/lib/services/order-providers";
-import { createFoxreloadContractOrder, findFoxreloadOrderId, isFoxreloadConfigured, payFoxreloadOrder, readFoxreloadContractOrder, readFoxreloadProductContract } from "@/lib/providers/foxreload";
+import { createFoxreloadContractOrder, findFoxreloadOrderId, hasFoxreloadUsdFunds, isFoxreloadConfigured, payFoxreloadOrder, readFoxreloadContractOrder, readFoxreloadProductContract } from "@/lib/providers/foxreload";
 import { decimalUnits } from "./contract";
 import { foxreloadRate } from "./exchange-rate";
 import { priceStars, prepareStarsProduct, TELEGRAM_STARS_PRODUCT, telegramUsername } from "./telegram-stars";
@@ -87,6 +87,9 @@ export async function buyTelegramStars(input: { userId: string; quoteId: string;
   }
   const orderProduct = prepareStarsProduct(product);
   if (!orderProduct) return { kind: "error", code: "changed", message: "Product details changed. Get a new quote." };
+  // This balance is only a snapshot, not a supplier reservation. Fail closed
+  // on a known shortfall or an unreadable balance before creating a wallet debit.
+  if (!await hasFoxreloadUsdFunds(quote.wholesaleTotal).catch(() => false)) return { kind: "error", code: "unavailable", message: "Stars are temporarily unavailable. Check your orders before trying again." };
   const reference = makeReference("STARS"), orderId = randomUUID();
   try {
     await db.transaction(async (tx) => {
