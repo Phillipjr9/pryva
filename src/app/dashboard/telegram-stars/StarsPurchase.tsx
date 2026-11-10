@@ -6,7 +6,7 @@ type Quote = { id: string; amount: number; quantity: number; expiresAt: string }
 type Attempt = { quote: Quote; username: string; requestId: string };
 type Order = { id: string; reference: string; status: string };
 
-export function StarsPurchase({ userId, available = true }: { userId: string; available?: boolean }) {
+export function StarsPurchase({ userId, available = true, prices = [], loadingPrices = false }: { userId: string; available?: boolean; prices?: { quantity: number; amount: number | null }[]; loadingPrices?: boolean }) {
   const storageKey = `pryva:stars-attempt:${userId}`;
   const [quantity, setQuantity] = useState("100");
   const [username, setUsername] = useState("");
@@ -71,13 +71,14 @@ export function StarsPurchase({ userId, available = true }: { userId: string; av
   return <section className="w-full max-w-2xl space-y-4 rounded-[1.5rem] border border-line bg-[#fffdfa] p-4 sm:p-6">
     {!storageReady ? <p className="text-meta text-ink-2">{message ?? "Preparing secure purchase recovery…"}</p> : null}
     {storageReady && !attempt && !order ? <>
-      {!available && <p role="status" className="rounded-xl bg-amber-50 p-3 text-meta text-amber-900">Telegram Stars ordering is not available right now. You can enter a username here, but pricing and checkout are not yet enabled.</p>}
+      {!available && <p role="status" className="rounded-xl bg-amber-50 p-3 text-meta text-amber-900">Telegram Stars ordering is not available right now. Indicative prices may be shown, but checkout is not yet enabled.</p>}
       <form onSubmit={getQuote} className="space-y-3">
         <h2 className="text-[1.05rem] font-semibold text-ink">Recipient and Stars</h2>
         <label htmlFor="stars-username" className="block text-meta font-semibold">Recipient Telegram username</label>
         <input id="stars-username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="@username" autoComplete="off" maxLength={33} className="min-h-11 w-full rounded-xl border border-line bg-white px-3 py-2 text-ink" />
         <p className="text-meta text-ink-2">Use the recipient’s public Telegram username, not their phone number. Double-check it before paying.</p>
-        <label htmlFor="stars-quantity" className="block text-meta font-semibold">Number of Stars</label>
+        {prices.length > 0 && <fieldset><legend className="text-meta font-semibold text-ink">Choose a Stars amount</legend><div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">{prices.map((item) => <button key={item.quantity} type="button" aria-pressed={quantity === String(item.quantity)} onClick={() => { setQuantity(String(item.quantity)); setQuote(null); }} className={`min-h-16 rounded-xl border p-3 text-left ${quantity === String(item.quantity) ? "border-lav-500 bg-lav-50 text-lav-800" : "border-line bg-white text-ink"}`}><span className="block font-semibold">★ {item.quantity.toLocaleString("en-NG")}</span><span className="text-meta">{loadingPrices ? "Checking…" : item.amount === null ? "Price unavailable" : `₦${item.amount.toLocaleString("en-NG")}`}</span></button>)}</div></fieldset>}
+        <label htmlFor="stars-quantity" className="block text-meta font-semibold">Or enter a custom number of Stars</label>
         <input id="stars-quantity" type="number" min="1" max="1000000" step="1" required value={quantity} onChange={(e) => { setQuantity(e.target.value); setQuote(null); }} className="min-h-11 w-full rounded-xl border border-line bg-white px-3 py-2 text-ink" />
         <button type="submit" disabled={busy || !available} className="btn btn-primary min-h-11 disabled:cursor-not-allowed disabled:opacity-50">Get current price</button>
       </form>
