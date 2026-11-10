@@ -141,13 +141,13 @@ function SimpleIcon({ slug, hex, version, size }: { slug: string; hex: string; v
 }
 
 /** A bundled, reviewed brand mark. Slugs come from the server's allowlist. */
-function VerifiedBrandLogo({ slug, size }: { slug: string; size: number }) {
+function VerifiedBrandLogo({ slug, size, format }: { slug: string; size: number; format?: "png" }) {
   const [failed, setFailed] = useState(false);
   if (failed) return <ServiceIcon service="numbers" size={size <= 28 ? "sm" : "md"} />;
   return (
     <span aria-hidden="true" className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line/70 bg-white" style={{ width: size, height: size }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={`/verification-logos/${encodeURIComponent(slug)}.svg`} alt="" width={size} height={size} loading="lazy" decoding="async" onError={() => setFailed(true)} className="h-full w-full object-contain p-1" />
+      <img src={`/verification-logos/${encodeURIComponent(slug)}.${format === "png" ? "png" : "svg"}`} alt="" width={size} height={size} loading="lazy" decoding="async" onError={() => setFailed(true)} className="h-full w-full object-contain p-1" />
     </span>
   );
 }
@@ -161,7 +161,7 @@ function itemArt(item: ExplorerItem, size: "sm" | "md" = "md") {
     case "service": return <ServiceIcon service={item.artwork.name} size={size} />;
     case "site-favicon": return <SiteFavicon key={item.artwork.domain} domain={item.artwork.domain} size={pixels} verification={item.category === "verification"} />;
     case "simple-icon": return <SimpleIcon key={item.artwork.slug} {...item.artwork} size={pixels} />;
-    case "verified-brand-logo": return <VerifiedBrandLogo key={item.artwork.slug} slug={item.artwork.slug} size={pixels} />;
+    case "verified-brand-logo": return <VerifiedBrandLogo key={`${item.artwork.slug}:${item.artwork.format ?? "svg"}`} slug={item.artwork.slug} format={item.artwork.format} size={pixels} />;
     // A mailbox with no published favicon: Lucide's `mail-question`, never
     // another provider's logo or the Temporary-inbox tool's mark.
     case "unidentified-inbox": return <UnidentifiedInbox size={pixels} />;

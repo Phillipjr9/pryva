@@ -390,3 +390,76 @@ describe("boosting snapshot", () => {
     expect(panel.services).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("reviewed local social platform artwork", () => {
+  it("maps exact platform labels to their own bundled logos", async () => {
+    const { socialArtwork } = await import("@/lib/services/boosts/social-artwork");
+    const { existsSync } = await import("node:fs");
+    const cases = [
+      ["Shopee", "shopee"], ["Clubhouse", "clubhouse"], ["CoinMarketCap", "coinmarketcap"],
+      ["Rumble", "rumble"], ["Tidal", "tidal"], ["Ok.ru", "odnoklassniki"],
+      ["Apple Music", "applemusic"], ["Shazam", "shazam"], ["BlueSky", "bluesky"],
+      ["RedNote", "xiaohongshu"], ["Reverbenation", "reverbnation"], ["Line", "line"],
+    ];
+    for (const [platform, slug] of cases) {
+      const art = socialArtwork(platform, `${platform} Followers`);
+      expect(art).toEqual({ kind: "verified-brand-logo", slug: `social-${slug}` });
+      expect(existsSync(`public/verification-logos/social-${slug}.svg`)).toBe(true);
+    }
+    expect(socialArtwork("Medium", "Medium Followers")).toEqual({ kind: "verified-brand-logo", slug: "social-medium" });
+    expect(existsSync("public/verification-logos/social-medium.svg")).toBe(true);
+  });
+
+  it("handles explicitly named catch-all products but never guesses from similar words", async () => {
+    const { socialArtwork } = await import("@/lib/services/boosts/social-artwork");
+    const { existsSync } = await import("node:fs");
+    for (const [name, slug] of [["Rarible Followers", "rarible"], ["OpenSea Views", "opensea"], ["CoinMarketCap Trending Page", "coinmarketcap"]]) {
+      expect(socialArtwork("Other platforms", name)).toEqual({ kind: "verified-brand-logo", slug: `social-${slug}` });
+      expect(existsSync(`public/verification-logos/social-${slug}.svg`)).toBe(true);
+    }
+    expect(socialArtwork("Other platforms", "OpenSeas Views")).toBeNull();
+    expect(socialArtwork("Other platforms", "Some other platform promoting OpenSea")).toBeNull();
+    expect(socialArtwork("Medium", "Medium quality followers")).toBeNull();
+    expect(socialArtwork("Line Voom", "Line Voom Views")).toEqual({ kind: "verified-brand-logo", slug: "social-line-voom", format: "png" });
+    expect(socialArtwork("Shopee partner", "Shopee partner followers")).toBeNull();
+    expect(socialArtwork(null, "Rarible Followers")).toBeNull();
+  });
+
+  it("does not change classification, pricing or buy actions for an existing listing", async () => {
+    const { boostItems } = await import("@/lib/services/boosts/smm-catalog");
+    const [item] = boostItems(snapshot([service({ name: "Shopee Followers", category: "Shopee" })]));
+    expect(item).toMatchObject({
+      platform: "Shopee", name: "Shopee Followers", tag: "Followers",
+      artwork: { kind: "verified-brand-logo", slug: "social-shopee" },
+      price: 203, action: { label: "Buy boost" },
+    });
+  });
+});
+
+describe("social product identity takes precedence over supplier shelf", () => {
+  it("does not give Threads or TikTok products the Instagram logo", async () => {
+    const { describeBoost } = await import("@/lib/services/boosts/smm-catalog");
+    const threads = describeBoost(service({ name: "Threads Followers", category: "Instagram" }), "NGN");
+    expect(threads).toMatchObject({ platform: "Threads", artwork: { kind: "brand", name: "threads" }, tag: "Followers" });
+    const tiktok = describeBoost(service({ name: "Tiktok Followers", category: "Instagram" }), "NGN");
+    expect(tiktok).toMatchObject({ platform: "TikTok", artwork: { kind: "brand", name: "tiktok" }, tag: "Followers" });
+    const unnamed = describeBoost(service({ name: "Custom Comments", category: "Instagram - Comments" }), "NGN");
+    expect(unnamed).toMatchObject({ platform: "Instagram", artwork: { kind: "brand", name: "instagram" } });
+  });
+});
+
+describe("reviewed raster social artwork", () => {
+  it("returns the correct local file format for the reviewed platforms", async () => {
+    const { socialArtwork } = await import("@/lib/services/boosts/social-artwork");
+    const { existsSync } = await import("node:fs");
+    for (const [platform, slug] of [["Likee", "likee"], ["Boomplay", "boomplay"], ["Rutube.ru", "rutube"], ["Line Voom", "line-voom"], ["Trovo", "trovo"]]) {
+      expect(socialArtwork(platform, `${platform} Followers`)).toEqual({ kind: "verified-brand-logo", slug: `social-${slug}`, format: "png" });
+      expect(existsSync(`public/verification-logos/social-${slug}.png`)).toBe(true);
+    }
+    expect(socialArtwork("Yandex", "Yandex Zen Likes")).toEqual({ kind: "verified-brand-logo", slug: "social-yandex-zen", format: "png" });
+    expect(existsSync("public/verification-logos/social-yandex-zen.png")).toBe(true);
+    expect(socialArtwork("Yandex", "Yandex Q Likes")).toBeNull();
+    expect(socialArtwork("Yandex", "Yandex plays")).toBeNull();
+    expect(socialArtwork("Likee partner", "Likee partner followers")).toBeNull();
+  });
+});

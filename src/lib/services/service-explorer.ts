@@ -38,8 +38,8 @@ export type ExplorerArtwork =
   | { kind: "site-favicon"; domain: string }
   /** A real, pinned Simple Icons mark matched by its exact published title. */
   | { kind: "simple-icon"; slug: string; hex: string; version: string }
-  /** Official App Store artwork, selected from a fixed list of app IDs. */
-  | { kind: "verified-brand-logo"; slug: string }
+  /** A locally bundled, reviewed brand mark from an allowlisted source. */
+  | { kind: "verified-brand-logo"; slug: string; format?: "png" }
   | { kind: "network"; name: AirtimeProvider };
 export type ExplorerItem = {
   id: string;

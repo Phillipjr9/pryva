@@ -11,6 +11,7 @@ import {
 import type { BrandSlug } from "@/lib/content/brand-marks";
 import { formatNaira } from "@/lib/services/catalog";
 import { PROMOTION_EXAMPLES, type ExplorerItem } from "@/lib/services/service-explorer";
+import { socialArtwork } from "@/lib/services/boosts/social-artwork";
 import { normalizeCurrency, retailPerThousand, totalForQuantity } from "@/lib/services/boosts/smm-pricing";
 
 export type BoostSnapshot = {
@@ -297,9 +298,14 @@ function fallbackPlatform(service: SmmService): DetectedPlatform {
 function detectPlatform(service: SmmService): DetectedPlatform | null {
   const text = `${service.name ?? ""} ${service.category ?? ""}`;
   if (NON_SOCIAL.test(text)) return null;
-  for (const candidate of PLATFORM_MATCHERS) {
-    if (candidate.terms.some((term) => matchesPlatform(text, term))) {
-      return { name: candidate.platform.name, brand: candidate.platform.brand, rank: candidate.rank };
+  // The actual listing is more specific than the supplier's broad shelf.
+  // For example, Threads and TikTok products can be filed under Instagram.
+  // Matching both strings together incorrectly gives them Instagram's logo.
+  for (const part of [service.name ?? "", service.category ?? ""]) {
+    for (const candidate of PLATFORM_MATCHERS) {
+      if (candidate.terms.some((term) => matchesPlatform(part, term))) {
+        return { name: candidate.platform.name, brand: candidate.platform.brand, rank: candidate.rank };
+      }
     }
   }
   // Unknown platform: only list it when it is genuinely selling a social intent.
@@ -383,7 +389,7 @@ export function describeBoost(service: SmmService, snapshotCurrency: string | nu
     // platform's logo and not a blank tile.
     artwork: platform?.brand
       ? { kind: "brand", name: platform.brand }
-      : { kind: "service", name: "social-promotion" },
+      : socialArtwork(platform?.name ?? null, cleanName) ?? { kind: "service", name: "social-promotion" },
     perThousand,
     min: service.min,
     max: service.max,

@@ -22,6 +22,20 @@ describe("verification artwork failures", () => {
     expect(screen.getByRole("heading", { name: "Activision" })).toBeTruthy();
   });
 
+  it("renders a social listing's locally bundled platform mark", () => {
+    const socialItem: ExplorerItem = { ...item, category: "social", name: "Shopee Followers", artwork: { kind: "verified-brand-logo", slug: "social-shopee" } };
+    const { container } = render(<ServiceCard item={socialItem} countryName="Nigeria" />);
+    expect(container.querySelector("img")?.getAttribute("src")).toBe("/verification-logos/social-shopee.svg");
+    expect(screen.getByRole("heading", { name: "Shopee Followers" })).toBeTruthy();
+  });
+
+  it("renders a reviewed raster platform mark from the local bundle", () => {
+    const raster: ExplorerItem = { ...item, category: "social", name: "Likee Comments", artwork: { kind: "verified-brand-logo", slug: "social-likee", format: "png" } };
+    const { container } = render(<ServiceCard item={raster} countryName="Nigeria" />);
+    expect(container.querySelector("img")?.getAttribute("src")).toBe("/verification-logos/social-likee.png");
+    expect(screen.getByRole("heading", { name: "Likee Comments" })).toBeTruthy();
+  });
+
   it("falls back on a broken bundled logo and resets for a different logo", () => {
     const { container, rerender } = render(<ServiceCard item={{ ...item, artwork: { kind: "verified-brand-logo", slug: "adobe" } }} countryName="United States" />);
     expect(container.querySelector("img")?.getAttribute("src")).toBe("/verification-logos/adobe.svg");
