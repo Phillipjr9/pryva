@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ auth: vi.fn(), limit: vi.fn(), configured: vi.fn(), probe: vi.fn(), blocked: vi.fn() }));
+vi.mock("@/lib/services/foxreload/exchange-rate", () => ({ foxreloadRate: async () => null }));
 vi.mock("@/lib/identity/admin-auth", () => ({ authorizeAdminApi: mocks.auth }));
 vi.mock("@/lib/platform/rate-limit", () => ({ createRateLimiter: () => mocks.limit }));
 vi.mock("@/lib/platform/financial-environment", () => ({ financialActionsUnavailable: mocks.blocked }));

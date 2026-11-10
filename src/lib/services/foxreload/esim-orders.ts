@@ -9,6 +9,7 @@ import { afterPurchase } from "@/lib/checkout/purchase";
 import { FOXRELOAD_PROVIDER } from "@/lib/services/order-providers";
 import { createFoxreloadContractOrder, findFoxreloadOrderId, isFoxreloadConfigured, payFoxreloadOrder, readFoxreloadContractOrder, readFoxreloadProductContract } from "@/lib/providers/foxreload";
 import { decimalUnits } from "./contract";
+import { foxreloadRate } from "./exchange-rate";
 import { approvedEsimOffers, esimOfferFingerprint, priceEsim, publicEsimId } from "./esim-offers";
 
 const SERVICE = "esim" as const, SLUG = "foxreload-esim";
@@ -16,7 +17,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 type Result = { kind: "quote"; id: string; amount: number; name: string; region: string; terms: string; expiresAt: Date }
   | { kind: "order"; id: string; reference: string; status: string; replayed: boolean }
   | { kind: "error"; code: "invalid" | "unavailable" | "changed" | "insufficient" | "pending"; message: string; reference?: string };
-function configured() { return process.env.FOXRELOAD_ESIMS_ENABLED === "true" && isFoxreloadConfigured() && process.env.FOXRELOAD_IS_MOCK !== "true" && Boolean(process.env.FOXRELOAD_USD_NGN_RATE?.trim()); }
+function configured() { return process.env.FOXRELOAD_ESIMS_ENABLED === "true" && isFoxreloadConfigured() && process.env.FOXRELOAD_IS_MOCK !== "true"; }
 export function listedEsimOffers() {
   return configured() ? approvedEsimOffers().map(({ id, name, region }) => ({ id: publicEsimId(id), name, region })) : [];
 }
@@ -26,7 +27,8 @@ export async function quoteEsim(userId: string, publicId: string): Promise<Resul
   const offer = approvedEsimOffers().find((entry) => publicEsimId(entry.id) === publicId);
   if (!offer) return { kind: "error", code: "unavailable", message: "This product is unavailable." };
   const product = await readFoxreloadProductContract(offer.id).catch(() => null);
-  const price = product && priceEsim(product, offer);
+  const rate = await foxreloadRate();
+  const price = product && rate && priceEsim(product, offer, { FOXRELOAD_USD_NGN_RATE: rate.value });
   if (!price) return { kind: "error", code: "unavailable", message: "A current price is unavailable for this product." };
   const expiresAt = new Date(Date.now() + 120_000);
   const [quote] = await db.insert(foxreloadQuotes).values({ userId, productId: offer.id, productName: esimOfferFingerprint(offer), customerTerms: offer.terms, quantity: 1, wholesaleTotal: price.wholesaleTotal, currency: "usd", amount: price.amount, expiresAt }).returning({ id: foxreloadQuotes.id });
@@ -68,7 +70,8 @@ export async function buyEsim(input: { userId: string; quoteId: string; requestI
   const offer = approvedEsimOffers().find((entry) => entry.id === quote.productId && esimOfferFingerprint(entry) === quote.productName);
   if (!offer || quote.customerTerms !== offer.terms) return { kind: "error", code: "changed", message: "Product terms changed. Get a new quote." };
   const product = await readFoxreloadProductContract(offer.id).catch(() => null);
-  const current = product && priceEsim(product, offer);
+  const rate = await foxreloadRate();
+  const current = product && rate && priceEsim(product, offer, { FOXRELOAD_USD_NGN_RATE: rate.value });
   if (!product || !current || current.amount !== quote.amount || current.wholesaleTotal !== quote.wholesaleTotal) return { kind: "error", code: "changed", message: "Price or availability changed. Get a new quote." };
   const orderId = randomUUID(), reference = makeReference("ESIM");
   try {

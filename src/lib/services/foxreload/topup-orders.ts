@@ -9,6 +9,7 @@ import { afterPurchase } from "@/lib/checkout/purchase";
 import { FOXRELOAD_PROVIDER } from "@/lib/services/order-providers";
 import { createFoxreloadContractOrder, findFoxreloadOrderId, isFoxreloadConfigured, payFoxreloadOrder, readFoxreloadContractOrder, readFoxreloadProductContract } from "@/lib/providers/foxreload";
 import { decimalUnits } from "./contract";
+import { foxreloadRate } from "./exchange-rate";
 import { approvedTopupOffers, normalizeTopupNote, prepareTopup, publicTopupId, topupFingerprint, topupIntent, topupPrice, type TopupField } from "./topup-offers";
 const SERVICE = "subscriptions" as const, DIRECT_SLUG = "direct-topup", LOGIN_SLUG = "login-topup";
 const slug = (deliveryType: "direct_topup" | "login_topup") => deliveryType === "login_topup" ? LOGIN_SLUG : DIRECT_SLUG;
@@ -17,7 +18,7 @@ type Result = { kind: "quote"; id: string; amount: number; name: string; region:
   | { kind: "order"; id: string; reference: string; status: string; replayed: boolean }
   | { kind: "error"; code: "invalid" | "unavailable" | "changed" | "insufficient" | "pending"; message: string; reference?: string };
 function hasSecret() { const secret = process.env.FOXRELOAD_INTENT_SECRET; return !!secret && secret.length >= 32 && secret.length <= 1024; }
-function baseConfigured() { return isFoxreloadConfigured() && process.env.FOXRELOAD_IS_MOCK !== "true" && !!process.env.FOXRELOAD_USD_NGN_RATE?.trim() && hasSecret(); }
+function baseConfigured() { return isFoxreloadConfigured() && process.env.FOXRELOAD_IS_MOCK !== "true" && hasSecret(); }
 function enabledFor(type: "direct_topup" | "login_topup") { return baseConfigured() && (type === "login_topup" ? process.env.FOXRELOAD_LOGIN_TOPUPS_ENABLED === "true" && process.env.FOXRELOAD_CLIENT_CODES_ENABLED === "true" : process.env.FOXRELOAD_TOPUPS_ENABLED === "true"); }
 function anyConfigured() { return enabledFor("direct_topup") || enabledFor("login_topup"); }
 export function listedTopupOffers() {
@@ -29,7 +30,8 @@ export async function quoteTopup(userId: string, publicId: string, quantity: num
   const offer = approvedTopupOffers().find((entry) => publicTopupId(entry.id) === publicId);
   if (!offer || !enabledFor(offer.deliveryType ?? "direct_topup")) return { kind: "error", code: "unavailable", message: "This product is unavailable." };
   const product = await readFoxreloadProductContract(offer.id).catch(() => null);
-  const price = product && topupPrice(product, offer, quantity);
+  const rate = await foxreloadRate();
+  const price = product && rate && topupPrice(product, offer, quantity, { FOXRELOAD_USD_NGN_RATE: rate.value });
   if (!price) return { kind: "error", code: "unavailable", message: "A current price is unavailable for this product or quantity." };
   const expiresAt = new Date(Date.now() + 120_000);
   const [quote] = await db.insert(foxreloadQuotes).values({ userId, productId: offer.id, productName: topupFingerprint(offer), customerTerms: offer.terms, quantity, wholesaleTotal: price.wholesaleTotal, currency: "usd", amount: price.amount, expiresAt }).returning({ id: foxreloadQuotes.id });
@@ -70,7 +72,8 @@ export async function buyTopup(input: { userId: string; quoteId: string; request
   if (!enabledFor(deliveryType)) return { kind: "error", code: "unavailable", message: "This product is unavailable." };
   if (!normalizeTopupNote(note, offer.fields)) return { kind: "error", code: "invalid", message: "Enter the requested recipient details." };
   const product = await readFoxreloadProductContract(offer.id).catch(() => null);
-  const current = product && topupPrice(product, offer, quote.quantity), prepared = product && prepareTopup(product, offer);
+  const rate = await foxreloadRate();
+  const current = product && rate && topupPrice(product, offer, quote.quantity, { FOXRELOAD_USD_NGN_RATE: rate.value }), prepared = product && prepareTopup(product, offer);
   if (!prepared || !current || current.amount !== quote.amount || current.wholesaleTotal !== quote.wholesaleTotal) return { kind: "error", code: "changed", message: "Price or availability changed. Get a new quote." };
   const orderId = randomUUID(), reference = makeReference("TOPUP");
   try {

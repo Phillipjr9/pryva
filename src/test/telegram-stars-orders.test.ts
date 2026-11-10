@@ -41,6 +41,17 @@ async function quote() { const result = await service.quoteTelegramStars(USER, 1
 async function balance() { const [row] = await database.select({ balance: users.walletBalance }).from(users).where(eq(users.id, USER)); return row.balance; }
 
 describe("Telegram Stars end-to-end order claims", () => {
+  it("uses a fresh live rate when not pinned and refuses checkout if the rate becomes unavailable", async () => {
+    const { clearRateCache } = await import("@/lib/payments/exchange-rate");
+    clearRateCache(); vi.stubEnv("FOXRELOAD_USD_NGN_RATE", ""); vi.stubEnv("USD_NGN_RATE", "");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ result: "success", base_code: "USD", time_last_update_unix: Math.floor(Date.now() / 1000), rates: { NGN: 1500 } })));
+    try {
+      const q = await quote(); expect(q.amount).toBe(3255);
+      clearRateCache(); fetchMock.mockRejectedValue(new Error("offline"));
+      const result = await service.buyTelegramStars({ userId: USER, quoteId: q.id, requestId: REQUEST, username: "valid_user" });
+      expect(result).toMatchObject({ kind: "error" }); expect(await balance()).toBe(20_000); expect(mocks.create).not.toHaveBeenCalled();
+    } finally { fetchMock.mockRestore(); clearRateCache(); }
+  });
   it("recovers a lost supplier ID by verified lookup without another create or payment", async () => {
     const q = await quote();
     mocks.create.mockImplementationOnce(async (input: { idempotencyKey: string }) => { supplierKey = input.idempotencyKey; recipient = "valid_user"; throw new Error("timeout"); });

@@ -9,6 +9,7 @@ import { afterPurchase } from "@/lib/checkout/purchase";
 import { FOXRELOAD_PROVIDER } from "@/lib/services/order-providers";
 import { createFoxreloadContractOrder, findFoxreloadOrderId, isFoxreloadConfigured, payFoxreloadOrder, readFoxreloadContractOrder, readFoxreloadProductContract } from "@/lib/providers/foxreload";
 import { decimalUnits } from "./contract";
+import { foxreloadRate } from "./exchange-rate";
 import { approvedCodeOffers, offerFingerprint, priceCode, publicCodeId } from "./code-offers";
 
 const SERVICE = "gift-cards" as const, SLUG = "digital-code";
@@ -16,7 +17,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 type Result = { kind: "quote"; id: string; amount: number; name: string; region: string; expiresAt: Date }
   | { kind: "order"; id: string; reference: string; status: string; replayed: boolean }
   | { kind: "error"; code: "invalid" | "unavailable" | "changed" | "insufficient" | "pending"; message: string; reference?: string };
-function configured() { return process.env.FOXRELOAD_CODES_ENABLED === "true" && isFoxreloadConfigured() && process.env.FOXRELOAD_IS_MOCK !== "true" && Boolean(process.env.FOXRELOAD_USD_NGN_RATE?.trim()); }
+function configured() { return process.env.FOXRELOAD_CODES_ENABLED === "true" && isFoxreloadConfigured() && process.env.FOXRELOAD_IS_MOCK !== "true"; }
 export function listedCodeOffers() {
   return configured() ? approvedCodeOffers().map(({ id, name, region }) => ({ id: publicCodeId(id), name, region })) : [];
 }
@@ -26,7 +27,8 @@ export async function quoteCode(userId: string, publicId: string): Promise<Resul
   const offer = approvedCodeOffers().find((entry) => publicCodeId(entry.id) === publicId);
   if (!offer) return { kind: "error", code: "unavailable", message: "This product is unavailable." };
   const product = await readFoxreloadProductContract(offer.id).catch(() => null);
-  const price = product && priceCode(product, offer);
+  const rate = await foxreloadRate();
+  const price = product && rate && priceCode(product, offer, { FOXRELOAD_USD_NGN_RATE: rate.value });
   if (!price) return { kind: "error", code: "unavailable", message: "A current price is unavailable for this product." };
   const expiresAt = new Date(Date.now() + 120_000);
   const [quote] = await db.insert(foxreloadQuotes).values({ userId, productId: offer.id, productName: offerFingerprint(offer), quantity: 1, wholesaleTotal: price.wholesaleTotal, currency: "usd", amount: price.amount, expiresAt }).returning({ id: foxreloadQuotes.id });
@@ -66,7 +68,8 @@ export async function buyCode(input: { userId: string; quoteId: string; requestI
   const offer = approvedCodeOffers().find((entry) => entry.id === quote.productId && offerFingerprint(entry) === quote.productName);
   if (!offer) return { kind: "error", code: "changed", message: "Product terms changed. Get a new quote." };
   const product = await readFoxreloadProductContract(offer.id).catch(() => null);
-  const current = product && priceCode(product, offer);
+  const rate = await foxreloadRate();
+  const current = product && rate && priceCode(product, offer, { FOXRELOAD_USD_NGN_RATE: rate.value });
   if (!product || !current || current.amount !== quote.amount || current.wholesaleTotal !== quote.wholesaleTotal) return { kind: "error", code: "changed", message: "Price or availability changed. Get a new quote." };
   const orderId = randomUUID(), reference = makeReference("CODE");
   try {

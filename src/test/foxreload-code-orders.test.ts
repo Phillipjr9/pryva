@@ -76,6 +76,14 @@ describe("reviewed FoxReload code orders", () => {
     await database.update(users).set({ walletBalance: 0 }).where(eq(users.id, USER));
     expect(await service.buyCode({ userId: USER, quoteId: q.id, requestId: REQUEST })).toMatchObject({ code: "insufficient" }); expect(mocks.create).not.toHaveBeenCalled();
   });
+  it("refuses a changed or invalid exchange rate before wallet debit", async () => {
+    const q = await quote();
+    vi.stubEnv("FOXRELOAD_USD_NGN_RATE", "1600");
+    expect(await service.buyCode({ userId: USER, quoteId: q.id, requestId: REQUEST })).toMatchObject({ code: "changed" });
+    vi.stubEnv("FOXRELOAD_USD_NGN_RATE", "invalid");
+    expect(await service.buyCode({ userId: USER, quoteId: q.id, requestId: REQUEST })).toMatchObject({ code: "changed" });
+    expect(await balance()).toBe(20_000); expect(mocks.create).not.toHaveBeenCalled();
+  });
   it("never pays a mismatched supplier order", async () => {
     const q = await quote(); mocks.create.mockImplementationOnce(async (input: { idempotencyKey: string }) => { supplierKey = input.idempotencyKey; return { ...providerOrder("active", "active"), price: "500" }; });
     expect(await service.buyCode({ userId: USER, quoteId: q.id, requestId: REQUEST })).toMatchObject({ status: "review" }); expect(mocks.pay).not.toHaveBeenCalled();

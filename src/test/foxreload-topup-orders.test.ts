@@ -142,6 +142,14 @@ describe("reviewed direct top-ups", () => {
     await database.update(users).set({ walletBalance: 0 }).where(eq(users.id, USER));
     expect(await service.buyTopup({ userId: USER, quoteId: q.id, requestId: REQUEST, note: NOTE })).toMatchObject({ code: "insufficient" }); expect(mocks.create).not.toHaveBeenCalled();
   });
+  it("refuses a changed or invalid exchange rate before wallet debit", async () => {
+    const q = await quote();
+    vi.stubEnv("FOXRELOAD_USD_NGN_RATE", "1600");
+    expect(await service.buyTopup({ userId: USER, quoteId: q.id, requestId: REQUEST, note: NOTE })).toMatchObject({ code: "changed" });
+    vi.stubEnv("FOXRELOAD_USD_NGN_RATE", "invalid");
+    expect(await service.buyTopup({ userId: USER, quoteId: q.id, requestId: REQUEST, note: NOTE })).toMatchObject({ code: "changed" });
+    expect(await balance()).toBe(20_000); expect(mocks.create).not.toHaveBeenCalled();
+  });
   it("does not pay if the supplier order reports another target", async () => {
     const q = await quote(); mocks.create.mockImplementationOnce(async (input: { idempotencyKey: string }) => { supplierKey = input.idempotencyKey; suppliedNote = { ...NOTE, player_id: "wrong" }; return providerOrder("active", "active"); });
     expect(await service.buyTopup({ userId: USER, quoteId: q.id, requestId: REQUEST, note: NOTE })).toMatchObject({ status: "review" }); expect(mocks.pay).not.toHaveBeenCalled();

@@ -149,8 +149,8 @@ async function fetchFreshNgnRate(currency: NgnQuoteCurrency): Promise<NgnQuoteRa
  * NGN per unit of the named currency, or null if it cannot be established.
  * No hard-coded or stale fallback is ever used for an eSIM purchase quote.
  */
-export async function getFreshNgnRate(currency: NgnQuoteCurrency): Promise<NgnQuoteRate | null> {
-  const raw = process.env[`${currency}_NGN_RATE`]?.trim();
+export async function getFreshNgnRate(currency: NgnQuoteCurrency, options: { allowOverride?: boolean } = {}): Promise<NgnQuoteRate | null> {
+  const raw = options.allowOverride === false ? undefined : process.env[`${currency}_NGN_RATE`]?.trim();
   if (raw) {
     const rate = Number(raw);
     return Number.isFinite(rate) && rate > 100

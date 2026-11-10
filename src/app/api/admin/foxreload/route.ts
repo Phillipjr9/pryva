@@ -5,7 +5,7 @@ import { FoxreloadError, isFoxreloadConfigured, probeFoxreloadAccount } from "@/
 import { approvedCodeOffers } from "@/lib/services/foxreload/code-offers";
 import { approvedEsimOffers } from "@/lib/services/foxreload/esim-offers";
 import { approvedTopupOffers } from "@/lib/services/foxreload/topup-offers";
-import { decimalUnits } from "@/lib/services/foxreload/contract";
+import { foxreloadRate } from "@/lib/services/foxreload/exchange-rate";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -20,13 +20,14 @@ export async function GET(request: Request) {
   if (allowed.unavailable) return reply({ ok: false, error: "Check temporarily unavailable." }, 503);
   if (!allowed.allowed) return reply({ ok: false, error: "Try again in a minute." }, 429);
   const configured = isFoxreloadConfigured();
-  const rate = decimalUnits(process.env.FOXRELOAD_USD_NGN_RATE?.trim());
+  const rate = await foxreloadRate();
   const secret = process.env.FOXRELOAD_INTENT_SECRET;
   const offers = approvedTopupOffers();
   const settings = {
     purchasesBlockedInEnvironment: financialActionsUnavailable(),
     mock: process.env.FOXRELOAD_IS_MOCK === "true",
-    rateConfigured: rate !== null && rate > BigInt(0),
+    rateConfigured: rate !== null,
+    rateSource: rate?.source ?? "unavailable",
     intentSecretConfigured: !!secret && secret.length >= 32 && secret.length <= 1024,
     starsEnabled: process.env.FOXRELOAD_STARS_ENABLED === "true",
     codesEnabled: process.env.FOXRELOAD_CODES_ENABLED === "true",

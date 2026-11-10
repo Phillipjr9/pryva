@@ -208,3 +208,14 @@ checks the echoed username before payment or completion. Read-only lookup by
 local idempotency key can recover lost supplier IDs for Stars, codes, eSIMs and
 account top-ups without re-creating, re-paying or automatically refunding.
 This remains disabled and unverified against the account or real paid orders.
+
+### Current exchange-rate follow-up
+
+FoxReload quotes can use a recent USD/NGN reference rate when no manual
+`FOXRELOAD_USD_NGN_RATE` is configured. The reference source's publication
+time is validated and is no older than 36 hours, rounded up to four decimals;
+there is no stale or hard-coded fallback. An explicit override remains supported
+but has no automatic staleness check. Purchase rechecks pricing before debit.
+A reference rate is not a guarantee of the actual cost of funding the account.
+Sales flags, individual product review and account/delivery verification remain
+separate requirements. Earlier sections are historical snapshots.

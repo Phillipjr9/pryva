@@ -270,8 +270,8 @@ all units are terminal, replaying the original batch closes it without spending.
 
 Telegram Stars (FoxReload): the new path is disabled by default and is not a
 blanket enablement of other FoxReload products. Before enabling, apply migration
-0041, configure FOXRELOAD_API_KEY and a current FOXRELOAD_USD_NGN_RATE (no
-fallback; digital retail markup is 40%), verify the current account-specific
+0041, configure FOXRELOAD_API_KEY and confirm a usable reference exchange rate
+(or set a verified FOXRELOAD_USD_NGN_RATE; digital retail markup is 40%), verify the current account-specific
 product and contract with the supplier, and verify a mock or otherwise approved
 test. Then explicitly set FOXRELOAD_STARS_ENABLED=true. Do not put supplier keys
 in client code. Preview and ephemeral databases refuse purchases. The supplier
@@ -302,8 +302,11 @@ card program and does not implement card ownership or credentials. Empty or
 malformed configuration allows no new products. Region and name changes
 invalidate existing unused quotes.
 
-A verified, current FOXRELOAD_USD_NGN_RATE is required; quotes use a 40% markup
-and expire in two minutes. This manually configured rate has no freshness alarm.
+Quotes use a 40% markup and expire in two minutes. If FOXRELOAD_USD_NGN_RATE
+is set, it must be valid and is used as-is; it has no freshness alarm. If unset,
+a validated USD/NGN reference rate no older than 36 hours is used, with no stale
+or hard-coded fallback. A changed price or unavailable rate blocks checkout.
+The reference rate is not proof of actual account funding or conversion costs.
 Migration 0041 must be applied. Account-specific mock order/response behavior,
 provider idempotency, every approved SKU and the release procedure still require
 verification. A provider order is created and paid only after a wallet debit;
@@ -318,8 +321,8 @@ API responses. Do not put supplier data, API keys or codes in logs/tickets.
 
 The eight legacy brand gift-card routes remain separate and are not repaired by
 this slice. This work does not implement general direct/login top-ups, eSIM,
-card issuance/top-ups, all catalogue SKUs, automatic exchange-rate refresh, or
-production deployment. Obtain approval before live paid supplier orders.
+card issuance/top-ups or all catalogue SKUs. Later sections document subsequent
+implementation and deployment. Obtain approval before live paid supplier orders.
 
 FOXRELOAD DIRECT TOP-UPS — LOCAL ONLY / NOT READY TO ENABLE
 The direct-top-up slice is disabled with FOXRELOAD_TOPUPS_ENABLED=false and has
@@ -361,8 +364,8 @@ order ID can recover a uniquely matching supplier order after full verification.
 Missing, ambiguous, mismatched or unpaid orders remain in review; no automatic
 create/pay/refund retry is safe. New sales remain off until migration 0041,
 account-authenticated product/contract verification, mock/live behavior and
-operator reconciliation are verified. Recheck the USD/NGN rate; the configured
-rate has no staleness alarm. No supplier funds or live orders have been touched.
+operator reconciliation are verified. Recheck the USD/NGN funding rate; an
+explicitly configured rate has no staleness alarm. No supplier funds or live orders have been touched.
 
 For the direct-top-up slice, apply migration 0042 as well as 0041: it stores the
 exact buyer-visible restrictions with each quote/order. Include detailed

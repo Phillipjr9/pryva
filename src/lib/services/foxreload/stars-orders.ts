@@ -9,6 +9,7 @@ import { afterPurchase } from "@/lib/checkout/purchase";
 import { FOXRELOAD_PROVIDER } from "@/lib/services/order-providers";
 import { createFoxreloadContractOrder, findFoxreloadOrderId, isFoxreloadConfigured, payFoxreloadOrder, readFoxreloadContractOrder, readFoxreloadProductContract } from "@/lib/providers/foxreload";
 import { decimalUnits } from "./contract";
+import { foxreloadRate } from "./exchange-rate";
 import { priceStars, prepareStarsProduct, TELEGRAM_STARS_PRODUCT, telegramUsername } from "./telegram-stars";
 
 const SERVICE = "subscriptions" as const;
@@ -22,14 +23,15 @@ export type StarsResult =
   | { kind: "error"; code: "invalid" | "unavailable" | "changed" | "insufficient" | "pending"; message: string; reference?: string };
 
 export function starsSalesConfigured() {
-  return process.env.FOXRELOAD_STARS_ENABLED === "true" && isFoxreloadConfigured() && process.env.FOXRELOAD_IS_MOCK !== "true" && Boolean(process.env.FOXRELOAD_USD_NGN_RATE?.trim());
+  return process.env.FOXRELOAD_STARS_ENABLED === "true" && isFoxreloadConfigured() && process.env.FOXRELOAD_IS_MOCK !== "true";
 }
 
 export async function quoteTelegramStars(userId: string, quantity: number): Promise<StarsResult> {
   if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 1_000_000) return { kind: "error", code: "invalid", message: "Enter a valid number of Stars." };
   if (!starsSalesConfigured()) return { kind: "error", code: "unavailable", message: "Telegram Stars pricing is not available right now." };
   const product = await readFoxreloadProductContract(TELEGRAM_STARS_PRODUCT).catch(() => null);
-  const price = product && priceStars(product, quantity);
+  const rate = await foxreloadRate();
+  const price = product && rate && priceStars(product, quantity, { FOXRELOAD_USD_NGN_RATE: rate.value });
   if (!product || !price) return { kind: "error", code: "unavailable", message: "This Stars quantity is not available right now." };
   const expiresAt = new Date(Date.now() + QUOTE_MS);
   const [quote] = await db.insert(foxreloadQuotes).values({ userId, productId: product.id, productName: product.name.slice(0, 160), quantity, wholesaleTotal: price.wholesaleTotal, currency: "usd", amount: price.amount, expiresAt }).returning({ id: foxreloadQuotes.id });
@@ -78,7 +80,8 @@ export async function buyTelegramStars(input: { userId: string; quoteId: string;
   const [quote] = await db.select().from(foxreloadQuotes).where(and(eq(foxreloadQuotes.id, quoteId), eq(foxreloadQuotes.userId, input.userId))).limit(1);
   if (!quote || quote.orderId || quote.expiresAt <= new Date()) return { kind: "error", code: "changed", message: "This quote has expired or was used. Get a new quote." };
   const product = await readFoxreloadProductContract(TELEGRAM_STARS_PRODUCT).catch(() => null);
-  const current = product && priceStars(product, quote.quantity);
+  const rate = await foxreloadRate();
+  const current = product && rate && priceStars(product, quote.quantity, { FOXRELOAD_USD_NGN_RATE: rate.value });
   if (!product || !current || quote.productId !== product.id || quote.currency !== "usd" || current.amount !== quote.amount || current.wholesaleTotal !== quote.wholesaleTotal) {
     return { kind: "error", code: "changed", message: "The price or availability changed. Get a new quote." };
   }
