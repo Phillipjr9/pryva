@@ -21,7 +21,7 @@ export type ExplorerCategory = ServiceId;
 export type ExplorerFilter = ExplorerCategory | "all";
 export type ExplorerArtwork =
   | { kind: "brand"; name: BrandSlug | "disney-plus" }
-  | { kind: "service"; name: "numbers" | "esim" | "proxies" | "email-otp" | "accounts" | "bulk" | "scheduled" | "social-promotion" }
+  | { kind: "service"; name: "numbers" | "esim" | "proxies" | "email-otp" | "accounts" | "bulk" | "scheduled" | "social-promotion" | "gift-cards" | "subscriptions" | "data" | "games" | "topups" | "prepaid" }
   /**
    * An inbox whose provider we could not identify. It is deliberately not
    * `email-otp`: that glyph belongs to the "Temporary inbox" card, and a grid
@@ -63,6 +63,8 @@ export type ExplorerItem = {
   price: number | null;
   priceFrom?: boolean;
   action: { label: string; href: string } | null;
+  /** This listing is browse-only until its checkout is enabled. */
+  orderingPaused?: boolean;
 };
 
 export const VERIFICATION_EXAMPLES: Array<{ name: string; brand: BrandSlug; tag: string }> = [

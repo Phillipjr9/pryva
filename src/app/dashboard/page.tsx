@@ -11,7 +11,6 @@ import { ServiceIcon } from "@/components/ServiceIcon";
 import { LiveCodeCard, type LiveCode } from "@/components/dashboard/LiveCodeCard";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { BalanceHero } from "@/components/dashboard/BalanceHero";
-import { DigitalCatalogHighlights } from "@/components/dashboard/DigitalCatalogHighlights";
 import { readServiceReadiness } from "@/lib/services/service-readiness";
 import { orderByReadiness, SERVICE_STATE_DOT, SERVICE_STATE_LABEL } from "@/lib/services/service-states";
 
@@ -24,6 +23,11 @@ const quickBuys = [
   { label: "eSIM data", note: "Travel data plans", href: "/dashboard/services?country=ng&category=esim", service: "esim" as const, category: "esim" },
   { label: "Residential proxies", note: "Clean rotating IP pools", href: "/dashboard/services?country=ng&category=proxies", service: "proxies" as const, category: "proxies" },
   { label: "Digital accounts", note: "Streaming & AI subscriptions", href: "/dashboard/services?country=ng&category=accounts", service: "accounts" as const, category: "accounts" },
+  { label: "Games & gaming", note: "Games, keys & credits", href: "/dashboard/services?category=games", service: "games" as const, category: "games" },
+  { label: "Account top-ups", note: "Game & account credits", href: "/dashboard/services?category=topups", service: "topups" as const, category: "topups" },
+  { label: "Gift cards", note: "Vouchers & app stores", href: "/dashboard/services?category=gift-cards", service: "gift-cards" as const, category: "gift-cards" },
+  { label: "Subscriptions", note: "Entertainment & tools", href: "/dashboard/services?category=subscriptions", service: "subscriptions" as const, category: "subscriptions" },
+  { label: "Prepaid & finance", note: "Prepaid products & cards", href: "/dashboard/services?category=prepaid", service: "prepaid" as const, category: "prepaid" },
   { label: "Mobile data", note: "MTN, Airtel, Glo & 9mobile", href: "/dashboard/data", service: "data" as const, category: "data" },
   { label: "Temporary inbox", note: "Free disposable email", href: "/dashboard/inbox", service: "email-otp" as const, category: "email" },
   { label: "Bulk orders", note: "Volume basket discounts", href: "/dashboard/bulk-orders", service: "bulk" as const, category: "tools" },
@@ -133,8 +137,6 @@ export default async function DashboardOverviewPage() {
           { label: "Refunded", value: formatNaira(refundedToWallet), note: "back to wallet" },
         ]}
       />
-
-      <DigitalCatalogHighlights />
 
       {/* Keep a live code card and a country hint near the active account state,
           while letting recent activity and quick actions lead the page. */}

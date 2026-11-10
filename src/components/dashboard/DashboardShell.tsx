@@ -32,6 +32,9 @@ type NavItem = {
     | "email-otp"
     | "accounts"
     | "data"
+    | "games"
+    | "topups"
+    | "prepaid"
     | "gift-cards"
     | "bulk"
     | "scheduled"
@@ -67,13 +70,16 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
       { href: "/dashboard/services", label: "Data Plans", art: "data", category: "data" },
       { href: "/dashboard/services", label: "Accounts", art: "accounts", category: "accounts" },
       { href: "/dashboard/services", label: "Subscriptions", art: "subscriptions", category: "subscriptions" },
+      { href: "/dashboard/services", label: "Games & gaming", art: "games", category: "games" },
+      { href: "/dashboard/services", label: "Account top-ups", art: "topups", category: "topups" },
+      { href: "/dashboard/services", label: "Gift cards", art: "gift-cards", category: "gift-cards" },
+      { href: "/dashboard/services", label: "Prepaid & finance", art: "prepaid", category: "prepaid" },
       { href: "/dashboard/services", label: "App verification", art: "app-verification", category: "verification" },
       { href: "/dashboard/services", label: "Social promotion", art: "social-promotion", category: "social" },
       { href: "/dashboard/services", label: "Proxies", art: "proxies", category: "proxies" },
       { href: "/dashboard/services", label: "Email OTP", art: "email-otp", category: "email" },
-      // Gift cards are wallet credit Pryva issues itself, not a service in the
-      // catalogue, so this links straight at the page instead of the hub.
-      { href: "/dashboard/gift-cards", label: "Gift cards", art: "gift-cards" },
+      // Wallet credit remains its own flow, distinct from digital vouchers.
+      { href: "/dashboard/gift-cards", label: "Wallet gift cards", art: "gift-cards" },
       { href: "/dashboard/bulk-orders", label: "Bulk Orders", art: "bulk" },
       { href: "/dashboard/scheduled", label: "Scheduled", art: "scheduled" },
     ],

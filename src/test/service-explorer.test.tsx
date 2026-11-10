@@ -45,7 +45,7 @@ describe("country-first service explorer", () => {
 
   it("keeps service categories without fabricating supplier listings", () => {
     const ids = EXPLORER_CATEGORIES.map((category) => category.id);
-    expect(ids).toEqual(["verification", "social", "numbers", "esim", "proxies", "email", "accounts", "subscriptions", "data", "tools"]);
+    expect(ids).toEqual(["verification", "social", "numbers", "esim", "proxies", "email", "accounts", "subscriptions", "games", "topups", "gift-cards", "prepaid", "data", "tools"]);
     const items = buildServiceExplorer("ng");
     expect(new Set(items.map((item) => item.id)).size).toBe(items.length);
     for (const category of ["verification", "social", "esim", "subscriptions", "data"]) {
@@ -53,7 +53,7 @@ describe("country-first service explorer", () => {
     }
     // Supplier-backed entries arrive separately; a platform vocabulary is not a listing.
     expect(items.some((item) => item.id.startsWith("verification-") || item.id.startsWith("social-"))).toBe(false);
-    expect(ids).not.toContain("gift-cards");
+    expect(ids).toContain("gift-cards");
   });
 
   it("never inserts synthetic platform records into a country catalog", () => {

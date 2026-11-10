@@ -433,3 +433,15 @@ exposes wholesale cost or supplier identifiers. Unreviewed or disabled listings
 remain visible but do not gain checkout links, and quote/purchase paths retain
 all of their existing checks. A supplier outage, missing key, rate limit or
 financial-environment restriction may still prevent catalogue access.
+
+DIGITAL DISCOVERY IN THE SERVICE HUB
+Customer discovery is interleaved into the regular service cards. eSIM and
+subscriptions share their existing shelves; games/game currency/gaming services,
+account top-ups, gift cards/app-store credits/vouchers, and prepaid/finance have
+shelves in the same hub and sidebar. The initial all-category view samples one
+root per shelf; selecting a shelf loads its mapped roots, with per-root cursor
+paging and a maximum of 50 matches per root search. New supplier root categories
+need an explicit mapping; test-order root products are not shown in this hub.
+The selected hub country does not establish digital product coverage. Stock and
+ordering are separate: no checkout is exposed without the existing reviewed
+product and service gates. Wallet-credit gift cards retain their separate page.

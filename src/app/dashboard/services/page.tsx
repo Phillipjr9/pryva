@@ -32,6 +32,7 @@ export default async function DashboardServicesPage({
       rejectedCountry={rejectedCountry}
       rejectedCategory={rejectedCategory}
       readiness={readiness}
+      enableDigitalCatalogue
     />
   );
 }

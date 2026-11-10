@@ -7,6 +7,7 @@ import { CountryFlag } from "@/components/CountryFlag";
 import { CountrySelector } from "@/components/dashboard/CountrySelector";
 import { NetworkBadge } from "@/components/NetworkBadge";
 import { ServiceIcon } from "@/components/ServiceIcon";
+import { useDigitalExplorer } from "@/components/dashboard/useDigitalExplorer";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
 import { ArrowRight, ChevronDown, Globe, Lock, MailQuestion, Search, Shield, Sparkle } from "@/components/icons";
 import { formatNaira } from "@/lib/services/catalog";
@@ -63,6 +64,10 @@ const CATEGORY_ICONS: Record<string, string> = {
   accounts: "👤",
   subscriptions: "🎬",
   data: "📶",
+  games: "🎮",
+  topups: "💳",
+  "gift-cards": "🎁",
+  prepaid: "💳",
   tools: "⚙️",
 };
 
@@ -163,7 +168,7 @@ export function ServiceCard({ item, countryName }: { item: ExplorerItem; country
   const coverage = item.source === "live"
       ? (item.coverage === "catalog-country" ? `Reported region: ${countryName}` : item.coverage === "unconfirmed" ? "Country coverage unconfirmed" : "Not country-specific")
       : item.coverage === "catalog-country" ? `Catalog region: ${countryName}` : item.coverage === "unconfirmed" ? "Country coverage unconfirmed" : "Not filtered by country";
-  const noAction = item.category === "verification" && item.source === "live"
+  const noAction = item.orderingPaused ? "Ordering paused" : item.category === "verification" && item.source === "live"
     ? "Not available to order"
     : item.source === "live" ? "Ordering paused" : "Not available";
   const action = item.action;
@@ -342,6 +347,7 @@ export function ServiceExplorer({
   rejectedCountry = null,
   rejectedCategory = null,
   readiness = [],
+  enableDigitalCatalogue = false,
 }: {
   initialCountry: string | null;
   initialCategory: string | null;
@@ -354,6 +360,7 @@ export function ServiceExplorer({
    * renders — just without the labels.
    */
   readiness?: ServiceReadinessEntry[];
+  enableDigitalCatalogue?: boolean;
 }) {
   const [country, setCountry] = useState(() => resolveExplorerCountry(initialCountry));
   const [category, setCategory] = useState<ExplorerFilter>(() => explorerCategory(initialCategory));
@@ -371,11 +378,11 @@ export function ServiceExplorer({
   const feedScope = category === "all" ? "all" : category === "email" ? "numbers" : category;
   const currentLive = liveState?.country === country && liveState.scope === feedScope ? liveState : null;
   const selectedCategory = EXPLORER_CATEGORIES.find((entry) => entry.id === category);
+  const digital = useDigitalExplorer(enableDigitalCatalogue, category, search);
   const items = useMemo(() => {
     const base = buildServiceExplorer(country);
-    return currentLive?.items.length
-      ? interleaveExplorerItems([...currentLive.items, ...base]) : base;
-  }, [country, currentLive]);
+    return interleaveExplorerItems([...digital.items, ...(currentLive?.items ?? []), ...base]);
+  }, [country, currentLive, digital.items]);
   const filtered = useMemo(() => filterExplorerItems(items, category, search, tag), [items, category, search, tag]);
   /**
    * Social promotion lists every offer the supplier sells, which is hundreds
@@ -533,7 +540,6 @@ export function ServiceExplorer({
           <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">{selectedCategory?.label ?? "Your service hub"}</h1>
           <p className="mt-1.5 max-w-2xl text-[0.82rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Pick a country once, then browse the matched services.` : "Pick a country once and browse categories without redoing the choice every time."}</p>
         </div>
-        <Link href="/dashboard/digital-catalog" className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-lav-200 bg-white px-4 text-meta font-semibold text-lav-700 hover:underline">Shop digital products <ArrowRight className="h-3.5 w-3.5" /></Link>
         <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline">My orders <ArrowRight className="h-3.5 w-3.5" /></Link>
       </div>
 
@@ -752,7 +758,10 @@ export function ServiceExplorer({
                 {filtered.slice(0, visible).map((item) => <ServiceCard key={item.id} item={item} countryName={selectedCountry.name} />)}
               </div>
             )}
-            {filtered.length === 0 && (
+            {digital.loading && <p role="status" className="mt-4 text-meta text-ink-2">Loading more listings…</p>}
+            {digital.error && <p role="status" className="mt-4 text-meta text-amber-800">Some listings could not be loaded. <button type="button" onClick={digital.retry} className="font-semibold underline">Retry listings</button></p>}
+            {digital.limited && <p className="mt-4 text-meta text-ink-3">Search is limited to 50 listings per product type; refine your search to find more.</p>}
+            {filtered.length === 0 && !digital.loading && !digital.error && (
               <div className="rounded-2xl border border-dashed border-line bg-cream/50 p-8 text-center">
                 {!search && tag === "all" && (category === "data" || category === "subscriptions") ? (
                   <>
@@ -776,6 +785,8 @@ export function ServiceExplorer({
                 <button type="button" onClick={() => setVisible((current) => current + PAGE_SIZE)} className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2.5 text-meta font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-lav-700">Show more <span className="text-ink-3">({filtered.length - visible} remaining)</span></button>
               </div>
             )}
+            {digital.hasMore && <div className="mt-4 text-center"><button type="button" disabled={digital.loading || digital.loadingMore} onClick={() => { void digital.loadMore(); }} className="rounded-full border border-line bg-white px-4 py-2.5 text-meta font-semibold text-ink-2 disabled:opacity-50">{digital.loadingMore ? "Loading listings…" : "Load more digital listings"}</button></div>}
+            {enableDigitalCatalogue && (category === "all" || ["esim", "subscriptions", "games", "topups", "gift-cards", "prepaid"].includes(category)) && <p className="mt-4 text-micro text-ink-3">Digital product stock is reported and may change. Country coverage and ordering eligibility must be confirmed separately. {category === "all" ? "Choose a category to browse all its product types." : ""}</p>}
             <p className="mt-5 border-t border-line pt-4 text-micro leading-relaxed text-ink-3">Stock means available inventory. My units means your remaining purchased units. Unknown and not tracked are not the same as zero. Listings do not guarantee platform support or verified coverage.</p>
           </section>
         </>

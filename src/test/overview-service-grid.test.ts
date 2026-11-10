@@ -20,9 +20,9 @@ const overview = readFileSync(join(root, "app/dashboard/page.tsx"), "utf8");
 describe("overview service hub", () => {
   const grid = overview.match(/className="mt-3 grid[^"]*"/)?.[0] ?? "";
 
-  it("shows digital catalogue highlights directly on the overview", () => {
-    expect(overview).toContain("<DigitalCatalogHighlights />");
-    expect(overview.indexOf("<DigitalCatalogHighlights />")).toBeLessThan(overview.indexOf("Recent orders"));
+  it("places digital families alongside other quick actions", () => {
+    for (const category of ["games", "topups", "gift-cards", "subscriptions", "prepaid"]) expect(overview).toContain(`category=${category}`);
+    expect(overview).not.toContain("<DigitalCatalogHighlights");
   });
 
   it("keeps quick actions balanced on a phone and stacks to one column on the wide sidebar", () => {

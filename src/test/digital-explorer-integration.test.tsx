@@ -1,0 +1,59 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
+
+const id = (value: string) => `digital-${value.repeat(24)}`;
+const response = (data: object, ok = true) => ({ ok, status: ok ? 200 : 503, json: async () => data });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+describe("digital listings in service categories", () => {
+  it("integrates eSIM products with existing cards, without claiming country coverage or enabling checkout", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("digital-catalog")) return response({ ok: true, items: [{ id: id("a"), name: "Travel plan", stock: "reported" }], nextCursor: null });
+      return response({ ok: true, country: "ng", live: true, items: [{ id: "old-esim", category: "esim", name: "Existing eSIM", description: "Travel data", tag: "Travel", artwork: { kind: "service", name: "esim" }, source: "live", coverage: "catalog-country", stock: null, myUnits: null, price: null, action: null }] });
+    });
+    vi.stubGlobal("fetch", fetchMock); render(<ServiceExplorer initialCountry="ng" initialCategory="esim" enableDigitalCatalogue />);
+    const digital = (await screen.findByRole("heading", { name: "Travel plan" })).closest("article")!;
+    expect(await screen.findByRole("heading", { name: "Existing eSIM" })).toBeTruthy();
+    expect(within(digital).getAllByText(/region unconfirmed/i).length).toBeGreaterThan(0);
+    expect(within(digital).getByRole("button", { name: "Ordering paused" }).hasAttribute("disabled")).toBe(true);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("category=esim") && String(url).includes("stock=available"))).toBe(true);
+  });
+  it("groups the actual game roots together and loads the next page without losing the first", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      const params = new URL(url, "https://example.test").searchParams;
+      const root = params.get("category");
+      if (root === "games" && params.has("cursor")) return response({ ok: true, items: [{ id: id("b"), name: "Next game", stock: "reported", checkout: "codes" }], nextCursor: null });
+      return response({ ok: true, items: root === "games" ? [{ id: id("a"), name: "Game one", stock: "reported" }] : [], nextCursor: root === "games" ? "cursor1" : null });
+    });
+    vi.stubGlobal("fetch", fetchMock); render(<ServiceExplorer initialCountry="ng" initialCategory="games" enableDigitalCatalogue />);
+    expect(await screen.findByRole("heading", { name: "Game one" })).toBeTruthy();
+    expect(fetchMock.mock.calls.map(([url]) => new URL(String(url), "https://example.test").searchParams.get("category"))).toEqual(expect.arrayContaining(["games", "game-currency", "gaming-services"]));
+    fireEvent.click(screen.getByRole("button", { name: "Load more digital listings" }));
+    const card = (await screen.findByRole("heading", { name: "Next game" })).closest("article")!;
+    expect(screen.getByRole("heading", { name: "Game one" })).toBeTruthy();
+    expect(within(card).getByRole("link", { name: "Check price and availability" }).getAttribute("href")).toBe(`/dashboard/digital-codes?product=${id("b")}`);
+  });
+  it("keeps partial results and reports failures without inventing stock", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const root = new URL(url, "https://example.test").searchParams.get("category");
+      return root === "games" ? response({ ok: true, items: [{ id: id("a"), name: "Game one", stock: "reported" }], nextCursor: null }) : response({ error: "secret" }, false);
+    }));
+    render(<ServiceExplorer initialCountry="ng" initialCategory="games" enableDigitalCatalogue />);
+    expect(await screen.findByRole("heading", { name: "Game one" })).toBeTruthy();
+    expect((await screen.findByText(/Some listings could not be loaded/)).textContent).not.toContain("secret");
+  });
+  it("searches the relevant catalogue roots instead of only the first page", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      const params = new URL(url, "https://example.test").searchParams;
+      return response({ ok: true, items: params.get("q") === "Roblox" ? [{ id: id("c"), name: "Roblox credit", stock: "reported" }] : [], nextCursor: null, searchLimited: true });
+    });
+    vi.stubGlobal("fetch", fetchMock); render(<ServiceExplorer initialCountry="ng" initialCategory="topups" enableDigitalCatalogue />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    fireEvent.change(screen.getByLabelText("Search services"), { target: { value: "Roblox" } });
+    expect(await screen.findByRole("heading", { name: "Roblox credit" })).toBeTruthy();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("q=Roblox"))).toBe(true);
+    expect(screen.getByText(/Search is limited to 50/)).toBeTruthy();
+  });
+});
