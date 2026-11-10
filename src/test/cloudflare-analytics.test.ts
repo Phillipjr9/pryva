@@ -12,11 +12,13 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("Cloudflare analytics adapter", () => {
-  it("reads two bounded datasets without returning secrets or request queries", async () => {
+  it("reads four bounded datasets without returning secrets or request queries", async () => {
     const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
       const { query } = JSON.parse(String(init.body));
       expect(init.headers).toMatchObject({ Authorization: "Bearer test-private-token" });
       expect(init.redirect).toBe("error");
+      if (query.includes("httpRequestsAdaptiveGroups")) return zoneResult({ countries: [{ count: 20, dimensions: { clientCountryName: "US" } }], paths: [{ count: 12, dimensions: { clientRequestPath: "/signup?private=1" } }], statuses: [{ count: 10, dimensions: { edgeResponseStatus: 403 } }] });
+      if (query.includes("firewallEventsAdaptiveGroups")) return zoneResult({ actions: [{ count: 10, dimensions: { action: "block" } }], services: [{ count: 9, dimensions: { source: "waf" } }], rules: [{ count: 5, dimensions: { ruleId: "rule-1" } }] });
       if (query.includes("firewallEventsAdaptive")) {
         expect(query).toContain("limit: 100");
         expect(query).not.toContain("clientRequestQuery");
@@ -29,9 +31,11 @@ describe("Cloudflare analytics adapter", () => {
     vi.stubGlobal("fetch", fetcher);
     const result = await readCloudflareOverview(NOW);
     expect(result).toMatchObject({ configured: true, events: { status: "ready", data: [{ action: "block", path: "/signup" }] }, traffic: { status: "ready", data: [{ requests: 25, bytes: 120 }] } });
+    expect(result).toMatchObject({ trafficBreakdown: { status: "ready", data: { paths: [{ label: "/signup", count: 12 }], statuses: [{ label: "403", count: 10 }] } }, securityBreakdown: { status: "ready", data: { actions: [{ label: "block", count: 10 }] } } });
+    expect(JSON.stringify(result)).not.toContain("private=1");
     expect(JSON.stringify(result)).not.toContain("test-private-token");
     expect(JSON.stringify(result)).not.toContain("token=secret");
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenCalledTimes(4);
   });
   it("does not call Cloudflare from preview or without valid config", async () => {
     const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
@@ -47,7 +51,7 @@ describe("Cloudflare analytics adapter", () => {
       return zoneResult({ httpRequests1hGroups: [] });
     }));
     const result = await readCloudflareOverview(NOW);
-    expect(result).toMatchObject({ events: { status: "unavailable" }, traffic: { status: "ready", data: [] } });
+    expect(result).toMatchObject({ events: { status: "unavailable" }, traffic: { status: "ready", data: [] }, trafficBreakdown: { status: "unavailable" }, securityBreakdown: { status: "unavailable" } });
     expect(JSON.stringify(result)).not.toContain("sensitive");
     vi.stubGlobal("fetch", vi.fn(async () => zoneResult({ firewallEventsAdaptive: [{ action: "block" }], httpRequests1hGroups: [{ dimensions: { datetime: "bad" }, sum: { requests: -1, bytes: 3 } }] })));
     expect(await readCloudflareOverview(NOW)).toMatchObject({ events: { status: "unavailable" }, traffic: { status: "unavailable" } });

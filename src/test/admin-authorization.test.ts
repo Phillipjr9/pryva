@@ -10,6 +10,7 @@ import * as messages from "@/app/api/admin/messages/route";
 import * as orders from "@/app/api/admin/orders/route";
 import * as refunds from "@/app/api/admin/refunds/route";
 import * as metrics from "@/app/api/admin/security/metrics/route";
+import * as cloudflare from "@/app/api/admin/security/cloudflare/route";
 import * as stats from "@/app/api/admin/stats/route";
 import * as suppliers from "@/app/api/admin/suppliers/route";
 import * as userDetails from "@/app/api/admin/users/[id]/route";
@@ -42,6 +43,7 @@ const handlers: Array<{ path: string; method: string; handler: Handler }> = [
   { path: "refunds", method: "GET", handler: refunds.GET },
   { path: "refunds", method: "POST", handler: refunds.POST },
   { path: "security/metrics", method: "GET", handler: metrics.GET },
+  { path: "security/cloudflare", method: "GET", handler: cloudflare.GET },
   { path: "stats", method: "GET", handler: stats.GET },
   { path: "suppliers", method: "GET", handler: suppliers.GET },
   { path: "users", method: "GET", handler: users.GET },
