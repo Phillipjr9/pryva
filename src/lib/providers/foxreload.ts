@@ -184,7 +184,7 @@ async function foxreloadFetch(
 }
 
 /** Authenticated, read-only readiness probe. Never return profile fields or balances. */
-export async function probeFoxreloadAccount(): Promise<{ active: boolean; funds: { usd: "positive" | "zero" | "unknown"; rub: "positive" | "zero" | "unknown" } }> {
+export async function probeFoxreloadAccount(): Promise<{ active: boolean; funds: { usd: "positive" | "zero" | "unknown"; rub: "positive" | "zero" | "unknown" }; returnedBalances: number; returnedCurrencies: string[] }> {
   const profile = await foxreloadFetch("/api/access/me");
   if (!profile || typeof profile !== "object" || Array.isArray(profile) || typeof (profile as Record<string, unknown>).isActive !== "boolean") {
     throw new FoxreloadError("Invalid account response", 502, "INVALID_RESPONSE");
@@ -193,15 +193,17 @@ export async function probeFoxreloadAccount(): Promise<{ active: boolean; funds:
   if (!Array.isArray(raw) || raw.length > 10) throw new FoxreloadError("Invalid balance response", 502, "INVALID_RESPONSE");
   const funds: { usd: "positive" | "zero" | "unknown"; rub: "positive" | "zero" | "unknown" } = { usd: "unknown", rub: "unknown" };
   const seen = new Set<string>();
+  const returnedCurrencies = new Set<string>();
   for (const entry of raw) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new FoxreloadError("Invalid balance response", 502, "INVALID_RESPONSE");
     const { currency, available } = entry as Record<string, unknown>;
+    if (typeof currency === "string" && ["usd", "rub", "eur", "ton"].includes(currency)) returnedCurrencies.add(currency.toUpperCase());
     if (currency !== "usd" && currency !== "rub") continue;
     if (seen.has(currency) || typeof available !== "string" || !/^(?:0|[1-9]\d{0,20})(?:\.\d{1,18})?$/.test(available)) throw new FoxreloadError("Invalid balance response", 502, "INVALID_RESPONSE");
     seen.add(currency);
     funds[currency] = /[1-9]/.test(available) ? "positive" : "zero";
   }
-  return { active: (profile as Record<string, boolean>).isActive, funds };
+  return { active: (profile as Record<string, boolean>).isActive, funds, returnedBalances: raw.length, returnedCurrencies: [...returnedCurrencies].sort() };
 }
 
 export async function getFoxreloadAccount(): Promise<FoxreloadAccount> {

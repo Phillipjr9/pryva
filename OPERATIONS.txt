@@ -414,3 +414,8 @@ The separate legacy brand-gift-card checkout now requires
 FOXRELOAD_LEGACY_GIFT_CARDS_ENABLED=true as well as the key and non-mock mode.
 Leave it disabled: its matching, pricing and reconciliation still require review.
 Existing requests can be replayed by request ID even while new sales are blocked.
+The same administrator screen provides a read-only product search and contract
+inspection. Search results are limited to 50; missing or unrecognized metadata
+must not be inferred. This screen never changes an allowlist or creates an order.
+The account probe also reports the number and recognized currencies of balance
+rows without exposing values; unknown does not imply an empty wallet.

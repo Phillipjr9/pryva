@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 
-type Result = { configured: boolean; account: null | { active: boolean; funds: { usd: string; rub: string } }; error: null | "auth" | "unavailable"; settings: { purchasesBlockedInEnvironment: boolean; mock: boolean; rateConfigured: boolean; intentSecretConfigured: boolean; starsEnabled: boolean; codesEnabled: boolean; topupsEnabled: boolean; loginTopupsEnabled: boolean; confirmationsEnabled: boolean; esimsEnabled: boolean; reviewedCodes: number; reviewedDirectTopups: number; reviewedLoginTopups: number; reviewedEsims: number } };
+type Result = { configured: boolean; account: null | { active: boolean; funds: { usd: string; rub: string }; returnedBalances: number; returnedCurrencies: string[] }; error: null | "auth" | "unavailable"; settings: { purchasesBlockedInEnvironment: boolean; mock: boolean; rateConfigured: boolean; intentSecretConfigured: boolean; starsEnabled: boolean; codesEnabled: boolean; topupsEnabled: boolean; loginTopupsEnabled: boolean; confirmationsEnabled: boolean; esimsEnabled: boolean; reviewedCodes: number; reviewedDirectTopups: number; reviewedLoginTopups: number; reviewedEsims: number } };
 const status = (enabled: boolean) => enabled ? "Enabled" : "Disabled";
 export function FoxreloadCheck() {
   const [data, setData] = useState<Result | null>(null);
@@ -23,7 +23,7 @@ export function FoxreloadCheck() {
     {data && <div className="mt-4 space-y-3 text-sm text-ink-2" role="status">
       <p><strong>API key:</strong> {data.configured ? "Set" : "Not set in this deployment"}</p>
       <p><strong>Account:</strong> {data.account ? data.account.active ? "Authenticated and active" : "Authenticated but inactive" : data.error === "auth" ? "Authentication refused" : data.error === "unavailable" ? "Could not verify" : "Not checked"}</p>
-      {data.account && <p><strong>Available funds:</strong> USD {data.account.funds.usd}; RUB {data.account.funds.rub} (amounts hidden).</p>}
+      {data.account && <><p><strong>Available funds:</strong> USD {data.account.funds.usd}; RUB {data.account.funds.rub} (amounts hidden).</p><p>The account returned {data.account.returnedBalances} balance {data.account.returnedBalances === 1 ? "entry" : "entries"}{data.account.returnedCurrencies.length ? ` (${data.account.returnedCurrencies.join(", ")})` : " with no recognized currency"}. Unknown does not mean zero; check the account account or support.</p></>}
       <p><strong>Environment:</strong> {data.settings.purchasesBlockedInEnvironment ? "Purchases blocked in this environment" : "Production purchase guard allows checkout"}; mock mode {data.settings.mock ? "on" : "off"}.</p>
       <p><strong>Pricing rate:</strong> {data.settings.rateConfigured ? "Set" : "Missing or invalid"}; <strong>recipient binding secret:</strong> {data.settings.intentSecretConfigured ? "Set" : "Missing or invalid"}.</p>
       <ul className="list-disc space-y-1 pl-5">

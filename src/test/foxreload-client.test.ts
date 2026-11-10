@@ -40,9 +40,15 @@ describe("FoxReload client", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ isActive: true, email: "private@example.test", referralCode: "private" })));
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify([{ currency: "usd", available: "1.0000", reserved: "0", pending: "0" }, { currency: "rub", available: "0.000", reserved: "0", pending: "0" }])));
-    expect(await probeFoxreloadAccount()).toEqual({ active: true, funds: { usd: "positive", rub: "zero" } });
+    expect(await probeFoxreloadAccount()).toEqual({ active: true, funds: { usd: "positive", rub: "zero" }, returnedBalances: 2, returnedCurrencies: ["RUB", "USD"] });
     expect(fetchMock.mock.calls.map(([url, init]) => [new URL(String(url)).pathname, init?.method])).toEqual([["/api/access/me", "GET"], ["/api/access/me/balances/", "GET"]]);
     expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({ "X-API-Key": "fox_test_secret_key_12345" });
+  });
+  it("does not assume missing balance rows mean zero", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ isActive: true })));
+    fetchMock.mockResolvedValueOnce(new Response("[]"));
+    expect(await probeFoxreloadAccount()).toEqual({ active: true, funds: { usd: "unknown", rub: "unknown" }, returnedBalances: 0, returnedCurrencies: [] });
   });
   it("rejects malformed profile and balance responses rather than claiming success", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
