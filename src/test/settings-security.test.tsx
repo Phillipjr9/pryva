@@ -30,8 +30,9 @@ describe("security lives inside settings", () => {
     for (const control of ["TwoFactorCard", "SessionsCard", "remainingRecoveryCodes", "twoFactorAvailable"]) {
       expect(section, control).toContain(control);
     }
-    // Nothing was lost in the move: the old page's guidance came too.
-    expect(section).toContain("What we do on our side");
+    // Keep customer safety habits without exposing internal security policy details.
+    expect(section).not.toContain("What we do on our side");
+    expect(section).not.toContain("Session cookies are http-only");
     expect(section).toContain("Habits that keep an account safe");
   });
 
