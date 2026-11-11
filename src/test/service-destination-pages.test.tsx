@@ -24,7 +24,7 @@ describe("service destinations", () => {
     }
     const data = renderToStaticMarkup(await DataPlansPage({ searchParams: Promise.resolve({ plan: "airtel-1gb" }) }));
     expect(data).toContain("Live mobile data catalogue");
-    expect(data).toContain("Loading supplier bundles");
+    expect(data).toContain("Loading current bundles");
     expect(data).not.toContain("Airtel 1GB");
     expect(data).not.toContain("MTN 1GB");
   });

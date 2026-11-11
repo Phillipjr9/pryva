@@ -122,14 +122,14 @@ describe("supplier status endpoint", () => {
     const body = await (await report("?country=ng")).json();
     const nigeria = body.plans.find((plan: { slug: string }) => plan.slug === "vn-ng");
 
-    // 0.40 USD at 1,500 = 600 naira cost against a 1,340 naira plan price.
+    // 0.40 USD at 1,500 = 600 naira cost against a 1,058 naira plan price.
     expect(nigeria).toMatchObject({
       slug: "vn-ng",
       country: "ng",
-      ourPriceNgn: 1340,
+      ourPriceNgn: 1058,
       cheapest: { supplier: "bitcall", costNgn: 600 },
-      profitNgn: 740,
-      marginPct: 55.2,
+      profitNgn: 458,
+      marginPct: 43.3,
       clearsFloor: true,
       blockedBy: null,
     });
@@ -143,9 +143,9 @@ describe("supplier status endpoint", () => {
     const body = await (await report("?country=ng")).json();
     const nigeria = body.plans.find((plan: { slug: string }) => plan.slug === "vn-ng");
 
-    // 1,800 naira cost against 1,340 charged: refused, and the reason is named.
+    // 1,800 naira cost against 1,058 charged: refused, and the reason is named.
     expect(nigeria).toMatchObject({ cheapest: { costNgn: 1800 }, clearsFloor: false, blockedBy: "UNPROFITABLE" });
-    expect(nigeria.profitNgn).toBe(-460);
+    expect(nigeria.profitNgn).toBe(-742);
   });
 
   it("reports a supplier failure as a code, never as an upstream message", async () => {

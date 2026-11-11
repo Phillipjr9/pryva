@@ -36,7 +36,7 @@ describe("Bitcall app-specific OTP catalogue", () => {
       source: "live",
       category: "verification",
       stock: 3,
-      price: 1340,
+      price: 1058,
       action: { label: "Choose service", href: expect.stringContaining("?country=ng") },
     });
     const signal = items.find((item) => item.name === "Signal")!;
@@ -59,7 +59,7 @@ describe("Bitcall app-specific OTP catalogue", () => {
       name: "Verification number",
       source: "live",
       stock: 5,
-      price: 1340,
+      price: 1058,
       action: { label: "Choose service" },
     });
     expect(JSON.stringify(items)).not.toContain("opaque_ref_1");
@@ -67,7 +67,7 @@ describe("Bitcall app-specific OTP catalogue", () => {
     state.read.mockResolvedValue({ offers: [unlabelled], errorCode: null, stale: false });
     const resolved = await findOtpCheckoutOffer("ng", items[0].id);
     expect(resolved.errorCode).toBeNull();
-    expect(resolved.listing).toMatchObject({ app: "Verification number", priceNgn: 1340, purchasable: true });
+    expect(resolved.listing).toMatchObject({ app: "Verification number", priceNgn: 1058, purchasable: true });
   });
 
   it("shows Bitcall inventory for other countries without enabling unsupported checkout", () => {
@@ -90,7 +90,7 @@ describe("Bitcall app-specific OTP catalogue", () => {
     expect(state.read).toHaveBeenCalledWith("bitcall", "ng", "Nigeria", undefined, true);
     expect(result).toMatchObject({
       errorCode: null,
-      listing: { id, app: "WhatsApp", countryCode: "ng", priceNgn: 1340, purchasable: true },
+      listing: { id, app: "WhatsApp", countryCode: "ng", priceNgn: 1058, purchasable: true },
     });
     expect(JSON.stringify(result)).not.toContain("private-service-id");
     expect(JSON.stringify(result)).not.toContain("costNgn");
