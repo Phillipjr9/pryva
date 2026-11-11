@@ -81,7 +81,7 @@ describe("Bitcall app-specific OTP catalogue", () => {
       name: "WhatsApp", category: "verification", source: "live", stock: 6,
       price: null, action: null, detail: "Benin · single-use verification",
     });
-    expect(items[0].description).toContain("checkout is not enabled for this country");
+    expect(items[0].description).toContain("purchasing is locked for this country");
   });
 
   it("re-resolves an opaque offer ID from the live listing before checkout", async () => {

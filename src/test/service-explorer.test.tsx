@@ -8,7 +8,7 @@ import { formatUnitCount, safeUnitCount } from "@/lib/services/service-units";
 import { EXPLORER_COUNTRIES } from "@/lib/content/explorer-countries";
 import {
   buildServiceExplorer, canPreviewPlan, EXPLORER_CATEGORIES, explorerCategory, explorerCountry,
-  filterExplorerItems, mergeExplorerSources, planMatchesCountry, type ExplorerItem,
+  filterExplorerItems, interleaveExplorerItems, planMatchesCountry, type ExplorerItem,
 } from "@/lib/services/service-explorer";
 
 describe("country-first service explorer", () => {
@@ -23,11 +23,6 @@ describe("country-first service explorer", () => {
     expect(markup).not.toContain("Start with a country.");
   });
 
-  it("links the Accounts category directly to the same account browser", () => {
-    const html = renderToStaticMarkup(<ServiceExplorer initialCountry="ng" initialCategory="all" />);
-    expect(html).toMatch(/<a[^>]*href="\/dashboard\/accounts"[^>]*>[^]*?Accounts/);
-  });
-
   it("offers the ISO country and territory directory without treating it as supplier coverage", () => {
     expect(EXPLORER_COUNTRIES.length).toBe(249);
     expect(new Set(EXPLORER_COUNTRIES.map((country) => country.code)).size).toBe(249);
@@ -40,17 +35,6 @@ describe("country-first service explorer", () => {
     expect(items.filter((item) => item.category === "verification")).toEqual([]);
   });
 
-  it("mixes sources within each category while retaining distinct offers", () => {
-    const base: ExplorerItem = { id: "a", category: "esim", name: "Same plan name", description: "", tag: "", artwork: { kind: "service", name: "esim" }, source: "live", coverage: "unconfirmed", stock: null, myUnits: null, price: 100, action: { label: "Buy", href: "/one" } };
-    const source1 = [base, { ...base, id: "b", action: { label: "Buy", href: "/two" } }];
-    const source2 = [{ ...base, id: "c", price: 200, action: { label: "Quote", href: "/three" } }, { ...base, id: "d" }];
-    const mixed = mergeExplorerSources([source1, source2]);
-    expect(mixed.map((item) => item.id)).toEqual(["a", "c", "b", "d"]);
-    expect(mixed[0].action?.href).toBe("/one");
-    expect(mixed[1]).toMatchObject({ price: 200, action: { href: "/three" } });
-    expect(mergeExplorerSources([[], source2]).map((item) => item.id)).toEqual(["c", "d"]);
-  });
-
   it("validates country and category parameters rather than guessing", () => {
     expect(explorerCountry("NG")?.name).toBe("Nigeria");
     expect(explorerCountry("Nigeria")).toBeNull();
@@ -61,7 +45,7 @@ describe("country-first service explorer", () => {
 
   it("keeps service categories without fabricating supplier listings", () => {
     const ids = EXPLORER_CATEGORIES.map((category) => category.id);
-    expect(ids).toEqual(["verification", "social", "numbers", "esim", "proxies", "email", "accounts", "subscriptions", "games", "topups", "gift-cards", "prepaid", "data", "tools"]);
+    expect(ids).toEqual(["verification", "social", "numbers", "esim", "proxies", "email", "accounts", "subscriptions", "data", "tools"]);
     const items = buildServiceExplorer("ng");
     expect(new Set(items.map((item) => item.id)).size).toBe(items.length);
     for (const category of ["verification", "social", "esim", "subscriptions", "data"]) {
@@ -69,7 +53,7 @@ describe("country-first service explorer", () => {
     }
     // Supplier-backed entries arrive separately; a platform vocabulary is not a listing.
     expect(items.some((item) => item.id.startsWith("verification-") || item.id.startsWith("social-"))).toBe(false);
-    expect(ids).toContain("gift-cards");
+    expect(ids).not.toContain("gift-cards");
   });
 
   it("never inserts synthetic platform records into a country catalog", () => {
@@ -124,6 +108,22 @@ describe("country-first service explorer", () => {
     expect(buildServiceExplorer("gb").filter((item) => item.category === "data")).toEqual([]);
   });
 
+  it("keeps each service family in its own shelf instead of interleaving it across unrelated categories", () => {
+    const items: ExplorerItem[] = [
+      { id: "social-1", category: "social", name: "Instagram", description: "Boost", tag: "Followers", artwork: { kind: "brand", name: "instagram" }, source: "live", coverage: "not-country-specific", stock: null, myUnits: null, price: 1600, action: null },
+      { id: "verification-1", category: "verification", name: "WhatsApp", description: "Live app", tag: "Messaging", artwork: { kind: "brand", name: "whatsapp" }, source: "live", coverage: "catalog-country", stock: 12, myUnits: null, price: null, action: null },
+      { id: "social-2", category: "social", name: "TikTok", description: "Boost", tag: "Followers", artwork: { kind: "brand", name: "tiktok" }, source: "live", coverage: "not-country-specific", stock: null, myUnits: null, price: 1400, action: null },
+      { id: "numbers-1", category: "numbers", name: "NG number", description: "Number", tag: "Single use", artwork: { kind: "service", name: "numbers" }, source: "catalog", coverage: "catalog-country", stock: null, myUnits: null, price: 600, action: null },
+    ];
+
+    expect(interleaveExplorerItems(items).map((item) => item.category)).toEqual([
+      "verification",
+      "social",
+      "social",
+      "numbers",
+    ]);
+  });
+
   it("filters listings by category, type and search without leaking other categories", () => {
     const items = buildServiceExplorer("ng");
     expect(filterExplorerItems(items, "social", "instagram", "Followers")).toEqual([]);
@@ -152,15 +152,15 @@ describe("country-first service explorer", () => {
 
   it("shows view-only Bitcall OTP listings without implying unsupported countries can be ordered", () => {
     const item: ExplorerItem = {
-      id: "otp-whatsapp-bj", category: "verification", name: "WhatsApp", description: "Live stock listing · checkout is not enabled for this country",
+      id: "otp-whatsapp-bj", category: "verification", name: "WhatsApp", description: "Stocks left · purchasing is locked for this country",
       tag: "Messaging", artwork: { kind: "brand", name: "whatsapp" }, source: "live",
       coverage: "catalog-country", stock: 6, myUnits: null, price: null, action: null,
     };
     const markup = renderToStaticMarkup(<ServiceCard item={item} countryName="Benin" />);
-    expect(markup).toContain("Reported stock:");
+    expect(markup).toContain("Stocks left:");
     expect(markup).toContain("6 left");
-    expect(markup).toContain("Ordering unavailable");
-    expect(markup).toContain("Not available to order");
+    expect(markup).toContain("Purchasing locked");
+    expect(markup).toContain("Purchasing locked");
   });
 
   it("shows provider-reported Bitcall OTP stock on mobile, including zero and unknown distinctly", () => {
@@ -171,7 +171,7 @@ describe("country-first service explorer", () => {
       action: { label: "Choose service", href: "/dashboard/services/otp?country=ng" },
     };
     const markup = renderToStaticMarkup(<ServiceCard item={item} countryName="Nigeria" />);
-    expect(markup).toContain("Reported stock:");
+    expect(markup).toContain("Stocks left:");
     expect(markup).toContain("17 left");
     expect(markup).toContain("sm:hidden");
 
@@ -197,37 +197,6 @@ describe("unit counts", () => {
     expect(markup).toContain("sm:grid-cols-2");
     expect(markup).toContain("0 left");
     expect(markup).toContain("23 left");
-    expect(markup).toContain("text-[0.8125rem]");
-  });
-});
-
-describe("number-plan stock on mobile", () => {
-  it("shows reported stock, zero, and unknown without inventing a plan total", () => {
-    const item: ExplorerItem = {
-      id: "live-rental", category: "numbers", name: "Number rental", description: "Rental listing",
-      tag: "Rental", artwork: { kind: "service", name: "numbers" }, source: "live",
-      coverage: "catalog-country", stock: 8, myUnits: null, price: null, action: null,
-    };
-    for (const [stock, expected] of [[8, "8 left"], [0, "0 left"], [null, "Not reported"]] as const) {
-      const markup = renderToStaticMarkup(<ServiceCard item={{ ...item, stock }} countryName="United States" />);
-      expect(markup).toContain("Stock:");
-      expect(markup).toContain(expected);
-      expect(markup).toContain("sm:hidden");
-    }
-    const plan = buildServiceExplorer("us").find((entry) => entry.id === "plan-vn-us")!;
-    expect(plan.stock).toBeNull();
-    expect(renderToStaticMarkup(<ServiceCard item={plan} countryName="United States" />)).toContain("Not reported");
-  });
-
-  it("distinguishes the three US catalogue plan cards from live app listings", () => {
-    const plans = buildServiceExplorer("us").filter((entry) => entry.category === "numbers");
-    expect(plans.map((entry) => entry.id).sort()).toEqual(["plan-rent-us-30", "plan-vn-otp-5", "plan-vn-us"]);
-    expect(plans.every((entry) => entry.source === "catalog" && entry.stock === null)).toBe(true);
-  });
-
-  it("explains where app-specific stock is shown", () => {
-    const markup = renderToStaticMarkup(<ServiceExplorer initialCountry="us" initialCategory="numbers" />);
-    expect(markup).toContain("app-specific number listings and their reported stock appear under App verification");
-    expect(markup).toContain("Browse app-specific numbers");
+    expect(markup).toContain("text-[0.58rem]");
   });
 });

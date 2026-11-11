@@ -6,19 +6,12 @@ import {
   buyBitcallOtpActivation,
   isAmbiguousBitcallOutcome,
   isBitcallConfigured,
-  listBitcallOtpCountryEntries,
+  listBitcallOtpCountries,
   listBitcallOtpServices,
-  otpCountrySegmentFromId,
-  otpServiceLabelFromId,
 } from "@/lib/providers/bitcall";
-import { VERIFICATION_EXAMPLES } from "@/lib/services/service-explorer";
 import { buyFleexaSmsNumber, FleexaError, isFleexaConfigured, listFleexaSmsServices } from "@/lib/providers/fleexa";
 import { logger } from "@/lib/platform/logger";
-import {
-  supplierAmountToNgn,
-  supplierAmountWithRates,
-  supplierNgnRates,
-} from "@/lib/payments/supplier-currency";
+import { supplierAmountToNgn } from "@/lib/payments/supplier-currency";
 
 /**
  * Supplier catalog adapters for number verification.
@@ -63,31 +56,17 @@ export type BoughtNumber = {
 };
 
 /**
- * There is deliberately no wall-clock budget on a catalogue read.
+ * How long a catalogue read may take before it is treated as "nothing on offer".
  *
- * There used to be: four seconds for checkout, eight for browsing. Both were
- * shorter than the gateway's own per-request timeout (twenty seconds), so a slow
- * but working feed was reported as "nothing on offer" — the read was abandoned
- * for being late, and being late was never evidence about the catalogue. The
- * deadline only ever produced empty shops from impatience, and it is gone.
- *
- * The bound that remains is the network's: every gateway call carries its own
- * abort timeout, so a stalled read cannot hang forever, and it cannot be cut off
- * while it is still making progress.
+ * Bitcall's OTP feed can legitimately take longer than a few seconds when it is
+ * serving a wider publish set or a slow region. This budget is deliberately
+ * above the previous short value so a valid, slower read is not mistaken for a
+ * dead feed and a customer-facing verification list disappears.
  */
+const CATALOGUE_BUDGET_MS = 12_000;
 
 /** Catalogues are read-only, so a stale answer is safe for a short while. */
 const CATALOGUE_TTL_MS = 60_000;
-
-/**
- * How long a last-good read stays usable when a fresh one fails.
- *
- * Without this, one slow or failed read turned a working shop into an empty one:
- * the cached offers were already the right answer a second earlier, and a
- * read-only catalogue is not made wrong by being old. Bounded, so a feed that
- * has been down for an hour cannot keep advertising yesterday's stock.
- */
-const CATALOGUE_STALE_MS = 30 * 60_000;
 
 type CacheEntry = { at: number; offers: OtpOffer[]; };
 const catalogueCache = new Map<string, CacheEntry>();
@@ -195,21 +174,20 @@ function rankByCost(offers: OtpOffer[]): OtpOffer[] {
   );
 }
 
-/**
- * Reads one supplier's catalogue. Throws when it cannot be read.
- *
- * `fresh` is set by a checkout that is about to spend: it bypasses every cache
- * on this path, including the shared feed caches below, so the offer being
- * bought is priced from a live read rather than from a read another customer
- * happened to trigger.
- */
-async function fetchOffers(
-  supplier: OtpSupplierId,
-  country: string,
-  regionName: string,
-  fresh = false,
-): Promise<OtpOffer[]> {
-  return supplier === "fleexa" ? fleexaOffers(country, regionName) : bitcallOffers(country, regionName, fresh);
+/** Reject after `ms`, so a slow supplier cannot hold a purchase or a page. */
+function withBudget<T>(work: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`catalogue read exceeded ${ms}ms`)), ms);
+    work.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
+  });
+}
+
+/** Reads one supplier's catalogue. Throws when it cannot be read. */
+async function fetchOffers(supplier: OtpSupplierId, country: string, regionName: string): Promise<OtpOffer[]> {
+  return supplier === "fleexa" ? fleexaOffers(country, regionName) : bitcallOffers(country, regionName);
 }
 
 function mergeOtpOffer(existing: OtpOffer, next: OtpOffer): OtpOffer {
@@ -224,46 +202,6 @@ function mergeOtpOffer(existing: OtpOffer, next: OtpOffer): OtpOffer {
       existing.stock === null || next.stock === null ? null :
       existing.stock + next.stock,
   };
-}
-
-/**
- * The two Bitcall feeds behind a destination read, cached as they were read.
- *
- * A destination's offers come from the country catalogue plus — when that
- * country publishes no pools — the whole service catalogue. Both are global:
- * the same destinations and the same thousands of services answer every
- * country, and re-walking them per country and per request made first paint the
- * sum of ten round trips. Read once and shared, the cost is paid by the first
- * reader on an instance and nobody after them.
- *
- * Kept short because the pools inside carry stock counts, and skipped entirely
- * for a checkout (`fresh`), which must price what it is about to buy from a
- * live read.
- */
-const FEED_TTL_MS = 5 * 60_000;
-const feedCache = new Map<string, { at: number; value: unknown }>();
-const feedInFlight = new Map<string, Promise<unknown>>();
-
-async function cachedFeed<T>(key: string, fresh: boolean, read: () => Promise<T>): Promise<T> {
-  const cached = feedCache.get(key) as { at: number; value: T } | undefined;
-  if (!fresh && cached && Date.now() - cached.at < FEED_TTL_MS) return cached.value;
-
-  // One walk at a time per feed. Two customers opening the shop together used to
-  // start two walks of the same catalogue, and both waited for their own. A
-  // checkout that asks for a fresh read joins a walk already in flight rather
-  // than starting a duplicate: that read was started now, which is all `fresh`
-  // is asking for.
-  const inFlight = feedInFlight.get(key) as Promise<T> | undefined;
-  if (inFlight) return inFlight;
-
-  const pending = read().then((value) => {
-    feedCache.set(key, { at: Date.now(), value });
-    return value;
-  }).finally(() => {
-    feedInFlight.delete(key);
-  });
-  feedInFlight.set(key, pending);
-  return pending;
 }
 
 async function fleexaOffers(country: string, regionName: string): Promise<OtpOffer[]> {
@@ -288,204 +226,50 @@ async function fleexaOffers(country: string, regionName: string): Promise<OtpOff
   return [...offersByKey.values()];
 }
 
-/** The catalogue's own spelling where we recognize the brand, else a clean label. */
-function canonicalServiceName(raw: string): string {
-  const lower = raw.toLowerCase();
-  for (const entry of VERIFICATION_EXAMPLES) {
-    const brand = String(entry.brand);
-    if (!lower.startsWith(brand)) continue;
-    // Only a whole word counts: "threads" must not turn "threadsapp" into "Threads".
-    const next = lower.charAt(brand.length);
-    if (!next || /[\s/\-_,.+]/.test(next)) return entry.name;
-  }
-  return raw.replace(/(^|\s)([a-z])/g, (_match, space: string, letter: string) => `${space}${letter.toUpperCase()}`);
-}
-
-function serviceLabel(serviceId: string): string | null {
-  const raw = otpServiceLabelFromId(serviceId);
-  return raw ? canonicalServiceName(raw) : null;
-}
-
-/** A read slower than this is worth a line in the logs, with the stage that spent it. */
-const SLOW_READ_MS = 2_500;
-
-async function bitcallOffers(country: string, regionName: string, fresh = false): Promise<OtpOffer[]> {
+async function bitcallOffers(country: string, regionName: string): Promise<OtpOffer[]> {
   if (!isBitcallConfigured()) return [];
-  const startedAt = Date.now();
 
-  // Where an offer's destination is actually stated.
-  //
-  // `GET /v1/otp/services` names no country and accepts no country filter: its
-  // rows carry a name, a slug and pools, nothing else. The country catalogue
-  // does publish a `countryCode`, and its `pools[]` are the offers for that
-  // country. So the join below is the documented attribution — the previous
-  // shape, filtering service rows on a `countryCode` no service row has,
-  // discarded every offer for every destination. That is a catalogue which
-  // reads as empty while the key, the balance and the eSIM catalogue all work.
-  // The rate lookup is a second network call, so start it before the catalogue
-  // read instead of after it. Run in series, either call could consume the whole
-  // budget on its own — which is how a country's listing came back empty while
-  // the key, the balance and the catalogue were all fine.
-  void supplierNgnRates(["EUR"]).catch(() => undefined);
-
-  // Both feeds, started together.
-  //
-  // The service catalogue is only needed when this destination published no
-  // pools, and finding that out used to cost a serial round trip before the
-  // bigger read could even start. They do not depend on each other, so they go
-  // out at once; on the path that does not need the service catalogue, the read
-  // has still warmed a cache every other destination on this instance shares.
-  //
-  // The rejection is handled here rather than only at the await: on the pools
-  // path nothing consumes it, and an unobserved rejection is its own incident.
-  const countriesRead = cachedFeed("otp-countries", fresh, listBitcallOtpCountryEntries);
-  const servicesRead = cachedFeed("otp-services", fresh, () => listBitcallOtpServices({}));
-  servicesRead.catch(() => undefined);
-
-  const entries = await countriesRead;
-  const countriesMs = Date.now() - startedAt;
-  const mine = entries.filter((entry) => matchesCountry(entry.countryCode ?? entry.name, country, regionName));
-  const rows: PricedRow[] = [];
+  // Bitcall publishes opaque country codes (for example, US_1), which are not
+  // necessarily the ISO code we use in the storefront. Resolve the supplier's
+  // own values first, then filter with the tolerant ISO/region matcher; sending
+  // `US` directly can silently return an empty catalog when the provider expects
+  // its published code.
+  const providerCodes = await listBitcallOtpCountries();
+  const matchingCodes = [...new Set(providerCodes.filter((code) => matchesCountry(code, country, regionName)))];
+  const scopedServices = matchingCodes.length === 0
+    ? []
+    : (await Promise.all(
+        matchingCodes.map((countryCode) => listBitcallOtpServices({ countryCode })),
+      )).flat();
+  const scopedMatches = scopedServices.filter((service) => matchesCountry(service.countryCode, country, regionName));
+  // A country filter that returns nothing is not proof the country has no stock:
+  // providers sometimes publish region IDs but filter by a different canonical
+  // value. Retry the read-only catalog without a country filter and match only
+  // rows that identify this country. This stays on Bitcall and never purchases.
+  const services = scopedMatches.length > 0
+    ? scopedMatches
+    : (await listBitcallOtpServices()).filter((service) => matchesCountry(service.countryCode, country, regionName));
+  const offers: OtpOffer[] = [];
   const seen = new Set<string>();
-  let poolsSeen = 0;
-  for (const entry of mine) {
-    for (const pool of entry.pools) {
-      poolsSeen += 1;
-      if (!pool.serviceId || seen.has(pool.serviceId)) continue;
-      seen.add(pool.serviceId);
-      rows.push({
-        ref: pool.serviceId,
-        app: readableApp(serviceLabel(pool.serviceId)),
-        amount: pool.price,
-        currency: pool.currency,
-        stock: pool.availableCount,
-      });
-    }
-  }
-  const funnel = { entries: entries.length, matched: mine.length, pools: poolsSeen };
-  if (rows.length > 0) {
-    const priced = await priceRows(rows, country);
-    noteReadTime(country, startedAt, { countriesMs, servicesMs: null });
-    return reportEmptyRead(country, funnel, priced);
-  }
-
-  // A country entry can arrive without its inline pools: the field is documented
-  // but optional. The fallback used to filter service rows on `service.countryCode`
-  // — a field service rows do not carry — so it attributed nothing, for every
-  // destination, and said so only by returning an empty list. Attribution now
-  // comes from what the catalogue does publish:
-  //
-  //   1. a service row that states its own country, and
-  //   2. the destination segment of the offer's own published id
-  //      (`BRAVO-NG_1-whatsapp` is a Nigerian offer),
-  //
-  // and (2) only counts when the segment matches a code this destination itself
-  // published. A code it did not publish (Ghana's, on a Nigerian read) is not
-  // evidence, so coverage is never invented.
-  const ownCodes = new Set(
-    mine
-      .flatMap((entry) => [normalizeCountryCode(entry.countryCode), normalizeCountryCode(entry.name)])
-      .filter((code): code is string => code !== null),
-  );
-  const services = await servicesRead;
-  const servicesMs = Date.now() - startedAt - countriesMs;
   for (const service of services) {
-    const namesCountry = matchesCountry(service.countryCode, country, regionName);
+    // Do not trust that an upstream filter was honored: only attach a listing to
+    // this country when the response itself names a matching published region.
+    if (!matchesCountry(service.countryCode, country, regionName)) continue;
     const app = readableApp(service.name);
     for (const entry of service.offers) {
       if (!entry.serviceId || seen.has(entry.serviceId)) continue;
-      const segment = normalizeCountryCode(otpCountrySegmentFromId(entry.serviceId));
-      if (!namesCountry && !(segment !== null && ownCodes.has(segment))) continue;
       seen.add(entry.serviceId);
-      rows.push({
+      offers.push({
+        supplier: "bitcall",
         ref: entry.serviceId,
+        country,
         app,
-        amount: entry.price,
-        currency: entry.currency,
+        costNgn: await supplierAmountToNgn(entry.price, entry.currency),
         stock: entry.availableCount,
       });
     }
   }
-  const priced = await priceRows(rows, country);
-  noteReadTime(country, startedAt, { countriesMs, servicesMs });
-  return reportEmptyRead(country, funnel, priced);
-}
-
-/**
- * How long a destination's read took, and which feed spent it.
- *
- * This is the number the shop's first paint is made of, and it is deliberately
- * not a budget: a slow read is still a read, and nothing here shortens one. It
- * exists so "the page takes ages" has an answer in the logs — the gateways are
- * on another continent and each feed is a paginated walk, so which stage is
- * slow decides whether the fix is paging, caching or the feed itself.
- */
-function noteReadTime(
-  country: string,
-  startedAt: number,
-  stages: { countriesMs: number; servicesMs: number | null },
-): void {
-  const ms = Date.now() - startedAt;
-  if (ms < SLOW_READ_MS) return;
-  logger.warn("Bitcall OTP catalogue read was slow", {
-    country,
-    ms,
-    countriesMs: stages.countriesMs,
-    servicesMs: stages.servicesMs,
-  });
-}
-
-/**
- * A read that succeeds and yields nothing is the one failure mode with no
- * evidence: no error, no exception, just a country with no numbers on it. The
- * funnel counters say which stage emptied it — nothing published for the
- * destination, no pools, no usable price, or rows that were dropped later for
- * want of a label — because those have entirely different fixes.
- */
-function reportEmptyRead(
-  country: string,
-  funnel: { entries: number; matched: number; pools: number },
-  offers: OtpOffer[],
-): OtpOffer[] {
-  if (offers.length > 0 && offers.some((offer) => offer.costNgn !== null)) return offers;
-  logger.warn("Bitcall OTP catalogue produced no sellable offer", {
-    country,
-    entries: funnel.entries,
-    matched: funnel.matched,
-    pools: funnel.pools,
-    offers: offers.length,
-    priced: offers.filter((offer) => offer.costNgn !== null).length,
-    labelled: offers.filter((offer) => offer.app !== null).length,
-  });
   return offers;
-}
-
-/** One offer's attributes, before its supplier price has been converted. */
-type PricedRow = {
-  ref: string;
-  app: string | null;
-  amount: number | null;
-  currency: string | null;
-  stock: number | null;
-};
-
-/**
- * Convert a whole destination's rows in one pass.
- *
- * The distinct currencies are resolved concurrently — in practice that is the
- * single EUR lookup — and the conversion is then synchronous, so a country with
- * hundreds of pools costs one rate read rather than one per pool.
- */
-async function priceRows(rows: PricedRow[], country: string): Promise<OtpOffer[]> {
-  const rates = await supplierNgnRates(rows.map((row) => row.currency));
-  return rows.map((row) => ({
-    supplier: "bitcall" as const,
-    ref: row.ref,
-    country,
-    app: row.app,
-    costNgn: supplierAmountWithRates(row.amount, row.currency, rates),
-    stock: row.stock,
-  }));
 }
 
 /**
@@ -498,12 +282,12 @@ async function priceRows(rows: PricedRow[], country: string): Promise<OtpOffer[]
 export async function otpOffersFor(
   country: string,
   regionName: string,
-  options: { app?: string | null } = {},
+  options: { app?: string | null; budgetMs?: number } = {},
 ): Promise<OtpOffer[]> {
   const [all, wanted] = [
     await Promise.all(
       OTP_SUPPLIERS.map((supplier) =>
-        otpOffersForSupplier(supplier, country, regionName)),
+        otpOffersForSupplier(supplier, country, regionName, options.budgetMs ?? CATALOGUE_BUDGET_MS)),
     ),
     options.app?.trim().toLowerCase() || null,
   ] as const;
@@ -514,8 +298,6 @@ export async function otpOffersFor(
 /** Forget cached catalogues. Exported so a test can prove a fresh read happens. */
 export function clearOtpCatalogueCache(): void {
   catalogueCache.clear();
-  feedCache.clear();
-  feedInFlight.clear();
 }
 
 /**
@@ -526,22 +308,13 @@ export function clearOtpCatalogueCache(): void {
 export type OtpOfferRead = {
   offers: OtpOffer[];
   errorCode: string | null;
-  /**
-   * True when the offers came from the last good read rather than this request.
-   * They are still real offers for this country — just older than the TTL.
-   */
-  stale: boolean;
+  partial?: boolean;
+  degraded?: "funding" | "outage" | null;
 };
 
-/**
- * A stable opaque id for a live listing; the provider's service reference stays
- * server-side.
- *
- * An offer whose id names no app still has an id: the app is part of the hash as
- * an empty string, so an unlabelled offer is addressable instead of invisible.
- */
-export function otpOfferPublicId(country: string, ref: string, app: string | null): string {
-  return `otp-${createHash("sha256").update(`${country.toLowerCase()}\0${ref}\0${app ?? ""}`).digest("hex").slice(0, 24)}`;
+/** A stable opaque id for a live listing; the provider's service reference stays server-side. */
+export function otpOfferPublicId(country: string, ref: string, app: string): string {
+  return `otp-${createHash("sha256").update(`${country.toLowerCase()}\0${ref}\0${app}`).digest("hex").slice(0, 24)}`;
 }
 
 /** Read one supplier's offers while preserving a safe error code for storefront status. */
@@ -549,34 +322,35 @@ export async function readOtpOffersForSupplier(
   supplier: OtpSupplierId,
   country: string,
   regionName: string,
+  budgetMs: number = CATALOGUE_BUDGET_MS,
   refresh = false,
 ): Promise<OtpOfferRead> {
-  if (!otpSupplierConfigured(supplier)) return { offers: [], errorCode: "NOT_CONFIGURED", stale: false };
+  if (!otpSupplierConfigured(supplier)) return { offers: [], errorCode: "NOT_CONFIGURED" };
 
   const key = `${supplier}:${country}`;
   const cached = catalogueCache.get(key);
-  if (!refresh && cached && Date.now() - cached.at < CATALOGUE_TTL_MS) {
-    return { offers: cached.offers, errorCode: null, stale: false };
-  }
+  if (!refresh && cached && Date.now() - cached.at < CATALOGUE_TTL_MS) return { offers: cached.offers, errorCode: null, partial: false, degraded: null };
 
   try {
-    const offers = rankWithinSupplier(await fetchOffers(supplier, country, regionName, refresh));
+    const offers = rankWithinSupplier(await withBudget(fetchOffers(supplier, country, regionName), budgetMs));
     catalogueCache.set(key, { at: Date.now(), offers });
-    return { offers, errorCode: null, stale: false };
+    return { offers, errorCode: null, partial: false, degraded: null };
   } catch (error) {
-    const ageMs = cached ? Date.now() - cached.at : null;
-    const message = error instanceof Error ? error.message : String(error);
-
-    // Only browsing may fall back to the last good read. `refresh` is what a
-    // checkout passes when it is about to spend, and there an old answer must
-    // never stand in for a live one: refusing is the honest outcome.
-    if (!refresh && cached && ageMs !== null && ageMs <= CATALOGUE_STALE_MS) {
-      logger.warn("Serving the last good catalogue read", { supplier, ageMs, error: message });
-      return { offers: cached.offers, errorCode: null, stale: true };
+    const stale = cached && Date.now() - cached.at < CATALOGUE_TTL_MS * 3 ? cached.offers : null;
+    if (stale && stale.length > 0) {
+      logger.warn("Using stale number catalogue after a transient outage", {
+        supplier,
+        country,
+        staleOffers: stale.length,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { offers: stale, errorCode: null, partial: true, degraded: "outage" };
     }
-
-    logger.warn("Number catalogue unavailable", { supplier, error: message });
-    return { offers: [], errorCode: errorCodeOf(error), stale: false };
+    logger.warn("Number catalogue unavailable", {
+      supplier,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { offers: [], errorCode: errorCodeOf(error), partial: false, degraded: "outage" };
   }
 }
 
@@ -584,9 +358,9 @@ export async function otpOffersForSupplier(
   supplier: OtpSupplierId,
   country: string,
   regionName: string,
-  refresh = false,
+  budgetMs: number = CATALOGUE_BUDGET_MS,
 ): Promise<OtpOffer[]> {
-  return (await readOtpOffersForSupplier(supplier, country, regionName, refresh)).offers;
+  return (await readOtpOffersForSupplier(supplier, country, regionName, budgetMs)).offers;
 }
 
 /**
@@ -601,8 +375,7 @@ export async function otpSupplierProbe(
 ): Promise<{ offers: OtpOffer[]; errorCode: string | null }> {
   if (!otpSupplierConfigured(supplier)) return { offers: [], errorCode: "NOT_CONFIGURED" };
   try {
-    // A probe is a live look at one supplier by an operator, so it reads fresh.
-    return { offers: rankWithinSupplier(await fetchOffers(supplier, country, regionName, true)), errorCode: null };
+    return { offers: rankWithinSupplier(await fetchOffers(supplier, country, regionName)), errorCode: null };
   } catch (error) {
     return { offers: [], errorCode: errorCodeOf(error) };
   }
@@ -619,7 +392,7 @@ function errorCodeOf(error: unknown): string {
 }
 
 /** Buy one offer. Every call here spends real supplier balance. */
-export async function buyOtpNumber(offer: OtpOffer, onAccepted?: (providerRequestId: string) => Promise<void>): Promise<BoughtNumber> {
+export async function buyOtpNumber(offer: OtpOffer): Promise<BoughtNumber> {
   if (offer.supplier === "fleexa") {
     const order = await buyFleexaSmsNumber({
       // Pass the app when the catalogue named one: it is the difference between
@@ -627,7 +400,6 @@ export async function buyOtpNumber(offer: OtpOffer, onAccepted?: (providerReques
       app: offer.app ?? undefined,
       country: offer.country,
     });
-    if (order.requestId) await onAccepted?.(order.requestId);
     return {
       supplier: "fleexa",
       providerCostNgn: order.priceNgn ?? offer.costNgn,
@@ -639,21 +411,9 @@ export async function buyOtpNumber(offer: OtpOffer, onAccepted?: (providerReques
   }
 
   const activation = await buyBitcallOtpActivation(offer.ref);
-  // Persist the accepted reference before any subsequent conversion can fail.
-  if (activation.activationId) await onAccepted?.(activation.activationId);
-  // Once the activation was accepted, failures during conversion are ambiguous
-  // regardless of their original error type: the paid call already succeeded.
-  let costNgn = offer.costNgn;
-  if (activation.price !== null) {
-    try {
-      costNgn = await supplierAmountToNgn(activation.price, activation.currency);
-    } catch {
-      throw new Error("Could not calculate the cost of an accepted activation");
-    }
-  }
   return {
     supplier: "bitcall",
-    providerCostNgn: costNgn,
+    providerCostNgn: activation.price !== null ? await supplierAmountToNgn(activation.price, activation.currency) : offer.costNgn,
     providerRequestId: activation.activationId,
     number: activation.phoneNumber,
     app: offer.app,
@@ -666,15 +426,17 @@ export async function buyOtpNumber(offer: OtpOffer, onAccepted?: (providerReques
 /**
  * Did this failure possibly buy a number?
  *
- * Answering "yes" (or "don't know") means reconciliation is required. A
- * definitive refusal means no activation was created, but the checkout still
- * does not automatically try another offer. Unrecognised failures are ambiguous.
+ * Answering "yes" (or "don't know") ends the search. Answering "no" — the two
+ * "not executed" codes — lets the caller try the next supplier. Anything
+ * unrecognised is treated as ambiguous: the cost of one failed order is a
+ * retry, and the cost of a wrong retry is two numbers for one customer.
  */
 export function isAmbiguousOtpPurchase(error: unknown): boolean {
   if (error instanceof FleexaError) {
-    // Local preflight errors or an explicitly classified provider refusal.
-    // OTP_PROVIDER_REFUSED is raised only after a definitive non-execution.
-    return !["NO_API_KEY", "INVALID_BASE_URL", "RATE_LIMIT_UNAVAILABLE", "RATE_LIMITED", "OTP_PROVIDER_REFUSED"].includes(error.code ?? "");
+    // Raised before any request left this process, so nothing can have been
+    // bought: no key, no usable base URL, budget already spent, or a plan the
+    // provider refused outright.
+    return !["NO_API_KEY", "INVALID_BASE_URL", "RATE_LIMIT_UNAVAILABLE", "RATE_LIMITED"].includes(error.code ?? "");
   }
   if (error instanceof Error && error.name === "BitcallError") return isAmbiguousBitcallOutcome(error);
   // A thrown non-provider value is a bug, not a receipt: assume the worst.

@@ -4,6 +4,7 @@ import StatusPage from "@/app/(site)/status/page";
 const auth = vi.hoisted(() => ({ current: vi.fn() }));
 vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: auth.current }));
 import { GET as dataPlans } from "@/app/api/airtime/plans/route";
+import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -33,5 +34,12 @@ describe("unavailable services", () => {
     const html = renderToStaticMarkup(<StatusPage />);
     expect(html).toContain("Gift-card purchases and redemption are unavailable in this environment.");
     expect(html).not.toContain("plans have a configured ordering path");
+  });
+
+  it("allows a local override to keep live service listings visible in preview mode", () => {
+    vi.stubEnv("DATABASE_URL", "postgres://mock.invalid/db");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("FORCE_LIVE_LISTINGS", "1");
+    expect(financialActionsUnavailable()).toBe(false);
   });
 });

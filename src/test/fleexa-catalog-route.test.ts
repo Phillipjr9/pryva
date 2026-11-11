@@ -165,6 +165,16 @@ describe("supplier catalog endpoint", () => {
     expect(body).toMatchObject({ ok: true, live: true, partial: false, items: [SIGNAL] });
   });
 
+  it("times out a slow supplier instead of stalling the whole catalog", async () => {
+    state.snapshot.mockImplementation(() => new Promise(() => {}));
+    const response = await Promise.race([
+      GET(request()),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("catalog route hung")), 1_500)),
+    ]);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: "The live catalog is temporarily unavailable", reason: "unavailable" });
+  });
+
   it("serves boosting listings on their own when no other supplier is configured", async () => {
     state.fleexaConfigured = false; state.boostConfigured = true;
     const response = await GET(request());

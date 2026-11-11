@@ -870,7 +870,7 @@ function parseOtpOffer(row: unknown): BitcallOtpOffer | null {
   };
 }
 
-function parseOtpService(row: unknown): BitcallOtpService {
+function parseOtpService(row: unknown, fallbackCountryCode?: string): BitcallOtpService {
   const service = asRecord(row);
   const pools = Array.isArray(service.pools) ? service.pools : [];
   const offers: BitcallOtpOffer[] = [];
@@ -881,10 +881,21 @@ function parseOtpService(row: unknown): BitcallOtpService {
     seen.add(offer.serviceId);
     offers.push(offer);
   }
+  const countryCode = pickString(service, ["country_code", "countryCode", "country"]) ?? fallbackCountryCode ?? (() => {
+    const byId = pickString(service, ["serviceId", "service_id", "id"]);
+    if (!byId) return null;
+    const segments = byId.split("-").filter(Boolean);
+    return segments.length >= 3 ? segments[1] ?? null : null;
+  })() ?? (() => {
+    const slug = pickString(service, ["slug", "serviceSlug"]);
+    if (!slug) return null;
+    const segments = slug.split("-").filter(Boolean);
+    return segments.length >= 2 ? segments[0] ?? null : null;
+  })();
   return {
     name: pickString(service, ["name", "title", "serviceName"]),
     slug: pickString(service, ["slug", "serviceSlug"]),
-    countryCode: pickString(service, ["country_code", "countryCode", "country"]),
+    countryCode,
     offers,
   };
 }
@@ -1038,15 +1049,15 @@ async function readAllOtpPages(path: string, pageSize: number, query?: Record<st
  * get their names, never their destinations — see `listBitcallOtpCountryEntries`.
  */
 export async function listBitcallOtpServices(
-  filter: { q?: string; pageSize?: number } = {},
+  filter: { q?: string; pageSize?: number; countryCode?: string } = {},
 ): Promise<BitcallOtpService[]> {
-  const pages = await readAllOtpPages("/v1/otp/services", filter.pageSize ?? OTP_PAGE_SIZE, { q: filter.q });
+  const pages = await readAllOtpPages("/v1/otp/services", filter.pageSize ?? OTP_PAGE_SIZE, { q: filter.q, ...(filter.countryCode ? { countryCode: filter.countryCode } : {}) });
   const services: BitcallOtpService[] = [];
   for (const entry of pages) {
     // A page that failed is not a page that said "no more services": the read
     // throws rather than returning the pages before it as the whole catalogue.
     if (entry.error !== null) throw entry.error;
-    services.push(...rowsFrom(entry.payload).map(parseOtpService).filter((service) => service.offers.length > 0));
+    services.push(...rowsFrom(entry.payload).map((row) => parseOtpService(row, filter.countryCode)).filter((service) => service.offers.length > 0));
   }
   return services;
 }

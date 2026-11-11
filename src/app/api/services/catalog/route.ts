@@ -6,7 +6,7 @@ import { readSupplierSnapshot, supplierItemsForCountry } from "@/lib/services/nu
 import { isSmmPanelConfigured } from "@/lib/providers/smm-panel";
 import { boostItems, readBoostSnapshot } from "@/lib/services/boosts/smm-catalog";
 import { isBitcallConfigured } from "@/lib/providers/bitcall";
-import { ESIM_CATALOGUE_LIMIT, esimItemsForAllDestinations, esimItemsForCountry, readEsimCatalog } from "@/lib/services/esim/esim-catalog";
+import { esimItemsForAllDestinations, esimItemsForCountry, ESIM_CATALOGUE_LIMIT, readEsimCatalog } from "@/lib/services/esim/esim-catalog";
 import { explorerCountry } from "@/lib/services/service-explorer";
 import { catalogRateLimiter } from "@/lib/platform/rate-limit";
 import { isFundingFailure } from "@/lib/providers/types";
@@ -27,10 +27,26 @@ export const maxDuration = 30;
  */
 type Source<T> = { configured: boolean; snapshot: T | null; failure: "funding" | "outage" | null };
 
+const SUPPLIER_READ_TIMEOUT_MS = 1_200;
+
+async function withReadTimeout<T>(read: () => Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      read(),
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Supplier read timed out after ${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function attempt<T>(configured: boolean, read: () => Promise<T>): Promise<Source<T>> {
   if (!configured) return { configured: false, snapshot: null, failure: null };
   try {
-    return { configured: true, snapshot: await read(), failure: null };
+    return { configured: true, snapshot: await withReadTimeout(read, SUPPLIER_READ_TIMEOUT_MS), failure: null };
   } catch (error) {
     return { configured: true, snapshot: null, failure: isFundingFailure(error) ? "funding" : "outage" };
   }
@@ -52,6 +68,16 @@ export async function GET(request: NextRequest) {
   const country = explorerCountry(request.nextUrl.searchParams.get("country"));
   if (!country) return NextResponse.json({ error: "Choose a valid country" }, { status: 400 });
 
+  const requestedFeed = request.nextUrl.searchParams.get("feed");
+  const allDestinations = request.nextUrl.searchParams.get("allDestinations") === "1";
+  const validFeeds = ["esim", "numbers", "social", "verification"] as const;
+  if (requestedFeed && !(validFeeds as readonly string[]).includes(requestedFeed)) {
+    return NextResponse.json({ error: "Choose a valid feed" }, { status: 400 });
+  }
+  if (allDestinations && requestedFeed !== "esim") {
+    return NextResponse.json({ error: "All destinations is supported only for eSIM" }, { status: 400 });
+  }
+
   /**
    * "This deployment does not show live availability" is not a failure.
    *
@@ -68,36 +94,45 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // A combined request costs one read from every feed. Scope the same 30/min
-  // budget per feed so the four independent calls do not quadruple a normal
-  // browsing session's rate-limit usage or increase per-feed upstream load.
-  const feed = request.nextUrl.searchParams.get("feed");
-  const validFeeds = ["numbers", "social", "esim", "verification"];
-  if (feed !== null && !validFeeds.includes(feed)) return NextResponse.json({ error: "Invalid catalogue feed" }, { status: 400 });
-  const allDestinationsParam = request.nextUrl.searchParams.get("allDestinations");
-  if (allDestinationsParam !== null && (allDestinationsParam !== "1" || feed !== "esim")) return NextResponse.json({ error: "Invalid catalogue scope" }, { status: 400 });
-  const allDestinations = allDestinationsParam === "1";
-  const limits = await Promise.all((feed ? [feed] : validFeeds).map((name) => catalogRateLimiter(`supplier-catalog:${user.id}:${name}`)));
-  if (limits.some((limit) => limit.unavailable)) {
+  const requestedFeeds = requestedFeed ? [requestedFeed] : [...validFeeds];
+  const feedBudgetKeys = [...requestedFeeds].sort().map((feed) => `supplier-catalog:${user.id}:${feed}`);
+  const limits = await Promise.all(feedBudgetKeys.map((key) => catalogRateLimiter(key)));
+  const unavailable = limits.find((limit) => limit.unavailable);
+  if (unavailable) {
     return NextResponse.json({ error: "Catalog temporarily unavailable", reason: "unavailable" }, { status: 503 });
   }
-  if (limits.some((limit) => !limit.allowed)) return NextResponse.json({ error: "Please try again shortly", reason: "throttled" }, { status: 429 });
+  const throttled = limits.find((limit) => !limit.allowed);
+  if (throttled) return NextResponse.json({ error: "Please try again shortly", reason: "throttled" }, { status: 429 });
 
   const refresh = request.nextUrl.searchParams.get("refresh") === "1";
-  // The optional public category lets the explorer load independent feeds
-  // separately. Keep the original combined response for existing callers.
-  const include = (name: string) => feed === null || feed === name;
-  const [supplier, boost, esim, otp] = await Promise.all([
-    attempt(include("numbers") && isFleexaConfigured(), () => readSupplierSnapshot(refresh)),
-    attempt(include("social") && isSmmPanelConfigured(), () => readBoostSnapshot(refresh)),
-    attempt(include("esim") && isBitcallConfigured(), () => readEsimCatalog(refresh)),
-    attempt(include("verification") && isBitcallConfigured(), async () => {
-      const read = await readOtpOffersForSupplier("bitcall", country.code, country.name, refresh);
-      if (read.errorCode) throw otpCatalogProviderError(read.errorCode);
-      return { offers: read.offers, partial: read.stale, degraded: read.stale ? "outage" as const : null, fetchedAt: read.stale ? null : new Date().toISOString() };
-    }),
-  ]);
-  const sources = [supplier, boost, esim, otp];
+  const readSocial = () => attempt(isFleexaConfigured(), () => readSupplierSnapshot(refresh));
+  const readBoost = () => attempt(isSmmPanelConfigured(), () => readBoostSnapshot(refresh));
+  const readEsim = () => attempt(isBitcallConfigured(), () => readEsimCatalog(refresh));
+  const readOtp = () => attempt(isBitcallConfigured(), async () => {
+    const read = await readOtpOffersForSupplier("bitcall", country.code, country.name, refresh);
+    if (read.errorCode && read.offers.length === 0) throw otpCatalogProviderError(read.errorCode);
+    return { offers: read.offers, partial: read.partial ?? false, degraded: read.degraded ?? null, fetchedAt: new Date().toISOString() };
+  });
+
+  let supplier: Source<Awaited<ReturnType<typeof readSupplierSnapshot>>> | null = null;
+  let boost: Source<Awaited<ReturnType<typeof readBoostSnapshot>>> | null = null;
+  let esim: Source<Awaited<ReturnType<typeof readEsimCatalog>>> | null = null;
+  let otp: Source<{ offers: Awaited<ReturnType<typeof readOtpOffersForSupplier>>["offers"]; partial: boolean; degraded: "funding" | "outage" | null; fetchedAt: string; }> | null = null;
+
+  if (!requestedFeed) {
+    supplier = await readSocial();
+  }
+  if (!requestedFeed || requestedFeed === "social") {
+    boost = await readBoost();
+  }
+  if (!requestedFeed || requestedFeed === "esim") {
+    esim = await readEsim();
+  }
+  if (!requestedFeed || requestedFeed === "numbers" || requestedFeed === "verification") {
+    otp = await readOtp();
+  }
+
+  const sources = [supplier, boost, esim, otp].filter((source): source is NonNullable<typeof source> => source !== null);
 
   /**
    * No supplier connected is the steady state of a fresh deployment, not an
@@ -133,11 +168,32 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  if (allDestinations && requestedFeed === "esim") {
+    const items = esim.snapshot ? esimItemsForAllDestinations(esim.snapshot.listings) : [];
+    const unreadable = Boolean(esim.snapshot && esim.snapshot.stats && esim.snapshot.stats.returned > 0 && esim.snapshot.listings.length === 0);
+    const truncated = Boolean(esim.snapshot && esim.snapshot.listings.length > ESIM_CATALOGUE_LIMIT);
+    const partial = unreadable || truncated || Boolean(esim.snapshot?.partial);
+    return NextResponse.json(
+      {
+        ok: true,
+        country: country.code,
+        live: true,
+        reason: partial ? "partial" : null,
+        partial,
+        truncated,
+        unreadable,
+        fetchedAt: esim.snapshot?.fetchedAt ?? null,
+        items,
+      },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
+
   const items = [
-    ...(supplier.snapshot ? supplierItemsForCountry(supplier.snapshot, country.code) : []),
-    ...(otp.snapshot ? bitcallOtpItemsForCountry(otp.snapshot.offers, country.code, country.name) : []),
-    ...(esim.snapshot ? allDestinations ? esimItemsForAllDestinations(esim.snapshot.listings) : esimItemsForCountry(esim.snapshot.listings, country.code) : []),
-    ...(boost.snapshot ? boostItems(boost.snapshot) : []),
+    ...(supplier?.snapshot ? supplierItemsForCountry(supplier.snapshot, country.code) : []),
+    ...(otp?.snapshot ? bitcallOtpItemsForCountry(otp.snapshot.offers, country.code, country.name) : []),
+    ...(esim?.snapshot ? esimItemsForCountry(esim.snapshot.listings, country.code) : []),
+    ...(boost?.snapshot ? boostItems(boost.snapshot) : []),
   ];
   // Partial means "this may be incomplete": a configured source that failed, or
   // one that reported its own degraded read. A source that is simply not
@@ -148,11 +204,9 @@ export async function GET(request: NextRequest) {
     if (!source.snapshot) gaps.push(source.failure ?? "outage");
     else if (source.snapshot.partial) gaps.push(source.snapshot.degraded ?? "outage");
   }
-  const truncated = allDestinations && !!esim.snapshot && esim.snapshot.listings.length > ESIM_CATALOGUE_LIMIT;
-  const unreadable = allDestinations && !!esim.snapshot && esim.snapshot.listings.length === 0 && (esim.snapshot.stats?.returned ?? 0) > 0;
-  const partial = gaps.length > 0 || truncated || unreadable;
-  // Incomplete solely because of funding is not retryable.
-  const fundingGap = !truncated && !unreadable && gaps.length > 0 && gaps.every((gap) => gap === "funding");
+  const partial = gaps.length > 0;
+  // Incomplete, and every gap is a funding gap: still not retryable.
+  const fundingGap = partial && gaps.every((gap) => gap === "funding");
   const fetchedAt = sources
     .map((source) => source.snapshot?.fetchedAt)
     .filter((value): value is string => typeof value === "string" && Number.isFinite(Date.parse(value)))
@@ -160,7 +214,7 @@ export async function GET(request: NextRequest) {
     .pop() ?? null;
 
   return NextResponse.json(
-    { ok: true, country: country.code, live: true, reason: fundingGap ? "funding" : partial ? "partial" : null, partial, ...(truncated ? { truncated: true } : {}), ...(unreadable ? { unreadable: true } : {}), fetchedAt, items },
+    { ok: true, country: country.code, live: true, reason: fundingGap ? "funding" : partial ? "partial" : null, partial, fetchedAt, items },
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }

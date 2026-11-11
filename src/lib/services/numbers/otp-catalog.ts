@@ -80,7 +80,7 @@ export function bitcallOtpItemsForCountry(
         name: label,
         description: plan
           ? "Live app-specific number offer"
-          : "Live stock listing · checkout is not enabled for this country",
+          : "Live stock listing · purchasing is locked for this country",
         tag: brand?.tag ?? "Other",
         artwork: brand ? { kind: "brand", name: brand.brand } : verificationArtwork(label),
         source: "live",

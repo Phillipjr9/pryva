@@ -29,26 +29,33 @@ export async function readSupplierSnapshot(refresh = false): Promise<SupplierSna
   if (!refresh && cache && cache.expires > Date.now()) return cache.snapshot;
   if (inFlight) return inFlight;
   inFlight = (async () => {
-    const [email, rentals] = await Promise.allSettled([listFleexaEmailProducts(), listFleexaRentAreas()]);
-    const results = [email, rentals];
-    const failures = results.filter((result) => result.status === "rejected");
-    // An unfunded account is not an outage: preserve the refusal's own class so
-    // the hub can say "restocking" instead of offering a Retry that cannot work.
-    if (failures.length === results.length) {
-      if (failures.every((failure) => isFundingFailure(failure.reason))) throw failures[0].reason;
-      throw new Error("Supplier catalog unavailable");
+    try {
+      const [email, rentals] = await Promise.allSettled([listFleexaEmailProducts(), listFleexaRentAreas()]);
+      const results = [email, rentals];
+      const failures = results.filter((result) => result.status === "rejected");
+      // An unfunded account is not an outage: preserve the refusal's own class so
+      // the hub can say "restocking" instead of offering a Retry that cannot work.
+      if (failures.length === results.length) {
+        if (failures.every((failure) => isFundingFailure(failure.reason))) throw failures[0].reason;
+        throw new Error("Supplier catalog unavailable");
+      }
+      const snapshot: SupplierSnapshot = {
+        email: email.status === "fulfilled" ? email.value.slice(0, 2000) : [],
+        rentals: rentals.status === "fulfilled" ? rentals.value.slice(0, 2000) : [],
+        partial: failures.length > 0,
+        degraded: failures.length === 0 ? null : failures.every((failure) => isFundingFailure(failure.reason)) ? "funding" : "outage",
+        fetchedAt: new Date().toISOString(),
+      };
+      cache = { snapshot, expires: Date.now() + 30_000 };
+      return snapshot;
+    } catch (error) {
+      if (cache && Date.now() - cache.expires < 5 * 60_000) {
+        const stale = { ...cache.snapshot, partial: true, degraded: "outage" as const };
+        cache = { snapshot: stale, expires: Date.now() + 30_000 };
+        return stale;
+      }
+      throw error;
     }
-    const snapshot: SupplierSnapshot = {
-      // Provider responses are already byte-bounded; don't silently discard
-      // valid listings beyond an arbitrary second per-feed limit.
-      email: email.status === "fulfilled" ? email.value : [],
-      rentals: rentals.status === "fulfilled" ? rentals.value : [],
-      partial: failures.length > 0,
-      degraded: failures.length === 0 ? null : failures.every((failure) => isFundingFailure(failure.reason)) ? "funding" : "outage",
-      fetchedAt: new Date().toISOString(),
-    };
-    cache = { snapshot, expires: Date.now() + 30_000 };
-    return snapshot;
   })();
   try { return await inFlight; } finally { inFlight = null; }
 }

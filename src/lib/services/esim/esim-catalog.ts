@@ -107,63 +107,47 @@ type EsimSnapshot = {
 };
 
 const CATALOG_TTL_MS = 2 * 60_000;
-/**
- * How long the last whole snapshot may stand in for a read our own budget cut
- * short. A cap we imposed says nothing about how many plans exist, so it must
- * never become a shorter catalogue — but it also must not be served forever.
- */
-const SNAPSHOT_FALLBACK_MS = 30 * 60_000;
-/** After a cut-short read, wait this long before walking the feed again. */
-const SNAPSHOT_RETRY_MS = 15_000;
-
 let snapshotCache: { expires: number; snapshot: EsimSnapshot } | null = null;
-/** The last snapshot that read whole, kept for the budget-truncation case above. */
-let lastWholeSnapshot: { at: number; snapshot: EsimSnapshot } | null = null;
 let snapshotInFlight: Promise<EsimSnapshot> | null = null;
 let catalogCache: { expires: number; catalog: EsimCatalog } | null = null;
 let catalogInFlight: Promise<EsimCatalog> | null = null;
 
-/** A short-lived, process-local read cache; the eSIM catalogue cap is shared across instances. */
+/** A short-lived, process-local read cache; the shared gateway budget still protects the credential across instances. */
 async function readEsimSnapshot(refresh = false): Promise<EsimSnapshot> {
   if (!isBitcallConfigured()) throw new Error("eSIM provider not configured");
   if (!refresh && snapshotCache && snapshotCache.expires > Date.now()) return snapshotCache.snapshot;
   if (snapshotInFlight) return snapshotInFlight;
   snapshotInFlight = (async () => {
-    const [plans, countries] = await Promise.allSettled([listBitcallEsimPlans(), listBitcallEsimCountries()]);
-    // The plan catalog is the product; without it there is nothing to show.
-    // The country list only annotates coverage, so it degrades instead.
-    // Keep an unfunded-account refusal intact: it is not an outage.
-    if (plans.status === "rejected") {
-      if (isFundingFailure(plans.reason)) throw plans.reason;
-      throw new Error("eSIM catalog unavailable");
-    }
-    // A walk cut short by our own catalogue cap is not a smaller catalogue. The
-    // plans it did read are real, but publishing them as the whole list is how a
-    // cap turns into a storefront that quietly offers fewer products.
-    if (plans.value.partialReason === "budget") {
-      const age = lastWholeSnapshot ? Date.now() - lastWholeSnapshot.at : null;
-      if (lastWholeSnapshot && age !== null && age <= SNAPSHOT_FALLBACK_MS) {
-        logger.warn("Serving the last whole eSIM snapshot", { ageMs: age, reason: "budget" });
-        // Short hold, not a full TTL: the next attempt should walk the feed again.
-        snapshotCache = { snapshot: lastWholeSnapshot.snapshot, expires: Date.now() + SNAPSHOT_RETRY_MS };
-        return lastWholeSnapshot.snapshot;
+    try {
+      const [plans, countries] = await Promise.allSettled([listBitcallEsimPlans(), listBitcallEsimCountries()]);
+      // The plan catalog is the product; without it there is nothing to show.
+      // The country list only annotates coverage, so it degrades instead.
+      // Keep an unfunded-account refusal intact: it is not an outage.
+      if (plans.status === "rejected") {
+        if (isFundingFailure(plans.reason)) throw plans.reason;
+        throw new Error("eSIM catalog unavailable");
       }
+      const snapshot: EsimSnapshot = {
+        plans: plans.value.plans,
+        countries: countries.status === "fulfilled" ? countries.value.slice(0, 400) : [],
+        returned: plans.value.returned,
+        unreadable: plans.value.unreadable,
+        partial: plans.value.partial || countries.status === "rejected",
+        degraded: countries.status === "fulfilled" && !plans.value.partial
+          ? null
+          : countries.status === "rejected" && isFundingFailure(countries.reason) ? "funding" : "outage",
+        fetchedAt: new Date().toISOString(),
+      };
+      snapshotCache = { snapshot, expires: Date.now() + CATALOG_TTL_MS };
+      return snapshot;
+    } catch (error) {
+      if (snapshotCache && Date.now() - snapshotCache.expires < 5 * 60_000) {
+        const stale = { ...snapshotCache.snapshot, partial: true, degraded: "outage" as const, fetchedAt: snapshotCache.snapshot.fetchedAt };
+        snapshotCache = { snapshot: stale, expires: Date.now() + CATALOG_TTL_MS };
+        return stale;
+      }
+      throw error;
     }
-
-    const snapshot: EsimSnapshot = {
-      plans: plans.value.plans,
-      countries: countries.status === "fulfilled" ? countries.value : [],
-      returned: plans.value.returned,
-      unreadable: plans.value.unreadable,
-      partial: plans.value.partial || countries.status === "rejected",
-      degraded: countries.status === "fulfilled" && !plans.value.partial
-        ? null
-        : countries.status === "rejected" && isFundingFailure(countries.reason) ? "funding" : "outage",
-      fetchedAt: new Date().toISOString(),
-    };
-    snapshotCache = { snapshot, expires: Date.now() + CATALOG_TTL_MS };
-    if (!snapshot.partial) lastWholeSnapshot = { at: Date.now(), snapshot };
-    return snapshot;
   })();
   try {
     return await snapshotInFlight;
@@ -293,51 +277,60 @@ export async function readEsimCatalog(refresh = false): Promise<EsimCatalog> {
   if (!refresh && catalogCache && catalogCache.expires > Date.now()) return catalogCache.catalog;
   if (catalogInFlight) return catalogInFlight;
   catalogInFlight = (async () => {
-    const snapshot = await readEsimSnapshot(refresh);
-    const rates = await ratesFor(snapshot.plans);
-    const offers: EsimOffer[] = [];
-    const listings: EsimListing[] = [];
-    const seen = new Set<string>();
-    const stats: EsimCatalogStats = {
-      returned: snapshot.returned,
-      priced: 0,
-      skippedNoPlanId: snapshot.unreadable,
-      skippedNoPrice: 0,
-      skippedCurrency: 0,
-      skippedRate: 0,
-      duplicates: 0,
-      withCoverage: 0,
-      global: 0,
-      purchasable: 0,
-    };
-    for (const plan of snapshot.plans) {
-      const outcome = offerFromPlan(plan, rates);
-      if (!("listing" in outcome)) {
-        stats.skippedNoPlanId += 1;
-        continue;
+    try {
+      const snapshot = await readEsimSnapshot(refresh);
+      const rates = await ratesFor(snapshot.plans);
+      const offers: EsimOffer[] = [];
+      const listings: EsimListing[] = [];
+      const seen = new Set<string>();
+      const stats: EsimCatalogStats = {
+        returned: snapshot.returned,
+        priced: 0,
+        skippedNoPlanId: snapshot.unreadable,
+        skippedNoPrice: 0,
+        skippedCurrency: 0,
+        skippedRate: 0,
+        duplicates: 0,
+        withCoverage: 0,
+        global: 0,
+        purchasable: 0,
+      };
+      for (const plan of snapshot.plans) {
+        const outcome = offerFromPlan(plan, rates);
+        if (!("listing" in outcome)) {
+          stats.skippedNoPlanId += 1;
+          continue;
+        }
+        const listing = outcome.listing;
+        if (seen.has(listing.id)) {
+          stats.duplicates += 1;
+          continue;
+        }
+        seen.add(listing.id);
+        listings.push(listing);
+        if ("offer" in outcome) offers.push(outcome.offer);
+        else if (outcome.skip === "no-price") stats.skippedNoPrice += 1;
+        else if (outcome.skip === "rate-unavailable") stats.skippedRate += 1;
+        else stats.skippedCurrency += 1;
       }
-      const listing = outcome.listing;
-      if (seen.has(listing.id)) {
-        stats.duplicates += 1;
-        continue;
+      offers.sort((a, b) => a.priceNgn - b.priceNgn || a.name.localeCompare(b.name));
+      listings.sort((a, b) => (a.priceNgn ?? Infinity) - (b.priceNgn ?? Infinity) || a.name.localeCompare(b.name));
+      stats.priced = offers.length;
+      stats.withCoverage = listings.filter((listing) => listing.countries.length > 0).length;
+      stats.global = listings.filter((listing) => listing.coverage === "not-country-specific").length;
+      stats.purchasable = offers.filter((offer) => offer.purchasable).length;
+      logger.debug("eSIM catalogue read", { ...stats, partial: snapshot.partial });
+      const catalog: EsimCatalog = { offers, listings, partial: snapshot.partial, degraded: snapshot.degraded, fetchedAt: snapshot.fetchedAt, stats };
+      catalogCache = { catalog, expires: Date.now() + CATALOG_TTL_MS };
+      return catalog;
+    } catch (error) {
+      if (catalogCache && Date.now() - catalogCache.expires < 5 * 60_000) {
+        const stale = { ...catalogCache.catalog, partial: true, degraded: "outage" as const, fetchedAt: catalogCache.catalog.fetchedAt };
+        catalogCache = { catalog: stale, expires: Date.now() + CATALOG_TTL_MS };
+        return stale;
       }
-      seen.add(listing.id);
-      listings.push(listing);
-      if ("offer" in outcome) offers.push(outcome.offer);
-      else if (outcome.skip === "no-price") stats.skippedNoPrice += 1;
-      else if (outcome.skip === "rate-unavailable") stats.skippedRate += 1;
-      else stats.skippedCurrency += 1;
+      throw error;
     }
-    offers.sort((a, b) => a.priceNgn - b.priceNgn || a.name.localeCompare(b.name));
-    listings.sort((a, b) => (a.priceNgn ?? Infinity) - (b.priceNgn ?? Infinity) || a.name.localeCompare(b.name));
-    stats.priced = offers.length;
-    stats.withCoverage = listings.filter((listing) => listing.countries.length > 0).length;
-    stats.global = listings.filter((listing) => listing.coverage === "not-country-specific").length;
-    stats.purchasable = offers.filter((offer) => offer.purchasable).length;
-    logger.debug("eSIM catalogue read", { ...stats, partial: snapshot.partial });
-    const catalog: EsimCatalog = { offers, listings, partial: snapshot.partial, degraded: snapshot.degraded, fetchedAt: snapshot.fetchedAt, stats };
-    catalogCache = { catalog, expires: Date.now() + CATALOG_TTL_MS };
-    return catalog;
   })();
   try {
     return await catalogInFlight;
@@ -432,26 +425,30 @@ export function catalogueItems(offers: EsimListing[], limit = ESIM_CATALOGUE_LIM
   }));
 }
 
-/** All destinations from the bounded catalogue, without asserting country coverage. */
-export function esimItemsForAllDestinations(offers: EsimListing[]): ExplorerItem[] {
-  return offers.slice(0, ESIM_CATALOGUE_LIMIT).map((offer) => {
-    const countries = offer.countries.flatMap((value) => {
-      const code = value.trim().toLowerCase();
-      const canonical = code === "uk" ? "gb" : code === "usa" ? "us" : code === "uae" ? "ae" : code;
-      const name = explorerCountry(canonical)?.name;
-      return name ? [value, name] : [value];
-    });
-    const features = [offer.supportsVoice === true ? "Voice listed" : null, offer.supportsSms === true ? "SMS listed" : null, offer.includesPhoneNumber === true ? "Phone number listed" : null].filter(Boolean);
-    return {
-      id: offer.id, category: "esim", name: offer.name,
-      description: `${offer.dataLabel} · ${offer.validityLabel}`, tag: offer.region,
-      detail: [offer.region, ...features, "Confirm destination coverage"].join(" · "),
-      searchTerms: countries.join(" "),
-      artwork: { kind: "service", name: "esim" }, source: "live", coverage: "unconfirmed",
-      stock: null, myUnits: null, price: offer.priceNgn,
-      action: offer.purchasable && offer.priceNgn !== null ? { label: "Buy eSIM", href: `/dashboard/esim/${encodeURIComponent(offer.id)}` } : null,
-    };
-  });
+export function esimItemsForAllDestinations(offers: EsimListing[], limit = ESIM_CATALOGUE_LIMIT): ExplorerItem[] {
+  return offers.slice(0, limit).map((offer) => ({
+    id: offer.id,
+    category: "esim",
+    name: offer.name,
+    description: `${offer.dataLabel} · ${offer.validityLabel}`,
+    tag: offer.region,
+    artwork: { kind: "service", name: "esim" },
+    source: "live",
+    coverage: "unconfirmed",
+    stock: null,
+    myUnits: null,
+    price: offer.priceNgn,
+    detail: [
+      offer.includesPhoneNumber === true ? "Phone included" : null,
+      offer.supportsVoice === true ? "Voice listed" : null,
+      offer.supportsSms === true ? "SMS listed" : null,
+      offer.countries.length > 0 ? `${offer.countries.length} destination${offer.countries.length === 1 ? "" : "s"}` : null,
+    ].filter((value): value is string => Boolean(value)).join(" · "),
+    searchTerms: offer.countries.join(" ") || offer.region,
+    action: offer.purchasable && offer.priceNgn !== null
+      ? { label: "Buy eSIM", href: `/dashboard/esim/${encodeURIComponent(offer.id)}` }
+      : null,
+  }));
 }
 
 /**

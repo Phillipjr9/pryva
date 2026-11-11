@@ -15,7 +15,18 @@ export const EXPLORER_CATEGORIES: ReadonlyArray<{
   id: ServiceId;
   label: string;
   description: string;
-}> = SERVICES.map(({ id, label, description }) => ({ id, label, description }));
+}> = [
+  { id: "verification", label: "App verification", description: "SMS codes for apps" },
+  { id: "social", label: "Social promotion", description: "Followers, likes & views" },
+  { id: "numbers", label: "Number plans", description: "Single-use & rentals" },
+  { id: "esim", label: "eSIM", description: "Travel data plans" },
+  { id: "proxies", label: "Proxies", description: "Residential traffic" },
+  { id: "email", label: "Email OTP", description: "Temporary inboxes" },
+  { id: "accounts", label: "Accounts", description: "Account marketplace" },
+  { id: "subscriptions", label: "Subscriptions", description: "Entertainment & tools" },
+  { id: "data", label: "Mobile data", description: "Local network plans" },
+  { id: "tools", label: "Order tools", description: "Bulk & scheduled orders" },
+];
 
 export type ExplorerCategory = ServiceId;
 /** Platform vocabularies classify supplier listings. They are not offerings. */
@@ -359,14 +370,13 @@ export function cheapestVerifiedGiftCards(items: ExplorerItem[]): ExplorerItem[]
   });
 }
 
-/** Interleave categories so the All view doesn't bury whole service families. */
+/**
+ * Keep service families in their own shelf rather than shuffling a large feed
+ * across unrelated categories. The All view is still ordered by family, but it
+ * never mixes one service's cards into the middle of another family's rows.
+ */
 export function interleaveExplorerItems(items: ExplorerItem[]): ExplorerItem[] {
-  const groups = EXPLORER_CATEGORIES.map((category) => items.filter((item) => item.category === category.id));
-  const result: ExplorerItem[] = [];
-  for (let index = 0; groups.some((group) => index < group.length); index++) {
-    for (const group of groups) if (group[index]) result.push(group[index]);
-  }
-  return result;
+  return EXPLORER_CATEGORIES.flatMap((category) => items.filter((item) => item.category === category.id));
 }
 
 export function buildServiceExplorer(countryCode: string | null): ExplorerItem[] {

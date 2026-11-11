@@ -746,6 +746,36 @@ describe("OTP catalog", () => {
     expect(otpServiceLabelFromId("no-separators")).toBeNull();
   });
 
+  it("keeps a filtered country's services when the API omits a top-level countryCode", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
+      data: [{
+        name: "WhatsApp",
+        slug: "whatsapp",
+        availableCount: 17299,
+        pools: [{ serviceId: "CHARLIE-US-whatsapp", price: { amount: 2.03, currency: "USD" }, availableCount: 3321, successRate: 87 }],
+      }],
+    })));
+    const services = await listBitcallOtpServices({ countryCode: "US_1" });
+    expect(services).toHaveLength(1);
+    expect(services[0]).toMatchObject({ name: "WhatsApp", countryCode: "US_1" });
+    expect(services[0].offers).toHaveLength(1);
+  });
+
+  it("keeps a filtered country's services when the API omits a top-level countryCode", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
+      data: [{
+        name: "WhatsApp",
+        slug: "whatsapp",
+        availableCount: 17299,
+        pools: [{ serviceId: "CHARLIE-US-whatsapp", price: { amount: 2.03, currency: "USD" }, availableCount: 3321, successRate: 87 }],
+      }],
+    })));
+    const services = await listBitcallOtpServices({ countryCode: "US_1" });
+    expect(services).toHaveLength(1);
+    expect(services[0]).toMatchObject({ name: "WhatsApp", countryCode: "US_1" });
+    expect(services[0].offers).toHaveLength(1);
+  });
+
   it("drops a service whose offers carry no serviceId, since it could not be bought", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
       data: [
