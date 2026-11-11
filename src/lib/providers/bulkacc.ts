@@ -267,21 +267,29 @@ export function salvageOrderCode(text: string): string | null {
   return match ? match[1] : null;
 }
 
-const CATALOG_TTL_MS = 30 * 60 * 1000;
+const CATALOG_TTL_MS = 60 * 1000;
 const MAX_CATALOG_PAGES = 25;
 const CATALOG_PAGE_SIZE = 200;
 
-type CacheEntry = { value: BulkaccProduct[]; expiresAt: number };
+export type BulkaccCatalog = { products: BulkaccProduct[]; partial: boolean; checkedAt: string };
+type CacheEntry = { value: BulkaccCatalog; expiresAt: number };
 let catalogCache: CacheEntry | null = null;
+let catalogPending: Promise<BulkaccCatalog> | null = null;
+let catalogProgress: { products: BulkaccProduct[]; nextPage: number; checkedAt: string; expiresAt: number } | null = null;
 
 export function clearBulkaccCache(): void {
   catalogCache = null;
+  catalogPending = null;
+  catalogProgress = null;
 }
 
 /** One page of the product list. */
 export async function listProducts(pageIndex = 1, pageSize = CATALOG_PAGE_SIZE): Promise<BulkaccProductPage> {
   const { envelope } = await request("/api/products/list", { pageIndex, pageSize });
   const data = readData(envelope, "/api/products/list") as Record<string, unknown> | null;
+  if (!data || !Array.isArray(data.items)) {
+    throw new BulkaccError("Could not read account catalogue", "bad_response", 502);
+  }
   const rawItems = Array.isArray(data?.items) ? data.items : [];
   if (!rawItems.length) {
     // An empty page is not a neutral outcome. This supplier reports a logical
@@ -316,34 +324,56 @@ export async function listProducts(pageIndex = 1, pageSize = CATALOG_PAGE_SIZE):
   };
 }
 
-/**
- * The whole catalog, cached for 30 minutes.
- *
- * Walking pages once and filtering locally is what makes search, grouping and
- * pagination affordable: the supplier's list endpoint is the only catalog call,
- * and stock/price are re-verified per product at checkout.
- */
-export async function listAllProducts(): Promise<BulkaccProduct[]> {
+/** A coalesced, one-minute snapshot. Bounded walks resume after the cooldown,
+ * explicitly reporting partial inventory rather than silently truncating it. */
+export async function readBulkaccCatalog(): Promise<BulkaccCatalog> {
   if (catalogCache && Date.now() < catalogCache.expiresAt) return catalogCache.value;
-
-  const products: BulkaccProduct[] = [];
-  const seen = new Set<string>();
-  let page = 1;
-  let totalPages = 1;
-
-  do {
-    const result = await listProducts(page);
-    totalPages = Math.max(1, Math.min(result.totalPages, MAX_CATALOG_PAGES));
-    for (const product of result.items) {
-      if (seen.has(product.code)) continue;
-      seen.add(product.code);
-      products.push(product);
+  if (catalogPending) return catalogPending;
+  const pending = (async () => {
+    const progress = catalogProgress && catalogProgress.expiresAt > Date.now() ? catalogProgress : null;
+    const products = [...(progress?.products ?? [])];
+    const seen = new Set(products.map((product) => product.code));
+    const checkedAt = progress?.checkedAt ?? new Date().toISOString();
+    let page = progress?.nextPage ?? 1;
+    const end = page + MAX_CATALOG_PAGES - 1;
+    let partial = true;
+    try {
+      for (; page <= end; page++) {
+        const result = await listProducts(page);
+        if (result.pageIndex !== page || result.totalPages < page) throw new BulkaccError("Catalogue pagination stalled", "bad_response", 502);
+        let added = 0;
+        for (const product of result.items) {
+          if (seen.has(product.code)) continue;
+          seen.add(product.code);
+          products.push(product);
+          added++;
+        }
+        if (page >= result.totalPages) {
+          partial = products.length < result.totalCount;
+          // Malformed/missing rows cannot be recovered by walking past the last page.
+          catalogProgress = null;
+          break;
+        }
+        if (!added) throw new BulkaccError("Catalogue pagination stalled", "bad_response", 502);
+      }
+      if (page > end) catalogProgress = { products, nextPage: page, checkedAt, expiresAt: Date.now() + 30 * 60_000 };
+    } catch (error) {
+      if (!products.length) throw error;
+      catalogProgress = { products, nextPage: page, checkedAt, expiresAt: Date.now() + 30 * 60_000 };
+      logger.warn("Account catalogue read incomplete", { code: error instanceof BulkaccError ? error.code : "catalog_read_failed" });
     }
-    page += 1;
-  } while (page <= totalPages && page <= MAX_CATALOG_PAGES);
+    const value = { products, partial, checkedAt };
+    catalogCache = { value, expiresAt: Date.now() + CATALOG_TTL_MS };
+    return value;
+  })();
+  catalogPending = pending;
+  try { return await pending; }
+  finally { if (catalogPending === pending) catalogPending = null; }
+}
 
-  catalogCache = { value: products, expiresAt: Date.now() + CATALOG_TTL_MS };
-  return products;
+/** Compatibility for internal readers that need only the product rows. */
+export async function listAllProducts(): Promise<BulkaccProduct[]> {
+  return (await readBulkaccCatalog()).products;
 }
 
 export type CatalogProbe =

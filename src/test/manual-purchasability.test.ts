@@ -101,10 +101,10 @@ describe("per-listing purchasability", () => {
     expect(result["p3:netflix-standard"]).toBe(false);
   });
 
-  it("opens a hand-prepared listing only once someone can prepare it", async () => {
+  it("keeps retired hand-prepared listings unbuyable even with an administrator", async () => {
     runtime.checkoutEnabled = true;
     runtime.manualReachable = true;
-    expect(await purchasableBySlug()).toEqual({ "p1:300004": true, "p3:netflix-standard": true });
+    expect(await purchasableBySlug()).toEqual({ "p1:300004": true, "p3:netflix-standard": false });
   });
 
   it("never reports an unavailable listing as purchasable", async () => {

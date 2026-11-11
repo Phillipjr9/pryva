@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       }
       return price;
     }
-    const { listings, meta, partial } = await listMarketplaceListings({ ...query,
+    const { listings, meta, partial, checkedAt } = await listMarketplaceListings({ ...query,
       sellingPrice: async (listing) => (await priceFor(listing)).unitNgn,
     });
 
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
       }),
     );
 
-    return NextResponse.json({ configured: true, listings: priced, meta, partial: !!partial }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ configured: true, listings: priced, meta, partial: !!partial, checkedAt }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof MarketplaceError) {
       logger.error("Marketplace listings failed", { code: error.code, status: error.status });

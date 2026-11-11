@@ -6,6 +6,7 @@ const runtime = vi.hoisted(() => ({
   accszoneConfigured: false,
   products: [] as Record<string, unknown>[],
   catalogError: null as Error | null,
+  catalogPartial: false,
   productError: null as Error | null,
   legacyListings: [] as Record<string, unknown>[],
   legacyPaged: false,
@@ -37,10 +38,10 @@ vi.mock("@/lib/providers/bulkacc", () => {
     isBulkaccConfigured: () => runtime.bulkaccConfigured,
     isAmbiguousOutcome: (error: unknown) =>
       error instanceof BulkaccError && ["ambiguous_outcome", "timeout", "bad_response"].includes(error.code),
-    listAllProducts: async () => {
+    readBulkaccCatalog: async () => {
       runtime.calls.listAllProducts += 1;
       if (runtime.catalogError) throw runtime.catalogError;
-      return runtime.products;
+      return { products: runtime.products, partial: runtime.catalogPartial, checkedAt: new Date().toISOString() };
     },
     getProduct: async (code: string) => {
       runtime.calls.getProduct += 1;
@@ -154,6 +155,7 @@ beforeEach(() => {
   runtime.accszoneConfigured = true;
   runtime.products = [SPOTIFY, GMAIL, SOLD_OUT];
   runtime.catalogError = null;
+  runtime.catalogPartial = false;
   runtime.productError = null;
   runtime.legacyListings = [{
     id: 7, slug: "legacy-instagram", title: "Instagram account", price: "0.44",
@@ -328,6 +330,17 @@ describe("sourcing order", () => {
     expect(titles).toContain("Streaming");
     expect(titles).toContain("Email");
     expect(secretLeak(categories)).toEqual([]);
+  });
+});
+
+describe("primary catalogue completeness", () => {
+  it("propagates an incomplete primary snapshot through listings and category metadata", async () => {
+    runtime.catalogPartial = true;
+    clearMarketplaceCatalogCache();
+    const page = await listMarketplaceListings();
+    expect(page.partial).toBe(true);
+    expect(Number.isFinite(Date.parse(page.checkedAt))).toBe(true);
+    expect((await listMarketplaceCategories()).partial).toBe(true);
   });
 });
 

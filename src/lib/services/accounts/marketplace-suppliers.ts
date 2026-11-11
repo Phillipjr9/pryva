@@ -28,7 +28,7 @@ import {
   getProduct,
   isAmbiguousOutcome,
   isBulkaccConfigured,
-  listAllProducts,
+  readBulkaccCatalog,
   productPriceUsd,
   type BulkaccProduct,
 } from "@/lib/providers/bulkacc";
@@ -324,15 +324,15 @@ function fromAccsZone(listing: {
 }
 
 /** Whole primary catalog, or null when the primary cannot serve it. */
-async function primaryListings(): Promise<MarketplaceListing[] | null> {
+async function primaryListings(): Promise<{ listings: MarketplaceListing[]; partial: boolean; checkedAt: string } | null> {
   if (!isBulkaccConfigured()) return null;
   try {
-    const products = await listAllProducts();
-    if (!products.length) return null;
-    return products.map((product) => {
+    const snapshot = await readBulkaccCatalog();
+    const listings = snapshot.products.map((product) => {
       const listing = toListing(product);
       return { ...listing, browseGroup: browseGroupFor(listing) };
     });
+    return { listings, partial: snapshot.partial, checkedAt: snapshot.checkedAt };
   } catch (error) {
     // A primary catalog failure is exactly when the fallback earns its place.
     logger.warn("Primary account catalog unavailable, falling back", {
@@ -355,11 +355,11 @@ export type ListingQuery = {
   sellingPrice?: (listing: MarketplaceListing) => Promise<number>;
 };
 
-type BrowseCatalog = { listings: MarketplaceListing[]; source: CatalogSource; partial: boolean };
-const BROWSE_TTL_MS = 5 * 60 * 1000;
+type BrowseCatalog = { listings: MarketplaceListing[]; source: CatalogSource; partial: boolean; checkedAt: string };
+const BROWSE_TTL_MS = 60 * 1000;
 let browseCache: { key: string; expires: number; value: BrowseCatalog } | null = null;
 let browsePending: { key: string; promise: Promise<BrowseCatalog> } | null = null;
-let secondaryProgress: { listings: MarketplaceListing[]; nextPage: number; expires: number } | null = null;
+let secondaryProgress: { listings: MarketplaceListing[]; nextPage: number; checkedAt: string; expires: number } | null = null;
 
 export function clearMarketplaceCatalogCache(): void {
   browseCache = null;
@@ -379,8 +379,9 @@ async function combinedCatalog(): Promise<BrowseCatalog> {
     const [primary, secondary] = await Promise.all([
       primaryListings(),
       (async () => {
-        if (!isAccsZoneConfigured()) { secondaryProgress = null; return { listings: [], partial: false }; }
+        if (!isAccsZoneConfigured()) { secondaryProgress = null; return { listings: [], partial: false, checkedAt: null }; }
         const progress = secondaryProgress && secondaryProgress.expires > Date.now() ? secondaryProgress : null;
+        const checkedAt = progress?.checkedAt ?? new Date().toISOString();
         const listings: MarketplaceListing[] = [...(progress?.listings ?? [])];
         const seen = new Set(listings.map((listing) => listing.slug));
         let page = progress?.nextPage ?? 1;
@@ -397,7 +398,7 @@ async function combinedCatalog(): Promise<BrowseCatalog> {
               listings.push({ ...listing, browseGroup: browseGroupFor(listing) });
               added++;
             }
-            if (page >= result.meta.last_page) { secondaryProgress = null; return { listings, partial: false }; }
+            if (page >= result.meta.last_page) { secondaryProgress = null; return { listings, partial: false, checkedAt }; }
             if (!added) throw new Error("Catalogue pagination stalled");
           }
         } catch (error) {
@@ -405,21 +406,22 @@ async function combinedCatalog(): Promise<BrowseCatalog> {
         }
         // Resume remaining pages after the short incomplete-cache cooldown,
         // rather than permanently hiding everything past the read budget.
-        secondaryProgress = { listings, nextPage: page, expires: Date.now() + 30 * 60 * 1000 };
-        return { listings, partial: true };
+        secondaryProgress = { listings, nextPage: page, checkedAt, expires: Date.now() + 30 * 60 * 1000 };
+        return { listings, partial: true, checkedAt };
       })(),
     ]);
     return {
-      listings: [...(primary ?? []), ...secondary.listings],
+      listings: [...(primary?.listings ?? []), ...secondary.listings],
+      checkedAt: [primary?.checkedAt, secondary.checkedAt].filter((date): date is string => !!date).sort()[0] ?? new Date().toISOString(),
       source: primary ? "primary" as const : secondary.listings.length ? "fallback" as const : "none" as const,
-      partial: (isBulkaccConfigured() && primary === null) || secondary.partial,
+      partial: (isBulkaccConfigured() && primary === null) || !!primary?.partial || secondary.partial,
     };
   })();
   const pending = { key, promise };
   browsePending = pending;
   try {
     const value = await promise;
-    if (browsePending === pending) browseCache = { key, value, expires: Date.now() + (value.partial ? 60_000 : BROWSE_TTL_MS) };
+    if (browsePending === pending) browseCache = { key, value, expires: Math.min(Date.now() + BROWSE_TTL_MS, Date.parse(value.checkedAt) + BROWSE_TTL_MS) };
     return value;
   } finally {
     if (browsePending === pending) browsePending = null;
@@ -523,19 +525,19 @@ async function pageInMemory(
  * grouping, sorting and pagination instead of one call per page view.
  */
 export async function listMarketplaceListings(query: ListingQuery = {}): Promise<{
-  listings: MarketplaceListing[]; meta: MarketplaceMeta; source: CatalogSource; partial?: boolean;
+  listings: MarketplaceListing[]; meta: MarketplaceMeta; source: CatalogSource; partial?: boolean; checkedAt: string;
 }> {
   const page = Number.isSafeInteger(query.page) && (query.page as number) > 0 ? query.page as number : 1;
   const perPage = Number.isSafeInteger(query.perPage) && (query.perPage as number) > 0 ? Math.min(query.perPage as number, 60) : 24;
   const catalog = await combinedCatalog();
   const result = await pageInMemory(catalog.listings, query, page, perPage, catalog.source);
-  return { ...result, partial: catalog.partial };
+  return { ...result, partial: catalog.partial, checkedAt: catalog.checkedAt };
 }
 
 /**
  * Authoritative listing for checkout.
  *
- * Always re-read from the source: the cached catalog can be up to 30 minutes
+ * Always re-read from the source: the cached primary catalog can be up to one minute
  * old, and price and stock are what the customer is charged against.
  */
 export async function getMarketplaceListing(slug: string): Promise<MarketplaceListing> {

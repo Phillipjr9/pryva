@@ -142,6 +142,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
       const data = (await response.json()) as {
         configured?: boolean;
         partial?: boolean;
+        checkedAt?: string;
         listings?: Listing[];
         meta?: Meta;
         error?: string;
@@ -159,7 +160,8 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
       setPartial(data.partial === true);
       setListings(data.listings ?? []);
       setMeta(data.meta ?? null);
-      setLastChecked(new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }));
+      setLastChecked(data.checkedAt && Number.isFinite(Date.parse(data.checkedAt))
+        ? new Date(data.checkedAt).toLocaleString() : null);
     } catch {
       if (current === requestId.current) {
         setError("Could not load accounts. Check your connection.");
@@ -519,8 +521,8 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
       {/* Results */}
       <div className="mt-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-meta text-ink-3">
-          <span>{loading ? "Refreshing stock…" : lastChecked ? `Stock checked at ${lastChecked}; it may change.` : "Stock not checked yet."}</span>
-          <button type="button" disabled={loading} onClick={() => void loadListings()} className="font-semibold text-lav-700 hover:underline disabled:opacity-50">Refresh stock</button>
+          <span>{loading ? "Loading listings…" : lastChecked ? `Catalogue snapshot from ${lastChecked}. Stock may change; checked again at checkout.` : "Stock snapshot time unavailable. Stock is checked again at checkout."}</span>
+          <button type="button" disabled={loading} onClick={() => void loadListings()} className="font-semibold text-lav-700 hover:underline disabled:opacity-50">Reload listings</button>
         </div>
         {error && (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[0.875rem] text-red-800">

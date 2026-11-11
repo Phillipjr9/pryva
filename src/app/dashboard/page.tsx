@@ -228,7 +228,7 @@ export default async function DashboardOverviewPage() {
                 <span className="min-w-0 flex-1">
                   <span className="flex min-w-0 items-center justify-center gap-1.5 sm:justify-start">
                     <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${SERVICE_STATE_DOT[item.state]}`} />
-                    <span className="block min-w-0 text-[0.8125rem] font-semibold leading-tight text-ink group-hover:text-lav-700 sm:truncate sm:text-[0.8125rem]">{item.label}</span>
+                    <span className="block min-w-0 text-[0.8125rem] font-semibold leading-tight text-ink group-hover:text-lav-700 sm:text-[0.8125rem]">{item.label}</span>
                   </span>
                   <span className="hidden truncate text-micro text-ink-3 sm:block">{item.note}</span>
                   <span className="sr-only"> — {SERVICE_STATE_LABEL[item.state]}</span>

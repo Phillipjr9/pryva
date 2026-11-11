@@ -42,4 +42,15 @@ describe("account catalogue discovery", () => {
     });
   });
 
+  it("shows the supplier snapshot time instead of claiming that a reload checked stock now", async () => {
+    const checkedAt = "2026-01-01T12:00:00.000Z";
+    vi.stubGlobal("fetch", vi.fn(async () => response({ configured: true, categories: [], listings: [], checkedAt })));
+    render(<AccountsBrowser purchaseEnabled />);
+    const snapshot = await screen.findByText(`Catalogue snapshot from ${new Date(checkedAt).toLocaleString()}. Stock may change; checked again at checkout.`);
+    expect(snapshot).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Reload listings" }));
+    await waitFor(() => expect(screen.getByText(`Catalogue snapshot from ${new Date(checkedAt).toLocaleString()}. Stock may change; checked again at checkout.`)).toBeTruthy());
+    expect(screen.queryByText(/Stock checked at/)).toBeNull();
+  });
+
 });

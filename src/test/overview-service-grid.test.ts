@@ -41,11 +41,10 @@ describe("overview service hub", () => {
     expect(section.slice(0, 200)).toContain("lg:order-2");
   });
 
-  it("keeps the labels short enough to survive a truncate", () => {
-    // The longest one decides whether a row needs the whole column.
-    const tileLabels = [...overview.matchAll(/\{ label: "([^"]+)", note:/g)].map((m) => m[1]);
-    expect(tileLabels.length).toBeGreaterThanOrEqual(8);
-    const longest = tileLabels.reduce((a, b) => (b.length > a.length ? b : a), "");
-    expect(longest.length, `longest tile label "${longest}"`).toBeLessThanOrEqual(20);
+  it("wraps descriptive labels instead of truncating service names", () => {
+    expect(overview).toContain('label: "Social & Digital Accounts"');
+    const label = overview.match(/<span className="([^"]*)">\{item\.label\}<\/span>/)?.[1] ?? "";
+    expect(label).not.toContain("truncate");
+    expect(label).toContain("leading-tight");
   });
 });

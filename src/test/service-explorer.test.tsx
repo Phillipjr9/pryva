@@ -198,6 +198,7 @@ describe("unit counts", () => {
     expect(markup).toContain("sm:grid-cols-2");
     expect(markup).toContain("0 left");
     expect(markup).toContain("23 left");
-    expect(markup).toContain("text-[0.58rem]");
+    expect(markup).toContain("text-[0.8125rem]");
+    expect(markup).not.toContain("text-[0.58rem]");
   });
 });

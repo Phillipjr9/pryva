@@ -11,9 +11,8 @@ import {
   supportsPromoCodes,
 } from "@/lib/services/accounts/marketplace-suppliers";
 import { isMarketplaceCheckoutConfigured } from "@/lib/services/accounts/marketplace-policy";
-import { isManualFulfilmentReachable } from "@/lib/services/accounts/manual-fulfilment";
 import { isManualSlug } from "@/lib/services/accounts/manual-catalog";
-import { ACCOUNTS_PROVIDER, MANUAL_PROVIDER } from "@/lib/services/order-providers";
+import { ACCOUNTS_PROVIDER } from "@/lib/services/order-providers";
 import { validatePromo } from "@/lib/providers/accszone";
 import { usdCents } from "@/lib/payments/supplier-money";
 import { fulfilmentLabel } from "@/lib/services/warranty";
@@ -134,21 +133,8 @@ export async function POST(request: NextRequest) {
   const promoCode = typeof body.promoCode === "string" ? body.promoCode.trim().toUpperCase() : "";
   const clientReference = scopedReference(user.id, requestId);
   const reference = `MKT-${clientReference.replace(/-/g, "").slice(0, 28)}`;
-  // Hand-sourced items are recorded and queued; no supplier call is made.
+  // Legacy manual tokens remain recognizable for existing-order replays.
   const isManual = isManualSlug(slug);
-
-  // A hand-sourced item is prepared through /admin/fulfilment, which needs an
-  // administrator with a verified address. Refuse here, before the wallet is
-  // touched: the debit happens in a transaction further down, and taking money
-  // for an item nobody can prepare is not made right by refunding it — the
-  // customer still did not get what they bought. The storefront already hides
-  // the button, but a hidden button is not a control.
-  if (isManual && !(await isManualFulfilmentReachable())) {
-    return NextResponse.json(
-      { error: "This item cannot be prepared right now. No payment was taken." },
-      { status: 503 },
-    );
-  }
 
   // A repeat of the same request must not call the supplier a second time, even
   // when the listing or provider is no longer available.
@@ -158,6 +144,10 @@ export async function POST(request: NextRequest) {
     if (previous) return existingResponse(previous, slug, quantity);
   } catch {
     return pendingResponse(reference);
+  }
+
+  if (isManual) {
+    return NextResponse.json({ error: "This listing is no longer available. No payment was taken." }, { status: 410 });
   }
 
   let listing;
@@ -186,7 +176,10 @@ export async function POST(request: NextRequest) {
         maxQuantity: listing.maxQuantity,
       }, { status: 400 });
     }
-    // `stock === null` is unknown, not zero: the source is still the authority.
+    if (listing.stock === null) {
+      return NextResponse.json({ error: "Stock could not be confirmed. Please try again later. No payment was taken." }, { status: 409 });
+    }
+    // A confirmed supplier count must cover the requested basket.
     if (listing.stock !== null && listing.stock < quantity) {
       return NextResponse.json({ error: `Only ${listing.stock} left in stock.`, available: listing.stock }, { status: 409 });
     }
@@ -249,11 +242,8 @@ export async function POST(request: NextRequest) {
         productName: listing.title, planLabel: `${quantity} × account`,
         region: listing.group ?? "Global", duration: fulfilmentLabel(listing.fulfilment),
         amount: price.totalNgn, status: "processing",
-        // A hand-sourced order makes no supplier call, so it carries its own
-        // provider value: the unresolved-purchase guard above exists to stop a
-        // second automated supplier request and must not block these.
-        provider: isManual ? MANUAL_PROVIDER : ACCOUNTS_PROVIDER,
-        providerRequestId: isManual ? null : clientReference,
+        provider: ACCOUNTS_PROVIDER,
+        providerRequestId: clientReference,
       }).returning({ id: orders.id });
       if (!created) throw new Error("Order insert failed");
       await tx.insert(walletTransactions).values({
@@ -266,21 +256,7 @@ export async function POST(request: NextRequest) {
     if (reservation.previous) return existingResponse(reservation.previous, slug, quantity);
     orderId = reservation.orderId!;
     void afterPurchase(user.id);
-    if (isManual) {
-      // No supplier call to make. The order waits in the fulfilment queue and
-      // its credentials appear on the order page once they are confirmed.
-      logger.info("Hand-sourced order recorded", { reference, quantity });
-      return NextResponse.json({
-        ok: true,
-        preparing: true,
-        order: { id: orderId, reference },
-        listing: listing.title,
-        quantity,
-        totalNgn: price.totalNgn,
-        warrantyDays: listing.warrantyDays,
-        message: "Your order is confirmed and being prepared. Your credentials appear on the order page as soon as they are ready.",
-      });
-    }
+
   } catch (error) {
     if (error instanceof InsufficientBalance) {
       return NextResponse.json({ error: "Insufficient wallet balance.", required: price.totalNgn }, { status: 402 });

@@ -34,7 +34,7 @@ vi.mock("@/lib/payments/exchange-rate", () => ({
 
 vi.mock("@/lib/providers/bulkacc", () => ({
   isBulkaccConfigured: () => runtime.bulkaccConfigured,
-  listAllProducts: async () => runtime.products,
+  readBulkaccCatalog: async () => ({ products: runtime.products, partial: false, checkedAt: new Date().toISOString() }),
   getProduct: async (code: string) => runtime.products.find((p) => p.code === code),
   productPriceUsd: (product: { priceUsd: string }) => product.priceUsd,
   normalizeProduct: (product: Record<string, unknown>) => product,

@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  *
  * Neutral URL and neutral labels on purpose: shoppers see Pryva's own product
  * groups ("Streaming", "Email", "Social"), never a supplier's taxonomy, and
- * never a supplier's name. Categories are cached server-side for 30 minutes
+ * never a supplier's name. Categories are cached server-side with the shared short-lived inventory snapshot
  * because the sources rate-limit catalog reads per account.
  */
 export async function GET(request: NextRequest) {

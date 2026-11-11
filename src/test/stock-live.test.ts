@@ -76,6 +76,18 @@ vi.mock("@/lib/providers/accszone", async (importOriginal) => {
 
 vi.mock("@/lib/services/accounts/manual-catalog", () => ({ availableManualProducts: () => Array(state.manual).fill({}) }));
 
+vi.mock("@/lib/services/accounts/marketplace-suppliers", () => ({
+  isMarketplaceCatalogAvailable: () => state.bulkacc || state.accszone,
+  listMarketplaceListings: async () => {
+    if (state.productsError) throw new Error(state.productsError);
+    const page = state.products as { items: import("@/lib/providers/bulkacc").BulkaccProduct[]; totalCount: number };
+    return { listings: page.items.map((product) => ({ slug: `p1:${product.code}`, title: product.name,
+      group: product.groupName, category: product.categoryName, stock: product.inStock,
+      minQuantity: product.min, priceUsd: String(product.priceMicros / 1_000_000),
+    })), meta: { total: page.totalCount }, partial: false };
+  },
+}));
+
 import { buildStockReport } from "@/lib/admin/stock-live";
 import { laneHeadline } from "@/lib/admin/stock-report";
 
@@ -198,20 +210,21 @@ describe("the stock report", () => {
     expect(laneHeadline(email)).toBe("the feed returned nothing");
   });
 
-  it("counts hand-prepared listings alongside the feed without pretending they are stock", async () => {
+  it("does not count retired manual inventory alongside the API feed", async () => {
     state.manual = 2;
     const { lanes } = await buildStockReport();
-    expect(lanes.find((lane) => lane.lane === "accounts")!.error).toContain("2 hand-prepared");
+    expect(lanes.find((lane) => lane.lane === "accounts")!.error).toBeNull();
   });
 
-  it("names a connected marketplace that is not the active source", async () => {
+  it("uses an API-only catalogue even with only the secondary source connected", async () => {
     state.accszone = true;
+    state.bulkacc = false;
+    state.manual = 10;
     const { lanes } = await buildStockReport();
-    const line = lanes
-      .find((lane) => lane.lane === "accounts")!
-      .lines.find((entry) => entry.id === "alternate-marketplace");
-    expect(line?.state).toBe("not-sold");
-    expect(line?.note).toMatch(/not the active source/i);
+    const accounts = lanes.find((lane) => lane.lane === "accounts")!;
+    expect(accounts.connected).toBe(true);
+    expect(accounts.error).toBeNull();
+    expect(accounts.lines.some((line) => line.id === "alternate-marketplace")).toBe(false);
   });
 
   it("marks eSIM as connected but not sold, so it never counts as buyable", async () => {

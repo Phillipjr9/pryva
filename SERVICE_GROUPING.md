@@ -101,3 +101,28 @@ Listing responses preserve API stock counts, including zero and unknown (null).
 Unknown and insufficient stock do not advertise a buyable listing. Known stock
 continues to be checked against the supplier at checkout, and prices remain
 sorted lowest first. No stock counts are invented for missing inventory.
+
+### Inventory/readiness audit follow-up
+
+- Bulkacc browsing now uses a coalesced one-minute inventory snapshot. The UI
+  displays the snapshot's server timestamp, not the time a browser reloaded it;
+  reloads are honestly labelled "Reload listings". Checkout still re-reads the
+  selected product directly.
+- Bounded Bulkacc walks report `partial` and resume remaining pages after their
+  cooldown. Malformed envelopes, stalled pagination and missing rows cannot be
+  presented as complete healthy inventory. Snapshot age is retained across a
+  resumed walk, and incompleteness propagates to listings and categories.
+- Unknown account stock is refused by checkout before any debit, matching the
+  storefront. New manual-token purchases are explicitly retired; existing-order
+  replays and historical fulfilment records remain supported.
+- Admin account stock now samples the same API-only catalogue as customers,
+  including partial-read warnings, with no manual inventory contribution.
+- Read-only inbox/rental feeds no longer discard rows after 2,000 entries.
+  eSIM destination search expands country codes to names, and locally truncated
+  walks retain a recent complete snapshot with a degradation warning. Stale
+  eSIM/inbox fallback limits use original snapshot age, not extended cache expiry.
+- Verification/social logos now render all declared artwork types, fail safely,
+  and reset when an asset changes. Stock counts meet the phone typography floor;
+  long quick-action labels wrap rather than truncate.
+- Legacy test expectations were aligned with purpose-based navigation and the
+  authoritative unfiltered OTP service feed, without changing ordering gates.
