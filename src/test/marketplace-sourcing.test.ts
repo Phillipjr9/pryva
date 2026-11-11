@@ -217,11 +217,8 @@ describe("sourcing order", () => {
 
     runtime.accszoneConfigured = false;
     expect(marketplaceSource()).toBe("none");
-    // The hand-sourced catalog still has something to sell with no API at all.
-    expect(isMarketplaceCatalogAvailable()).toBe(true);
-    const manualOnly = await listMarketplaceListings();
-    expect(manualOnly.listings.length).toBeGreaterThan(0);
-    expect(manualOnly.listings.every((listing) => listing.slug.startsWith("p3:"))).toBe(true);
+    expect(isMarketplaceCatalogAvailable()).toBe(false);
+    expect((await listMarketplaceListings()).listings).toEqual([]);
 
     // A primary catalog failure must empty nothing: the fallback takes over.
     runtime.bulkaccConfigured = true;
@@ -325,7 +322,7 @@ describe("sourcing order", () => {
     expect(checkout.browseGroup).toBeUndefined();
   });
 
-  it("groups hand-sourced streaming items with API-sourced ones under one label", async () => {
+  it("groups API-sourced items by purpose", async () => {
     const { categories } = await listMarketplaceCategories();
     const titles = categories.map((category) => category.title);
     expect(titles).toContain("Streaming");
@@ -354,17 +351,9 @@ describe("what a customer is shown", () => {
     expect(one.warrantyDays).toBe(120);
   });
 
-  it("says an item is confirmed after payment instead of inventing a stock count", async () => {
+  it("only shows API listings and preserves reported stock", async () => {
     const { listings } = await listMarketplaceListings({ perPage: 60 });
-    const manual = listings.filter((listing) => listing.fulfilment === "manual");
-    expect(manual.length).toBeGreaterThan(0);
-    for (const listing of manual) {
-      expect(listing.stock).toBeNull();
-      expect(listing.sold).toBeNull();
-      expect(listing.available).toBe(true);
-      expect(listing.maxQuantity).toBeGreaterThan(0);
-      expect(listing.warrantyDays).toBe(120);
-    }
+    expect(listings.every((listing) => listing.fulfilment === "instant" && !listing.slug.startsWith("p3:"))).toBe(true);
     // API-sourced listings keep the count the source actually reported.
     const spotify = listings.find((listing) => listing.slug === "p1:300004");
     expect(spotify?.stock).toBe(32949);
@@ -463,10 +452,8 @@ describe("buying", () => {
   });
 
   it("refuses to buy a hand-sourced item through the supplier path", async () => {
-    const manual = await getMarketplaceListing("p3:netflix-standard");
-    expect(manual.fulfilment).toBe("manual");
-    await expect(purchaseMarketplaceListing({ listing: manual, quantity: 1, clientReference: "r" }))
-      .rejects.toMatchObject({ code: "manual_fulfilment" });
+    await expect(getMarketplaceListing("p3:netflix-standard"))
+      .rejects.toMatchObject({ code: "listing_not_found", status: 404 });
     expect(runtime.calls.createOrder).toBe(0);
     expect(runtime.calls.purchase).toBe(0);
   });

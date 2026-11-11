@@ -5,7 +5,7 @@
  * Every route goes through this module, so no route, response, log line or
  * browser bundle ever needs to know a supplier's name.
  *
- * Browsing combines both configured API catalogues and the manual lane.
+ * Browsing includes configured API catalogues only. Manual listings are retired.
  * Supplier preference never hides another supplier's account listings.
  *
  * Two rules this module exists to protect:
@@ -42,7 +42,6 @@ import {
 } from "@/lib/providers/accszone";
 import { logger } from "@/lib/platform/logger";
 import { usdMicros, usdString } from "@/lib/payments/supplier-money";
-import { availableManualProducts, getManualProduct, isManualSlug, type ManualProduct } from "@/lib/services/accounts/manual-catalog";
 import { warrantyDaysForGroup, type FulfilmentMode } from "@/lib/services/warranty";
 
 /** Opaque, stable routing tokens. Not initials, not abbreviations. */
@@ -259,15 +258,9 @@ export function marketplaceSource(): CatalogSource {
   return "none";
 }
 
-/**
- * Is there anything at all to sell?
- *
- * Hand-sourced products count on their own: they need no API key, so the
- * storefront can be live for streaming items while no supplier feed is
- * connected yet.
- */
+/** Only a configured API source can supply new account listings. */
 export function isMarketplaceCatalogAvailable(): boolean {
-  return marketplaceSource() !== "none" || manualListings().length > 0;
+  return marketplaceSource() !== "none";
 }
 
 function toListing(product: BulkaccProduct): MarketplaceListing {
@@ -288,36 +281,6 @@ function toListing(product: BulkaccProduct): MarketplaceListing {
     warrantyDays: warrantyDaysForGroup(group),
     fulfilment: "instant",
   };
-}
-
-/**
- * A hand-sourced product as a marketplace listing.
- *
- * `stock` stays null on purpose: this source publishes no live count, so any
- * number here would be invented. Availability comes from the owner's flag.
- */
-function fromManual(product: ManualProduct): MarketplaceListing {
-  return {
-    slug: product.slug,
-    sourceId: product.id,
-    title: product.title,
-    group: product.group,
-    category: null,
-    subcategory: null,
-    priceUsd: product.costUsd,
-    stock: null,
-    minQuantity: 1,
-    maxQuantity: product.maxQuantity,
-    available: product.available,
-    sold: null,
-    warrantyDays: product.warrantyDays,
-    fulfilment: "manual",
-  };
-}
-
-/** Every hand-sourced listing, whether or not an API source is connected. */
-function manualListings(): MarketplaceListing[] {
-  return availableManualProducts().map(fromManual);
 }
 
 function fromAccsZone(listing: {
@@ -447,7 +410,7 @@ async function combinedCatalog(): Promise<BrowseCatalog> {
       })(),
     ]);
     return {
-      listings: [...manualListings(), ...(primary ?? []), ...secondary.listings],
+      listings: [...(primary ?? []), ...secondary.listings],
       source: primary ? "primary" as const : secondary.listings.length ? "fallback" as const : "none" as const,
       partial: (isBulkaccConfigured() && primary === null) || secondary.partial,
     };
@@ -579,12 +542,9 @@ export async function getMarketplaceListing(slug: string): Promise<MarketplaceLi
   const parsed = parseListingSlug(slug);
   if (!parsed) throw new MarketplaceError("Invalid listing", "listing_not_found", 404);
 
-  // Hand-sourced items are re-read from the catalog on every call, so an item
-  // the owner switched off stops being sellable immediately.
+  // Keep legacy tokens parseable for historical orders, but refuse new sales.
   if (parsed.token === MANUAL_TOKEN) {
-    const product = getManualProduct(slug);
-    if (!product) throw new MarketplaceError("This item is not available", "listing_not_found", 404);
-    return fromManual(product);
+    throw new MarketplaceError("This listing is no longer available", "listing_not_found", 404);
   }
 
   if (parsed.token === PRIMARY_TOKEN) {

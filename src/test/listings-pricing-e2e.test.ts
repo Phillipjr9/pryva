@@ -157,23 +157,12 @@ describe("listings route pricing, end to end", () => {
     }
   });
 
-  it("still serves a catalog from the hand-prepared lane alone, with no API key", async () => {
-    // No API source is connected, but the hand-prepared products need no key, so
-    // the storefront is not empty — and those prices go through the same parser.
+  it("does not substitute manual listings when no API is configured", async () => {
     runtime.bulkaccConfigured = false;
     runtime.accszoneConfigured = false;
-
     const response = await GET(request());
     expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.configured).toBe(true);
-    const prices = body.listings.map((listing: { priceNgn: number }) => listing.priceNgn);
-    expect(prices).toEqual([...prices].sort((a, b) => a - b));
-    expect(body.listings.length).toBeGreaterThan(0);
-    expect(body.listings.every((l: { slug: string }) => l.slug.startsWith("p3:"))).toBe(true);
-    for (const listing of body.listings) {
-      expect(listing.priceNgn, listing.title).toBeGreaterThan(0);
-    }
+    expect(await response.json()).toEqual({ configured: false, listings: [], meta: null });
   });
 
   it("degrades to an empty catalog only when there is nothing at all to sell", async () => {
@@ -205,6 +194,19 @@ describe("listings route pricing, end to end", () => {
     const all = await (await GET(new NextRequest("https://pryva.test/api/accounts/listings?search=Facebook"))).json();
     expect(all.meta.total).toBe(30);
     expect(all.listings[0].stock).toBe(0);
+  });
+
+  it("preserves missing and zero API stock without advertising either as buyable", async () => {
+    runtime.preview = true;
+    clearManualCatalogCache();
+    runtime.products[0].inStock = null;
+    runtime.products[1].inStock = 0;
+    const body = await (await GET(request())).json();
+    const unknown = body.listings.find((listing: { slug: string }) => listing.slug === "p1:300004");
+    const soldOut = body.listings.find((listing: { slug: string }) => listing.slug === "p1:300005");
+    expect(unknown).toMatchObject({ stock: null, purchasable: false });
+    expect(soldOut).toMatchObject({ stock: 0, available: false, purchasable: false });
+    expect(body.listings.every((listing: { slug: string }) => !listing.slug.startsWith("p3:"))).toBe(true);
   });
 
 });

@@ -88,3 +88,16 @@ No supplier orders or production deployment were performed for this change.
 
 This is a code-path audit with mocked supplier regression tests and a local
 production build, not an authenticated live inventory verification or deployment.
+
+### API-only account marketplace (owner decision)
+
+New account listings and categories now come exclusively from configured API
+catalogues (currently Bulkacc in production). Manual inventory is no longer
+merged into browsing or used as a fallback when APIs are absent. Old manual
+listing tokens cannot resolve for a new purchase; historical order data and
+fulfilment tooling are retained for existing orders.
+
+Listing responses preserve API stock counts, including zero and unknown (null).
+Unknown and insufficient stock do not advertise a buyable listing. Known stock
+continues to be checked against the supplier at checkout, and prices remain
+sorted lowest first. No stock counts are invented for missing inventory.
