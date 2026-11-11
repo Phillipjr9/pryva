@@ -40,8 +40,11 @@ export async function readSupplierSnapshot(refresh = false): Promise<SupplierSna
         throw new Error("Supplier catalog unavailable");
       }
       const snapshot: SupplierSnapshot = {
-        email: email.status === "fulfilled" ? email.value.slice(0, 2000) : [],
-        rentals: rentals.status === "fulfilled" ? rentals.value.slice(0, 2000) : [],
+        // Provider responses are already byte-bounded; don't silently discard
+        // valid listings beyond an arbitrary second per-feed limit. A rental
+        // area past row 2,000 belongs to a country too.
+        email: email.status === "fulfilled" ? email.value : [],
+        rentals: rentals.status === "fulfilled" ? rentals.value : [],
         partial: failures.length > 0,
         degraded: failures.length === 0 ? null : failures.every((failure) => isFundingFailure(failure.reason)) ? "funding" : "outage",
         fetchedAt: new Date().toISOString(),
