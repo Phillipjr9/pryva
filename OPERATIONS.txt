@@ -483,3 +483,154 @@ query strings are not requested. The panel cannot modify firewall rules. Make
 changes in Cloudflare only after checking admin access and webhook exemptions.
 Direct access to a Vercel hostname can bypass Cloudflare controls; separately
 review production and preview hostname protection with the platform provider.
+
+Traffic bursts on the public pages
+----------------------------------
+The homepage and the other marketing pages are prerendered and served from the
+host's cache; they are rebuilt in the background at most every five minutes
+(revalidate = 300 in src/app/(site)/layout.tsx), so a change to an environment
+variable they print can take that long to appear. npm run build lists every
+route: "○" is prerendered, "ƒ" is rendered for each request. /accounts,
+/contact, /esim, /pricing, /reviews, /status, /testimonials, /virtual-numbers,
+/login and /signup are still "ƒ"; a burst aimed at one of those is rendered by
+the application every time.
+
+A prerendered page cannot know who is looking at it. The header's signed-in
+state is fetched by the browser from /api/visitor after the page is shown: one
+small uncached request per page load, which reads the database only when the
+browser sends a session cookie. If it fails, the page stays as the signed-out
+version, whose links still work. The path is outside /api/auth/ on purpose: an
+edge rate limit meant for sign-in must not be spent by page views.
+
+What still reaches the application for every visitor, cached page or not:
+src/proxy.ts (headers only, no database) on each page and API request, and
+/api/visitor once per page load. Links from the header, footer and homepage to
+the per-request pages above are not prefetched, because that prefetch brings
+nothing back (src/components/site/SiteLink.tsx). Links to prerendered pages
+are, and those prefetches are served from the cache but still count as requests
+on the host's meter.
+
+Sessions and rate limits live in PostgreSQL, so any instance can serve any
+request; how many instances run, and how requests are spread across them, is the
+host's work and is not configured in this repository. None of this has been
+load-tested. It also does not change what the hosting plan allows: compare the
+plan's included requests, data transfer and function invocations with the
+traffic a launch or campaign is expected to bring, because a plan that pauses a
+project when an allowance is spent pauses it when the traffic arrives.
+
+Database capacity
+-----------------
+Migration 0044 only adds indexes: orders by status and by time, wallet
+transactions by order and by time, users by time. They serve the operator
+console's lists and totals, the cron sweeps over open orders, refunds and the
+daily reconciliation, all of which read whole tables without them. The runner
+applies each file in one transaction, so every index is built while writes to
+its table wait. On tables of thousands of rows that is momentary. If orders or
+wallet_transactions has grown to millions of rows, build them by hand first,
+outside a transaction, and let the deployment find them already present:
+
+  CREATE INDEX CONCURRENTLY IF NOT EXISTS orders_status_created_idx
+    ON orders (status, created_at);
+  CREATE INDEX CONCURRENTLY IF NOT EXISTS orders_created_idx
+    ON orders (created_at);
+  CREATE INDEX CONCURRENTLY IF NOT EXISTS wallet_transactions_order_idx
+    ON wallet_transactions (order_id) WHERE order_id IS NOT NULL;
+  CREATE INDEX CONCURRENTLY IF NOT EXISTS wallet_transactions_created_idx
+    ON wallet_transactions (created_at);
+  CREATE INDEX CONCURRENTLY IF NOT EXISTS users_created_idx
+    ON users (created_at);
+
+A concurrent build that is interrupted leaves an invalid index under the same
+name, which the migration would then skip. Check before deploying, and drop and
+rebuild anything this returns:
+
+  SELECT indexrelid::regclass FROM pg_index WHERE NOT indisvalid;
+
+/api/admin/users and /api/admin/orders return at most 100 rows per request (50
+by default); a larger limit is clamped rather than refused, and the response
+states the limit and offset it used. Page with limit and offset. The orders
+total now counts the rows matching the status filter instead of every order.
+
+Exports are bounded too, and they refuse instead of cutting a file short.
+/api/admin/export carries at most 10,000 rows and about 4 MB per request, oldest
+first, and reads only the columns the file contains. A range that holds more
+answers 413 with a message; narrow startDate and endDate and export in parts
+(CSV is the smaller format). Called with no dates it still means "everything",
+so on a large table it now answers 413 where it used to try. The console's
+"Export orders" button always sends the reporting period, so it is affected only
+when one period holds more than that. A customer's wallet export
+(/api/wallet/transactions/export) carries at most 5,000 entries, is allowed
+twice a minute for each account, and tells a customer with a longer history to
+contact support, as /api/user/export does. Send that customer their ledger from
+the database; the console has no per-customer export.
+
+The on-demand check at /admin/integrity is now a fixed number of SQL statements
+(two when the books are clean, four when they are not) instead of two or three
+queries for every account and every order. It gives the same counts. Two
+things an operator will notice: choosing "wallet" or "orders" now runs only that
+half; and the log names at most 25 failing accounts and 25 failing orders, with
+the reason for each, then the number left over. checkWalletIntegrity and
+checkOrderIntegrity (src/lib/payments/payment-integrity.ts) still give the full
+detail for one record, from code; no console page calls them. The daily close
+(reconciliation) is separate and unchanged.
+
+A customer's order history (/dashboard/orders) is read 200 orders at a time,
+newest first. The status filter and the search box are applied by the database
+over the whole history, and the counts beside the filters are still counts of
+everything, so the page behaves as it did; a list longer than 200 gains "Newer
+orders" and "Older orders" links. The search is a substring match over the
+customer's own rows and cannot use an index, like /api/search. The review form
+offers a customer's 100 most recent delivered orders that have no review yet,
+instead of every order they ever placed.
+
+Both connection pools fail a query that cannot get a connection within ten
+seconds instead of waiting without limit, and log instead of crashing when an
+idle connection is dropped ("[db] idle connection dropped"). "timeout exceeded
+when trying to connect" in the logs means the pool or the database is
+saturated: compare the database's connection count with instances x PG_POOL_MAX
+(.env.example) and lower PG_POOL_MAX before raising anything. There is no Redis
+or other cache server, and nothing here needs one yet: rate limits are rows in
+rate_limit_buckets and the public pages are cached by the host. /api/search
+still runs leading-wildcard ILIKE scans, bounded per account by its rate limit
+rather than by an index.
+
+Sign-in attack telemetry
+------------------------
+Every failed sign-in writes one log line, "Sign-in failed", with the reason
+(wrong_password, unknown_account, closed_account, account_locked, throttled or
+wrong_second_factor), the account ID when the address has one, and salted hashes
+of the address tried and of the client address. It never holds the password,
+the email address or the IP. The hashes use FRAUD_HASH_SALT, like the fraud
+tables, so a line can be matched to a row there.
+
+The host keeps runtime logs for a period that depends on the plan, and on the
+smallest plans that is about an hour: the lines are for watching an attack while
+it happens. What lasts is the queue at /admin/security, which gains three kinds:
+
+  login_lockout           An account was locked by 8 wrong passwords in a row.
+                          Warn. Not emailed: anyone who knows an address can
+                          cause it.
+  second_factor_guessing  10 wrong two-factor codes on one account in an hour.
+                          High, emailed. Each one followed a correct password,
+                          so treat that password as known and have it reset.
+  login_failure_spike     100 failed sign-ins across the site in an hour. High,
+                          emailed, and posted to ALERT_WEBHOOK_URL. At most
+                          once an hour for as long as it continues.
+
+Email goes to FRAUD_ALERT_EMAIL, or to ADMIN_EMAILS when that is unset, and
+needs Resend configured. With neither mail nor the webhook the events are still
+queued and nobody is told. The thresholds are constants in
+src/lib/platform/rate-limit.ts and have not been tuned against real traffic: if
+the hourly alert fires on an ordinary day, raise FAILED_SIGN_IN_ALERT_THRESHOLD
+rather than learning to ignore it. Counting stops for the rest of the hour once
+the alert is out, so the number in rate_limit_buckets is not a total.
+
+During an attack the limits are already refusing the attempts: 5 per address
+and 30 per connection in 15 minutes, then a 30-minute lock after 8 wrong
+passwords, which the correct password does not lift. Do not relax them. The log
+lines show whether one account, one network or many are involved. A single
+network can be blocked at the host's firewall, and a rate-limit rule there on
+/api/auth/ turns the rest away before they reach the application; see
+BOT_ATTACK_FINDINGS.md. A locked customer can sign in again after 30 minutes,
+or at once by completing a password reset. These alerts report an attack. They
+do not stop one, and they have not been exercised against production.
