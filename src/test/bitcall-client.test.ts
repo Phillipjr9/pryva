@@ -746,34 +746,35 @@ describe("OTP catalog", () => {
     expect(otpServiceLabelFromId("no-separators")).toBeNull();
   });
 
-  it("keeps a filtered country's services when the API omits a top-level countryCode", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
-      data: [{
-        name: "WhatsApp",
-        slug: "whatsapp",
-        availableCount: 17299,
-        pools: [{ serviceId: "CHARLIE-US-whatsapp", price: { amount: 2.03, currency: "USD" }, availableCount: 3321, successRate: 87 }],
-      }],
-    })));
-    const services = await listBitcallOtpServices({ countryCode: "US_1" });
-    expect(services).toHaveLength(1);
-    expect(services[0]).toMatchObject({ name: "WhatsApp", countryCode: "US_1" });
-    expect(services[0].offers).toHaveLength(1);
-  });
+  it("gives a service row no country, because the published row carries none", async () => {
+    // A row is `{ name, slug, availableCount, price, poolCount, pools }`. Reading a
+    // destination out of the slug filed every offer of a service called
+    // "US Mobile" under the United States, including the Canadian ones.
+    const fetchMock = vi.fn().mockImplementation(() => json({
+      data: [
+        {
+          name: "adidas", slug: "adidas", availableCount: 42780784, poolCount: 125,
+          price: { min: 0.336276, max: 52.29522, average: 5.820161, currency: "EUR" },
+          pools: [{ serviceId: "ALPHA-46-adidas", price: { amount: 0.336276, currency: "EUR" }, availableCount: 9999 }],
+        },
+        {
+          name: "US Mobile", slug: "us-mobile", availableCount: 40, poolCount: 1,
+          price: { min: 0.9, max: 0.9, average: 0.9, currency: "EUR" },
+          pools: [{ serviceId: "DELTA-CA-us_mobile", price: { amount: 0.9, currency: "EUR" }, availableCount: 40 }],
+        },
+      ],
+      meta: { page: 1, pageSize: 200, total: 2, totalPages: 1, hasNext: false },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
 
-  it("keeps a filtered country's services when the API omits a top-level countryCode", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
-      data: [{
-        name: "WhatsApp",
-        slug: "whatsapp",
-        availableCount: 17299,
-        pools: [{ serviceId: "CHARLIE-US-whatsapp", price: { amount: 2.03, currency: "USD" }, availableCount: 3321, successRate: 87 }],
-      }],
-    })));
-    const services = await listBitcallOtpServices({ countryCode: "US_1" });
-    expect(services).toHaveLength(1);
-    expect(services[0]).toMatchObject({ name: "WhatsApp", countryCode: "US_1" });
-    expect(services[0].offers).toHaveLength(1);
+    const services = await listBitcallOtpServices();
+
+    expect(services.map((service) => service.countryCode)).toEqual([null, null]);
+    expect(services.map((service) => service.offers[0].serviceId)).toEqual(["ALPHA-46-adidas", "DELTA-CA-us_mobile"]);
+    // And the walk asks for the whole catalogue: no country filter is sent.
+    const { url } = lastCall(fetchMock);
+    expect(url.pathname).toBe("/v1/otp/services");
+    expect([...url.searchParams.keys()].sort()).toEqual(["page", "pageSize"]);
   });
 
   it("drops a service whose offers carry no serviceId, since it could not be bought", async () => {
