@@ -11,7 +11,7 @@ const text = terms.replace(/\s+/g, " ");
  */
 describe("terms of service", () => {
   it("is dated, so a dispute can be settled against a known version", () => {
-    expect(text).toContain('const LAST_UPDATED = "30 October 2026"');
+    expect(text).toContain('const LAST_UPDATED = "11 November 2026"');
     expect(text).toContain("Version in force from");
     expect(text).toContain("Earlier versions");
   });
@@ -38,6 +38,7 @@ describe("terms of service", () => {
       "/refund-policy",
       "/privacy",
       "/cookie-policy",
+      "/account-provenance",
       "/contact",
       "/status",
       "/dashboard/settings#security",

@@ -21,7 +21,7 @@ describe("public site destinations", () => {
     // /blog, /help, /testimonials and /status were published pages that nothing
     // on the site linked to; /terms and /privacy were missing from the footer
     // while the less central refund and cookie policies were listed.
-    for (const href of ["/blog", "/help", "/testimonials", "/status", "/terms", "/privacy", "/refund-policy", "/cookie-policy", "/about", "/how-it-works", "/pricing", "/faq", "/contact", "/digital-services", "/accounts"]) {
+    for (const href of ["/blog", "/help", "/testimonials", "/status", "/terms", "/privacy", "/refund-policy", "/account-provenance", "/cookie-policy", "/about", "/how-it-works", "/pricing", "/faq", "/contact", "/digital-services", "/accounts"]) {
       expect(hrefs.has(href), href).toBe(true);
     }
   });
