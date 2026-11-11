@@ -87,8 +87,6 @@ describe("Bitcall app-specific OTP catalogue", () => {
   it("re-resolves an opaque offer ID from the live listing before checkout", async () => {
     const id = otpOfferPublicId("ng", "private-service-id-1", "WhatsApp");
     const result = await findOtpCheckoutOffer("ng", id, { refresh: true });
-    // The fifth argument is `refresh`; the fourth is the optional deadline, which
-    // a checkout does not set. A checkout must never be answered from a cache.
     expect(state.read).toHaveBeenCalledWith("bitcall", "ng", "Nigeria", undefined, true);
     expect(result).toMatchObject({
       errorCode: null,
