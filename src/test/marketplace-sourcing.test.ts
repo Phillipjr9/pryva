@@ -8,6 +8,7 @@ const runtime = vi.hoisted(() => ({
   catalogError: null as Error | null,
   productError: null as Error | null,
   legacyListings: [] as Record<string, unknown>[],
+  legacyPaged: false,
   legacyCategories: [] as { id: number; title: string; slug: string }[],
   legacyError: null as Error | null,
   order: null as { orderCode: string } | null,
@@ -76,11 +77,11 @@ vi.mock("@/lib/providers/accszone", () => {
   return {
     AccsZoneError,
     isAccsZoneConfigured: () => runtime.accszoneConfigured,
-    listListings: async () => {
+    listListings: async (query: { page?: number } = {}) => {
       if (runtime.legacyError) throw runtime.legacyError;
       return {
-        listings: runtime.legacyListings,
-        meta: { current_page: 1, last_page: 1, per_page: 20, total: runtime.legacyListings.length },
+        listings: runtime.legacyPaged ? runtime.legacyListings.slice((query.page ?? 1) - 1, query.page ?? 1) : runtime.legacyListings,
+        meta: { current_page: query.page ?? 1, last_page: runtime.legacyPaged ? runtime.legacyListings.length : 1, per_page: runtime.legacyPaged ? 1 : 20, total: runtime.legacyListings.length },
       };
     },
     listAllCategories: async () => {
@@ -108,6 +109,7 @@ import {
   labelId,
   listMarketplaceCategories,
   listMarketplaceListings,
+  clearMarketplaceCatalogCache,
   marketplaceSource,
   MarketplaceError,
   parseListingSlug,
@@ -145,7 +147,9 @@ function secretLeak(value: unknown): string[] {
 }
 
 beforeEach(() => {
+  clearMarketplaceCatalogCache();
   runtime.preview = false;
+  runtime.legacyPaged = false;
   runtime.bulkaccConfigured = true;
   runtime.accszoneConfigured = true;
   runtime.products = [SPOTIFY, GMAIL, SOLD_OUT];
@@ -223,8 +227,67 @@ describe("sourcing order", () => {
     runtime.bulkaccConfigured = true;
     runtime.accszoneConfigured = true;
     runtime.catalogError = new Error("catalog read failed");
+    clearMarketplaceCatalogCache();
     const fallen = await listMarketplaceListings();
     expect(fallen.listings.some((listing) => listing.slug === "p2:legacy-instagram")).toBe(true);
+  });
+
+  it("combines both feeds and applies shared social filters even when the primary succeeds", async () => {
+    const result = await listMarketplaceListings({ perPage: 60 });
+    expect(result.partial).toBe(false);
+    expect(result.listings.some((listing) => listing.slug.startsWith("p1:"))).toBe(true);
+    expect(result.listings.some((listing) => listing.slug === "p2:legacy-instagram")).toBe(true);
+    const categories = await listMarketplaceCategories();
+    const social = categories.categories.find((category) => category.title === "Social")!;
+    expect(social).toBeDefined();
+    const filtered = await listMarketplaceListings({ categoryId: social.id, search: "instagram" });
+    expect(filtered.listings.map((listing) => listing.slug)).toContain("p2:legacy-instagram");
+  });
+
+  it("walks all secondary pages before shared filtering and pagination", async () => {
+    runtime.legacyPaged = true;
+    runtime.legacyListings.push({ ...runtime.legacyListings[0], id: 8, slug: "facebook-second-page", title: "Facebook aged account", category: { id: 2, title: "Facebook", slug: "facebook" } });
+    const result = await listMarketplaceListings({ search: "facebook", perPage: 1 });
+    expect(result.partial).toBe(false);
+    expect(result.listings.map((listing) => listing.slug)).toEqual(["p2:facebook-second-page"]);
+    expect(result.meta.total).toBe(1);
+  });
+
+  it("resumes larger secondary catalogues after the read-budget cooldown", async () => {
+    runtime.legacyPaged = true;
+    const sample = runtime.legacyListings[0];
+    runtime.legacyListings = Array.from({ length: 26 }, (_, index) => ({ ...sample, id: index + 1, slug: `page-${index + 1}`, title: `Instagram page${index + 1}` }));
+    const first = await listMarketplaceListings({ search: "page26" });
+    expect(first.partial).toBe(true);
+    expect(first.listings).toEqual([]);
+    const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 61_000);
+    try {
+      const complete = await listMarketplaceListings({ search: "page26" });
+      expect(complete.partial).toBe(false);
+      expect(complete.listings.map((listing) => listing.slug)).toEqual(["p2:page-26"]);
+    } finally { clock.mockRestore(); }
+  });
+
+  it("sorts the entire combined catalogue by Naira selling price before slicing pages", async () => {
+    const sellingPrice = vi.fn(async (listing: { slug: string }) => listing.slug === "p1:300004" ? 10 : listing.slug === "p2:legacy-instagram" ? 20 : 500);
+    const first = await listMarketplaceListings({ perPage: 1, page: 1, sellingPrice });
+    const second = await listMarketplaceListings({ perPage: 1, page: 2, sellingPrice });
+    expect(first.listings[0].slug).toBe("p1:300004");
+    expect(second.listings[0].slug).toBe("p2:legacy-instagram");
+    expect(first.meta.total).toBe(second.meta.total);
+    expect(first.meta.total).toBeGreaterThan(3);
+  });
+
+  it("retains the working feed and marks the combined catalogue incomplete when the other fails", async () => {
+    runtime.legacyError = new Error("unavailable");
+    const result = await listMarketplaceListings({ perPage: 60 });
+    expect(result.partial).toBe(true);
+    expect(result.listings.some((listing) => listing.slug.startsWith("p1:"))).toBe(true);
+  });
+
+  it("coalesces categories and listing requests into one shared read", async () => {
+    await Promise.all([listMarketplaceListings(), listMarketplaceCategories(), listMarketplaceListings({ search: "instagram" })]);
+    expect(runtime.calls.listAllProducts).toBe(1);
   });
 
   it("serves one catalog read for search, grouping, sorting and paging", async () => {
@@ -234,7 +297,7 @@ describe("sourcing order", () => {
     expect(meta.total).toBeGreaterThan(2);
 
     // In-stock items outrank sold-out ones whatever the sort asks for.
-    const all = await listMarketplaceListings({ perPage: 60 });
+    const all = await listMarketplaceListings({ perPage: 60, sort: "sort_key" });
     const last = all.listings[all.listings.length - 1];
     expect(last.stock).toBe(0);
 

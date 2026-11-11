@@ -395,7 +395,7 @@ export default async function HomePage() {
 
                 <div className="w-full max-w-sm rounded-2xl border border-line bg-white/85 p-5">
                   <p className="text-micro font-semibold uppercase tracking-[0.14em] text-ink-3">
-                    Account marketplace
+                    Social &amp; Digital Accounts
                   </p>
                   <p className="mt-1 text-[2rem] font-medium tracking-tight">
                     Browse listings
@@ -405,7 +405,7 @@ export default async function HomePage() {
                     you confirm.
                   </p>
                   <Link href="/accounts" className="btn btn-primary mt-4 w-full">
-                    Browse accounts
+                    Browse social &amp; digital accounts
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>

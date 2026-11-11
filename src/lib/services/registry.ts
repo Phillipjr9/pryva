@@ -209,8 +209,8 @@ export const SERVICES: readonly ServiceDefinition[] = [
   },
   {
     id: "accounts",
-    label: "Accounts",
-    description: "Account marketplace",
+    label: "Social & Digital Accounts",
+    description: "Social media, email & other accounts",
     sale: { kind: "supplier", source: "marketplace" },
     lane: "accounts",
     orderServices: ["accounts"],
@@ -228,7 +228,7 @@ export const SERVICES: readonly ServiceDefinition[] = [
     retry: { attempts: 1, delayMs: 60_000 },
   },
   {
-    id: "games", label: "Games & gaming", description: "Games, keys & game currency",
+    id: "games", label: "Games & gaming", description: "Games, keys, credits & game top-ups",
     sale: { kind: "catalogue" }, lane: null, orderServices: ["gift-cards", "subscriptions"], deliveryMinutes: null, retry: null,
   },
   {
@@ -245,8 +245,8 @@ export const SERVICES: readonly ServiceDefinition[] = [
   },
   {
     id: "data",
-    label: "Mobile data",
-    description: "Local network plans",
+    label: "Mobile data & airtime",
+    description: "Local data bundles & phone credit",
     sale: { kind: "supplier", source: "fleexa" },
     lane: "data",
     orderServices: ["data", "airtime"],

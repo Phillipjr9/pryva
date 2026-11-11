@@ -122,18 +122,12 @@ export async function GET(request: NextRequest) {
   let esim: Source<Awaited<ReturnType<typeof readEsimCatalog>>> | null = null;
   let otp: Source<{ offers: Awaited<ReturnType<typeof readOtpOffersForSupplier>>["offers"]; partial: boolean; degraded: "funding" | "outage" | null; fetchedAt: string; }> | null = null;
 
-  if (!requestedFeed) {
-    supplier = await readSocial();
-  }
-  if (!requestedFeed || requestedFeed === "social") {
-    boost = await readBoost();
-  }
-  if (!requestedFeed || requestedFeed === "esim") {
-    esim = await readEsim();
-  }
-  if (!requestedFeed || requestedFeed === "numbers" || requestedFeed === "verification") {
-    otp = await readOtp();
-  }
+  [supplier, boost, esim, otp] = await Promise.all([
+    (!requestedFeed || requestedFeed === "numbers") ? readSocial() : null,
+    (!requestedFeed || requestedFeed === "social") ? readBoost() : null,
+    (!requestedFeed || requestedFeed === "esim") ? readEsim() : null,
+    (!requestedFeed || requestedFeed === "numbers" || requestedFeed === "verification") ? readOtp() : null,
+  ]);
 
   const sources = [supplier, boost, esim, otp].filter((source): source is NonNullable<typeof source> => source !== null);
   console.log("CATALOG_ROUTE_SOURCE_STATUS", {

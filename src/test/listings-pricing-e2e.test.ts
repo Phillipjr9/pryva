@@ -68,6 +68,7 @@ vi.mock("@/lib/providers/accszone", () => {
 });
 
 const { GET } = await import("@/app/api/accounts/listings/route");
+const { clearMarketplaceCatalogCache } = await import("@/lib/services/accounts/marketplace-suppliers");
 const { clearManualCatalogCache } = await import("@/lib/services/accounts/manual-catalog");
 
 const request = () => new NextRequest("https://pryva.test/api/accounts/listings", {
@@ -75,6 +76,7 @@ const request = () => new NextRequest("https://pryva.test/api/accounts/listings"
 });
 
 beforeEach(() => {
+  clearMarketplaceCatalogCache();
   runtime.preview = false;
   runtime.bulkaccConfigured = true;
   runtime.accszoneConfigured = false;
@@ -113,6 +115,8 @@ describe("listings route pricing, end to end", () => {
 
     const body = await response.json();
     expect(body.configured).toBe(true);
+    const prices = body.listings.map((listing: { priceNgn: number }) => listing.priceNgn);
+    expect(prices).toEqual([...prices].sort((a, b) => a - b));
     expect(body.listings.length).toBeGreaterThan(0);
 
     for (const listing of body.listings) {
@@ -122,7 +126,7 @@ describe("listings route pricing, end to end", () => {
     }
 
     // $3.48 at ₦1600 costs ₦5,568 and must sell above cost, inside the band.
-    const spotify = body.listings.find((l: { title: string }) => l.title.includes("Spotify"));
+    const spotify = body.listings.find((l: { slug: string }) => l.slug === "p1:300004");
     expect(spotify.priceNgn).toBeGreaterThanOrEqual(7238); // cost × 1.30 floor
     expect(spotify.priceNgn).toBeLessThanOrEqual(8352);    // cost × 1.50 ceiling
   });
@@ -163,6 +167,8 @@ describe("listings route pricing, end to end", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.configured).toBe(true);
+    const prices = body.listings.map((listing: { priceNgn: number }) => listing.priceNgn);
+    expect(prices).toEqual([...prices].sort((a, b) => a - b));
     expect(body.listings.length).toBeGreaterThan(0);
     expect(body.listings.every((l: { slug: string }) => l.slug.startsWith("p3:"))).toBe(true);
     for (const listing of body.listings) {

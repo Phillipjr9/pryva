@@ -6,7 +6,7 @@ import { ArrowRight, Shield } from "@/components/icons";
 import { isMarketplaceCheckoutConfigured } from "@/lib/services/accounts/marketplace-policy";
 import { ServiceTitle } from "@/components/ServiceTitle";
 
-export const metadata: Metadata = { title: "Accounts" };
+export const metadata: Metadata = { title: "Social & Digital Accounts" };
 
 /**
  * The accounts catalogue, inside the dashboard shell.
@@ -24,10 +24,10 @@ export default async function DashboardAccountsPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <ServiceTitle service="accounts">
-            Accounts
+            Social &amp; Digital Accounts
           </ServiceTitle>
           <p className="mt-1 text-[0.875rem] text-ink-2">
-            Browse live listings priced in Naira. Country coverage is not provided or filtered here, and stock can change.
+            Buy Facebook, Instagram, TikTok, email and other digital accounts, including aged accounts where listed. Check each listing for its age, features and delivery details. Prices are in Naira; country coverage is not filtered here and stock can change.
           </p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-micro text-ink-3">

@@ -69,7 +69,7 @@ describe("dashboard navigation", () => {
   });
 
   it("routes accounts directly to the dashboard browser instead of an extra hub step", () => {
-    expect(shell).toContain('{ href: "/dashboard/accounts", label: "Accounts", art: "accounts"');
+    expect(shell).toContain('{ href: "/dashboard/accounts", label: "Social & Digital Accounts", art: "accounts"');
     expect(shell).not.toContain('{ href: "/accounts"');
     const explorer = readFileSync(join(root, "lib/services/service-explorer.ts"), "utf8");
     expect(explorer).toContain('href: "/dashboard/accounts"');

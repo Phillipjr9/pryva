@@ -4,6 +4,7 @@ import {
   listMarketplaceListings,
   MarketplaceError,
   type ListingQuery,
+  type MarketplaceListing,
 } from "@/lib/services/accounts/marketplace-suppliers";
 import { isMarketplaceCatalogAvailable } from "@/lib/services/accounts/marketplace-suppliers";
 import { isMarketplaceCheckoutConfigured } from "@/lib/services/accounts/marketplace-policy";
@@ -37,18 +38,30 @@ export async function GET(request: NextRequest) {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
   };
 
-  const sortParam = params.get("sort") ?? "sort_key";
+  const sortParam = params.get("sort") ?? "total_price";
   const query: ListingQuery = {
     categoryId: toPositiveInt(params.get("categoryId")),
     subcategoryId: toPositiveInt(params.get("subcategoryId")),
     search: params.get("search")?.trim().slice(0, 80) || undefined,
-    sort: (ALLOWED_SORTS.has(sortParam) ? sortParam : "sort_key") as ListingQuery["sort"],
+    sort: (ALLOWED_SORTS.has(sortParam) ? sortParam : "total_price") as ListingQuery["sort"],
     direction: params.get("direction") === "desc" ? "desc" : "asc",
     page: toPositiveInt(params.get("page")) ?? 1,
   };
 
   try {
-    const { listings, meta } = await listMarketplaceListings(query);
+    const prices = new Map<string, Promise<Awaited<ReturnType<typeof priceMarketplaceListing>>>>();
+    function priceFor(listing: MarketplaceListing) {
+      let price = prices.get(listing.slug);
+      if (!price) {
+        price = priceMarketplaceListing({ unitPriceUsd: listing.priceUsd, quantity: 1,
+          categoryTitle: listing.category ?? undefined, subcategoryTitle: listing.subcategory ?? undefined });
+        prices.set(listing.slug, price);
+      }
+      return price;
+    }
+    const { listings, meta, partial } = await listMarketplaceListings({ ...query,
+      sellingPrice: async (listing) => (await priceFor(listing)).unitNgn,
+    });
 
     const checkoutEnabled = isMarketplaceCheckoutConfigured();
     // Asked only when it can change an answer: with checkout off, or with no
@@ -59,14 +72,7 @@ export async function GET(request: NextRequest) {
 
     const priced = await Promise.all(
       listings.map(async (listing) => {
-        const breakdown = await priceMarketplaceListing({
-          unitPriceUsd: listing.priceUsd,
-          quantity: 1,
-          // Premiums match on the source's own product-line text, which never
-          // leaves the server; only the Pryva group label is returned.
-          categoryTitle: listing.category ?? undefined,
-          subcategoryTitle: listing.subcategory ?? undefined,
-        });
+        const breakdown = await priceFor(listing);
 
         return {
           id: labelId(listing.slug),
@@ -98,7 +104,7 @@ export async function GET(request: NextRequest) {
       }),
     );
 
-    return NextResponse.json({ configured: true, listings: priced, meta }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ configured: true, listings: priced, meta, partial: !!partial }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof MarketplaceError) {
       logger.error("Marketplace listings failed", { code: error.code, status: error.status });

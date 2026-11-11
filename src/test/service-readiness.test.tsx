@@ -141,11 +141,17 @@ describe("the hub's arrangement", () => {
 
   it.each([
     ["data", "View data service status", "/dashboard/data"],
-    ["subscriptions", "View subscription service status", "/dashboard/digital"],
+
   ] as const)("explains the empty %s category without inventing listings", (category, label, href) => {
     render(<ServiceExplorer initialCountry="ng" initialCategory={category} />);
     expect(screen.getByText(/No plans or prices are available to order/i)).toBeTruthy();
     expect(screen.getByRole("link", { name: label }).getAttribute("href")).toBe(href);
+  });
+
+  it("explains an empty subscription shelf without claiming every subscription is disabled", () => {
+    render(<ServiceExplorer initialCountry="ng" initialCategory="subscriptions" />);
+    expect(screen.getByText(/No subscription listings have loaded/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Ask about subscriptions" }).getAttribute("href")).toBe("/dashboard/support");
   });
 
   it("does not offer the request path for a category that can be bought", () => {

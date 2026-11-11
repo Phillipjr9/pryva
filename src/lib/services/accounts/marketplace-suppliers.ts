@@ -5,14 +5,8 @@
  * Every route goes through this module, so no route, response, log line or
  * browser bundle ever needs to know a supplier's name.
  *
- * Sourcing order (owner's decision):
- *   1. **Primary** — the configured account marketplace with a documented API.
- *      Used whenever its key is present and its catalog can be read.
- *   2. **Fallback** — the legacy marketplace client, used when the primary is
- *      not configured or its catalog read fails.
- *   3. **Manual lane** — products sourced by hand (`data/manual-catalog.json`).
- *      No API exists for them, so they are sold as Pryva catalog items and
- *      fulfilled through the admin queue.
+ * Browsing combines both configured API catalogues and the manual lane.
+ * Supplier preference never hides another supplier's account listings.
  *
  * Two rules this module exists to protect:
  *
@@ -42,8 +36,6 @@ import {
   AccsZoneError,
   getListing,
   isAccsZoneConfigured,
-  listAllCategories,
-  listAllSubcategories,
   listListings,
   purchaseAccounts,
   type AccsZoneRef,
@@ -395,67 +387,96 @@ export type ListingQuery = {
   direction?: "asc" | "desc";
   page?: number;
   perPage?: number;
+  /** Server-only selling-price resolver, used before global pagination. */
+  sellingPrice?: (listing: MarketplaceListing) => Promise<number>;
 };
 
-/** Pryva-facing groups for the storefront filter rail. */
-export async function listMarketplaceCategories(): Promise<{
-  categories: MarketplaceCategory[];
-  subcategories: MarketplaceCategory[];
-  source: CatalogSource;
-}> {
-  const sort = (entries: Map<string, number>) =>
-    [...entries.entries()]
-      .map(([title, id]) => ({ id, title, slug: title.toLowerCase().replace(/[^a-z0-9]+/g, "-") }))
-      .sort((a, b) => a.title.localeCompare(b.title));
+type BrowseCatalog = { listings: MarketplaceListing[]; source: CatalogSource; partial: boolean };
+const BROWSE_TTL_MS = 5 * 60 * 1000;
+let browseCache: { key: string; expires: number; value: BrowseCatalog } | null = null;
+let browsePending: { key: string; promise: Promise<BrowseCatalog> } | null = null;
+let secondaryProgress: { listings: MarketplaceListing[]; nextPage: number; expires: number } | null = null;
 
-  const manual = manualListings();
-  const primary = await primaryListings();
-  if (primary || manual.length) {
-    const groups = new Map<string, number>();
-    const lines = new Map<string, number>();
-    for (const listing of [...manual, ...(primary ?? [])]) {
-      const group = listing.browseGroup ?? listing.group;
-      if (group) groups.set(group, labelId(group));
-      if (listing.category) lines.set(listing.category, labelId(listing.category));
-    }
-    return {
-      categories: sort(groups),
-      subcategories: sort(lines),
-      source: primary ? "primary" : "none",
-    };
-  }
-
-  if (isAccsZoneConfigured()) {
-    try {
-      const categories = await listAllCategories();
-      return {
-        categories: categories.map(({ id, title, slug }) => ({ id, title, slug })),
-        subcategories: [],
-        source: "fallback",
-      };
-    } catch (error) {
-      logger.warn("Fallback account catalog unavailable", {
-        code: error instanceof AccsZoneError ? error.code : "unknown_error",
-      });
-    }
-  }
-
-  return { categories: [], subcategories: [], source: "none" };
+export function clearMarketplaceCatalogCache(): void {
+  browseCache = null;
+  browsePending = null;
+  secondaryProgress = null;
 }
 
-/** Subcategories for one category id (fallback source only needs this). */
-export async function listMarketplaceSubcategories(categoryId: number): Promise<MarketplaceCategory[]> {
-  const source = marketplaceSource();
-  if (source !== "fallback") return [];
+/** A single shared snapshot keeps category IDs, filtering and pagination aligned.
+ * Bounded reads protect the legacy account-wide rate budget. Incomplete reads
+ * are explicitly labelled, never presented as a complete combined catalogue.
+ * Prices and stock are still re-read from the selected supplier at checkout. */
+async function combinedCatalog(): Promise<BrowseCatalog> {
+  const key = `${isBulkaccConfigured()}:${isAccsZoneConfigured()}`;
+  if (browseCache?.key === key && browseCache.expires > Date.now()) return browseCache.value;
+  if (browsePending?.key === key) return browsePending.promise;
+  const promise = (async () => {
+    const [primary, secondary] = await Promise.all([
+      primaryListings(),
+      (async () => {
+        if (!isAccsZoneConfigured()) { secondaryProgress = null; return { listings: [], partial: false }; }
+        const progress = secondaryProgress && secondaryProgress.expires > Date.now() ? secondaryProgress : null;
+        const listings: MarketplaceListing[] = [...(progress?.listings ?? [])];
+        const seen = new Set(listings.map((listing) => listing.slug));
+        let page = progress?.nextPage ?? 1;
+        const lastRead = page + 24;
+        try {
+          for (; page <= lastRead; page++) {
+            const result = await listListings({ page });
+            if (!Array.isArray(result.listings) || !Number.isSafeInteger(result.meta.last_page) || result.meta.last_page < page || result.meta.current_page !== page) throw new Error("Invalid catalogue page");
+            let added = 0;
+            for (const row of result.listings) {
+              const listing = fromAccsZone(row);
+              if (seen.has(listing.slug)) continue;
+              seen.add(listing.slug);
+              listings.push({ ...listing, browseGroup: browseGroupFor(listing) });
+              added++;
+            }
+            if (page >= result.meta.last_page) { secondaryProgress = null; return { listings, partial: false }; }
+            if (!added) throw new Error("Catalogue pagination stalled");
+          }
+        } catch (error) {
+          logger.warn("Account catalogue partly unavailable", { code: error instanceof AccsZoneError ? error.code : "catalog_read_failed" });
+        }
+        // Resume remaining pages after the short incomplete-cache cooldown,
+        // rather than permanently hiding everything past the read budget.
+        secondaryProgress = { listings, nextPage: page, expires: Date.now() + 30 * 60 * 1000 };
+        return { listings, partial: true };
+      })(),
+    ]);
+    return {
+      listings: [...manualListings(), ...(primary ?? []), ...secondary.listings],
+      source: primary ? "primary" as const : secondary.listings.length ? "fallback" as const : "none" as const,
+      partial: (isBulkaccConfigured() && primary === null) || secondary.partial,
+    };
+  })();
+  const pending = { key, promise };
+  browsePending = pending;
   try {
-    const subcategories = await listAllSubcategories(categoryId);
-    return subcategories.map(({ id, title, slug }) => ({ id, title, slug }));
-  } catch (error) {
-    logger.warn("Fallback subcategories unavailable", {
-      code: error instanceof AccsZoneError ? error.code : "unknown_error",
-    });
-    return [];
+    const value = await promise;
+    if (browsePending === pending) browseCache = { key, value, expires: Date.now() + (value.partial ? 60_000 : BROWSE_TTL_MS) };
+    return value;
+  } finally {
+    if (browsePending === pending) browsePending = null;
   }
+}
+
+function categoryEntries(listings: MarketplaceListing[], field: "group" | "category") {
+  const labels = new Set(listings.map((listing) => field === "group" ? listing.browseGroup ?? listing.group : listing.category).filter((label): label is string => !!label));
+  return [...labels].sort((a, b) => a.localeCompare(b)).map((title) => ({ id: labelId(title), title, slug: title.toLowerCase().replace(/[^a-z0-9]+/g, "-") }));
+}
+
+export async function listMarketplaceCategories(): Promise<{
+  categories: MarketplaceCategory[]; subcategories: MarketplaceCategory[]; source: CatalogSource; partial?: boolean;
+}> {
+  const catalog = await combinedCatalog();
+  return { categories: categoryEntries(catalog.listings, "group"), subcategories: categoryEntries(catalog.listings, "category"), source: catalog.source, partial: catalog.partial };
+}
+
+export async function listMarketplaceSubcategories(categoryId: number): Promise<MarketplaceCategory[]> {
+  const catalog = await combinedCatalog();
+  return categoryEntries(catalog.listings.filter((listing) => labelId(listing.browseGroup ?? listing.group ?? "") === categoryId), "category");
 }
 
 function matchesSearch(listing: MarketplaceListing, search: string): boolean {
@@ -478,7 +499,7 @@ function sortListings(listings: MarketplaceListing[], sort: string, direction: "
     // sold-out listings it can actually fulfil.
     const aAvailable = a.available ? 0 : 1;
     const bAvailable = b.available ? 0 : 1;
-    return aAvailable - bAvailable || delta * factor;
+    return (sort === "total_price" ? 0 : aAvailable - bAvailable) || delta * factor || a.slug.localeCompare(b.slug);
   });
 }
 
@@ -489,13 +510,13 @@ function sortListings(listings: MarketplaceListing[], sort: string, direction: "
  * so a group that only exists in the hand-sourced catalog still filters
  * correctly instead of resolving to nothing.
  */
-function pageInMemory(
+async function pageInMemory(
   listings: MarketplaceListing[],
   query: ListingQuery,
   page: number,
   perPage: number,
   source: CatalogSource,
-): { listings: MarketplaceListing[]; meta: MarketplaceMeta; source: CatalogSource } {
+): Promise<{ listings: MarketplaceListing[]; meta: MarketplaceMeta; source: CatalogSource }> {
   let filtered = listings;
 
   if (query.categoryId) {
@@ -512,7 +533,13 @@ function pageInMemory(
     filtered = filtered.filter((listing) => matchesSearch(listing, query.search as string));
   }
 
-  const sorted = sortListings(filtered, query.sort ?? "sort_key", query.direction ?? "asc");
+  const sort = query.sort ?? "total_price";
+  let sorted: MarketplaceListing[];
+  if (sort === "total_price" && query.sellingPrice) {
+    const priced = await Promise.all(filtered.map(async (listing) => ({ listing, price: await query.sellingPrice!(listing) })));
+    const direction = query.direction === "desc" ? -1 : 1;
+    sorted = priced.sort((a, b) => (a.price - b.price) * direction || a.listing.slug.localeCompare(b.listing.slug)).map(({ listing }) => listing);
+  } else sorted = sortListings(filtered, sort, query.direction ?? "asc");
   const total = sorted.length;
   return {
     listings: sorted.slice((page - 1) * perPage, page * perPage),
@@ -528,58 +555,13 @@ function pageInMemory(
  * grouping, sorting and pagination instead of one call per page view.
  */
 export async function listMarketplaceListings(query: ListingQuery = {}): Promise<{
-  listings: MarketplaceListing[];
-  meta: MarketplaceMeta;
-  source: CatalogSource;
+  listings: MarketplaceListing[]; meta: MarketplaceMeta; source: CatalogSource; partial?: boolean;
 }> {
-  const page = Number.isSafeInteger(query.page) && (query.page as number) > 0 ? (query.page as number) : 1;
-  const perPage = Number.isSafeInteger(query.perPage) && (query.perPage as number) > 0
-    ? Math.min(query.perPage as number, 60)
-    : 24;
-
-  const manual = manualListings();
-  const primary = await primaryListings();
-
-  // Hand-sourced items need no API key, so they are sellable on their own and
-  // always merge with the primary catalog when one is connected.
-  if (primary || !isAccsZoneConfigured()) {
-    return pageInMemory([...manual, ...(primary ?? [])], query, page, perPage, primary ? "primary" : "none");
-  }
-
-  try {
-    const { listings, meta } = await listListings({
-      categoryId: query.categoryId,
-      subcategoryId: query.subcategoryId,
-      search: query.search,
-      sort: query.sort,
-      direction: query.direction,
-      page,
-    });
-    // This source pages server-side, so hand-sourced items join the first page
-    // rather than disturbing its pagination.
-    const merged = page === 1 ? [...manual, ...listings.map(fromAccsZone)] : listings.map(fromAccsZone);
-    return {
-      listings: merged,
-      // The source reports its own total; add the hand-sourced rows once so the
-      // pager does not offer a page that has nothing on it.
-      meta: { ...meta, total: meta.total + (page === 1 ? manual.length : 0) },
-      source: "fallback",
-    };
-  } catch (error) {
-    if (manual.length) {
-      // Losing the supplier feed should not empty the storefront: the
-      // hand-sourced catalog can still be sold.
-      logger.warn("Falling back to the hand-sourced catalog only", {
-        code: error instanceof AccsZoneError ? error.code : "unknown_error",
-      });
-      return pageInMemory(manual, query, page, perPage, "none");
-    }
-    throw new MarketplaceError(
-      "Could not load listings",
-      error instanceof AccsZoneError ? error.code : "unknown_error",
-      error instanceof AccsZoneError && error.status === 429 ? 429 : 502,
-    );
-  }
+  const page = Number.isSafeInteger(query.page) && (query.page as number) > 0 ? query.page as number : 1;
+  const perPage = Number.isSafeInteger(query.perPage) && (query.perPage as number) > 0 ? Math.min(query.perPage as number, 60) : 24;
+  const catalog = await combinedCatalog();
+  const result = await pageInMemory(catalog.listings, query, page, perPage, catalog.source);
+  return { ...result, partial: catalog.partial };
 }
 
 /**

@@ -155,7 +155,7 @@ const serviceDefinitions: Service[] = [
     ],
   },
   {
-    slug: "accounts", name: "Digital Accounts", shortName: "Accounts", href: "/accounts",
+    slug: "accounts", name: "Social & Digital Accounts", shortName: "Social & Digital Accounts", href: "/accounts",
     eyebrow: "Marketplace", tagline: "Explore account listings.",
     description: "Browse live account listings when available, priced in naira. Orders that cannot be confirmed go to review instead of charging you twice.",
     intro: "Account listings, stock and prices are read live. Availability and credentials are not guaranteed; a purchase that cannot be confirmed is held for review.",

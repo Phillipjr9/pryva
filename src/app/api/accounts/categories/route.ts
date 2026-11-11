@@ -32,15 +32,15 @@ export async function GET(request: NextRequest) {
       if (!Number.isInteger(categoryId) || categoryId <= 0) {
         return NextResponse.json({ error: "Invalid category" }, { status: 400 });
       }
-      const [{ categories }, subcategories] = await Promise.all([
+      const [{ categories, partial }, subcategories] = await Promise.all([
         listMarketplaceCategories(),
         listMarketplaceSubcategories(categoryId),
       ]);
-      return NextResponse.json({ configured: true, categories, subcategories });
+      return NextResponse.json({ configured: true, categories, subcategories, partial: !!partial });
     }
 
-    const { categories, subcategories } = await listMarketplaceCategories();
-    return NextResponse.json({ configured: true, categories, subcategories });
+    const { categories, subcategories, partial } = await listMarketplaceCategories();
+    return NextResponse.json({ configured: true, categories, subcategories, partial: !!partial });
   } catch (error) {
     if (error instanceof MarketplaceError) {
       logger.error("Marketplace categories failed", { code: error.code, status: error.status });

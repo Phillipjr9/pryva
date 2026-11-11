@@ -76,14 +76,12 @@ describe("dashboard sidebar coverage", () => {
     expect(glyphOf(subscriptions!.html)).not.toBe(glyphOf(accounts!.html));
   });
 
-  it("provides direct Stars and Call of Duty Mobile links", () => {
+  it("groups Stars and Call of Duty under their shared product categories", () => {
     const nav = anchors(render());
-    const stars = nav.find((a) => a.href === "/dashboard/telegram-stars");
-    const cod = nav.find((a) => a.href === "/dashboard/call-of-duty-mobile");
-    expect(stars?.html).toContain("Telegram Stars");
-    expect(stars?.html).toContain("<svg");
-    expect(cod?.html).toContain("Call of Duty Mobile CP");
-    expect(cod?.html).toContain("/digital-brand-icons/call-of-duty-mobile.png");
+    expect(nav.find((a) => a.href === "/dashboard/services?category=topups")).toBeTruthy();
+    expect(nav.find((a) => a.href === "/dashboard/services?category=games")).toBeTruthy();
+    expect(nav.find((a) => a.href === "/dashboard/telegram-stars")).toBeUndefined();
+    expect(nav.find((a) => a.href === "/dashboard/call-of-duty-mobile")).toBeUndefined();
   });
 
   it("links the review page that used to have no entry point", () => {
@@ -112,7 +110,7 @@ describe("dashboard sidebar coverage", () => {
       );
     }
     // Pryva-issued wallet credit is managed separately from third-party cards.
-    expect(hrefs).toContain("/dashboard/gift-cards");
+    expect(hrefs).toContain("/dashboard/services?category=gift-cards");
   });
 });
 
@@ -172,7 +170,7 @@ describe("sidebar and tab icons", () => {
     }
   });
 
-  it("only uses the bundled Call of Duty image in the sidebar", () => {
+  it("uses service icons rather than duplicate standalone product images in the sidebar", () => {
     const html = render();
     expect(html).not.toContain("/images/nav/");
     expect(html).not.toContain("/images/services/");
@@ -180,8 +178,7 @@ describe("sidebar and tab icons", () => {
     // logo and legitimately goes through next/image.
     const nav = navBlock(html, "Dashboard navigation");
     expect(nav).not.toContain("srcSet");
-    expect(nav.match(/<img/g)).toHaveLength(1);
-    expect(nav).toContain("/digital-brand-icons/call-of-duty-mobile.png");
+    expect(nav.match(/<img/g) ?? []).toHaveLength(0);
   });
 });
 

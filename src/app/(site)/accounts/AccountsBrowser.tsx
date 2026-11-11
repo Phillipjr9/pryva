@@ -44,6 +44,7 @@ type Listing = {
 type Meta = { current_page: number; last_page: number; per_page: number; total: number };
 
 const SORTS = [
+  { value: "total_price", label: "Price: lowest first" },
   { value: "sort_key", label: "Recommended" },
   { value: "available_stock", label: "Most stock" },
   { value: "title", label: "A–Z" },
@@ -59,7 +60,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<(typeof SORTS)[number]["value"]>("sort_key");
+  const [sort, setSort] = useState<(typeof SORTS)[number]["value"]>("total_price");
   const [page, setPage] = useState(1);
 
   const [listings, setListings] = useState<Listing[]>([]);
@@ -67,6 +68,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
   const [loading, setLoading] = useState(true);
   const [lastChecked, setLastChecked] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [partial, setPartial] = useState(false);
   const [categoryError, setCategoryError] = useState<string | null>(null);
 
   const [selected, setSelected] = useState<Listing | null>(null);
@@ -137,6 +139,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
       const response = await fetch(`/api/accounts/listings?${params.toString()}`, { cache: "no-store" });
       const data = (await response.json()) as {
         configured?: boolean;
+        partial?: boolean;
         listings?: Listing[];
         meta?: Meta;
         error?: string;
@@ -151,6 +154,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
         setLastChecked(null);
         return;
       }
+      setPartial(data.partial === true);
       setListings(data.listings ?? []);
       setMeta(data.meta ?? null);
       setLastChecked(new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }));
@@ -483,6 +487,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
         </div>
       </div>
 
+      {partial && <p role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-meta text-amber-900">Some account listings could not be loaded. Prices are sorted across the listings currently available; the complete catalogue may contain other offers. Try refreshing shortly.</p>}
       {/* Results */}
       <div className="mt-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-meta text-ink-3">
