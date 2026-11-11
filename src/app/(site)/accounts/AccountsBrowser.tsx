@@ -44,6 +44,7 @@ type Listing = {
 type Meta = { current_page: number; last_page: number; per_page: number; total: number };
 
 const SORTS = [
+  { value: "total_price", label: "Price: lowest first" },
   { value: "sort_key", label: "Recommended" },
   { value: "available_stock", label: "Most stock" },
   { value: "title", label: "A–Z" },
@@ -59,14 +60,16 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<(typeof SORTS)[number]["value"]>("sort_key");
+  const [sort, setSort] = useState<(typeof SORTS)[number]["value"]>("total_price");
   const [page, setPage] = useState(1);
+  const [inStockOnly, setInStockOnly] = useState(true);
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastChecked, setLastChecked] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [partial, setPartial] = useState(false);
   const [categoryError, setCategoryError] = useState<string | null>(null);
 
   const [selected, setSelected] = useState<Listing | null>(null);
@@ -129,6 +132,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
     setError(null);
 
     const params = new URLSearchParams({ sort, page: String(page) });
+    if (inStockOnly) params.set("inStock", "true");
     if (activeCategory) params.set("categoryId", String(activeCategory));
     if (activeSubcategory) params.set("subcategoryId", String(activeSubcategory));
     if (search) params.set("search", search);
@@ -137,6 +141,8 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
       const response = await fetch(`/api/accounts/listings?${params.toString()}`, { cache: "no-store" });
       const data = (await response.json()) as {
         configured?: boolean;
+        partial?: boolean;
+        checkedAt?: string;
         listings?: Listing[];
         meta?: Meta;
         error?: string;
@@ -151,9 +157,11 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
         setLastChecked(null);
         return;
       }
+      setPartial(data.partial === true);
       setListings(data.listings ?? []);
       setMeta(data.meta ?? null);
-      setLastChecked(new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }));
+      setLastChecked(data.checkedAt && Number.isFinite(Date.parse(data.checkedAt))
+        ? new Date(data.checkedAt).toLocaleString() : null);
     } catch {
       if (current === requestId.current) {
         setError("Could not load accounts. Check your connection.");
@@ -164,7 +172,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
     } finally {
       if (current === requestId.current) setLoading(false);
     }
-  }, [activeCategory, activeSubcategory, search, sort, page]);
+  }, [activeCategory, activeSubcategory, search, sort, page, inStockOnly]);
 
   useEffect(() => {
     const version = requestId;
@@ -375,7 +383,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
       {purchaseEnabled && listings.some((listing) => listing.fulfilment === "manual" && !listing.purchasable) && (
         <div role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.875rem] text-amber-900">
           Items marked <strong>Prepared for you</strong> cannot be ordered right now. Every other listing is
-          available as normal.
+          subject to its own stock and checkout checks.
         </div>
       )}
       {/* Filters */}
@@ -410,6 +418,32 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
             </button>
           ))}
         </div>
+
+        <div className="flex flex-wrap items-center gap-2" aria-label="Find accounts by platform">
+          <span className="text-meta text-ink-3">Find a platform:</span>
+          {["Facebook", "Instagram", "TikTok", "Twitter", "Snapchat", "Reddit", "Discord", "YouTube", "Telegram"].map((platform) => (
+            <button key={platform} type="button"
+              onClick={() => {
+                selectCategory(null);
+                setSearchInput(platform);
+                setSearch(platform);
+                setPage(1);
+              }}
+              className="rounded-full border border-line bg-white px-3 py-1.5 text-meta font-medium text-lav-700 hover:border-lav-300">
+              {platform === "Twitter" ? "X / Twitter" : platform}
+            </button>
+          ))}
+          <button type="button" onClick={() => { selectCategory(null); setSearchInput(""); setSearch(""); setPage(1); }}
+            className="px-2 py-1.5 text-meta font-semibold text-lav-700 hover:underline">Clear filters</button>
+        </div>
+        <label className="flex items-center gap-2 text-[0.875rem] text-ink-2">
+          <input type="checkbox" checked={inStockOnly} onChange={(event) => { setInStockOnly(event.target.checked); setPage(1); }} />
+          In stock only
+        </label>
+        <p className="text-meta text-ink-3">
+          Search covers the whole catalogue, not just this page. Prices are lowest first by default.
+          Uncheck “In stock only” to include sold-out and unconfirmed-stock listings from all connected catalogues.
+        </p>
 
         {activeCategory !== null && subcategories.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 border-t border-line/60 pt-3">
@@ -483,11 +517,12 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
         </div>
       </div>
 
+      {partial && <p role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-meta text-amber-900">Some account listings could not be loaded. Prices are sorted across the listings currently available; the complete catalogue may contain other offers. Try refreshing shortly.</p>}
       {/* Results */}
       <div className="mt-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-meta text-ink-3">
-          <span>{loading ? "Refreshing stock…" : lastChecked ? `Stock checked at ${lastChecked}; it may change.` : "Stock not checked yet."}</span>
-          <button type="button" disabled={loading} onClick={() => void loadListings()} className="font-semibold text-lav-700 hover:underline disabled:opacity-50">Refresh stock</button>
+          <span>{loading ? "Loading listings…" : lastChecked ? `Catalogue snapshot from ${lastChecked}. Stock may change; checked again at checkout.` : "Stock snapshot time unavailable. Stock is checked again at checkout."}</span>
+          <button type="button" disabled={loading} onClick={() => void loadListings()} className="font-semibold text-lav-700 hover:underline disabled:opacity-50">Reload listings</button>
         </div>
         {error && (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[0.875rem] text-red-800">
@@ -510,7 +545,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
           <div className="rounded-2xl border border-line bg-white p-10 text-center">
             <p className="text-[0.9375rem] font-semibold text-ink">No accounts match those filters</p>
             <p className="mt-1 text-[0.8125rem] text-ink-2">
-              Try a different category, or clear your search to see everything.
+              Try another platform or clear your search. Uncheck “In stock only” to include sold-out listings.
             </p>
           </div>
         )}

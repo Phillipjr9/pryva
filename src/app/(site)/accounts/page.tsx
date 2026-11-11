@@ -6,12 +6,12 @@ import { PlatformStrip } from "@/components/PlatformBadge";
 import { ServiceIcon } from "@/components/ServiceIcon";
 
 export const metadata: Metadata = {
-  title: "Digital Account Listings — Facebook, Instagram, Gmail & More | PryvaLogs",
+  title: "Social & Digital Account Listings — Facebook, Instagram, Gmail & More | PryvaLogs",
   description:
-    "Browse digital account listings priced in Naira. Purchase availability and delivery depend on current stock.",
+    "Browse social media and digital account listings priced in Naira. Purchase availability and delivery depend on current stock.",
   alternates: { canonical: "/accounts" },
   openGraph: {
-    title: "Digital Account Listings | PryvaLogs",
+    title: "Social & Digital Account Listings | PryvaLogs",
     description:
       "Browse Facebook, Instagram, Gmail, TikTok and more, with Naira pricing.",
     url: "/accounts",
@@ -38,14 +38,14 @@ export default function AccountsPage() {
           <div className="max-w-3xl">
             <ServiceIcon service="accounts" size="lg" className="mb-5" />
             <span className="inline-flex items-center gap-2 rounded-full border border-lav-200 bg-white px-3 py-1 text-meta font-semibold uppercase tracking-[0.16em] text-lav-800">
-              Digital accounts
+              Social &amp; Digital Accounts
             </span>
             <h1 className="mt-5 text-[2.1rem] font-semibold leading-[1.1] tracking-tight text-ink sm:text-[2.9rem]">
-              Browse digital account listings priced in Naira.
+              Browse social media and digital account listings priced in Naira.
             </h1>
             <p className="mt-4 max-w-2xl text-[1rem] leading-relaxed text-ink-2">
               Facebook, Instagram, Gmail, Outlook, TikTok, gaming and streaming accounts — browse
-              listings priced in Naira. Uncertain purchases require review by support.
+              listings priced in Naira, including aged accounts where listed. Check each listing’s age and features. Uncertain purchases require review by support.
             </p>
             <PlatformStrip
               className="mt-6"

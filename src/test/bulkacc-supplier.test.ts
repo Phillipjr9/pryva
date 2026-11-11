@@ -17,6 +17,7 @@ import {
   getProduct,
   isAmbiguousOutcome,
   listAllProducts,
+  readBulkaccCatalog,
   maskedKey,
   normalizeProduct,
   productPriceUsd,
@@ -49,6 +50,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.clearAllMocks();
@@ -230,8 +232,8 @@ describe("supplier client: money-spending safety", () => {
   });
 
   it("walks the catalog once, de-duplicates codes and serves the second read from cache", async () => {
-    const page = (items: unknown[], totalPages: number) =>
-      jsonResponse({ data: { items, totalCount: items.length, pageIndex: 1, pageSize: 200, totalPages }, statusCode: 200, message: "success" });
+    const page = (items: unknown[], totalPages: number, pageIndex = 1) =>
+      jsonResponse({ data: { items, totalCount: 2, pageIndex, pageSize: 200, totalPages }, statusCode: 200, message: "success" });
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(page([
         { code: "1", name: "Aged USA Spotify", price: 1.2, inStock: 32949, min: 1, groupName: "Spotify", categoryName: "Aged USA Spotify" },
@@ -240,7 +242,7 @@ describe("supplier client: money-spending safety", () => {
       ], 2))
       .mockResolvedValueOnce(page([
         { code: "2", name: "Warmed up Gmail", price: 0.8, inStock: 7969, min: 1, groupName: "Google", categoryName: "Gmail" },
-      ], 2));
+      ], 2, 2));
     vi.stubGlobal("fetch", fetchMock);
 
     const products = await listAllProducts();
@@ -254,4 +256,41 @@ describe("supplier client: money-spending safety", () => {
     expect(logged()).toContain("bad_product");
     expect(logged()).not.toContain(API_KEY);
   });
+  it("coalesces reads, preserves snapshot time, and refreshes stock after five minutes", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockImplementation(async () => jsonResponse({ data: {
+      items: [{ code: "1", name: "Facebook", price: 1, inStock: fetchMock.mock.calls.length === 1 ? 4 : 0, min: 1 }],
+      totalCount: 1, totalPages: 1, pageIndex: 1, pageSize: 200,
+    } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const [first, concurrent] = await Promise.all([readBulkaccCatalog(), readBulkaccCatalog()]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(concurrent).toEqual(first);
+    await vi.advanceTimersByTimeAsync(299_000);
+    expect((await readBulkaccCatalog()).checkedAt).toBe(first.checkedAt);
+    await vi.advanceTimersByTimeAsync(1_001);
+    const next = await readBulkaccCatalog();
+    expect(next.products[0].inStock).toBe(0);
+    expect(Date.parse(next.checkedAt)).toBeGreaterThan(Date.parse(first.checkedAt));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("walks beyond the old 25-page cutoff and publishes only the complete catalogue", async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      const page = Number(new URL(url).searchParams.get("pageIndex"));
+      return jsonResponse({ data: { items: [{ code: String(page), name: `Account ${page}`, price: 1, inStock: 3, min: 1 }],
+        totalCount: 27, totalPages: 27, pageIndex: page, pageSize: 1 } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const complete = await readBulkaccCatalog();
+    expect(complete.products).toHaveLength(27);
+    expect(complete.partial).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(27);
+  });
+
+  it("does not call a failed logical response an empty healthy catalogue", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ data: null, statusCode: 200, message: "refused" })));
+    await expect(readBulkaccCatalog()).rejects.toMatchObject({ code: "bad_response" });
+  });
+
 });

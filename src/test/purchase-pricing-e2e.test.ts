@@ -153,7 +153,7 @@ beforeAll(async () => {
   pg = new PGlite();
   for (const file of [
     "0000_base_schema.sql", "0001_google_subject.sql", "0002_shared_rate_limits.sql",
-    "0003_withdrawal_idempotency.sql", "0004_paystack_transfer_reference.sql", "0005_wallet_email_outbox.sql", "0006_order_idempotency.sql", "0007_order_reconciliation_note.sql", "0008_order_provider_cost.sql", "0009_password_reset_tokens.sql", "0010_order_provider_no_default.sql", "0011_email_verification.sql", "0012_topup_payer_name.sql", "0013_disposable_inboxes.sql", "0014_admin_audit_log.sql", "0015_two_factor.sql", "0016_product_reviews.sql", "0017_login_lockout.sql", "0018_reconciliation_runs.sql", "0019_support_tickets.sql", "0020_webauthn.sql", "0021_referrals.sql", "0022_fraud.sql", "0023_boost_orders.sql", "0024_account_deletions.sql", "0025_account_deletion_forfeiture.sql", "0026_webhook_events.sql", "0027_esim_credentials.sql", "0028_esim_delivery_email.sql", "0029_notification_gaps.sql", "0030_payout_name_approvals.sql", "0031_email_delivery_events.sql", "0032_welcome_verified_emails.sql", "0033_account_activity_emails.sql", "0034_customer_activity_emails.sql", "0035_admin_bans.sql", "0035_code_received_at.sql", "0036_account_suspension.sql", "0037_gift_card_request_id.sql", "0038_referral_credit_provenance.sql", "0039_refund_check_fairness.sql", "0040_bulk_batch_claims.sql", "0041_foxreload_quotes.sql", "0042_foxreload_quote_terms.sql", "0043_foxreload_client_code.sql", "0044_scale_indexes.sql",
+    "0003_withdrawal_idempotency.sql", "0004_paystack_transfer_reference.sql", "0005_wallet_email_outbox.sql", "0006_order_idempotency.sql", "0007_order_reconciliation_note.sql", "0008_order_provider_cost.sql", "0009_password_reset_tokens.sql", "0010_order_provider_no_default.sql", "0011_email_verification.sql", "0012_topup_payer_name.sql", "0013_disposable_inboxes.sql", "0014_admin_audit_log.sql", "0015_two_factor.sql", "0016_product_reviews.sql", "0017_login_lockout.sql", "0018_reconciliation_runs.sql", "0019_support_tickets.sql", "0020_webauthn.sql", "0021_referrals.sql", "0022_fraud.sql", "0023_boost_orders.sql", "0024_account_deletions.sql", "0025_account_deletion_forfeiture.sql", "0026_webhook_events.sql", "0027_esim_credentials.sql", "0028_esim_delivery_email.sql", "0029_notification_gaps.sql", "0030_payout_name_approvals.sql", "0031_email_delivery_events.sql", "0032_welcome_verified_emails.sql", "0033_account_activity_emails.sql", "0034_customer_activity_emails.sql", "0035_admin_bans.sql", "0035_code_received_at.sql", "0036_account_suspension.sql", "0037_gift_card_request_id.sql", "0038_referral_credit_provenance.sql", "0039_refund_check_fairness.sql", "0040_bulk_batch_claims.sql", "0041_foxreload_quotes.sql", "0042_foxreload_quote_terms.sql", "0043_foxreload_client_code.sql", "0044_scale_indexes.sql", "0045_shared_catalog_snapshots.sql",
   ]) {
     await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   }
@@ -359,28 +359,23 @@ describe("checkout with real pricing", () => {
     expect(mocks.purchaseCalls).toBe(0);
   });
 
-  it("charges a real six-decimal price for a hand-prepared item without calling any source", async () => {
-    // Sellable only because someone can prepare it: see the refusal test below.
+  it("refuses retired manual listings even with a reachable administrator", async () => {
     await seedReachableAdmin();
-    mocks.listing = listing({
-      slug: "p3:netflix-standard", sourceId: "netflix-standard", title: "Netflix Standard (1080p)",
-      priceUsd: "2.500000", stock: null, sold: null, warrantyDays: 120, fulfilment: "manual",
-    });
-
+    mocks.listing = listing({ slug: "p3:netflix-standard", stock: null, fulfilment: "manual" });
     const response = await purchaseRoute.POST(purchaseRequest({ slug: "p3:netflix-standard", quantity: 2 }));
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.preparing).toBe(true);
-    expect(body.warrantyDays).toBe(120);
-    expect(body.totalNgn).toBeGreaterThan(0);
+    expect(response.status).toBe(410);
+    expect(await orderRows()).toHaveLength(0);
+    expect(await balance()).toBe(START_BALANCE);
+    expect(mocks.purchaseCalls).toBe(0);
+  });
 
-    const [order] = await orderRows();
-    expect(order.provider).toBe("manual");
-    expect(order.status).toBe("processing");
-    expect(order.amount).toBe(body.totalNgn);
-    expect(await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "first_purchase"))).toMatchObject([{ userId: USER, eventKind: "first_purchase" }]);
-    expect(await balance()).toBe(START_BALANCE - body.totalNgn);
-    // No source exists for this item, so none may be contacted.
+  it("refuses API purchases with unknown stock before any wallet debit", async () => {
+    mocks.listing = listing({ stock: null });
+    const response = await purchaseRoute.POST(purchaseRequest({ slug: "p1:300004", quantity: 1 }));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toContain("Stock could not be confirmed");
+    expect(await balance()).toBe(START_BALANCE);
+    expect(await orderRows()).toHaveLength(0);
     expect(mocks.purchaseCalls).toBe(0);
   });
 
@@ -396,7 +391,7 @@ describe("checkout with real pricing", () => {
     });
 
     const response = await purchaseRoute.POST(purchaseRequest({ slug: "p3:netflix-standard", quantity: 2 }));
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(410);
     // Refused before the wallet was touched: no order, no debit, no source call.
     expect(await orderRows()).toHaveLength(0);
     expect(await balance()).toBe(START_BALANCE);
@@ -416,7 +411,7 @@ describe("checkout with real pricing", () => {
     });
 
     const response = await purchaseRoute.POST(purchaseRequest({ slug: "p3:netflix-standard", quantity: 2 }));
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(410);
     expect(await balance()).toBe(START_BALANCE);
   });
 

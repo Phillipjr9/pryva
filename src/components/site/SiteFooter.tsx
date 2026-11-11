@@ -14,7 +14,7 @@ const columns = [
     // also contains the accounts entry (a duplicate React key used to be
     // logged for "/accounts" on every page).
     links: [
-      { href: "/accounts", label: "Digital accounts" },
+      { href: "/accounts", label: "Social & Digital Accounts" },
       // Services fulfilled inside the app link through sign-in, so a signed-out
       // visitor is asked to log in instead of being bounced by a redirect.
       ...services.map((service) => ({

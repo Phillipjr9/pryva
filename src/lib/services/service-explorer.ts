@@ -3,7 +3,7 @@ import { plans, type Plan } from "@/lib/services/catalog";
 import { EXPLORER_COUNTRIES, type ExplorerCountry } from "@/lib/content/explorer-countries";
 import type { AirtimeProvider } from "@/lib/services/data/airtime";
 import type { BrandSlug } from "@/lib/content/brand-marks";
-import { SERVICES, type ServiceId } from "@/lib/services/registry";
+import { SERVICES, SERVICE_IDS, type ServiceId } from "@/lib/services/registry";
 
 /**
  * The hub's shelves, from the registry rather than a second list.
@@ -15,18 +15,10 @@ export const EXPLORER_CATEGORIES: ReadonlyArray<{
   id: ServiceId;
   label: string;
   description: string;
-}> = [
-  { id: "verification", label: "App verification", description: "SMS codes for apps" },
-  { id: "social", label: "Social promotion", description: "Followers, likes & views" },
-  { id: "numbers", label: "Number plans", description: "Single-use & rentals" },
-  { id: "esim", label: "eSIM", description: "Travel data plans" },
-  { id: "proxies", label: "Proxies", description: "Residential traffic" },
-  { id: "email", label: "Email OTP", description: "Temporary inboxes" },
-  { id: "accounts", label: "Accounts", description: "Account marketplace" },
-  { id: "subscriptions", label: "Subscriptions", description: "Entertainment & tools" },
-  { id: "data", label: "Mobile data", description: "Local network plans" },
-  { id: "tools", label: "Order tools", description: "Bulk & scheduled orders" },
-];
+}> = SERVICE_IDS.map((id) => {
+  const service = SERVICES.find((entry) => entry.id === id)!;
+  return { id, label: service.label, description: service.description };
+});
 
 export type ExplorerCategory = ServiceId;
 /** Platform vocabularies classify supplier listings. They are not offerings. */
@@ -304,6 +296,20 @@ function planItems(country: ExplorerCountry): ExplorerItem[] {
 function additionalItems(_country: ExplorerCountry): ExplorerItem[] {
   const other: ExplorerItem[] = [
     {
+      id: "call-of-duty-browser", category: "games", name: "Call of Duty: Mobile CP",
+      description: "Browse game top-ups by account region", tag: "Game top-up",
+      artwork: { kind: "digital-product", art: null }, source: "tool", coverage: "unconfirmed",
+      stock: null, myUnits: null, price: null,
+      action: { label: "Browse Call of Duty top-ups", href: "/dashboard/call-of-duty-mobile" },
+    },
+    {
+      id: "pryva-wallet-gifts", category: "gift-cards", name: "Pryva gift cards",
+      description: "Send or redeem Pryva wallet credit", tag: "Wallet gift card",
+      artwork: { kind: "service", name: "gift-cards" }, source: "tool", coverage: "not-country-specific",
+      stock: null, myUnits: null, price: null,
+      action: { label: "Send or redeem Pryva credit", href: "/dashboard/gift-cards" },
+    },
+    {
       // A free tool rather than a product, shaped like the order tools below for
       // the same reason: no price because nothing is charged, no stock because
       // we do not sell units, no country because an address is not regional.
@@ -317,10 +323,10 @@ function additionalItems(_country: ExplorerCountry): ExplorerItem[] {
       action: { label: "Open temporary inbox", href: "/dashboard/inbox" },
     },
     {
-      id: "account-marketplace", category: "accounts", name: "Account marketplace",
-      description: "Browse live listings", tag: "Digital accounts", artwork: { kind: "service", name: "accounts" },
+      id: "account-marketplace", category: "accounts", name: "Social & Digital Accounts",
+      description: "Buy social media, email and other accounts; aged accounts where listed", tag: "Account listings", artwork: { kind: "service", name: "accounts" },
       source: "catalog", coverage: "unconfirmed", stock: null, myUnits: null, price: null,
-      action: { label: "Browse accounts", href: "/dashboard/accounts" },
+      action: { label: "Browse social & digital accounts", href: "/dashboard/accounts" },
     },
     {
       id: "bulk-orders", category: "tools", name: "Bulk orders",

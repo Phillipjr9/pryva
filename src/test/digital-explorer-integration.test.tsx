@@ -151,17 +151,17 @@ describe("digital listings in service categories", () => {
     const fetchMock = vi.fn(async (url: string) => {
       const params = new URL(url, "https://example.test").searchParams;
       const next = params.get("cursor") === "next";
-      return response({ ok: true, items: params.get("category") === "topups" ? [{ id: next ? id("c") : id("a"), name: next ? "Roblox credit" : "Other credit", stock: "reported" }] : [], nextCursor: params.get("category") === "topups" && !next ? "next" : null });
+      return response({ ok: true, items: params.get("category") === "topups" ? [{ id: next ? id("c") : id("a"), name: next ? "Later account credit" : "Other credit", stock: "reported" }] : [], nextCursor: params.get("category") === "topups" && !next ? "next" : null });
     });
     vi.stubGlobal("fetch", fetchMock); render(<ServiceExplorer initialCountry="ng" initialCategory="topups" enableDigitalCatalogue />);
     await screen.findByRole("heading", { name: "Other credit" });
     const count = fetchMock.mock.calls.length;
-    fireEvent.change(screen.getByLabelText("Search services"), { target: { value: "Roblox" } });
+    fireEvent.change(screen.getByLabelText("Search services"), { target: { value: "Later" } });
     expect(screen.getByText(/search filters the listings loaded/i)).toBeTruthy();
     expect(fetchMock.mock.calls.length).toBe(count);
     fireEvent.click(screen.getByRole("button", { name: "Load more digital listings" }));
-    expect(await screen.findByRole("heading", { name: "Roblox credit" })).toBeTruthy();
-    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("q=Roblox"))).toBe(false);
+    expect(await screen.findByRole("heading", { name: "Later account credit" })).toBeTruthy();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("q=Later"))).toBe(false);
   });
   it("finds explicit gift cards in catalogue-wide search without admitting unrelated results", async () => {
     const fetchMock = vi.fn(async (url: string) => {
@@ -208,4 +208,18 @@ it("shows reported gift-card terms as unconfirmed, not a retail price or eligibi
   expect(within(card).getAllByText(/Reported country: US/).length).toBeGreaterThan(0);
   expect(within(card).getAllByText(/Redemption eligibility unconfirmed/).length).toBeGreaterThan(0);
   expect(within(card).getByText("See details")).toBeTruthy();
+});
+
+it("finds subscription codes via catalogue search without displaying unrelated matches", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    const params = new URL(url, "https://example.test").searchParams;
+    return response({ ok: true, items: params.get("q") === "Disney" ? [
+      { id: id("a"), name: "Disney+ 3 months", stock: "reported", checkout: "codes" },
+      { id: id("b"), name: "Disney game key", stock: "reported" },
+    ] : [], nextCursor: null });
+  }));
+  render(<ServiceExplorer initialCountry="ng" initialCategory="subscriptions" enableDigitalCatalogue />);
+  fireEvent.change(screen.getByLabelText("Search services"), { target: { value: "Disney" } });
+  expect(await screen.findByRole("heading", { name: "Disney+ 3 months" })).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "Disney game key" })).toBeNull();
 });

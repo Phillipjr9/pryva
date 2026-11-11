@@ -6,15 +6,17 @@ import {
   MarketplaceError,
 } from "@/lib/services/accounts/marketplace-suppliers";
 import { logger } from "@/lib/platform/logger";
+import { SnapshotUnavailableError } from "@/lib/platform/shared-snapshot";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /**
  * GET /api/accounts/categories?categoryId=22
  *
  * Neutral URL and neutral labels on purpose: shoppers see Pryva's own product
  * groups ("Streaming", "Email", "Social"), never a supplier's taxonomy, and
- * never a supplier's name. Categories are cached server-side for 30 minutes
+ * never a supplier's name. Categories are cached server-side with the shared short-lived inventory snapshot
  * because the sources rate-limit catalog reads per account.
  */
 export async function GET(request: NextRequest) {
@@ -32,16 +34,22 @@ export async function GET(request: NextRequest) {
       if (!Number.isInteger(categoryId) || categoryId <= 0) {
         return NextResponse.json({ error: "Invalid category" }, { status: 400 });
       }
-      const [{ categories }, subcategories] = await Promise.all([
+      const [{ categories, partial }, subcategories] = await Promise.all([
         listMarketplaceCategories(),
         listMarketplaceSubcategories(categoryId),
       ]);
-      return NextResponse.json({ configured: true, categories, subcategories });
+      return NextResponse.json({ configured: true, categories, subcategories, partial: !!partial });
     }
 
-    const { categories, subcategories } = await listMarketplaceCategories();
-    return NextResponse.json({ configured: true, categories, subcategories });
+    const { categories, subcategories, partial } = await listMarketplaceCategories();
+    return NextResponse.json({ configured: true, categories, subcategories, partial: !!partial });
   } catch (error) {
+    if (error instanceof SnapshotUnavailableError) {
+      return NextResponse.json(
+        { error: "Categories are being refreshed. Please try again shortly.", code: "catalog_unavailable" },
+        { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "10" } },
+      );
+    }
     if (error instanceof MarketplaceError) {
       logger.error("Marketplace categories failed", { code: error.code, status: error.status });
       return NextResponse.json(

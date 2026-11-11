@@ -34,7 +34,7 @@ vi.mock("@/lib/payments/exchange-rate", () => ({
 
 vi.mock("@/lib/providers/bulkacc", () => ({
   isBulkaccConfigured: () => runtime.bulkaccConfigured,
-  listAllProducts: async () => runtime.products,
+  readBulkaccCatalog: async () => ({ products: runtime.products, partial: false, checkedAt: new Date().toISOString() }),
   getProduct: async (code: string) => runtime.products.find((p) => p.code === code),
   productPriceUsd: (product: { priceUsd: string }) => product.priceUsd,
   normalizeProduct: (product: Record<string, unknown>) => product,
@@ -68,6 +68,7 @@ vi.mock("@/lib/providers/accszone", () => {
 });
 
 const { GET } = await import("@/app/api/accounts/listings/route");
+const { clearMarketplaceCatalogCache } = await import("@/lib/services/accounts/marketplace-suppliers");
 const { clearManualCatalogCache } = await import("@/lib/services/accounts/manual-catalog");
 
 const request = () => new NextRequest("https://pryva.test/api/accounts/listings", {
@@ -75,6 +76,7 @@ const request = () => new NextRequest("https://pryva.test/api/accounts/listings"
 });
 
 beforeEach(() => {
+  clearMarketplaceCatalogCache();
   runtime.preview = false;
   runtime.bulkaccConfigured = true;
   runtime.accszoneConfigured = false;
@@ -113,6 +115,8 @@ describe("listings route pricing, end to end", () => {
 
     const body = await response.json();
     expect(body.configured).toBe(true);
+    const prices = body.listings.map((listing: { priceNgn: number }) => listing.priceNgn);
+    expect(prices).toEqual([...prices].sort((a, b) => a - b));
     expect(body.listings.length).toBeGreaterThan(0);
 
     for (const listing of body.listings) {
@@ -122,7 +126,7 @@ describe("listings route pricing, end to end", () => {
     }
 
     // $3.48 at ₦1600 costs ₦5,568 and must sell above cost, inside the band.
-    const spotify = body.listings.find((l: { title: string }) => l.title.includes("Spotify"));
+    const spotify = body.listings.find((l: { slug: string }) => l.slug === "p1:300004");
     expect(spotify.priceNgn).toBeGreaterThanOrEqual(7238); // cost × 1.30 floor
     expect(spotify.priceNgn).toBeLessThanOrEqual(8352);    // cost × 1.50 ceiling
   });
@@ -153,21 +157,12 @@ describe("listings route pricing, end to end", () => {
     }
   });
 
-  it("still serves a catalog from the hand-prepared lane alone, with no API key", async () => {
-    // No API source is connected, but the hand-prepared products need no key, so
-    // the storefront is not empty — and those prices go through the same parser.
+  it("does not substitute manual listings when no API is configured", async () => {
     runtime.bulkaccConfigured = false;
     runtime.accszoneConfigured = false;
-
     const response = await GET(request());
     expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.configured).toBe(true);
-    expect(body.listings.length).toBeGreaterThan(0);
-    expect(body.listings.every((l: { slug: string }) => l.slug.startsWith("p3:"))).toBe(true);
-    for (const listing of body.listings) {
-      expect(listing.priceNgn, listing.title).toBeGreaterThan(0);
-    }
+    expect(await response.json()).toEqual({ configured: false, listings: [], meta: null });
   });
 
   it("degrades to an empty catalog only when there is nothing at all to sell", async () => {
@@ -182,4 +177,36 @@ describe("listings route pricing, end to end", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ configured: false, listings: [], meta: null });
   });
+  it("filters stock across the whole catalogue before price sorting and pagination", async () => {
+    runtime.preview = true;
+    clearManualCatalogCache();
+    runtime.products = Array.from({ length: 30 }, (_, index) => ({
+      code: String(800000 + index), name: `Facebook account ${index}`, description: null,
+      groupName: "Social", categoryName: "Facebook", inStock: index < 25 ? 0 : 10, min: 1,
+      priceMicros: (index + 1) * 1000000, priceUsd: `${index + 1}.000000`,
+    }));
+    const filtered = await (await GET(new NextRequest("https://pryva.test/api/accounts/listings?inStock=true&search=Facebook"))).json();
+    expect(filtered.meta.total).toBe(5);
+    expect(filtered.listings).toHaveLength(5);
+    expect(filtered.listings.every((listing: { stock: number }) => listing.stock === 10)).toBe(true);
+    const prices = filtered.listings.map((listing: { priceNgn: number }) => listing.priceNgn);
+    expect(prices).toEqual([...prices].sort((a, b) => a - b));
+    const all = await (await GET(new NextRequest("https://pryva.test/api/accounts/listings?search=Facebook"))).json();
+    expect(all.meta.total).toBe(30);
+    expect(all.listings[0].stock).toBe(0);
+  });
+
+  it("preserves missing and zero API stock without advertising either as buyable", async () => {
+    runtime.preview = true;
+    clearManualCatalogCache();
+    runtime.products[0].inStock = null;
+    runtime.products[1].inStock = 0;
+    const body = await (await GET(request())).json();
+    const unknown = body.listings.find((listing: { slug: string }) => listing.slug === "p1:300004");
+    const soldOut = body.listings.find((listing: { slug: string }) => listing.slug === "p1:300005");
+    expect(unknown).toMatchObject({ stock: null, purchasable: false });
+    expect(soldOut).toMatchObject({ stock: 0, available: false, purchasable: false });
+    expect(body.listings.every((listing: { slug: string }) => !listing.slug.startsWith("p3:"))).toBe(true);
+  });
+
 });

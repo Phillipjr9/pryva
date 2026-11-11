@@ -57,10 +57,9 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
       { href: "/dashboard", label: "Overview", nav: "overview" },
       { href: "/dashboard/orders", label: "Orders", nav: "orders" },
       { href: "/dashboard/wallet", label: "Wallet", nav: "wallet" },
-      { href: "/dashboard/gift-cards", label: "Pryva gift cards", art: "gift-cards" },
       // Free, and the only thing on this list that is: one inbox a day, nothing
       // retained. It sits under Manage rather than Buy because no money moves.
-      { href: "/dashboard/inbox", label: "Temporary inbox", nav: "inbox" },
+      { href: "/dashboard/services", label: "Temporary inbox", art: "email-otp", category: "email" },
       // Inviting a friend is not a purchase and not a setting: it sits under
       // Manage because it is about the account, and it costs nothing to open.
       { href: "/dashboard/referrals", label: "Refer & earn", nav: "referrals" },
@@ -70,12 +69,10 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
     label: "Buy",
     items: [
       { href: "/dashboard/services", label: "All services", nav: "services" },
-      { href: "/dashboard/telegram-stars", label: "Telegram Stars", brand: "telegram" },
-      { href: "/dashboard/call-of-duty-mobile", label: "Call of Duty Mobile CP", digitalArtwork: "Call of Duty Mobile" },
       { href: "/dashboard/services", label: "Number plans", art: "numbers", category: "numbers" },
       { href: "/dashboard/services", label: "eSIM", art: "esim", category: "esim" },
-      { href: "/dashboard/services", label: "Data Plans", art: "data", category: "data" },
-      { href: "/dashboard/accounts", label: "Accounts", art: "accounts" },
+      { href: "/dashboard/services", label: "Mobile data & airtime", art: "data", category: "data" },
+      { href: "/dashboard/accounts", label: "Social & Digital Accounts", art: "accounts" },
       { href: "/dashboard/services", label: "Subscriptions", art: "subscriptions", category: "subscriptions" },
       { href: "/dashboard/services", label: "Games & gaming", art: "games", category: "games" },
       { href: "/dashboard/services", label: "Account top-ups", art: "topups", category: "topups" },
@@ -84,7 +81,6 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
       { href: "/dashboard/services", label: "App verification", art: "app-verification", category: "verification" },
       { href: "/dashboard/services", label: "Social promotion", art: "social-promotion", category: "social" },
       { href: "/dashboard/services", label: "Proxies", art: "proxies", category: "proxies" },
-      { href: "/dashboard/services", label: "Email OTP", art: "email-otp", category: "email" },
       { href: "/dashboard/bulk-orders", label: "Bulk Orders", art: "bulk" },
       { href: "/dashboard/scheduled", label: "Scheduled", art: "scheduled" },
     ],

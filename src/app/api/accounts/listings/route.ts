@@ -4,15 +4,17 @@ import {
   listMarketplaceListings,
   MarketplaceError,
   type ListingQuery,
+  type MarketplaceListing,
 } from "@/lib/services/accounts/marketplace-suppliers";
 import { isMarketplaceCatalogAvailable } from "@/lib/services/accounts/marketplace-suppliers";
 import { isMarketplaceCheckoutConfigured } from "@/lib/services/accounts/marketplace-policy";
-import { isManualFulfilmentReachable } from "@/lib/services/accounts/manual-fulfilment";
 import { priceMarketplaceListing } from "@/lib/services/accounts/marketplace-pricing";
 import { logger } from "@/lib/platform/logger";
+import { SnapshotUnavailableError } from "@/lib/platform/shared-snapshot";
 import { safeUnitCount } from "@/lib/services/service-units";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const ALLOWED_SORTS = new Set(["sort_key", "total_price", "available_stock", "title"]);
 
@@ -37,36 +39,36 @@ export async function GET(request: NextRequest) {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
   };
 
-  const sortParam = params.get("sort") ?? "sort_key";
+  const sortParam = params.get("sort") ?? "total_price";
   const query: ListingQuery = {
+    inStockOnly: params.get("inStock") === "true",
     categoryId: toPositiveInt(params.get("categoryId")),
     subcategoryId: toPositiveInt(params.get("subcategoryId")),
     search: params.get("search")?.trim().slice(0, 80) || undefined,
-    sort: (ALLOWED_SORTS.has(sortParam) ? sortParam : "sort_key") as ListingQuery["sort"],
+    sort: (ALLOWED_SORTS.has(sortParam) ? sortParam : "total_price") as ListingQuery["sort"],
     direction: params.get("direction") === "desc" ? "desc" : "asc",
     page: toPositiveInt(params.get("page")) ?? 1,
   };
 
   try {
-    const { listings, meta } = await listMarketplaceListings(query);
+    const prices = new Map<string, Promise<Awaited<ReturnType<typeof priceMarketplaceListing>>>>();
+    function priceFor(listing: MarketplaceListing) {
+      let price = prices.get(listing.slug);
+      if (!price) {
+        price = priceMarketplaceListing({ unitPriceUsd: listing.priceUsd, quantity: 1,
+          categoryTitle: listing.category ?? undefined, subcategoryTitle: listing.subcategory ?? undefined });
+        prices.set(listing.slug, price);
+      }
+      return price;
+    }
+    const { listings, meta, partial, checkedAt, stale } = await listMarketplaceListings({ ...query,
+      sellingPrice: async (listing) => (await priceFor(listing)).unitNgn,
+    });
 
     const checkoutEnabled = isMarketplaceCheckoutConfigured();
-    // Asked only when it can change an answer: with checkout off, or with no
-    // hand-sourced listing on this page of results, the query would be wasted.
-    const manualReady = checkoutEnabled && listings.some((listing) => listing.fulfilment === "manual")
-      ? await isManualFulfilmentReachable()
-      : false;
-
     const priced = await Promise.all(
       listings.map(async (listing) => {
-        const breakdown = await priceMarketplaceListing({
-          unitPriceUsd: listing.priceUsd,
-          quantity: 1,
-          // Premiums match on the source's own product-line text, which never
-          // leaves the server; only the Pryva group label is returned.
-          categoryTitle: listing.category ?? undefined,
-          subcategoryTitle: listing.subcategory ?? undefined,
-        });
+        const breakdown = await priceFor(listing);
 
         return {
           id: labelId(listing.slug),
@@ -83,23 +85,23 @@ export async function GET(request: NextRequest) {
           maxQuantity: listing.maxQuantity,
           available: listing.available,
           fulfilment: listing.fulfilment,
-          /**
-           * Whether checkout is permitted for THIS listing, decided server-side.
-           *
-           * Distinct from `available`, which is the source's own declaration of
-           * stock, and from the page-wide pause: a hand-sourced item additionally
-           * needs someone who can reach the queue that prepares it. Computing it
-           * here rather than in the browser keeps one source of truth, and means
-           * the purchase route and the storefront cannot disagree about what is
-           * buyable.
-           */
-          purchasable: checkoutEnabled && (listing.fulfilment !== "manual" || manualReady),
+          // API stock must cover the minimum basket; unknown is not buyable.
+          purchasable: checkoutEnabled && listing.available && listing.stock !== null && listing.stock >= listing.minQuantity,
         };
       }),
     );
 
-    return NextResponse.json({ configured: true, listings: priced, meta }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(
+      { configured: true, listings: priced, meta, partial: !!partial, checkedAt, stale: !!stale },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
+    if (error instanceof SnapshotUnavailableError) {
+      return NextResponse.json(
+        { error: "Listings are being refreshed. Please try again shortly.", code: "catalog_unavailable" },
+        { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "10" } },
+      );
+    }
     if (error instanceof MarketplaceError) {
       logger.error("Marketplace listings failed", { code: error.code, status: error.status });
       const message =

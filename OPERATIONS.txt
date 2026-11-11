@@ -615,10 +615,11 @@ To remove the wait, raise the minimum capacity to 0.5 ACU or more, which keeps
 the instance running and billed around the clock. To make it rarer, lengthen
 the pause interval (up to 24 hours).
 
-There is no Redis or other cache server, and nothing here needs one yet: rate
-limits are rows in rate_limit_buckets and the public pages are cached by the
-host. /api/search still runs leading-wildcard ILIKE scans, bounded per account
-by its rate limit rather than by an index.
+There is no Redis or other cache server: rate limits are rows in
+rate_limit_buckets, the complete account-catalogue snapshot is in
+catalog_snapshots, and public pages are cached by the host. /api/search still
+runs leading-wildcard ILIKE scans, bounded per account by its rate limit rather
+than by an index.
 
 Sign-in attack telemetry
 ------------------------
@@ -660,3 +661,53 @@ network can be blocked at the host's firewall, and a rate-limit rule there on
 BOT_ATTACK_FINDINGS.md. A locked customer can sign in again after 30 minutes,
 or at once by completing a password reset. These alerts report an attack. They
 do not stop one, and they have not been exercised against production.
+
+Account catalogue snapshots
+---------------------------
+Migration 0045_shared_catalog_snapshots.sql is required before the account
+listing code that uses it is deployed. Apply pending migrations with:
+
+  npm run db:migrate
+
+catalog_snapshots holds one complete combined account catalogue and its refresh
+lease. Every application instance reads that row. A supplier crawl publishes a
+new payload only after every configured source and every page has completed;
+a timeout, duplicate page, missing row or failed source leaves the old payload
+untouched. The row therefore does not need historical payload copies or an
+unbounded retry/resume table.
+
+The browse snapshot refreshes after five minutes. Once a good payload exists,
+an expired read returns it immediately with stale:true while one leaseholder
+refreshes in the background (registered with Vercel waitUntil). Other instances
+do not duplicate the crawl. A failed warm refresh has a 30-second retry
+cooldown. On a cold start with no good payload, concurrent readers wait up to
+30 seconds for the leaseholder, then receive HTTP 503 rather than a partial
+catalogue. Supplier crawls have a 30-page-time deadline plus each request's own
+20-second timeout, and the listing/category functions have a 60-second limit.
+
+partial:false now means the stored walk completed; stale:true means it is an
+older complete walk. Neither flag is a stock guarantee. Checkout still reads
+the selected product directly and rechecks live price, quantity and stock. Do
+not replace those reads with the snapshot, and never automatically retry an
+ambiguous paid supplier order.
+
+Useful operator checks (these return metadata only, not listing contents):
+
+  SELECT key, checked_at, refreshed_at, lease_owner, lease_expires_at,
+         payload IS NOT NULL AS has_snapshot,
+         jsonb_array_length(payload->'listings') AS listings
+  FROM catalog_snapshots;
+
+If no row has a payload, check supplier credentials and the runtime warning
+"Initial shared snapshot refresh failed". If refreshed_at is old and
+lease_expires_at remains in the future, a crawl is running or failed recently.
+Do not delete a good payload to fix a supplier outage; that converts a stale
+but usable storefront into a cold 503. A payload key beginning accounts:v2:
+can be deleted deliberately to force a cold rebuild after a data-format fix.
+
+This design removes the demonstrated per-instance partial-pagination defect.
+It is not a zero-interruption or thousands-of-concurrent-users certification.
+There is still no production load-test result, supplier rate limits and stock
+remain external dependencies, and the Aurora pause/capacity and pool guidance
+above still applies. Run representative load tests and keep the database
+awake/appropriately sized before making a capacity guarantee.

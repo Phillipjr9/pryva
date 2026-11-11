@@ -69,7 +69,7 @@ describe("service explorer live listings", () => {
     }) });
     vi.stubGlobal("fetch", fetchMock);
     render(<ServiceExplorer initialCountry={null} initialCategory="verification" />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
     expect(String(fetchMock.mock.calls[0][0])).toContain("/api/services/catalog?country=ng");
     fireEvent.click(screen.getByRole("button", { name: "US" }));
     const card = (await screen.findByRole("heading", { name: "Example live app" })).closest("article")!;
@@ -78,7 +78,7 @@ describe("service explorer live listings", () => {
     expect(within(card).getByText("Indicative price ₦1,250")).toBeTruthy();
     expect(within(card).getAllByText("7 left").length).toBeGreaterThan(0);
     expect(within(card).getByText("Not tracked")).toBeTruthy();
-    expect(within(card).getByRole("button", { name: "Not available to order" }).hasAttribute("disabled")).toBe(true);
+    expect(within(card).getByRole("button", { name: "Purchasing locked" }).hasAttribute("disabled")).toBe(true);
     expect(screen.getByText(/Live listings are current/)).toBeTruthy();
     expect(screen.getByText("2026-01-01 12:34:56 UTC")).toBeTruthy();
   });
@@ -106,7 +106,7 @@ describe("service explorer live listings", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, country: "us", items: [] }) });
     vi.stubGlobal("fetch", fetchMock);
     render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
     expect(String(fetchMock.mock.calls[0][0])).toContain("/api/services/catalog?country=us");
     // The demo inventory endpoint was deleted with the demo subsystem.
     expect(fetchMock.mock.calls.every(([url]) => !String(url).includes("/demo/"))).toBe(true);
@@ -121,7 +121,7 @@ describe("service explorer live listings", () => {
     }) });
     vi.stubGlobal("fetch", fetchMock);
     render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
     expect(await screen.findByText(/Live availability is off in this environment/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
     expect(screen.queryByText(/couldn&apos;t be loaded/)).toBeNull();

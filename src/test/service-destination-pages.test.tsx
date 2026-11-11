@@ -7,6 +7,7 @@ import { buildServiceExplorer } from "@/lib/services/service-explorer";
 const user = { id: "preview-user", name: "Preview", email: "preview@example.test", walletBalance: 5000, createdAt: new Date(0) };
 vi.mock("@/lib/identity/auth", () => ({ requireUser: async () => user }));
 vi.mock("next/navigation", () => ({
+  redirect: (href: string) => { throw new Error(`REDIRECT:${href}`); },
   notFound: () => { throw new Error("NOT_FOUND"); },
   useRouter: () => ({ push: vi.fn() }),
 }));
@@ -14,11 +15,7 @@ vi.mock("next/navigation", () => ({
 describe("service destinations", () => {
   it("directs subscriptions to the shared category without inventing prices or listings", async () => {
     expect(buildServiceExplorer("ng").filter((item) => item.category === "subscriptions")).toEqual([]);
-    const markup = renderToStaticMarkup(await DigitalServicesPage());
-    expect(markup).toContain("/dashboard/services?category=subscriptions");
-    expect(markup).toContain("Ordering depends on the individual listing");
-    expect(markup).not.toContain("Spotify Premium - 1 Month");
-    expect(markup).not.toContain("Netflix Premium - 1 Month");
+    expect(() => DigitalServicesPage()).toThrow("REDIRECT:/dashboard/services?category=subscriptions");
   });
 
   it("does not fall back to an unrelated data plan for invalid links", async () => {

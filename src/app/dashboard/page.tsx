@@ -22,13 +22,13 @@ const quickBuys = [
   { label: "Social boosts", note: "Followers, likes & views", href: "/dashboard/services?country=ng&category=social", service: "social-promotion" as const, category: "social" },
   { label: "eSIM data", note: "Travel data plans", href: "/dashboard/services?country=ng&category=esim", service: "esim" as const, category: "esim" },
   { label: "Residential proxies", note: "Clean rotating IP pools", href: "/dashboard/services?country=ng&category=proxies", service: "proxies" as const, category: "proxies" },
-  { label: "Accounts", note: "Social, email & streaming", href: "/dashboard/accounts", service: "accounts" as const, category: "accounts" },
+  { label: "Social & Digital Accounts", note: "Social media, email & aged listings", href: "/dashboard/accounts", service: "accounts" as const, category: "accounts" },
   { label: "Games & gaming", note: "Games, keys & credits", href: "/dashboard/services?category=games", service: "games" as const, category: "games" },
   { label: "Account top-ups", note: "Game & account credits", href: "/dashboard/services?category=topups", service: "topups" as const, category: "topups" },
   { label: "Gift cards", note: "Vouchers & app stores", href: "/dashboard/services?category=gift-cards", service: "gift-cards" as const, category: "gift-cards" },
   { label: "Subscriptions", note: "Entertainment & tools", href: "/dashboard/services?category=subscriptions", service: "subscriptions" as const, category: "subscriptions" },
   { label: "Prepaid & finance", note: "Prepaid products & cards", href: "/dashboard/services?category=prepaid", service: "prepaid" as const, category: "prepaid" },
-  { label: "Mobile data", note: "MTN, Airtel, Glo & 9mobile", href: "/dashboard/data", service: "data" as const, category: "data" },
+  { label: "Mobile data & airtime", note: "MTN, Airtel, Glo & 9mobile", href: "/dashboard/services?category=data", service: "data" as const, category: "data" },
   { label: "Temporary inbox", note: "Free disposable email", href: "/dashboard/inbox", service: "email-otp" as const, category: "email" },
   { label: "Bulk orders", note: "Volume basket discounts", href: "/dashboard/bulk-orders", service: "bulk" as const, category: "tools" },
 ] as const;
@@ -228,7 +228,7 @@ export default async function DashboardOverviewPage() {
                 <span className="min-w-0 flex-1">
                   <span className="flex min-w-0 items-center justify-center gap-1.5 sm:justify-start">
                     <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${SERVICE_STATE_DOT[item.state]}`} />
-                    <span className="block min-w-0 text-[0.8125rem] font-semibold leading-tight text-ink group-hover:text-lav-700 sm:truncate sm:text-[0.8125rem]">{item.label}</span>
+                    <span className="block min-w-0 text-[0.8125rem] font-semibold leading-tight text-ink group-hover:text-lav-700 sm:text-[0.8125rem]">{item.label}</span>
                   </span>
                   <span className="hidden truncate text-micro text-ink-3 sm:block">{item.note}</span>
                   <span className="sr-only"> — {SERVICE_STATE_LABEL[item.state]}</span>

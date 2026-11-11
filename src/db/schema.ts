@@ -22,6 +22,16 @@ export const rateLimitBuckets = pgTable("rate_limit_buckets", {
   resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
 }, (table) => [index("rate_limit_buckets_reset_at_idx").on(table.resetAt)]);
 
+export const catalogSnapshots = pgTable("catalog_snapshots", {
+  key: varchar("key", { length: 128 }).primaryKey(),
+  // NULL until the first complete supplier walk is atomically published.
+  payload: jsonb("payload"),
+  checkedAt: timestamp("checked_at", { withTimezone: true }),
+  refreshedAt: timestamp("refreshed_at", { withTimezone: true }),
+  leaseOwner: uuid("lease_owner"),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+}, (table) => [index("catalog_snapshots_lease_idx").on(table.leaseExpiresAt)]);
+
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 120 }).notNull(),
