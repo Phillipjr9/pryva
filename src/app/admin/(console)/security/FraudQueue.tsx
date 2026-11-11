@@ -12,6 +12,9 @@ const KIND_LABEL: Record<string, string> = {
   purchase_velocity: "Too many purchases",
   gift_card_velocity: "Too many gift cards",
   suspicious_signup: "Suspicious signup",
+  login_lockout: "Sign-in locked after wrong passwords",
+  second_factor_guessing: "Wrong two-factor codes after a correct password",
+  login_failure_spike: "Failed sign-ins above the alert threshold",
 };
 
 const SEVERITY_STYLE: Record<string, string> = {

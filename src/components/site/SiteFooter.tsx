@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { SiteLink as Link } from "@/components/site/SiteLink";
 import { ArrowRight, Card, Shield, Check } from "@/components/icons";
 import { services } from "@/lib/services/catalog";
 import { BrandLockup } from "@/components/brand/BrandLockup";

@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import { SiteLink as Link } from "@/components/site/SiteLink";
 import type { Metadata } from "next";
 import { PHOTOS } from "@/lib/platform/photos";
 import { Reveal } from "@/components/ui/Reveal";
@@ -27,7 +27,7 @@ import { CountryFlag } from "@/components/CountryFlag";
 import { hasCountryFlag } from "@/lib/platform/countries";
 import { StickyMobileCta } from "@/components/site/StickyMobileCta";
 import { BrandMark } from "@/components/brand/BrandLockup";
-import { getCurrentUser } from "@/lib/identity/auth";
+import { VisitorLink, VisitorText } from "@/components/site/SiteSession";
 
 export const metadata: Metadata = {
   title: "PryvaLogs — Virtual numbers, eSIMs and proxies for Nigeria",
@@ -149,20 +149,31 @@ const faqSchema = {
   })),
 };
 
-export default async function HomePage() {
-  // Only used to decide whether a dashboard-only service card links straight in
-  // or sends a signed-out visitor to sign in and come back.
-  const user = await getCurrentUser().catch(() => null);
+/**
+ * Prerendered, and the same for every visitor.
+ *
+ * This page used to call `getCurrentUser()` to decide where three links pointed,
+ * and that single cookie read made the homepage a per-request render: it could
+ * not be cached, so every visitor in a traffic spike cost a function invocation
+ * before any HTML was sent. Nothing here reads the request now. The markup is
+ * the signed-out version; `VisitorLink` and `VisitorText` correct the few places
+ * that differ once the browser knows the visitor is signed in.
+ *
+ * Not `async` on purpose — there is nothing to wait for, and a stray `await` on
+ * request data is how the page would quietly become dynamic again.
+ * `src/test/public-shell-static.test.tsx` holds that line.
+ */
+export default function HomePage() {
   const numberPlans = plansFor("numbers");
   const configuredNumbers = numberPlans.filter((plan) => isNumberPlanOrderingConfigured(plan.slug)).length;
   const numberFulfilment = configuredNumbers > 0
     ? `Ordering configured · ${configuredNumbers} of ${numberPlans.length} plans`
     : "Ordering unavailable";
 
-  const serviceHref = (href: string) => {
-    if (!href.startsWith("/dashboard")) return href;
-    return user ? href : `/login?next=${encodeURIComponent(href)}`;
-  };
+  // A dashboard-only service is linked through sign-in, which brings a signed-out
+  // visitor back to the right page and forwards a signed-in one straight there.
+  const signedOutHref = (href: string) =>
+    href.startsWith("/dashboard") ? `/login?next=${encodeURIComponent(href)}` : href;
 
   return (
     <>
@@ -305,8 +316,9 @@ export default async function HomePage() {
                   delay={index * 50}
                   className="w-[84vw] max-w-[20rem] shrink-0 snap-center sm:w-auto sm:max-w-none"
                 >
-                  <Link
-                    href={serviceHref(service.href)}
+                  <VisitorLink
+                    href={signedOutHref(service.href)}
+                    signedInHref={service.href}
                     className="group relative flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 transition-all duration-300 hover:-translate-y-1 hover:border-lav-200 hover:shadow-[var(--shadow-card)] sm:p-6"
                   >
                     <div className="relative flex items-start justify-between gap-4">
@@ -357,7 +369,9 @@ export default async function HomePage() {
                         {inDashboard && (
                           <p className="mt-1 inline-flex items-center gap-1.5 text-micro font-medium text-ink-3">
                             <Lock className="h-3 w-3 text-lav-500" />
-                            {service.slug === "data" ? "Data purchases not available yet" : user ? "Open in your dashboard" : "In your dashboard — sign in to check"}
+                            {service.slug === "data" ? "Data purchases not available yet" : (
+                              <VisitorText signedOut="In your dashboard — sign in to check" signedIn="Open in your dashboard" />
+                            )}
                           </p>
                         )}
                       </div>
@@ -365,7 +379,7 @@ export default async function HomePage() {
                         <ArrowUpRight className="h-4 w-4" />
                       </span>
                     </div>
-                  </Link>
+                  </VisitorLink>
                 </Reveal>
               );
             })}
@@ -830,7 +844,7 @@ export default async function HomePage() {
           </Reveal>
         </div>
       </section>
-      <StickyMobileCta label="Explore the catalogue" targetId="final-cta" href={user ? "/dashboard" : "/signup"} />
+      <StickyMobileCta label="Explore the catalogue" targetId="final-cta" href="/signup" signedInHref="/dashboard" />
     </>
   );
 }

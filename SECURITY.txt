@@ -21,7 +21,22 @@ as proof of identity.
 ---------------------------------
 
 - src/lib/identity/account-lockout.ts and the shared rate limiter bound sign-in attempts;
-  neither alone stops a distributed attack.
+  neither alone stops a distributed attack. Per connection: 30 attempts in 15
+  minutes. Per address: 5 in 15 minutes. Per account: locked for 30 minutes after
+  8 wrong passwords in a row, and the correct password does not lift the lock.
+  A limiter that cannot reach its store answers 503 rather than letting the
+  attempt through. Passwords are stored as scrypt hashes with a per-password
+  salt and compared in constant time (src/lib/identity/auth.ts).
+- src/lib/identity/login-attempts.ts makes those refusals visible. Every failed
+  sign-in writes one "Sign-in failed" log line with the reason, the account when
+  the address has one, and salted hashes of the address tried and the client
+  address; never the password, the address or the IP itself. An account being
+  locked is queued at /admin/security. One hundred failures in an hour across
+  the site, or ten wrong two-factor codes on one account, are queued as high
+  severity and mailed to the fraud-alert recipients, at most once an hour; the
+  site-wide one is also posted to ALERT_WEBHOOK_URL. The counting runs after the
+  response and stops once the hour's alert is out, so it adds neither delay nor
+  load to the attack it reports. This is detection. It refuses nothing.
 - src/lib/identity/admin-two-factor.ts and admin authorization separate operators from
   customers. Verified operator addresses and 2FA are required by default.
   src/lib/identity/two-factor.ts stores TOTP secrets encrypted under TWO_FACTOR_KEY
@@ -89,6 +104,16 @@ unconfirmed response. These controls do not verify production delivery.
   bug bounty. Do not interpret tests as proof against attackers.
 - Edge bot defence and a WAF are outside this repository; distributed abuse can
   exceed per-IP controls. Review firewall and account-lockout telemetry.
+- Sign-in telemetry is only as useful as its channels. With no ALERT_WEBHOOK_URL
+  and no working fraud-alert mail, an attack is logged and queued and nobody is
+  told. The host keeps runtime logs for a short, plan-dependent time (about an
+  hour on the smallest plans), so the per-attempt lines are gone soon after an
+  attack unless they are drained elsewhere; only the queue entries persist. The
+  alert thresholds are fixed constants that have not been tuned against real
+  traffic, and none of it has been exercised against production.
+- The account lock is also a way to keep a customer out: anyone who knows an
+  address can lock it for 30 minutes at a time by guessing. That is the usual
+  trade for stopping the guessing; a password reset lifts the lock at once.
 - The signup challenge is off until both Turnstile keys are set. Until then the
   honeypot, the 10-per-hour-per-IP signup limit and the 20-per-15-minute Google
   return limit are the only signup filters, and a determined script defeats them.

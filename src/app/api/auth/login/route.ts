@@ -4,6 +4,7 @@ import { users } from "@/db/schema";
 import { createSession, isValidEmail, normalizeEmail, verifyPassword } from "@/lib/identity/auth";
 import { LOCKOUT_DURATION_MS, clearFailedLogins, lockoutRemainingMs, recordFailedLogin } from "@/lib/identity/account-lockout";
 import { checkAuthRateLimit, clearAuthRateLimit } from "@/lib/identity/auth-rate-limit";
+import { noteFailedSignIn } from "@/lib/identity/login-attempts";
 import { isSameOriginMutation } from "@/lib/platform/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 import {
@@ -50,7 +51,13 @@ export async function POST(request: Request) {
     const email = typeof fields.email === "string" ? normalizeEmail(fields.email) : "";
     const password = typeof fields.password === "string" ? fields.password : "";
     const limited = await checkAuthRateLimit(request, "login", email.length <= 200 ? email : "");
-    if (limited) return limited;
+    if (limited) {
+      // A refused guess is still a guess, and in a real attack these are nearly
+      // all of them: the limiter lets five through and turns the rest away. A 503
+      // is the limiter's own store failing, which is not somebody guessing.
+      if (limited.status === 429) noteFailedSignIn(request, { reason: "throttled", email });
+      return limited;
+    }
 
     if (email.length > 200 || !isValidEmail(email) || password.length === 0) {
       return Response.json(
@@ -67,6 +74,7 @@ export async function POST(request: Request) {
     // be used to learn which emails have accounts here.
     const lockedForMs = user ? lockoutRemainingMs(user) : 0;
     if (lockedForMs > 0) {
+      noteFailedSignIn(request, { reason: "account_locked", userId: user?.id });
       return lockedResponse(lockedForMs);
     }
 
@@ -75,6 +83,7 @@ export async function POST(request: Request) {
     // below would refuse it anyway -- this says why, and keeps a deleted row out of
     // the lockout counters it has no business in.
     if (user?.deletedAt || user?.suspendedAt) {
+      noteFailedSignIn(request, { reason: "closed_account", userId: user.id });
       return Response.json({ ok: false, error: "Those details don't match an account." }, { status: 401 });
     }
 
@@ -87,12 +96,19 @@ export async function POST(request: Request) {
         try {
           const state = await recordFailedLogin(user.id);
           if (state.lockedUntil && state.lockedUntil.getTime() > Date.now()) {
+            // The write that sets the lock also resets the counter, so a count of
+            // zero is the attempt that locked the account. A second wrong guess
+            // racing it sees the same lock and is not reported as a new one.
+            noteFailedSignIn(request, { reason: "wrong_password", userId: user.id, lockedNow: state.attempts === 0 });
             return lockedResponse(LOCKOUT_DURATION_MS);
           }
         } catch (error) {
           console.error("[auth] failed to record a failed sign-in", error instanceof Error ? error.message : String(error));
         }
       }
+      // Every wrong guess leaves a line. Nothing in the reply changes: the
+      // visitor still cannot tell a wrong password from an unknown address.
+      noteFailedSignIn(request, user ? { reason: "wrong_password", userId: user.id } : { reason: "unknown_account", email });
       return Response.json({ ok: false, error: "Those details don't match an account." }, { status: 401 });
     }
 
