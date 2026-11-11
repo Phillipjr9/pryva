@@ -43,6 +43,7 @@ const { otpSupplierOrder, otpSupplierProbe, clearOtpCatalogueCache, otpOfferPubl
 const { FleexaError } = await import("@/lib/providers/fleexa");
 const { BitcallError } = await import("@/lib/providers/bitcall");
 const { isAmbiguousOtpPurchase } = await import("@/lib/services/numbers/otp-suppliers");
+const { clearRateCache } = await import("@/lib/payments/exchange-rate");
 
 const RATE = 1500;
 const plan = findPlan("vn-ng")!;
@@ -84,9 +85,12 @@ beforeEach(() => {
   // Catalogues are cached briefly so a purchase does not re-read them; a test
   // that changes what a supplier sells has to start from a cold cache.
   clearOtpCatalogueCache();
+  clearRateCache();
   fleexa.configured = true;
   bitcall.configured = true;
   vi.stubEnv("USD_NGN_RATE", String(RATE));
+  vi.stubEnv("EUR_NGN_RATE", "");
+  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
   fleexa.list.mockResolvedValue([]);
   bitcall.list.mockResolvedValue([]);
   bitcall.buy.mockResolvedValue(activation);
@@ -95,6 +99,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 

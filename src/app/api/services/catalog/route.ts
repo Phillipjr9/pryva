@@ -27,7 +27,10 @@ export const maxDuration = 30;
  */
 type Source<T> = { configured: boolean; snapshot: T | null; failure: "funding" | "outage" | null };
 
-const SUPPLIER_READ_TIMEOUT_MS = 1_200;
+// Bitcall's live OTP catalogue is legitimately slower than the old 1.2s guard
+// and can need multiple pages before the target country publishes enough rows.
+// Treat a slow-but-valid read as a real read, not as a 503 outage.
+const SUPPLIER_READ_TIMEOUT_MS = 15_000;
 
 async function withReadTimeout<T>(read: () => Promise<T>, timeoutMs: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -109,7 +112,7 @@ export async function GET(request: NextRequest) {
   const readBoost = () => attempt(isSmmPanelConfigured(), () => readBoostSnapshot(refresh));
   const readEsim = () => attempt(isBitcallConfigured(), () => readEsimCatalog(refresh));
   const readOtp = () => attempt(isBitcallConfigured(), async () => {
-    const read = await readOtpOffersForSupplier("bitcall", country.code, country.name, refresh);
+    const read = await readOtpOffersForSupplier("bitcall", country.code, country.name, undefined, refresh);
     if (read.errorCode && read.offers.length === 0) throw otpCatalogProviderError(read.errorCode);
     return { offers: read.offers, partial: read.partial ?? false, degraded: read.degraded ?? null, fetchedAt: new Date().toISOString() };
   });
@@ -133,6 +136,16 @@ export async function GET(request: NextRequest) {
   }
 
   const sources = [supplier, boost, esim, otp].filter((source): source is NonNullable<typeof source> => source !== null);
+  console.log("CATALOG_ROUTE_SOURCE_STATUS", {
+    requestedFeed,
+    requestedFeeds,
+    sources: sources.map((source) => ({
+      configured: source.configured,
+      hasSnapshot: Boolean(source.snapshot),
+      failure: source.failure,
+      partial: source.snapshot && "partial" in source.snapshot ? Boolean((source.snapshot as { partial?: boolean }).partial) : false,
+    })),
+  });
 
   /**
    * No supplier connected is the steady state of a fresh deployment, not an
@@ -168,7 +181,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (allDestinations && requestedFeed === "esim") {
+  if (allDestinations && requestedFeed === "esim" && esim) {
     const items = esim.snapshot ? esimItemsForAllDestinations(esim.snapshot.listings) : [];
     const unreadable = Boolean(esim.snapshot && esim.snapshot.stats && esim.snapshot.stats.returned > 0 && esim.snapshot.listings.length === 0);
     const truncated = Boolean(esim.snapshot && esim.snapshot.listings.length > ESIM_CATALOGUE_LIMIT);

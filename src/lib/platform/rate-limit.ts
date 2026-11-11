@@ -30,6 +30,17 @@ export function cleanupRateLimitStore() {
   }
 }
 
+function makeRoomInPreviewRateLimitStore() {
+  cleanupRateLimitStore();
+  if (previewStore.size < MAX_PREVIEW_KEYS) return;
+
+  const oldestEntries = [...previewStore.entries()]
+    .sort(([, left], [, right]) => left.resetTime - right.resetTime)
+    .slice(0, previewStore.size - MAX_PREVIEW_KEYS + 1);
+
+  for (const [key] of oldestEntries) previewStore.delete(key);
+}
+
 /**
  * PostgreSQL uses one atomic upsert per bucket, shared by every app instance.
  * Preview mode is intentionally process-local and is not a production store.
@@ -47,11 +58,8 @@ export function createRateLimiter(config: RateLimitConfig) {
     if (isPreviewDatabase()) {
       const record = previewStore.get(hashedKey);
       if (!record || now >= record.resetTime) {
-        if (!record && previewStore.size >= MAX_PREVIEW_KEYS) {
-          cleanupRateLimitStore();
-          if (previewStore.size >= MAX_PREVIEW_KEYS) {
-            return { allowed: false, remaining: 0, resetTime: now + config.windowMs, unavailable: true };
-          }
+        if (!record) {
+          makeRoomInPreviewRateLimitStore();
         }
         const resetTime = now + config.windowMs;
         previewStore.set(hashedKey, { count: 1, resetTime });

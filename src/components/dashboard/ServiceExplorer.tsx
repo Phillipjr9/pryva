@@ -307,6 +307,9 @@ export function ServiceExplorer({
   rejectedCountry = null,
   rejectedCategory = null,
   readiness = [],
+  initialAllEsimDestinations = false,
+  reviewedItems = [],
+  enableDigitalCatalogue = false,
 }: {
   initialCountry: string | null;
   initialCategory: string | null;
@@ -319,6 +322,9 @@ export function ServiceExplorer({
    * renders — just without the labels.
    */
   readiness?: ServiceReadinessEntry[];
+  initialAllEsimDestinations?: boolean;
+  reviewedItems?: ExplorerItem[];
+  enableDigitalCatalogue?: boolean;
 }) {
   const [country, setCountry] = useState(() => resolveExplorerCountry(initialCountry));
   const [category, setCategory] = useState<ExplorerFilter>(() => explorerCategory(initialCategory));

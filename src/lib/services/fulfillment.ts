@@ -208,7 +208,7 @@ async function fulfillNumber(plan: Plan, intent: SmsIntent, options: FulfillPlan
   // provider API directly.
   // A browsing cache may be stale. Every paid checkout, including a generic
   // country plan, must use a fresh quote for its stock and margin check.
-  const read = await readOtpOffersForSupplier("bitcall", intent.country, plan.region, true);
+  const read = await readOtpOffersForSupplier("bitcall", intent.country, plan.region, undefined, true);
   if (read.errorCode || read.stale) {
     throw new FleexaError("The selected service could not be confirmed", read.errorCode === "INSUFFICIENT_BALANCE" ? 402 : 503, read.errorCode ?? "STALE_CATALOG");
   }

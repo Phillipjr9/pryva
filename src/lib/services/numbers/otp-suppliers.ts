@@ -6,7 +6,6 @@ import {
   buyBitcallOtpActivation,
   isAmbiguousBitcallOutcome,
   isBitcallConfigured,
-  listBitcallOtpCountries,
   listBitcallOtpServices,
 } from "@/lib/providers/bitcall";
 import { buyFleexaSmsNumber, FleexaError, isFleexaConfigured, listFleexaSmsServices } from "@/lib/providers/fleexa";
@@ -229,26 +228,12 @@ async function fleexaOffers(country: string, regionName: string): Promise<OtpOff
 async function bitcallOffers(country: string, regionName: string): Promise<OtpOffer[]> {
   if (!isBitcallConfigured()) return [];
 
-  // Bitcall publishes opaque country codes (for example, US_1), which are not
-  // necessarily the ISO code we use in the storefront. Resolve the supplier's
-  // own values first, then filter with the tolerant ISO/region matcher; sending
-  // `US` directly can silently return an empty catalog when the provider expects
-  // its published code.
-  const providerCodes = await listBitcallOtpCountries();
-  const matchingCodes = [...new Set(providerCodes.filter((code) => matchesCountry(code, country, regionName)))];
-  const scopedServices = matchingCodes.length === 0
-    ? []
-    : (await Promise.all(
-        matchingCodes.map((countryCode) => listBitcallOtpServices({ countryCode })),
-      )).flat();
-  const scopedMatches = scopedServices.filter((service) => matchesCountry(service.countryCode, country, regionName));
-  // A country filter that returns nothing is not proof the country has no stock:
-  // providers sometimes publish region IDs but filter by a different canonical
-  // value. Retry the read-only catalog without a country filter and match only
-  // rows that identify this country. This stays on Bitcall and never purchases.
-  const services = scopedMatches.length > 0
-    ? scopedMatches
-    : (await listBitcallOtpServices()).filter((service) => matchesCountry(service.countryCode, country, regionName));
+  // The service feed is the authoritative source for live OTP rows. Bitcall's
+  // country catalogue is a separate read that can fail in the same way as a key
+  // validation error, and it is not needed to build the customer offer list.
+  // Read the service catalogue once, then filter the published region labels with
+  // the same tolerant ISO/region matcher we already use for the storefront.
+  const services = await listBitcallOtpServices({});
   const offers: OtpOffer[] = [];
   const seen = new Set<string>();
   for (const service of services) {
@@ -310,11 +295,12 @@ export type OtpOfferRead = {
   errorCode: string | null;
   partial?: boolean;
   degraded?: "funding" | "outage" | null;
+  stale?: boolean;
 };
 
 /** A stable opaque id for a live listing; the provider's service reference stays server-side. */
-export function otpOfferPublicId(country: string, ref: string, app: string): string {
-  return `otp-${createHash("sha256").update(`${country.toLowerCase()}\0${ref}\0${app}`).digest("hex").slice(0, 24)}`;
+export function otpOfferPublicId(country: string, ref: string, app: string | null): string {
+  return `otp-${createHash("sha256").update(`${country.toLowerCase()}\0${ref}\0${app ?? ""}`).digest("hex").slice(0, 24)}`;
 }
 
 /** Read one supplier's offers while preserving a safe error code for storefront status. */
@@ -329,12 +315,12 @@ export async function readOtpOffersForSupplier(
 
   const key = `${supplier}:${country}`;
   const cached = catalogueCache.get(key);
-  if (!refresh && cached && Date.now() - cached.at < CATALOGUE_TTL_MS) return { offers: cached.offers, errorCode: null, partial: false, degraded: null };
+  if (!refresh && cached && Date.now() - cached.at < CATALOGUE_TTL_MS) return { offers: cached.offers, errorCode: null, partial: false, degraded: null, stale: false };
 
   try {
     const offers = rankWithinSupplier(await withBudget(fetchOffers(supplier, country, regionName), budgetMs));
     catalogueCache.set(key, { at: Date.now(), offers });
-    return { offers, errorCode: null, partial: false, degraded: null };
+    return { offers, errorCode: null, partial: false, degraded: null, stale: false };
   } catch (error) {
     const stale = cached && Date.now() - cached.at < CATALOGUE_TTL_MS * 3 ? cached.offers : null;
     if (stale && stale.length > 0) {
@@ -344,7 +330,7 @@ export async function readOtpOffersForSupplier(
         staleOffers: stale.length,
         error: error instanceof Error ? error.message : String(error),
       });
-      return { offers: stale, errorCode: null, partial: true, degraded: "outage" };
+      return { offers: stale, errorCode: errorCodeOf(error), partial: true, degraded: "outage", stale: true };
     }
     logger.warn("Number catalogue unavailable", {
       supplier,
@@ -392,7 +378,10 @@ function errorCodeOf(error: unknown): string {
 }
 
 /** Buy one offer. Every call here spends real supplier balance. */
-export async function buyOtpNumber(offer: OtpOffer): Promise<BoughtNumber> {
+export async function buyOtpNumber(
+  offer: OtpOffer,
+  onAccepted?: (providerRequestId: string) => Promise<void> | void,
+): Promise<BoughtNumber> {
   if (offer.supplier === "fleexa") {
     const order = await buyFleexaSmsNumber({
       // Pass the app when the catalogue named one: it is the difference between
@@ -411,6 +400,7 @@ export async function buyOtpNumber(offer: OtpOffer): Promise<BoughtNumber> {
   }
 
   const activation = await buyBitcallOtpActivation(offer.ref);
+  if (activation.activationId) await onAccepted?.(activation.activationId);
   return {
     supplier: "bitcall",
     providerCostNgn: activation.price !== null ? await supplierAmountToNgn(activation.price, activation.currency) : offer.costNgn,
@@ -433,10 +423,23 @@ export async function buyOtpNumber(offer: OtpOffer): Promise<BoughtNumber> {
  */
 export function isAmbiguousOtpPurchase(error: unknown): boolean {
   if (error instanceof FleexaError) {
-    // Raised before any request left this process, so nothing can have been
-    // bought: no key, no usable base URL, budget already spent, or a plan the
-    // provider refused outright.
-    return !["NO_API_KEY", "INVALID_BASE_URL", "RATE_LIMIT_UNAVAILABLE", "RATE_LIMITED"].includes(error.code ?? "");
+    // A definitive refusal means the purchase did not execute and there is no
+    // second supplier to try. The ambiguous cases are limited to missing
+    // confirmation from a live provider call, not an explicit decline.
+    const definitive = new Set([
+      "NO_API_KEY",
+      "INVALID_BASE_URL",
+      "RATE_LIMIT_UNAVAILABLE",
+      "RATE_LIMITED",
+      "OTP_PROVIDER_REFUSED",
+      "SERVICE_UNAVAILABLE",
+      "COST_UNKNOWN",
+      "UNPROFITABLE",
+      "OTP_OFFER_STALE",
+      "INVALID_OTP_SELECTION",
+      "OTP_CLAIM_REQUIRED",
+    ]);
+    return !definitive.has(error.code ?? "");
   }
   if (error instanceof Error && error.name === "BitcallError") return isAmbiguousBitcallOutcome(error);
   // A thrown non-provider value is a bug, not a receipt: assume the worst.

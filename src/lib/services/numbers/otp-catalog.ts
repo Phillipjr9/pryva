@@ -119,7 +119,7 @@ export async function findOtpCheckoutOffer(
   const plan = numberPlanForCountry(country.code);
   if (!plan) return { listing: null, errorCode: "UNSUPPORTED_COUNTRY" };
 
-  const read = await readOtpOffersForSupplier("bitcall", country.code, country.name, options.refresh);
+  const read = await readOtpOffersForSupplier("bitcall", country.code, country.name, undefined, options.refresh);
   if (read.errorCode) return { listing: null, errorCode: read.errorCode };
   // The app is not required to resolve an offer: the id is the ref plus whatever
   // label the provider gave it, which may be none.

@@ -5,6 +5,7 @@ const auth = vi.hoisted(() => ({ current: vi.fn() }));
 vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: auth.current }));
 import { GET as dataPlans } from "@/app/api/airtime/plans/route";
 import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
+import { catalogRateLimiter, cleanupRateLimitStore } from "@/lib/platform/rate-limit";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -41,5 +42,26 @@ describe("unavailable services", () => {
     vi.stubEnv("VERCEL_ENV", "preview");
     vi.stubEnv("FORCE_LIVE_LISTINGS", "1");
     expect(financialActionsUnavailable()).toBe(false);
+  });
+
+  it("does not mark preview rate-limit overflow as a provider outage", async () => {
+    vi.stubEnv("DATABASE_URL", "");
+    vi.stubEnv("PGHOST", "");
+    vi.stubEnv("PGUSER", "");
+    vi.stubEnv("AWS_REGION", "");
+    vi.stubEnv("AWS_ROLE_ARN", "");
+    cleanupRateLimitStore();
+
+    let sawUnavailable = false;
+    for (let i = 0; i < 10_001; i++) {
+      const result = await catalogRateLimiter(`overflow-${i}`);
+      if (result.unavailable) {
+        sawUnavailable = true;
+        break;
+      }
+    }
+
+    expect(sawUnavailable).toBe(false);
+    cleanupRateLimitStore();
   });
 });

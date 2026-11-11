@@ -1080,7 +1080,7 @@ export async function findBitcallOtpService(reference: string): Promise<BitcallO
     throw new BitcallError("Invalid service reference", 400, "VALIDATION_ERROR", null, ["reference"]);
   }
   const payload = await gatewayFetch("GET", `/v1/otp/services/${encodeURIComponent(ref)}`);
-  return rowsFrom(payload).slice(0, 2000).map(parseOtpService).filter((service) => service.offers.length > 0);
+  return rowsFrom(payload).slice(0, 2000).map((row) => parseOtpService(row)).filter((service) => service.offers.length > 0);
 }
 
 /**
