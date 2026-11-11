@@ -6,8 +6,10 @@ import {
   MarketplaceError,
 } from "@/lib/services/accounts/marketplace-suppliers";
 import { logger } from "@/lib/platform/logger";
+import { SnapshotUnavailableError } from "@/lib/platform/shared-snapshot";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /**
  * GET /api/accounts/categories?categoryId=22
@@ -42,6 +44,12 @@ export async function GET(request: NextRequest) {
     const { categories, subcategories, partial } = await listMarketplaceCategories();
     return NextResponse.json({ configured: true, categories, subcategories, partial: !!partial });
   } catch (error) {
+    if (error instanceof SnapshotUnavailableError) {
+      return NextResponse.json(
+        { error: "Categories are being refreshed. Please try again shortly.", code: "catalog_unavailable" },
+        { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "10" } },
+      );
+    }
     if (error instanceof MarketplaceError) {
       logger.error("Marketplace categories failed", { code: error.code, status: error.status });
       return NextResponse.json(

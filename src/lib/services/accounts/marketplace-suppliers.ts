@@ -41,6 +41,7 @@ import {
   type AccsZoneRef,
 } from "@/lib/providers/accszone";
 import { logger } from "@/lib/platform/logger";
+import { clearLocalSnapshots, readSharedSnapshot, SnapshotUnavailableError } from "@/lib/platform/shared-snapshot";
 import { usdMicros, usdString } from "@/lib/payments/supplier-money";
 import { warrantyDaysForGroup, type FulfilmentMode } from "@/lib/services/warranty";
 
@@ -184,7 +185,9 @@ const STREAMING_KEYWORDS = [
 ];
 
 /** Title keywords that mean "AI tools" whatever group the source used. */
-const AI_KEYWORDS = ["chatgpt", "openai", "midjourney", "claude"];
+const AI_KEYWORDS = ["chatgpt", "openai", "midjourney", "claude", "grok"];
+const REVIEW_KEYWORDS = ["tripadvisor", "trustpilot", "google review"];
+const GAMING_KEYWORDS = ["roblox", "fortnite", "minecraft"];
 
 /**
  * Pryva-facing group for one supplier product.
@@ -201,6 +204,8 @@ export function groupLabelFor(product: { groupName?: string | null; name?: strin
   if (STREAMING_KEYWORDS.some((needle) => haystack.includes(needle))) return "Streaming";
   if (fromGroup) return fromGroup;
   if (AI_KEYWORDS.some((needle) => haystack.includes(needle))) return "AI tools";
+  if (REVIEW_KEYWORDS.some((needle) => haystack.includes(needle))) return "Reviews";
+  if (GAMING_KEYWORDS.some((needle) => haystack.includes(needle))) return "Gaming";
   return "Other";
 }
 
@@ -355,77 +360,89 @@ export type ListingQuery = {
   sellingPrice?: (listing: MarketplaceListing) => Promise<number>;
 };
 
-type BrowseCatalog = { listings: MarketplaceListing[]; source: CatalogSource; partial: boolean; checkedAt: string };
-const BROWSE_TTL_MS = 60 * 1000;
-let browseCache: { key: string; expires: number; value: BrowseCatalog } | null = null;
-let browsePending: { key: string; promise: Promise<BrowseCatalog> } | null = null;
-let secondaryProgress: { listings: MarketplaceListing[]; nextPage: number; checkedAt: string; expires: number } | null = null;
+type BrowseCatalog = {
+  listings: MarketplaceListing[];
+  source: CatalogSource;
+  partial: boolean;
+  checkedAt: string;
+  /** Complete but older than the refresh interval. Never a partial crawl. */
+  stale?: boolean;
+};
+const BROWSE_TTL_MS = 5 * 60 * 1000;
+const MAX_SECONDARY_PAGES = 100;
 
 export function clearMarketplaceCatalogCache(): void {
-  browseCache = null;
-  browsePending = null;
-  secondaryProgress = null;
+  clearLocalSnapshots();
 }
 
-/** A single shared snapshot keeps category IDs, filtering and pagination aligned.
- * Bounded reads protect the legacy account-wide rate budget. Incomplete reads
- * are explicitly labelled, never presented as a complete combined catalogue.
- * Prices and stock are still re-read from the selected supplier at checkout. */
-async function combinedCatalog(): Promise<BrowseCatalog> {
-  const key = `${isBulkaccConfigured()}:${isAccsZoneConfigured()}`;
-  if (browseCache?.key === key && browseCache.expires > Date.now()) return browseCache.value;
-  if (browsePending?.key === key) return browsePending.promise;
-  const promise = (async () => {
-    const [primary, secondary] = await Promise.all([
-      primaryListings(),
-      (async () => {
-        if (!isAccsZoneConfigured()) { secondaryProgress = null; return { listings: [], partial: false, checkedAt: null }; }
-        const progress = secondaryProgress && secondaryProgress.expires > Date.now() ? secondaryProgress : null;
-        const checkedAt = progress?.checkedAt ?? new Date().toISOString();
-        const listings: MarketplaceListing[] = [...(progress?.listings ?? [])];
-        const seen = new Set(listings.map((listing) => listing.slug));
-        let page = progress?.nextPage ?? 1;
-        const lastRead = page + 24;
-        try {
-          for (; page <= lastRead; page++) {
-            const result = await listListings({ page });
-            if (!Array.isArray(result.listings) || !Number.isSafeInteger(result.meta.last_page) || result.meta.last_page < page || result.meta.current_page !== page) throw new Error("Invalid catalogue page");
-            let added = 0;
-            for (const row of result.listings) {
-              const listing = fromAccsZone(row);
-              if (seen.has(listing.slug)) continue;
-              seen.add(listing.slug);
-              listings.push({ ...listing, browseGroup: browseGroupFor(listing) });
-              added++;
-            }
-            if (page >= result.meta.last_page) { secondaryProgress = null; return { listings, partial: false, checkedAt }; }
-            if (!added) throw new Error("Catalogue pagination stalled");
-          }
-        } catch (error) {
-          logger.warn("Account catalogue partly unavailable", { code: error instanceof AccsZoneError ? error.code : "catalog_read_failed" });
-        }
-        // Resume remaining pages after the short incomplete-cache cooldown,
-        // rather than permanently hiding everything past the read budget.
-        secondaryProgress = { listings, nextPage: page, checkedAt, expires: Date.now() + 30 * 60 * 1000 };
-        return { listings, partial: true, checkedAt };
-      })(),
-    ]);
-    return {
-      listings: [...(primary?.listings ?? []), ...secondary.listings],
-      checkedAt: [primary?.checkedAt, secondary.checkedAt].filter((date): date is string => !!date).sort()[0] ?? new Date().toISOString(),
-      source: primary ? "primary" as const : secondary.listings.length ? "fallback" as const : "none" as const,
-      partial: (isBulkaccConfigured() && primary === null) || !!primary?.partial || secondary.partial,
-    };
-  })();
-  const pending = { key, promise };
-  browsePending = pending;
-  try {
-    const value = await promise;
-    if (browsePending === pending) browseCache = { key, value, expires: Math.min(Date.now() + BROWSE_TTL_MS, Date.parse(value.checkedAt) + BROWSE_TTL_MS) };
-    return value;
-  } finally {
-    if (browsePending === pending) browsePending = null;
+async function secondaryListings(): Promise<{ listings: MarketplaceListing[]; checkedAt: string | null }> {
+  if (!isAccsZoneConfigured()) return { listings: [], checkedAt: null };
+  const checkedAt = new Date().toISOString();
+  const deadline = Date.now() + 30_000;
+  const listings: MarketplaceListing[] = [];
+  const seen = new Set<string>();
+  for (let page = 1; page <= MAX_SECONDARY_PAGES; page++) {
+    if (Date.now() >= deadline) throw new Error("Catalogue refresh deadline reached");
+    const result = await listListings({ page });
+    if (!Array.isArray(result.listings) || !Number.isSafeInteger(result.meta.last_page) ||
+        result.meta.last_page < page || result.meta.last_page > MAX_SECONDARY_PAGES ||
+        result.meta.current_page !== page) {
+      throw new Error("Invalid catalogue page");
+    }
+    let added = 0;
+    for (const row of result.listings) {
+      const listing = fromAccsZone(row);
+      if (seen.has(listing.slug)) continue;
+      seen.add(listing.slug);
+      listings.push({ ...listing, browseGroup: browseGroupFor(listing) });
+      added++;
+    }
+    if (page >= result.meta.last_page) {
+      if (listings.length < result.meta.total) throw new Error("Incomplete catalogue");
+      return { listings, checkedAt };
+    }
+    if (!added) throw new Error("Catalogue pagination stalled");
   }
+  throw new Error("Catalogue exceeds the pagination safety bound");
+}
+
+async function buildCombinedCatalog(): Promise<BrowseCatalog> {
+  const [primary, secondary] = await Promise.all([primaryListings(), secondaryListings()]);
+  // A complete combined snapshot requires every configured source. Publishing
+  // just the healthy half would hide products until the next crawl.
+  if ((isBulkaccConfigured() && (!primary || primary.partial))) {
+    throw new Error("Primary catalogue did not complete");
+  }
+  return {
+    listings: [...(primary?.listings ?? []), ...secondary.listings],
+    checkedAt: [primary?.checkedAt, secondary.checkedAt]
+      .filter((date): date is string => !!date).sort()[0] ?? new Date().toISOString(),
+    source: primary ? "primary" as const : secondary.listings.length ? "fallback" as const : "none" as const,
+    partial: false,
+  };
+}
+
+/**
+ * All instances read and atomically replace the same complete PostgreSQL value.
+ * During refreshes, shoppers immediately receive the previous complete value;
+ * supplier failures never truncate it. Live price and stock checks at checkout
+ * are intentionally independent of this browse snapshot.
+ */
+async function combinedCatalog(): Promise<BrowseCatalog> {
+  const key = `accounts:v2:${isBulkaccConfigured()}:${isAccsZoneConfigured()}`;
+  const snapshot = await readSharedSnapshot<BrowseCatalog>({
+    key,
+    ttlMs: BROWSE_TTL_MS,
+    refresh: async () => {
+      const value = await buildCombinedCatalog();
+      return { value, checkedAt: value.checkedAt };
+    },
+  });
+  if (!snapshot.value || !Array.isArray(snapshot.value.listings) ||
+      !snapshot.value.listings.every((listing) => listing && typeof listing.slug === "string")) {
+    throw new SnapshotUnavailableError("The stored catalogue is invalid");
+  }
+  return { ...snapshot.value, partial: false, stale: snapshot.stale };
 }
 
 function categoryEntries(listings: MarketplaceListing[], field: "group" | "category") {
@@ -525,13 +542,13 @@ async function pageInMemory(
  * grouping, sorting and pagination instead of one call per page view.
  */
 export async function listMarketplaceListings(query: ListingQuery = {}): Promise<{
-  listings: MarketplaceListing[]; meta: MarketplaceMeta; source: CatalogSource; partial?: boolean; checkedAt: string;
+  listings: MarketplaceListing[]; meta: MarketplaceMeta; source: CatalogSource; partial?: boolean; checkedAt: string; stale?: boolean;
 }> {
   const page = Number.isSafeInteger(query.page) && (query.page as number) > 0 ? query.page as number : 1;
   const perPage = Number.isSafeInteger(query.perPage) && (query.perPage as number) > 0 ? Math.min(query.perPage as number, 60) : 24;
   const catalog = await combinedCatalog();
   const result = await pageInMemory(catalog.listings, query, page, perPage, catalog.source);
-  return { ...result, partial: catalog.partial, checkedAt: catalog.checkedAt };
+  return { ...result, partial: false, checkedAt: catalog.checkedAt, stale: catalog.stale };
 }
 
 /**

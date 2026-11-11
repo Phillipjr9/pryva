@@ -10,9 +10,11 @@ import { isMarketplaceCatalogAvailable } from "@/lib/services/accounts/marketpla
 import { isMarketplaceCheckoutConfigured } from "@/lib/services/accounts/marketplace-policy";
 import { priceMarketplaceListing } from "@/lib/services/accounts/marketplace-pricing";
 import { logger } from "@/lib/platform/logger";
+import { SnapshotUnavailableError } from "@/lib/platform/shared-snapshot";
 import { safeUnitCount } from "@/lib/services/service-units";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const ALLOWED_SORTS = new Set(["sort_key", "total_price", "available_stock", "title"]);
 
@@ -59,7 +61,7 @@ export async function GET(request: NextRequest) {
       }
       return price;
     }
-    const { listings, meta, partial, checkedAt } = await listMarketplaceListings({ ...query,
+    const { listings, meta, partial, checkedAt, stale } = await listMarketplaceListings({ ...query,
       sellingPrice: async (listing) => (await priceFor(listing)).unitNgn,
     });
 
@@ -89,8 +91,17 @@ export async function GET(request: NextRequest) {
       }),
     );
 
-    return NextResponse.json({ configured: true, listings: priced, meta, partial: !!partial, checkedAt }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(
+      { configured: true, listings: priced, meta, partial: !!partial, checkedAt, stale: !!stale },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
+    if (error instanceof SnapshotUnavailableError) {
+      return NextResponse.json(
+        { error: "Listings are being refreshed. Please try again shortly.", code: "catalog_unavailable" },
+        { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "10" } },
+      );
+    }
     if (error instanceof MarketplaceError) {
       logger.error("Marketplace listings failed", { code: error.code, status: error.status });
       const message =

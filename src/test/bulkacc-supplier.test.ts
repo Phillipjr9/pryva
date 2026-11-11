@@ -256,7 +256,7 @@ describe("supplier client: money-spending safety", () => {
     expect(logged()).toContain("bad_product");
     expect(logged()).not.toContain(API_KEY);
   });
-  it("coalesces reads, preserves snapshot time, and refreshes stock after one minute", async () => {
+  it("coalesces reads, preserves snapshot time, and refreshes stock after five minutes", async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockImplementation(async () => jsonResponse({ data: {
       items: [{ code: "1", name: "Facebook", price: 1, inStock: fetchMock.mock.calls.length === 1 ? 4 : 0, min: 1 }],
@@ -266,7 +266,7 @@ describe("supplier client: money-spending safety", () => {
     const [first, concurrent] = await Promise.all([readBulkaccCatalog(), readBulkaccCatalog()]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(concurrent).toEqual(first);
-    await vi.advanceTimersByTimeAsync(59_000);
+    await vi.advanceTimersByTimeAsync(299_000);
     expect((await readBulkaccCatalog()).checkedAt).toBe(first.checkedAt);
     await vi.advanceTimersByTimeAsync(1_001);
     const next = await readBulkaccCatalog();
@@ -275,22 +275,16 @@ describe("supplier client: money-spending safety", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("marks a bounded walk incomplete and resumes the remaining pages after the cooldown", async () => {
-    vi.useFakeTimers();
+  it("walks beyond the old 25-page cutoff and publishes only the complete catalogue", async () => {
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
       const page = Number(new URL(url).searchParams.get("pageIndex"));
       return jsonResponse({ data: { items: [{ code: String(page), name: `Account ${page}`, price: 1, inStock: 3, min: 1 }],
         totalCount: 27, totalPages: 27, pageIndex: page, pageSize: 1 } });
     });
     vi.stubGlobal("fetch", fetchMock);
-    const first = await readBulkaccCatalog();
-    expect(first.products).toHaveLength(25);
-    expect(first.partial).toBe(true);
-    await vi.advanceTimersByTimeAsync(60_001);
     const complete = await readBulkaccCatalog();
     expect(complete.products).toHaveLength(27);
     expect(complete.partial).toBe(false);
-    expect(complete.checkedAt).toBe(first.checkedAt);
     expect(fetchMock).toHaveBeenCalledTimes(27);
   });
 

@@ -267,20 +267,21 @@ export function salvageOrderCode(text: string): string | null {
   return match ? match[1] : null;
 }
 
-const CATALOG_TTL_MS = 60 * 1000;
-const MAX_CATALOG_PAGES = 25;
+const CATALOG_TTL_MS = 5 * 60 * 1000;
+// Safety bound, not a normal read budget. The live catalogue is about 20 pages;
+// 100 allows substantial growth while still detecting a broken pagination loop.
+const MAX_CATALOG_PAGES = 100;
 const CATALOG_PAGE_SIZE = 200;
+const CATALOG_CRAWL_DEADLINE_MS = 30_000;
 
 export type BulkaccCatalog = { products: BulkaccProduct[]; partial: boolean; checkedAt: string };
 type CacheEntry = { value: BulkaccCatalog; expiresAt: number };
 let catalogCache: CacheEntry | null = null;
 let catalogPending: Promise<BulkaccCatalog> | null = null;
-let catalogProgress: { products: BulkaccProduct[]; nextPage: number; checkedAt: string; expiresAt: number } | null = null;
 
 export function clearBulkaccCache(): void {
   catalogCache = null;
   catalogPending = null;
-  catalogProgress = null;
 }
 
 /** One page of the product list. */
@@ -324,50 +325,58 @@ export async function listProducts(pageIndex = 1, pageSize = CATALOG_PAGE_SIZE):
   };
 }
 
-/** A coalesced, one-minute snapshot. Bounded walks resume after the cooldown,
- * explicitly reporting partial inventory rather than silently truncating it. */
+/**
+ * A coalesced, complete-only snapshot. Process-local progress was removed: it
+ * made different serverless instances expose different slices of the catalogue.
+ * The marketplace's PostgreSQL snapshot coordinates crawls across instances;
+ * this local cache only avoids duplicate work inside the refreshing instance.
+ */
 export async function readBulkaccCatalog(): Promise<BulkaccCatalog> {
   if (catalogCache && Date.now() < catalogCache.expiresAt) return catalogCache.value;
   if (catalogPending) return catalogPending;
   const pending = (async () => {
-    const progress = catalogProgress && catalogProgress.expiresAt > Date.now() ? catalogProgress : null;
-    const products = [...(progress?.products ?? [])];
-    const seen = new Set(products.map((product) => product.code));
-    const checkedAt = progress?.checkedAt ?? new Date().toISOString();
-    let page = progress?.nextPage ?? 1;
-    const end = page + MAX_CATALOG_PAGES - 1;
-    let partial = true;
-    try {
-      for (; page <= end; page++) {
-        const result = await listProducts(page);
-        if (result.pageIndex !== page || result.totalPages < page) throw new BulkaccError("Catalogue pagination stalled", "bad_response", 502);
-        let added = 0;
-        for (const product of result.items) {
-          if (seen.has(product.code)) continue;
-          seen.add(product.code);
-          products.push(product);
-          added++;
-        }
-        if (page >= result.totalPages) {
-          partial = products.length < result.totalCount;
-          // Malformed/missing rows cannot be recovered by walking past the last page.
-          catalogProgress = null;
-          break;
-        }
-        if (!added) throw new BulkaccError("Catalogue pagination stalled", "bad_response", 502);
+    const products: BulkaccProduct[] = [];
+    const seen = new Set<string>();
+    const checkedAt = new Date().toISOString();
+    const deadline = Date.now() + CATALOG_CRAWL_DEADLINE_MS;
+    for (let page = 1; page <= MAX_CATALOG_PAGES; page++) {
+      if (Date.now() >= deadline) throw new BulkaccError("Catalogue refresh deadline reached", "timeout", 504);
+      const result = await listProducts(page);
+      if (result.pageIndex !== page || result.totalPages < page || result.totalPages > MAX_CATALOG_PAGES) {
+        throw new BulkaccError("Catalogue pagination stalled", "bad_response", 502);
       }
-      if (page > end) catalogProgress = { products, nextPage: page, checkedAt, expiresAt: Date.now() + 30 * 60_000 };
-    } catch (error) {
-      if (!products.length) throw error;
-      catalogProgress = { products, nextPage: page, checkedAt, expiresAt: Date.now() + 30 * 60_000 };
-      logger.warn("Account catalogue read incomplete", { code: error instanceof BulkaccError ? error.code : "catalog_read_failed" });
+      let added = 0;
+      for (const product of result.items) {
+        if (seen.has(product.code)) continue;
+        seen.add(product.code);
+        products.push(product);
+        added++;
+      }
+      if (page >= result.totalPages) {
+        if (products.length < result.totalCount) {
+          throw new BulkaccError("Catalogue is incomplete", "bad_response", 502);
+        }
+        const value = { products, partial: false, checkedAt };
+        catalogCache = { value, expiresAt: Date.now() + CATALOG_TTL_MS };
+        return value;
+      }
+      if (!added) throw new BulkaccError("Catalogue pagination stalled", "bad_response", 502);
     }
-    const value = { products, partial, checkedAt };
-    catalogCache = { value, expiresAt: Date.now() + CATALOG_TTL_MS };
-    return value;
+    throw new BulkaccError("Catalogue exceeds the pagination safety bound", "bad_response", 502);
   })();
   catalogPending = pending;
   try { return await pending; }
+  catch (error) {
+    // Keep serving the last complete value in this process. Cross-instance
+    // last-known-good behaviour is supplied by the shared marketplace snapshot.
+    if (catalogCache) {
+      logger.warn("Account catalogue refresh failed; using last complete snapshot", {
+        code: error instanceof BulkaccError ? error.code : "catalog_read_failed",
+      });
+      return catalogCache.value;
+    }
+    throw error;
+  }
   finally { if (catalogPending === pending) catalogPending = null; }
 }
 

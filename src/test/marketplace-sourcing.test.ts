@@ -182,6 +182,9 @@ describe("product grouping is Pryva's own, not a source's", () => {
     // A source with no streaming group still gets streaming products recognised.
     expect(groupLabelFor({ groupName: "Other Social Networks", name: "Netflix Premium 4K" })).toBe("Streaming");
     expect(groupLabelFor({ groupName: "Game", name: "Roblox" })).toBe("Gaming");
+    expect(groupLabelFor({ groupName: "Other", name: "Roblox account" })).toBe("Gaming");
+    expect(groupLabelFor({ groupName: "Other", name: "Grok Premium" })).toBe("AI tools");
+    expect(groupLabelFor({ groupName: "Other", name: "Tripadvisor reviews" })).toBe("Reviews");
     expect(groupLabelFor({ groupName: "Google" })).toBe("Email");
     expect(groupLabelFor({ groupName: "Something New" })).toBe("Other");
     expect(groupLabelFor({})).toBe("Other");
@@ -211,7 +214,7 @@ describe("product grouping is Pryva's own, not a source's", () => {
 });
 
 describe("sourcing order", () => {
-  it("prefers the primary source, falls back when it is unconfigured or fails", async () => {
+  it("reports the configured source and never publishes a cold partial fallback", async () => {
     expect(marketplaceSource()).toBe("primary");
 
     runtime.bulkaccConfigured = false;
@@ -222,13 +225,13 @@ describe("sourcing order", () => {
     expect(isMarketplaceCatalogAvailable()).toBe(false);
     expect((await listMarketplaceListings()).listings).toEqual([]);
 
-    // A primary catalog failure must empty nothing: the fallback takes over.
+    // A cold primary failure must not publish only the fallback and hide the
+    // primary's products as though that were the whole catalogue.
     runtime.bulkaccConfigured = true;
     runtime.accszoneConfigured = true;
     runtime.catalogError = new Error("catalog read failed");
     clearMarketplaceCatalogCache();
-    const fallen = await listMarketplaceListings();
-    expect(fallen.listings.some((listing) => listing.slug === "p2:legacy-instagram")).toBe(true);
+    await expect(listMarketplaceListings()).rejects.toThrow("temporarily unavailable");
   });
 
   it("combines both feeds and applies shared social filters even when the primary succeeds", async () => {
@@ -252,19 +255,13 @@ describe("sourcing order", () => {
     expect(result.meta.total).toBe(1);
   });
 
-  it("resumes larger secondary catalogues after the read-budget cooldown", async () => {
+  it("walks beyond the old 25-page cutoff before filtering the complete catalogue", async () => {
     runtime.legacyPaged = true;
     const sample = runtime.legacyListings[0];
     runtime.legacyListings = Array.from({ length: 26 }, (_, index) => ({ ...sample, id: index + 1, slug: `page-${index + 1}`, title: `Instagram page${index + 1}` }));
-    const first = await listMarketplaceListings({ search: "page26" });
-    expect(first.partial).toBe(true);
-    expect(first.listings).toEqual([]);
-    const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 61_000);
-    try {
-      const complete = await listMarketplaceListings({ search: "page26" });
-      expect(complete.partial).toBe(false);
-      expect(complete.listings.map((listing) => listing.slug)).toEqual(["p2:page-26"]);
-    } finally { clock.mockRestore(); }
+    const complete = await listMarketplaceListings({ search: "page26" });
+    expect(complete.partial).toBe(false);
+    expect(complete.listings.map((listing) => listing.slug)).toEqual(["p2:page-26"]);
   });
 
   it("sorts the entire combined catalogue by Naira selling price before slicing pages", async () => {
@@ -277,11 +274,19 @@ describe("sourcing order", () => {
     expect(first.meta.total).toBeGreaterThan(3);
   });
 
-  it("retains the working feed and marks the combined catalogue incomplete when the other fails", async () => {
+  it("keeps the last complete combined catalogue when a refresh fails", async () => {
+    const initial = await listMarketplaceListings({ perPage: 60 });
+    expect(initial.partial).toBe(false);
     runtime.legacyError = new Error("unavailable");
-    const result = await listMarketplaceListings({ perPage: 60 });
-    expect(result.partial).toBe(true);
-    expect(result.listings.some((listing) => listing.slug.startsWith("p1:"))).toBe(true);
+    const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 300_001);
+    try {
+      const result = await listMarketplaceListings({ perPage: 60 });
+      expect(result.partial).toBe(false);
+      expect(result.stale).toBe(true);
+      expect(result.meta.total).toBe(initial.meta.total);
+      expect(result.checkedAt).toBe(initial.checkedAt);
+      expect(result.listings.some((listing) => listing.slug.startsWith("p1:"))).toBe(true);
+    } finally { clock.mockRestore(); }
   });
 
   it("coalesces categories and listing requests into one shared read", async () => {
@@ -334,13 +339,10 @@ describe("sourcing order", () => {
 });
 
 describe("primary catalogue completeness", () => {
-  it("propagates an incomplete primary snapshot through listings and category metadata", async () => {
+  it("refuses to publish an incomplete primary snapshot", async () => {
     runtime.catalogPartial = true;
     clearMarketplaceCatalogCache();
-    const page = await listMarketplaceListings();
-    expect(page.partial).toBe(true);
-    expect(Number.isFinite(Date.parse(page.checkedAt))).toBe(true);
-    expect((await listMarketplaceCategories()).partial).toBe(true);
+    await expect(listMarketplaceListings()).rejects.toThrow("temporarily unavailable");
   });
 });
 
