@@ -105,8 +105,10 @@ export function createAwsIamPool(): Pool {
     user: settings.username,
     database: settings.database,
     ssl: sslConfig(),
-    // Same limits as the connection-string pool. The bounded connect wait
-    // matters most here: every new connection signs an IAM token first.
+    // Same limits as the connection-string pool. The connect wait is bounded
+    // but long, because this is the database that pauses when it is idle: a
+    // connection made while it is paused is held until it has resumed, and a
+    // limit shorter than that fails the request instead (see `pool-settings`).
     ...poolSettings(),
     // pg calls this per connection. Reuse the token until it is near expiry so a
     // burst of connections does not each trigger an STS assume-role round trip.

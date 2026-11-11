@@ -25,6 +25,19 @@ describe("poolSettings", () => {
     expect(settings.connectionTimeoutMillis).toBeGreaterThan(0);
   });
 
+  it("waits long enough for a paused database to wake up", () => {
+    // Aurora from the Vercel integration pauses when it is idle and holds a new
+    // connection until it has resumed: about 15 seconds by AWS's figure, longer
+    // after a day asleep, and AWS recommends a connection timeout of 30 seconds
+    // or more. A shorter default fails the first request after every quiet
+    // spell, which the driver's unlimited wait never did. See
+    // `db-pool-wake.test.ts` for what the driver does on each side of the limit.
+    expect(DEFAULT_POOL_CONNECT_TIMEOUT_MS).toBeGreaterThanOrEqual(30_000);
+    // And it is still a limit: a minute at most, against the five the host
+    // allows a request by default.
+    expect(DEFAULT_POOL_CONNECT_TIMEOUT_MS).toBeLessThanOrEqual(60_000);
+  });
+
   it("keeps the driver's size and idle timeout unless told otherwise", () => {
     expect(poolSettings({})).toEqual({
       max: DEFAULT_POOL_MAX,

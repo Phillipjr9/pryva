@@ -583,16 +583,42 @@ customer's own rows and cannot use an index, like /api/search. The review form
 offers a customer's 100 most recent delivered orders that have no review yet,
 instead of every order they ever placed.
 
-Both connection pools fail a query that cannot get a connection within ten
+Both connection pools fail a query that cannot get a connection within thirty
 seconds instead of waiting without limit, and log instead of crashing when an
-idle connection is dropped ("[db] idle connection dropped"). "timeout exceeded
-when trying to connect" in the logs means the pool or the database is
-saturated: compare the database's connection count with instances x PG_POOL_MAX
-(.env.example) and lower PG_POOL_MAX before raising anything. There is no Redis
-or other cache server, and nothing here needs one yet: rate limits are rows in
-rate_limit_buckets and the public pages are cached by the host. /api/search
-still runs leading-wildcard ILIKE scans, bounded per account by its rate limit
-rather than by an index.
+idle connection is dropped ("[db] idle connection dropped"). The limit produces
+two different log messages. "timeout exceeded when trying to connect" means
+every connection of that instance stayed busy for the whole thirty seconds: the
+pool or the database is saturated. Compare the database's connection count with
+instances x PG_POOL_MAX (.env.example) and lower PG_POOL_MAX before raising
+anything. "Connection terminated due to connection timeout" means the database
+did not answer a new connection in time, which is what a wake-up that ran long
+looks like (next paragraph); the request after it normally succeeds.
+
+The production database pauses when it is idle, unless that has been changed.
+Aurora created through the Vercel AWS integration starts with a capacity range
+of 0 to 16 ACU and pauses after 300 seconds without a connection. Nothing in
+this repository reads or sets that, so look at the cluster itself: the capacity
+settings in the RDS console, or
+
+  aws rds describe-db-clusters \
+    --query 'DBClusters[*].ServerlessV2ScalingConfiguration'
+
+While it is paused the prerendered public pages are unaffected: they come from
+the cache, and a visitor with no session never reaches the database. The first
+request that does need it (a sign-in, a dashboard page, the nightly job) is held
+until the database has resumed. AWS gives that as about 15 seconds, and 30
+seconds or longer after more than a day paused, and it resumes at a small
+capacity and scales up from there. That wait is the reason the connection limit
+is thirty seconds; with a shorter one the request fails instead of being slow,
+so do not lower PG_POOL_CONNECT_TIMEOUT_MS while the minimum capacity is zero.
+To remove the wait, raise the minimum capacity to 0.5 ACU or more, which keeps
+the instance running and billed around the clock. To make it rarer, lengthen
+the pause interval (up to 24 hours).
+
+There is no Redis or other cache server, and nothing here needs one yet: rate
+limits are rows in rate_limit_buckets and the public pages are cached by the
+host. /api/search still runs leading-wildcard ILIKE scans, bounded per account
+by its rate limit rather than by an index.
 
 Sign-in attack telemetry
 ------------------------

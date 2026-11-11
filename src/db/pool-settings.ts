@@ -32,6 +32,9 @@
  * by all of them: `instances x PG_POOL_MAX` is the number that has to stay under
  * it. Lower `PG_POOL_MAX` when the database reports too many connections; a
  * bigger database only moves the point at which the same thing happens.
+ *
+ * The connect wait is the one limit that is new, and it is sized for a database
+ * that is asleep, not for one that is busy: see `DEFAULT_POOL_CONNECT_TIMEOUT_MS`.
  */
 
 /** Connections one application instance may hold. node-postgres' own default. */
@@ -43,11 +46,22 @@ export const DEFAULT_POOL_IDLE_TIMEOUT_MS = 10_000;
 /**
  * How long a query waits for a connection before failing.
  *
- * Generous on purpose: a cold start has to open a TLS connection and, on Aurora,
- * mint an IAM token first. Ten seconds is far beyond that and far below the
- * point at which a visitor has already given up.
+ * Long on purpose, because the production database sleeps. Aurora created
+ * through the Vercel AWS integration starts with a minimum capacity of zero: it
+ * pauses after five minutes without a connection, and a connection made while it
+ * is paused is held until it has resumed. AWS gives that as "approximately 15
+ * seconds", "30 seconds or longer" after more than a day paused, and recommends
+ * connection timeouts of 30 seconds or more for that case:
+ * https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-serverless-v2-auto-pause.html
+ *
+ * A limit shorter than the wake-up does not make the first request after a quiet
+ * spell faster. It makes it fail, where the driver's unlimited wait let it
+ * succeed slowly. Thirty seconds lets that request through, and still ends a
+ * wait that would otherwise last until the host gave up on the request.
+ *
+ * Lower it (`PG_POOL_CONNECT_TIMEOUT_MS`) only for a database that cannot pause.
  */
-export const DEFAULT_POOL_CONNECT_TIMEOUT_MS = 10_000;
+export const DEFAULT_POOL_CONNECT_TIMEOUT_MS = 30_000;
 
 export type PoolSettings = {
   max: number;
