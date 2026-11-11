@@ -5,7 +5,7 @@ import { userTwoFactor } from "@/db/schema";
 import { listCredentialSummaries, relyingPartyFor } from "@/lib/identity/passkeys";
 import { remainingRecoveryCodes, twoFactorAvailable } from "@/lib/identity/two-factor";
 import type { PublicUser } from "@/lib/identity/auth";
-import { Check, Clock, Shield, User } from "@/components/icons";
+import { Clock, User } from "@/components/icons";
 import { PasskeysCard } from "@/components/settings/PasskeysCard";
 import { SessionsCard } from "./SessionsCard";
 import { TwoFactorCard } from "./TwoFactorCard";
@@ -72,25 +72,6 @@ export async function SecuritySection({ user }: { user: PublicUser }) {
       </div>
 
       <PasskeysCard passkeys={passkeys} available={passkeysAvailableHere} />
-
-      <div className="rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
-        <h3 className="flex items-center gap-2 text-[0.9375rem] font-semibold">
-          <Shield className="h-4 w-4 text-lav-700" /> What we do on our side
-        </h3>
-        <ul className="mt-2.5 grid gap-2 text-[0.8125rem] text-ink-2 sm:grid-cols-2">
-          {[
-            "Session cookies are http-only and expire after 30 days.",
-            "Sign-in is rate limited per connection and per account, and locks for 30 minutes after 8 wrong passwords.",
-            "Every purchase and refund is written to your wallet ledger, and a nightly job checks the arithmetic.",
-            "Administrator access is granted separately, never at sign-up, and requires a second factor.",
-          ].map((tip) => (
-            <li key={tip} className="flex items-start gap-2">
-              <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
-              {tip}
-            </li>
-          ))}
-        </ul>
-      </div>
 
       <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
         <h3 className="flex items-center gap-2 text-[0.9375rem] font-semibold">
