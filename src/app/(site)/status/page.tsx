@@ -66,10 +66,11 @@ export default function StatusPage() {
         : "eSIM ordering is unavailable here. Coverage and prices are not currently available.",
     },
     {
-      name: "Account marketplace checkout",
-      status: marketplaceEnabled ? "Available" : "Not available",
+      name: "Social & Digital Accounts",
+      href: "/accounts",
+      status: marketplaceEnabled ? "Ordering configured" : "Not available",
       detail: marketplaceEnabled
-        ? "Listings can be purchased from your wallet. Live stock is shown per listing."
+        ? "Account checkout is configured, but this does not mean every platform or listing is in stock. Browse accounts and check each listing’s stock and purchase availability."
         : "Checkout is unavailable here, so listings cannot be purchased yet.",
     },
     {
@@ -119,7 +120,7 @@ export default function StatusPage() {
         <div className="mt-7 rounded-2xl border border-amber-200 bg-amber-50 p-6">
           <h2 className="text-lg font-semibold text-amber-950">Live monitoring is not connected</h2>
           <p className="mt-2 text-sm leading-6 text-amber-900">
-            This page reports which products can be ordered and delivered. It does not verify
+            This page reports which ordering features are configured, not which products are in stock. It does not verify
             delivery-partner uptime or current incidents, so it is not a live health check.
           </p>
         </div>
@@ -141,6 +142,9 @@ export default function StatusPage() {
                 </span>
               </div>
               <p className="mt-2 text-sm leading-6 text-ink-2">{service.detail}</p>
+              {"href" in service && typeof service.href === "string" && (
+                <Link href={service.href} className="mt-3 inline-block text-sm font-semibold text-lav-700 hover:underline">Browse social &amp; digital accounts</Link>
+              )}
             </section>
           ))}
         </div>

@@ -1,7 +1,7 @@
 import "server-only";
 
-import { isAccsZoneConfigured } from "@/lib/providers/accszone";
-import { isBulkaccConfigured, listProducts } from "@/lib/providers/bulkacc";
+import { isMarketplaceCatalogAvailable, listMarketplaceListings } from "@/lib/services/accounts/marketplace-suppliers";
+import { usdMicros } from "@/lib/payments/supplier-money";
 import {
   isBitcallConfigured,
   listBitcallOtpCountryEntries,
@@ -13,7 +13,6 @@ import { readSupplierSnapshot } from "@/lib/services/numbers/fleexa-catalog";
 import { normalizeCountryCode } from "@/lib/services/numbers/otp-suppliers";
 import { supplierAmountToNgn } from "@/lib/payments/supplier-currency";
 import { fulfilablePlans } from "@/lib/services/fulfillment";
-import { availableManualProducts } from "@/lib/services/accounts/manual-catalog";
 import { readBoostSnapshot } from "@/lib/services/boosts/smm-catalog";
 import { isSmmPanelConfigured } from "@/lib/providers/smm-panel";
 import {
@@ -124,45 +123,24 @@ export async function buildStockReport(options: { refresh?: boolean } = {}): Pro
     lanes.push(summariseLane("email-otp", "Email inboxes", [], { connected: false, error: NOT_CONFIGURED }));
   }
 
-  /* Account marketplace. */
-  if (isBulkaccConfigured()) {
+  /* Use the same API-only inventory as the storefront, never retired manual rows. */
+  if (isMarketplaceCatalogAvailable()) {
     try {
-      const page = await listProducts(1, ACCOUNT_SAMPLE);
-      const lines = accountProductLines(page.items);
-      // A second marketplace can be connected and never read: the primary feed
-      // wins whenever it is configured. Reporting it as a line is the difference
-      // between "we have a fallback" and "we have a fallback we know works".
-      if (isAccsZoneConfigured()) {
-        lines.push(
-          notSoldLine(
-            "alternate-marketplace",
-            "Alternate marketplace",
-            "connected, but not the active source — it is only read when the primary feed is absent",
-          ),
-        );
-      }
-      const held = availableManualProducts().length;
-      lanes.push(
-        summariseLane("accounts", "Accounts marketplace", lines, {
-          error:
-            page.totalCount > lines.length
-              ? `showing ${lines.length} of ${page.totalCount} listings${held ? ` · ${held} hand-prepared listed too` : ""}`
-              : held
-                ? `${held} hand-prepared listing${held === 1 ? "" : "s"} alongside the feed`
-                : null,
-        }),
-      );
+      const page = await listMarketplaceListings({ perPage: ACCOUNT_SAMPLE });
+      const lines = accountProductLines(page.listings.map((listing) => ({
+        code: listing.slug, name: listing.title, description: null,
+        groupName: listing.group, categoryName: listing.category,
+        inStock: listing.stock, min: listing.minQuantity, priceMicros: usdMicros(listing.priceUsd),
+      })));
+      lanes.push(summariseLane("accounts", "Accounts marketplace", lines, {
+        error: page.partial ? "catalogue incomplete; some inventory could not be read"
+          : page.meta.total > lines.length ? `showing ${lines.length} of ${page.meta.total} listings` : null,
+      }));
     } catch (error) {
       lanes.push(summariseLane("accounts", "Accounts marketplace", [], { connected: false, error: requestFailed(message(error)) }));
     }
   } else {
-    const held = availableManualProducts().length;
-    lanes.push(
-      summariseLane("accounts", "Accounts marketplace", [], {
-        connected: held > 0,
-        error: held > 0 ? `${NOT_CONFIGURED} · ${held} hand-prepared listing${held === 1 ? "" : "s"}` : NOT_CONFIGURED,
-      }),
-    );
+    lanes.push(summariseLane("accounts", "Accounts marketplace", [], { connected: false, error: NOT_CONFIGURED }));
   }
 
   /* Boosts. */

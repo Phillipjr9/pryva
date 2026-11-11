@@ -127,6 +127,12 @@ async function readEsimSnapshot(refresh = false): Promise<EsimSnapshot> {
         if (isFundingFailure(plans.reason)) throw plans.reason;
         throw new Error("eSIM catalog unavailable");
       }
+      // A local budget limit is not evidence that products disappeared upstream.
+      // Retain a recent complete snapshot, preserving its original age and marking degradation.
+      if (plans.value.partial && plans.value.partialReason === "budget" && snapshotCache &&
+          !snapshotCache.snapshot.partial && Date.now() - Date.parse(snapshotCache.snapshot.fetchedAt) < 5 * 60_000) {
+        return { ...snapshotCache.snapshot, partial: true, degraded: "outage" as const };
+      }
       const snapshot: EsimSnapshot = {
         plans: plans.value.plans,
         countries: countries.status === "fulfilled" ? countries.value.slice(0, 400) : [],
@@ -141,7 +147,7 @@ async function readEsimSnapshot(refresh = false): Promise<EsimSnapshot> {
       snapshotCache = { snapshot, expires: Date.now() + CATALOG_TTL_MS };
       return snapshot;
     } catch (error) {
-      if (snapshotCache && Date.now() - snapshotCache.expires < 5 * 60_000) {
+      if (snapshotCache && Date.now() - Date.parse(snapshotCache.snapshot.fetchedAt) < 5 * 60_000) {
         const stale = { ...snapshotCache.snapshot, partial: true, degraded: "outage" as const, fetchedAt: snapshotCache.snapshot.fetchedAt };
         snapshotCache = { snapshot: stale, expires: Date.now() + CATALOG_TTL_MS };
         return stale;
@@ -324,7 +330,7 @@ export async function readEsimCatalog(refresh = false): Promise<EsimCatalog> {
       catalogCache = { catalog, expires: Date.now() + CATALOG_TTL_MS };
       return catalog;
     } catch (error) {
-      if (catalogCache && Date.now() - catalogCache.expires < 5 * 60_000) {
+      if (catalogCache && Date.now() - Date.parse(catalogCache.catalog.fetchedAt) < 5 * 60_000) {
         const stale = { ...catalogCache.catalog, partial: true, degraded: "outage" as const, fetchedAt: catalogCache.catalog.fetchedAt };
         catalogCache = { catalog: stale, expires: Date.now() + CATALOG_TTL_MS };
         return stale;
@@ -444,7 +450,11 @@ export function esimItemsForAllDestinations(offers: EsimListing[], limit = ESIM_
       offer.supportsSms === true ? "SMS listed" : null,
       offer.countries.length > 0 ? `${offer.countries.length} destination${offer.countries.length === 1 ? "" : "s"}` : null,
     ].filter((value): value is string => Boolean(value)).join(" · "),
-    searchTerms: offer.countries.join(" ") || offer.region,
+    searchTerms: offer.countries.flatMap((country) => {
+      const code = country.trim().toLowerCase();
+      const canonical = code === "uk" ? "gb" : code === "usa" ? "us" : code === "uae" ? "ae" : code;
+      return [country, explorerCountry(canonical)?.name ?? ""];
+    }).join(" ") || offer.region,
     action: offer.purchasable && offer.priceNgn !== null
       ? { label: "Buy eSIM", href: `/dashboard/esim/${encodeURIComponent(offer.id)}` }
       : null,

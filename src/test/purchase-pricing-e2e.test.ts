@@ -359,28 +359,23 @@ describe("checkout with real pricing", () => {
     expect(mocks.purchaseCalls).toBe(0);
   });
 
-  it("charges a real six-decimal price for a hand-prepared item without calling any source", async () => {
-    // Sellable only because someone can prepare it: see the refusal test below.
+  it("refuses retired manual listings even with a reachable administrator", async () => {
     await seedReachableAdmin();
-    mocks.listing = listing({
-      slug: "p3:netflix-standard", sourceId: "netflix-standard", title: "Netflix Standard (1080p)",
-      priceUsd: "2.500000", stock: null, sold: null, warrantyDays: 120, fulfilment: "manual",
-    });
-
+    mocks.listing = listing({ slug: "p3:netflix-standard", stock: null, fulfilment: "manual" });
     const response = await purchaseRoute.POST(purchaseRequest({ slug: "p3:netflix-standard", quantity: 2 }));
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.preparing).toBe(true);
-    expect(body.warrantyDays).toBe(120);
-    expect(body.totalNgn).toBeGreaterThan(0);
+    expect(response.status).toBe(410);
+    expect(await orderRows()).toHaveLength(0);
+    expect(await balance()).toBe(START_BALANCE);
+    expect(mocks.purchaseCalls).toBe(0);
+  });
 
-    const [order] = await orderRows();
-    expect(order.provider).toBe("manual");
-    expect(order.status).toBe("processing");
-    expect(order.amount).toBe(body.totalNgn);
-    expect(await database.select().from(schema.walletEmailOutbox).where(eq(schema.walletEmailOutbox.eventKind, "first_purchase"))).toMatchObject([{ userId: USER, eventKind: "first_purchase" }]);
-    expect(await balance()).toBe(START_BALANCE - body.totalNgn);
-    // No source exists for this item, so none may be contacted.
+  it("refuses API purchases with unknown stock before any wallet debit", async () => {
+    mocks.listing = listing({ stock: null });
+    const response = await purchaseRoute.POST(purchaseRequest({ slug: "p1:300004", quantity: 1 }));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toContain("Stock could not be confirmed");
+    expect(await balance()).toBe(START_BALANCE);
+    expect(await orderRows()).toHaveLength(0);
     expect(mocks.purchaseCalls).toBe(0);
   });
 
@@ -396,7 +391,7 @@ describe("checkout with real pricing", () => {
     });
 
     const response = await purchaseRoute.POST(purchaseRequest({ slug: "p3:netflix-standard", quantity: 2 }));
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(410);
     // Refused before the wallet was touched: no order, no debit, no source call.
     expect(await orderRows()).toHaveLength(0);
     expect(await balance()).toBe(START_BALANCE);
@@ -416,7 +411,7 @@ describe("checkout with real pricing", () => {
     });
 
     const response = await purchaseRoute.POST(purchaseRequest({ slug: "p3:netflix-standard", quantity: 2 }));
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(410);
     expect(await balance()).toBe(START_BALANCE);
   });
 

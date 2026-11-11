@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function TelegramStarsPage() {
   const user = await requireUser("/dashboard/telegram-stars");
   return <div className="grid min-w-0 gap-4">
-    <Link href="/dashboard/digital-catalog" className="w-fit text-meta font-semibold text-lav-700 hover:underline">← Digital catalogue</Link>
+    <Link href="/dashboard/services?category=topups" className="w-fit text-meta font-semibold text-lav-700 hover:underline">← Account top-ups</Link>
     <div className="flex min-w-0 items-start gap-3 sm:gap-4">
       <BrandIcon brand="telegram" size={52} decorative />
       <div className="min-w-0">

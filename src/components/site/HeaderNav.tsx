@@ -21,7 +21,7 @@ type NavUser = { name: string; walletBalance: number } | null;
 const primaryLinks = [
   { href: "/", label: "Home" },
   { href: "/pricing", label: "Pricing" },
-  { href: "/accounts", label: "Accounts" },
+  { href: "/accounts", label: "Social & Digital Accounts" },
   { href: "/how-it-works", label: "How it works" },
   { href: "/faq", label: "FAQ" },
   { href: "/contact", label: "Contact" },

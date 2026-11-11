@@ -6,8 +6,10 @@ const runtime = vi.hoisted(() => ({
   accszoneConfigured: false,
   products: [] as Record<string, unknown>[],
   catalogError: null as Error | null,
+  catalogPartial: false,
   productError: null as Error | null,
   legacyListings: [] as Record<string, unknown>[],
+  legacyPaged: false,
   legacyCategories: [] as { id: number; title: string; slug: string }[],
   legacyError: null as Error | null,
   order: null as { orderCode: string } | null,
@@ -36,10 +38,10 @@ vi.mock("@/lib/providers/bulkacc", () => {
     isBulkaccConfigured: () => runtime.bulkaccConfigured,
     isAmbiguousOutcome: (error: unknown) =>
       error instanceof BulkaccError && ["ambiguous_outcome", "timeout", "bad_response"].includes(error.code),
-    listAllProducts: async () => {
+    readBulkaccCatalog: async () => {
       runtime.calls.listAllProducts += 1;
       if (runtime.catalogError) throw runtime.catalogError;
-      return runtime.products;
+      return { products: runtime.products, partial: runtime.catalogPartial, checkedAt: new Date().toISOString() };
     },
     getProduct: async (code: string) => {
       runtime.calls.getProduct += 1;
@@ -76,11 +78,11 @@ vi.mock("@/lib/providers/accszone", () => {
   return {
     AccsZoneError,
     isAccsZoneConfigured: () => runtime.accszoneConfigured,
-    listListings: async () => {
+    listListings: async (query: { page?: number } = {}) => {
       if (runtime.legacyError) throw runtime.legacyError;
       return {
-        listings: runtime.legacyListings,
-        meta: { current_page: 1, last_page: 1, per_page: 20, total: runtime.legacyListings.length },
+        listings: runtime.legacyPaged ? runtime.legacyListings.slice((query.page ?? 1) - 1, query.page ?? 1) : runtime.legacyListings,
+        meta: { current_page: query.page ?? 1, last_page: runtime.legacyPaged ? runtime.legacyListings.length : 1, per_page: runtime.legacyPaged ? 1 : 20, total: runtime.legacyListings.length },
       };
     },
     listAllCategories: async () => {
@@ -108,6 +110,7 @@ import {
   labelId,
   listMarketplaceCategories,
   listMarketplaceListings,
+  clearMarketplaceCatalogCache,
   marketplaceSource,
   MarketplaceError,
   parseListingSlug,
@@ -145,11 +148,14 @@ function secretLeak(value: unknown): string[] {
 }
 
 beforeEach(() => {
+  clearMarketplaceCatalogCache();
   runtime.preview = false;
+  runtime.legacyPaged = false;
   runtime.bulkaccConfigured = true;
   runtime.accszoneConfigured = true;
   runtime.products = [SPOTIFY, GMAIL, SOLD_OUT];
   runtime.catalogError = null;
+  runtime.catalogPartial = false;
   runtime.productError = null;
   runtime.legacyListings = [{
     id: 7, slug: "legacy-instagram", title: "Instagram account", price: "0.44",
@@ -213,18 +219,74 @@ describe("sourcing order", () => {
 
     runtime.accszoneConfigured = false;
     expect(marketplaceSource()).toBe("none");
-    // The hand-sourced catalog still has something to sell with no API at all.
-    expect(isMarketplaceCatalogAvailable()).toBe(true);
-    const manualOnly = await listMarketplaceListings();
-    expect(manualOnly.listings.length).toBeGreaterThan(0);
-    expect(manualOnly.listings.every((listing) => listing.slug.startsWith("p3:"))).toBe(true);
+    expect(isMarketplaceCatalogAvailable()).toBe(false);
+    expect((await listMarketplaceListings()).listings).toEqual([]);
 
     // A primary catalog failure must empty nothing: the fallback takes over.
     runtime.bulkaccConfigured = true;
     runtime.accszoneConfigured = true;
     runtime.catalogError = new Error("catalog read failed");
+    clearMarketplaceCatalogCache();
     const fallen = await listMarketplaceListings();
     expect(fallen.listings.some((listing) => listing.slug === "p2:legacy-instagram")).toBe(true);
+  });
+
+  it("combines both feeds and applies shared social filters even when the primary succeeds", async () => {
+    const result = await listMarketplaceListings({ perPage: 60 });
+    expect(result.partial).toBe(false);
+    expect(result.listings.some((listing) => listing.slug.startsWith("p1:"))).toBe(true);
+    expect(result.listings.some((listing) => listing.slug === "p2:legacy-instagram")).toBe(true);
+    const categories = await listMarketplaceCategories();
+    const social = categories.categories.find((category) => category.title === "Social")!;
+    expect(social).toBeDefined();
+    const filtered = await listMarketplaceListings({ categoryId: social.id, search: "instagram" });
+    expect(filtered.listings.map((listing) => listing.slug)).toContain("p2:legacy-instagram");
+  });
+
+  it("walks all secondary pages before shared filtering and pagination", async () => {
+    runtime.legacyPaged = true;
+    runtime.legacyListings.push({ ...runtime.legacyListings[0], id: 8, slug: "facebook-second-page", title: "Facebook aged account", category: { id: 2, title: "Facebook", slug: "facebook" } });
+    const result = await listMarketplaceListings({ search: "facebook", perPage: 1 });
+    expect(result.partial).toBe(false);
+    expect(result.listings.map((listing) => listing.slug)).toEqual(["p2:facebook-second-page"]);
+    expect(result.meta.total).toBe(1);
+  });
+
+  it("resumes larger secondary catalogues after the read-budget cooldown", async () => {
+    runtime.legacyPaged = true;
+    const sample = runtime.legacyListings[0];
+    runtime.legacyListings = Array.from({ length: 26 }, (_, index) => ({ ...sample, id: index + 1, slug: `page-${index + 1}`, title: `Instagram page${index + 1}` }));
+    const first = await listMarketplaceListings({ search: "page26" });
+    expect(first.partial).toBe(true);
+    expect(first.listings).toEqual([]);
+    const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 61_000);
+    try {
+      const complete = await listMarketplaceListings({ search: "page26" });
+      expect(complete.partial).toBe(false);
+      expect(complete.listings.map((listing) => listing.slug)).toEqual(["p2:page-26"]);
+    } finally { clock.mockRestore(); }
+  });
+
+  it("sorts the entire combined catalogue by Naira selling price before slicing pages", async () => {
+    const sellingPrice = vi.fn(async (listing: { slug: string }) => listing.slug === "p1:300004" ? 10 : listing.slug === "p2:legacy-instagram" ? 20 : 500);
+    const first = await listMarketplaceListings({ perPage: 1, page: 1, sellingPrice });
+    const second = await listMarketplaceListings({ perPage: 1, page: 2, sellingPrice });
+    expect(first.listings[0].slug).toBe("p1:300004");
+    expect(second.listings[0].slug).toBe("p2:legacy-instagram");
+    expect(first.meta.total).toBe(second.meta.total);
+    expect(first.meta.total).toBeGreaterThan(3);
+  });
+
+  it("retains the working feed and marks the combined catalogue incomplete when the other fails", async () => {
+    runtime.legacyError = new Error("unavailable");
+    const result = await listMarketplaceListings({ perPage: 60 });
+    expect(result.partial).toBe(true);
+    expect(result.listings.some((listing) => listing.slug.startsWith("p1:"))).toBe(true);
+  });
+
+  it("coalesces categories and listing requests into one shared read", async () => {
+    await Promise.all([listMarketplaceListings(), listMarketplaceCategories(), listMarketplaceListings({ search: "instagram" })]);
+    expect(runtime.calls.listAllProducts).toBe(1);
   });
 
   it("serves one catalog read for search, grouping, sorting and paging", async () => {
@@ -234,7 +296,7 @@ describe("sourcing order", () => {
     expect(meta.total).toBeGreaterThan(2);
 
     // In-stock items outrank sold-out ones whatever the sort asks for.
-    const all = await listMarketplaceListings({ perPage: 60 });
+    const all = await listMarketplaceListings({ perPage: 60, sort: "sort_key" });
     const last = all.listings[all.listings.length - 1];
     expect(last.stock).toBe(0);
 
@@ -262,12 +324,23 @@ describe("sourcing order", () => {
     expect(checkout.browseGroup).toBeUndefined();
   });
 
-  it("groups hand-sourced streaming items with API-sourced ones under one label", async () => {
+  it("groups API-sourced items by purpose", async () => {
     const { categories } = await listMarketplaceCategories();
     const titles = categories.map((category) => category.title);
     expect(titles).toContain("Streaming");
     expect(titles).toContain("Email");
     expect(secretLeak(categories)).toEqual([]);
+  });
+});
+
+describe("primary catalogue completeness", () => {
+  it("propagates an incomplete primary snapshot through listings and category metadata", async () => {
+    runtime.catalogPartial = true;
+    clearMarketplaceCatalogCache();
+    const page = await listMarketplaceListings();
+    expect(page.partial).toBe(true);
+    expect(Number.isFinite(Date.parse(page.checkedAt))).toBe(true);
+    expect((await listMarketplaceCategories()).partial).toBe(true);
   });
 });
 
@@ -291,17 +364,9 @@ describe("what a customer is shown", () => {
     expect(one.warrantyDays).toBe(120);
   });
 
-  it("says an item is confirmed after payment instead of inventing a stock count", async () => {
+  it("only shows API listings and preserves reported stock", async () => {
     const { listings } = await listMarketplaceListings({ perPage: 60 });
-    const manual = listings.filter((listing) => listing.fulfilment === "manual");
-    expect(manual.length).toBeGreaterThan(0);
-    for (const listing of manual) {
-      expect(listing.stock).toBeNull();
-      expect(listing.sold).toBeNull();
-      expect(listing.available).toBe(true);
-      expect(listing.maxQuantity).toBeGreaterThan(0);
-      expect(listing.warrantyDays).toBe(120);
-    }
+    expect(listings.every((listing) => listing.fulfilment === "instant" && !listing.slug.startsWith("p3:"))).toBe(true);
     // API-sourced listings keep the count the source actually reported.
     const spotify = listings.find((listing) => listing.slug === "p1:300004");
     expect(spotify?.stock).toBe(32949);
@@ -400,10 +465,8 @@ describe("buying", () => {
   });
 
   it("refuses to buy a hand-sourced item through the supplier path", async () => {
-    const manual = await getMarketplaceListing("p3:netflix-standard");
-    expect(manual.fulfilment).toBe("manual");
-    await expect(purchaseMarketplaceListing({ listing: manual, quantity: 1, clientReference: "r" }))
-      .rejects.toMatchObject({ code: "manual_fulfilment" });
+    await expect(getMarketplaceListing("p3:netflix-standard"))
+      .rejects.toMatchObject({ code: "listing_not_found", status: 404 });
     expect(runtime.calls.createOrder).toBe(0);
     expect(runtime.calls.purchase).toBe(0);
   });

@@ -1,5 +1,5 @@
 import { digitalArtwork } from "@/lib/content/digital-artwork";
-import { isNamedGiftCard } from "@/lib/services/digital-service-category";
+import { digitalServiceFamily, DIGITAL_FAMILY_LABELS } from "@/lib/services/digital-service-category";
 import type { ExplorerItem } from "@/lib/services/service-explorer";
 
 type Offer = { id: string; name: string; region: string; kind: "codes" | "topups" | "esims" };
@@ -7,9 +7,9 @@ type Offer = { id: string; name: string; region: string; kind: "codes" | "topups
 /** Configured offers remain quotable even if they aren't on the loaded browse pages. */
 export function reviewedDigitalItems(offers: readonly Offer[], starsEnabled: boolean): ExplorerItem[] {
   const items: ExplorerItem[] = offers.map((offer) => {
-    const gift = offer.kind === "codes" && isNamedGiftCard(offer.name);
-    const category = offer.kind === "esims" ? "esim" : offer.kind === "topups" ? "topups" : gift ? "gift-cards" : "tools";
-    const label = offer.kind === "esims" ? "Travel eSIM" : offer.kind === "topups" ? "Account top-up" : gift ? "Gift card" : "Digital code · category unconfirmed";
+    const family = digitalServiceFamily(offer.name, offer.kind);
+    const category = family ?? "tools";
+    const label = family ? DIGITAL_FAMILY_LABELS[family] : "Digital code · category unconfirmed";
     return {
       id: offer.id, name: offer.name, category, description: label, tag: label,
       artwork: { kind: "digital-product", art: digitalArtwork(offer.name) },

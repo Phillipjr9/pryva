@@ -27,7 +27,9 @@ vi.mock("@/lib/services/numbers/fleexa-catalog", () => ({
 
 vi.mock("@/lib/providers/bitcall", () => ({
   isBitcallConfigured: bitcall.configured,
+  BitcallError: class BitcallError extends Error {},
   listBitcallOtpCountries: bitcall.listCountries,
+  listBitcallOtpCountryEntries: async () => [{ countryCode: "NG", name: "Nigeria", pools: [{ serviceId: "svc-1", price: 500, currency: "NGN", availableCount: 7 }] }],
   listBitcallOtpServices: bitcall.listServices,
   isAmbiguousBitcallOutcome: vi.fn(() => false),
   buyBitcallOtpActivation: vi.fn(),
@@ -60,40 +62,39 @@ describe("otp stock aggregation", () => {
     ]);
   });
 
-  it("uses Bitcall's published country code for app-verification catalog reads", async () => {
+  it("filters the unfiltered feed against published country labels", async () => {
     bitcall.configured.mockReturnValue(true);
     bitcall.listCountries.mockResolvedValue(["NG", "US_1"]);
-    bitcall.listServices.mockImplementation(async ({ countryCode }: { countryCode?: string }) => countryCode === "US_1" ? [{
+    bitcall.listServices.mockImplementation(async () => [{
       name: "WhatsApp",
       slug: "us-whatsapp",
       countryCode: "US_1",
       offers: [{ serviceId: "us-whatsapp-pool", price: 500, currency: "NGN", availableCount: 9, successRate: 87 }],
-    }] : []);
+    }]);
 
     const { readOtpOffersForSupplier, clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");
     clearOtpCatalogueCache();
     const read = await readOtpOffersForSupplier("bitcall", "us", "United States", undefined, true);
 
-    expect(bitcall.listServices).toHaveBeenCalledWith({ countryCode: "US_1" });
+    expect(bitcall.listServices).toHaveBeenCalledWith({});
     expect(read.errorCode).toBeNull();
     expect(read.offers).toMatchObject([{ supplier: "bitcall", ref: "us-whatsapp-pool", country: "us", app: "WhatsApp", stock: 9 }]);
   });
 
-  it("falls back to Bitcall's unfiltered catalog when a country filter misses provider stock", async () => {
+  it("uses the authoritative unfiltered catalogue without a separate country lookup", async () => {
     bitcall.configured.mockReturnValue(true);
     bitcall.listCountries.mockResolvedValue(["US_1"]);
     const service = {
       name: "WhatsApp", slug: "us-whatsapp", countryCode: "US_1",
       offers: [{ serviceId: "us-whatsapp-pool", price: 500, currency: "NGN", availableCount: 9, successRate: 87 }],
     };
-    bitcall.listServices.mockImplementation(async (filter?: { countryCode?: string }) => filter?.countryCode ? [] : [service]);
+    bitcall.listServices.mockResolvedValue([service]);
 
     const { readOtpOffersForSupplier, clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");
     clearOtpCatalogueCache();
     const read = await readOtpOffersForSupplier("bitcall", "us", "United States", undefined, true);
 
-    expect(bitcall.listServices).toHaveBeenNthCalledWith(1, { countryCode: "US_1" });
-    expect(bitcall.listServices).toHaveBeenNthCalledWith(2);
+    expect(bitcall.listServices).toHaveBeenCalledExactlyOnceWith({});
     expect(read.offers).toMatchObject([{ ref: "us-whatsapp-pool", country: "us", app: "WhatsApp", stock: 9 }]);
   });
 
@@ -102,7 +103,7 @@ describe("otp stock aggregation", () => {
     bitcall.configured.mockReturnValue(true);
     bitcall.listCountries.mockResolvedValue(["US_1"]);
     bitcall.listServices.mockImplementation(async (filter?: { countryCode?: string }) => {
-      if (filter?.countryCode) {
+      if (filter) {
         await new Promise((resolve) => setTimeout(resolve, 6_000));
         return [{
           name: "WhatsApp",
@@ -144,11 +145,11 @@ describe("otp stock aggregation", () => {
     const first = await readOtpOffersForSupplier("bitcall", "us", "United States", undefined, true);
     expect(first.offers).toMatchObject([{ app: "WhatsApp", stock: 9 }]);
 
-    bitcall.listCountries.mockRejectedValueOnce(new Error("temporary outage"));
+    bitcall.listServices.mockRejectedValueOnce(new Error("temporary outage"));
     const second = await readOtpOffersForSupplier("bitcall", "us", "United States", undefined, true);
 
     expect(second.offers).toMatchObject([{ app: "WhatsApp", stock: 9 }]);
-    expect(second.errorCode).toBeNull();
+    expect(second.errorCode).toBe("UNKNOWN_ERROR");
     expect(second.partial).toBe(true);
   });
 

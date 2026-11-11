@@ -40,8 +40,8 @@ export async function readSupplierSnapshot(refresh = false): Promise<SupplierSna
         throw new Error("Supplier catalog unavailable");
       }
       const snapshot: SupplierSnapshot = {
-        email: email.status === "fulfilled" ? email.value.slice(0, 2000) : [],
-        rentals: rentals.status === "fulfilled" ? rentals.value.slice(0, 2000) : [],
+        email: email.status === "fulfilled" ? email.value : [],
+        rentals: rentals.status === "fulfilled" ? rentals.value : [],
         partial: failures.length > 0,
         degraded: failures.length === 0 ? null : failures.every((failure) => isFundingFailure(failure.reason)) ? "funding" : "outage",
         fetchedAt: new Date().toISOString(),
@@ -49,7 +49,7 @@ export async function readSupplierSnapshot(refresh = false): Promise<SupplierSna
       cache = { snapshot, expires: Date.now() + 30_000 };
       return snapshot;
     } catch (error) {
-      if (cache && Date.now() - cache.expires < 5 * 60_000) {
+      if (cache && Date.now() - Date.parse(cache.snapshot.fetchedAt) < 5 * 60_000) {
         const stale = { ...cache.snapshot, partial: true, degraded: "outage" as const };
         cache = { snapshot: stale, expires: Date.now() + 30_000 };
         return stale;

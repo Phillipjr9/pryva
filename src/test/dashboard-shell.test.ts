@@ -69,7 +69,7 @@ describe("dashboard navigation", () => {
   });
 
   it("routes accounts directly to the dashboard browser instead of an extra hub step", () => {
-    expect(shell).toContain('{ href: "/dashboard/accounts", label: "Accounts", art: "accounts"');
+    expect(shell).toContain('{ href: "/dashboard/accounts", label: "Social & Digital Accounts", art: "accounts"');
     expect(shell).not.toContain('{ href: "/accounts"');
     const explorer = readFileSync(join(root, "lib/services/service-explorer.ts"), "utf8");
     expect(explorer).toContain('href: "/dashboard/accounts"');
@@ -96,7 +96,7 @@ describe("dashboard navigation", () => {
     for (const category of ["verification", "social", "numbers", "esim", "proxies", "email", "subscriptions", "data", "games", "topups", "gift-cards", "prepaid"]) {
       expect(shell, `${category} should have a hub shortcut`).toContain(`category: "${category}"`);
     }
-    expect(shell).toContain('href: "/dashboard/gift-cards", label: "Pryva gift cards"');
+    expect(shell).toContain('href: "/dashboard/services", label: "Gift cards"');
     // Every row, including this one, carries a real image rather than a glyph.
     expect(shell).toContain('label: "All services", nav: "services"');
   });

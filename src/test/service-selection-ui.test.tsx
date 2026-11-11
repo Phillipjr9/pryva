@@ -49,9 +49,9 @@ describe("choosing services", () => {
     expect(screen.getAllByRole("heading", { name: "Nigeria rental" })).toHaveLength(3);
     expect(screen.queryByRole("heading", { name: "Nigeria" })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Mobile data" }));
-    expect(screen.getByRole("heading", { level: 1, name: "Mobile data" })).toBeTruthy();
-    expect(screen.getByText("Mobile data plans are not connected yet")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Mobile data & airtime" }));
+    expect(screen.getByRole("heading", { level: 1, name: "Mobile data & airtime" })).toBeTruthy();
+    expect(screen.getByText(/Mobile data and airtime delivery is not connected/)).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "MTN 1GB" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Airtel 1GB" })).toBeNull();
   });
@@ -91,7 +91,7 @@ describe("number-plan navigation", () => {
       ok: true, country: "us", items: [{ id: "otp-1", category: "verification", name: "Test app", description: "Live listing", tag: "Other", artwork: { kind: "service", name: "numbers" }, source: "live", coverage: "catalog-country", stock: 7, myUnits: null, price: null, action: null }],
     }) }));
     render(<ServiceExplorer initialCountry="us" initialCategory="numbers" />);
-    fireEvent.click(screen.getByRole("button", { name: "Browse app-specific numbers" }));
+    fireEvent.click(screen.getByRole("button", { name: "App verification" }));
     expect(screen.getByRole("heading", { level: 1, name: "App verification" })).toBeTruthy();
     expect(window.location.search).toBe("?country=us&category=verification");
     expect(await screen.findByRole("heading", { name: "Test app" })).toBeTruthy();

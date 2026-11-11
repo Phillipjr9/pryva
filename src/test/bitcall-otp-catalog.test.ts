@@ -87,7 +87,7 @@ describe("Bitcall app-specific OTP catalogue", () => {
   it("re-resolves an opaque offer ID from the live listing before checkout", async () => {
     const id = otpOfferPublicId("ng", "private-service-id-1", "WhatsApp");
     const result = await findOtpCheckoutOffer("ng", id, { refresh: true });
-    expect(state.read).toHaveBeenCalledWith("bitcall", "ng", "Nigeria", true);
+    expect(state.read).toHaveBeenCalledWith("bitcall", "ng", "Nigeria", undefined, true);
     expect(result).toMatchObject({
       errorCode: null,
       listing: { id, app: "WhatsApp", countryCode: "ng", priceNgn: 1340, purchasable: true },

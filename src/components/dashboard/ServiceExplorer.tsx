@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { DigitalCategoryPicker } from "@/components/dashboard/DigitalCategoryPicker";
+import { useLiveServiceExplorer, type LiveState } from "@/components/dashboard/useLiveServiceExplorer";
+import { useDigitalExplorer } from "@/components/dashboard/useDigitalExplorer";
+import { DigitalProductIcon } from "@/components/DigitalProductIcon";
 import { BrandIcon } from "@/components/BrandIcon";
 import { CountryFlag } from "@/components/CountryFlag";
 import { CountrySelector } from "@/components/dashboard/CountrySelector";
@@ -24,7 +28,7 @@ import {
   explorerCategory,
   explorerCountry,
   filterExplorerItems,
-  interleaveExplorerItems,
+  mergeExplorerSources,
   type ExplorerFilter,
   type ExplorerItem,
 } from "@/lib/services/service-explorer";
@@ -121,13 +125,31 @@ function SiteFavicon({ domain, size }: { domain: string; size: number }) {
   );
 }
 
+function ListingLogo({ src, size }: { src: string; size: number }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <ServiceIcon service="numbers" size={size <= 28 ? "sm" : "md"} />;
+  // Brand assets have already been matched to exact names in the server allowlist.
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt="" width={size} height={size} loading="lazy" decoding="async"
+    referrerPolicy="no-referrer" onError={() => setFailed(true)} className="shrink-0 rounded-lg object-contain" />;
+}
+
 function itemArt(item: ExplorerItem, size: "sm" | "md" = "md") {
   const pixels = size === "sm" ? 28 : 42;
   switch (item.artwork.kind) {
+    case "digital-product": return <DigitalProductIcon name={item.name} artwork={item.artwork.art} size={pixels} />;
     case "brand": return <BrandIcon brand={item.artwork.name} size={pixels} decorative />;
     case "network": return <NetworkBadge provider={item.artwork.name} size={pixels} />;
     case "service": return <ServiceIcon service={item.artwork.name} size={size} />;
-    case "site-favicon": return <SiteFavicon domain={item.artwork.domain} size={pixels} />;
+    case "site-favicon": return <SiteFavicon key={item.artwork.domain} domain={item.artwork.domain} size={pixels} />;
+    case "simple-icon": {
+      const src = `https://cdn.jsdelivr.net/npm/simple-icons@${item.artwork.version}/icons/${item.artwork.slug}.svg`;
+      return <ListingLogo key={src} src={src} size={pixels} />;
+    }
+    case "verified-brand-logo": {
+      const src = `/verification-logos/${item.artwork.slug}.${item.artwork.format ?? "svg"}`;
+      return <ListingLogo key={src} src={src} size={pixels} />;
+    }
     // A mailbox with no published favicon: Lucide's `mail-question`, never
     // another provider's logo or the Temporary-inbox tool's mark.
     case "unidentified-inbox": return <UnidentifiedInbox size={pixels} />;
@@ -138,7 +160,7 @@ export function ServiceCard({ item, countryName }: { item: ExplorerItem; country
   const coverage = item.source === "live"
       ? (item.coverage === "catalog-country" ? `Reported region: ${countryName}` : item.coverage === "unconfirmed" ? "Country coverage unconfirmed" : "Not country-specific")
       : item.coverage === "catalog-country" ? `Catalog region: ${countryName}` : item.coverage === "unconfirmed" ? "Country coverage unconfirmed" : "Not filtered by country";
-  const noAction = item.category === "verification" && item.source === "live"
+  const noAction = item.orderingPaused ? "Ordering paused" : item.category === "verification" && item.source === "live"
     ? "Purchasing locked"
     : item.source === "live" ? "Ordering paused" : "Not available";
   const action = item.action;
@@ -170,7 +192,7 @@ export function ServiceCard({ item, countryName }: { item: ExplorerItem; country
       <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-lav-50/70 sm:rounded-xl">{itemArt(item)}</div>
       <div className="min-w-0 flex-1 sm:mt-3">
         <div className="flex min-w-0 items-start justify-between gap-2">
-          <h3 className="min-w-0 truncate text-[0.86rem] font-semibold leading-snug text-ink sm:whitespace-normal sm:break-words sm:text-[0.92rem]">{item.name}</h3>
+          <h3 className="min-w-0 truncate text-[0.875rem] font-semibold leading-snug text-ink sm:whitespace-normal sm:break-words sm:text-[0.9375rem]">{item.name}</h3>
           <span className={`hidden shrink-0 rounded-full px-2.5 py-1 text-micro font-bold uppercase tracking-[0.08em] sm:inline-flex ${sourceTone}`}>
             {sourceLabel}
           </span>
@@ -244,20 +266,6 @@ function writeSelection(country: string, category: ExplorerFilter) {
  * both steady states, so they must not read as breakage or offer a Retry that
  * cannot change the answer. Only `error` and `throttled` are worth retrying.
  */
-type LiveState = {
-  country: string;
-  items: ExplorerItem[];
-  live: boolean;
-  partial: boolean;
-  failed: boolean;
-  reason: "environment" | "unconfigured" | "funding" | "throttled" | "error" | null;
-  fetchedAt: string | null;
-};
-
-type CatalogPayload = {
-  ok?: boolean; country?: string; live?: boolean; partial?: boolean;
-  reason?: string | null; fetchedAt?: string | null; items?: ExplorerItem[];
-};
 
 function liveUnavailableCopy(reason: LiveState["reason"]) {
   if (reason === "environment") return {
@@ -280,7 +288,7 @@ function liveUnavailableCopy(reason: LiveState["reason"]) {
   };
   if (reason === "error") return {
     lead: "Live listings are refreshing.",
-    rest: "Browse the catalogue below while the live feed syncs again.",
+    rest: "Live listings may be incomplete or out of date. Browse the catalogue below while the live feed syncs again.",
   };
   return {
     lead: "Live availability is not shown yet.",
@@ -326,6 +334,7 @@ export function ServiceExplorer({
   reviewedItems?: ExplorerItem[];
   enableDigitalCatalogue?: boolean;
 }) {
+  const [allEsimDestinations, setAllEsimDestinations] = useState(initialAllEsimDestinations);
   const [country, setCountry] = useState(() => resolveExplorerCountry(initialCountry));
   const [category, setCategory] = useState<ExplorerFilter>(() => explorerCategory(initialCategory));
   const [search, setSearch] = useState("");
@@ -333,15 +342,28 @@ export function ServiceExplorer({
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [platformOpen, setPlatformOpen] = useState<Record<string, boolean>>({});
   const [groupVisible, setGroupVisible] = useState<Record<string, number>>({});
-  const [liveState, setLiveState] = useState<LiveState | null>(null);
   const [liveRevision, setLiveRevision] = useState(0);
+  const liveState = useLiveServiceExplorer(country, liveRevision, category === "esim" && allEsimDestinations);
+  const [stockOnly, setStockOnly] = useState(true);
   const selectedCountry = explorerCountry(country);
   const selectedCategory = EXPLORER_CATEGORIES.find((entry) => entry.id === category);
+  const [subcategory, setSubcategory] = useState<{ id: string; name: string; root?: string } | null>(null);
+  const digital = useDigitalExplorer(enableDigitalCatalogue, category, search, stockOnly, subcategory);
   const items = useMemo(() => {
-    const base = buildServiceExplorer(country);
-    return liveState?.country === country && liveState.items.length
-      ? interleaveExplorerItems([...liveState.items, ...base]) : base;
-  }, [country, liveState]);
+    const base = subcategory ? [] : buildServiceExplorer(country);
+    // Retain the feed's category metadata, but prefer the reviewed checkout for
+    // the same opaque product ID. Never deduplicate by similar product names.
+    const reviewedById = new Map(reviewedItems.map((item) => [item.id, item]));
+    const catalogue = digital.items.map((item) => {
+      const reviewed = reviewedById.get(item.id);
+      return reviewed && !item.orderingPaused ? { ...item, action: reviewed.action } : item;
+    });
+    const loadedIds = new Set(catalogue.map((item) => item.id));
+    return mergeExplorerSources([
+      !subcategory && liveState?.country === country ? liveState.items : [], base, catalogue,
+      subcategory ? [] : reviewedItems.filter((item) => !loadedIds.has(item.id)),
+    ]);
+  }, [country, liveState, digital.items, reviewedItems, subcategory]);
   const filtered = useMemo(() => filterExplorerItems(items, category, search, tag), [items, category, search, tag]);
   /**
    * Social promotion lists every offer the supplier sells, which is hundreds
@@ -392,37 +414,6 @@ export function ServiceExplorer({
   }, [readinessById]);
   const summary = readinessSummary(readiness);
 
-  // Live listings: boosts are purchasable, the others are read-only until their ordering is wired.
-  useEffect(() => {
-    if (!country) return;
-    const controller = new AbortController();
-    fetch(`/api/services/catalog?country=${encodeURIComponent(country)}${liveRevision ? "&refresh=1" : ""}`, { cache: "no-store", signal: controller.signal })
-      .then(async (response) => {
-        const data = (await response.json().catch(() => null)) as CatalogPayload | null;
-        if (!response.ok || !data?.ok || data.country !== country || !Array.isArray(data.items)) {
-          // A throttled read is the one failure a customer can clear themselves.
-          const throttled = response.status === 429;
-          if (!controller.signal.aborted) {
-            setLiveState({ country, items: [], live: false, partial: false, failed: true, reason: throttled ? "throttled" : "error", fetchedAt: null });
-          }
-          return;
-        }
-        const fetchedAt = typeof data.fetchedAt === "string" && Number.isFinite(Date.parse(data.fetchedAt)) ? data.fetchedAt : null;
-        // `live !== false` keeps older payloads (which predate the flag) working.
-        // "partial" travels as `partial: true`; `reason` names why, in the
-        // customer's terms: closed environment, no supplier, or out of funds.
-        const reason = data.reason === "environment" || data.reason === "unconfigured" || data.reason === "funding"
-          ? data.reason
-          : null;
-        if (!controller.signal.aborted) {
-          setLiveState({ country, items: data.items, live: data.live !== false, partial: Boolean(data.partial), failed: false, reason: data.live === false || data.partial ? reason : null, fetchedAt });
-        }
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setLiveState({ country, items: [], live: false, partial: false, failed: true, reason: "error", fetchedAt: null });
-      });
-    return () => controller.abort();
-  }, [country, liveRevision]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && country) {
@@ -435,7 +426,9 @@ export function ServiceExplorer({
     function restoreSelection() {
       const params = new URLSearchParams(window.location.search);
       setCountry(explorerCountry(params.get("country"))?.code ?? resolveExplorerCountry(null));
+      setSubcategory(null);
       setCategory(explorerCategory(params.get("category")));
+      setAllEsimDestinations(params.get("allDestinations") === "1");
       setSearch("");
       setTag("all");
       setVisible(PAGE_SIZE);
@@ -446,6 +439,7 @@ export function ServiceExplorer({
 
   function chooseCountry(code: string) {
     const next = explorerCountry(code)?.code ?? (country || "ng");
+    setAllEsimDestinations(false);
     setCountry(next);
     if (next !== country) setLiveRevision(0);
     setTag("all");
@@ -455,6 +449,7 @@ export function ServiceExplorer({
   }
 
   function chooseCategory(next: ExplorerFilter) {
+    setSubcategory(null);
     setCategory(next);
     setTag("all");
     setSearch("");
@@ -468,7 +463,7 @@ export function ServiceExplorer({
         <div>
           <p className="text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Explore PryvaLogs</p>
           <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">{selectedCategory?.label ?? "Your service hub"}</h1>
-          <p className="mt-1.5 max-w-2xl text-[0.82rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Pick a country once, then browse the matched services.` : "Pick a country once and browse categories without redoing the choice every time."}</p>
+          <p className="mt-1.5 max-w-2xl text-[0.8125rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Pick a country once, then browse the matched services.` : "Pick a country once and browse categories without redoing the choice every time."}</p>
         </div>
         <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline">My orders <ArrowRight className="h-3.5 w-3.5" /></Link>
       </div>
@@ -490,7 +485,7 @@ export function ServiceExplorer({
         <div className="relative grid gap-3 md:grid-cols-[1fr_1.1fr] md:items-center md:gap-4">
           <div>
             <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Globe className="h-3.5 w-3.5" /> Country</p>
-            <h2 id="choose-country-title" className="mt-1.5 text-[1.1rem] font-semibold text-ink sm:mt-2 sm:text-[1.25rem]">Pick a country once.</h2>
+            <h2 id="choose-country-title" className="mt-1.5 text-[1.125rem] font-semibold text-ink sm:mt-2 sm:text-[1.25rem]">Pick a country once.</h2>
             <p className="mt-1.5 max-w-sm text-meta leading-relaxed text-ink-2">Your selection stays saved for this service hub, so you do not need to rechoose it for every category or browse session.</p>
           </div>
           <div className="rounded-2xl border border-white/80 bg-white/60 p-3 shadow-sm sm:p-4">
@@ -503,7 +498,7 @@ export function ServiceExplorer({
         <div className="rounded-[1.5rem] border border-dashed border-lav-200 bg-white/70 px-4 py-8 text-center sm:px-6 sm:py-10">
           <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-lav-50 text-lav-700"><Globe className="h-5 w-5" /></span>
           <h2 className="mt-3 text-[1rem] font-semibold text-ink">Choose a country to explore</h2>
-          <p className="mx-auto mt-1.5 max-w-md text-[0.8rem] leading-relaxed text-ink-2">We&apos;ll show service categories and available listings after you make your selection.</p>
+          <p className="mx-auto mt-1.5 max-w-md text-[0.8125rem] leading-relaxed text-ink-2">We&apos;ll show service categories and available listings after you make your selection.</p>
           <div className="mx-auto mt-5 grid max-w-xl grid-cols-2 gap-2 sm:mt-6 sm:grid-cols-3 sm:gap-3">
             {POPULAR_COUNTRIES.map((c) => (
               <button
@@ -513,7 +508,7 @@ export function ServiceExplorer({
                 className="flex flex-col items-center justify-center rounded-2xl border border-line bg-white p-3 transition-all hover:-translate-y-0.5 hover:border-lav-300 hover:shadow-xs sm:p-3.5"
               >
                 <CountryFlag code={c.code} size={28} decorative />
-                <span className="mt-2 text-[0.85rem] font-semibold text-ink">{c.name}</span>
+                <span className="mt-2 text-[0.875rem] font-semibold text-ink">{c.name}</span>
                 <span className="mt-0.5 text-micro text-ink-3">{c.desc}</span>
               </button>
             ))}
@@ -525,7 +520,7 @@ export function ServiceExplorer({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Step 02</p>
-                <h2 id="categories-title" className="mt-1 text-[1.05rem] font-semibold text-ink">Choose a category</h2>
+                <h2 id="categories-title" className="mt-1 text-[1rem] font-semibold text-ink">Choose a category</h2>
               </div>
               <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-meta font-semibold text-ink-2">
                 <CountryFlag code={selectedCountry.code} size={18} decorative radius={9} /> {selectedCountry.name}
@@ -596,7 +591,7 @@ export function ServiceExplorer({
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Sparkle className="h-3.5 w-3.5" /> Step 03</p>
-                <h2 id="services-title" className="mt-1 text-[1.05rem] font-semibold text-ink">{selectedCategory ? `Explore ${selectedCategory.label}` : "Explore services"}</h2>
+                <h2 id="services-title" className="mt-1 text-[1rem] font-semibold text-ink">{selectedCategory ? `Explore ${selectedCategory.label}` : "Explore services"}</h2>
                 <p aria-live="polite" className="mt-1 text-meta text-ink-3">{filtered.length} {`listing${filtered.length === 1 ? "" : "s"}`} · {selectedCountry.name} selected</p>
                 {liveState?.country === country && liveState.fetchedAt && <p className="mt-1 text-micro text-ink-3">Stock checked: <time dateTime={liveState.fetchedAt}>{new Date(liveState.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
               </div>
@@ -606,6 +601,18 @@ export function ServiceExplorer({
               </div>
             </div>
 
+            {enableDigitalCatalogue && <label className="mt-3 flex items-center gap-2 text-meta text-ink-2"><input type="checkbox" checked={stockOnly} onChange={(event) => { setStockOnly(event.target.checked); setVisible(PAGE_SIZE); }} />Show catalogue listings with reported stock only</label>}
+            {enableDigitalCatalogue && <DigitalCategoryPicker key={category} category={category} onSelect={(entry) => { setSubcategory(entry); setVisible(PAGE_SIZE); }} />}
+            {category === "esim" && <label className="mt-3 flex items-center gap-2 text-meta text-ink-2"><input type="checkbox" checked={allEsimDestinations} onChange={(event) => { setAllEsimDestinations(event.target.checked); setVisible(PAGE_SIZE); }} />Browse all destinations</label>}
+            {enableDigitalCatalogue && <div className="mt-3 text-meta text-ink-3" aria-live="polite">
+              <p>Search filters the listings loaded in this category; load more pages to see further matches.</p>
+              <p>Offers are grouped by service, across catalogues. Check each offer’s region and terms before buying; digital catalogue coverage is unconfirmed.</p>
+              {digital.loading && <p>Loading more service offers…</p>}
+              {digital.error && <p>Some listings could not be loaded from the digital catalogue. <button type="button" onClick={digital.retry} className="font-semibold underline">Retry catalogue</button></p>}
+              {digital.limited && <p>Search results are limited. Browse category pages for more offers.</p>}
+              {digital.hasMore && <button type="button" disabled={digital.loadingMore} onClick={digital.loadMore} className="mt-2 rounded-lg border border-line px-3 py-2 font-semibold">{digital.loadingMore ? "Loading…" : "Load more digital listings"}</button>}
+            </div>}
+
             {tags.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-1.5 border-t border-line pt-4" aria-label="Service types">
                 <button type="button" onClick={() => { setTag("all"); setVisible(PAGE_SIZE); }} aria-pressed={tag === "all"} className={`rounded-lg px-2.5 py-1.5 text-micro font-semibold ${tag === "all" ? "bg-lav-100 text-lav-800" : "text-ink-3 hover:bg-cream"}`}>All types</button>
@@ -613,9 +620,10 @@ export function ServiceExplorer({
               </div>
             )}
 
-            {liveState?.country === country && (liveState.reason === "funding" || liveState.reason === "throttled") && (
+            {liveState?.loading && <p role="status" className="mt-3 text-meta text-ink-3">Live listings are still loading. Available feeds are shown as they arrive.</p>}
+            {liveState?.country === country && (liveState.reason === "funding" || liveState.reason === "throttled" || liveState.reason === "error") && (
               <p role="status" className="mt-4 text-meta text-amber-800">
-                {liveState.reason === "throttled" ? "Live listings were refreshed too quickly." : "Live listings are paused while we restock."}{" "}
+                {liveState.reason === "throttled" ? "Live listings were refreshed too quickly." : liveState.reason === "funding" ? "Live listings are paused while we restock." : "Some live listings could not be loaded."}{" "}
                 {/* No Retry on a funding gap: retrying cannot restock it. */}
                 {liveState.reason !== "funding" && <button type="button" className="font-semibold underline" onClick={() => setLiveRevision((value) => value + 1)}>Retry</button>}
               </p>
@@ -643,7 +651,7 @@ export function ServiceExplorer({
                           <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-lav-50/70">
                             {itemArt(group.items[0], "sm")}
                           </span>
-                          <span className="min-w-0 flex-1 truncate text-[0.92rem] font-semibold text-ink">{group.platform}</span>
+                          <span className="min-w-0 flex-1 truncate text-[0.9375rem] font-semibold text-ink">{group.platform}</span>
                           <span className="shrink-0 rounded-full bg-cream px-2 py-0.5 text-micro font-semibold text-ink-2">
                             {group.items.length}
                             <span className="sr-only"> {group.items.length === 1 ? "listing" : "listings"}</span>
@@ -680,8 +688,10 @@ export function ServiceExplorer({
             )}
             {filtered.length === 0 && (
               <div className="rounded-2xl border border-dashed border-line bg-cream/50 p-8 text-center">
-                <p className="text-[0.88rem] font-semibold text-ink">No listings match these filters</p>
+                <p className="text-[0.875rem] font-semibold text-ink">No listings match these filters</p>
                 <p className="mt-1 text-meta text-ink-2">Try another search, category or country. This doesn&apos;t indicate live availability.</p>
+                {category === "data" && !search && <p className="mt-3 text-meta text-ink-2">Mobile data and airtime delivery is not connected. No plans or prices are available to order. <Link href="/dashboard/data" className="font-semibold text-lav-700 underline">View data service status</Link></p>}
+                {category === "subscriptions" && !search && !digital.loading && <p className="mt-3 text-meta text-ink-2">No subscription listings have loaded for this selection. Try loading more catalogue pages or <Link href="/dashboard/support" className="font-semibold text-lav-700 underline">Ask about subscriptions</Link>. Availability depends on each product.</p>}
                 {(search || tag !== "all") && <button type="button" onClick={() => { setSearch(""); setTag("all"); setVisible(PAGE_SIZE); }} className="mt-3 text-meta font-semibold text-lav-700 underline underline-offset-2">Clear filters</button>}
               </div>
             )}

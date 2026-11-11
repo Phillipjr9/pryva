@@ -68,7 +68,7 @@ beforeEach(() => {
   state.otpItems.mockReturnValue([]);
 });
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); });
 
 describe("supplier catalog endpoint", () => {
   it("offers a bounded all-destinations eSIM view without contacting unrelated feeds", async () => {
@@ -81,6 +81,14 @@ describe("supplier catalog endpoint", () => {
     expect(state.esimItems).not.toHaveBeenCalled();
     expect(state.snapshot).not.toHaveBeenCalled();
     expect((await GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&feed=social&allDestinations=1"))).status).toBe(400);
+  });
+  it("includes the rental and inbox feed when numbers are loaded independently", async () => {
+    const body = await (await GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&feed=numbers"))).json();
+    expect(state.snapshot).toHaveBeenCalled();
+    expect(state.items).toHaveBeenCalled();
+    expect(body.items).toContainEqual(SIGNAL);
+    expect(state.boostSnapshot).not.toHaveBeenCalled();
+    expect(state.esimSnapshot).not.toHaveBeenCalled();
   });
   it("reports unreadable eSIM rows instead of treating them as an empty catalogue", async () => {
     state.bitcallConfigured = true;
@@ -167,10 +175,11 @@ describe("supplier catalog endpoint", () => {
 
   it("times out a slow supplier instead of stalling the whole catalog", async () => {
     state.snapshot.mockImplementation(() => new Promise(() => {}));
-    const response = await Promise.race([
-      GET(request()),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("catalog route hung")), 1_500)),
-    ]);
+    vi.useFakeTimers();
+    const pending = GET(request());
+    await vi.advanceTimersByTimeAsync(15_001);
+    const response = await pending;
+    vi.useRealTimers();
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({ error: "The live catalog is temporarily unavailable", reason: "unavailable" });
   });
@@ -276,6 +285,6 @@ describe("supplier catalog endpoint", () => {
     expect(state.snapshot).toHaveBeenCalledWith(true);
     expect(state.boostSnapshot).toHaveBeenCalledWith(true);
     expect(state.esimSnapshot).toHaveBeenCalledWith(true);
-    expect(state.otpRead).toHaveBeenCalledWith("bitcall", "us", expect.any(String), true);
+    expect(state.otpRead).toHaveBeenCalledWith("bitcall", "us", expect.any(String), undefined, true);
   });
 });
