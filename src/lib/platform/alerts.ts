@@ -6,9 +6,10 @@ import "server-only";
  * The app logs well and reports nowhere: `logger.error` writes a structured line
  * to the platform's stdout, and unless somebody is reading the log at that moment
  * a failed payout, a broken cron step or a throwing route is invisible until a
- * customer writes in. This posts those lines to a webhook instead -- Slack and
- * Discord both accept `{ "text": ... }`, so no vendor SDK or account is required
- * to start catching them.
+ * customer writes in. This posts those lines to a webhook instead -- Slack
+ * accepts `{ "text": ... }`, and so does Discord on its Slack-compatible endpoint
+ * (the webhook URL followed by `/slack`; the plain Discord URL refuses the post),
+ * so no vendor SDK or account is required to start catching them.
  *
  * Three rules, because an alerting path that can hurt the caller is worse than no
  * alerting at all:
