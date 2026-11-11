@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { SiteLink as Link } from "@/components/site/SiteLink";
 import { usePathname } from "next/navigation";
 import { ArrowRight, Close, Menu } from "@/components/icons";
 import { formatNaira } from "@/lib/services/catalog";
 import { BrandLockup } from "@/components/brand/BrandLockup";
+import { useSiteVisitor } from "@/components/site/SiteSession";
 
 type NavUser = { name: string; walletBalance: number } | null;
 
@@ -175,4 +176,16 @@ export function HeaderNav({ user }: { user: NavUser }) {
       )}
     </>
   );
+}
+
+/**
+ * The header as the public shell mounts it.
+ *
+ * `HeaderNav` stays a plain function of its `user` prop. This is the one place
+ * that connects it to the visitor's session, and it does so in the browser: the
+ * shell is prerendered and shared, so the server never knows who is looking at
+ * it. See `SiteSession` for why.
+ */
+export function SiteHeaderNav() {
+  return <HeaderNav user={useSiteVisitor()} />;
 }

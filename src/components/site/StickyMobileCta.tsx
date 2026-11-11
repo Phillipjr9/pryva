@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { SiteLink as Link } from "@/components/site/SiteLink";
 import { ArrowRight } from "@/components/icons";
 import { formatNaira } from "@/lib/services/catalog";
+import { useSiteVisitor } from "@/components/site/SiteSession";
 
 /**
  * Phone-only sticky bar.
@@ -17,6 +18,7 @@ export function StickyMobileCta({
   price,
   targetId,
   href = "/signup",
+  signedInHref,
 }: {
   label: string;
   /**
@@ -28,7 +30,15 @@ export function StickyMobileCta({
   price?: number;
   targetId: string;
   href?: string;
+  /**
+   * Where the button goes once the visitor is known to be signed in. The page
+   * this sits on is prerendered for everyone, so it cannot know that on the
+   * server; `href` is what the shared markup carries.
+   */
+  signedInHref?: string;
 }) {
+  const visitor = useSiteVisitor();
+  const destination = visitor && signedInHref ? signedInHref : href;
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
@@ -60,7 +70,7 @@ export function StickyMobileCta({
             </p>
             <p className="truncate text-micro text-ink-3">{label}</p>
           </div>
-          <Link href={href} className="btn btn-primary !px-5 !py-3 !text-[0.875rem]">
+          <Link href={destination} className="btn btn-primary !px-5 !py-3 !text-[0.875rem]">
             Get started
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
