@@ -34,6 +34,9 @@ export const metadata: Metadata = {
   description:
     "Explore plans for virtual numbers, eSIM data, residential proxies, email OTP and digital accounts, priced in Naira.",
   alternates: { canonical: "/" },
+  other: {
+    "gridinsoft-key": "8bmojscjo3jigdtd24hkaujyy3qj7b2txbqud8jd0irj26j1yvn2hdb4q6iwtcoy",
+  },
   openGraph: {
     title: "PryvaLogs — Virtual numbers, eSIMs and proxies for Nigeria",
     description:
