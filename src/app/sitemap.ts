@@ -20,6 +20,7 @@ const routes = [
   "/terms",
   "/privacy",
   "/refund-policy",
+  "/account-provenance",
   "/cookie-policy",
   "/pricing",
   "/how-it-works",

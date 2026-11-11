@@ -47,6 +47,7 @@ const columns = [
       { href: "/contact", label: "Contact support" },
       { href: "/status", label: "Service status" },
       { href: "/refund-policy", label: "Refund policy" },
+      { href: "/account-provenance", label: "Account provenance" },
       { href: "/terms", label: "Terms of service" },
       { href: "/privacy", label: "Privacy policy" },
       { href: "/cookie-policy", label: "Cookie policy" },

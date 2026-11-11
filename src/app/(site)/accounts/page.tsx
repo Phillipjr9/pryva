@@ -111,14 +111,19 @@ export default function AccountsPage() {
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
           <h2 className="text-[0.9375rem] font-semibold text-amber-900">Before you buy</h2>
           <p className="mt-2 max-w-3xl text-[0.875rem] leading-relaxed text-amber-900/80">
-            Accounts are delivered exactly as described and are not screened by PryvaLogs beyond the
-            checks described here. Use them in line with each platform&apos;s terms — some platforms restrict
-            account transfers, and you accept that risk when you buy. Save your credentials on delivery;
+            Every account currently offered is covered by our{" "}
+            <Link href="/account-provenance" className="font-semibold underline underline-offset-2">
+              Account Provenance and Transfer Policy
+            </Link>
+            . Suppliers must establish the inventory source, original-holder authorization, and whether
+            the platform permits transfer. Inventory that fails these checks is rejected or suspended.
+            Use accounts in line with each platform&apos;s terms, and save your credentials on delivery;
             if we cannot save them to your order history, we will warn you. See our{" "}
             <Link href="/terms" className="font-semibold underline underline-offset-2">
               Terms
             </Link>{" "}
-            for refund details.
+            and <Link href="/refund-policy" className="font-semibold underline underline-offset-2">refund policy</Link>{" "}
+            for delivery and refund details.
           </p>
         </div>
       </section>

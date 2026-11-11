@@ -32,7 +32,7 @@ type Clause = {
   body: ReactNode;
 };
 
-const LAST_UPDATED = "30 October 2026";
+const LAST_UPDATED = "11 November 2026";
 
 const clauses: Clause[] = [
   {
@@ -48,8 +48,8 @@ const clauses: Clause[] = [
         </p>
         <p>
           They sit alongside the <Link href="/refund-policy">refund policy</Link>,{" "}
-          <Link href="/privacy">privacy policy</Link> and{" "}
-          <Link href="/cookie-policy">cookie policy</Link>, which are part of this agreement. Where
+          <Link href="/privacy">privacy policy</Link>, <Link href="/cookie-policy">cookie policy</Link> and{" "}
+          <Link href="/account-provenance">account provenance and transfer policy</Link>, which are part of this agreement. Where
           two of these documents disagree, the refund policy decides questions about refunds and
           these terms decide everything else.
         </p>
@@ -193,7 +193,8 @@ const clauses: Clause[] = [
             afterwards.
           </li>
           <li>
-            <strong>Digital accounts</strong> are delivered as the access the order describes.
+            <strong>Digital accounts</strong> are delivered as the access the order describes and are
+            covered by the <Link href="/account-provenance">account provenance and transfer policy</Link>.
             Change the password and recovery details immediately, and follow the platform&rsquo;s
             rules: an account can be restricted by the platform for reasons outside our control.
           </li>
