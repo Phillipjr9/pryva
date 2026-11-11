@@ -2,7 +2,8 @@ import { authorizeAdminApi } from "@/lib/identity/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
-import { desc, count } from "drizzle-orm";
+import { desc, count, eq } from "drizzle-orm";
+import { pageWindow } from "@/lib/platform/pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -11,27 +12,37 @@ export async function GET(request: NextRequest) {
     const access = await authorizeAdminApi(request);
     if (access.response) return access.response;
 
-    const limit = parseInt(request.nextUrl.searchParams.get("limit") || "50");
-    const offset = parseInt(request.nextUrl.searchParams.get("offset") || "0");
+    // Bounded: `?limit=` used to reach the database unchanged, so one request
+    // could ask for the whole order history at once. See `pageWindow`.
+    const { limit, offset } = pageWindow(request.nextUrl.searchParams);
     const status = request.nextUrl.searchParams.get("status");
+    const where = status ? eq(orders.status, status) : undefined;
 
-    let query = db.query.orders.findMany({
+    // Only the columns this response sends. An order row also carries what was
+    // delivered — codes, activation details — and none of that belongs in the
+    // memory of a request that is only listing references and amounts.
+    const allOrders = await db.query.orders.findMany({
+      columns: {
+        id: true,
+        reference: true,
+        userId: true,
+        service: true,
+        productName: true,
+        amount: true,
+        status: true,
+        createdAt: true,
+      },
+      where,
       orderBy: [desc(orders.createdAt)],
       limit,
       offset,
     });
 
-    if (status) {
-      query = db.query.orders.findMany({
-        where: (orders, { eq }) => eq(orders.status, status),
-        orderBy: [desc(orders.createdAt)],
-        limit,
-        offset,
-      });
-    }
-
-    const allOrders = await query;
-    const [total] = await db.select({ count: count() }).from(orders);
+    // The total describes the same set the page was cut from. It used to count
+    // every order whatever the filter, so a filtered list reported page counts
+    // for rows it would never return.
+    const totalQuery = db.select({ count: count() }).from(orders);
+    const [total] = await (where ? totalQuery.where(where) : totalQuery);
 
     return NextResponse.json({
       ok: true,

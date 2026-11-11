@@ -16,6 +16,7 @@
 import { Pool, type PoolConfig } from "pg";
 
 import { awsIamConfigured } from "@/lib/platform/database-config";
+import { poolSettings } from "@/db/pool-settings";
 
 const TOKEN_TTL_MS = 14 * 60 * 1000; // AWS issues 15-minute tokens; refresh early.
 
@@ -104,6 +105,9 @@ export function createAwsIamPool(): Pool {
     user: settings.username,
     database: settings.database,
     ssl: sslConfig(),
+    // Same limits as the connection-string pool. The bounded connect wait
+    // matters most here: every new connection signs an IAM token first.
+    ...poolSettings(),
     // pg calls this per connection. Reuse the token until it is near expiry so a
     // burst of connections does not each trigger an STS assume-role round trip.
     password: async () => {

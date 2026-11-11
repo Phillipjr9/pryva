@@ -3,7 +3,9 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({ user: vi.fn(), admin: vi.fn(), where: vi.fn(), findMany: vi.fn() }));
 vi.mock("@/db", () => ({ db: {
-  select: () => ({ from: () => ({ where: mocks.where }) }),
+  // The admin export is a bounded read: where → orderBy → limit. `mocks.where`
+  // still supplies the rows; it is simply the end of a longer chain now.
+  select: () => ({ from: () => ({ where: () => ({ orderBy: () => ({ limit: mocks.where }) }) }) }),
   query: { walletTransactions: { findMany: mocks.findMany } },
 } }));
 vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: mocks.user }));

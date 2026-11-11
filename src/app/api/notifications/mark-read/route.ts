@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { requireAuthApi } from "@/lib/identity/auth";
 import { isSameOriginMutation } from "@/lib/platform/net";
 import { notificationRateLimiter } from "@/lib/platform/rate-limit";
@@ -58,13 +58,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Provide up to 100 valid notification IDs" }, { status: 400 });
     }
 
-    // Mark specific notifications as read
-    for (const id of notificationIds) {
-      await db
-        .update(notifications)
-        .set({ read: 1 })
-        .where(and(eq(notifications.id, id), eq(notifications.userId, user.id)));
-    }
+    // Mark specific notifications as read — one statement for the whole list.
+    // This used to be a loop of single-row updates: up to a hundred round trips
+    // to the database, each holding a pooled connection, for what is one write.
+    // The account filter is unchanged, so an id belonging to somebody else still
+    // matches nothing.
+    const ids = [...new Set(notificationIds as string[])];
+    await db
+      .update(notifications)
+      .set({ read: 1 })
+      .where(and(eq(notifications.userId, user.id), inArray(notifications.id, ids)));
 
     logger.info("Notifications marked as read", { userId: user.id, count: notificationIds.length });
 

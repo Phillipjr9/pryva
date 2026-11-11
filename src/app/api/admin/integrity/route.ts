@@ -15,16 +15,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "Unsupported integrity scope" }, { status: 400 });
     }
 
-    const summary = await runFullIntegrityCheck();
-    const filtered = {
-      users: scope === "orders" ? { checked: 0, issues: 0 } : summary.users,
-      orders: scope === "wallet" ? { checked: 0, issues: 0 } : summary.orders,
-    };
+    // The scope decides what is read, not just what is shown: the half that was
+    // not asked for is reported as zero checked because it was not run.
+    const summary = await runFullIntegrityCheck(scope);
 
     return NextResponse.json({
       ok: true,
       scope,
-      summary: filtered,
+      summary,
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {

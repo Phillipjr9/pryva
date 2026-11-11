@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, notInArray } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, productReviews, users } from "@/db/schema";
 import { recordAdminAction } from "@/lib/admin/admin-audit";
@@ -175,9 +175,41 @@ export async function listUserReviews(userId: string) {
     .orderBy(desc(productReviews.createdAt));
 }
 
-/** The caller's orders that can be reviewed and have not been yet. */
+/**
+ * How many orders the review picker offers.
+ *
+ * It read every order the customer had ever placed, whatever its status, and
+ * every review they had written, to fill one drop-down. The drop-down is for
+ * choosing something bought lately; a hundred entries is already more than
+ * anyone scrolls. An order that is not offered can still be reviewed —
+ * `createReview` checks the order itself, not this list.
+ */
+export const REVIEWABLE_ORDERS_LIMIT = 100;
+
+/**
+ * How many of the customer's own reviews are read to leave reviewed orders out.
+ * A review is written by hand and checked by a person, so this is far more than
+ * anyone has; past it, an order reviewed long ago could be offered again, and
+ * `createReview` would refuse the second review as it always has.
+ */
+const REVIEWED_ORDERS_LOOKBACK = 1_000;
+
+/** The caller's most recent orders that can be reviewed and have not been yet. */
 export async function listReviewableOrders(userId: string) {
-  const ownOrders = await db
+  const reviewed = await db
+    .select({ orderId: productReviews.orderId })
+    .from(productReviews)
+    .where(eq(productReviews.userId, userId))
+    .orderBy(desc(productReviews.createdAt))
+    .limit(REVIEWED_ORDERS_LOOKBACK);
+  const reviewedIds = reviewed.map((row) => row.orderId);
+
+  // Delivered, this customer's, and not one of those: the filter is the
+  // database's, so the limit counts orders that will actually be offered.
+  const reviewable = [eq(orders.userId, userId), inArray(orders.status, [...REVIEWABLE_STATUSES])];
+  if (reviewedIds.length > 0) reviewable.push(notInArray(orders.id, reviewedIds));
+
+  return db
     .select({
       id: orders.id,
       reference: orders.reference,
@@ -188,20 +220,9 @@ export async function listReviewableOrders(userId: string) {
       createdAt: orders.createdAt,
     })
     .from(orders)
-    .where(eq(orders.userId, userId))
-    .orderBy(desc(orders.createdAt));
-
-  const reviewed = await db
-    .select({ orderId: productReviews.orderId })
-    .from(productReviews)
-    .where(eq(productReviews.userId, userId));
-  const reviewedIds = new Set(reviewed.map((row) => row.orderId));
-
-  return ownOrders.filter(
-    (order) =>
-      (REVIEWABLE_STATUSES as readonly string[]).includes(order.status) &&
-      !reviewedIds.has(order.id),
-  );
+    .where(and(...reviewable))
+    .orderBy(desc(orders.createdAt))
+    .limit(REVIEWABLE_ORDERS_LIMIT);
 }
 
 export type ModerationDecision = "publish" | "reject";

@@ -1,28 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { orders } from "@/db/schema";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/identity/auth";
+import { ORDER_HISTORY_PAGE_SIZE as ORDERS_PER_PAGE } from "@/lib/platform/pagination";
 import { formatNaira } from "@/lib/services/catalog";
+import { orderHistoryPageNumber, readOrderHistory, type OrderHistoryRow } from "@/lib/services/order-history";
 import { ArrowRight, ArrowUpRight, Clock, Receipt, Search, Sparkle } from "@/components/icons";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 
 export const metadata: Metadata = { title: "Orders" };
 export const dynamic = "force-dynamic";
 
-type OrderRow = {
-  id: string;
-  reference: string;
-  productName: string;
-  planLabel: string;
-  region: string | null;
-  amount: number;
-  status: string;
-  otpCode: string | null;
-  expiresAt: Date | string | null;
-  createdAt: Date | string;
-};
+type OrderRow = OrderHistoryRow;
 
 const statusStyles: Record<string, string> = {
   active: "bg-emerald-50 text-emerald-700",
@@ -42,35 +31,30 @@ function dayLabel(date: Date) {
   return date.toLocaleDateString("en-NG", { day: "numeric", month: "short" });
 }
 
+/** A repeated `?q=a&q=b` arrives as an array; the first one is the one meant. */
+function single(value: string | string[] | undefined, fallback: string): string {
+  if (Array.isArray(value)) return value[0] ?? fallback;
+  return value ?? fallback;
+}
+
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string }>;
+  searchParams: Promise<{ status?: string | string[]; q?: string | string[]; page?: string | string[] }>;
 }) {
   const user = await requireUser("/dashboard/orders");
-  const { status = "all", q = "" } = await searchParams;
+  const params = await searchParams;
+  const status = single(params.status, "all");
+  const q = single(params.q, "");
+  const page = orderHistoryPageNumber(params.page);
+  const query = q.trim();
 
-  const rows = (await db
-    .select()
-    .from(orders)
-    .where(eq(orders.userId, user.id))
-    .orderBy(desc(orders.createdAt))) as unknown as OrderRow[];
-
-  const query = q.trim().toLowerCase();
-  const matches = rows.filter((order) => {
-    if (status !== "all" && order.status !== status) return false;
-    if (!query) return true;
-    return [order.productName, order.planLabel, order.reference, order.region ?? ""]
-      .join(" ")
-      .toLowerCase()
-      .includes(query);
-  });
-
-  const activeCount = rows.filter((order) => order.status === "active").length;
-  const refundedCount = rows.filter((order) => order.status === "refunded").length;
+  // The filter and the search are applied in the database, over the whole
+  // history; what comes back is one page of the result. See the reader for why.
+  const { rows, hasOlder, totals } = await readOrderHistory({ userId: user.id, status, query, page });
 
   // Group by month so a long history reads as a timeline instead of one wall.
-  const grouped = matches.reduce<Array<{ label: string; items: OrderRow[] }>>((acc, order) => {
+  const grouped = rows.reduce<Array<{ label: string; items: OrderRow[] }>>((acc, order) => {
     const label = monthLabel(new Date(order.createdAt));
     const bucket = acc.find((entry) => entry.label === label);
     if (bucket) bucket.items.push(order);
@@ -79,18 +63,31 @@ export default async function OrdersPage({
   }, []);
 
   const filters = [
-    { key: "all", label: `All (${rows.length})` },
-    { key: "active", label: `Active (${activeCount})` },
-    { key: "refunded", label: `Refunded (${refundedCount})` },
+    { key: "all", label: `All (${totals.all})` },
+    { key: "active", label: `Active (${totals.active})` },
+    { key: "refunded", label: `Refunded (${totals.refunded})` },
   ];
 
-  const hrefFor = (nextStatus: string) => {
-    const params = new URLSearchParams();
-    if (nextStatus !== "all") params.set("status", nextStatus);
-    if (query) params.set("q", q.trim());
-    const qs = params.toString();
+  // Choosing a filter starts again from the newest orders; the pager below
+  // carries the filter and the search across pages.
+  const hrefFor = (nextStatus: string, nextPage = 1) => {
+    const next = new URLSearchParams();
+    if (nextStatus !== "all") next.set("status", nextStatus);
+    if (query) next.set("q", query);
+    if (nextPage > 1) next.set("page", String(nextPage));
+    const qs = next.toString();
     return qs ? `/dashboard/orders?${qs}` : "/dashboard/orders";
   };
+
+  // A page number past the end (a stale link, or a filter that now matches
+  // fewer orders) would otherwise read as "Nothing matches that".
+  if (page > 1 && rows.length === 0) redirect(hrefFor(status));
+
+  /** The matching orders do not fit on one page, so this is one of several. */
+  const paged = page > 1 || hasOlder;
+  const firstShown = (page - 1) * ORDERS_PER_PAGE + 1;
+  const lastShown = firstShown + rows.length - 1;
+  const narrowed = status !== "all" || query.length > 0;
 
   return (
     <div className="grid gap-4">
@@ -106,7 +103,7 @@ export default async function OrdersPage({
         </Link>
       </div>
 
-      {rows.length > 0 && (
+      {totals.all > 0 && (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-1.5">
             {filters.map((filter) => {
@@ -142,18 +139,18 @@ export default async function OrdersPage({
         </div>
       )}
 
-      {rows.length === 0 ? (
+      {totals.all === 0 ? (
         <EmptyState
           icon={Receipt}
           title="No orders yet"
           body="Orders and their references appear here. Temporary inboxes are free and never create an order, so they do not appear in this list."
           action={{ label: "Browse pricing", href: "/pricing" }}
         />
-      ) : matches.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState
           icon={Search}
           title="Nothing matches that"
-          body={`No ${status === "all" ? "" : `${status} `}orders match “${q.trim()}”. Try the reference number or a product name.`}
+          body={`No ${status === "all" ? "" : `${status} `}orders match “${query}”. Try the reference number or a product name.`}
           action={{ label: "Clear filters", href: "/dashboard/orders" }}
         />
       ) : (
@@ -241,6 +238,39 @@ export default async function OrdersPage({
             </section>
           ))}
         </div>
+      )}
+
+      {paged && (
+        <nav
+          aria-label="Order history pages"
+          className="flex flex-col gap-3 rounded-[1.5rem] border border-line bg-white/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p className="text-meta text-ink-2">
+            {narrowed ? "Matching orders" : "Orders"} {firstShown.toLocaleString("en-NG")}–
+            {lastShown.toLocaleString("en-NG")}
+            {!narrowed && ` of ${totals.all.toLocaleString("en-NG")}`}, newest first.
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {page > 1 && (
+              <Link
+                href={hrefFor(status, page - 1)}
+                rel="prev"
+                className="whitespace-nowrap rounded-full border border-line bg-white px-3 py-1.5 text-meta font-semibold text-ink-2 transition-colors hover:border-lav-200"
+              >
+                Newer orders
+              </Link>
+            )}
+            {hasOlder && (
+              <Link
+                href={hrefFor(status, page + 1)}
+                rel="next"
+                className="whitespace-nowrap rounded-full border border-line bg-white px-3 py-1.5 text-meta font-semibold text-ink-2 transition-colors hover:border-lav-200"
+              >
+                Older orders
+              </Link>
+            )}
+          </div>
+        </nav>
       )}
     </div>
   );

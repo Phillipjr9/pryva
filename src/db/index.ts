@@ -3,6 +3,7 @@ import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 import { createAwsIamPool } from "@/db/aws-iam";
+import { guardPool, poolSettings } from "@/db/pool-settings";
 import {
   awsIamConfigured,
   persistentDatabaseConfigured,
@@ -740,11 +741,15 @@ const useAwsIam = !databaseUrl && awsIamConfigured();
 export const pool: Pool | null =
   databaseUrl || useAwsIam
     ? (() => {
+        // Bounded waits and an error listener on both kinds of pool: see
+        // `pool-settings` for what the driver's defaults do under load.
         const runtimePool =
           globalForDb.__arenaNextJsPostgresqlPool ??
-          (databaseUrl
-            ? new Pool({ connectionString: databaseUrl })
-            : createAwsIamPool());
+          guardPool(
+            databaseUrl
+              ? new Pool({ connectionString: databaseUrl, ...poolSettings() })
+              : createAwsIamPool(),
+          );
 
         if (process.env.NODE_ENV !== "production") {
           globalForDb.__arenaNextJsPostgresqlPool = runtimePool;

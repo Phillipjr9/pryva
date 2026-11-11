@@ -60,7 +60,11 @@ export const users = pgTable("users", {
    * keeps it un-reversible.
    */
   deletedEmailHash: varchar("deleted_email_hash", { length: 64 }),
-}, (table) => [index("users_deleted_idx").on(table.deletedAt)]);
+}, (table) => [
+  index("users_deleted_idx").on(table.deletedAt),
+  // Migration 0044: the signup-spike count and newest-first console listings.
+  index("users_created_idx").on(table.createdAt),
+]);
 
 /**
  * The receipt for a closed account.
@@ -384,6 +388,10 @@ export const orders = pgTable(
   (table) => [
     index("orders_user_idx").on(table.userId),
     uniqueIndex("orders_user_request_idx").on(table.userId, table.requestId),
+    // Migration 0044. Open orders are a sliver of this table; every sweep that
+    // looks for them filters on status first, so the index leads with it.
+    index("orders_status_created_idx").on(table.status, table.createdAt),
+    index("orders_created_idx").on(table.createdAt),
   ],
 );
 
@@ -438,7 +446,13 @@ export const walletTransactions = pgTable(
     reference: varchar("reference", { length: 40 }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("wallet_user_idx").on(table.userId)],
+  (table) => [
+    index("wallet_user_idx").on(table.userId),
+    // Migration 0044. Refund checks and order pages look the ledger up by order
+    // alone; rows with no order (top-ups, payouts) are left out of the index.
+    index("wallet_transactions_order_idx").on(table.orderId).where(sql`order_id IS NOT NULL`),
+    index("wallet_transactions_created_idx").on(table.createdAt),
+  ],
 );
 
 /**
