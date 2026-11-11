@@ -27,4 +27,19 @@ describe("account catalogue discovery", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "Product type 1" })).toBeNull());
     expect(screen.getByText("Instagram account")).toBeTruthy();
   });
+  it("searches the complete catalogue by platform and can include sold-out offers", async () => {
+    const mock = vi.fn(async (_url: string) => response({ configured: true, listings: [], categories: [], meta: { current_page: 1, last_page: 1, per_page: 24, total: 0 } }));
+    vi.stubGlobal("fetch", mock);
+    render(<AccountsBrowser purchaseEnabled />);
+    await waitFor(() => expect(mock.mock.calls.some(([url]) => String(url).includes("inStock=true"))).toBe(true));
+    fireEvent.click(screen.getByRole("button", { name: /^Facebook$/ }));
+    await waitFor(() => expect(mock.mock.calls.some(([url]) => String(url).includes("search=Facebook") && String(url).includes("sort=total_price"))).toBe(true));
+    fireEvent.click(screen.getByRole("checkbox", { name: "In stock only" }));
+    await waitFor(() => {
+      const urls = mock.mock.calls.map(([url]) => String(url)).filter((url) => url.includes("listings"));
+      expect(urls.at(-1)).toContain("search=Facebook");
+      expect(urls.at(-1)).not.toContain("inStock=true");
+    });
+  });
+
 });

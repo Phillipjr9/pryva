@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
 
   const sortParam = params.get("sort") ?? "total_price";
   const query: ListingQuery = {
+    inStockOnly: params.get("inStock") === "true",
     categoryId: toPositiveInt(params.get("categoryId")),
     subcategoryId: toPositiveInt(params.get("subcategoryId")),
     search: params.get("search")?.trim().slice(0, 80) || undefined,

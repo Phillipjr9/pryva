@@ -383,6 +383,7 @@ export type ListingQuery = {
   categoryId?: number;
   subcategoryId?: number;
   search?: string;
+  inStockOnly?: boolean;
   sort?: "sort_key" | "total_price" | "available_stock" | "title";
   direction?: "asc" | "desc";
   page?: number;
@@ -517,7 +518,11 @@ async function pageInMemory(
   perPage: number,
   source: CatalogSource,
 ): Promise<{ listings: MarketplaceListing[]; meta: MarketplaceMeta; source: CatalogSource }> {
-  let filtered = listings;
+  let filtered = query.inStockOnly
+    ? listings.filter((listing) => listing.available && (listing.stock === null
+      ? listing.fulfilment === "manual"
+      : listing.stock >= listing.minQuantity))
+    : listings;
 
   if (query.categoryId) {
     const labels = new Set(filtered.map((listing) => listing.browseGroup ?? listing.group).filter(Boolean) as string[]);

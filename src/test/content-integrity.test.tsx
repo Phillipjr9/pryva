@@ -38,6 +38,17 @@ describe("public content integrity", () => {
     expect(html).not.toContain("can be ordered and delivered automatically");
     expect(html).not.toMatch(/99\.\d+%|all systems operational|resolved incident/i);
   });
+  it("distinguishes account checkout configuration from stock and links to the catalogue", () => {
+    vi.stubEnv("DATABASE_URL", "postgres://mock.invalid/db");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("BULKACC_API_KEY", "test-only");
+    const html = renderToStaticMarkup(<StatusPage />);
+    const row = html.split("Social &amp; Digital Accounts")[1]?.split("</section>")[0];
+    expect(row).toContain("Ordering configured");
+    expect(row).not.toContain(">Available<");
+    expect(row).toContain("does not mean every platform or listing is in stock");
+    expect(row).toContain('href="/accounts"');
+  });
   it("reports gift cards separately when wallet actions are configured", () => {
     vi.stubEnv("DATABASE_URL", "postgres://mock.invalid/db");
     vi.stubEnv("VERCEL_ENV", "production");

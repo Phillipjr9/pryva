@@ -62,6 +62,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<(typeof SORTS)[number]["value"]>("total_price");
   const [page, setPage] = useState(1);
+  const [inStockOnly, setInStockOnly] = useState(true);
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -131,6 +132,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
     setError(null);
 
     const params = new URLSearchParams({ sort, page: String(page) });
+    if (inStockOnly) params.set("inStock", "true");
     if (activeCategory) params.set("categoryId", String(activeCategory));
     if (activeSubcategory) params.set("subcategoryId", String(activeSubcategory));
     if (search) params.set("search", search);
@@ -168,7 +170,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
     } finally {
       if (current === requestId.current) setLoading(false);
     }
-  }, [activeCategory, activeSubcategory, search, sort, page]);
+  }, [activeCategory, activeSubcategory, search, sort, page, inStockOnly]);
 
   useEffect(() => {
     const version = requestId;
@@ -379,7 +381,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
       {purchaseEnabled && listings.some((listing) => listing.fulfilment === "manual" && !listing.purchasable) && (
         <div role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.875rem] text-amber-900">
           Items marked <strong>Prepared for you</strong> cannot be ordered right now. Every other listing is
-          available as normal.
+          subject to its own stock and checkout checks.
         </div>
       )}
       {/* Filters */}
@@ -414,6 +416,32 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
             </button>
           ))}
         </div>
+
+        <div className="flex flex-wrap items-center gap-2" aria-label="Find accounts by platform">
+          <span className="text-meta text-ink-3">Find a platform:</span>
+          {["Facebook", "Instagram", "TikTok", "Twitter", "Snapchat", "Reddit", "Discord", "YouTube", "Telegram"].map((platform) => (
+            <button key={platform} type="button"
+              onClick={() => {
+                selectCategory(null);
+                setSearchInput(platform);
+                setSearch(platform);
+                setPage(1);
+              }}
+              className="rounded-full border border-line bg-white px-3 py-1.5 text-meta font-medium text-lav-700 hover:border-lav-300">
+              {platform === "Twitter" ? "X / Twitter" : platform}
+            </button>
+          ))}
+          <button type="button" onClick={() => { selectCategory(null); setSearchInput(""); setSearch(""); setPage(1); }}
+            className="px-2 py-1.5 text-meta font-semibold text-lav-700 hover:underline">Clear filters</button>
+        </div>
+        <label className="flex items-center gap-2 text-[0.875rem] text-ink-2">
+          <input type="checkbox" checked={inStockOnly} onChange={(event) => { setInStockOnly(event.target.checked); setPage(1); }} />
+          In stock only
+        </label>
+        <p className="text-meta text-ink-3">
+          Search covers the whole catalogue, not just this page. Prices are lowest first by default.
+          Uncheck “In stock only” to include sold-out and unconfirmed-stock listings from all connected catalogues.
+        </p>
 
         {activeCategory !== null && subcategories.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 border-t border-line/60 pt-3">
@@ -515,7 +543,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
           <div className="rounded-2xl border border-line bg-white p-10 text-center">
             <p className="text-[0.9375rem] font-semibold text-ink">No accounts match those filters</p>
             <p className="mt-1 text-[0.8125rem] text-ink-2">
-              Try a different category, or clear your search to see everything.
+              Try another platform or clear your search. Uncheck “In stock only” to include sold-out listings.
             </p>
           </div>
         )}
