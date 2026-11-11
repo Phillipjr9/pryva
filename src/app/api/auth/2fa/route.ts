@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { createSession } from "@/lib/identity/auth";
 import { checkAuthRateLimit, clearAuthRateLimit } from "@/lib/identity/auth-rate-limit";
+import { noteFailedSignIn } from "@/lib/identity/login-attempts";
 import { isSameOriginMutation } from "@/lib/platform/net";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 import { logger } from "@/lib/platform/logger";
@@ -51,7 +52,10 @@ export async function POST(request: NextRequest) {
     // Shares the IP bucket with password attempts; no key bucket, because there is
     // no email in this request and the challenge is unguessable.
     const limited = await checkAuthRateLimit(request, "login", "");
-    if (limited) return limited;
+    if (limited) {
+      if (limited.status === 429) noteFailedSignIn(request, { reason: "throttled" });
+      return limited;
+    }
 
     let body: unknown;
     try {
@@ -83,6 +87,10 @@ export async function POST(request: NextRequest) {
         );
       }
       await failChallenge(challenge.id, challenge.attempts);
+      // A wrong code here followed a correct password. It is logged and counted
+      // per account, because enough of them means the password is known to
+      // somebody who is now working on the second factor.
+      noteFailedSignIn(request, { reason: "wrong_second_factor", userId: challenge.userId });
       return invalid();
     }
 

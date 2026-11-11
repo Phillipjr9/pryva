@@ -300,6 +300,38 @@ export const verificationSendRateLimiter = createRateLimiter({ windowMs: 60 * 60
  */
 export const accountReadRateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 60 });
 
+/**
+ * Not limits: shared tallies of failed sign-ins, used to notice an attack.
+ *
+ * The per-IP and per-account limiters each see one corner of a guessing run. A
+ * botnet that stays under every individual budget is invisible to all of them,
+ * and so is a script hammering one account — to the limiter that is five
+ * attempts and then a stream of refusals nobody counts. The sign-in routes bump
+ * these once per failed attempt (see `src/lib/identity/login-attempts.ts`) and
+ * the operator is told when a window reaches its maximum.
+ *
+ * They are built on the same bucket as the limiters for the same reason the
+ * limiters are: an in-process count lets each serverless instance see only its
+ * own share and stay under the threshold. The bucket also gives "exactly once
+ * per window" for free — one caller, across every instance, is the one whose
+ * bump lands on the maximum. Nothing is ever refused because of a tally.
+ *
+ *   * every failed sign-in, across the whole site: 100 in an hour;
+ *   * wrong two-factor codes on one account: 10 in an hour. Each of those
+ *     followed a correct password, so the bar is far lower.
+ */
+export const FAILED_SIGN_IN_ALERT_WINDOW_MS = 60 * 60_000;
+export const FAILED_SIGN_IN_ALERT_THRESHOLD = 100;
+export const SECOND_FACTOR_FAILURE_ALERT_THRESHOLD = 10;
+export const failedSignInTally = createRateLimiter({
+  windowMs: FAILED_SIGN_IN_ALERT_WINDOW_MS,
+  maxRequests: FAILED_SIGN_IN_ALERT_THRESHOLD,
+});
+export const secondFactorFailureTally = createRateLimiter({
+  windowMs: FAILED_SIGN_IN_ALERT_WINDOW_MS,
+  maxRequests: SECOND_FACTOR_FAILURE_ALERT_THRESHOLD,
+});
+
 /** Drop one key's counter after successful authentication. */
 export async function resetRateLimit(key: string): Promise<void> {
   const hashedKey = digest(key);

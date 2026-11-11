@@ -747,6 +747,20 @@ const FRAUD_KIND_LABELS: Record<string, { label: string; heading: string; summar
     summary:
       "One account crossed the daily gift-card redemption ceiling. Further redemptions were refused for the rest of the day; cards already redeemed are untouched.",
   },
+  // The two sign-in signals that are mailed. A single locked account is queued
+  // without an email: anybody who knows an address can cause one.
+  login_failure_spike: {
+    label: "Sign-in attack",
+    heading: "Failed sign-ins are arriving quickly",
+    summary:
+      "Failed sign-in attempts across the site reached the hourly alert threshold. Nothing new was blocked because of this message: the rate limits and the account lockout were already refusing the attempts. It is here so that you know it is happening.",
+  },
+  second_factor_guessing: {
+    label: "Two-factor guessing",
+    heading: "Someone has a password and is guessing codes",
+    summary:
+      "Wrong two-factor codes keep arriving for one account, each after a correct password. The second factor is holding, but the password should be treated as known: ask the customer to reset it, or suspend the account until they have.",
+  },
 };
 
 /**
