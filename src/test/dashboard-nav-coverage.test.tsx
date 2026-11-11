@@ -144,7 +144,7 @@ describe("sidebar and tab icons", () => {
       "/dashboard",
       "/dashboard/orders",
       "/dashboard/wallet",
-      "/dashboard/inbox",
+      "/dashboard/services?category=email",
       "/dashboard/referrals",
       "/dashboard/notifications",
       "/dashboard/reviews",
