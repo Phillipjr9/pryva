@@ -870,7 +870,7 @@ function parseOtpOffer(row: unknown): BitcallOtpOffer | null {
   };
 }
 
-function parseOtpService(row: unknown, fallbackCountryCode?: string): BitcallOtpService {
+function parseOtpService(row: unknown): BitcallOtpService {
   const service = asRecord(row);
   const pools = Array.isArray(service.pools) ? service.pools : [];
   const offers: BitcallOtpOffer[] = [];
@@ -881,21 +881,10 @@ function parseOtpService(row: unknown, fallbackCountryCode?: string): BitcallOtp
     seen.add(offer.serviceId);
     offers.push(offer);
   }
-  const countryCode = pickString(service, ["country_code", "countryCode", "country"]) ?? fallbackCountryCode ?? (() => {
-    const byId = pickString(service, ["serviceId", "service_id", "id"]);
-    if (!byId) return null;
-    const segments = byId.split("-").filter(Boolean);
-    return segments.length >= 3 ? segments[1] ?? null : null;
-  })() ?? (() => {
-    const slug = pickString(service, ["slug", "serviceSlug"]);
-    if (!slug) return null;
-    const segments = slug.split("-").filter(Boolean);
-    return segments.length >= 2 ? segments[0] ?? null : null;
-  })();
   return {
     name: pickString(service, ["name", "title", "serviceName"]),
     slug: pickString(service, ["slug", "serviceSlug"]),
-    countryCode,
+    countryCode: pickString(service, ["country_code", "countryCode", "country"]),
     offers,
   };
 }
@@ -1044,20 +1033,28 @@ async function readAllOtpPages(path: string, pageSize: number, query?: Record<st
 /**
  * The service catalogue.
  *
- * One collection, paginated: the endpoint accepts `q` and paging only. It
- * carries no country field and *no country filter*, so this is where services
- * get their names, never their destinations — see `listBitcallOtpCountryEntries`.
+ * One collection, paginated. A row is `{ name, slug, availableCount, price,
+ * poolCount, pools }`: it names a service and never a destination, so this is
+ * where services get their names — see `listBitcallOtpCountryEntries` for where
+ * an offer's country is stated.
+ *
+ * The published spec also lists `name`, `country_code` and `pool` filters. They
+ * are deliberately not sent. A filtered response carries no country on its rows
+ * either, so nothing in it can confirm the filter was applied, and stamping
+ * every returned row with the country that was asked for files other countries'
+ * offers under it whenever the filter is ignored or spelled differently. An
+ * offer under the wrong country is a number sold for the wrong country.
  */
 export async function listBitcallOtpServices(
-  filter: { q?: string; pageSize?: number; countryCode?: string } = {},
+  filter: { q?: string; pageSize?: number } = {},
 ): Promise<BitcallOtpService[]> {
-  const pages = await readAllOtpPages("/v1/otp/services", filter.pageSize ?? OTP_PAGE_SIZE, { q: filter.q, ...(filter.countryCode ? { countryCode: filter.countryCode } : {}) });
+  const pages = await readAllOtpPages("/v1/otp/services", filter.pageSize ?? OTP_PAGE_SIZE, { q: filter.q });
   const services: BitcallOtpService[] = [];
   for (const entry of pages) {
     // A page that failed is not a page that said "no more services": the read
     // throws rather than returning the pages before it as the whole catalogue.
     if (entry.error !== null) throw entry.error;
-    services.push(...rowsFrom(entry.payload).map((row) => parseOtpService(row, filter.countryCode)).filter((service) => service.offers.length > 0));
+    services.push(...rowsFrom(entry.payload).map(parseOtpService).filter((service) => service.offers.length > 0));
   }
   return services;
 }
@@ -1080,7 +1077,7 @@ export async function findBitcallOtpService(reference: string): Promise<BitcallO
     throw new BitcallError("Invalid service reference", 400, "VALIDATION_ERROR", null, ["reference"]);
   }
   const payload = await gatewayFetch("GET", `/v1/otp/services/${encodeURIComponent(ref)}`);
-  return rowsFrom(payload).slice(0, 2000).map((row) => parseOtpService(row)).filter((service) => service.offers.length > 0);
+  return rowsFrom(payload).slice(0, 2000).map(parseOtpService).filter((service) => service.offers.length > 0);
 }
 
 /**
