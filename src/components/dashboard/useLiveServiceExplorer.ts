@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { fetchCatalogue } from "@/lib/platform/catalog-fetch";
 import type { ExplorerItem } from "@/lib/services/service-explorer";
 
 type Reason = "environment" | "unconfigured" | "funding" | "throttled" | "error" | null;
@@ -52,7 +53,7 @@ export function useLiveServiceExplorer(country: string, revision: number, allEsi
         let value: LiveState = { country, items: [], live: false, partial: true,
           failed: true, reason: "error", fetchedAt: null, loading: false };
         try {
-          const response = await fetch(`/api/services/catalog?${params}`, { cache: "no-store", signal: controller.signal });
+          const response = await fetchCatalogue(`/api/services/catalog?${params}`, controller.signal);
           const data = await response.json().catch(() => null);
           if (response.ok && data?.ok && data.country === country && Array.isArray(data.items)) {
             const reason: Reason = ["environment", "unconfigured", "funding"].includes(data.reason) ? data.reason : null;

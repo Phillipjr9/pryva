@@ -180,12 +180,22 @@ async function persistentRefresh<T>(
   }
 }
 
-export async function readSharedSnapshot<T>(options: {
-  key: string;
-  ttlMs: number;
-  leaseMs?: number;
-  refresh: Refresh<T>;
-}): Promise<SharedSnapshot<T>> {
+type SnapshotOptions<T> = { key: string; ttlMs: number; leaseMs?: number; refresh: Refresh<T> };
+const sharedReads = new Map<string, Promise<SharedSnapshot<unknown>>>();
+
+/** One database/lease waiter per scope per instance, not one per shopper. */
+export async function readSharedSnapshot<T>(options: SnapshotOptions<T>): Promise<SharedSnapshot<T>> {
+  const scope = `${options.key}:${options.ttlMs}:${options.leaseMs ?? 120_000}`;
+  const pending = sharedReads.get(scope);
+  if (pending) return pending as Promise<SharedSnapshot<T>>;
+  const read = readSharedSnapshotOnce(options).finally(() => {
+    if (sharedReads.get(scope) === read) sharedReads.delete(scope);
+  });
+  sharedReads.set(scope, read as Promise<SharedSnapshot<unknown>>);
+  return read;
+}
+
+async function readSharedSnapshotOnce<T>(options: SnapshotOptions<T>): Promise<SharedSnapshot<T>> {
   const { key, ttlMs, refresh } = options;
   const leaseMs = options.leaseMs ?? 120_000;
   if (!/^[a-z0-9:_-]{1,120}$/i.test(key)) throw new Error("Invalid snapshot key");

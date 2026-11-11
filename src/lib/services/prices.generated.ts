@@ -17,130 +17,130 @@ export type GeneratedPrice = {
 
 export const CATALOG_PRICES: Record<string, GeneratedPrice> = {
   "proxy-eu-10": {
-    "price": 33250,
-    "maxDiscountPercent": 3
+    "price": 28313,
+    "maxDiscountPercent": 0
   },
   "proxy-ng-1": {
-    "price": 3650,
-    "maxDiscountPercent": 4
+    "price": 3094,
+    "maxDiscountPercent": 0
   },
   "proxy-ng-25": {
-    "price": 67500,
-    "maxDiscountPercent": 3
+    "price": 57500,
+    "maxDiscountPercent": 0
   },
   "proxy-ng-5": {
-    "price": 15600,
-    "maxDiscountPercent": 3
+    "price": 13271,
+    "maxDiscountPercent": 0
   },
   "proxy-us-5": {
-    "price": 18200,
-    "maxDiscountPercent": 3
+    "price": 15479,
+    "maxDiscountPercent": 0
   },
   "rent-ng-30": {
-    "price": 8400,
-    "maxDiscountPercent": 10
+    "price": 6636,
+    "maxDiscountPercent": 0
   },
   "rent-ng-7": {
-    "price": 4250,
-    "maxDiscountPercent": 10
+    "price": 3358,
+    "maxDiscountPercent": 0
   },
   "rent-ng-90": {
-    "price": 21750,
-    "maxDiscountPercent": 10
+    "price": 17250,
+    "maxDiscountPercent": 0
   },
   "rent-uk-30": {
-    "price": 11750,
-    "maxDiscountPercent": 10
+    "price": 9292,
+    "maxDiscountPercent": 0
   },
   "rent-us-30": {
-    "price": 10600,
-    "maxDiscountPercent": 10
+    "price": 8407,
+    "maxDiscountPercent": 0
   },
   "vn-ca": {
-    "price": 2240,
-    "maxDiscountPercent": 10
+    "price": 1771,
+    "maxDiscountPercent": 0
   },
   "vn-de": {
-    "price": 2460,
-    "maxDiscountPercent": 10
+    "price": 1944,
+    "maxDiscountPercent": 0
   },
   "vn-gh": {
-    "price": 1570,
-    "maxDiscountPercent": 10
+    "price": 1242,
+    "maxDiscountPercent": 0
   },
   "vn-ng": {
-    "price": 1340,
-    "maxDiscountPercent": 10
+    "price": 1058,
+    "maxDiscountPercent": 0
   },
   "vn-otp-5": {
-    "price": 6150,
-    "maxDiscountPercent": 10
+    "price": 4865,
+    "maxDiscountPercent": 0
   },
   "vn-uk": {
-    "price": 2010,
-    "maxDiscountPercent": 10
+    "price": 1587,
+    "maxDiscountPercent": 0
   },
   "vn-us": {
-    "price": 1670,
-    "maxDiscountPercent": 10
+    "price": 1323,
+    "maxDiscountPercent": 0
   }
 };
 
 export const DIGITAL_PRICES: Record<string, GeneratedPrice> = {
   "canva-1month": {
-    "price": 2690,
-    "maxDiscountPercent": 7
+    "price": 2208,
+    "maxDiscountPercent": 0
   },
   "canva-3months": {
-    "price": 7000,
-    "maxDiscountPercent": 7
+    "price": 5750,
+    "maxDiscountPercent": 0
   },
   "chatgpt-1month": {
-    "price": 8650,
-    "maxDiscountPercent": 7
+    "price": 7073,
+    "maxDiscountPercent": 0
   },
   "chatgpt-3months": {
-    "price": 23700,
-    "maxDiscountPercent": 7
+    "price": 19458,
+    "maxDiscountPercent": 0
   },
   "disney-1month": {
-    "price": 3250,
-    "maxDiscountPercent": 7
+    "price": 2657,
+    "maxDiscountPercent": 0
   },
   "disney-3months": {
-    "price": 8650,
-    "maxDiscountPercent": 7
+    "price": 7073,
+    "maxDiscountPercent": 0
   },
   "netflix-1month": {
-    "price": 3800,
-    "maxDiscountPercent": 7
+    "price": 3094,
+    "maxDiscountPercent": 0
   },
   "netflix-3months": {
-    "price": 10250,
-    "maxDiscountPercent": 7
+    "price": 8407,
+    "maxDiscountPercent": 0
   },
   "netflix-6months": {
-    "price": 18850,
-    "maxDiscountPercent": 7
+    "price": 15479,
+    "maxDiscountPercent": 0
   },
   "spotify-1month": {
-    "price": 2160,
-    "maxDiscountPercent": 7
+    "price": 1771,
+    "maxDiscountPercent": 0
   },
   "spotify-3months": {
-    "price": 5950,
-    "maxDiscountPercent": 7
+    "price": 4865,
+    "maxDiscountPercent": 0
   },
   "spotify-6months": {
-    "price": 10800,
-    "maxDiscountPercent": 7
+    "price": 8844,
+    "maxDiscountPercent": 0
   },
   "youtube-1month": {
-    "price": 2690,
-    "maxDiscountPercent": 7
+    "price": 2208,
+    "maxDiscountPercent": 0
   },
   "youtube-3months": {
-    "price": 7000,
-    "maxDiscountPercent": 7
+    "price": 5750,
+    "maxDiscountPercent": 0
   }
 };

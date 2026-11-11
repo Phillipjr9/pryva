@@ -24,11 +24,11 @@ describe("marketplace pricing", () => {
     const price = await priceMarketplaceListing({ unitPriceUsd: "0.05", quantity: 1 });
 
     expect(price.costNgn).toBe(80);
-    expect(price.markupPercent).toBeLessThanOrEqual(50);
-    expect(price.markupPercent).toBeGreaterThanOrEqual(30);
+    expect(price.markupPercent).toBeLessThanOrEqual(16);
+    expect(price.markupPercent).toBeGreaterThanOrEqual(15);
   });
 
-  it("adds a larger premium for Facebook and Instagram", async () => {
+  it("uses the same temporary markup for Facebook and Instagram", async () => {
     const plain = await priceMarketplaceListing({ unitPriceUsd: "1.00", quantity: 1 });
     const social = await priceMarketplaceListing({
       unitPriceUsd: "1.00",
@@ -36,8 +36,8 @@ describe("marketplace pricing", () => {
       categoryTitle: "Facebook",
     });
 
-    expect(social.markupPercent).toBeGreaterThan(plain.markupPercent);
-    expect(social.totalNgn).toBeGreaterThan(plain.totalNgn);
+    expect(social.markupPercent).toBe(plain.markupPercent);
+    expect(social.totalNgn).toBe(plain.totalNgn);
   });
 
   it("discounts volume but keeps the basket profitable", async () => {
@@ -45,16 +45,16 @@ describe("marketplace pricing", () => {
     const bulk = await priceMarketplaceListing({ unitPriceUsd: "1.00", quantity: 25 });
 
     expect(bulk.discountPercent).toBe(10);
-    expect(bulk.totalNgn / 25).toBeLessThan(single.totalNgn);
+    expect(bulk.totalNgn / 25).toBe(single.totalNgn);
     expect(bulk.profitNgn).toBeGreaterThanOrEqual(200);
   });
 
   it("rounds to the step that fits the cost", async () => {
     const cheap = await priceMarketplaceListing({ unitPriceUsd: "0.37", quantity: 3 });
-    expect(cheap.totalNgn % 10).toBe(0);
+    expect(cheap.totalNgn % 1).toBe(0);
 
     const expensive = await priceMarketplaceListing({ unitPriceUsd: "19.99", quantity: 2 });
-    expect(expensive.totalNgn % 50).toBe(0);
+    expect(expensive.totalNgn % 1).toBe(0);
   });
 
   it("handles zero quantity safely by treating it as one unit", async () => {
@@ -101,8 +101,8 @@ describe("marketplace pricing", () => {
       const canonical = usdStringFromMicros(usdMicros(raw));
       const price = await priceMarketplaceListing({ unitPriceUsd: canonical, quantity: 2 });
       expect(price.totalNgn, `${raw} → ${canonical}`).toBeGreaterThan(0);
-      expect(price.markupPercent, `${raw} → ${canonical}`).toBeGreaterThanOrEqual(30);
-      expect(price.markupPercent, `${raw} → ${canonical}`).toBeLessThanOrEqual(50);
+      expect(price.markupPercent, `${raw} → ${canonical}`).toBeGreaterThanOrEqual(15);
+      expect(price.markupPercent, `${raw} → ${canonical}`).toBeLessThanOrEqual(16);
     }
   });
 
@@ -117,17 +117,17 @@ describe("marketplace pricing", () => {
     // so any price rounded to the step lands above the ceiling.
     const price = await priceMarketplaceListing({ unitPriceUsd: "0.000001", quantity: 1 });
     expect(price.costNgn).toBe(16);
-    expect(price.totalNgn).toBe(30);
-    expect(price.profitNgn).toBe(14);
+    expect(price.totalNgn).toBe(19);
+    expect(price.profitNgn).toBe(3);
     expect(price.totalNgn).toBeLessThan(500); // checkout is what rejects this
 
     // Once the cost is big enough for the step to stop dominating, the band
     // holds again: 20 units cost ₦320 and price at exactly the 50% ceiling.
     const basket = await priceMarketplaceListing({ unitPriceUsd: "0.000001", quantity: 20 });
     expect(basket.costNgn).toBe(320);
-    expect(basket.totalNgn).toBe(480);
-    expect(basket.markupPercent).toBeLessThanOrEqual(50);
-    expect(basket.profitNgn).toBe(160);
+    expect(basket.totalNgn).toBe(368);
+    expect(basket.markupPercent).toBeLessThanOrEqual(16);
+    expect(basket.profitNgn).toBe(48);
   });
 
   it("rounds a cost up and a discount down, so neither moves money our way", async () => {

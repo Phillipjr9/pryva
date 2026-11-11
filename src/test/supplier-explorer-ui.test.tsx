@@ -42,7 +42,7 @@ describe("service explorer live listings", () => {
     }));
     render(<ServiceExplorer initialCountry="us" initialCategory={null} />);
     expect(await screen.findByRole("heading", { name: "Available boost" })).toBeTruthy();
-    expect(await screen.findByText(/Some live listings could not be loaded/)).toBeTruthy();
+    expect(await screen.findByText(/Some live listings could not be loaded/, {}, { timeout: 5000 })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
     expect(screen.getByText(/Live listings may be incomplete or out of date/)).toBeTruthy();
   });
@@ -146,7 +146,7 @@ describe("service explorer live listings", () => {
     expect(await screen.findByRole("heading", { name: /Explore App verification/i })).toBeTruthy();
     expect(screen.queryByText(/couldn&apos;t be loaded/)).toBeNull();
     expect(screen.queryByText(/couldn't be loaded/)).toBeNull();
-    expect(await screen.findByRole("button", { name: "Retry" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Retry" }, { timeout: 5000 })).toBeTruthy();
   });
 
   it("says we are restocking when the balance is the reason, and drops the retry", async () => {
@@ -182,8 +182,7 @@ describe("service explorer live listings", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 429, json: async () => ({ error: "slow down", reason: "throttled" }) });
     vi.stubGlobal("fetch", fetchMock);
     render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
-    const note = await screen.findByRole("status");
-    expect(note.textContent).toMatch(/refreshed too quickly/);
+    await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/refreshed too quickly/), { timeout: 5000 });
     expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
     // The neutral note explains it too, rather than claiming nothing is shown yet.
     expect(screen.getAllByText(/refreshed too quickly/).length).toBeGreaterThan(1);

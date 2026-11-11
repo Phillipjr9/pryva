@@ -1,5 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { persistentDatabaseConfigured } from "@/lib/platform/database-config";
+import { readSupplierCatalogue, supplierCatalogueKey } from "@/lib/platform/supplier-catalogue-snapshot";
 import { isFundingFailure } from "@/lib/providers/types";
 import { isFleexaConfigured, listFleexaEmailProducts, listFleexaRentAreas, type FleexaEmailProduct, type FleexaRentArea } from "@/lib/providers/fleexa";
 import { priceFromCost, isPriceInBand } from "@/lib/services/pricing";
@@ -23,8 +25,31 @@ export type SupplierSnapshot = {
 let cache: { expires: number; snapshot: SupplierSnapshot } | null = null;
 let inFlight: Promise<SupplierSnapshot> | null = null;
 
-/** A short-lived, process-local read cache; the shared rate limit still protects the supplier key across instances. */
+/** Share each source independently so one failed source never hides the other. */
 export async function readSupplierSnapshot(refresh = false): Promise<SupplierSnapshot> {
+  if (!isFleexaConfigured()) throw new Error("Supplier not configured");
+  if (!persistentDatabaseConfigured()) return readLocalSupplierSnapshot(refresh);
+  const shared = <T>(family: string, load: () => Promise<T>) => readSupplierCatalogue(
+    supplierCatalogueKey(family, process.env.FLEEXA_API_KEY?.trim() ?? ""),
+    async () => ({ rows: await load(), partial: false, degraded: null, fetchedAt: new Date().toISOString() }),
+  );
+  const [email, rentals] = await Promise.allSettled([
+    shared("fleexa-email", listFleexaEmailProducts),
+    shared("fleexa-rentals", listFleexaRentAreas),
+  ]);
+  const values = [email, rentals].flatMap(result => result.status === "fulfilled" ? [result.value] : []);
+  if (!values.length) throw new Error("Supplier catalog unavailable");
+  const partial = values.length < 2 || values.some(value => value.partial);
+  return {
+    email: email.status === "fulfilled" ? email.value.rows : [],
+    rentals: rentals.status === "fulfilled" ? rentals.value.rows : [],
+    partial, degraded: partial ? "outage" : null,
+    fetchedAt: values.map(value => value.fetchedAt).sort()[0],
+  };
+}
+
+/** Local coalescing for development and tests without a persistent database. */
+async function readLocalSupplierSnapshot(refresh = false): Promise<SupplierSnapshot> {
   if (!isFleexaConfigured()) throw new Error("Supplier not configured");
   if (!refresh && cache && cache.expires > Date.now()) return cache.snapshot;
   if (inFlight) return inFlight;

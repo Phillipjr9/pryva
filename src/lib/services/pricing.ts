@@ -1,47 +1,13 @@
-/**
- * Pryva's profit policy.
- *
- * The business model: a supplier charges a **fixed amount** per unit, Pryva sells
- * it to the customer. Every selling price in the product is derived from that
- * cost, never typed in by hand, so margin cannot quietly erode when a supplier
- * raises their price or the Naira moves.
- *
- * The band is 30–50% **markup on cost**:
- *
- *     cost ₦1,000 → price ₦1,300 (30%) … ₦1,500 (50%)
- *
- * Markup on cost is what "I make 40% on this" means to a reseller: profit as a
- * share of what you paid. `grossMarginPercent()` is also exported for reporting,
- * because accountants quote margin on the *selling* price (₦1,300 − ₦1,000 is a
- * 23% gross margin but a 30% markup). Both are shown in the price audit so there
- * is no ambiguity about which number is being quoted.
- *
- * Configuration lives in env so the owner can retune without a deploy:
- *   PRICING_MIN_MARKUP_PERCENT    (default 30)
- *   PRICING_TARGET_MARKUP_PERCENT (default 40)
- *   PRICING_MAX_MARKUP_PERCENT    (default 50)
- */
+/** Temporary pricing policy: paid supplier-backed services use 15% markup
+ * on cost, rounded to whole naira. This is not guaranteed net profit. Legacy
+ * pricing overrides are ignored while this owner-approved policy is active.
+ * Free tools and wallet face values are not supplier-backed sale prices. */
 
 import type { ServiceSlug } from "@/lib/services/catalog";
 
-function envNumber(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) return fallback;
-  const value = Number(raw);
-  return Number.isFinite(value) && value > 0 ? value : fallback;
-}
-
-export const PROFIT_BAND = {
-  get min() {
-    return envNumber("PRICING_MIN_MARKUP_PERCENT", 30);
-  },
-  get target() {
-    return envNumber("PRICING_TARGET_MARKUP_PERCENT", 40);
-  },
-  get max() {
-    return envNumber("PRICING_MAX_MARKUP_PERCENT", 50);
-  },
-};
+/** Temporary owner-approved policy; legacy deployment overrides must not restore
+ * the previous 30–50% markup. This is markup on cost, not net profit. */
+export const PROFIT_BAND = { min: 15, target: 15, max: 15 } as const;
 
 /**
  * Where inside the band each service sits.
@@ -57,16 +23,16 @@ export const PROFIT_BAND = {
  * tool. See the note on the email plans in src/lib/services/catalog.ts.
  */
 export const SERVICE_TARGET_MARKUP: Record<string, number> = {
-  numbers: 45,
-  esim: 35,
-  proxies: 35,
-  accounts: 45,
-  digital: 40,
-  data: 32,
-  "gift-cards": 30,
-  bulk: 35,
-  scheduled: 35,
-  airtime: 4, // thin by nature — see the note in src/lib/services/data/airtime.ts
+  numbers: 15,
+  esim: 15,
+  proxies: 15,
+  accounts: 15,
+  digital: 15,
+  data: 15,
+  "gift-cards": 15,
+  bulk: 15,
+  scheduled: 15,
+  airtime: 15, // thin by nature — see the note in src/lib/services/data/airtime.ts
 };
 
 /** Rounding step for a selling price. Prices never end in an odd ₦37. */
@@ -80,8 +46,8 @@ const PRICE_STEP = 50;
  * ₦250, which is a 56% markup. Smaller steps keep cheap items inside the band.
  */
 export function priceStepFor(costNgn: number): number {
-  if (costNgn < 2000) return 10;
-  return 50;
+  void costNgn;
+  return 1;
 }
 
 /**
@@ -127,6 +93,7 @@ export function roundUpToNgn(value: number, step = PRICE_STEP): number {
 
 /** The target markup for a service, always clamped inside the configured band. */
 export function targetMarkupPercent(service?: string): number {
+  if (service === "numbers") return 15;
   const configured = service ? SERVICE_TARGET_MARKUP[service] : undefined;
   const wanted = configured ?? PROFIT_BAND.target;
   return Math.min(PROFIT_BAND.max, Math.max(PROFIT_BAND.min, wanted));
@@ -162,7 +129,7 @@ export function priceFromCost(
     // Rounding pushed us over 50%. Drop to the largest step that still fits,
     // then fall back to the exact ceiling rounded to the nearest naira.
     const stepped = Math.floor(ceiling / step) * step;
-    price = stepped >= floor ? stepped : Math.round(ceiling);
+    price = stepped >= floor ? stepped : Math.ceil(ceiling);
   }
 
   return {
