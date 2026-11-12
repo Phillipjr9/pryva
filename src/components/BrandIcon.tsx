@@ -102,7 +102,40 @@ export function BrandIcon({
   }
 
   const mark = BRAND_MARKS[brand as BrandSlug];
-  if (!mark) return null;
+  if (!mark) {
+    // An unbundled/typoed brand must not disappear as an empty square. Keep a
+    // neutral, explicitly non-logo monogram until a verified mark is available.
+    const name = String(brand).replace(/[-_]+/g, " ").trim() || "Brand";
+    const initials = name.split(/\s+/).length > 1
+      ? name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()
+      : name.slice(0, 2).toUpperCase();
+    return (
+      <span
+        role={decorative ? undefined : "img"}
+        aria-label={decorative ? undefined : name}
+        aria-hidden={decorative ? true : undefined}
+        title={decorative ? undefined : name}
+        className={className}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: size,
+          height: size,
+          flex: "0 0 auto",
+          borderRadius: variant === "tile" ? Math.round(size * 0.28) : 0,
+          background: variant === "tile" ? "#f1edff" : "transparent",
+          color: "#51418f",
+          fontSize: Math.max(8, Math.round(size * 0.32)),
+          fontWeight: 700,
+          lineHeight: 1,
+          overflow: "hidden",
+        }}
+      >
+        {initials}
+      </span>
+    );
+  }
 
   const selfColoured = SELF_COLOURED.has(brand as BrandSlug);
   const tray = variant === "tile";

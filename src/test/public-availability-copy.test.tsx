@@ -32,7 +32,7 @@ describe("/proxies", () => {
     expect(proxyPlans.length).toBeGreaterThan(0);
     expect(markup).toContain("View live proxy plans");
     expect(markup).toContain("/login?next=%2Fdashboard%2Fproxies");
-    expect(markup).toContain("Prices and availability are fetched from the connected supplier");
+    expect(markup).toContain("Prices and availability can change");
     for (const plan of proxyPlans) expect(markup).not.toContain(plan.name);
   });
 

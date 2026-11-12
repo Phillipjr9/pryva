@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
 
 const quickBuys = [
-  { label: "Number plans", note: "Single-use & rentals", href: "/dashboard/services?country=ng&category=numbers", service: "numbers" as const, category: "numbers" },
+  { label: "Number plans", note: "App-specific & general plans", href: "/dashboard/services?country=ng&category=numbers", service: "numbers" as const, category: "numbers" },
   { label: "Social boosts", note: "Followers, likes & views", href: "/dashboard/services?country=ng&category=social", service: "social-promotion" as const, category: "social" },
   { label: "eSIM data", note: "Travel data plans", href: "/dashboard/services?country=ng&category=esim", service: "esim" as const, category: "esim" },
   { label: "Residential proxies", note: "Clean rotating IP pools", href: "/dashboard/services?country=ng&category=proxies", service: "proxies" as const, category: "proxies" },
@@ -56,8 +56,11 @@ export default async function DashboardOverviewPage() {
   // come from the same configuration the checkout reads, so a tile cannot
   // promise more than the page behind it will honour.
   const readiness = new Map(readServiceReadiness().map((entry) => [entry.id, entry]));
+  const accountReadiness = readiness.get("accounts");
+  const accountState = accountReadiness?.state ?? "unavailable";
+  const accountShortcut = quickBuys.find((item) => item.category === "accounts")!;
   const serviceTiles = orderByReadiness(
-    quickBuys.map((item) => ({
+    quickBuys.filter((item) => item.category !== "accounts").map((item) => ({
       ...item,
       state: readiness.get(item.category)?.state ?? ("unavailable" as const),
     })),
@@ -217,6 +220,21 @@ export default async function DashboardOverviewPage() {
               <Receipt className="h-3 w-3" /> All services
             </Link>
           </div>
+          <Link
+            href={accountShortcut.href}
+            className="group mt-3 flex min-h-[76px] min-w-0 items-center gap-3 rounded-2xl border border-lav-200 bg-lav-50/70 p-3 transition-colors hover:border-lav-400 hover:bg-lav-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-lav-500 sm:p-3.5"
+          >
+            <ServiceIcon service={accountShortcut.service} size="sm" />
+            <span className="min-w-0 flex-1">
+              <span className="block break-words text-[0.875rem] font-semibold leading-snug text-ink group-hover:text-lav-700">{accountShortcut.label}</span>
+              <span className="mt-0.5 block text-micro leading-snug text-ink-3">Browse account listings · separate from App verification</span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2 py-1 text-micro font-semibold text-ink-2">
+              <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${SERVICE_STATE_DOT[accountState]}`} />
+              <span className="hidden min-[390px]:inline">{SERVICE_STATE_LABEL[accountState]}</span>
+            </span>
+            <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0 text-ink-3 group-hover:text-lav-700" />
+          </Link>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-2.5 lg:grid-cols-1">
             {serviceTiles.map((item) => (
               <Link

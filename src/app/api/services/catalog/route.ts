@@ -10,12 +10,14 @@ import { esimItemsForAllDestinations, esimItemsForCountry, ESIM_CATALOGUE_LIMIT,
 import { explorerCountry } from "@/lib/services/service-explorer";
 import { catalogRateLimiter } from "@/lib/platform/rate-limit";
 import { retryAfterReset } from "@/lib/platform/retry-after";
+import { CatalogueReadTimeout, withCatalogueReadTimeout } from "@/lib/platform/catalogue-read-timeout";
+import { logger } from "@/lib/platform/logger";
 import { isFundingFailure } from "@/lib/providers/types";
 import { readOtpOffersForSupplier } from "@/lib/services/numbers/otp-suppliers";
 import { bitcallOtpItemsForCountry, otpCatalogProviderError } from "@/lib/services/numbers/otp-catalog";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 /**
  * A configured supplier that returned nothing, versus one that is not
@@ -28,31 +30,38 @@ export const maxDuration = 30;
  */
 type Source<T> = { configured: boolean; snapshot: T | null; failure: "funding" | "outage" | null };
 
-// Bitcall's live OTP catalogue is legitimately slower than the old 1.2s guard
-// and can need multiple pages before the target country publishes enough rows.
-// Treat a slow-but-valid read as a real read, not as a 503 outage.
-const SUPPLIER_READ_TIMEOUT_MS = 15_000;
+// Individual provider requests may take 20 seconds, a shared cold snapshot can
+// wait 30 seconds for another instance, and eSIM pagination can take two rounds.
+// A 15-second outer guard reported healthy but slow reads as outages. The whole
+// request also has a budget, including auth and rate limiting, so a cold database
+// cannot push this read past the platform's 60-second function limit.
+const SUPPLIER_READ_TIMEOUT_MS = 45_000;
+const REQUEST_WORK_BUDGET_MS = 55_000;
+type Feed = "numbers" | "social" | "esim" | "verification";
 
-async function withReadTimeout<T>(read: () => Promise<T>, timeoutMs: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      read(),
-      new Promise<T>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`Supplier read timed out after ${timeoutMs}ms`)), timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+function preflightUnavailable(stage: "authentication" | "rate-limit", error: unknown) {
+  logger.warn("Live catalogue request unavailable", {
+    stage, reason: error instanceof CatalogueReadTimeout ? "timeout" : "outage",
+  });
+  return NextResponse.json({ error: "Catalog temporarily unavailable", reason: "unavailable" }, {
+    status: 503, headers: { "Cache-Control": "private, no-store", "Retry-After": "30" },
+  });
 }
 
-async function attempt<T>(configured: boolean, read: () => Promise<T>): Promise<Source<T>> {
+async function attempt<T>(feed: Feed, configured: boolean, timeoutMs: number, read: () => Promise<T>): Promise<Source<T>> {
   if (!configured) return { configured: false, snapshot: null, failure: null };
+  const startedAt = Date.now();
   try {
-    return { configured: true, snapshot: await withReadTimeout(read, SUPPLIER_READ_TIMEOUT_MS), failure: null };
+    return { configured: true, snapshot: await withCatalogueReadTimeout(read, timeoutMs), failure: null };
   } catch (error) {
-    return { configured: true, snapshot: null, failure: isFundingFailure(error) ? "funding" : "outage" };
+    const funding = isFundingFailure(error);
+    // Operationally distinguish our deadline from a provider refusal without
+    // logging raw provider bodies, customer IDs, URLs or credentials.
+    logger.warn("Live catalogue feed unavailable", {
+      feed, reason: funding ? "funding" : error instanceof CatalogueReadTimeout ? "timeout" : "outage",
+      elapsedMs: Date.now() - startedAt,
+    });
+    return { configured: true, snapshot: null, failure: funding ? "funding" : "outage" };
   }
 }
 
@@ -67,7 +76,17 @@ async function attempt<T>(configured: boolean, read: () => Promise<T>): Promise<
  * every configured supplier fails is the catalog unavailable.
  */
 export async function GET(request: NextRequest) {
-  const user = await getCurrentUser();
+  const deadline = Date.now() + REQUEST_WORK_BUDGET_MS;
+  const remaining = () => Math.max(0, deadline - Date.now());
+  async function withinBudget<T>(read: () => Promise<T>): Promise<T> {
+    const timeout = remaining();
+    if (!timeout) throw new CatalogueReadTimeout();
+    return withCatalogueReadTimeout(read, timeout);
+  }
+
+  let user: Awaited<ReturnType<typeof getCurrentUser>>;
+  try { user = await withinBudget(getCurrentUser); }
+  catch (error) { return preflightUnavailable("authentication", error); }
   if (!user) return NextResponse.json({ error: "Please sign in" }, { status: 401 });
   const country = explorerCountry(request.nextUrl.searchParams.get("country"));
   if (!country) return NextResponse.json({ error: "Choose a valid country" }, { status: 400 });
@@ -100,7 +119,9 @@ export async function GET(request: NextRequest) {
 
   const requestedFeeds = requestedFeed ? [requestedFeed] : [...validFeeds];
   const feedBudgetKeys = [...requestedFeeds].sort().map((feed) => `supplier-catalog:${user.id}:${feed}`);
-  const limits = await Promise.all(feedBudgetKeys.map((key) => catalogRateLimiter(key)));
+  let limits: Awaited<ReturnType<typeof catalogRateLimiter>>[];
+  try { limits = await withinBudget(() => Promise.all(feedBudgetKeys.map((key) => catalogRateLimiter(key)))); }
+  catch (error) { return preflightUnavailable("rate-limit", error); }
   const unavailable = limits.find((limit) => limit.unavailable);
   if (unavailable) {
     return NextResponse.json({ error: "Catalog temporarily unavailable", reason: "unavailable" }, { status: 503, headers: { "Cache-Control": "private, no-store", "Retry-After": "30" } });
@@ -112,11 +133,13 @@ export async function GET(request: NextRequest) {
   });
 
   const refresh = request.nextUrl.searchParams.get("refresh") === "1";
-  const readSocial = () => attempt(isFleexaConfigured(), () => readSupplierSnapshot(refresh));
-  const readBoost = () => attempt(isSmmPanelConfigured(), () => readBoostSnapshot(refresh));
-  const readEsim = () => attempt(isBitcallConfigured(), () => readEsimCatalog(refresh));
+  const readBudget = Math.min(SUPPLIER_READ_TIMEOUT_MS, remaining());
+  if (!readBudget) return preflightUnavailable("rate-limit", new CatalogueReadTimeout());
+  const readSocial = () => attempt("numbers", isFleexaConfigured(), readBudget, () => readSupplierSnapshot(refresh));
+  const readBoost = () => attempt("social", isSmmPanelConfigured(), readBudget, () => readBoostSnapshot(refresh));
+  const readEsim = () => attempt("esim", isBitcallConfigured(), readBudget, () => readEsimCatalog(refresh));
   let otpRetryAfter: number | null = null;
-  const readOtp = () => attempt(isBitcallConfigured(), async () => {
+  const readOtp = () => attempt("verification", isBitcallConfigured(), readBudget, async () => {
     const read = await readOtpOffersForSupplier("bitcall", country.code, country.name, undefined, refresh);
     if (read.errorCode === "RATE_LIMITED" || read.errorCode === "LOCAL_RATE_BUDGET") {
       otpRetryAfter = read.retryAfterSeconds ?? 60;
@@ -138,15 +161,22 @@ export async function GET(request: NextRequest) {
   ]);
 
   const sources = [supplier, boost, esim, otp].filter((source): source is NonNullable<typeof source> => source !== null);
-  console.log("CATALOG_ROUTE_SOURCE_STATUS", {
+  // Include the name with each status: the aggregate request's feed order is
+  // not the same as source order. No customer identifiers or provider data.
+  logger.info("CATALOG_ROUTE_SOURCE_STATUS", {
     requestedFeed,
-    requestedFeeds,
-    sources: sources.map((source) => ({
+    sources: ([
+      { feed: "numbers", source: supplier },
+      { feed: "social", source: boost },
+      { feed: "esim", source: esim },
+      { feed: "verification", source: otp },
+    ] as const).flatMap(({ feed, source }) => source ? [{
+      feed,
       configured: source.configured,
       hasSnapshot: Boolean(source.snapshot),
       failure: source.failure,
-      partial: source.snapshot && "partial" in source.snapshot ? Boolean((source.snapshot as { partial?: boolean }).partial) : false,
-    })),
+      partial: Boolean(source.snapshot?.partial),
+    }] : []),
   });
 
   /**

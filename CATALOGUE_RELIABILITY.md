@@ -164,3 +164,99 @@ The owner confirmed that a verified backup is available, but it was not
 independently inspected. The OTP fix adds no migration; its migration files and
 runner match `26f2b08`, whose build reported all 48 files recorded. No paid test
 order was placed.
+
+## 2026-11-12 listing recovery and page errors — local work only
+
+The production catalogue route at build `82588da` has a 15-second supplier wait
+and a 30-second function cap, while provider requests can take 20 seconds and a
+cold shared-snapshot publication can take 30 seconds. That mismatch can reject
+otherwise successful reads, but there is no authenticated incident response or
+runtime trace proving it caused the reported failure. The public health endpoint
+was healthy; it does not check authenticated catalogue availability.
+
+At approximately 20:44 UTC on 2026-11-12, the public account listings and
+categories endpoints both returned `catalog_unavailable`, and `/accounts`
+rendered the corresponding retry message. The listings endpoint still returned
+that response around 21:15 UTC. This confirms a catalogue failure at those times,
+not a page crash or which upstream or storage operation failed. The authenticated
+service-catalogue response and runtime logs remain unavailable.
+
+The local route now budgets authentication, rate limiting and supplier reads
+within 55 seconds, gives supplier reads up to 45 seconds, and declares a
+60-second function cap. The browser wait is 65 seconds. Timeouts stop the caller
+waiting rather than cancelling shared refreshes; paid operations are unchanged.
+Supplier feeds load independently and on demand, with affected-feed status,
+per-feed retry cooldowns and healthy results retained. A render-error boundary
+provides separate, sanitized recovery from an actual page crash. Country
+restoration and blocked browser storage no longer prevent browsing.
+
+The account catalogue previously required every configured source to complete
+before publishing a cold combined snapshot. Local changes retain the last
+complete snapshot when one exists; otherwise they can serve a separately leased,
+explicitly partial candidate containing only complete source walks. A failed
+source cannot overwrite the complete snapshot, all-source failures remain errors,
+and candidate caching limits repeated cold retries. Source reads are bounded at
+35 seconds, stale timestamps remain visible, and checkout still rechecks the
+chosen listing. This handles an isolated source failure but does not establish
+that such a failure caused the observed production response.
+
+The client validates live and mobile-data rows before rendering; malformed rows
+are omitted or their unsafe checkout links are locked. Nigerian mobile-data prices
+are published catalogue prices, not
+checkout quotes; purchasing remains disabled. Account listings validate their
+response, keep valid rows with an incomplete warning, retain same-filter results
+on a failed refresh, and pause checkout until a refresh succeeds. Results for a
+previous filter are hidden while another loads. Account platform shortcuts come
+from the loaded page and search the whole catalogue; their names are not a stock
+promise. All checkout flows still perform their server-side checks.
+
+Validation after these local changes: production build, TypeScript, full ESLint,
+pricing audit and diff check passed. The full suite passed 3,338 of 3,347 tests;
+the same nine failures in dashboard navigation, public eSIM copy, pricing
+availability and supplier-copy tests were reproduced on the untouched branch
+base. One additional intermittent failure was traced to a cost-disclosure test
+matching `900` inside a random order ID; the test now checks exact cost values
+and an explicit receipt-field allowlist. PostgreSQL-compatible integration tests
+confirmed partial-account recovery, lease contention and preservation of the
+complete snapshot. Synthetic Chromium checks covered mobile and desktop layout,
+country changes, blocked storage, independent feed recovery, malformed rows,
+guarded links, account filters and failed-refresh recovery. A separate
+production-mode Next fixture using the services error boundary confirmed that
+retry re-fetches a failed Server Component and recovers from a client render
+error. These fixtures are not live supplier or paid-checkout tests.
+
+At initial verification, production was `dpl_38v4mH6PNeK65R226R3nfGKZUmGM` at
+`82588da12e8992d0ae5eeb4521508e903cbc58b6`, while this branch was based on
+`7478bf869979bf770ed95e20a65b3b70eecf8eff`. Those histories diverged: the live
+tree had a proxy shop that the branch lacked, and the branch had newer OTP and
+checkout work. The release candidate incorporates the production commit, restores
+`/dashboard/proxies` unchanged, retains the newer OTP work, and corrects category
+copy to say Number plans includes both app-specific and general offers. Migration
+files and the migration runner match the previously live production tree.
+
+On the reconciled candidate, build, typecheck, full ESLint, enforced pricing audit,
+production dependency audit and 159 focused tests passed. The full suite passed
+3,341 of 3,348 tests; all seven failures were among the previously observed
+baseline failures. Two navigation assertions were then updated to recognize the
+restored dedicated proxy shop and passed in a 42-test navigation/explorer run.
+The five other failures concerned public eSIM copy, pricing availability, and
+supplier-copy expectations.
+
+During release validation a newer production commit, `2095bed`, was promoted on
+the other production history. The candidate also merges that commit, retaining
+its grouped service navigation, proxy shop and public-page updates alongside the
+recovery and Number plans work. Data readiness copy now accurately describes the
+published Nigerian catalogue while stating that checkout and delivery are not
+connected. After reconciliation, 407 tests across 41 affected files passed,
+including the previously failing test files; build, typecheck, lint, enforced
+pricing audit and production dependency audit passed. The full suite was not
+repeated after this second merge. A further production deployment was started
+from `7dac2a5`, a small category-card width fix on top of `2095bed`; the
+candidate incorporates it too, and 79 layout/explorer tests passed after that
+merge. The migration files and runner match that production history.
+
+No authenticated production catalogue response or paid order was obtained during
+this investigation. Obtain the affected page/category, country, approximate UTC
+time and sanitized error or screenshot, then correlate with runtime logs and an
+authenticated, read-only catalogue response. Do not request or share credentials,
+cookies, authorization headers or complete supplier payloads.

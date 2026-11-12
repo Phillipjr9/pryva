@@ -26,6 +26,7 @@ afterEach(() => {
   config.accounts = false;
   config.preview = true;
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 
 describe("service readiness", () => {
@@ -81,6 +82,8 @@ describe("service readiness", () => {
       expect(serviceConfigured(id)).toBe(false);
       expect(laneConfigured(id)).toBe(false);
     }
+    expect(states.get("data")?.detail).toMatch(/published Nigerian data plans and prices/i);
+    expect(states.get("data")?.detail).toMatch(/checkout and delivery are not connected/i);
   });
 
   it("does not advertise purchases or inboxes from a Vercel preview with live configuration", () => {
@@ -117,10 +120,10 @@ describe("the hub's arrangement", () => {
   const readiness = [
     { id: "proxies" as const, label: "Proxies", state: "unavailable" as const, detail: "No proxy supplier is connected, so nothing can be ordered." },
     { id: "numbers" as const, label: "Number plans", state: "buy" as const, detail: "Single-use numbers and rentals are delivered automatically." },
-    { id: "data" as const, label: "Mobile data", state: "paused" as const, detail: "Data plans are catalogued, but no supplier is connected." },
+    { id: "data" as const, label: "Mobile data", state: "paused" as const, detail: "Browse published Nigerian data plans and prices when available. Checkout and delivery are not connected yet." },
   ];
 
-  it("orders the category chips by readiness and keeps the rest after them", () => {
+  it("groups related categories while keeping ready services first within each group", () => {
     const { container } = render(
       <ServiceExplorer initialCountry="ng" initialCategory={null} readiness={readiness} />,
     );
@@ -135,20 +138,25 @@ describe("the hub's arrangement", () => {
   });
 
   it("explains a category that cannot be ordered and offers a way to ask", () => {
-    render(<ServiceExplorer initialCountry="ng" initialCategory="data" readiness={readiness} />);
-    expect(screen.getByText(/no supplier is connected/i)).toBeTruthy();
+    render(<ServiceExplorer initialCountry="ng" initialCategory="proxies" readiness={readiness} />);
+    expect(screen.getByText(/No proxy supplier is connected/i)).toBeTruthy();
     const link = screen.getByRole("link", { name: "Ask about it" });
     expect(link.getAttribute("href")).toContain("/dashboard/support#ask=");
-    expect(decodeURIComponent(link.getAttribute("href")!)).toContain("Mobile data");
+    expect(decodeURIComponent(link.getAttribute("href")!)).toContain("Proxies");
   });
 
-  it.each([
-    ["data", "View data service status", "/dashboard/data"],
-
-  ] as const)("explains the empty %s category without inventing listings", (category, label, href) => {
-    render(<ServiceExplorer initialCountry="ng" initialCategory={category} />);
-    expect(screen.getByText(/No plans or prices are available to order/i)).toBeTruthy();
-    expect(screen.getByRole("link", { name: label }).getAttribute("href")).toBe(href);
+  it("explains an empty data catalogue and offers help without inventing listings or enabling checkout", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ plans: [], checkedAt: "2026-11-12T12:00:00Z", stale: false,
+      checkoutReason: "Purchase and delivery tracking are being connected." })));
+    render(<ServiceExplorer initialCountry="ng" initialCategory="data" readiness={readiness} />);
+    expect(screen.getByText(/Purchases are not available from this catalogue yet/)).toBeTruthy();
+    expect(screen.getByText(/Browse published Nigerian data plans and prices/i)).toBeTruthy();
+    expect(screen.getByText(/Checkout and delivery are not connected yet/i)).toBeTruthy();
+    const ask = screen.getByRole("link", { name: "Ask about it" });
+    expect(decodeURIComponent(ask.getAttribute("href")!)).toContain("Mobile data");
+    expect(await screen.findByText(/0 bundles · lowest price first/)).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "MTN 1GB" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /buy|purchase|checkout/i })).toBeNull();
   });
 
   it("explains an empty subscription shelf without claiming every subscription is disabled", () => {

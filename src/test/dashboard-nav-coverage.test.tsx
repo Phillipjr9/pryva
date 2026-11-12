@@ -48,7 +48,7 @@ describe("dashboard sidebar coverage", () => {
   it("gives every Buy row its own artwork instead of a generic glyph", () => {
     // "All services" is a signpost, not a shelf: it keeps the sparkle glyph.
     const rows = anchors(render()).filter(
-      (anchor) => (anchor.href.includes("/dashboard/services") && anchor.href !== "/dashboard/services") || anchor.href === "/dashboard/accounts",
+      (anchor) => (anchor.href.includes("/dashboard/services") && anchor.href !== "/dashboard/services") || anchor.href === "/dashboard/accounts" || anchor.href === "/dashboard/proxies",
     );
     expect(rows.length).toBeGreaterThanOrEqual(
       EXPLORER_CATEGORIES.filter((category) => category.id !== "tools").length,
@@ -63,7 +63,7 @@ describe("dashboard sidebar coverage", () => {
   it("does not dress two shelves in the same glyph", () => {
     // "All services" is a signpost, not a shelf: it keeps the sparkle glyph.
     const rows = anchors(render()).filter(
-      (anchor) => (anchor.href.includes("/dashboard/services") && anchor.href !== "/dashboard/services") || anchor.href === "/dashboard/accounts",
+      (anchor) => (anchor.href.includes("/dashboard/services") && anchor.href !== "/dashboard/services") || anchor.href === "/dashboard/accounts" || anchor.href === "/dashboard/proxies",
     );
     const subscriptions = rows.find((row) => row.html.includes("Subscriptions"));
     const accounts = rows.find((row) => row.html.includes("Accounts"));
@@ -91,11 +91,12 @@ describe("dashboard sidebar coverage", () => {
     expect(reviews!.html).toContain("Reviews");
   });
 
-  it("keeps every hub category reachable from the sidebar", () => {
+  it("keeps every category reachable from the sidebar", () => {
     const hrefs = anchors(render()).map((anchor) => anchor.href);
     for (const category of EXPLORER_CATEGORIES) {
-      if (category.id === "accounts") {
-        expect(hrefs).toContain("/dashboard/accounts");
+      if (category.id === "accounts" || category.id === "proxies") {
+        // Both have dedicated shops rather than filtered hub links.
+        expect(hrefs).toContain(`/dashboard/${category.id}`);
         continue;
       }
       if (category.id === "tools") {
@@ -185,9 +186,9 @@ describe("sidebar and tab icons", () => {
 describe("category icons", () => {
   it("gives each shelf its own glyph and an accessible name", () => {
     const expected: Array<[ServiceType, string]> = [
-      ["app-verification", "Google"],
-      ["social-promotion", "Instagram"],
-      ["subscriptions", "Spotify"],
+      ["app-verification", "App Verification"],
+      ["social-promotion", "Social Promotion"],
+      ["subscriptions", "Subscriptions"],
     ];
     const shapes = new Set<string>();
     for (const [service, name] of expected) {

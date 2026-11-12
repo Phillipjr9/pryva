@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupplierSnapshot } from "@/lib/services/numbers/fleexa-catalog";
 
 const supplier = vi.hoisted(() => ({
@@ -21,6 +21,7 @@ const snapshot: SupplierSnapshot = {
 };
 
 beforeEach(() => { vi.resetModules(); vi.clearAllMocks(); supplier.configured.mockReturnValue(true); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 
 describe("read-only supplier catalog", () => {
   it("preserves all entries returned by both read-only feeds", async () => {
@@ -158,6 +159,18 @@ describe("read-only supplier catalog", () => {
     expect(supplier.email).toHaveBeenCalledTimes(1);
     await readSupplierSnapshot(true);
     expect(supplier.email).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns a healthy subfeed when its sibling hangs, then recovers on refresh", async () => {
+    const { readSupplierSnapshot } = await import("@/lib/services/numbers/fleexa-catalog");
+    vi.useFakeTimers();
+    supplier.email.mockResolvedValue(snapshot.email);
+    supplier.rentals.mockImplementationOnce(() => new Promise(() => {})).mockResolvedValue(snapshot.rentals);
+    const pending = readSupplierSnapshot();
+    await vi.advanceTimersByTimeAsync(35_001);
+    expect(await pending).toMatchObject({ email: snapshot.email, rentals: [], partial: true, degraded: "outage" });
+    const recovered = await readSupplierSnapshot(true);
+    expect(recovered).toMatchObject({ email: snapshot.email, rentals: snapshot.rentals, partial: false, degraded: null });
   });
 
   it("fails rather than presenting an empty healthy catalog if all endpoints fail", async () => {

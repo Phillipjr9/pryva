@@ -6,10 +6,14 @@ const runtime = vi.hoisted(() => ({
   accszoneConfigured: false,
   products: [] as Record<string, unknown>[],
   catalogError: null as Error | null,
+  catalogHangs: false,
+  catalogGate: null as Promise<void> | null,
   catalogPartial: false,
   catalogStale: false,
+  catalogCheckedAt: null as string | null,
   productError: null as Error | null,
   legacyListings: [] as Record<string, unknown>[],
+  legacyHangs: false,
   legacyPaged: false,
   legacyCategories: [] as { id: number; title: string; slug: string }[],
   legacyError: null as Error | null,
@@ -18,7 +22,7 @@ const runtime = vi.hoisted(() => ({
   delivered: [] as string[],
   balanceOk: true,
   calls: {
-    listAllProducts: 0, getProduct: 0, createOrder: 0, getOrderAccounts: 0,
+    listAllProducts: 0, legacyCatalog: 0, getProduct: 0, createOrder: 0, getOrderAccounts: 0,
     getListing: 0, purchase: 0, balance: 0,
   },
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -41,8 +45,10 @@ vi.mock("@/lib/providers/bulkacc", () => {
       error instanceof BulkaccError && ["ambiguous_outcome", "timeout", "bad_response"].includes(error.code),
     readBulkaccCatalog: async () => {
       runtime.calls.listAllProducts += 1;
+      if (runtime.catalogHangs) await new Promise(() => {});
+      if (runtime.catalogGate) await runtime.catalogGate;
       if (runtime.catalogError) throw runtime.catalogError;
-      return { products: runtime.products, partial: runtime.catalogPartial, stale: runtime.catalogStale, checkedAt: new Date().toISOString() };
+      return { products: runtime.products, partial: runtime.catalogPartial, stale: runtime.catalogStale, checkedAt: runtime.catalogCheckedAt ?? new Date().toISOString() };
     },
     getProduct: async (code: string) => {
       runtime.calls.getProduct += 1;
@@ -80,6 +86,8 @@ vi.mock("@/lib/providers/accszone", () => {
     AccsZoneError,
     isAccsZoneConfigured: () => runtime.accszoneConfigured,
     listListings: async (query: { page?: number } = {}) => {
+      runtime.calls.legacyCatalog += 1;
+      if (runtime.legacyHangs) await new Promise(() => {});
       if (runtime.legacyError) throw runtime.legacyError;
       return {
         listings: runtime.legacyPaged ? runtime.legacyListings.slice((query.page ?? 1) - 1, query.page ?? 1) : runtime.legacyListings,
@@ -156,9 +164,13 @@ beforeEach(() => {
   runtime.accszoneConfigured = true;
   runtime.products = [SPOTIFY, GMAIL, SOLD_OUT];
   runtime.catalogError = null;
+  runtime.catalogHangs = false;
+  runtime.catalogGate = null;
   runtime.catalogPartial = false;
   runtime.catalogStale = false;
+  runtime.catalogCheckedAt = null;
   runtime.productError = null;
+  runtime.legacyHangs = false;
   runtime.legacyListings = [{
     id: 7, slug: "legacy-instagram", title: "Instagram account", price: "0.44",
     available_stock: 10, sold: 3, category: { id: 1, title: "Instagram", slug: "instagram" }, subcategory: null,
@@ -216,7 +228,7 @@ describe("product grouping is Pryva's own, not a source's", () => {
 });
 
 describe("sourcing order", () => {
-  it("reports the configured source and never publishes a cold partial fallback", async () => {
+  it("reports the configured source and labels a healthy cold fallback as incomplete", async () => {
     expect(marketplaceSource()).toBe("primary");
 
     runtime.bulkaccConfigured = false;
@@ -227,13 +239,75 @@ describe("sourcing order", () => {
     expect(isMarketplaceCatalogAvailable()).toBe(false);
     expect((await listMarketplaceListings()).listings).toEqual([]);
 
-    // A cold primary failure must not publish only the fallback and hide the
-    // primary's products as though that were the whole catalogue.
     runtime.bulkaccConfigured = true;
     runtime.accszoneConfigured = true;
     runtime.catalogError = new Error("catalog read failed");
     clearMarketplaceCatalogCache();
+    const result = await listMarketplaceListings({ perPage: 60 });
+    expect(result.partial).toBe(true);
+    expect(result.listings.map((listing) => listing.slug)).toEqual(["p2:legacy-instagram"]);
+    expect((await listMarketplaceCategories()).partial).toBe(true);
+    // The separate incomplete candidate is shared briefly, rather than starting
+    // a new supplier crawl for every category, page, or retry.
+    expect(runtime.calls.listAllProducts).toBe(1);
+    expect(runtime.calls.legacyCatalog).toBe(1);
+  });
+
+  it("keeps primary listings when the secondary feed fails", async () => {
+    runtime.legacyError = new Error("secondary unavailable");
+    const result = await listMarketplaceListings({ perPage: 60 });
+    expect(result.partial).toBe(true);
+    expect(result.listings.length).toBeGreaterThan(0);
+    expect(result.listings.every((listing) => listing.slug.startsWith("p1:"))).toBe(true);
+    expect((await listMarketplaceCategories()).partial).toBe(true);
+  });
+
+  it("reports an outage when every configured feed fails and briefly coalesces retries", async () => {
+    runtime.catalogError = new Error("primary unavailable");
+    runtime.legacyError = new Error("secondary unavailable");
     await expect(listMarketplaceListings()).rejects.toThrow("temporarily unavailable");
+    await expect(listMarketplaceCategories()).rejects.toThrow("temporarily unavailable");
+    expect(runtime.calls.listAllProducts).toBe(1);
+    expect(runtime.calls.legacyCatalog).toBe(1);
+  });
+
+  it.each(["primary", "secondary"] as const)("bounds a hung %s feed and returns the healthy one", async (side) => {
+    vi.useFakeTimers();
+    try {
+      runtime.catalogHangs = side === "primary";
+      runtime.legacyHangs = side === "secondary";
+      const pending = listMarketplaceListings({ perPage: 60 });
+      await vi.advanceTimersByTimeAsync(35_001);
+      const result = await pending;
+      expect(result.partial).toBe(true);
+      expect(result.listings.length).toBeGreaterThan(0);
+      expect(result.listings.every((listing) => listing.slug.startsWith(side === "primary" ? "p2:" : "p1:"))).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("recovers the complete catalogue after a cold source outage without relabelling partial data", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-12T12:00:00Z"));
+    try {
+      runtime.catalogError = new Error("primary unavailable");
+      const incomplete = await listMarketplaceListings({ perPage: 60 });
+      expect(incomplete.partial).toBe(true);
+      runtime.catalogError = null;
+      let release!: () => void;
+      runtime.catalogGate = new Promise<void>((resolve) => { release = resolve; });
+      await vi.advanceTimersByTimeAsync(30_001);
+      // The previous candidate is still explicitly partial while refresh runs.
+      const duringRefresh = await listMarketplaceListings({ perPage: 60 });
+      expect(duringRefresh.partial).toBe(true);
+      expect(duringRefresh.stale).toBe(true);
+      release();
+      await vi.advanceTimersByTimeAsync(0);
+      const recovered = await listMarketplaceListings({ perPage: 60 });
+      expect(recovered.partial).toBe(false);
+      expect(recovered.stale).toBe(false);
+      expect(recovered.listings.some((listing) => listing.slug.startsWith("p1:"))).toBe(true);
+      expect(recovered.listings.some((listing) => listing.slug.startsWith("p2:"))).toBe(true);
+    } finally { vi.useRealTimers(); }
   });
 
   it("combines both feeds and applies shared social filters even when the primary succeeds", async () => {
@@ -276,9 +350,15 @@ describe("sourcing order", () => {
     expect(first.meta.total).toBeGreaterThan(3);
   });
 
-  it("never publishes an expired local fallback as a fresh combined catalogue", async () => {
+  it("never presents an expired local fallback as a fresh combined catalogue", async () => {
     runtime.catalogStale = true;
-    await expect(listMarketplaceListings()).rejects.toThrow("temporarily unavailable");
+    runtime.catalogCheckedAt = "2026-01-01T00:00:00.000Z";
+    const result = await listMarketplaceListings({ perPage: 60 });
+    expect(result.stale).toBe(true);
+    expect(result.checkedAt).toBe(runtime.catalogCheckedAt);
+    expect(result.partial).toBe(false);
+    expect(result.listings.some((listing) => listing.slug.startsWith("p1:"))).toBe(true);
+    expect(result.listings.some((listing) => listing.slug.startsWith("p2:"))).toBe(true);
   });
 
   it("keeps the warm shared snapshot stale when a local fallback cannot refresh", async () => {
@@ -339,6 +419,17 @@ describe("sourcing order", () => {
     expect(searched.listings.map((listing) => listing.title)).toContain("Warmed Up Gmail With 2FA");
   });
 
+  it("searches Twitter and X accounts without confusing Xbox or Netflix", async () => {
+    runtime.products = [
+      { ...GMAIL, code: "101", name: "Aged X account", categoryName: "X" },
+      { ...GMAIL, code: "102", name: "Twitter profile", categoryName: "Twitter" },
+      { ...GMAIL, code: "103", name: "Xbox account", categoryName: "Gaming" },
+      { ...GMAIL, code: "104", name: "Netflix account", categoryName: "Streaming" },
+    ];
+    const result = await listMarketplaceListings({ search: "Twitter", perPage: 60 });
+    expect(result.listings.map((item) => item.title).sort()).toEqual(["Aged X account", "Twitter profile"]);
+  });
+
   it("includes recognized social products filed as Other without changing checkout terms", async () => {
     runtime.products.push({ code: "203412", name: "Australia (AU) Instagram with 2FA and Email Access", description: null,
       groupName: "Unrecognized", categoryName: "Aged Australia Instagram", inStock: 23, min: 1,
@@ -365,8 +456,14 @@ describe("sourcing order", () => {
 });
 
 describe("primary catalogue completeness", () => {
-  it("refuses to publish an incomplete primary snapshot", async () => {
+  it("never includes an incomplete primary walk, but keeps a complete secondary browseable", async () => {
     runtime.catalogPartial = true;
+    clearMarketplaceCatalogCache();
+    const result = await listMarketplaceListings({ perPage: 60 });
+    expect(result.partial).toBe(true);
+    expect(result.listings.map((listing) => listing.slug)).toEqual(["p2:legacy-instagram"]);
+
+    runtime.accszoneConfigured = false;
     clearMarketplaceCatalogCache();
     await expect(listMarketplaceListings()).rejects.toThrow("temporarily unavailable");
   });

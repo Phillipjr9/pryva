@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 const state = vi.hoisted(() => ({
   preview: false,
   user: { id: "buyer" } as { id: string } | null,
+  auth: vi.fn(),
   limit: vi.fn(),
   snapshot: vi.fn(),
   items: vi.fn(),
@@ -19,7 +20,7 @@ const state = vi.hoisted(() => ({
   bitcallConfigured: false,
 }));
 vi.mock("@/lib/platform/demo-policy", () => ({ isPreviewDatabase: () => state.preview }));
-vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: async () => state.user }));
+vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: state.auth }));
 vi.mock("@/lib/platform/rate-limit", async (importOriginal) => {
   // Keep the real module: other limiters are constructed when a route imports
   // a money module, and a factory that omits them fails at import time.
@@ -44,7 +45,7 @@ vi.mock("@/lib/services/esim/esim-catalog", () => ({ readEsimCatalog: state.esim
 
 import { ProviderError } from "@/lib/providers/types";
 
-import { GET } from "@/app/api/services/catalog/route";
+import { GET, maxDuration } from "@/app/api/services/catalog/route";
 
 function request(country = "us") { return new NextRequest(`https://pryva.test/api/services/catalog?country=${country}`); }
 
@@ -56,6 +57,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.preview = false; state.user = { id: "buyer" };
   state.fleexaConfigured = true; state.boostConfigured = false; state.bitcallConfigured = false;
+  state.auth.mockImplementation(async () => state.user);
   state.limit.mockResolvedValue({ allowed: true });
   state.snapshot.mockResolvedValue({ partial: false, fetchedAt: "2026-01-01T00:00:00Z", privateUpstream: "never exposed" });
   state.items.mockReturnValue([SIGNAL]);
@@ -71,6 +73,27 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); });
 
 describe("supplier catalog endpoint", () => {
+  it("labels each aggregate source status without logging customer or provider data", async () => {
+    state.boostConfigured = true;
+    state.bitcallConfigured = true;
+    state.boostSnapshot.mockRejectedValue(new Error("sensitive provider details"));
+    const log = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    try {
+      const response = await GET(request());
+      expect((await response.json()).partial).toBe(true);
+      const line = log.mock.calls.map(([entry]) => String(entry)).find((entry) => entry.includes("CATALOG_ROUTE_SOURCE_STATUS"));
+      expect(line).toBeDefined();
+      const status = JSON.parse(line!.slice(line!.indexOf('{"requestedFeed"')));
+      expect(status.sources).toEqual([
+        { feed: "numbers", configured: true, hasSnapshot: true, failure: null, partial: false },
+        { feed: "social", configured: true, hasSnapshot: false, failure: "outage", partial: false },
+        { feed: "esim", configured: true, hasSnapshot: true, failure: null, partial: false },
+        { feed: "verification", configured: true, hasSnapshot: true, failure: null, partial: false },
+      ]);
+      expect(line).not.toMatch(/sensitive provider details|never exposed|buyer/);
+    } finally { log.mockRestore(); }
+  });
+
   it("offers a bounded all-destinations eSIM view without contacting unrelated feeds", async () => {
     state.bitcallConfigured = true;
     const listings = Array.from({ length: 1001 }, (_, index) => ({ id: `plan-${index}` }));
@@ -182,15 +205,86 @@ describe("supplier catalog endpoint", () => {
     expect(body).toMatchObject({ ok: true, live: true, partial: false, items: [SIGNAL] });
   });
 
-  it("times out a slow supplier instead of stalling the whole catalog", async () => {
+  it("times out a hung supplier instead of stalling the whole catalog", async () => {
     state.snapshot.mockImplementation(() => new Promise(() => {}));
     vi.useFakeTimers();
     const pending = GET(request());
-    await vi.advanceTimersByTimeAsync(15_001);
+    await vi.advanceTimersByTimeAsync(45_001);
     const response = await pending;
     vi.useRealTimers();
+    expect(maxDuration).toBe(60);
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({ error: "The live catalog is temporarily unavailable", reason: "unavailable" });
+  });
+
+  it.each([16_000, 31_000, 44_000])("accepts a healthy supplier read completing after %sms", async (duration) => {
+    vi.useFakeTimers();
+    state.snapshot.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve({
+      partial: false, fetchedAt: "2026-01-01T00:00:00Z",
+    }), duration)));
+    let finished = false;
+    const pending = GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&feed=numbers"))
+      .then((response) => { finished = true; return response; });
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(finished).toBe(false);
+    await vi.advanceTimersByTimeAsync(duration - 15_000);
+    const response = await pending;
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ live: true, partial: false, items: [SIGNAL] });
+  });
+
+  it("allows a cold authentication followed by a slow but successful read within the whole-request budget", async () => {
+    vi.useFakeTimers();
+    state.auth.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve(state.user), 20_000)));
+    state.snapshot.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve({
+      partial: false, fetchedAt: "2026-01-01T00:00:00Z",
+    }), 31_000)));
+    const pending = GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&feed=numbers"));
+    await vi.advanceTimersByTimeAsync(51_000);
+    expect(await (await pending).json()).toMatchObject({ live: true, partial: false, items: [SIGNAL] });
+  });
+
+  it("returns a bounded error before the function cap if preflight consumed part of the supplier budget", async () => {
+    vi.useFakeTimers();
+    state.auth.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve(state.user), 25_000)));
+    state.snapshot.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve({
+      partial: false, fetchedAt: "2026-01-01T00:00:00Z",
+    }), 31_000)));
+    const pending = GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&feed=numbers"));
+    await vi.advanceTimersByTimeAsync(55_001);
+    const response = await pending;
+    expect(response.status).toBe(503);
+    expect(response.headers.get("retry-after")).toBe("10");
+    expect(await response.json()).toMatchObject({ reason: "unavailable" });
+    expect(state.snapshot).toHaveBeenCalledOnce();
+  });
+
+  it.each(["authentication", "rate-limit"] as const)("bounds a hung %s preflight without contacting suppliers", async (stage) => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    if (stage === "authentication") state.auth.mockImplementation(() => new Promise(() => {}));
+    else state.limit.mockImplementation(() => new Promise(() => {}));
+    const pending = GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&feed=numbers"));
+    await vi.advanceTimersByTimeAsync(55_001);
+    const response = await pending;
+    expect(response.status).toBe(503);
+    expect(response.headers.get("retry-after")).toBe("30");
+    expect(state.snapshot).not.toHaveBeenCalled();
+    expect(warn.mock.calls.flat().join(" ")).toContain(`\"stage\":\"${stage}\"`);
+    warn.mockRestore();
+  });
+
+  it("logs a safe failure class without exposing provider error details", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    state.snapshot.mockRejectedValue(new Error("private supplier key and body"));
+    const response = await GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&feed=numbers"));
+    expect(response.status).toBe(503);
+    expect(warn).toHaveBeenCalled();
+    const logs = warn.mock.calls.flat().join(" ");
+    expect(logs).toContain('"feed":"numbers"');
+    expect(logs).toContain('"reason":"outage"');
+    expect(logs).not.toContain("private supplier key and body");
+    warn.mockRestore();
   });
 
   it("serves boosting listings on their own when no other supplier is configured", async () => {

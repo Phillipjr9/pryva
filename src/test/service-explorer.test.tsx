@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { SERVICE_IDS } from "@/lib/services/registry";
+import { SERVICES, SERVICE_IDS } from "@/lib/services/registry";
 import { findPlan, plans } from "@/lib/services/catalog";
 import { ServiceCard, ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
@@ -13,15 +13,29 @@ import {
 } from "@/lib/services/service-explorer";
 
 describe("country-first service explorer", () => {
-  it("defaults to a single active country instead of blocking the whole explorer", () => {
+  it("waits for a remembered country during hydration and renders explicit countries immediately", () => {
     expect(buildServiceExplorer(null)).toEqual([]);
     expect(buildServiceExplorer("")).toEqual([]);
     expect(buildServiceExplorer("not-a-country")).toEqual([]);
-    const markup = renderToStaticMarkup(<ServiceExplorer initialCountry={null} initialCategory={null} />);
+    const pending = renderToStaticMarkup(<ServiceExplorer initialCountry={null} initialCategory={null} />);
+    expect(pending).toContain("Restoring your country selection");
+    expect(pending).not.toContain("Nigeria selected");
+    const markup = renderToStaticMarkup(<ServiceExplorer initialCountry="ng" initialCategory={null} />);
     expect(markup).toContain("Nigeria selected");
     expect(markup).not.toContain("Choose a country to explore");
     expect(markup).toContain("Choose a category");
     expect(markup).not.toContain("Start with a country.");
+  });
+
+  it("groups every category and keeps the picker wrapped and touch-friendly on mobile", () => {
+    const markup = renderToStaticMarkup(<ServiceExplorer initialCountry="ng" initialCategory={null} />);
+    for (const entry of EXPLORER_CATEGORIES) expect(markup).toContain(entry.label.replaceAll("&", "&amp;"));
+    for (const title of ["Phone &amp; connectivity", "Digital products &amp; accounts", "Growth &amp; everyday tools"]) {
+      expect(markup).toContain(title);
+    }
+    expect(markup).toContain("min-[360px]:grid-cols-2");
+    expect(markup).toContain("min-h-[88px]");
+    expect(markup).not.toContain("overflow-x-auto px-1 pb-1");
   });
 
   it("offers the ISO country and territory directory without treating it as supplier coverage", () => {
@@ -42,6 +56,20 @@ describe("country-first service explorer", () => {
     expect(explorerCountry(["ng"])).toBeNull();
     expect(explorerCategory("social")).toBe("social");
     expect(explorerCategory("unexpected")).toBe("all");
+  });
+
+  it("explains how Number plans and app verification share app-specific offers", () => {
+    expect(SERVICES.find((service) => service.id === "verification")?.description).toMatch(/app-specific.*SMS verification/i);
+    expect(SERVICES.find((service) => service.id === "numbers")?.description).toMatch(/app-specific.*general.*rentals/i);
+    for (const category of ["numbers", "verification"] as const) {
+      const markup = renderToStaticMarkup(<ServiceExplorer initialCountry="ng" initialCategory={category} />);
+      expect(markup).toContain("Not sure which category?");
+      expect(markup).toContain("Browse number plans");
+      expect(markup).toContain("Browse app-specific SMS");
+      expect(markup).toContain("Number plans includes app-specific single-use offers alongside general plans and rentals");
+      expect(markup).toContain("App verification focuses on those same app-specific offers");
+      expect(markup).not.toContain("not listed for a particular app");
+    }
   });
 
   it("keeps service categories without fabricating supplier listings", () => {

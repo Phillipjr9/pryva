@@ -53,7 +53,8 @@ describe("app-specific offers in Number plans", () => {
       expect(within(section).getAllByRole("link", { name: /Choose service/ }).some((link) => link.getAttribute("href") === `${offer.action?.href}&from=numbers`)).toBe(true);
     }
     expect(screen.getByRole("heading", { name: "Nigeria", level: 3 })).toBeTruthy();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(fetchMock.mock.calls.map(([url]) => new URL(url, "https://pryva.test").searchParams.get("feed")).sort()).toEqual(["numbers", "verification"]);
   });
 
   it("locks unexpected checkout links or links to a different country", async () => {

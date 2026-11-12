@@ -89,6 +89,29 @@ describe("service explorer live listings", () => {
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
+  it("can retry a failed feed while an unrelated feed is still loading", async () => {
+    let numbersReads = 0;
+    const fetchMock = vi.fn(async (url: string) => {
+      const feed = new URL(url, "https://pryva.test").searchParams.get("feed");
+      if (feed === "verification") return new Promise<Response>(() => {});
+      if (feed === "numbers" && ++numbersReads === 1) return Response.json({}, { status: 500 });
+      const items = feed === "numbers" ? [{ id: "rental", category: "numbers", name: "Recovered rental", description: "Rental", tag: "Rental",
+        artwork: { kind: "service", name: "numbers" }, source: "live", coverage: "catalog-country", stock: null, myUnits: null, price: null, action: null }] : [];
+      return Response.json({ ok: true, country: "us", live: true, partial: false, items });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="us" initialCategory="all" />);
+    const retry = await screen.findByRole("button", { name: "Retry" });
+    expect(screen.getByText(/Live listings are still loading/)).toBeTruthy();
+    expect(screen.queryByText(/Live listings are current/)).toBeNull();
+    expect(retry).toHaveProperty("disabled", false);
+    fireEvent.click(retry);
+    expect(await screen.findByRole("heading", { name: "Recovered rental" })).toBeTruthy();
+    expect(numbersReads).toBe(2);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("feed=verification"))).toHaveLength(1);
+    expect(screen.queryByText(/Live listings are current/)).toBeNull();
+  });
+
   it("keeps successful listings visible and reports a failed feed", async () => {
     vi.stubGlobal("fetch", vi.fn((url: string) => {
       const feed = new URL(url, "https://pryva.test").searchParams.get("feed");
@@ -118,15 +141,15 @@ describe("service explorer live listings", () => {
 
   it("uses the saved default country and labels stock, indicative price and paused ordering", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
-      ok: true, country: "us", partial: false, fetchedAt: "2026-01-01T12:34:56.000Z", items: [{
+      ok: true, country: "us", live: true, partial: false, fetchedAt: "2026-01-01T12:34:56.000Z", items: [{
         id: "live-sms-test", category: "verification", name: "Example live app", description: "SMS verification listing", tag: "Other",
         artwork: { kind: "service", name: "numbers" }, source: "live", coverage: "catalog-country", stock: 7, myUnits: null, price: 1250, action: null,
       }],
     }) });
     vi.stubGlobal("fetch", fetchMock);
     render(<ServiceExplorer initialCountry={null} initialCategory="verification" />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
-    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/services/catalog?country=ng");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/services/catalog?country=ng&feed=verification");
     fireEvent.click(screen.getByRole("button", { name: "US" }));
     const card = (await screen.findByRole("heading", { name: "Example live app" })).closest("article")!;
     expect(within(card).getByText("Live listing")).toBeTruthy();
@@ -143,7 +166,7 @@ describe("service explorer live listings", () => {
     // Boosts are the one live listing that can actually be bought: no country
     // gate, a "from" price, and a link — not a disabled button.
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
-      ok: true, country: "ng", partial: false, fetchedAt: "2026-01-01T12:34:56.000Z", items: [{
+      ok: true, country: "ng", live: true, partial: false, fetchedAt: "2026-01-01T12:34:56.000Z", items: [{
         id: "live-boost-0123456789abcdef0123", category: "social", name: "Instagram Followers", description: "Followers boost",
         tag: "Followers", artwork: { kind: "brand", name: "instagram" }, source: "live", coverage: "not-country-specific",
         stock: null, myUnits: null, price: 1600, priceFrom: true,
@@ -159,11 +182,11 @@ describe("service explorer live listings", () => {
   });
 
   it("requests the live catalog and never a demo endpoint", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, country: "us", items: [] }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, country: "us", live: true, partial: false, items: [] }) });
     vi.stubGlobal("fetch", fetchMock);
     render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
-    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/services/catalog?country=us");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/services/catalog?country=us&feed=verification");
     // The demo inventory endpoint was deleted with the demo subsystem.
     expect(fetchMock.mock.calls.every(([url]) => !String(url).includes("/demo/"))).toBe(true);
     expect(screen.queryByText(/Demo catalog/)).toBeNull();
@@ -177,7 +200,7 @@ describe("service explorer live listings", () => {
     }) });
     vi.stubGlobal("fetch", fetchMock);
     render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(await screen.findByText(/Live availability is off in this environment/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
     expect(screen.queryByText(/couldn&apos;t be loaded/)).toBeNull();
@@ -240,7 +263,7 @@ describe("service explorer live listings", () => {
     render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
     expect((await screen.findByRole("link", { name: "Sign in again" })).getAttribute("href")).toBe("/login?next=%2Fdashboard%2Fservices");
     expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("names a throttle as a throttle and still offers the retry", async () => {

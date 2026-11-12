@@ -78,7 +78,7 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
       { href: "/dashboard/services", label: "Account top-ups", art: "topups", category: "topups" },
       { href: "/dashboard/services", label: "Gift cards", art: "gift-cards", category: "gift-cards" },
       { href: "/dashboard/services", label: "Prepaid & finance", art: "prepaid", category: "prepaid" },
-      { href: "/dashboard/services", label: "App verification", art: "app-verification", category: "verification" },
+      { href: "/dashboard/services", label: "App-specific SMS", art: "app-verification", category: "verification" },
       { href: "/dashboard/services", label: "Social promotion", art: "social-promotion", category: "social" },
       { href: "/dashboard/proxies", label: "Proxies", art: "proxies" },
       { href: "/dashboard/bulk-orders", label: "Bulk Orders", art: "bulk" },

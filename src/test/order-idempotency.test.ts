@@ -162,9 +162,19 @@ describe("recorded unit cost", () => {
 
     // Wholesale cost is recorded for the owner and must never reach the buyer:
     // the receipt is an explicit field allowlist, and this keeps it that way.
-    expect(JSON.stringify(body)).not.toContain("providerCostNgn");
-    expect(JSON.stringify(body)).not.toContain("900");
-    expect(JSON.stringify(body)).not.toContain('"provider"');
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain("providerCostNgn");
+    expect(serialized).not.toContain('"provider"');
+    // Match a whole JSON value, not a coincidental "900" inside a random UUID.
+    // Keep checking both numeric and string representations of the cost.
+    const exactCost = /(?:^|[:,\[])(?:900|"900")(?=[,\]}])/;
+    expect('{"cost":900}').toMatch(exactCost);
+    expect('{"cost":"900"}').toMatch(exactCost);
+    expect('{"id":"a-9002"}').not.toMatch(exactCost);
+    expect(serialized).not.toMatch(exactCost);
+    expect(Object.keys(body).sort()).toEqual(["balance", "ok", "order", "pending", "replayed"]);
+    expect(Object.keys(body.order).sort()).toEqual(["amount", "id", "planLabel", "productName", "reference", "service", "status"]);
+    expect(body.order.amount).toBe(findPlan(SLUG)!.price);
 
     // The cost sheet holds planned prices; only this column holds what the
     // supplier really charged, which is the only honest basis for margin.

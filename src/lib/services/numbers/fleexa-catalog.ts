@@ -2,6 +2,8 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { persistentDatabaseConfigured } from "@/lib/platform/database-config";
 import { readSupplierCatalogue, supplierCatalogueKey } from "@/lib/platform/supplier-catalogue-snapshot";
+import { CatalogueReadTimeout, withCatalogueReadTimeout } from "@/lib/platform/catalogue-read-timeout";
+import { logger } from "@/lib/platform/logger";
 import { isFundingFailure } from "@/lib/providers/types";
 import { isFleexaConfigured, listFleexaEmailProducts, listFleexaRentAreas, type FleexaEmailProduct, type FleexaRentArea } from "@/lib/providers/fleexa";
 import { priceFromCost, isPriceInBand } from "@/lib/services/pricing";
@@ -25,6 +27,18 @@ export type SupplierSnapshot = {
 let cache: { expires: number; snapshot: SupplierSnapshot } | null = null;
 let inFlight: Promise<SupplierSnapshot> | null = null;
 
+// Longer than the 30-second shared cold-snapshot wait, shorter than the route's
+// 45-second deadline. A stuck subfeed must not hide the other successful one.
+const SOURCE_READ_TIMEOUT_MS = 35_000;
+async function readSource<T>(source: "email" | "rentals", read: () => Promise<T>): Promise<T> {
+  try {
+    return await withCatalogueReadTimeout(read, SOURCE_READ_TIMEOUT_MS);
+  } catch (error) {
+    if (error instanceof CatalogueReadTimeout) logger.warn("Live catalogue subfeed timed out", { feed: "numbers", source });
+    throw error;
+  }
+}
+
 /** Share each source independently so one failed source never hides the other. */
 export async function readSupplierSnapshot(refresh = false): Promise<SupplierSnapshot> {
   if (!isFleexaConfigured()) throw new Error("Supplier not configured");
@@ -34,8 +48,8 @@ export async function readSupplierSnapshot(refresh = false): Promise<SupplierSna
     async () => ({ rows: await load(), partial: false, degraded: null, fetchedAt: new Date().toISOString() }),
   );
   const [email, rentals] = await Promise.allSettled([
-    shared("fleexa-email", listFleexaEmailProducts),
-    shared("fleexa-rentals", listFleexaRentAreas),
+    readSource("email", () => shared("fleexa-email", listFleexaEmailProducts)),
+    readSource("rentals", () => shared("fleexa-rentals", listFleexaRentAreas)),
   ]);
   const values = [email, rentals].flatMap(result => result.status === "fulfilled" ? [result.value] : []);
   if (!values.length) throw new Error("Supplier catalog unavailable");
@@ -55,7 +69,10 @@ async function readLocalSupplierSnapshot(refresh = false): Promise<SupplierSnaps
   if (inFlight) return inFlight;
   inFlight = (async () => {
     try {
-      const [email, rentals] = await Promise.allSettled([listFleexaEmailProducts(), listFleexaRentAreas()]);
+      const [email, rentals] = await Promise.allSettled([
+        readSource("email", listFleexaEmailProducts),
+        readSource("rentals", listFleexaRentAreas),
+      ]);
       const results = [email, rentals];
       const failures = results.filter((result) => result.status === "rejected");
       // An unfunded account is not an outage: preserve the refusal's own class so
