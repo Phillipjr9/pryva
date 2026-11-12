@@ -32,6 +32,13 @@ describe("overview service hub", () => {
     expect(overview).toContain("separate from App verification");
   });
 
+  it("keeps the shortcut status below the description instead of squeezing its label", () => {
+    const shortcut = overview.slice(overview.indexOf('href={accountShortcut.href}'), overview.indexOf('<div className="mt-3 grid'));
+    expect(shortcut.indexOf("{SERVICE_STATE_LABEL[accountState]}")).toBeLessThan(shortcut.indexOf("<ArrowRight"));
+    expect(shortcut).not.toContain("hidden min-[390px]:inline");
+    expect(shortcut).toContain("mt-2 inline-flex");
+  });
+
   it("keeps quick actions balanced on a phone and stacks to one column on the wide sidebar", () => {
     expect(grid).toContain("grid-cols-2");
     expect(grid).toContain("sm:grid-cols-2");

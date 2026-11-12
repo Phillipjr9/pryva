@@ -1,0 +1,30 @@
+/* A soft, stationary sheen and a shallow bevel: more dimensional than a flat
+   panel, but still quiet enough for the balance and actions to lead. */
+.card {
+  border-color: rgba(205, 186, 240, 0.24);
+  background:
+    radial-gradient(ellipse at 96% -15%, rgba(154, 126, 220, 0.25), transparent 48%),
+    linear-gradient(135deg, #393047 0%, #29223a 55%, #211c30 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(13, 9, 22, 0.24),
+    0 3px 0 -1px rgba(32, 25, 45, 0.42),
+    0 16px 28px -22px rgba(35, 24, 56, 0.7);
+}
+
+.sheen {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.015) 28%, transparent 49%);
+}
+
+.edge {
+  pointer-events: none;
+  position: absolute;
+  right: 8%;
+  bottom: 0;
+  left: 8%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+}

@@ -218,8 +218,11 @@ describe("overview layout", () => {
   });
 
   it("describes the account with aggregates, never with the visible slice", () => {
+    const rentals = readFileSync(join(root, "lib/services/numbers/active-rentals.ts"), "utf8");
     expect(overview).toContain("count()");
-    expect(overview).toContain("sum(orders.amount)");
+    expect(overview).toContain("countActiveRentedNumbers(user.id");
+    expect(rentals).toContain("countDistinct(");
+    expect(overview).not.toContain("sum(orders.amount)");
   });
 });
 
