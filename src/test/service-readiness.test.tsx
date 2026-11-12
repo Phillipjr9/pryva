@@ -120,7 +120,7 @@ describe("the hub's arrangement", () => {
     { id: "data" as const, label: "Mobile data", state: "paused" as const, detail: "Data plans are catalogued, but no supplier is connected." },
   ];
 
-  it("orders the category chips by readiness and keeps the rest after them", () => {
+  it("groups related categories while keeping ready services first within each group", () => {
     const { container } = render(
       <ServiceExplorer initialCountry="ng" initialCategory={null} readiness={readiness} />,
     );
@@ -142,13 +142,12 @@ describe("the hub's arrangement", () => {
     expect(decodeURIComponent(link.getAttribute("href")!)).toContain("Mobile data");
   });
 
-  it.each([
-    ["data", "View data service status", "/dashboard/data"],
-
-  ] as const)("explains the empty %s category without inventing listings", (category, label, href) => {
-    render(<ServiceExplorer initialCountry="ng" initialCategory={category} />);
-    expect(screen.getByText(/No plans or prices are available to order/i)).toBeTruthy();
-    expect(screen.getByRole("link", { name: label }).getAttribute("href")).toBe(href);
+  it("explains that the data category is not yet orderable and opens its service page", () => {
+    render(<ServiceExplorer initialCountry="ng" initialCategory="data" readiness={readiness} />);
+    expect(screen.getByText(/Purchases are not available from this catalogue yet/)).toBeTruthy();
+    expect(screen.getByText(/no supplier is connected/i)).toBeTruthy();
+    const ask = screen.getByRole("link", { name: "Ask about it" });
+    expect(decodeURIComponent(ask.getAttribute("href")!)).toContain("Mobile data");
   });
 
   it("explains an empty subscription shelf without claiming every subscription is disabled", () => {

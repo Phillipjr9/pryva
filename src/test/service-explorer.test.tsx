@@ -24,6 +24,17 @@ describe("country-first service explorer", () => {
     expect(markup).not.toContain("Start with a country.");
   });
 
+  it("groups every category and keeps the picker wrapped and touch-friendly on mobile", () => {
+    const markup = renderToStaticMarkup(<ServiceExplorer initialCountry="ng" initialCategory={null} />);
+    for (const entry of EXPLORER_CATEGORIES) expect(markup).toContain(entry.label.replaceAll("&", "&amp;"));
+    for (const title of ["Phone &amp; connectivity", "Digital products &amp; accounts", "Growth &amp; everyday tools"]) {
+      expect(markup).toContain(title);
+    }
+    expect(markup).toContain("min-[360px]:grid-cols-2");
+    expect(markup).toContain("min-h-[88px]");
+    expect(markup).not.toContain("overflow-x-auto px-1 pb-1");
+  });
+
   it("offers the ISO country and territory directory without treating it as supplier coverage", () => {
     expect(EXPLORER_COUNTRIES.length).toBe(249);
     expect(new Set(EXPLORER_COUNTRIES.map((country) => country.code)).size).toBe(249);

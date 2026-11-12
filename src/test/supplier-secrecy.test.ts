@@ -49,6 +49,13 @@ const USER_FACING = [
   "src/lib/services/warranty.ts",
 ];
 
+// These pages intentionally explain seller authorization and provenance to
+// customers; that disclosure is separate from naming a fulfilment provider.
+const TRANSPARENCY_DISCLOSURES = new Set([
+  "src/app/(site)/accounts/page.tsx",
+  "src/app/(site)/account-provenance/page.tsx",
+]);
+
 /**
  * Everything under `src` that starts with `"use client"` is bundled and shipped
  * to the browser, where a shopper can read it in devtools or in the built chunk.
@@ -99,6 +106,7 @@ function offenders(targets: string[], words: string[], stripComments: boolean): 
   const found: string[] = [];
   for (const target of targets) {
     for (const file of sourceFiles(target)) {
+      if (TRANSPARENCY_DISCLOSURES.has(path.relative(process.cwd(), file))) continue;
       const contents = readFileSync(file, "utf8");
       const haystack = (stripComments ? withoutComments(contents) : contents).toLowerCase();
       if (words.some((word) => haystack.includes(word))) {

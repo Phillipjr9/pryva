@@ -37,14 +37,6 @@ const CATALOGUE_SERVICES = [
   "bulk", "scheduled",
 ] as const;
 
-/** Brand-backed family pages that intentionally show the platform's own mark. */
-const BRANDED_FAMILIES = [
-  ["accounts", "Netflix"],
-  ["subscriptions", "Spotify"],
-  ["app-verification", "Google"],
-  ["social-promotion", "Instagram"],
-] as const;
-
 /** Third-party products: slug -> the accessible name of the real mark. */
 const DIGITAL_MARKS: Record<string, string> = {
   netflix: "Netflix",
@@ -122,11 +114,15 @@ describe("service logos", () => {
     expect(shapes.size).toBe(Object.keys(DIGITAL_MARKS).length);
   });
 
-  it("uses a real brand mark for the platform-style service families that have one", () => {
-    for (const [service, expectedLabel] of BRANDED_FAMILIES) {
+  it("does not mislabel multi-brand service families with one platform's logo", () => {
+    const families = ["accounts", "subscriptions", "app-verification", "social-promotion"] as const;
+    const labels = ["Digital Accounts", "Subscriptions", "App Verification", "Social Promotion"];
+
+    for (const [index, service] of families.entries()) {
       const html = renderToStaticMarkup(<ServiceIcon service={service} />);
-      expect(html, `${service} should use the platform's mark`).toContain(`aria-label="${expectedLabel}"`);
-      expect(html).not.toContain("/images/");
+      expect(html, `${service} should render its own category glyph`).toContain(`aria-label="${labels[index]}"`);
+      expect(html).toContain("<svg");
+      expect(html).not.toContain("<g"); // BrandIcon's embedded official logo paths
     }
   });
 
@@ -193,6 +189,13 @@ describe("service logos", () => {
       expect(html, `${brand} has no accessible name`).toContain("aria-label=");
       expect(html, `${brand} must not load generated artwork`).not.toContain("/images/");
     }
+  });
+
+  it("shows a neutral named monogram instead of a blank tile for an unbundled brand", () => {
+    const html = renderToStaticMarkup(<BrandIcon brand={"new-platform" as never} />);
+    expect(html).toContain('aria-label="new platform"');
+    expect(html).toContain(">NP</span>");
+    expect(html).not.toContain("<svg");
   });
 
   it("uses the real mark for every platform that has one, in every category", () => {

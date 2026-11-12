@@ -50,8 +50,8 @@ it("keeps all gift-card offers visible rather than hiding a more expensive suppl
 it("explains the smaller number-plan shelf and opens app verification without changing country", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ ok: true, country: "ng", live: true, items: [] }) })));
   render(<ServiceExplorer initialCountry="ng" initialCategory="numbers" />);
-  expect(screen.getByText(/App-specific SMS numbers are grouped under App verification/)).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Browse app-specific verification numbers" }));
+  expect(screen.getByText(/App verification shows numbers listed for a specific app/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Browse app-specific SMS" }));
   expect(screen.getByRole("heading", { level: 1, name: "App verification" })).toBeTruthy();
   expect(new URLSearchParams(window.location.search).get("country")).toBe("ng");
 });

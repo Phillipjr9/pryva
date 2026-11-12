@@ -163,8 +163,8 @@ describe("the public eSIM page agrees with itself", () => {
     expect(page).toContain("const highlights = live");
     expect(page).toContain("const faqs = live");
     expect(page).toContain("Check current plans");
-    // The pre-launch strings must survive for the no-supplier case.
-    expect(read("lib/services/catalog.ts")).toContain("not available for purchase yet");
+    // The shared catalog describes the live destination-based ordering flow.
+    expect(read("lib/services/catalog.ts")).toContain("Current plans");
   });
 });
 
