@@ -51,7 +51,7 @@ describe("choosing services", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Mobile data & airtime" }));
     expect(screen.getByRole("heading", { level: 1, name: "Mobile data & airtime" })).toBeTruthy();
-    expect(screen.getByText(/Mobile data and airtime delivery is not connected/)).toBeTruthy();
+    expect(screen.getByText(/Purchases are not available from this catalogue yet/)).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "MTN 1GB" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Airtel 1GB" })).toBeNull();
   });

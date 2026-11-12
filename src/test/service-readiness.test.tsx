@@ -131,21 +131,18 @@ describe("the hub's arrangement", () => {
     expect(index("App verification")).toBeGreaterThan(index("Proxies"));
   });
 
-  it("explains a category that cannot be ordered and offers a way to ask", () => {
+  it("opens the data browser even when legacy readiness marks checkout paused", () => {
     render(<ServiceExplorer initialCountry="ng" initialCategory="data" readiness={readiness} />);
-    expect(screen.getByText(/no supplier is connected/i)).toBeTruthy();
-    const link = screen.getByRole("link", { name: "Ask about it" });
-    expect(link.getAttribute("href")).toContain("/dashboard/support#ask=");
-    expect(decodeURIComponent(link.getAttribute("href")!)).toContain("Mobile data");
+    expect(screen.getByText(/Purchases are not available from this catalogue yet/i)).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Live mobile data catalogue" })).toBeTruthy();
+    expect(screen.queryByText(/no supplier is connected/i)).toBeNull();
   });
 
-  it.each([
-    ["data", "View data service status", "/dashboard/data"],
-
-  ] as const)("explains the empty %s category without inventing listings", (category, label, href) => {
-    render(<ServiceExplorer initialCountry="ng" initialCategory={category} />);
-    expect(screen.getByText(/No plans or prices are available to order/i)).toBeTruthy();
-    expect(screen.getByRole("link", { name: label }).getAttribute("href")).toBe(href);
+  it("loads the data category without inventing static bundle listings", () => {
+    render(<ServiceExplorer initialCountry="ng" initialCategory="data" />);
+    expect(screen.getByText(/Loading current bundles/i)).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "MTN 1GB" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Back to all services" })).toBeTruthy();
   });
 
   it("explains an empty subscription shelf without claiming every subscription is disabled", () => {
