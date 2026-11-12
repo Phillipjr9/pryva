@@ -115,16 +115,20 @@ export async function GET(request: NextRequest) {
   const readSocial = () => attempt(isFleexaConfigured(), () => readSupplierSnapshot(refresh));
   const readBoost = () => attempt(isSmmPanelConfigured(), () => readBoostSnapshot(refresh));
   const readEsim = () => attempt(isBitcallConfigured(), () => readEsimCatalog(refresh));
+  let otpRetryAfter: number | null = null;
   const readOtp = () => attempt(isBitcallConfigured(), async () => {
     const read = await readOtpOffersForSupplier("bitcall", country.code, country.name, undefined, refresh);
+    if (read.errorCode === "RATE_LIMITED" || read.errorCode === "LOCAL_RATE_BUDGET") {
+      otpRetryAfter = read.retryAfterSeconds ?? 60;
+    }
     if (read.errorCode && read.offers.length === 0) throw otpCatalogProviderError(read.errorCode);
-    return { offers: read.offers, partial: read.partial ?? false, degraded: read.degraded ?? null, fetchedAt: new Date().toISOString() };
+    return { offers: read.offers, partial: read.partial ?? false, degraded: read.degraded ?? null, fetchedAt: read.fetchedAt ?? null };
   });
 
   let supplier: Source<Awaited<ReturnType<typeof readSupplierSnapshot>>> | null = null;
   let boost: Source<Awaited<ReturnType<typeof readBoostSnapshot>>> | null = null;
   let esim: Source<Awaited<ReturnType<typeof readEsimCatalog>>> | null = null;
-  let otp: Source<{ offers: Awaited<ReturnType<typeof readOtpOffersForSupplier>>["offers"]; partial: boolean; degraded: "funding" | "outage" | null; fetchedAt: string; }> | null = null;
+  let otp: Source<{ offers: Awaited<ReturnType<typeof readOtpOffersForSupplier>>["offers"]; partial: boolean; degraded: "funding" | "outage" | null; fetchedAt: string | null; }> | null = null;
 
   [supplier, boost, esim, otp] = await Promise.all([
     (!requestedFeed || requestedFeed === "numbers") ? readSocial() : null,
@@ -172,10 +176,18 @@ export async function GET(request: NextRequest) {
         { headers: { "Cache-Control": "private, no-store" } },
       );
     }
+    // Preserve an upstream account cooldown; a browser retry must not restart
+    // a paginated supplier walk before the provider allows it.
+    if (requestedFeed === "verification" && otpRetryAfter !== null) {
+      return NextResponse.json(
+        { error: "Please try again shortly", reason: "throttled" },
+        { status: 429, headers: { "Cache-Control": "private, no-store", "Retry-After": String(otpRetryAfter) } },
+      );
+    }
     // Configured but unreachable: this one *is* transient, and retrying works.
     return NextResponse.json(
       { error: "The live catalog is temporarily unavailable", reason: "unavailable" },
-      { status: 503, headers: { "Cache-Control": "private, no-store", "Retry-After": "10" } },
+      { status: 503, headers: { "Cache-Control": "private, no-store", "Retry-After": String(Math.max(10, otpRetryAfter ?? 0)) } },
     );
   }
 
@@ -226,6 +238,6 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(
     { ok: true, country: country.code, live: true, reason: fundingGap ? "funding" : partial ? "partial" : null, partial, fetchedAt, items },
-    { headers: { "Cache-Control": "private, no-store" } },
+    { headers: { "Cache-Control": "private, no-store", ...(otpRetryAfter !== null ? { "Retry-After": String(otpRetryAfter) } : {}) } },
   );
 }

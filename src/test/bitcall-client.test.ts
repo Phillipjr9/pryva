@@ -17,6 +17,7 @@ import {
   getBitcallEsimOrder,
   getBitcallEsimProfile,
   getBitcallOtpActivation,
+  getBitcallOtpOffer,
   isAmbiguousBitcallOutcome,
   isBitcallConfigured,
   listBitcallEsimCountries,
@@ -262,6 +263,18 @@ describe("gateway transport", () => {
     expect(error.code).toBe("RATE_LIMITED");
     expect(error.retryAfterSeconds).toBe(17);
     expect(classifyRetry("RATE_LIMITED")).toBe("retry_after_acting");
+  });
+
+  it("keeps a 429 cooldown even when a proxy returns a non-JSON body", async () => {
+    const retryAt = new Date(Date.now() + 60_000).toUTCString();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("too many requests", {
+      status: 429, headers: { "Retry-After": retryAt },
+    })));
+    const error = await listBitcallOtpServices().catch((caught: unknown) => caught) as BitcallError;
+    expect(error.code).toBe("RATE_LIMITED");
+    expect(error.status).toBe(429);
+    expect(error.retryAfterSeconds).toBeGreaterThanOrEqual(59);
+    expect(error.retryAfterSeconds).toBeLessThanOrEqual(60);
   });
 
   it("surfaces a Bitcall 429 on a purchase without automatically retrying it", async () => {
@@ -693,8 +706,7 @@ describe("OTP catalog", () => {
     const { url } = lastCall(fetchMock);
     expect(url.pathname).toBe("/v1/otp/services");
     expect(url.searchParams.get("q")).toBe("whatsapp");
-    // Not a documented parameter: the endpoint accepts `q` and paging only, and a
-    // country filter it does not honour reads as "this country has no stock".
+    // A global name search does not specify the optional country filter.
     expect(url.searchParams.get("country_code")).toBeNull();
     expect(url.searchParams.get("pageSize")).toBe("200");
   });
@@ -746,47 +758,52 @@ describe("OTP catalog", () => {
     expect(otpServiceLabelFromId("no-separators")).toBeNull();
   });
 
-  it("keeps a filtered country's services when the API omits a top-level countryCode", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
+  it("sends the documented country_code filter and preserves absent country fields", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => json({
       data: [{
-        name: "WhatsApp",
-        slug: "whatsapp",
-        availableCount: 17299,
+        name: "WhatsApp", slug: "whatsapp", availableCount: 17299,
         pools: [{ serviceId: "CHARLIE-US-whatsapp", price: { amount: 2.03, currency: "USD" }, availableCount: 3321, successRate: 87 }],
       }],
-    })));
+    }));
+    vi.stubGlobal("fetch", fetchMock);
     const services = await listBitcallOtpServices({ countryCode: "US_1" });
     expect(services).toHaveLength(1);
-    expect(services[0]).toMatchObject({ name: "WhatsApp", countryCode: "US_1" });
+    // A filter is context, not an explicit country field supplied in the row.
+    expect(services[0]).toMatchObject({ name: "WhatsApp", countryCode: null });
     expect(services[0].offers).toHaveLength(1);
+    expect(lastCall(fetchMock).url.searchParams.get("country_code")).toBe("US_1");
+    expect(lastCall(fetchMock).url.searchParams.has("countryCode")).toBe(false);
   });
 
-  it("keeps a filtered country's services when the API omits a top-level countryCode", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
-      data: [{
-        name: "WhatsApp",
-        slug: "whatsapp",
-        availableCount: 17299,
-        pools: [{ serviceId: "CHARLIE-US-whatsapp", price: { amount: 2.03, currency: "USD" }, availableCount: 3321, successRate: 87 }],
-      }],
-    })));
-    const services = await listBitcallOtpServices({ countryCode: "US_1" });
-    expect(services).toHaveLength(1);
-    expect(services[0]).toMatchObject({ name: "WhatsApp", countryCode: "US_1" });
-    expect(services[0].offers).toHaveLength(1);
+  it("confirms the exact opaque offer using the documented flat detail response", async () => {
+    const id = "DELTA-US-instagram_/_threads";
+    const fetchMock = vi.fn().mockResolvedValue(json({ data: [{
+      serviceId: id, name: "Instagram", country: { countryCode: "US_1", name: "United States" },
+      price: { amount: 0.42, currency: "EUR" }, availableCount: 9,
+    }], meta: { page: 1, total: 1, totalPages: 1, hasNext: false } }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await getBitcallOtpOffer(id)).toMatchObject({ serviceId: id, countryCode: "US_1", price: 0.42, currency: "EUR", availableCount: 9 });
+    expect(lastCall(fetchMock).url.pathname).toBe(`/v1/otp/services/${encodeURIComponent(id)}`);
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
-  it("drops a service whose offers carry no serviceId, since it could not be bought", async () => {
+  it("does not call a mixed malformed service catalogue complete", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => json({
       data: [
-        { name: "No pools" },
         { name: "Empty", pools: [] },
         { name: "Unbuyable", pools: [{ price: 0.1 }] },
         { name: "Fine", pools: [{ serviceId: "A-B-fine", price: 0.1 }] },
       ],
     })));
-    const services = await listBitcallOtpServices();
-    expect(services.map((s) => s.name)).toEqual(["Fine"]);
+    await expect(listBitcallOtpServices()).rejects.toMatchObject({ code: "SERVICE_RESPONSE_INVALID" });
+  });
+
+  it("accepts an explicitly empty pool list, but not a missing one", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => json({ data: [{ name: "Empty", pools: [] }] }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(listBitcallOtpServices()).resolves.toEqual([]);
+    fetchMock.mockImplementation(() => json({ data: [{ name: "Missing pools" }] }));
+    await expect(listBitcallOtpServices()).rejects.toMatchObject({ code: "SERVICE_RESPONSE_INVALID" });
   });
 
   it("treats a name that matches nothing as an empty result, not an error", async () => {
@@ -881,6 +898,68 @@ describe("catalogue paging", () => {
       Array.from({ length: 250 }, (_, i) => ({ serviceId: `POOL-US_1-${i}`, price: 0.1 }))
     }], meta: { page: 1, hasNext: false } })));
     expect((await listBitcallOtpCountryEntries())[0].pools).toHaveLength(250);
+  });
+
+  it("rejects an excessive or contradictory OTP page count without returning a partial list", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(json({
+      data: [{ name: "One", pools: [{ serviceId: "offer-one" }] }],
+      meta: { page: 1, totalPages: 51, hasNext: true },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(listBitcallOtpServices({ countryCode: "US_1" })).rejects.toMatchObject({ code: "CATALOGUE_INCOMPLETE" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    fetchMock.mockReset().mockImplementation((url: URL) => {
+      const page = Number(url.searchParams.get("page"));
+      return json({ data: [{ name: `Service ${page}`, pools: [{ serviceId: `offer-${page}` }] }],
+        meta: { page, totalPages: page === 1 ? 2 : 3, hasNext: true } });
+    });
+    await expect(listBitcallOtpServices({ countryCode: "US_1" })).rejects.toMatchObject({ code: "CATALOGUE_INCOMPLETE" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("cancels an unfinished OTP page walk and does not request later pages", async () => {
+    const pendingSignals: AbortSignal[] = [];
+    const fetchMock = vi.fn().mockImplementation((url: URL, init: RequestInit) => {
+      const page = Number(url.searchParams.get("page"));
+      if (page === 1) return Promise.resolve(json({
+        data: [{ name: "One", pools: [{ serviceId: "offer-one" }] }],
+        meta: { page: 1, totalPages: 8, hasNext: true },
+      }));
+      const signal = init.signal!;
+      pendingSignals.push(signal);
+      return new Promise<Response>((_resolve, reject) => {
+        signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController();
+    const read = listBitcallOtpServices({ countryCode: "US_1" }, { signal: controller.signal }).catch((error: unknown) => error);
+    await vi.waitFor(() => expect(pendingSignals.length).toBeGreaterThan(0));
+    const started = fetchMock.mock.calls.length;
+    controller.abort();
+    await expect(read).resolves.toMatchObject({ code: "UPSTREAM_UNREACHABLE" });
+    expect(pendingSignals.every((signal) => signal.aborted)).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(started);
+    expect(fetchMock.mock.calls.every(([url]) => (url as URL).searchParams.get("country_code") === "US_1")).toBe(true);
+  });
+
+  it("aborts a stalled sibling page and preserves a 429 cooldown", async () => {
+    let siblingSignal!: AbortSignal;
+    const fetchMock = vi.fn().mockImplementation((url: URL, init: RequestInit) => {
+      const page = Number(url.searchParams.get("page"));
+      if (page === 1) return Promise.resolve(json({ data: [{ name: "One", pools: [{ serviceId: "offer-one" }] }],
+        meta: { page: 1, totalPages: 3, hasNext: true } }));
+      if (page === 2) return Promise.resolve(json({ error: { code: "RATE_LIMITED" } }, 429, { "Retry-After": "60" }));
+      siblingSignal = init.signal!;
+      return new Promise<Response>((_resolve, reject) => {
+        siblingSignal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(listBitcallOtpServices({ countryCode: "US_1" })).rejects.toMatchObject({ code: "RATE_LIMITED", retryAfterSeconds: 60 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(siblingSignal.aborted).toBe(true);
   });
 
   it("refuses a walk whose later page failed rather than listing what it read", async () => {

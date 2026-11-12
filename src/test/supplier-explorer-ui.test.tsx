@@ -7,6 +7,62 @@ beforeEach(() => { window.localStorage.clear(); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.localStorage.clear(); });
 
 describe("service explorer live listings", () => {
+  it("does not report zero app listings while that feed is still loading", async () => {
+    let finishOtp!: (response: unknown) => void;
+    const pending = new Promise((resolve) => { finishOtp = resolve; });
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (new URL(url, "https://pryva.test").searchParams.get("feed") === "verification") return pending;
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true, country: "us", live: true, items: [] }) });
+    }));
+    render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
+    expect(await screen.findByText(/Loading app verification listings/)).toBeTruthy();
+    expect(screen.queryByText(/0 listings · United States selected/)).toBeNull();
+    expect(screen.queryByText("No listings match these filters")).toBeNull();
+    expect(screen.queryByText(/No app verification listings were reported/)).toBeNull();
+    await act(async () => { finishOtp({ ok: true, json: async () => ({ ok: true, country: "us", live: true, items: [{
+      id: "otp-sample", category: "verification", name: "WhatsApp", description: "Live offer", tag: "Messaging",
+      artwork: { kind: "service", name: "numbers" }, source: "live", coverage: "catalog-country", stock: 7, myUnits: null, price: null, action: null,
+    }] }) }); });
+    expect(await screen.findByRole("heading", { name: "WhatsApp" })).toBeTruthy();
+    expect(screen.getByText(/1 listing · United States selected/)).toBeTruthy();
+  });
+
+  it("shows a genuine empty result only after a successful verification read", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, country: "us", live: true, items: [] }) }));
+    render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
+    expect(await screen.findByText(/No app verification listings were reported for United States/)).toBeTruthy();
+    expect(screen.getByText(/0 listings · United States selected/)).toBeTruthy();
+  });
+
+  it("does not describe a verification feed failure as zero inventory", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ reason: "unavailable" }), {
+      status: 503, headers: { "content-type": "application/json", "retry-after": "10" },
+    })));
+    render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
+    expect(await screen.findByText(/App verification listings are unavailable right now/)).toBeTruthy();
+    expect(screen.queryByText(/0 listings · United States selected/)).toBeNull();
+    expect(screen.queryByText(/No app verification listings were reported/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+  });
+
+  it("labels throttled cached verification listings as incomplete and holds retry until the cooldown", async () => {
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      const feed = new URL(url, "https://pryva.test").searchParams.get("feed");
+      const data = feed === "verification" ? { ok: true, country: "us", live: true, partial: true, reason: "partial",
+        fetchedAt: "2026-01-01T12:34:56.000Z", items: [{
+          id: "otp-stale", category: "verification", name: "Stale WhatsApp", description: "Live offer", tag: "Messaging",
+          artwork: { kind: "service", name: "numbers" }, source: "live", coverage: "catalog-country", stock: 3, myUnits: null, price: null, action: null,
+        }] } : { ok: true, country: "us", live: true, items: [] };
+      return Promise.resolve(Response.json(data, { headers: { "retry-after": "60" } }));
+    }));
+    render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
+    expect(await screen.findByRole("heading", { name: "Stale WhatsApp" })).toBeTruthy();
+    expect(screen.getByText(/Live listings may be incomplete or out of date/)).toBeTruthy();
+    expect(screen.queryByText(/Live listings are current/)).toBeNull();
+    expect(screen.getByText("2026-01-01 12:34:56 UTC")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Retry" }).hasAttribute("disabled")).toBe(true);
+  });
+
   it("renders a fast feed while another is pending, then reuses it when switching categories", async () => {
     let finishOtp!: (response: unknown) => void;
     const pending = new Promise((resolve) => { finishOtp = resolve; });

@@ -11,6 +11,7 @@ const bitcall = vi.hoisted(() => ({
   configured: true,
   buy: vi.fn(),
   list: vi.fn(),
+  detail: vi.fn(),
   cancel: vi.fn(),
   read: vi.fn(),
 }));
@@ -32,7 +33,8 @@ vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
     isBitcallConfigured: () => bitcall.configured,
     buyBitcallOtpActivation: bitcall.buy,
     listBitcallOtpServices: bitcall.list,
-    listBitcallOtpCountryEntries: async () => [],
+    listBitcallOtpCountryEntries: async () => [{ countryCode: "NG_1", name: "Nigeria", pools: [] }],
+    getBitcallOtpOffer: bitcall.detail,
     cancelBitcallOtpActivation: bitcall.cancel,
     getBitcallOtpActivation: bitcall.read,
   };
@@ -93,6 +95,13 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
   fleexa.list.mockResolvedValue([]);
   bitcall.list.mockResolvedValue([]);
+  // The exact-offer read sees the same quote unless a test overrides it.
+  bitcall.detail.mockImplementation(async (ref: string) => {
+    const rows = await bitcall.list.mock.results.at(-1)?.value as Array<{ countryCode: string; offers: Array<{ serviceId: string }> }>;
+    const row = rows?.find((entry) => entry.offers.some((offer) => offer.serviceId === ref));
+    const offer = row?.offers.find((entry) => entry.serviceId === ref);
+    return offer && row ? { ...offer, countryCode: row.countryCode } : null;
+  });
   bitcall.buy.mockResolvedValue(activation);
   bitcall.cancel.mockResolvedValue({ activationId: "act-1", status: "cancelled" });
 });
@@ -185,7 +194,7 @@ describe("Bitcall-only fulfilment", () => {
     await expect(fulfillPlan(plan, { otpOfferId: id, onOtpAttempt, onOtpAccepted }))
       .resolves.toMatchObject({ provider: "bitcall", providerRequestId: "act-1" });
 
-    expect(bitcall.list).toHaveBeenCalledWith({});
+    expect(bitcall.list).toHaveBeenCalledWith({ countryCode: "NG_1" }, { signal: expect.any(AbortSignal) });
     expect(bitcall.buy).toHaveBeenCalledTimes(1);
     expect(bitcall.buy).toHaveBeenCalledWith(selectedRef);
     expect(fleexa.buy).not.toHaveBeenCalled();

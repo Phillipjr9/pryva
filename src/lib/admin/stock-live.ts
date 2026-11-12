@@ -2,16 +2,12 @@ import "server-only";
 
 import { isMarketplaceCatalogAvailable, listMarketplaceListings } from "@/lib/services/accounts/marketplace-suppliers";
 import { usdMicros } from "@/lib/payments/supplier-money";
-import {
-  isBitcallConfigured,
-  listBitcallOtpCountryEntries,
-} from "@/lib/providers/bitcall";
+import { isBitcallConfigured } from "@/lib/providers/bitcall";
 import type { FleexaEmailProduct, FleexaSmsService } from "@/lib/providers/fleexa";
 import { isFleexaConfigured } from "@/lib/providers/fleexa";
 import { logger } from "@/lib/platform/logger";
 import { readSupplierSnapshot } from "@/lib/services/numbers/fleexa-catalog";
-import { normalizeCountryCode } from "@/lib/services/numbers/otp-suppliers";
-import { supplierAmountToNgn } from "@/lib/payments/supplier-currency";
+import { normalizeCountryCode, readOtpOffersForSupplier } from "@/lib/services/numbers/otp-suppliers";
 import { fulfilablePlans } from "@/lib/services/fulfillment";
 import { readBoostSnapshot } from "@/lib/services/boosts/smm-catalog";
 import { isSmmPanelConfigured } from "@/lib/providers/smm-panel";
@@ -60,39 +56,42 @@ export async function buildStockReport(options: { refresh?: boolean } = {}): Pro
   const sellable = fulfilablePlans();
 
   /* Single-use OTP stock is Bitcall-only; rentals and inbox diagnostics stay on Fleexa. */
-  const sellableSmsCountries = new Set(
-    sellable
-      .filter((entry) => entry.intent.kind === "sms")
-      .map((entry) => normalizeCountryCode(entry.intent.country) ?? ""),
-  );
-  let smsServices: FleexaSmsService[] = [];
+  const smsCountries = new Map<string, string>();
+  for (const { plan, intent } of sellable) {
+    if (intent.kind === "sms") smsCountries.set(intent.country, plan.region);
+  }
+  const smsServices: FleexaSmsService[] = [];
+  const unknownCountries = new Set<string>();
   let otpError: string | null = isBitcallConfigured() ? null : NOT_CONFIGURED;
   if (isBitcallConfigured()) {
-    try {
-      // The country catalogue is where a destination and its pooled offers are
-      // stated. The service catalogue names no country at all, so building this
-      // lane from it reported every destination as having no stock.
-      const catalogue = await listBitcallOtpCountryEntries();
-      for (const entry of catalogue) {
-        const countryCode = normalizeCountryCode(entry.countryCode || entry.name);
-        if (!countryCode || !sellableSmsCountries.has(countryCode)) continue;
-        for (const offer of entry.pools) {
-          if (!offer.serviceId) continue;
-          smsServices.push({
-            id: offer.serviceId,
-            name: entry.name ?? countryCode,
-            country: countryCode,
-            priceNgn: await supplierAmountToNgn(offer.price, offer.currency),
-            stock: offer.availableCount,
-          });
+    // Reuse the same country-filtered reads as the storefront. The documented
+    // country index publishes codes and starting prices, not per-service pools.
+    await Promise.all([...smsCountries].map(async ([countryCode, region]) => {
+      try {
+        const read = await readOtpOffersForSupplier("bitcall", countryCode, region, undefined, refresh);
+        if (read.errorCode || read.stale || read.partial) {
+          unknownCountries.add(countryCode);
+          return;
         }
+        for (const offer of read.offers) {
+          if (offer.supplier !== "bitcall" || normalizeCountryCode(offer.country) !== countryCode) continue;
+          smsServices.push({ id: offer.ref, name: offer.app, country: countryCode, priceNgn: offer.costNgn, stock: offer.stock });
+        }
+      } catch {
+        unknownCountries.add(countryCode);
       }
-    } catch (error) {
-      otpError = message(error);
-      logger.warn("Bitcall catalog unavailable for stock report", { error: otpError });
+    }));
+    if (unknownCountries.size) {
+      otpError = "Some number catalogues could not be confirmed";
+      logger.warn("Bitcall catalog incomplete for stock report", { countries: unknownCountries.size });
     }
   }
-  lanes.push(summariseLane("numbers", "Virtual numbers", numberPlanLines(sellable, smsServices), {
+  const smsLines = numberPlanLines(sellable, smsServices).map((line) => {
+    const plan = sellable.find((entry) => entry.plan.slug === line.id && entry.intent.kind === "sms");
+    if (!plan || plan.intent.kind !== "sms" || !unknownCountries.has(plan.intent.country)) return line;
+    return { ...line, state: "unknown" as const, stock: null, note: "the live number catalogue could not be confirmed" };
+  });
+  lanes.push(summariseLane("numbers", "Virtual numbers", smsLines, {
     connected: isBitcallConfigured(),
     error: otpError,
   }));
