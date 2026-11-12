@@ -225,14 +225,24 @@ production-mode Next fixture using the services error boundary confirmed that
 retry re-fetches a failed Server Component and recovers from a client render
 error. These fixtures are not live supplier or paid-checkout tests.
 
-At verification, production was `dpl_38v4mH6PNeK65R226R3nfGKZUmGM` at
-`82588da12e8992d0ae5eeb4521508e903cbc58b6`, while this branch is based on
-`7478bf869979bf770ed95e20a65b3b70eecf8eff`. They diverge: production contains
-`/dashboard/proxies`, which this branch does not, and this branch contains later
-OTP and checkout work absent from that production tree. Reconcile both histories
-and revalidate before any separately approved release; deploying this tree as-is
-would remove the production proxy page. No deployment or paid order was made for
-this investigation. Obtain the affected page/category, country, approximate UTC
-time and sanitized error or screenshot, then correlate with runtime logs and an
-authenticated, read-only catalogue response. Do not request or share credentials,
-cookies, authorization headers or complete supplier payloads.
+At initial verification, production was `dpl_38v4mH6PNeK65R226R3nfGKZUmGM` at
+`82588da12e8992d0ae5eeb4521508e903cbc58b6`, while this branch was based on
+`7478bf869979bf770ed95e20a65b3b70eecf8eff`. Those histories diverged: the live
+tree had a proxy shop that the branch lacked, and the branch had newer OTP and
+checkout work. The release candidate incorporates the production commit, restores
+`/dashboard/proxies` unchanged, retains the newer OTP work, and corrects category
+copy to say Number plans includes both app-specific and general offers. Migration
+files and the migration runner match the previously live production tree.
+
+On the reconciled candidate, build, typecheck, full ESLint, enforced pricing audit,
+production dependency audit and 159 focused tests passed. The full suite passed
+3,341 of 3,348 tests; all seven failures were among the previously observed
+baseline failures. Two navigation assertions were then updated to recognize the
+restored dedicated proxy shop and passed in a 42-test navigation/explorer run.
+The five other failures concern existing public eSIM copy, pricing availability,
+and supplier-copy expectations. No authenticated production catalogue response or
+paid order was obtained during this investigation. Obtain the affected
+page/category, country, approximate UTC time and sanitized error or screenshot,
+then correlate with runtime logs and an authenticated, read-only catalogue
+response. Do not request or share credentials, cookies, authorization headers or
+complete supplier payloads.

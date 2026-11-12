@@ -820,8 +820,12 @@ export function ServiceExplorer({
               onClear={clearQuickSelection}
             />
 
-            {category === "numbers" && <div className="mt-3 rounded-xl border border-line bg-white p-3 text-meta text-ink-2">
-              <p>Browse app-specific single-use numbers alongside general plans and rentals for {selectedCountry.name}. Some countries are view-only; each offer shows if purchasing is available. Choose another country to check its offers.</p>
+            {(category === "numbers" || category === "verification") && <div role="note" className="mt-3 rounded-xl border border-lav-200 bg-lav-50/60 p-3 text-meta leading-relaxed text-ink-2">
+              <p><strong className="text-ink">Not sure which category?</strong> Number plans includes app-specific single-use offers alongside general plans and rentals for {selectedCountry.name}. App verification focuses on those same app-specific offers. Availability and checkout depend on each offer and country.</p>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                <button type="button" onClick={() => chooseCategory("numbers")} className="font-semibold text-lav-700 underline">Browse number plans</button>
+                <button type="button" onClick={() => chooseCategory("verification")} className="font-semibold text-lav-700 underline">Browse app-specific SMS</button>
+              </div>
             </div>}
             {enableDigitalCatalogue && <label className="mt-3 flex items-center gap-2 text-meta text-ink-2"><input type="checkbox" checked={stockOnly} onChange={(event) => { setStockOnly(event.target.checked); setVisible(PAGE_SIZE); }} />Show catalogue listings with reported stock only</label>}
             {enableDigitalCatalogue && category === "subscriptions" && <p className="mt-2 text-meta text-ink-2">Browse subscription product types below or search by product name. {stockOnly ? "Out-of-stock and unknown-stock listings are hidden; clear the stock filter to include them." : "All reported availability states are included; ordering is checked separately."} Use load more to browse remaining catalogue pages.</p>}
