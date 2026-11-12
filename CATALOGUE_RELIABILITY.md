@@ -239,10 +239,22 @@ production dependency audit and 159 focused tests passed. The full suite passed
 3,341 of 3,348 tests; all seven failures were among the previously observed
 baseline failures. Two navigation assertions were then updated to recognize the
 restored dedicated proxy shop and passed in a 42-test navigation/explorer run.
-The five other failures concern existing public eSIM copy, pricing availability,
-and supplier-copy expectations. No authenticated production catalogue response or
-paid order was obtained during this investigation. Obtain the affected
-page/category, country, approximate UTC time and sanitized error or screenshot,
-then correlate with runtime logs and an authenticated, read-only catalogue
-response. Do not request or share credentials, cookies, authorization headers or
-complete supplier payloads.
+The five other failures concerned public eSIM copy, pricing availability, and
+supplier-copy expectations.
+
+During release validation a newer production commit, `2095bed`, was promoted on
+the other production history. The candidate also merges that commit, retaining
+its grouped service navigation, proxy shop and public-page updates alongside the
+recovery and Number plans work. Data readiness copy now accurately describes the
+published Nigerian catalogue while stating that checkout and delivery are not
+connected. After reconciliation, 407 tests across 41 affected files passed,
+including the previously failing test files; build, typecheck, lint, enforced
+pricing audit and production dependency audit passed. The full suite was not
+repeated after this second merge. The migration files and runner still match the
+newest production commit.
+
+No authenticated production catalogue response or paid order was obtained during
+this investigation. Obtain the affected page/category, country, approximate UTC
+time and sanitized error or screenshot, then correlate with runtime logs and an
+authenticated, read-only catalogue response. Do not request or share credentials,
+cookies, authorization headers or complete supplier payloads.

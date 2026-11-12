@@ -203,14 +203,14 @@ describe("homepage service list", () => {
       "eSIM Data",
       "Residential Proxies",
       "Email OTP",
-      "Netflix",
+      "Digital Accounts",
       "Data Plans",
       "Bulk Orders",
       "Scheduled Purchases",
     ];
 
-    // Accounts deliberately uses the real Netflix mark, whose accessible name
-    // describes the actual logo. Other service families use their own glyphs.
+    // The multi-platform accounts family uses its own category glyph rather
+    // than borrowing one platform's logo. Other service families do the same.
     // The accessible name is the icon's identity now that it is inline SVG.
     // Counting `aria-label` rather than a file name also proves the icon is
     // actually labelled, which a bare <img src> never guaranteed.

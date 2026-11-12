@@ -120,11 +120,11 @@ const serviceDefinitions: Service[] = [
   {
     slug: "proxies", name: "Residential Proxies", shortName: "Proxies", href: "/proxies",
     eyebrow: "Live proxy plans", tagline: "Residential proxies by country and state.",
-    description: "Browse live proxy plans and final naira prices from the connected supplier.",
+    description: "Browse live proxy plans and final naira prices by destination.",
     intro: "Choose a current plan and supported destination in your dashboard. Each purchased IP slot is activated only when you extract its credentials, and lasts up to six hours.",
     unit: "per IP slot", icon: "globe",
     highlights: [
-      { title: "Live plans", body: "Current plan sizes and final naira prices are fetched from the supplier." },
+      { title: "Live plans", body: "Current plan sizes and final naira prices are checked when you sign in." },
       { title: "Choose a destination", body: "Select from supported countries and states shown at checkout." },
       { title: "Owner-only credentials", body: "Extract credentials when ready. They are returned only to the signed-in owner while the slot is active." },
     ],
@@ -133,7 +133,7 @@ const serviceDefinitions: Service[] = [
     faqs: [
       { q: "How do I buy a proxy?", a: "Sign in to see live plans, choose a destination, and review the current naira price before confirming." },
       { q: "How long does a proxy slot last?", a: "A slot is short-term and lasts no longer than six hours. Extract it when you are ready to use it." },
-      { q: "Can I buy a proxy now?", a: "Yes. Sign in to see whether the supplier currently has plans available for your destination." },
+      { q: "Can I buy a proxy now?", a: "Yes. Sign in to check current plans and availability for your destination." },
       { q: "Does a proxy guarantee anonymity?", a: "No. A proxy does not by itself guarantee anonymity or access to a particular site." },
     ],
   },

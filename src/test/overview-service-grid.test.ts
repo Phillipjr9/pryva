@@ -25,6 +25,13 @@ describe("overview service hub", () => {
     expect(overview).not.toContain("<DigitalCatalogHighlights");
   });
 
+  it("pins Social & Digital Accounts as a direct, clearly distinguished shortcut", () => {
+    expect(overview).toContain('quickBuys.find((item) => item.category === "accounts")');
+    expect(overview).toContain('quickBuys.filter((item) => item.category !== "accounts")');
+    expect(overview).toContain('href={accountShortcut.href}');
+    expect(overview).toContain("separate from App verification");
+  });
+
   it("keeps quick actions balanced on a phone and stacks to one column on the wide sidebar", () => {
     expect(grid).toContain("grid-cols-2");
     expect(grid).toContain("sm:grid-cols-2");

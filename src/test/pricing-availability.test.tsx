@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import PricingPage from "@/app/(site)/pricing/page";
-import { formatNaira, plans } from "@/lib/services/catalog";
+import { plans } from "@/lib/services/catalog";
 import { isPlanFulfillable } from "@/lib/services/fulfillment";
 
 /**
@@ -26,10 +26,9 @@ const NOTE = "Ordering is unavailable for this plan here; no charge can be made.
  * so the "one action or one note per card" rule below still holds; only the
  * wording of the eSIM dead end changes.
  */
-const LIVE_ESIM_NOTE = "Example only — not orderable. See current eSIM plans";
-// email-otp is absent: a temporary inbox is free, so it has no plans to price
-// and no group on this page. Pinned explicitly below.
-const PRICED_SERVICES = ["numbers", "esim", "proxies"];
+// eSIM and proxies are live catalogues, not static plan prices. Only number
+// plans backed by the local price book are rendered as individual pricing cards.
+const PRICED_SERVICES = ["numbers"];
 
 const priced = plans.filter((plan) => PRICED_SERVICES.includes(plan.service));
 
@@ -60,9 +59,9 @@ const LIVE_ESIM_LINK = "/esim";
 
 describe("/pricing only offers to sell what can be delivered", () => {
   it("covers both kinds of plan, so the assertions below are not vacuous", () => {
-    expect(priced.length).toBe(17);
+    expect(priced.length).toBe(12);
     expect(deliverable.length).toBe(10);
-    expect(undeliverable.length).toBe(7);
+    expect(undeliverable.length).toBe(2);
   });
 
   it("does not offer checkout when supplier ordering is unconfigured", () => {
@@ -87,7 +86,7 @@ describe("/pricing only offers to sell what can be delivered", () => {
 
   it("says so in the same words the plan page already uses", () => {
     const esimDead = undeliverable.filter((plan) => plan.service === "esim").length;
-    expect(count(NOTE) + count(LIVE_ESIM_NOTE)).toBe(undeliverable.length);
+    expect(count(NOTE)).toBe(undeliverable.length);
     // A sample card may point at the live catalogue, but never at a sale.
     if (esimDead > 0) expect(count("/signup?plan=esim-")).toBe(0);
   });
@@ -119,15 +118,11 @@ describe("/pricing only offers to sell what can be delivered", () => {
     expect(markup).not.toContain("Shared team access");
   });
 
-  it("still shows what an undeliverable plan claims to be, which is why the note matters", () => {
-    const scale = plans.find((plan) => plan.slug === "proxy-ng-25");
-    expect(scale, "proxy-ng-25 should exist in the catalog").toBeDefined();
-    // planLabel and duration are NOT suppressed, so this plan still reads as 25GB
-    // in Nigeria for 30 days, with a price. That is the listing the owner wants
-    // kept; the note is what stops it reading as an offer to sell it.
-    expect(markup).toContain(scale!.planLabel);
-    expect(markup).toContain(scale!.duration);
-    expect(markup).toContain(formatNaira(scale!.price));
+  it("routes live proxy pricing to the signed-in shop instead of showing sample prices", () => {
+    expect(markup).toContain("Residential Proxies");
+    expect(markup).toContain("/login?next=%2Fdashboard%2Fproxies");
+    expect(markup).toContain("Current plans and final naira prices load after sign-in");
+    expect(markup).not.toContain("25GB · Nigeria");
   });
 
   /**

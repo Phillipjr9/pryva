@@ -68,7 +68,7 @@ const DETAIL: Record<ServiceId, Copy> = {
   topups: () => "Browse account top-ups; ordering depends on the individual product and may be paused.",
   "gift-cards": () => "Browse digital vouchers; ordering depends on the individual product and may be paused.",
   prepaid: () => "Browse prepaid products and cards; these products are not currently available to order.",
-  data: () => "Mobile data delivery is not connected, so plans and prices are not currently shown.",
+  data: () => "Browse published Nigerian data plans and prices when available. Checkout and delivery are not connected yet.",
   tools: ({ preview, supplier }) =>
     supplier("fleexa")
       ? "Bulk orders buy the same units as a single order. Eligible schedules run nightly."

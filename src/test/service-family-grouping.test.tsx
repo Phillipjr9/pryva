@@ -63,7 +63,8 @@ it("keeps the same live app offer available in Number plans and App verification
   expect(await screen.findByRole("button", { name: /WhatsApp.*1 option/ })).toBeTruthy();
   const numberSection = screen.getByRole("region", { name: "Apps for single-use numbers" });
   expect(within(numberSection).getByRole("link", { name: "Choose service" }).getAttribute("href")).toBe(`${otp.action?.href}&from=numbers`);
-  fireEvent.click(screen.getByRole("button", { name: /App verification/ }));
+  expect(screen.getByText(/App verification focuses on those same app-specific offers/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Browse app-specific SMS" }));
   expect(screen.getByRole("heading", { level: 1, name: "App verification" })).toBeTruthy();
   const card = (await screen.findByRole("heading", { name: "WhatsApp" })).closest("article")!;
   expect(within(card).getByRole("link", { name: "Choose service" }).getAttribute("href")).toBe(otp.action?.href);

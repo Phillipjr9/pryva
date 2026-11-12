@@ -32,6 +32,7 @@ import {
   explorerCountry,
   filterExplorerItems,
   mergeExplorerSources,
+  type ExplorerCategory,
   type ExplorerFilter,
   type ExplorerItem,
 } from "@/lib/services/service-explorer";
@@ -59,6 +60,33 @@ const SOCIAL_TAGS = [
 ];
 const NUMBER_TAGS = ["Single use", "Rental", "Bundle"];
 const DATA_TAGS = ["MTN", "Airtel", "Glo", "9mobile"];
+
+/** Keep related services together; category cards wrap instead of hiding off-screen on phones. */
+const SERVICE_CATEGORY_GROUPS: ReadonlyArray<{
+  id: string;
+  label: string;
+  description: string;
+  categories: readonly ExplorerCategory[];
+}> = [
+  {
+    id: "connectivity",
+    label: "Phone & connectivity",
+    description: "Numbers, verification, and internet access",
+    categories: ["numbers", "verification", "esim", "data", "proxies"],
+  },
+  {
+    id: "digital-products",
+    label: "Digital products & accounts",
+    description: "Accounts, entertainment, games, and credit",
+    categories: ["accounts", "subscriptions", "games", "topups", "gift-cards", "prepaid"],
+  },
+  {
+    id: "growth-tools",
+    label: "Growth & everyday tools",
+    description: "Audience growth, inboxes, and order helpers",
+    categories: ["social", "email", "tools"],
+  },
+];
 
 const CATEGORY_ICONS: Record<string, string> = {
   verification: "💬",
@@ -130,7 +158,7 @@ function SiteFavicon({ domain, size }: { domain: string; size: number }) {
 
 function ListingLogo({ src, size }: { src: string; size: number }) {
   const [failed, setFailed] = useState(false);
-  if (failed) return <ServiceIcon service="numbers" size={size <= 28 ? "sm" : "md"} />;
+  if (failed) return <ServiceIcon service="accounts" size={size <= 28 ? "sm" : "md"} decorative />;
   // Brand assets have already been matched to exact names in the server allowlist.
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={src} alt="" width={size} height={size} loading="lazy" decoding="async"
@@ -664,6 +692,12 @@ export function ServiceExplorer({
       <p className="mt-2 text-meta text-ink-2">Browse current Nigerian data bundles by network, lowest published price first. Airtime listings are not connected yet. Purchases are not available from this catalogue yet.</p>
     </div>
     <button type="button" onClick={() => chooseCategory("all")} className="w-fit text-meta font-semibold text-lav-700 underline">Back to all services</button>
+    {selectedReadiness && selectedReadiness.state !== "buy" && selectedReadiness.state !== "free" ? (
+      <div role="note" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-white px-3.5 py-2.5 text-meta text-ink-2">
+        <span>{selectedReadiness.detail}</span>
+        <Link href={`/dashboard/support#ask=${encodeURIComponent(`When will ${selectedReadiness.label} be available to order?`)}`} className="shrink-0 font-semibold text-lav-700 underline underline-offset-2">Ask about it</Link>
+      </div>
+    ) : null}
     <DataPlansForm />
   </div>;
 
@@ -727,43 +761,55 @@ export function ServiceExplorer({
               </span>
             </div>
             {summary ? <p className="mt-1.5 text-meta text-ink-3">{summary}</p> : null}
-            {/*
-              `relative` is not decoration. The chips are a horizontal scroll
-              strip on a phone, and each one carries an `sr-only` status label
-              ("— Not connected") for screen readers. `sr-only` is
-              `position: absolute`, so without a positioned ancestor it escapes
-              the strip entirely and resolves against the page — where the
-              strip has been scrolled it lands *past* the right edge of the
-              viewport, at the unscrolled offset of a chip nobody can see. That
-              made the document 1403px wide on a 390px phone, and a mobile
-              browser that finds a page three times the screen width zooms out
-              to fit it. This one class keeps every label inside the strip.
-            */}
-            <div className="relative -mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:mt-4 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:pb-0" aria-label="Service categories">
-              <button type="button" onClick={() => chooseCategory("all")} aria-pressed={category === "all"} className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-meta font-semibold transition-colors sm:px-3.5 sm:py-2 ${category === "all" ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}>
-                <span aria-hidden="true">⚡</span> All categories
+            <div role="group" aria-label="Service categories" className="mt-3 space-y-4 sm:mt-4">
+              <button
+                type="button"
+                onClick={() => chooseCategory("all")}
+                aria-pressed={category === "all"}
+                className={`flex min-h-11 w-full items-center justify-between rounded-xl border px-3.5 py-2.5 text-left text-meta font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-lav-400 ${category === "all" ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}
+              >
+                <span><span aria-hidden="true">⚡</span> All categories</span>
+                <span className="text-micro font-medium opacity-75">Browse everything</span>
               </button>
-              {orderedCategories.map((entry) => {
-                const state = readinessById.get(entry.id);
-                return (
-                  <button
-                    key={entry.id}
-                    type="button"
-                    title={state ? `${entry.description} · ${SERVICE_STATE_LABEL[state.state]}` : entry.description}
-                    onClick={() => chooseCategory(entry.id)}
-                    aria-pressed={category === entry.id}
-                    className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-meta font-semibold transition-colors sm:px-3.5 sm:py-2 ${category === entry.id ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}
-                  >
-                    <span aria-hidden="true">{CATEGORY_ICONS[entry.id] ?? "✨"}</span> {entry.label}
-                    {state ? (
-                      <>
-                        <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${SERVICE_STATE_DOT[state.state]}`} />
-                        <span className="sr-only">— {SERVICE_STATE_LABEL[state.state]}</span>
-                      </>
-                    ) : null}
-                  </button>
-                );
-              })}
+              <div className="grid gap-3 lg:grid-cols-3 lg:gap-4">
+                {SERVICE_CATEGORY_GROUPS.map((group) => {
+                  const groupEntries = orderedCategories.filter((entry) => group.categories.includes(entry.id));
+                  return (
+                    <section key={group.id} aria-labelledby={`category-group-${group.id}`} className="min-w-0 rounded-2xl border border-line bg-white/70 p-3 sm:p-4">
+                      <div className="mb-2.5">
+                        <h3 id={`category-group-${group.id}`} className="text-meta font-semibold text-ink">{group.label}</h3>
+                        <p className="mt-0.5 text-micro leading-relaxed text-ink-3">{group.description}</p>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                        {groupEntries.map((entry) => {
+                          const state = readinessById.get(entry.id);
+                          const selected = category === entry.id;
+                          return (
+                            <button
+                              key={entry.id}
+                              type="button"
+                              title={`${entry.description}${state ? ` · ${SERVICE_STATE_LABEL[state.state]}` : ""}`}
+                              onClick={() => chooseCategory(entry.id)}
+                              aria-pressed={selected}
+                              className={`flex min-h-[88px] min-w-0 items-start gap-2.5 rounded-xl border p-2.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-lav-400 ${selected ? "border-lav-700 bg-lav-700 text-white" : "border-line bg-white text-ink hover:border-lav-300 hover:bg-lav-50/60"}`}
+                            >
+                              <span aria-hidden="true" className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-base ${selected ? "bg-white/15" : "bg-lav-50"}`}>{CATEGORY_ICONS[entry.id] ?? "✨"}</span>
+                              <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+                                <span className="w-full break-words text-meta font-semibold leading-snug">{entry.label}</span>
+                                <span className={`line-clamp-2 text-micro leading-snug ${selected ? "text-white/80" : "text-ink-3"}`}>{entry.description}</span>
+                                {state && <span className={`mt-0.5 inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-0.5 text-micro font-semibold leading-tight ${selected ? "bg-white/15 text-white" : "bg-cream text-ink-2"}`}>
+                                  <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${selected ? "bg-current" : SERVICE_STATE_DOT[state.state]}`} />
+                                  <span className="break-words">{SERVICE_STATE_LABEL[state.state]}</span>
+                                </span>}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
             </div>
             {selectedReadiness && selectedReadiness.state !== "buy" && selectedReadiness.state !== "free" ? (
               <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-line bg-white px-3.5 py-2.5 text-meta text-ink-2">
