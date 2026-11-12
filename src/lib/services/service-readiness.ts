@@ -48,7 +48,11 @@ const DETAIL: Record<ServiceId, Copy> = {
       : supplier("bitcall")
         ? "Some travel data plans are priced live and issued as an activation code; check each listing before ordering."
         : "Some travel data listings can be browsed, but ordering is not currently available for every plan.",
-  proxies: () => "Proxy plans cannot be delivered yet. The catalogue is for comparison only; ordering is paused.",
+  proxies: ({ preview, supplier }) => preview
+    ? "Proxy ordering is unavailable in this environment."
+    : supplier("fleexa")
+      ? "Live proxy plans and destinations are checked again before purchase; credentials are issued when each slot is extracted."
+      : "The proxy supplier is not connected, so proxy orders cannot be placed.",
   email: ({ preview }) =>
     preview
       ? "The temporary inbox is unavailable in this environment."
@@ -106,9 +110,9 @@ export function readServiceReadiness(): ServiceReadinessEntry[] {
   const entries: ServiceReadinessEntry[] = SERVICES.map((service) => ({
     id: service.id,
     label: service.label,
-    // A credential alone cannot make a service buyable: these pages and
-    // purchase paths are currently disabled even when Fleexa is configured.
-    state: service.id === "proxies" || service.id === "data" || service.id === "subscriptions"
+    // Data and general subscriptions still have no full customer purchase path.
+    // Proxies are separately connected to the live Fleexa proxy API and rechecked at checkout.
+    state: service.id === "data" || service.id === "subscriptions"
       ? "paused" : stateFor(service.sale, context),
     detail: DETAIL[service.id](context),
   }));

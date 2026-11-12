@@ -337,8 +337,8 @@ export const LANES: readonly LaneDefinition[] = [
     label: "Residential proxies",
     configuredBy: "proxies",
     staleHours: 24,
-    delivery: "Proxy credentials are issued on the order page once the purchase clears.",
-    recovery: "A proxy purchase that cannot be delivered is refunded to your wallet.",
+    delivery: "Purchased slots appear on the order page; extract a slot to activate it and receive credentials, then reveal them again while active.",
+    recovery: "An ambiguous supplier result is held for reconciliation rather than retried automatically; only a confirmed supplier refusal may be refunded.",
   },
   {
     id: "subscriptions",

@@ -28,25 +28,26 @@ describe("/proxies", () => {
   const markup = renderToStaticMarkup(<ProxiesPage />);
   const proxyPlans = plansFor("proxies");
 
-  it("still lists and prices the proxy plans", () => {
+  it("replaces stale static examples with a live dashboard catalogue link", () => {
     expect(proxyPlans.length).toBeGreaterThan(0);
-    for (const plan of proxyPlans) {
-      expect(markup).toContain(plan.name);
-    }
+    expect(markup).toContain("View live proxy plans");
+    expect(markup).toContain("/login?next=%2Fdashboard%2Fproxies");
+    expect(markup).toContain("Prices and availability are fetched from the connected supplier");
+    for (const plan of proxyPlans) expect(markup).not.toContain(plan.name);
   });
 
-  it("offers no way to buy one and says why", () => {
+  it("does not claim static plans are fulfillable or show outdated prices", () => {
     for (const plan of proxyPlans) {
-      expect(isPlanFulfillable(plan.slug), `${plan.slug} must not be sellable`).toBe(false);
+      expect(isPlanFulfillable(plan.slug), `${plan.slug} must not be sellable from the stale catalog`).toBe(false);
       expect(markup, `${plan.slug} must not link to signup`).not.toContain(`/signup?plan=${plan.slug}`);
     }
-    expect(markup.split(NOTE).length - 1).toBe(proxyPlans.length);
-    expect(markup).toContain("Proxy plans are not available yet");
+    expect(markup).not.toContain(NOTE);
+    expect(markup).not.toContain("Proxy plans are not available yet");
   });
 
-  it("does not send a visitor to sign up from the hero either", () => {
-    // The only signup link in the page body used to be this one.
+  it("links only through the authenticated dashboard shop", () => {
     expect(markup).not.toContain('href="/signup"');
+    expect(markup).toContain("/login?next=%2Fdashboard%2Fproxies");
   });
 });
 

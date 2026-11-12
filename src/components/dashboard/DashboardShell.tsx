@@ -80,7 +80,7 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
       { href: "/dashboard/services", label: "Prepaid & finance", art: "prepaid", category: "prepaid" },
       { href: "/dashboard/services", label: "App verification", art: "app-verification", category: "verification" },
       { href: "/dashboard/services", label: "Social promotion", art: "social-promotion", category: "social" },
-      { href: "/dashboard/services", label: "Proxies", art: "proxies", category: "proxies" },
+      { href: "/dashboard/proxies", label: "Proxies", art: "proxies" },
       { href: "/dashboard/bulk-orders", label: "Bulk Orders", art: "bulk" },
       { href: "/dashboard/scheduled", label: "Scheduled", art: "scheduled" },
     ],

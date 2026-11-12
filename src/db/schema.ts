@@ -405,6 +405,19 @@ export const orders = pgTable(
   ],
 );
 
+/** Provider-side proxy slots attached to a Pryva order; credentials are never persisted. */
+export const proxySlots = pgTable("proxy_slots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  providerSlotId: varchar("provider_slot_id", { length: 100 }).notNull().unique(),
+  country: varchar("country", { length: 2 }).notNull(),
+  state: varchar("state", { length: 100 }),
+  proxyType: integer("proxy_type").notNull(),
+  status: varchar("status", { length: 24 }).notNull().default("purchased"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("proxy_slots_order_idx").on(table.orderId)]);
+
 /** Short-lived immutable retail quote; one quote can fund at most one order. */
 export const foxreloadQuotes = pgTable("foxreload_quotes", {
   id: uuid("id").primaryKey().defaultRandom(),

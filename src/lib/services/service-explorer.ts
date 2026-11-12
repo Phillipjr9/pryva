@@ -254,7 +254,7 @@ export function canPreviewPlan(plan: Plan, countryCode: string): boolean {
 const planCategories: Partial<Record<Plan["service"], ExplorerCategory>> = {
   numbers: "numbers",
   esim: "esim",
-  proxies: "proxies",
+  // Proxies are a live provider catalogue, not the old static planning samples.
   // email-otp is absent: a free inbox is not a catalogue plan, so it has no plan
   // rows to map. Live inbox availability reaches the explorer through
   // supplierItemsForCountry instead, already categorised as "email".
@@ -264,9 +264,9 @@ function planItems(country: ExplorerCountry): ExplorerItem[] {
   return plans.flatMap((plan): ExplorerItem[] => {
     const category = planCategories[plan.service];
     if (!category) return [];
-    // eSIM plans come from the supplier catalogue and are sold from there. The
-    // static builder has no supplier reference, so only live offers are listed.
-    if (plan.service === "esim") return [];
+    // eSIM and proxy plans come from authenticated supplier catalogues rather
+    // than this static builder. The explorer does not fabricate stale offers.
+    if (plan.service === "esim" || plan.service === "proxies") return [];
     const matches = planMatchesCountry(plan, country.code);
     const ambiguous = ambiguousPlanRegions.has(plan.region);
     if (!matches && !ambiguous) return [];
@@ -327,6 +327,12 @@ function additionalItems(_country: ExplorerCountry): ExplorerItem[] {
       description: "Buy social media, email and other accounts; aged accounts where listed", tag: "Account listings", artwork: { kind: "service", name: "accounts" },
       source: "catalog", coverage: "unconfirmed", stock: null, myUnits: null, price: null,
       action: { label: "Browse social & digital accounts", href: "/dashboard/accounts" },
+    },
+    {
+      id: "residential-proxies", category: "proxies", name: "Residential proxies",
+      description: "Browse live plans by country and state", tag: "Proxy plans", artwork: { kind: "service", name: "proxies" },
+      source: "live", coverage: "unconfirmed", stock: null, myUnits: null, price: null,
+      action: { label: "Browse live proxy plans", href: "/dashboard/proxies" },
     },
     {
       id: "bulk-orders", category: "tools", name: "Bulk orders",

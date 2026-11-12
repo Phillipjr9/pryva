@@ -1,108 +1,32 @@
-import { Metadata } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { serviceMap, plansFor, formatNaira } from "@/lib/services/catalog";
-import { isPlanFulfillable } from "@/lib/services/fulfillment";
-import { ArrowRight, Bell } from "@/components/icons";
-import { CountryFlag } from "@/components/CountryFlag";
-import { hasCountryFlag } from "@/lib/platform/countries";
 import { ServiceIcon } from "@/components/ServiceIcon";
 
 export const metadata: Metadata = {
   title: "Residential Proxies",
-  description: "Explore proxy plans for secure browsing and data collection.",
+  description: "Browse live residential proxy plans by country and state.",
 };
 
 export default function ProxiesPage() {
-  const service = serviceMap.proxies;
-  const plans = plansFor("proxies");
-
-  if (!service) return <div>Service not found</div>;
-
   return (
-    <div className="min-h-screen bg-cream">
-      <section className="py-16 sm:py-20">
-        <div className="shell">
-          <div className="max-w-3xl">
-            <ServiceIcon service="proxies" size="lg" className="mb-5" />
-            <span className="mb-4 inline-block rounded-full bg-amber-100 px-4 py-1.5 text-meta font-semibold text-amber-800">
-              Coming soon
-            </span>
-            <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3.5rem]">{service.tagline}</h1>
-            <p className="mt-6 text-[1.125rem] leading-relaxed text-ink-2">{service.description}</p>
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-[0.875rem] leading-relaxed text-amber-900">
-                <strong>Not available yet.</strong> Proxy plans are listed with their catalog prices
-                so you can compare options, but nothing here can be ordered or charged until a
-                delivery path is connected.
-              </p>
-            </div>
-            <div className="mt-6 flex flex-wrap gap-3 sm:gap-4">
-              <Link href="/status" className="inline-flex items-center gap-2 rounded-xl bg-lav-700 px-6 py-3 text-[0.9375rem] font-semibold text-white hover:bg-lav-800">
-                Check availability <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link href="/contact" className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-6 py-3 text-[0.9375rem] font-semibold text-ink hover:bg-cream">
-                <Bell className="h-4 w-4" /> Get notified
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="pb-16">
-        <div className="shell">
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {service.highlights.map((highlight, index) => (
-              <div key={index} className="rounded-2xl border border-line bg-white p-6">
-                <h3 className="text-[1.125rem] font-semibold text-ink mb-3">{highlight.title}</h3>
-                <p className="text-[0.875rem] text-ink-2 leading-relaxed">{highlight.body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="pb-16">
-        <div className="shell">
-          <h2 className="text-[1.75rem] font-semibold text-ink mb-3">Catalog pricing</h2>
-          <p className="mb-8 max-w-2xl text-[0.9375rem] leading-relaxed text-ink-2">
-            Proxy plans are not available yet, so they cannot be ordered or charged. They stay
-            listed with their prices so you can see what is planned and what it costs.
+    <main className="min-h-screen bg-cream">
+      <section className="shell py-16 sm:py-20">
+        <div className="max-w-3xl">
+          <ServiceIcon service="proxies" size="lg" className="mb-5" />
+          <p className="mb-3 text-meta font-semibold uppercase tracking-widest text-lav-700">Residential proxies</p>
+          <h1 className="text-[2.5rem] font-medium tracking-tight text-ink sm:text-[3.5rem]">Live proxy plans, checked before purchase</h1>
+          <p className="mt-6 text-[1.125rem] leading-relaxed text-ink-2">
+            Sign in to load current plans and supported countries from the supplier. Choose a country and state, review the current naira price, then extract each purchased IP when you are ready to activate it. Slots last up to six hours.
           </p>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {plans.slice(0, 6).map((plan) => (
-              <div key={plan.slug} className={`rounded-2xl border p-6 ${plan.popular ? "border-lav-600 bg-white shadow-[var(--shadow-card)]" : "border-line bg-white"}`}>
-                <h3 className="mb-2 flex items-center gap-2 text-[1.125rem] font-semibold text-ink">
-                  {hasCountryFlag(plan.region) && <CountryFlag region={plan.region} size={20} decorative />}
-                  {plan.name}
-                </h3>
-                <p className="text-[0.875rem] text-ink-2 mb-4">{plan.planLabel}</p>
-                <div className="mb-4"><span className="text-[2rem] font-bold text-ink">{formatNaira(plan.price)}</span></div>
-                {isPlanFulfillable(plan.slug) ? (
-                  <Link href={`/signup?plan=${plan.slug}`} className="block w-full rounded-xl bg-lav-700 px-4 py-3 text-center text-[0.875rem] font-semibold text-white hover:bg-lav-800">Get Started</Link>
-                ) : (
-                  <p className="block w-full rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-center text-meta font-semibold leading-relaxed text-amber-900">
-                    This plan cannot be delivered yet, so it cannot be ordered or charged.
-                  </p>
-                )}
-              </div>
-            ))}
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Link href="/login?next=%2Fdashboard%2Fproxies" className="rounded-xl bg-lav-700 px-6 py-3 font-semibold text-white hover:bg-lav-800">View live proxy plans</Link>
+            <Link href="/status" className="rounded-xl border border-line bg-white px-6 py-3 font-semibold text-ink hover:bg-cream">Service status</Link>
           </div>
+          <p className="mt-5 max-w-2xl rounded-xl border border-amber-200 bg-amber-50 p-4 text-meta leading-relaxed text-amber-900">
+            Prices and availability are fetched from the connected supplier and can change. Checkout rechecks the plan and price; proxy credentials are shown only to the signed-in owner while the slot is active.
+          </p>
         </div>
       </section>
-
-      <section className="pb-16">
-        <div className="shell max-w-3xl">
-          <h2 className="text-[1.75rem] font-semibold text-ink mb-8">FAQ</h2>
-          <div className="space-y-4">
-            {service.faqs.map((faq, index) => (
-              <div key={index} className="rounded-2xl border border-line bg-white p-6">
-                <h3 className="text-[1rem] font-semibold text-ink mb-3">{faq.q}</h3>
-                <p className="text-[0.875rem] text-ink-2 leading-relaxed">{faq.a}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-    </div>
+    </main>
   );
 }

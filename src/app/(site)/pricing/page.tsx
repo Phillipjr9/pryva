@@ -55,12 +55,12 @@ export default function PricingPage() {
         <div className="shell">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
             {serviceGroups.map((group) => {
-              const count = plans.filter((plan) => plan.service === group.slug).length;
+              const count = group.slug === "proxies" ? null : plans.filter((plan) => plan.service === group.slug).length;
               return (
                 <div key={group.slug} className="rounded-xl border border-line bg-white/85 p-2.5 text-left shadow-[var(--shadow-card)] sm:rounded-2xl sm:p-3">
                   <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.12em] text-ink-3 sm:text-[0.8125rem]">{group.name}</p>
-                  <p className="mt-1.5 text-[0.9375rem] font-semibold text-ink sm:mt-2 sm:text-[1.125rem]">{count}</p>
-                  <p className="text-[0.8125rem] text-ink-2 sm:text-[0.8125rem]">plans</p>
+                  <p className="mt-1.5 text-[0.9375rem] font-semibold text-ink sm:mt-2 sm:text-[1.125rem]">{count ?? "Live"}</p>
+                  <p className="text-[0.8125rem] text-ink-2 sm:text-[0.8125rem]">{count === null ? "supplier plans" : "plans"}</p>
                 </div>
               );
             })}
@@ -79,6 +79,19 @@ export default function PricingPage() {
                 <div className="rounded-2xl border border-line bg-white p-6">
                   <p className="text-ink-2">{live ? "Current eSIM plans, prices and coverage are listed in the dashboard." : "eSIM ordering is currently unavailable; prices and coverage cannot be confirmed."}</p>
                   {live && <Link href="/dashboard/services?category=esim" className="mt-4 inline-flex font-semibold text-lav-700 underline underline-offset-2">Browse current eSIM plans</Link>}
+                </div>
+              </div>
+            </section>
+          );
+        }
+        if (group.slug === "proxies") {
+          return (
+            <section key={group.slug} className="pb-16">
+              <div className="shell">
+                <div className="mb-6 flex items-center gap-3 sm:mb-8 sm:gap-4"><ServiceIcon service="proxies" size="lg" /><h2 className="text-[1.35rem] font-semibold text-ink sm:text-[1.75rem]">Residential Proxies</h2></div>
+                <div className="rounded-2xl border border-line bg-white p-6">
+                  <p className="text-ink-2">Live plans and final naira prices load from the supplier after sign-in. Plans, supported regions and availability may change.</p>
+                  <Link href="/login?next=%2Fdashboard%2Fproxies" className="mt-4 inline-flex font-semibold text-lav-700 underline underline-offset-2">View live proxy plans</Link>
                 </div>
               </div>
             </section>

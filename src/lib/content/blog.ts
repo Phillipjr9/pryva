@@ -39,7 +39,7 @@ export const blogPosts: BlogPost[] = [
     sections: [
       { heading: "What a proxy does", paragraphs: ["A proxy forwards network requests through another endpoint. Residential proxies use addresses associated with residential networks; location and performance can vary, and a proxy does not guarantee anonymity or access to a particular site."] },
       { heading: "Evaluate a plan", paragraphs: ["Review the location, bandwidth, expiry, authentication method and intended use before choosing a plan. Protect proxy credentials as you would a password, and use any service only with authorization and in accordance with applicable terms."] },
-      { heading: "Availability", paragraphs: ["Proxy purchases are not available yet. Check the status page for current availability."] },
+      { heading: "Availability", paragraphs: ["Sign in to browse current proxy plans and supported destinations. Supplier prices and availability can change, and each purchased slot is short-lived; extract its credentials only when you are ready to use it."] },
     ],
   },
   {
