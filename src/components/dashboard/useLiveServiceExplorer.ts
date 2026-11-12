@@ -110,18 +110,23 @@ export function useLiveServiceExplorer(country: string, revision: number, allEsi
     return () => controller.abort();
   }, [country, revision, allEsimDestinations, scope, enabled]);
 
-  // Keep every result for category switching, but only report the health and
-  // cooldown of feeds belonging to the shelf the customer is viewing.
-  const relevant = category === "all" ? FEEDS : FEEDS.filter((feed) => category === "verification" ? feed === "verification" : FEED_CATEGORIES[feed].includes(category));
+  // Number plans also show the app-specific verification feed. Include both in
+  // its status/cooldown, while keeping the verification result separate so a
+  // working rental feed cannot disguise an unavailable app feed as a zero.
+  const relevant = category === "all" ? FEEDS : FEEDS.filter((feed) =>
+    (category === "numbers" && feed === "verification") || FEED_CATEGORIES[feed].includes(category));
   const entries = state?.scope === scope ? state.feeds.filter(([feed]) => relevant.includes(feed)).map(([, value]) => value) : [];
   const retryAt = Math.max(0, ...entries.filter(retryable).map((entry) => entry.retryAt ?? 0));
   const retryBlocked = useRetryCooldown(retryAt);
+  const verificationFeed = state?.scope === scope ? state.feeds.find(([feed]) => feed === "verification")?.[1] ?? null : null;
+  const verificationRetryBlocked = useRetryCooldown(verificationFeed && retryable(verificationFeed) ? verificationFeed.retryAt ?? 0 : 0);
   if (!enabled || state?.scope !== scope) return null;
-  if (category === "all") return { ...state.value, retryBlocked };
+  const verificationLoading = state.pending.includes("verification");
+  if (category === "all") return { ...state.value, retryBlocked, verificationFeed, verificationLoading, verificationRetryBlocked };
   const gaps = entries.filter((entry) => entry.failed || entry.partial || (!entry.live && entry.reason !== "unconfigured"));
   const live = entries.some((entry) => entry.live);
   return { ...state.value, live, reason: feedReason(entries, live, relevant.length > 0 && entries.length === relevant.length),
     partial: gaps.length > 0, failed: entries.some((entry) => entry.failed),
-    loading: state.pending.some((feed) => relevant.includes(feed)), retryBlocked,
+    loading: state.pending.some((feed) => relevant.includes(feed)), retryBlocked, verificationFeed, verificationLoading, verificationRetryBlocked,
     fetchedAt: entries.flatMap((entry) => entry.fetchedAt ? [entry.fetchedAt] : []).sort()[0] ?? null };
 }

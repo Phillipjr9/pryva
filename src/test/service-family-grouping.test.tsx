@@ -47,13 +47,26 @@ it("keeps all gift-card offers visible rather than hiding a more expensive suppl
   expect(screen.getAllByRole("heading", { name: "Same gift card" })).toHaveLength(2);
 });
 
-it("explains the smaller number-plan shelf and opens app verification without changing country", async () => {
-  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ ok: true, country: "ng", live: true, items: [] }) })));
+it("keeps the same live app offer available in Number plans and App verification without changing country", async () => {
+  const otp: ExplorerItem = {
+    id: `otp-${"a".repeat(24)}`, category: "verification", name: "WhatsApp", description: "Live offer",
+    tag: "Messaging", artwork: { kind: "brand", name: "whatsapp" }, source: "live", coverage: "catalog-country",
+    stock: 5, myUnits: null, price: 1058, action: { label: "Choose service", href: `/dashboard/services/otp/otp-${"a".repeat(24)}?country=ng` },
+  };
+  const fetchMock = vi.fn(async (url: string) => ({ ok: true, json: async () => ({
+    ok: true, country: "ng", live: true, items: new URL(url, "https://example.test").searchParams.get("feed") === "verification" ? [otp] : [],
+  }) }));
+  vi.stubGlobal("fetch", fetchMock);
   render(<ServiceExplorer initialCountry="ng" initialCategory="numbers" />);
-  expect(screen.getByText(/App-specific SMS numbers are grouped under App verification/)).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Browse app-specific verification numbers" }));
+  expect(await screen.findByRole("button", { name: /WhatsApp.*1 option/ })).toBeTruthy();
+  const numberSection = screen.getByRole("region", { name: "Apps for single-use numbers" });
+  expect(within(numberSection).getByRole("link", { name: "Choose service" }).getAttribute("href")).toBe(`${otp.action?.href}&from=numbers`);
+  fireEvent.click(screen.getByRole("button", { name: /App verification/ }));
   expect(screen.getByRole("heading", { level: 1, name: "App verification" })).toBeTruthy();
+  const card = (await screen.findByRole("heading", { name: "WhatsApp" })).closest("article")!;
+  expect(within(card).getByRole("link", { name: "Choose service" }).getAttribute("href")).toBe(otp.action?.href);
   expect(new URLSearchParams(window.location.search).get("country")).toBe("ng");
+  expect(fetchMock).toHaveBeenCalledTimes(4);
 });
 
 it("loads the live data catalogue inside the data category without unrelated feeds", async () => {
