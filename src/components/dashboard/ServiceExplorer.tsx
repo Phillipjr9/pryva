@@ -594,7 +594,7 @@ export function ServiceExplorer({
                         <h3 id={`category-group-${group.id}`} className="text-meta font-semibold text-ink">{group.label}</h3>
                         <p className="mt-0.5 text-micro leading-relaxed text-ink-3">{group.description}</p>
                       </div>
-                      <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                      <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 lg:grid-cols-1">
                         {groupEntries.map((entry) => {
                           const state = readinessById.get(entry.id);
                           const selected = category === entry.id;

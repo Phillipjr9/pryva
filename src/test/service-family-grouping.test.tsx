@@ -11,6 +11,16 @@ const offer = (id: string, name: string): ExplorerItem => ({
   action: { label: "Check offer", href: `/dashboard/digital-esims?product=${id}` },
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.localStorage.clear(); });
+it("keeps category cards full-width inside desktop groups", () => {
+  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ ok: true, country: "ng", live: true, items: [] }) })));
+  render(<ServiceExplorer initialCountry="ng" initialCategory={null} />);
+  const group = screen.getByRole("region", { name: "Phone & connectivity" });
+  const firstCard = within(group).getByRole("button", { name: /Number plans/ });
+  const cardGrid = firstCard.parentElement!;
+  expect(cardGrid.className).toContain("lg:grid-cols-1");
+  expect(cardGrid.className).not.toContain("xl:grid-cols-2");
+});
+
 it("recognizes every service family and keeps offers from different sources on the same shelf", () => {
   expect(EXPLORER_CATEGORIES.map((item) => item.id)).toEqual([...SERVICE_IDS]);
   for (const id of SERVICE_IDS) expect(explorerCategory(id)).toBe(id);
