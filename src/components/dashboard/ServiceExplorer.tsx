@@ -281,6 +281,10 @@ function liveUnavailableCopy(reason: LiveState["reason"]) {
     lead: "Live listings were refreshed too quickly.",
     rest: "Give it a minute and press Retry; the listings below are unaffected.",
   };
+  if (reason === "sign-in") return {
+    lead: "Your session has expired.",
+    rest: "Sign in again to load live listings.",
+  };
   if (reason === "funding") return {
     // Out of stock at the source, not out of order. Nothing here is the
     // customer's to fix, and no amount of retrying restocks it.
@@ -624,9 +628,17 @@ export function ServiceExplorer({
               <p>Search filters the listings loaded in this category; load more pages to see further matches.</p>
               <p>Offers are grouped by service, across catalogues. Check each offer’s region and terms before buying; digital catalogue coverage is unconfirmed.</p>
               {digital.loading && <p>Loading more service offers…</p>}
-              {digital.error && <p>Some listings could not be loaded from the digital catalogue. <button type="button" onClick={digital.retry} className="font-semibold underline">Retry catalogue</button></p>}
+              {digital.error && <p>
+                {digital.reason === "environment" ? "The digital catalogue is unavailable in this environment."
+                  : digital.reason === "unconfigured" ? "Digital catalogue is not connected yet."
+                  : digital.reason === "sign-in" ? <>Your session has expired. <Link href="/login?next=%2Fdashboard%2Fservices" className="font-semibold underline">Sign in again</Link> to load digital listings.</>
+                  : digital.reason === "throttled" ? "Digital listings were requested too quickly. Wait a little before trying again."
+                  : "Some listings could not be loaded from the digital catalogue."}{" "}
+                {digital.retryBlocked && (digital.reason === "error" || digital.reason === "throttled") && "Please wait for the cooldown to finish. "}
+                {(digital.reason === "error" || digital.reason === "throttled") && <button type="button" onClick={digital.retry} disabled={digital.loading || digital.loadingMore || digital.retryBlocked} className="font-semibold underline disabled:opacity-50">Retry catalogue</button>}
+              </p>}
               {digital.limited && <p>Search results are limited. Browse category pages for more offers.</p>}
-              {digital.hasMore && <button type="button" disabled={digital.loadingMore} onClick={digital.loadMore} className="mt-2 rounded-lg border border-line px-3 py-2 font-semibold">{digital.loadingMore ? "Loading…" : "Load more digital listings"}</button>}
+              {digital.hasMore && <button type="button" disabled={digital.pageLoading || digital.loadingMore || digital.retryBlocked} onClick={digital.loadMore} className="mt-2 rounded-lg border border-line px-3 py-2 font-semibold disabled:opacity-50">{digital.loadingMore ? "Loading…" : "Load more digital listings"}</button>}
             </div>}
 
             {tags.length > 0 && (
@@ -637,11 +649,14 @@ export function ServiceExplorer({
             )}
 
             {liveState?.loading && <p role="status" className="mt-3 text-meta text-ink-3">Live listings are still loading. Available feeds are shown as they arrive.</p>}
-            {liveState?.country === country && (liveState.reason === "funding" || liveState.reason === "throttled" || liveState.reason === "error") && (
+            {liveState?.country === country && (liveState.reason === "funding" || liveState.reason === "throttled" || liveState.reason === "error" || liveState.reason === "sign-in") && (
               <p role="status" className="mt-4 text-meta text-amber-800">
-                {liveState.reason === "throttled" ? "Live listings were refreshed too quickly." : liveState.reason === "funding" ? "Live listings are paused while we restock." : "Some live listings could not be loaded."}{" "}
-                {/* No Retry on a funding gap: retrying cannot restock it. */}
-                {liveState.reason !== "funding" && <button type="button" className="font-semibold underline" onClick={() => setLiveRevision((value) => value + 1)}>Retry</button>}
+                {liveState.reason === "sign-in" ? <>Your session has expired. <Link href="/login?next=%2Fdashboard%2Fservices" className="font-semibold underline">Sign in again</Link>.</>
+                  : liveState.reason === "throttled" ? "Live listings were refreshed too quickly."
+                  : liveState.reason === "funding" ? "Live listings are paused while we restock." : "Some live listings could not be loaded."}{" "}
+                {/* No Retry on a funding gap or signed-out session. */}
+                {liveState.retryBlocked && (liveState.reason === "error" || liveState.reason === "throttled") && "Please wait before retrying. "}
+                {(liveState.reason === "error" || liveState.reason === "throttled") && <button type="button" className="font-semibold underline disabled:opacity-50" disabled={liveState.loading || liveState.retryBlocked} onClick={() => setLiveRevision((value) => value + 1)}>Retry</button>}
               </p>
             )}
             {platformGroups ? (

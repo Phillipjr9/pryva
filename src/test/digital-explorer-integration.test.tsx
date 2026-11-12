@@ -138,6 +138,98 @@ describe("digital listings in service categories", () => {
     expect(within(card).getByRole("button", { name: "Ordering paused" }).hasAttribute("disabled")).toBe(true);
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("category=topups-call-of-duty-mobile-activision"))).toBe(true);
   });
+  it("explains an unconnected catalogue instead of offering a retry that cannot work", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (new URL(url, "https://example.test").pathname === "/api/services/digital-catalog") {
+        return Response.json({ code: "unconfigured", error: "Not connected" }, { status: 503, headers: { "Retry-After": "60" } });
+      }
+      return response({ ok: true, country: "ng", live: true, items: [] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="ng" initialCategory="subscriptions" enableDigitalCatalogue />);
+    expect(await screen.findByText(/Digital catalogue is not connected yet/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Retry catalogue" })).toBeNull();
+    expect(fetchMock.mock.calls.filter(([url]) => new URL(String(url), "https://example.test").pathname === "/api/services/digital-catalog")).toHaveLength(2);
+  });
+
+  it("keeps available digital listings visible and explains a throttle", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      const parsed = new URL(url, "https://example.test");
+      if (parsed.pathname === "/api/services/digital-catalog") {
+        if (parsed.searchParams.get("category") === "games") return Response.json({ ok: true, items: [{ id: id("a"), name: "Game one", stock: "reported" }], nextCursor: null });
+        return Response.json({ error: "Please wait" }, { status: 429, headers: { "Retry-After": "60" } });
+      }
+      return response({ ok: true, country: "ng", live: true, items: [] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="ng" initialCategory="games" enableDigitalCatalogue />);
+    expect(await screen.findByRole("heading", { name: "Game one" })).toBeTruthy();
+    expect(await screen.findByText(/Digital listings were requested too quickly/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Retry catalogue" })).toHaveProperty("disabled", true);
+    expect(screen.getByText(/Please wait for the cooldown to finish/)).toBeTruthy();
+    const digitalCalls = fetchMock.mock.calls.filter(([url]) => new URL(String(url), "https://example.test").pathname === "/api/services/digital-catalog");
+    expect(digitalCalls).toHaveLength(4);
+  });
+
+  it("retries only failed shelves without hiding previously loaded listings", async () => {
+    let retrying = false;
+    let finishRetry: ((response: Response) => void) | undefined;
+    const fetchMock = vi.fn(async (url: string) => {
+      const parsed = new URL(url, "https://example.test");
+      if (parsed.pathname !== "/api/services/digital-catalog") return response({ ok: true, items: [] });
+      const root = parsed.searchParams.get("category");
+      if (root === "games") return Response.json({ ok: true, items: [{ id: id("a"), name: "Game one", stock: "reported" }], nextCursor: null });
+      if (root === "game-currency" && !retrying) return Response.json({ error: "unavailable" }, { status: 500 });
+      if (root === "game-currency") return new Promise<Response>((resolve) => { finishRetry = resolve; });
+      return Response.json({ ok: true, items: [], nextCursor: null });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="ng" initialCategory="games" enableDigitalCatalogue />);
+    expect(await screen.findByRole("heading", { name: "Game one" })).toBeTruthy();
+    const retry = await screen.findByRole("button", { name: "Retry catalogue" });
+    await waitFor(() => expect(retry).toHaveProperty("disabled", false));
+    retrying = true;
+    fireEvent.click(retry);
+    await waitFor(() => expect(finishRetry).toBeDefined());
+    expect(screen.getByRole("heading", { name: "Game one" })).toBeTruthy();
+    finishRetry!(Response.json({ ok: true, items: [{ id: id("b"), name: "Game two", stock: "reported" }], nextCursor: null }));
+    expect(await screen.findByRole("heading", { name: "Game two" })).toBeTruthy();
+    const calls = fetchMock.mock.calls.map(([url]) => new URL(String(url), "https://example.test"))
+      .filter((url) => url.pathname === "/api/services/digital-catalog");
+    expect(calls.filter((url) => url.searchParams.get("category") === "games")).toHaveLength(1);
+    expect(calls.filter((url) => url.searchParams.get("category") === "game-currency")).toHaveLength(2);
+    expect(calls.filter((url) => url.searchParams.get("category") === "gaming-services")).toHaveLength(1);
+    expect(calls.filter((url) => !url.searchParams.has("category"))).toHaveLength(1);
+  });
+
+  it("retries a failed later page without losing or reloading earlier pages", async () => {
+    let retrying = false;
+    const fetchMock = vi.fn(async (url: string) => {
+      const parsed = new URL(url, "https://example.test");
+      if (parsed.pathname !== "/api/services/digital-catalog") return response({ ok: true, items: [] });
+      if (parsed.searchParams.get("category") !== "games") return Response.json({ ok: true, items: [], nextCursor: null });
+      if (!parsed.searchParams.has("cursor")) return Response.json({ ok: true, items: [{ id: id("a"), name: "Game one", stock: "reported" }], nextCursor: "next" });
+      if (!retrying) return Response.json({ error: "unavailable" }, { status: 500 });
+      return Response.json({ ok: true, items: [{ id: id("b"), name: "Game two", stock: "reported" }], nextCursor: null });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="ng" initialCategory="games" enableDigitalCatalogue />);
+    expect(await screen.findByRole("heading", { name: "Game one" })).toBeTruthy();
+    const more = await screen.findByRole("button", { name: "Load more digital listings" });
+    await waitFor(() => expect(more).toHaveProperty("disabled", false));
+    fireEvent.click(more);
+    const retry = await screen.findByRole("button", { name: "Retry catalogue" });
+    await waitFor(() => expect(retry).toHaveProperty("disabled", false));
+    retrying = true;
+    fireEvent.click(retry);
+    expect(await screen.findByRole("heading", { name: "Game two" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Game one" })).toBeTruthy();
+    const calls = fetchMock.mock.calls.map(([url]) => new URL(String(url), "https://example.test"))
+      .filter((url) => url.pathname === "/api/services/digital-catalog" && url.searchParams.get("category") === "games");
+    expect(calls.filter((url) => !url.searchParams.has("cursor"))).toHaveLength(1);
+    expect(calls.filter((url) => url.searchParams.get("cursor") === "next")).toHaveLength(2);
+  });
+
   it("keeps partial results and reports failures without inventing stock", async () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       const root = new URL(url, "https://example.test").searchParams.get("category");

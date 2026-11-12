@@ -274,7 +274,7 @@ const MAX_CATALOG_PAGES = 100;
 const CATALOG_PAGE_SIZE = 200;
 const CATALOG_CRAWL_DEADLINE_MS = 30_000;
 
-export type BulkaccCatalog = { products: BulkaccProduct[]; partial: boolean; checkedAt: string };
+export type BulkaccCatalog = { products: BulkaccProduct[]; partial: boolean; checkedAt: string; stale?: boolean };
 type CacheEntry = { value: BulkaccCatalog; expiresAt: number };
 let catalogCache: CacheEntry | null = null;
 let catalogPending: Promise<BulkaccCatalog> | null = null;
@@ -363,20 +363,20 @@ export async function readBulkaccCatalog(): Promise<BulkaccCatalog> {
       if (!added) throw new BulkaccError("Catalogue pagination stalled", "bad_response", 502);
     }
     throw new BulkaccError("Catalogue exceeds the pagination safety bound", "bad_response", 502);
-  })();
-  catalogPending = pending;
-  try { return await pending; }
-  catch (error) {
-    // Keep serving the last complete value in this process. Cross-instance
-    // last-known-good behaviour is supplied by the shared marketplace snapshot.
+  })().catch((error: unknown) => {
+    // Keep the last complete local value, but mark it so a caller cannot
+    // republish this expired fallback as a newly refreshed shared snapshot.
+    // The fallback is inside the coalesced promise: all waiters see the same result.
     if (catalogCache) {
       logger.warn("Account catalogue refresh failed; using last complete snapshot", {
         code: error instanceof BulkaccError ? error.code : "catalog_read_failed",
       });
-      return catalogCache.value;
+      return { ...catalogCache.value, stale: true };
     }
     throw error;
-  }
+  });
+  catalogPending = pending;
+  try { return await pending; }
   finally { if (catalogPending === pending) catalogPending = null; }
 }
 

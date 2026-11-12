@@ -329,7 +329,7 @@ function fromAccsZone(listing: {
 }
 
 /** Whole primary catalog, or null when the primary cannot serve it. */
-async function primaryListings(): Promise<{ listings: MarketplaceListing[]; partial: boolean; checkedAt: string } | null> {
+async function primaryListings(): Promise<{ listings: MarketplaceListing[]; partial: boolean; stale: boolean; checkedAt: string } | null> {
   if (!isBulkaccConfigured()) return null;
   try {
     const snapshot = await readBulkaccCatalog();
@@ -337,7 +337,7 @@ async function primaryListings(): Promise<{ listings: MarketplaceListing[]; part
       const listing = toListing(product);
       return { ...listing, browseGroup: browseGroupFor(listing) };
     });
-    return { listings, partial: snapshot.partial, checkedAt: snapshot.checkedAt };
+    return { listings, partial: snapshot.partial, stale: snapshot.stale === true, checkedAt: snapshot.checkedAt };
   } catch (error) {
     // A primary catalog failure is exactly when the fallback earns its place.
     logger.warn("Primary account catalog unavailable, falling back", {
@@ -409,8 +409,9 @@ async function secondaryListings(): Promise<{ listings: MarketplaceListing[]; ch
 async function buildCombinedCatalog(): Promise<BrowseCatalog> {
   const [primary, secondary] = await Promise.all([primaryListings(), secondaryListings()]);
   // A complete combined snapshot requires every configured source. Publishing
-  // just the healthy half would hide products until the next crawl.
-  if ((isBulkaccConfigured() && (!primary || primary.partial))) {
+  // just the healthy half would hide products until the next crawl; publishing
+  // an expired process-local fallback would falsely mark it freshly refreshed.
+  if (isBulkaccConfigured() && (!primary || primary.partial || primary.stale)) {
     throw new Error("Primary catalogue did not complete");
   }
   return {

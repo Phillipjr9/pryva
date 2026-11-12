@@ -9,6 +9,7 @@ import { isBitcallConfigured } from "@/lib/providers/bitcall";
 import { esimItemsForAllDestinations, esimItemsForCountry, ESIM_CATALOGUE_LIMIT, readEsimCatalog } from "@/lib/services/esim/esim-catalog";
 import { explorerCountry } from "@/lib/services/service-explorer";
 import { catalogRateLimiter } from "@/lib/platform/rate-limit";
+import { retryAfterReset } from "@/lib/platform/retry-after";
 import { isFundingFailure } from "@/lib/providers/types";
 import { readOtpOffersForSupplier } from "@/lib/services/numbers/otp-suppliers";
 import { bitcallOtpItemsForCountry, otpCatalogProviderError } from "@/lib/services/numbers/otp-catalog";
@@ -102,10 +103,13 @@ export async function GET(request: NextRequest) {
   const limits = await Promise.all(feedBudgetKeys.map((key) => catalogRateLimiter(key)));
   const unavailable = limits.find((limit) => limit.unavailable);
   if (unavailable) {
-    return NextResponse.json({ error: "Catalog temporarily unavailable", reason: "unavailable" }, { status: 503 });
+    return NextResponse.json({ error: "Catalog temporarily unavailable", reason: "unavailable" }, { status: 503, headers: { "Cache-Control": "private, no-store", "Retry-After": "30" } });
   }
-  const throttled = limits.find((limit) => !limit.allowed);
-  if (throttled) return NextResponse.json({ error: "Please try again shortly", reason: "throttled" }, { status: 429 });
+  const throttled = limits.filter((limit) => !limit.allowed);
+  if (throttled.length) return NextResponse.json({ error: "Please try again shortly", reason: "throttled" }, {
+    status: 429,
+    headers: { "Cache-Control": "private, no-store", "Retry-After": retryAfterReset(Math.max(...throttled.map((limit) => limit.resetTime))) },
+  });
 
   const refresh = request.nextUrl.searchParams.get("refresh") === "1";
   const readSocial = () => attempt(isFleexaConfigured(), () => readSupplierSnapshot(refresh));
@@ -171,7 +175,7 @@ export async function GET(request: NextRequest) {
     // Configured but unreachable: this one *is* transient, and retrying works.
     return NextResponse.json(
       { error: "The live catalog is temporarily unavailable", reason: "unavailable" },
-      { status: 503 },
+      { status: 503, headers: { "Cache-Control": "private, no-store", "Retry-After": "10" } },
     );
   }
 

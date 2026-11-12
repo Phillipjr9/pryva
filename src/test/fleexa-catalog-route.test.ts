@@ -111,6 +111,15 @@ describe("supplier catalog endpoint", () => {
     expect((await GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&feed=unknown"))).status).toBe(400);
   });
 
+  it("sends a cooldown when a live catalogue feed is throttled", async () => {
+    const now = Date.now();
+    state.limit.mockResolvedValue({ allowed: false, resetTime: now + 45_000 });
+    const response = await GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&feed=numbers"));
+    expect(response.status).toBe(429);
+    expect(Number(response.headers.get("retry-after"))).toBeGreaterThanOrEqual(44);
+    expect(state.snapshot).not.toHaveBeenCalled();
+  });
+
   it("charges a combined request against all feed budgets and fails closed if any is exhausted", async () => {
     state.limit.mockImplementation(async (key: string) => ({ allowed: !key.endsWith(":verification") }));
     expect((await GET(request())).status).toBe(429);

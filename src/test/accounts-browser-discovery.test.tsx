@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { AccountsBrowser } from "@/app/(site)/accounts/AccountsBrowser";
 
 const response = (data: object) => ({ ok: true, json: async () => data });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("account catalogue discovery", () => {
   it("puts listings and search ahead of hundreds of root product types", async () => {
@@ -40,6 +40,30 @@ describe("account catalogue discovery", () => {
       expect(urls.at(-1)).toContain("search=Facebook");
       expect(urls.at(-1)).not.toContain("inStock=true");
     });
+  });
+
+  it("gives both account reads enough time for a cold shared snapshot", async () => {
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    vi.stubGlobal("fetch", vi.fn(async () => response({ configured: true, categories: [], listings: [] })));
+    render(<AccountsBrowser purchaseEnabled />);
+    await waitFor(() => expect(timeout.mock.calls.filter(([ms]) => ms === 65_000)).toHaveLength(2));
+  });
+
+  it("cancels obsolete listing reads when filters change or the page unmounts", async () => {
+    const signals: AbortSignal[] = [];
+    vi.stubGlobal("fetch", vi.fn((url: string, init: RequestInit) => {
+      if (url.includes("categories")) return Promise.resolve(response({ configured: true, categories: [] }));
+      const signal = init.signal as AbortSignal;
+      signals.push(signal);
+      return new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true }));
+    }));
+    const view = render(<AccountsBrowser purchaseEnabled />);
+    await waitFor(() => expect(signals).toHaveLength(1));
+    fireEvent.click(screen.getByRole("checkbox", { name: "In stock only" }));
+    await waitFor(() => expect(signals).toHaveLength(2));
+    expect(signals[0].aborted).toBe(true);
+    view.unmount();
+    expect(signals[1].aborted).toBe(true);
   });
 
   it("shows the supplier snapshot time instead of claiming that a reload checked stock now", async () => {

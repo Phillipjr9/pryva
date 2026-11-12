@@ -4,7 +4,7 @@ vi.mock("@/lib/identity/auth", () => ({ requireAuthApi: mocks.auth }));
 vi.mock("@/lib/providers/clubkonnect", () => ({ isClubkonnectConfigured: mocks.configured, listClubkonnectPlans: mocks.plans }));
 vi.mock("@/lib/platform/shared-snapshot", () => ({ readSharedSnapshot: mocks.snapshot }));
 vi.mock("@/lib/platform/rate-limit", () => ({ catalogRateLimiter: mocks.limit }));
-import { GET } from "@/app/api/airtime/plans/route";
+import { GET, maxDuration } from "@/app/api/airtime/plans/route";
 afterEach(() => { vi.restoreAllMocks(); vi.resetAllMocks(); vi.unstubAllEnvs(); });
 describe("live data catalogue route", () => {
   it("requires authentication", async () => {
@@ -15,7 +15,23 @@ describe("live data catalogue route", () => {
   it("requires configured credentials", async () => {
     mocks.auth.mockResolvedValue({ id: "u" });
     mocks.configured.mockReturnValue(false);
-    expect((await GET()).status).toBe(503);
+    const response = await GET();
+    expect(response.status).toBe(503);
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(await response.json()).toMatchObject({ code: "unconfigured" });
+  });
+  it("provides a cooldown when the browser has hit its rate limit", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+    mocks.auth.mockResolvedValue({ id: "u" });
+    mocks.configured.mockReturnValue(true);
+    mocks.limit.mockResolvedValue({ allowed: false, resetTime: 1_045_000 });
+    const response = await GET();
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("45");
+    expect(mocks.snapshot).not.toHaveBeenCalled();
+  });
+  it("allows a cold shared-snapshot waiter to complete within the route duration", () => {
+    expect(maxDuration).toBe(60);
   });
   it("publishes shared supplier listings with original timestamp and explicit checkout status", async () => {
     vi.stubEnv("CLUBKONNECT_USER_ID", "private-account");
@@ -32,7 +48,8 @@ describe("live data catalogue route", () => {
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(mocks.snapshot.mock.calls[0][0].key).not.toContain("private-account");
   });
-  it("does not expose supplier errors", async () => {
+  it("does not expose or log supplier errors", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.stubEnv("CLUBKONNECT_USER_ID", "private-account");
     mocks.auth.mockResolvedValue({ id: "u" });
     mocks.configured.mockReturnValue(true);
@@ -40,6 +57,8 @@ describe("live data catalogue route", () => {
     mocks.snapshot.mockRejectedValue(new Error("APIKey=secret"));
     const response = await GET();
     expect(response.status).toBe(503);
+    expect(response.headers.get("retry-after")).toBe("30");
     expect(await response.text()).not.toContain("secret");
+    expect(JSON.stringify(warn.mock.calls)).not.toMatch(/secret|private-account/);
   });
 });

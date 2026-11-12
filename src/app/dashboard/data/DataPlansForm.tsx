@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchCatalogue } from "@/lib/platform/catalog-fetch";
+import Link from "next/link";
+import { catalogueFailureReason, fetchCatalogue, SHARED_CATALOGUE_TIMEOUT_MS, type CatalogueFailureReason } from "@/lib/platform/catalog-fetch";
+import { retryAfterDeadline } from "@/lib/platform/retry-after";
+import { useRetryCooldown } from "@/lib/platform/use-retry-cooldown";
 import { BrandIcon } from "@/components/BrandIcon";
 import type { PublicUser } from "@/lib/identity/auth";
 import type { ClubkonnectPlan } from "@/lib/providers/clubkonnect";
@@ -20,21 +23,30 @@ function NetworkMark({ code, name }: { code: string; name: string }) {
 export function DataPlansForm({ initialPlanId }: DataPlansFormProps) {
   const [catalogue, setCatalogue] = useState<Catalogue | null>(null);
   const [error, setError] = useState("");
+  const [errorReason, setErrorReason] = useState<CatalogueFailureReason | null>(null);
+  const [retryAt, setRetryAt] = useState(0);
+  const retryBlocked = useRetryCooldown(retryAt);
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
   const [network, setNetwork] = useState("");
   const [search, setSearch] = useState("");
   useEffect(() => {
     const controller = new AbortController();
-    fetchCatalogue("/api/airtime/plans", controller.signal)
+    fetchCatalogue("/api/airtime/plans", controller.signal, { timeoutMs: SHARED_CATALOGUE_TIMEOUT_MS })
       .then(async response => {
-        const body = await response.json();
-        if (!response.ok) throw new Error(body.error || "Unable to load data plans.");
-        if (!Array.isArray(body.plans)) throw new Error("Invalid catalogue response.");
-        if (!controller.signal.aborted) setCatalogue(body);
+        const body = await response.json().catch(() => null);
+        if (!response.ok) {
+          if (!controller.signal.aborted) {
+            setErrorReason(catalogueFailureReason(response.status, body?.code));
+            setRetryAt(retryAfterDeadline(response.headers?.get("retry-after") ?? null, response.status === 429 ? 60_000 : 0));
+          }
+          throw new Error(body?.error || "Unable to load data plans.");
+        }
+        if (!Array.isArray(body?.plans)) throw new Error("Invalid catalogue response.");
+        if (!controller.signal.aborted) { setCatalogue(body); setErrorReason(null); }
       })
       .catch((reason: unknown) => {
-        if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Unable to load data plans.");
+        if (!controller.signal.aborted) setError(reason instanceof Error && reason.name !== "TimeoutError" ? reason.message : "Unable to load data plans. Please check your connection.");
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
@@ -48,10 +60,13 @@ export function DataPlansForm({ initialPlanId }: DataPlansFormProps) {
     <div className="flex flex-wrap items-end gap-3">
       <label className="text-meta">Network<select className="mt-1 block rounded-lg border border-line bg-white p-3" value={network} onChange={event => setNetwork(event.target.value)}><option value="">All networks</option>{networks.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select></label>
       <label className="text-meta">Search bundles<input className="mt-1 block rounded-lg border border-line bg-white p-3" value={search} onChange={event => setSearch(event.target.value)} placeholder="e.g. 1GB or monthly" /></label>
-      <button className="rounded-lg border border-line p-3 text-meta font-semibold" disabled={loading} onClick={() => { setLoading(true); setError(""); setReload(value => value + 1); }}>Reload listings</button>
+      <button className="rounded-lg border border-line p-3 text-meta font-semibold disabled:opacity-50" disabled={loading || retryBlocked || errorReason === "unconfigured" || errorReason === "sign-in"} onClick={() => { setLoading(true); setError(""); setErrorReason(null); setRetryAt(0); setReload(value => value + 1); }}>Reload listings</button>
     </div>
     {loading && <p role="status">Loading current bundles…</p>}
-    {error && <p role="alert">{error} {catalogue ? "Previously loaded listings remain below." : "Use Reload listings to retry."}</p>}
+    {error && <p role="alert">{errorReason === "sign-in" ? <>Your session has expired. <Link className="underline" href="/login?next=%2Fdashboard%2Fdata">Sign in again</Link>.</> : error}{" "}
+      {catalogue ? "Previously loaded listings remain below. " : ""}
+      {errorReason === "unconfigured" || errorReason === "sign-in" ? "" : retryBlocked ? "Please wait before reloading." : "Use Reload listings to retry."}
+    </p>}
     {catalogue && <>
       <p className="text-meta text-ink-2">Catalogue snapshot: <time dateTime={catalogue.checkedAt}>{new Date(catalogue.checkedAt).toLocaleString()}</time>. {catalogue.stale ? "Refresh delayed; these listings may have changed." : ""}</p>
       <p className="rounded-xl border border-line bg-white p-4 text-meta">Prices below are published catalogue prices, not checkout quotes. Numeric stock is not reported. {catalogue.checkoutReason}</p>

@@ -50,3 +50,48 @@ connection telemetry and authorized infrastructure changes.
 PGlite lease tests, snapshot policy tests, catalogue client tests and supplier/
 UI regressions. Typecheck, full ESLint, production build and diff check passed.
 Not the full repository test suite. These changes are not deployed at this stage.
+
+## 2026-11-12 follow-up — local changes only
+
+- Account category/listing and mobile-data browsers allow 65 seconds for routes
+  with a 60-second execution budget. Obsolete account reads are cancelled when
+  filters change or the page unmounts.
+- Read-only retries are bounded and cancellable. Rate limits include a
+  `Retry-After` cooldown; missing or long 429 cooldowns are not immediately
+  retried. Digital browsing and live service feeds keep successful results and
+  retry only failed shelves, cursors or feeds. Regional digital pages preserve
+  their previous page during a failed refresh. Digital types and mobile data
+  also wait for cooldowns.
+- The digital catalogue distinguishes a disabled environment, an unconnected
+  or rejected integration, a signed-out user and a temporary throttle/outage.
+  Checkout gates and supplier request budgets have not been relaxed.
+- An expired in-process account fallback is marked stale and cannot be
+  republished as a fresh shared catalogue. Existing complete shared snapshots
+  still remain available during refresh failures.
+- Local code inspection found possible deadline and request-amplification
+  problems. This does **not** establish which production failure the affected
+  shoppers saw, or prove that a deployment is fixed.
+
+### Production investigation
+
+For each affected page, collect the page URL, approximate UTC time, environment
+(production or preview), failing catalogue endpoint, HTTP status, and its
+`Retry-After` header if present. Do not collect cookies, authorization headers,
+API keys, account credentials or complete supplier responses. Check runtime logs
+(not only deployment build events) for `Digital catalogue read failed`,
+`Mobile data catalogue unavailable`, `Initial snapshot refresh failed`, or
+`Shared rate-limit store unavailable`; redact any sensitive details. Check
+integration configuration without exposing secret values. A 401, 429, and 503
+require different follow-up and should not all be assumed to be supplier outages.
+
+### Local validation
+
+The production build, TypeScript and ESLint passed. The full test run passed
+3,183 tests and failed four tests that also fail on the untouched base commit:
+three older mobile-data UI expectations and one supplier-copy check. Focused
+account snapshot, cooldown and catalogue recovery regressions passed. These
+results do not verify live integrations.
+
+This validation was performed on the working branch before production
+verification. No authenticated production catalogue request or paid transaction
+was performed as part of the local audit.

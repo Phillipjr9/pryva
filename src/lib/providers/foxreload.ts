@@ -2,6 +2,7 @@ import "server-only";
 import { createRateLimiter, resetRateLimit } from "@/lib/platform/rate-limit";
 import { readJsonWithLimit } from "@/lib/platform/request-body";
 import { ProviderError } from "@/lib/providers/types";
+import { retryAfterDelayMs, retryAfterReset } from "@/lib/platform/retry-after";
 
 const DEFAULT_BASE_URL = "https://public-api.foxreload.com";
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -26,11 +27,13 @@ export async function resetFoxreloadRateBudget(): Promise<void> {
 
 export class FoxreloadError extends ProviderError {
   readonly details?: unknown;
+  readonly retryAfterSeconds?: number;
 
-  constructor(message: string, status: number, code?: string, details?: unknown) {
+  constructor(message: string, status: number, code?: string, details?: unknown, retryAfterSeconds?: number) {
     super(message, { provider: "foxreload", status, code: code ?? "FOXRELOAD_ERROR" });
     this.name = "FoxreloadError";
     this.details = details;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -127,12 +130,12 @@ async function foxreloadFetch(
   if (special) {
     const specific = await special[0](special[1]);
     if (specific.unavailable) throw new FoxreloadError("FoxReload endpoint budget unavailable", 503, "RATE_LIMIT_UNAVAILABLE");
-    if (!specific.allowed) throw new FoxreloadError("FoxReload endpoint rate budget exceeded", 429, "RATE_LIMITED");
+    if (!specific.allowed) throw new FoxreloadError("FoxReload endpoint rate budget exceeded", 429, "RATE_LIMITED", undefined, Number(retryAfterReset(specific.resetTime)));
   }
   const budget = await foxreloadBudget("foxreload:edge");
   if (budget.unavailable) throw new FoxreloadError("FoxReload rate budget unavailable", 503, "RATE_LIMIT_UNAVAILABLE");
   if (!budget.allowed) {
-    throw new FoxreloadError("FoxReload rate budget exceeded", 429, "RATE_LIMITED");
+    throw new FoxreloadError("FoxReload rate budget exceeded", 429, "RATE_LIMITED", undefined, Number(retryAfterReset(budget.resetTime)));
   }
 
   const url = new URL(baseUrl() + path);
@@ -177,7 +180,9 @@ async function foxreloadFetch(
     const errObj = (payload?.error && typeof payload.error === "object" ? payload.error : payload) as Record<string, unknown> | null;
     const message = typeof errObj?.message === "string" ? errObj.message : `FoxReload error ${status}`;
     const code = typeof errObj?.code === "string" ? errObj.code : `HTTP_${status}`;
-    throw new FoxreloadError(message, status, code, errObj?.details);
+    const delay = status === 429 ? retryAfterDelayMs(response.headers.get("retry-after")) : null;
+    const retryAfterSeconds = delay === null ? undefined : Math.max(1, Math.min(Number.MAX_SAFE_INTEGER, Math.ceil(delay / 1000)));
+    throw new FoxreloadError(message, status, code, errObj?.details, retryAfterSeconds);
   }
 
   return payload;
