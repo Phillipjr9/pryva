@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { SERVICE_IDS } from "@/lib/services/registry";
+import { SERVICES, SERVICE_IDS } from "@/lib/services/registry";
 import { findPlan, plans } from "@/lib/services/catalog";
 import { ServiceCard, ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
@@ -42,6 +42,18 @@ describe("country-first service explorer", () => {
     expect(explorerCountry(["ng"])).toBeNull();
     expect(explorerCategory("social")).toBe("social");
     expect(explorerCategory("unexpected")).toBe("all");
+  });
+
+  it("clearly distinguishes app-specific SMS offers from general number plans", () => {
+    expect(SERVICES.find((service) => service.id === "verification")?.description).toMatch(/app-specific.*SMS verification/i);
+    expect(SERVICES.find((service) => service.id === "numbers")?.description).toMatch(/general.*not listed for a specific app/i);
+    for (const category of ["numbers", "verification"] as const) {
+      const markup = renderToStaticMarkup(<ServiceExplorer initialCountry="ng" initialCategory={category} />);
+      expect(markup).toContain("Not sure which category?");
+      expect(markup).toContain("Browse general number plans");
+      expect(markup).toContain("Browse app-specific SMS");
+      expect(markup).toContain("listed for a specific app");
+    }
   });
 
   it("keeps service categories without fabricating supplier listings", () => {

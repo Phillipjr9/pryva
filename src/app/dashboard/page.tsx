@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
 
 const quickBuys = [
-  { label: "Number plans", note: "Single-use & rentals", href: "/dashboard/services?country=ng&category=numbers", service: "numbers" as const, category: "numbers" },
+  { label: "General number plans", note: "Single-use & rentals · not app-listed", href: "/dashboard/services?country=ng&category=numbers", service: "numbers" as const, category: "numbers" },
   { label: "Social boosts", note: "Followers, likes & views", href: "/dashboard/services?country=ng&category=social", service: "social-promotion" as const, category: "social" },
   { label: "eSIM data", note: "Travel data plans", href: "/dashboard/services?country=ng&category=esim", service: "esim" as const, category: "esim" },
   { label: "Residential proxies", note: "Clean rotating IP pools", href: "/dashboard/services?country=ng&category=proxies", service: "proxies" as const, category: "proxies" },

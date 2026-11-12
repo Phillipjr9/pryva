@@ -615,10 +615,12 @@ export function ServiceExplorer({
               </div>
             </div>
 
-            {category === "numbers" && <div className="mt-3 rounded-xl border border-line bg-white p-3 text-meta text-ink-2">
-              <p>Number plans shows general plans and rentals for {selectedCountry?.name ?? "the selected country"}. App-specific SMS numbers are grouped under App verification, not duplicated here.</p>
-              <button type="button" onClick={() => chooseCategory("verification")} className="mt-2 font-semibold text-lav-700 underline">Browse app-specific verification numbers</button>
-              <p className="mt-2">Choose another country to check its offers. If more listings are loaded than shown, use Show more below.</p>
+            {(category === "numbers" || category === "verification") && <div role="note" className="mt-3 rounded-xl border border-lav-200 bg-lav-50/60 p-3 text-meta leading-relaxed text-ink-2">
+              <p><strong className="text-ink">Not sure which category?</strong> General number plans are single-use numbers and rentals not listed for a particular app. App verification shows numbers listed for a specific app so you can receive that app’s SMS code. They’re separate offers, so check the category and listing details.</p>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                <button type="button" onClick={() => chooseCategory("numbers")} className="font-semibold text-lav-700 underline">Browse general number plans</button>
+                <button type="button" onClick={() => chooseCategory("verification")} className="font-semibold text-lav-700 underline">Browse app-specific SMS</button>
+              </div>
             </div>}
             {enableDigitalCatalogue && <label className="mt-3 flex items-center gap-2 text-meta text-ink-2"><input type="checkbox" checked={stockOnly} onChange={(event) => { setStockOnly(event.target.checked); setVisible(PAGE_SIZE); }} />Show catalogue listings with reported stock only</label>}
             {enableDigitalCatalogue && category === "subscriptions" && <p className="mt-2 text-meta text-ink-2">Browse subscription product types below or search by product name. {stockOnly ? "Out-of-stock and unknown-stock listings are hidden; clear the stock filter to include them." : "All reported availability states are included; ordering is checked separately."} Use load more to browse remaining catalogue pages.</p>}

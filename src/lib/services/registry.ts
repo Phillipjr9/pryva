@@ -150,7 +150,7 @@ export const SERVICES: readonly ServiceDefinition[] = [
   {
     id: "verification",
     label: "App verification",
-    description: "SMS codes for apps",
+    description: "App-specific numbers for receiving SMS verification codes",
     sale: { kind: "catalogue" },
     lane: null,
     orderServices: [],
@@ -170,7 +170,7 @@ export const SERVICES: readonly ServiceDefinition[] = [
   {
     id: "numbers",
     label: "Number plans",
-    description: "Single-use & rentals",
+    description: "General single-use numbers and rentals, not listed for a specific app",
     sale: { kind: "supplier", source: "bitcall" },
     lane: "numbers",
     orderServices: ["numbers"],
