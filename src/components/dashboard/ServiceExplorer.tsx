@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { DataPlansForm } from "@/app/dashboard/data/DataPlansForm";
 import { DigitalCategoryPicker } from "@/components/dashboard/DigitalCategoryPicker";
 import { useLiveServiceExplorer, type LiveState } from "@/components/dashboard/useLiveServiceExplorer";
 import { useDigitalExplorer } from "@/components/dashboard/useDigitalExplorer";
@@ -343,12 +344,12 @@ export function ServiceExplorer({
   const [platformOpen, setPlatformOpen] = useState<Record<string, boolean>>({});
   const [groupVisible, setGroupVisible] = useState<Record<string, number>>({});
   const [liveRevision, setLiveRevision] = useState(0);
-  const liveState = useLiveServiceExplorer(country, liveRevision, category === "esim" && allEsimDestinations);
+  const liveState = useLiveServiceExplorer(country, liveRevision, category === "esim" && allEsimDestinations, category, category !== "data");
   const [stockOnly, setStockOnly] = useState(true);
   const selectedCountry = explorerCountry(country);
   const selectedCategory = EXPLORER_CATEGORIES.find((entry) => entry.id === category);
   const [subcategory, setSubcategory] = useState<{ id: string; name: string; root?: string } | null>(null);
-  const digital = useDigitalExplorer(enableDigitalCatalogue, category, search, stockOnly, subcategory);
+  const digital = useDigitalExplorer(enableDigitalCatalogue && category !== "data", category, search, stockOnly, subcategory);
   const items = useMemo(() => {
     const base = subcategory ? [] : buildServiceExplorer(country);
     // Retain the feed's category metadata, but prefer the reviewed checkout for
@@ -456,6 +457,15 @@ export function ServiceExplorer({
     setVisible(PAGE_SIZE);
     writeSelection(country, next);
   }
+
+  if (category === "data") return <div className="grid gap-5">
+    <div>
+      <h1 className="text-[1.6rem] font-semibold text-ink">Mobile data &amp; airtime</h1>
+      <p className="mt-2 text-meta text-ink-2">Browse current Nigerian data bundles by network, lowest published price first. Airtime listings are not connected yet. Purchases are not available from this catalogue yet.</p>
+    </div>
+    <button type="button" onClick={() => chooseCategory("all")} className="w-fit text-meta font-semibold text-lav-700 underline">Back to all services</button>
+    <DataPlansForm />
+  </div>;
 
   return (
     <div className="grid gap-4">
@@ -601,7 +611,13 @@ export function ServiceExplorer({
               </div>
             </div>
 
+            {category === "numbers" && <div className="mt-3 rounded-xl border border-line bg-white p-3 text-meta text-ink-2">
+              <p>Number plans shows general plans and rentals for {selectedCountry?.name ?? "the selected country"}. App-specific SMS numbers are grouped under App verification, not duplicated here.</p>
+              <button type="button" onClick={() => chooseCategory("verification")} className="mt-2 font-semibold text-lav-700 underline">Browse app-specific verification numbers</button>
+              <p className="mt-2">Choose another country to check its offers. If more listings are loaded than shown, use Show more below.</p>
+            </div>}
             {enableDigitalCatalogue && <label className="mt-3 flex items-center gap-2 text-meta text-ink-2"><input type="checkbox" checked={stockOnly} onChange={(event) => { setStockOnly(event.target.checked); setVisible(PAGE_SIZE); }} />Show catalogue listings with reported stock only</label>}
+            {enableDigitalCatalogue && category === "subscriptions" && <p className="mt-2 text-meta text-ink-2">Browse subscription product types below or search by product name. {stockOnly ? "Out-of-stock and unknown-stock listings are hidden; clear the stock filter to include them." : "All reported availability states are included; ordering is checked separately."} Use load more to browse remaining catalogue pages.</p>}
             {enableDigitalCatalogue && <DigitalCategoryPicker key={category} category={category} onSelect={(entry) => { setSubcategory(entry); setVisible(PAGE_SIZE); }} />}
             {category === "esim" && <label className="mt-3 flex items-center gap-2 text-meta text-ink-2"><input type="checkbox" checked={allEsimDestinations} onChange={(event) => { setAllEsimDestinations(event.target.checked); setVisible(PAGE_SIZE); }} />Browse all destinations</label>}
             {enableDigitalCatalogue && <div className="mt-3 text-meta text-ink-3" aria-live="polite">
@@ -690,7 +706,6 @@ export function ServiceExplorer({
               <div className="rounded-2xl border border-dashed border-line bg-cream/50 p-8 text-center">
                 <p className="text-[0.875rem] font-semibold text-ink">No listings match these filters</p>
                 <p className="mt-1 text-meta text-ink-2">Try another search, category or country. This doesn&apos;t indicate live availability.</p>
-                {category === "data" && !search && <p className="mt-3 text-meta text-ink-2">Mobile data and airtime delivery is not connected. No plans or prices are available to order. <Link href="/dashboard/data" className="font-semibold text-lav-700 underline">View data service status</Link></p>}
                 {category === "subscriptions" && !search && !digital.loading && <p className="mt-3 text-meta text-ink-2">No subscription listings have loaded for this selection. Try loading more catalogue pages or <Link href="/dashboard/support" className="font-semibold text-lav-700 underline">Ask about subscriptions</Link>. Availability depends on each product.</p>}
                 {(search || tag !== "all") && <button type="button" onClick={() => { setSearch(""); setTag("all"); setVisible(PAGE_SIZE); }} className="mt-3 text-meta font-semibold text-lav-700 underline underline-offset-2">Clear filters</button>}
               </div>

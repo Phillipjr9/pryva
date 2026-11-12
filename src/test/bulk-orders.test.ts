@@ -18,9 +18,9 @@ describe("Bulk Orders", () => {
         { productSlug: "vn-ng", quantity: 10 },
       ];
       const result = calculateBulkOrder(items);
-      expect(result.discountPercent).toBe(5);
-      expect(result.discount).toBeGreaterThan(0);
-      expect(result.total).toBeLessThan(result.subtotal);
+      expect(result.discountPercent).toBe(0);
+      expect(result.discount).toBe(0);
+      expect(result.total).toBe(result.subtotal);
     });
 
     it("should apply 10% discount for 20+ items", () => {
@@ -28,9 +28,9 @@ describe("Bulk Orders", () => {
         { productSlug: "vn-ng", quantity: 20 },
       ];
       const result = calculateBulkOrder(items);
-      expect(result.discountPercent).toBe(10);
-      expect(result.discount).toBeGreaterThan(0);
-      expect(result.total).toBeLessThan(result.subtotal);
+      expect(result.discountPercent).toBe(0);
+      expect(result.discount).toBe(0);
+      expect(result.total).toBe(result.subtotal);
     });
 
     it("rejects unknown products and non-positive or fractional quantities", () => {

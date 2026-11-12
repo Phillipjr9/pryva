@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { fetchCatalogue } from "@/lib/platform/catalog-fetch";
 import { formatNaira } from "@/lib/services/catalog";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/platform/utils";
@@ -100,9 +101,10 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     const url = activeCategory ? `/api/accounts/categories?categoryId=${activeCategory}` : "/api/accounts/categories";
 
-    fetch(url, { cache: "no-store" })
+    fetchCatalogue(url, controller.signal)
       .then((response) => {
         if (!response.ok) throw new Error("Categories unavailable");
         return response.json();
@@ -123,6 +125,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [activeCategory]);
 
@@ -138,7 +141,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
     if (search) params.set("search", search);
 
     try {
-      const response = await fetch(`/api/accounts/listings?${params.toString()}`, { cache: "no-store" });
+      const response = await fetchCatalogue(`/api/accounts/listings?${params.toString()}`);
       const data = (await response.json()) as {
         configured?: boolean;
         partial?: boolean;

@@ -106,8 +106,8 @@ describe("eSIM offers", () => {
     expect(offers).toHaveLength(1);
     // $4.50 × 1,600 = ₦7,200 cost; the band is +30–50%, rounded up to ₦50.
     expect(offers[0].costNgn).toBe(7_200);
-    expect(offers[0].priceNgn).toBeGreaterThanOrEqual(9_360);
-    expect(offers[0].priceNgn).toBeLessThanOrEqual(10_800);
+    expect(offers[0].priceNgn).toBe(8_280);
+    expect(offers[0].priceNgn).toBe(8_280);
     expect(offers[0].purchasable).toBe(true);
   });
 

@@ -1,5 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { persistentDatabaseConfigured } from "@/lib/platform/database-config";
+import { readSupplierCatalogue, supplierCatalogueKey } from "@/lib/platform/supplier-catalogue-snapshot";
 import { isFundingFailure } from "@/lib/providers/types";
 import {
   getSmmBalance,
@@ -40,8 +42,16 @@ export type BoostSnapshot = {
 let cache: { expires: number; snapshot: BoostSnapshot } | null = null;
 let inFlight: Promise<BoostSnapshot> | null = null;
 
-/** A short-lived, process-local read cache; the shared rate limit still protects the panel key across instances. */
+/** Shared in production; browser reloads cannot bypass the supplier cooldown. */
 export async function readBoostSnapshot(refresh = false): Promise<BoostSnapshot> {
+  if (!isSmmPanelConfigured()) throw new Error("Boosting supplier not configured");
+  if (!persistentDatabaseConfigured()) return readLocalBoostSnapshot(refresh);
+  const key = supplierCatalogueKey("boosts", `${smmPanelApiUrlSetting()}\0${process.env.SMM_PANEL_API_KEY?.trim() ?? ""}`);
+  return readSupplierCatalogue(key, () => readLocalBoostSnapshot(true));
+}
+
+/** Local coalescing also protects fallback/test environments. */
+async function readLocalBoostSnapshot(refresh = false): Promise<BoostSnapshot> {
   if (!isSmmPanelConfigured()) throw new Error("Boosting supplier not configured");
   if (!refresh && cache && cache.expires > Date.now()) return cache.snapshot;
   if (inFlight) return inFlight;

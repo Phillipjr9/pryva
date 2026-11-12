@@ -288,3 +288,14 @@ describe("supplier catalog endpoint", () => {
     expect(state.otpRead).toHaveBeenCalledWith("bitcall", "us", expect.any(String), undefined, true);
   });
 });
+
+it("does not let an unavailable verification feed degrade number plans", async () => {
+  state.fleexaConfigured = true;
+  state.bitcallConfigured = true;
+  state.otpRead.mockRejectedValue(new Error("Verification unavailable"));
+  const response = await GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&feed=numbers"));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ ok: true, partial: false });
+  expect(state.otpRead).not.toHaveBeenCalled();
+  expect(state.snapshot).toHaveBeenCalledTimes(1);
+});

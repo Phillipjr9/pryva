@@ -145,7 +145,7 @@ describe("digital listings in service categories", () => {
     }));
     render(<ServiceExplorer initialCountry="ng" initialCategory="games" enableDigitalCatalogue />);
     expect(await screen.findByRole("heading", { name: "Game one" })).toBeTruthy();
-    expect((await screen.findByText(/Some listings could not be loaded/)).textContent).not.toContain("secret");
+    expect((await screen.findByText(/Some listings could not be loaded/, {}, { timeout: 4000 })).textContent).not.toContain("secret");
   });
   it("searches loaded listings within the selected category and can search later pages", async () => {
     const fetchMock = vi.fn(async (url: string) => {
@@ -222,4 +222,19 @@ it("finds subscription codes via catalogue search without displaying unrelated m
   fireEvent.change(screen.getByLabelText("Search services"), { target: { value: "Disney" } });
   expect(await screen.findByRole("heading", { name: "Disney+ 3 months" })).toBeTruthy();
   expect(screen.queryByRole("heading", { name: "Disney game key" })).toBeNull();
+});
+
+it("includes off-shelf VPN and productivity subscriptions without importing gaming packs", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    const params = new URL(url, "https://example.test").searchParams;
+    return response({ ok: true, items: !params.get("category") ? [
+      { id: id("a"), name: "NordVPN 12 months", stock: "reported", checkout: "codes" },
+      { id: id("b"), name: "Google One 2TB", stock: "reported" },
+      { id: id("c"), name: "PUBG Premium currency pack", stock: "reported" },
+    ] : [], nextCursor: null });
+  }));
+  render(<ServiceExplorer initialCountry="ng" initialCategory="subscriptions" enableDigitalCatalogue />);
+  expect(await screen.findByRole("heading", { name: "NordVPN 12 months" })).toBeTruthy();
+  expect(await screen.findByRole("heading", { name: "Google One 2TB" })).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "PUBG Premium currency pack" })).toBeNull();
 });

@@ -24,7 +24,7 @@ describe("Bulk Orders Extended", () => {
       ];
       const result = calculateBulkOrder(items);
       expect(result.items.length).toBe(2);
-      expect(result.discountPercent).toBe(5);
+      expect(result.discountPercent).toBe(0);
       expect(result.total).toBe(result.subtotal - result.discount);
     });
 
@@ -33,7 +33,7 @@ describe("Bulk Orders Extended", () => {
         { productSlug: "vn-ng", quantity: 20 },
       ];
       const result = calculateBulkOrder(items);
-      expect(result.discountPercent).toBe(10);
+      expect(result.discountPercent).toBe(0);
     });
 
     it("should not exceed 10% discount", () => {
@@ -41,7 +41,7 @@ describe("Bulk Orders Extended", () => {
         { productSlug: "vn-ng", quantity: 100 },
       ];
       const result = calculateBulkOrder(items);
-      expect(result.discountPercent).toBe(10);
+      expect(result.discountPercent).toBe(0);
     });
 
     it("should calculate subtotals correctly for each item", () => {

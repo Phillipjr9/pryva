@@ -232,7 +232,7 @@ export const SERVICES: readonly ServiceDefinition[] = [
     sale: { kind: "catalogue" }, lane: null, orderServices: ["gift-cards", "subscriptions"], deliveryMinutes: null, retry: null,
   },
   {
-    id: "topups", label: "Account top-ups", description: "Game & account credits",
+    id: "topups", label: "Account top-ups", description: "Non-game account credits & balances",
     sale: { kind: "catalogue" }, lane: null, orderServices: ["subscriptions"], deliveryMinutes: null, retry: null,
   },
   {

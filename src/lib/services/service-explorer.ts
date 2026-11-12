@@ -394,7 +394,7 @@ export function buildServiceExplorer(countryCode: string | null): ExplorerItem[]
 export function filterExplorerItems(items: ExplorerItem[], category: ExplorerFilter, search: string, tag = "all"): ExplorerItem[] {
   const query = search.trim().toLocaleLowerCase();
   return items.filter((item) => {
-    if (category !== "all" && (item.allOnly || (item.category !== category && !item.crossCategorySearch))) return false;
+    if (category !== "all" && (item.allOnly || item.category !== category)) return false;
     if (tag !== "all" && item.tag !== tag) return false;
     if (!query) return true;
     const categoryLabel = item.crossCategorySearch ? "" : categoryById.get(item.category)?.label ?? "";
