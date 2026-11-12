@@ -14,21 +14,29 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe("choosing services", () => {
   it("filters to the chosen category and type, links the exact item, and restores history", async () => {
     window.history.replaceState(null, "", "/dashboard/services");
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (url: string) => ({
-      ok: true, json: async () => ({ ok: true, country: new URL(url, window.location.origin).searchParams.get("country"), items: [
-        { id: "live-views", category: "social", name: "Instagram views", description: "Supplier listing", tag: "Views", artwork: { kind: "brand", name: "instagram" }, source: "live", coverage: "not-country-specific", stock: null, myUnits: null, price: null, action: { label: "Order", href: "/dashboard/boosts/item" } },
-        { id: "live-whatsapp", category: "verification", name: "WhatsApp", description: "Supplier listing", tag: "Messaging", artwork: { kind: "brand", name: "whatsapp" }, source: "live", coverage: "catalog-country", stock: null, myUnits: null, price: null, action: null },
-      ] }),
-    })));
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (url: string) => {
+      const parsed = new URL(url, window.location.origin);
+      if (parsed.pathname === "/api/airtime/plans") return Response.json({
+        plans: [], checkedAt: "2026-11-12T12:00:00Z", stale: false, checkoutReason: "Checkout is not connected.",
+      });
+      const feed = parsed.searchParams.get("feed");
+      return Response.json({ ok: true, country: parsed.searchParams.get("country"), live: true, partial: false, items:
+        feed === "social" ? [
+          { id: "live-views", category: "social", name: "Instagram views", description: "Supplier listing", tag: "Views", artwork: { kind: "brand", name: "instagram" }, source: "live", coverage: "not-country-specific", stock: null, myUnits: null, price: 1200, action: { label: "Order", href: "/dashboard/services/boost/live-views" } },
+        ] : feed === "verification" ? [
+          { id: "live-whatsapp", category: "verification", name: "WhatsApp", description: "Supplier listing", tag: "Messaging", artwork: { kind: "brand", name: "whatsapp" }, source: "live", coverage: "catalog-country", stock: null, myUnits: null, price: null, action: null },
+        ] : [],
+      });
+    }));
     render(<ServiceExplorer initialCountry={null} initialCategory={null} />);
-    fireEvent.click(screen.getByRole("button", { name: "Nigeria" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Nigeria" }));
     fireEvent.click(screen.getByRole("button", { name: "Social promotion" }));
     expect(screen.getByRole("heading", { level: 1, name: "Social promotion" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "WhatsApp" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Views" }));
     const card = (await screen.findByRole("heading", { name: "Instagram views" })).closest("article")!;
     // The only social card is an actual supplier response, not a fabricated entry.
-    expect(within(card).getByRole("link", { name: "Order" }).getAttribute("href")).toBe("/dashboard/boosts/item");
+    expect(within(card).getByRole("link", { name: "Order" }).getAttribute("href")).toBe("/dashboard/services/boost/live-views");
     expect(screen.queryByRole("heading", { name: "Instagram followers" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "App verification" }));
     expect(await screen.findByRole("heading", { name: "WhatsApp" })).toBeTruthy();
@@ -51,7 +59,8 @@ describe("choosing services", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Mobile data & airtime" }));
     expect(screen.getByRole("heading", { level: 1, name: "Mobile data & airtime" })).toBeTruthy();
-    expect(screen.getByText(/Mobile data and airtime delivery is not connected/)).toBeTruthy();
+    expect(screen.getByText(/Purchases are not available from this catalogue yet/)).toBeTruthy();
+    expect(await screen.findByText(/0 bundles · lowest price first/)).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "MTN 1GB" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Airtel 1GB" })).toBeNull();
   });
@@ -88,7 +97,7 @@ describe("number-plan navigation", () => {
   it("opens app-specific listings without losing the selected country", async () => {
     window.history.replaceState(null, "", "/dashboard/services?country=us&category=numbers");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({
-      ok: true, country: "us", items: [{ id: "otp-1", category: "verification", name: "Test app", description: "Live listing", tag: "Other", artwork: { kind: "service", name: "numbers" }, source: "live", coverage: "catalog-country", stock: 7, myUnits: null, price: null, action: null }],
+      ok: true, country: "us", live: true, partial: false, items: [{ id: "otp-1", category: "verification", name: "Test app", description: "Live listing", tag: "Other", artwork: { kind: "service", name: "numbers" }, source: "live", coverage: "catalog-country", stock: 7, myUnits: null, price: null, action: null }],
     }) }));
     render(<ServiceExplorer initialCountry="us" initialCategory="numbers" />);
     fireEvent.click(screen.getByRole("button", { name: "App verification" }));

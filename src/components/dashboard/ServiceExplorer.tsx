@@ -7,6 +7,7 @@ import { DigitalCategoryPicker } from "@/components/dashboard/DigitalCategoryPic
 import { useLiveServiceExplorer, type LiveState } from "@/components/dashboard/useLiveServiceExplorer";
 import { useDigitalExplorer } from "@/components/dashboard/useDigitalExplorer";
 import { DigitalProductIcon } from "@/components/DigitalProductIcon";
+import { QuickShortcuts, type QuickShortcut } from "@/components/QuickShortcuts";
 import { BrandIcon } from "@/components/BrandIcon";
 import { CountryFlag } from "@/components/CountryFlag";
 import { CountrySelector } from "@/components/dashboard/CountrySelector";
@@ -16,6 +17,7 @@ import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
 import { ArrowRight, ChevronDown, Globe, Lock, MailQuestion, Search, Shield, Sparkle } from "@/components/icons";
 import { formatNaira } from "@/lib/services/catalog";
 import { formatUnitCount } from "@/lib/services/service-units";
+import { explorerShortcuts, shortcutForExplorerItem } from "@/lib/services/quick-shortcuts";
 import {
   orderByReadiness,
   readinessSummary,
@@ -268,13 +270,14 @@ function numberPlansOffer(item: ExplorerItem, countryCode: string): ExplorerItem
 /** The verification feed is also the app-specific part of Number plans. Keep
  * its status separate from rentals and retain every offer's own checkout link. */
 function NumberAppOffers({
-  countryName, countryCode, feed, pending, search, retryBlocked, onRetry,
+  countryName, countryCode, feed, pending, search, shortcutKey, retryBlocked, onRetry,
 }: {
   countryName: string;
   countryCode: string;
   feed: LiveState | null;
   pending: boolean;
   search: string;
+  shortcutKey: string | null;
   retryBlocked: boolean;
   onRetry: () => void;
 }) {
@@ -287,8 +290,8 @@ function NumberAppOffers({
     // discards their individual price, stock, ID or action.
     // Pending or missing feeds are not proof of country coverage, even if a
     // cached or malformed payload happens to contain rows.
-    const entries = filterExplorerItems(!pending && feed?.live ? feed.items : [], "verification", search)
-      .filter((item) => item.source === "live" && item.coverage === "catalog-country");
+    const entries = filterExplorerItems(!pending && feed?.live ? feed.items : [], "verification", shortcutKey ? "" : search)
+      .filter((item) => item.source === "live" && item.coverage === "catalog-country" && (!shortcutKey || shortcutForExplorerItem(item)?.key === shortcutKey));
     const byName = new Map<string, { name: string; items: ExplorerItem[] }>();
     for (const item of entries) {
       const key = item.name.trim().toLocaleLowerCase();
@@ -297,7 +300,7 @@ function NumberAppOffers({
       else byName.set(key, { name: item.name, items: [item] });
     }
     return [...byName.entries()].map(([key, group]) => ({ key, ...group }));
-  }, [feed, pending, search]);
+  }, [feed, pending, search, shortcutKey]);
   const offers = groups.reduce((total, group) => total + group.items.length, 0);
   const retryable = feed?.reason === "error" || feed?.reason === "throttled";
   const unconfirmed = !feed || !feed.live || feed.failed || feed.partial;
@@ -414,9 +417,11 @@ function resolveExplorerCountry(initialCountry: string | null) {
   const explicit = explorerCountry(initialCountry)?.code;
   if (explicit) return explicit;
   if (typeof window !== "undefined") {
-    const stored = window.localStorage.getItem(SERVICE_COUNTRY_STORAGE_KEY);
-    const remembered = explorerCountry(stored)?.code;
-    if (remembered) return remembered;
+    try {
+      const stored = window.localStorage.getItem(SERVICE_COUNTRY_STORAGE_KEY);
+      const remembered = explorerCountry(stored)?.code;
+      if (remembered) return remembered;
+    } catch { /* Storage can be blocked; browsing and explicit country choices still work. */ }
   }
   return "ng";
 }
@@ -447,20 +452,26 @@ export function ServiceExplorer({
   enableDigitalCatalogue?: boolean;
 }) {
   const [allEsimDestinations, setAllEsimDestinations] = useState(initialAllEsimDestinations);
-  const [country, setCountry] = useState(() => resolveExplorerCountry(initialCountry));
+  // Server and first browser render must agree. Restore a remembered country
+  // after hydration, before displaying or requesting country-specific offers.
+  const [country, setCountry] = useState(() => explorerCountry(initialCountry)?.code ?? "ng");
+  const [countryReady, setCountryReady] = useState(() => !!explorerCountry(initialCountry));
   const [category, setCategory] = useState<ExplorerFilter>(() => explorerCategory(initialCategory));
   const [search, setSearch] = useState("");
+  // Keep the catalogue's current query while a shortcut filters loaded items.
+  // This avoids restarting paginated reads or losing an existing search page.
+  const [quickSelection, setQuickSelection] = useState<(QuickShortcut & { catalogueSearch: string }) | null>(null);
   const [tag, setTag] = useState("all");
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [platformOpen, setPlatformOpen] = useState<Record<string, boolean>>({});
   const [groupVisible, setGroupVisible] = useState<Record<string, number>>({});
   const [liveRevision, setLiveRevision] = useState(0);
-  const liveState = useLiveServiceExplorer(country, liveRevision, category === "esim" && allEsimDestinations, category, category !== "data");
+  const liveState = useLiveServiceExplorer(country, liveRevision, category === "esim" && allEsimDestinations, category, countryReady && category !== "data");
   const [stockOnly, setStockOnly] = useState(true);
   const selectedCountry = explorerCountry(country);
   const selectedCategory = EXPLORER_CATEGORIES.find((entry) => entry.id === category);
   const [subcategory, setSubcategory] = useState<{ id: string; name: string; root?: string } | null>(null);
-  const digital = useDigitalExplorer(enableDigitalCatalogue && category !== "data", category, search, stockOnly, subcategory);
+  const digital = useDigitalExplorer(enableDigitalCatalogue && countryReady && category !== "data", category, quickSelection?.catalogueSearch ?? search, stockOnly, subcategory);
   const items = useMemo(() => {
     const base = subcategory ? [] : buildServiceExplorer(country);
     // Retain the feed's category metadata, but prefer the reviewed checkout for
@@ -476,7 +487,6 @@ export function ServiceExplorer({
       subcategory ? [] : reviewedItems.filter((item) => !loadedIds.has(item.id)),
     ]);
   }, [country, liveState, digital.items, reviewedItems, subcategory]);
-  const filtered = useMemo(() => filterExplorerItems(items, category, search, tag), [items, category, search, tag]);
   // An unresolved or failed verification feed is not a zero-stock result. The
   // hook can be null for the first render or immediately after a country switch.
   const verificationPending = category === "verification" && !!selectedCountry && (!liveState || liveState.country !== country || liveState.loading);
@@ -485,6 +495,32 @@ export function ServiceExplorer({
   const appFeed = liveState?.verificationFeed ?? null;
   const numberAppsPending = category === "numbers" && (!liveState || !appFeed || liveState.verificationLoading);
   const numberAppsUnconfirmed = category === "numbers" && !!appFeed && (!appFeed.live || appFeed.failed || appFeed.partial);
+
+  // Only actual, settled live feeds can contribute app shortcuts. In particular,
+  // an unconnected feed's malformed rows or a previous country's results must
+  // never become an implied platform listing. Partial/cached feeds keep their
+  // existing warnings and do not imply stock or checkout availability.
+  const shortcutLiveIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const [feed, pending] of [
+      [liveState?.verificationFeed, liveState?.verificationLoading],
+      [liveState?.socialFeed, liveState?.socialLoading],
+      [liveState?.numbersFeed, liveState?.numbersLoading],
+    ] as const) {
+      if (feed?.live && !pending) for (const item of feed.items) ids.add(item.id);
+    }
+    return ids;
+  }, [liveState]);
+  const quickChoices = useMemo(() => {
+    const candidates = category === "numbers"
+      ? !numberAppsPending && appFeed?.live ? appFeed.items : []
+      : filterExplorerItems(items, category, "");
+    return explorerShortcuts(candidates.filter((item) => item.source !== "live" || shortcutLiveIds.has(item.id)));
+  }, [items, category, numberAppsPending, appFeed, shortcutLiveIds]);
+  const filtered = useMemo(() => {
+    const matches = filterExplorerItems(items, category, quickSelection ? "" : search, tag);
+    return quickSelection ? matches.filter((item) => (item.source !== "live" || shortcutLiveIds.has(item.id)) && shortcutForExplorerItem(item)?.key === quickSelection.key) : matches;
+  }, [items, category, search, tag, quickSelection, shortcutLiveIds]);
   /**
    * Social promotion lists every offer the supplier sells, which is hundreds
    * rather than a handful. Grouping by platform keeps that navigable: each one
@@ -536,10 +572,21 @@ export function ServiceExplorer({
 
 
   useEffect(() => {
-    if (typeof window !== "undefined" && country) {
-      window.localStorage.setItem(SERVICE_COUNTRY_STORAGE_KEY, country);
-    }
-  }, [country]);
+    if (countryReady) return;
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      setCountry(resolveExplorerCountry(null));
+      setCountryReady(true);
+    });
+    return () => { active = false; };
+  }, [countryReady]);
+
+  useEffect(() => {
+    if (!countryReady) return;
+    try { window.localStorage.setItem(SERVICE_COUNTRY_STORAGE_KEY, country); }
+    catch { /* Remembering a preference is optional, not a reason to crash. */ }
+  }, [country, countryReady]);
 
   // Handle browser back/forward when a history entry from another page is restored.
   useEffect(() => {
@@ -550,6 +597,7 @@ export function ServiceExplorer({
       setCategory(explorerCategory(params.get("category")));
       setAllEsimDestinations(params.get("allDestinations") === "1");
       setSearch("");
+      setQuickSelection(null);
       setTag("all");
       setVisible(PAGE_SIZE);
     }
@@ -564,6 +612,7 @@ export function ServiceExplorer({
     if (next !== country) setLiveRevision(0);
     setTag("all");
     setSearch("");
+    setQuickSelection(null);
     setVisible(PAGE_SIZE);
     writeSelection(next, category);
   }
@@ -573,11 +622,43 @@ export function ServiceExplorer({
     setCategory(next);
     setTag("all");
     setSearch("");
+    setQuickSelection(null);
     setVisible(PAGE_SIZE);
     writeSelection(country, next);
   }
 
+  function clearQuickSelection() {
+    setQuickSelection(null);
+    setSearch("");
+    setVisible(PAGE_SIZE);
+  }
+
+  function chooseShortcut(key: string) {
+    const option = quickChoices.find((choice) => choice.key === key);
+    if (!option) return;
+    if (quickSelection?.key === key) { clearQuickSelection(); return; }
+    setQuickSelection({ ...option, catalogueSearch: quickSelection?.catalogueSearch ?? search });
+    setSearch(option.label);
+    // A previously selected type could otherwise hide the chosen app entirely.
+    setTag("all");
+    setVisible(PAGE_SIZE);
+  }
+
+  const rejectedNotice = rejectedCountry || rejectedCategory ? (
+    <p role="status" className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-meta leading-relaxed text-amber-900">
+      <Shield className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>
+        That link asked for{rejectedCountry ? <> country <strong className="font-semibold">&ldquo;{truncate(rejectedCountry)}&rdquo;</strong></> : null}
+        {rejectedCountry && rejectedCategory ? " and" : null}
+        {rejectedCategory ? <> category <strong className="font-semibold">&ldquo;{truncate(rejectedCategory)}&rdquo;</strong></> : null},
+        which isn&rsquo;t something we list, so the selection was reset instead of guessing. Check your selection.
+      </span>
+    </p>
+  ) : null;
+  if (!countryReady) return <div className="grid gap-4">{rejectedNotice}<p role="status" className="text-meta text-ink-2">Restoring your country selection…</p></div>;
+
   if (category === "data") return <div className="grid gap-5">
+    {rejectedNotice}
     <div>
       <h1 className="text-[1.6rem] font-semibold text-ink">Mobile data &amp; airtime</h1>
       <p className="mt-2 text-meta text-ink-2">Browse current Nigerian data bundles by network, lowest published price first. Airtime listings are not connected yet. Purchases are not available from this catalogue yet.</p>
@@ -597,17 +678,7 @@ export function ServiceExplorer({
         <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline">My orders <ArrowRight className="h-3.5 w-3.5" /></Link>
       </div>
 
-      {rejectedCountry || rejectedCategory ? (
-        <p role="status" className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-meta leading-relaxed text-amber-900">
-          <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>
-            That link asked for{rejectedCountry ? <> country <strong className="font-semibold">&ldquo;{truncate(rejectedCountry)}&rdquo;</strong></> : null}
-            {rejectedCountry && rejectedCategory ? " and" : null}
-            {rejectedCategory ? <> category <strong className="font-semibold">&ldquo;{truncate(rejectedCategory)}&rdquo;</strong></> : null},
-            which isn&rsquo;t something we list, so the selection was reset instead of guessing. Pick a country below.
-          </span>
-        </p>
-      ) : null}
+      {rejectedNotice}
 
       <section aria-labelledby="choose-country-title" className="relative overflow-hidden rounded-[1.5rem] border border-lav-200/80 bg-[#f6f1fc] p-4 sm:p-6">
         <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 h-48 w-48 rounded-full bg-lav-300/30 blur-3xl" />
@@ -615,7 +686,7 @@ export function ServiceExplorer({
           <div>
             <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Globe className="h-3.5 w-3.5" /> Country</p>
             <h2 id="choose-country-title" className="mt-1.5 text-[1.125rem] font-semibold text-ink sm:mt-2 sm:text-[1.25rem]">Pick a country once.</h2>
-            <p className="mt-1.5 max-w-sm text-meta leading-relaxed text-ink-2">Your selection stays saved for this service hub, so you do not need to rechoose it for every category or browse session.</p>
+            <p className="mt-1.5 max-w-sm text-meta leading-relaxed text-ink-2">Your selection is remembered on this device when browser storage is available.</p>
           </div>
           <div className="rounded-2xl border border-white/80 bg-white/60 p-3 shadow-sm sm:p-4">
             <CountrySelector id="service-country" value={country} onChange={chooseCountry} />
@@ -713,7 +784,7 @@ export function ServiceExplorer({
 
           <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-meta leading-relaxed border-amber-200 bg-amber-50/70 text-amber-900`}>
             <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-            {verificationPending || numberAppsPending ? <p><strong>Checking live availability.</strong> Results will appear as soon as the catalogue responds.</p>
+            {verificationPending || numberAppsPending || liveState?.loading ? <p><strong>Checking live availability.</strong> Results will appear as soon as the catalogue responds.</p>
               : numberAppsUnconfirmed && !liveState?.reason ? <p><strong>App availability is not confirmed.</strong> General plans and rentals can still be browsed below. <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>
               : liveState?.country === country && liveState.live && liveState.reason !== "funding" && !liveState.partial && !liveState.failed && !numberAppsUnconfirmed ? <p><strong>Live listings are current.</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. <Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).lead}</strong>{" "}{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).rest} <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
           </div>
@@ -734,16 +805,27 @@ export function ServiceExplorer({
               </div>
               <div className="relative w-full sm:max-w-[260px]">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
-                <input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setVisible(PAGE_SIZE); }} aria-label="Search services" placeholder="Search services or platforms" className="min-h-11 w-full rounded-xl border border-line bg-white py-2 pl-9 pr-3 text-meta text-ink outline-none placeholder:text-ink-3 focus:border-lav-400 focus:ring-4 focus:ring-lav-100" />
+                <input type="search" value={search} onChange={(event) => { setQuickSelection(null); setSearch(event.target.value); setVisible(PAGE_SIZE); }} aria-label="Search services" placeholder="Search services or platforms" className="min-h-11 w-full rounded-xl border border-line bg-white py-2 pl-9 pr-3 text-meta text-ink outline-none placeholder:text-ink-3 focus:border-lav-400 focus:ring-4 focus:ring-lav-100" />
               </div>
             </div>
+
+            <QuickShortcuts
+              key={`${country}:${category}:${subcategory?.id ?? ""}`}
+              label="Quick app and product shortcuts"
+              title={category === "numbers" || category === "verification" ? "Find an app:" : category === "social" ? "Find a platform:" : category === "email" ? "Find an app or provider:" : "Find an app or product:"}
+              description="These shortcuts filter loaded listings, which may be incomplete or out of date. Check stock, region and checkout on each offer."
+              options={quickChoices}
+              selected={quickSelection?.key ?? null}
+              onSelect={chooseShortcut}
+              onClear={clearQuickSelection}
+            />
 
             {category === "numbers" && <div className="mt-3 rounded-xl border border-line bg-white p-3 text-meta text-ink-2">
               <p>Browse app-specific single-use numbers alongside general plans and rentals for {selectedCountry.name}. Some countries are view-only; each offer shows if purchasing is available. Choose another country to check its offers.</p>
             </div>}
             {enableDigitalCatalogue && <label className="mt-3 flex items-center gap-2 text-meta text-ink-2"><input type="checkbox" checked={stockOnly} onChange={(event) => { setStockOnly(event.target.checked); setVisible(PAGE_SIZE); }} />Show catalogue listings with reported stock only</label>}
             {enableDigitalCatalogue && category === "subscriptions" && <p className="mt-2 text-meta text-ink-2">Browse subscription product types below or search by product name. {stockOnly ? "Out-of-stock and unknown-stock listings are hidden; clear the stock filter to include them." : "All reported availability states are included; ordering is checked separately."} Use load more to browse remaining catalogue pages.</p>}
-            {enableDigitalCatalogue && <DigitalCategoryPicker key={category} category={category} onSelect={(entry) => { setSubcategory(entry); setVisible(PAGE_SIZE); }} />}
+            {enableDigitalCatalogue && <DigitalCategoryPicker key={category} category={category} onSelect={(entry) => { setSubcategory(entry); if (quickSelection) clearQuickSelection(); setVisible(PAGE_SIZE); }} />}
             {category === "esim" && <label className="mt-3 flex items-center gap-2 text-meta text-ink-2"><input type="checkbox" checked={allEsimDestinations} onChange={(event) => { setAllEsimDestinations(event.target.checked); setVisible(PAGE_SIZE); }} />Browse all destinations</label>}
             {enableDigitalCatalogue && <div className="mt-3 text-meta text-ink-3" aria-live="polite">
               <p>Search filters the listings loaded in this category; load more pages to see further matches.</p>
@@ -765,17 +847,18 @@ export function ServiceExplorer({
             {tags.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-1.5 border-t border-line pt-4" aria-label="Service types">
                 <button type="button" onClick={() => { setTag("all"); setVisible(PAGE_SIZE); }} aria-pressed={tag === "all"} className={`rounded-lg px-2.5 py-1.5 text-micro font-semibold ${tag === "all" ? "bg-lav-100 text-lav-800" : "text-ink-3 hover:bg-cream"}`}>All types</button>
-                {tags.map((type) => <button key={type} type="button" onClick={() => { setTag(type); setVisible(PAGE_SIZE); }} aria-pressed={tag === type} className={`rounded-lg px-2.5 py-1.5 text-micro font-semibold ${tag === type ? "bg-lav-100 text-lav-800" : "text-ink-3 hover:bg-cream"}`}>{type}</button>)}
+                {tags.map((type) => <button key={type} type="button" onClick={() => { if (category === "numbers" && quickSelection && type !== "Single use") clearQuickSelection(); setTag(type); setVisible(PAGE_SIZE); }} aria-pressed={tag === type} className={`rounded-lg px-2.5 py-1.5 text-micro font-semibold ${tag === type ? "bg-lav-100 text-lav-800" : "text-ink-3 hover:bg-cream"}`}>{type}</button>)}
               </div>
             )}
 
             {category === "numbers" && (tag === "all" || tag === "Single use") && <NumberAppOffers
-              key={country}
+              key={`${country}:${quickSelection?.key ?? ""}`}
               countryName={selectedCountry.name}
               countryCode={selectedCountry.code}
               feed={appFeed}
               pending={numberAppsPending}
               search={search}
+              shortcutKey={quickSelection?.key ?? null}
               retryBlocked={liveState?.verificationRetryBlocked ?? false}
               onRetry={() => setLiveRevision((value) => value + 1)}
             />}
@@ -786,9 +869,10 @@ export function ServiceExplorer({
                 {liveState.reason === "sign-in" ? <>Your session has expired. <Link href="/login?next=%2Fdashboard%2Fservices" className="font-semibold underline">Sign in again</Link>.</>
                   : liveState.reason === "throttled" ? "Live listings were refreshed too quickly."
                   : liveState.reason === "funding" ? "Live listings are paused while we restock." : "Some live listings could not be loaded."}{" "}
+                {liveState.reason === "error" && liveState.affectedFeeds.length > 0 && <span>Affected: {liveState.affectedFeeds.join(", ")}. </span>}
                 {/* No Retry on a funding gap or signed-out session. */}
                 {liveState.retryBlocked && (liveState.reason === "error" || liveState.reason === "throttled") && "Please wait before retrying. "}
-                {(liveState.reason === "error" || liveState.reason === "throttled") && <button type="button" className="font-semibold underline disabled:opacity-50" disabled={liveState.loading || liveState.retryBlocked} onClick={() => setLiveRevision((value) => value + 1)}>Retry</button>}
+                {(liveState.reason === "error" || liveState.reason === "throttled") && <button type="button" className="font-semibold underline disabled:opacity-50" disabled={!liveState.canRetry} onClick={() => setLiveRevision((value) => value + 1)}>Retry</button>}
               </p>
             )}
             {category === "numbers" && <h3 className="mt-5 text-[0.9375rem] font-semibold text-ink">General plans &amp; rentals</h3>}
@@ -862,7 +946,7 @@ export function ServiceExplorer({
                   ? "Try another country or check back later. Availability can change."
                   : "Try another search, category or country. This doesn't indicate live availability."}</p>
                 {category === "subscriptions" && !search && !digital.loading && <p className="mt-3 text-meta text-ink-2">No subscription listings have loaded for this selection. Try loading more catalogue pages or <Link href="/dashboard/support" className="font-semibold text-lav-700 underline">Ask about subscriptions</Link>. Availability depends on each product.</p>}
-                {(search || tag !== "all") && <button type="button" onClick={() => { setSearch(""); setTag("all"); setVisible(PAGE_SIZE); }} className="mt-3 text-meta font-semibold text-lav-700 underline underline-offset-2">Clear filters</button>}
+                {(search || tag !== "all") && <button type="button" onClick={() => { clearQuickSelection(); setTag("all"); }} className="mt-3 text-meta font-semibold text-lav-700 underline underline-offset-2">Clear filters</button>}
               </div>
             )}
             {!platformGroups && visible < filtered.length && (

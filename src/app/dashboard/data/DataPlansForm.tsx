@@ -6,12 +6,43 @@ import { catalogueFailureReason, fetchCatalogue, SHARED_CATALOGUE_TIMEOUT_MS, ty
 import { retryAfterDeadline } from "@/lib/platform/retry-after";
 import { useRetryCooldown } from "@/lib/platform/use-retry-cooldown";
 import { BrandIcon } from "@/components/BrandIcon";
+import { QuickShortcuts } from "@/components/QuickShortcuts";
 import type { PublicUser } from "@/lib/identity/auth";
 import type { ClubkonnectPlan } from "@/lib/providers/clubkonnect";
 
 interface DataPlansFormProps { user?: PublicUser; initialPlanId?: string }
-type Catalogue = { plans: ClubkonnectPlan[]; checkedAt: string; stale: boolean; checkoutReason: string };
+type DisplayPlan = Pick<ClubkonnectPlan, "id" | "network" | "networkCode" | "name" | "publishedAmountKobo" | "dataType">;
+type Catalogue = { plans: DisplayPlan[]; checkedAt: string | null; stale: boolean; checkoutReason: string; incomplete: boolean };
 const money = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" });
+
+/** A malformed row must not take down the page or hide other usable bundles. */
+function readCatalogue(value: unknown): Catalogue | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const body = value as Record<string, unknown>;
+  if (!Array.isArray(body.plans)) return null;
+  const plans: DisplayPlan[] = [];
+  const seen = new Set<string>();
+  let incomplete = false;
+  for (const raw of body.plans) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) { incomplete = true; continue; }
+    const plan = raw as Record<string, unknown>;
+    if (typeof plan.id !== "string" || !plan.id.trim() || seen.has(plan.id) ||
+        typeof plan.network !== "string" || !plan.network.trim() || typeof plan.networkCode !== "string" || !plan.networkCode.trim() ||
+        typeof plan.name !== "string" || !plan.name.trim() || typeof plan.publishedAmountKobo !== "number" ||
+        !Number.isSafeInteger(plan.publishedAmountKobo) || plan.publishedAmountKobo <= 0 ||
+        !(plan.dataType === undefined || plan.dataType === null || typeof plan.dataType === "string")) {
+      incomplete = true; continue;
+    }
+    seen.add(plan.id);
+    plans.push({ id: plan.id, network: plan.network, networkCode: plan.networkCode, name: plan.name,
+      publishedAmountKobo: plan.publishedAmountKobo, dataType: typeof plan.dataType === "string" ? plan.dataType : null });
+  }
+  const checkedAt = typeof body.checkedAt === "string" && Number.isFinite(Date.parse(body.checkedAt)) ? body.checkedAt : null;
+  const checkoutReason = typeof body.checkoutReason === "string" && body.checkoutReason.trim()
+    ? body.checkoutReason : "Purchasing is unavailable from this catalogue.";
+  if (!checkedAt || typeof body.stale !== "boolean" || checkoutReason !== body.checkoutReason) incomplete = true;
+  return { plans, checkedAt, stale: body.stale !== false, checkoutReason, incomplete };
+}
 
 function NetworkMark({ code, name }: { code: string; name: string }) {
   const brand = ({ "01": "mtn", "02": "glo", "04": "airtel" } as const)[code as "01" | "02" | "04"];
@@ -40,10 +71,11 @@ export function DataPlansForm({ initialPlanId }: DataPlansFormProps) {
             setErrorReason(catalogueFailureReason(response.status, body?.code));
             setRetryAt(retryAfterDeadline(response.headers?.get("retry-after") ?? null, response.status === 429 ? 60_000 : 0));
           }
-          throw new Error(body?.error || "Unable to load data plans.");
+          throw new Error(typeof body?.error === "string" ? body.error : "Unable to load data plans.");
         }
-        if (!Array.isArray(body?.plans)) throw new Error("Invalid catalogue response.");
-        if (!controller.signal.aborted) { setCatalogue(body); setErrorReason(null); }
+        const next = readCatalogue(body);
+        if (!next || (body.plans.length > 0 && next.plans.length === 0)) throw new Error("The data catalogue could not be read.");
+        if (!controller.signal.aborted) { setCatalogue(next); setErrorReason(null); }
       })
       .catch((reason: unknown) => {
         if (!controller.signal.aborted) setError(reason instanceof Error && reason.name !== "TimeoutError" ? reason.message : "Unable to load data plans. Please check your connection.");
@@ -62,13 +94,25 @@ export function DataPlansForm({ initialPlanId }: DataPlansFormProps) {
       <label className="text-meta">Search bundles<input className="mt-1 block rounded-lg border border-line bg-white p-3" value={search} onChange={event => setSearch(event.target.value)} placeholder="e.g. 1GB or monthly" /></label>
       <button className="rounded-lg border border-line p-3 text-meta font-semibold disabled:opacity-50" disabled={loading || retryBlocked || errorReason === "unconfigured" || errorReason === "sign-in"} onClick={() => { setLoading(true); setError(""); setErrorReason(null); setRetryAt(0); setReload(value => value + 1); }}>Reload listings</button>
     </div>
+    {catalogue && <QuickShortcuts
+      label="Quick network shortcuts"
+      title="Find a network:"
+      description="Network names come from the loaded catalogue; stock is not reported and listings may change."
+      options={networks.map(([code, name]) => ({ key: code, label: name }))}
+      selected={network || null}
+      onSelect={(code) => { setNetwork((current) => current === code ? "" : code); setSearch(""); }}
+      onClear={() => setNetwork("")}
+      clearLabel="All networks"
+      alwaysShowClear
+    />}
     {loading && <p role="status">Loading current bundles…</p>}
     {error && <p role="alert">{errorReason === "sign-in" ? <>Your session has expired. <Link className="underline" href="/login?next=%2Fdashboard%2Fdata">Sign in again</Link>.</> : error}{" "}
       {catalogue ? "Previously loaded listings remain below. " : ""}
       {errorReason === "unconfigured" || errorReason === "sign-in" ? "" : retryBlocked ? "Please wait before reloading." : "Use Reload listings to retry."}
     </p>}
     {catalogue && <>
-      <p className="text-meta text-ink-2">Catalogue snapshot: <time dateTime={catalogue.checkedAt}>{new Date(catalogue.checkedAt).toLocaleString()}</time>. {catalogue.stale ? "Refresh delayed; these listings may have changed." : ""}</p>
+      {catalogue.incomplete && <p role="status" className="text-meta text-amber-800">Some bundles or catalogue details could not be shown. Listings may be incomplete; use Reload listings to try again.</p>}
+      <p className="text-meta text-ink-2">{catalogue.checkedAt ? <>Catalogue snapshot: <time dateTime={catalogue.checkedAt}>{new Date(catalogue.checkedAt).toLocaleString()}</time>.</> : "Catalogue snapshot time unavailable."} {catalogue.stale ? "Refresh delayed; these listings may have changed." : ""}</p>
       <p className="rounded-xl border border-line bg-white p-4 text-meta">Prices below are published catalogue prices, not checkout quotes. Numeric stock is not reported. {catalogue.checkoutReason}</p>
       {initialPlanId && <p className="text-meta">Choose a current bundle below; old plan links do not select a different product automatically.</p>}
       <p role="status" className="text-meta">{visible.length} bundles · lowest price first</p>

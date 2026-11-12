@@ -20,9 +20,11 @@ it("renders live, reviewed and digital catalogue eSIMs together, with their own 
   const digitalId = `digital-${"a".repeat(24)}`;
   vi.stubGlobal("fetch", vi.fn(async (url: string) => ({ ok: true, json: async () => url.startsWith("/api/services/digital-catalog?") ? {
     ok: true, items: [{ id: digitalId, name: "Catalogue travel plan", stock: "reported", checkout: "esims" }], nextCursor: null,
-  } : { ok: true, country: "ng", live: true, items: [offer("live", "Live travel plan")] } })));
+  } : { ok: true, country: "ng", live: true, items: [{ ...offer("live", "Live travel plan"), source: "live", price: 1200, action: { label: "Buy eSIM", href: "/dashboard/esim/live" } }] } })));
   render(<ServiceExplorer initialCountry="ng" initialCategory="esim" enableDigitalCatalogue reviewedItems={[offer("reviewed", "Reviewed travel plan")]} />);
-  for (const name of ["Live travel plan", "Reviewed travel plan", "Catalogue travel plan"]) {
+  const liveCard = (await screen.findByRole("heading", { name: "Live travel plan" })).closest("article")!;
+  expect(within(liveCard).getByRole("link").getAttribute("href")).toBe("/dashboard/esim/live");
+  for (const name of ["Reviewed travel plan", "Catalogue travel plan"]) {
     const card = (await screen.findByRole("heading", { name })).closest("article")!;
     expect(within(card).getByRole("link").getAttribute("href")).toContain("/dashboard/digital-esims?product=");
   }
@@ -66,7 +68,7 @@ it("keeps the same live app offer available in Number plans and App verification
   const card = (await screen.findByRole("heading", { name: "WhatsApp" })).closest("article")!;
   expect(within(card).getByRole("link", { name: "Choose service" }).getAttribute("href")).toBe(otp.action?.href);
   expect(new URLSearchParams(window.location.search).get("country")).toBe("ng");
-  expect(fetchMock).toHaveBeenCalledTimes(4);
+  expect(fetchMock).toHaveBeenCalledTimes(2);
 });
 
 it("loads the live data catalogue inside the data category without unrelated feeds", async () => {

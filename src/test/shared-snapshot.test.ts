@@ -1,5 +1,6 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle, type PgliteDatabase } from "drizzle-orm/pglite";
 import * as schema from "@/db/schema";
@@ -28,8 +29,44 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db");
 });
+afterEach(() => vi.unstubAllEnvs());
 
 describe("shared complete catalogue snapshots", () => {
+  it("serves a warm local snapshot to every reader while a refresh is in flight", async () => {
+    vi.stubEnv("DATABASE_URL", "");
+    vi.stubEnv("PGHOST", "");
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const refresh = vi.fn()
+      .mockResolvedValueOnce({ value: { version: 1 }, checkedAt: new Date().toISOString() })
+      .mockImplementationOnce(async () => { await gate; return { value: { version: 2 }, checkedAt: new Date().toISOString() }; });
+    await store.readSharedSnapshot({ key: "test:local-background", ttlMs: 0, refresh });
+    const first = await store.readSharedSnapshot<{ version: number }>({ key: "test:local-background", ttlMs: 0, refresh });
+    const second = await Promise.race([
+      store.readSharedSnapshot<{ version: number }>({ key: "test:local-background", ttlMs: 0, refresh }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 100)),
+    ]);
+    release();
+    expect(first).toMatchObject({ value: { version: 1 }, stale: true });
+    expect(second).toMatchObject({ value: { version: 1 }, stale: true });
+    expect(refresh).toHaveBeenCalledTimes(2);
+    await vi.waitFor(async () => {
+      const current = await store.readSharedSnapshot<{ version: number }>({ key: "test:local-background", ttlMs: 60_000, refresh });
+      expect(current.value.version).toBe(2);
+    });
+  });
+
+  it("lets an opted-in caller use an independent fallback when a cold lease is held", async () => {
+    const key = "test:skip-cold-wait";
+    await pg.exec(`INSERT INTO catalog_snapshots (key, lease_owner, lease_expires_at) VALUES ('${key}', '${randomUUID()}', now() + interval '1 minute')`);
+    const refresh = vi.fn(async () => ({ value: { version: 1 }, checkedAt: new Date().toISOString() }));
+    try {
+      await expect(store.readSharedSnapshot({ key, ttlMs: 60_000, skipColdWait: true, refresh }))
+        .rejects.toBeInstanceOf(store.SnapshotUnavailableError);
+      expect(refresh).not.toHaveBeenCalled();
+    } finally { await pg.exec(`DELETE FROM catalog_snapshots WHERE key = '${key}'`); }
+  });
+
   it("coalesces concurrent cold reads across the PostgreSQL lease", async () => {
     let calls = 0;
     const refresh = vi.fn(async () => {

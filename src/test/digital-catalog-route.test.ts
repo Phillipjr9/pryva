@@ -101,16 +101,26 @@ describe("read-only digital catalogue route", () => {
     const response = await GET(request("?category=topups&stock=available"));
     const data = await response.json();
     expect(response.status).toBe(200);
-    expect(data.items[0]).toMatchObject({ name: "3550 Coins (40% more value)", artwork: { kind: "category", key: "oxide-survival-island" }, stock: "reported", stockQuantity: 7 });
+    expect(data.items[0]).toMatchObject({ name: "3550 Coins (40% more value)", platform: "Oxide: Survival Island", artwork: { kind: "category", key: "oxide-survival-island" }, stock: "reported", stockQuantity: 7 });
     expect(data.items.slice(1, 6).map((item: { artwork: unknown }) => item.artwork)).toEqual(Array(5).fill({ kind: "category", key: "8-ball-pool" }));
+    expect(data.items.slice(1, 6).map((item: { platform: string }) => item.platform)).toEqual(Array(5).fill("8 Ball Pool"));
     expect(data.items[1]).toMatchObject({ id, name: "Golden Spin", stock: "reported", stockQuantity: 1, checkout: "topups" });
     expect(data.items[0]).not.toHaveProperty("checkout");
     expect(data.items[6]).toMatchObject({ stock: "out", stockQuantity: 0 });
     expect(data.items[6]).not.toHaveProperty("artwork");
+    expect(data.items[6]).not.toHaveProperty("platform");
     expect(data.items[7]).not.toHaveProperty("artwork");
+    expect(data.items[7]).not.toHaveProperty("platform");
     expect(JSON.stringify(data)).not.toMatch(/raw-|019e9cf|fazer-|evil|track|123\.45|categoryId|imagePath|slug/);
     expect(mocks.page).toHaveBeenCalledTimes(1);
     expect(mocks.page).toHaveBeenCalledWith({ query: undefined, cursor: undefined, category: "topups", inStockOnly: true });
+  });
+  it("returns a reviewed game name for an explicit top-up slug without exposing that slug", async () => {
+    mocks.page.mockResolvedValueOnce({ rows: [{ id: "raw-cod", name: "80 + 8 CP", slug: "call-of-duty-mobile-activision-us-80-plus-8-cp", deliveryType: "direct_topup", quantity: 2 }], nextCursor: null, searchLimited: false });
+    const data = await (await GET(request())).json();
+    expect(data.items[0]).toMatchObject({ name: "80 + 8 CP", platform: "Call of Duty Mobile", stock: "reported", stockQuantity: 2 });
+    expect(data.items[0]).not.toHaveProperty("checkout");
+    expect(JSON.stringify(data)).not.toMatch(/raw-cod|activision-us-80|slug|deliveryType/);
   });
   it("filters categories and links only exact approved products to checkout", async () => {
     const { createHash } = await import("node:crypto");

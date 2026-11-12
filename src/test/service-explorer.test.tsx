@@ -13,11 +13,14 @@ import {
 } from "@/lib/services/service-explorer";
 
 describe("country-first service explorer", () => {
-  it("defaults to a single active country instead of blocking the whole explorer", () => {
+  it("waits for a remembered country during hydration and renders explicit countries immediately", () => {
     expect(buildServiceExplorer(null)).toEqual([]);
     expect(buildServiceExplorer("")).toEqual([]);
     expect(buildServiceExplorer("not-a-country")).toEqual([]);
-    const markup = renderToStaticMarkup(<ServiceExplorer initialCountry={null} initialCategory={null} />);
+    const pending = renderToStaticMarkup(<ServiceExplorer initialCountry={null} initialCategory={null} />);
+    expect(pending).toContain("Restoring your country selection");
+    expect(pending).not.toContain("Nigeria selected");
+    const markup = renderToStaticMarkup(<ServiceExplorer initialCountry="ng" initialCategory={null} />);
     expect(markup).toContain("Nigeria selected");
     expect(markup).not.toContain("Choose a country to explore");
     expect(markup).toContain("Choose a category");

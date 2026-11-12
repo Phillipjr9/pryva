@@ -74,6 +74,7 @@ async function load(root: Root, query: string, cursor: string | undefined, signa
     for (const value of data.items) {
       if (!value || typeof value !== "object" || typeof value.id !== "string" || !/^digital-[a-f0-9]{24}$/.test(value.id) || typeof value.name !== "string" || !value.name || !["reported", "out", "unknown"].includes(value.stock)) continue;
       const checkout = value.checkout === "codes" || value.checkout === "topups" || value.checkout === "esims" ? value.checkout : null;
+      const platform = typeof value.platform === "string" && value.platform.length <= 80 && !/[\u0000-\u001f\u007f]/.test(value.platform) ? value.platform.trim() : "";
       const family = digitalServiceFamily(value.name, checkout ?? undefined, root.familyShelf ?? root.slug);
       if (root.giftCardsOnly && family !== "gift-cards") continue;
       const category = family ?? "tools";
@@ -83,7 +84,7 @@ async function load(root: Root, query: string, cursor: string | undefined, signa
       const terms = category === "gift-cards" ? reportedGiftTerms({ country_code: rawTerms?.country, amount: termValue?.amount, currency: termValue?.currency }) : null;
       const termDetails = [terms?.value ? `Reported value: ${terms.value.amount} ${terms.value.currency}` : null,
         terms?.country ? `Reported country: ${terms.country}` : null].filter(Boolean);
-      items.push({ id: value.id, category, name: value.name, description: label, tag: label, ...(!family ? { allOnly: true } : {}),
+      items.push({ id: value.id, category, name: value.name, description: label, tag: label, ...(platform ? { platform } : {}), ...(!family ? { allOnly: true } : {}),
         artwork: { kind: "digital-product", art: parseDigitalArtwork(value.artwork) }, source: "catalog", coverage: "unconfirmed", stock: typeof value.stockQuantity === "number" && Number.isSafeInteger(value.stockQuantity) && value.stockQuantity >= 0 ? value.stockQuantity : null, myUnits: null, price: null,
         detail: [`${value.stock === "reported" ? "Stock reported" : value.stock === "out" ? "Out of stock (reported)" : "Stock unknown"}`, ...termDetails, terms?.country ? "Redemption eligibility unconfirmed" : "region unconfirmed"].join(" · "), orderingPaused: !checkout || value.stock !== "reported", action: checkout && value.stock === "reported" ? { label: "Check price and availability", href: `/dashboard/digital-${checkout}?product=${encodeURIComponent(value.id)}` } : null });
     }

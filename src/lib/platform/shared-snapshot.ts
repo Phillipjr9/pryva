@@ -60,7 +60,11 @@ async function localSnapshot<T>(
   const entry = localEntries.get(key) ?? { snapshot: null, pending: null };
   localEntries.set(key, entry);
   if (entry.snapshot && !fresh(entry.snapshot, ttlMs).stale) return entry.snapshot as SharedSnapshot<T>;
-  if (entry.pending) return entry.pending as Promise<SharedSnapshot<T>>;
+  if (entry.pending) {
+    // A warm snapshot remains browsable while a refresh is already running.
+    // Only a cold read must wait for that in-flight publication.
+    return entry.snapshot ? { ...entry.snapshot as SharedSnapshot<T>, stale: true } : entry.pending as Promise<SharedSnapshot<T>>;
+  }
 
   const previous = entry.snapshot as SharedSnapshot<T> | null;
   const pending = refresh().then(({ value }) => {
@@ -180,12 +184,16 @@ async function persistentRefresh<T>(
   }
 }
 
-type SnapshotOptions<T> = { key: string; ttlMs: number; leaseMs?: number; refresh: Refresh<T> };
+type SnapshotOptions<T> = {
+  key: string; ttlMs: number; leaseMs?: number; refresh: Refresh<T>;
+  /** Only for callers with an independent safe fallback when another instance owns a cold lease. */
+  skipColdWait?: boolean;
+};
 const sharedReads = new Map<string, Promise<SharedSnapshot<unknown>>>();
 
 /** One database/lease waiter per scope per instance, not one per shopper. */
 export async function readSharedSnapshot<T>(options: SnapshotOptions<T>): Promise<SharedSnapshot<T>> {
-  const scope = `${options.key}:${options.ttlMs}:${options.leaseMs ?? 120_000}`;
+  const scope = `${options.key}:${options.ttlMs}:${options.leaseMs ?? 120_000}:${options.skipColdWait === true}`;
   const pending = sharedReads.get(scope);
   if (pending) return pending as Promise<SharedSnapshot<T>>;
   const read = readSharedSnapshotOnce(options).finally(() => {
@@ -248,6 +256,16 @@ async function readSharedSnapshotOnce<T>(options: SnapshotOptions<T>): Promise<S
       // The previously read complete value is still safer than an empty page.
     }
     return { ...current, stale: true };
+  }
+
+  // An explicitly supplied alternative can be used without waiting for an
+  // empty leased row. Re-read once in case a complete value was just published.
+  if (options.skipColdWait) {
+    try {
+      const latest = decodeRow<T>(await readRow(key));
+      if (latest) return fresh(remember(key, latest), ttlMs);
+    } catch { /* The caller will use its independent fallback. */ }
+    throw new SnapshotUnavailableError();
   }
 
   // Cold start with another instance already crawling: briefly wait for its

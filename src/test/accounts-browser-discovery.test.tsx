@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { AccountsBrowser } from "@/app/(site)/accounts/AccountsBrowser";
 
 const response = (data: object) => ({ ok: true, json: async () => data });
+const account = (title: string, id = 1) => ({ id, slug: `p1:${id}`, title, stock: 12, sold: null, category: "Social", subcategory: null, priceNgn: 500, warrantyDays: 30, minQuantity: 1, maxQuantity: 12, available: true, fulfilment: "instant", purchasable: true });
+const meta = (total: number, current_page = 1, last_page = 1) => ({ current_page, last_page, per_page: 24, total });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("account catalogue discovery", () => {
@@ -25,14 +27,14 @@ describe("account catalogue discovery", () => {
     expect(screen.getByRole("button", { name: "Product type 150" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "All accounts" }));
     await waitFor(() => expect(screen.queryByRole("button", { name: "Product type 1" })).toBeNull());
-    expect(screen.getByText("Instagram account")).toBeTruthy();
+    expect(await screen.findByText("Instagram account")).toBeTruthy();
   });
   it("searches the complete catalogue by platform and can include sold-out offers", async () => {
-    const mock = vi.fn(async (_url: string) => response({ configured: true, listings: [], categories: [], meta: { current_page: 1, last_page: 1, per_page: 24, total: 0 } }));
+    const mock = vi.fn(async (_url: string) => response({ configured: true, listings: [account("Facebook account")], categories: [], meta: meta(1) }));
     vi.stubGlobal("fetch", mock);
     render(<AccountsBrowser purchaseEnabled />);
     await waitFor(() => expect(mock.mock.calls.some(([url]) => String(url).includes("inStock=true"))).toBe(true));
-    fireEvent.click(screen.getByRole("button", { name: /^Facebook$/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Facebook$/ }));
     await waitFor(() => expect(mock.mock.calls.some(([url]) => String(url).includes("search=Facebook") && String(url).includes("sort=total_price"))).toBe(true));
     fireEvent.click(screen.getByRole("checkbox", { name: "In stock only" }));
     await waitFor(() => {
@@ -40,6 +42,49 @@ describe("account catalogue discovery", () => {
       expect(urls.at(-1)).toContain("search=Facebook");
       expect(urls.at(-1)).not.toContain("inStock=true");
     });
+  });
+
+  it("keeps the existing X / Twitter quick search accessible and clears it without changing stock filters", async () => {
+    const mock = vi.fn(async (_url: string) => response({ configured: true, listings: [account("X account"), account("Xbox account", 2)], categories: [], meta: meta(2) }));
+    vi.stubGlobal("fetch", mock);
+    render(<AccountsBrowser purchaseEnabled />);
+    const group = await screen.findByRole("group", { name: "Find accounts by platform" });
+    const twitter = within(group).getByRole("button", { name: "X / Twitter" });
+    expect(within(group).queryByRole("button", { name: "Facebook" })).toBeNull();
+    fireEvent.click(twitter);
+    expect(twitter.getAttribute("aria-pressed")).toBe("true");
+    await waitFor(() => expect(mock.mock.calls.some(([url]) => String(url).includes("search=Twitter") && String(url).includes("inStock=true"))).toBe(true));
+    fireEvent.click(within(group).getByRole("button", { name: "Clear filters" }));
+    expect(screen.getByRole("searchbox", { name: "Search accounts" })).toHaveProperty("value", "");
+    await waitFor(() => expect(screen.getByRole("button", { name: "X / Twitter" }).getAttribute("aria-pressed")).toBe("false"));
+    expect(screen.getByRole("checkbox", { name: "In stock only" })).toHaveProperty("checked", true);
+  });
+
+  it("does not advertise platform shortcuts when no corresponding listing has been loaded", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => response({ configured: true, listings: [], categories: [], meta: meta(0) })));
+    render(<AccountsBrowser purchaseEnabled />);
+    expect(await screen.findByText("No accounts match those filters")).toBeTruthy();
+    expect(screen.queryByRole("group", { name: "Find accounts by platform" })).toBeNull();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search accounts" }), { target: { value: "missing" } });
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(screen.getByRole("searchbox", { name: "Search accounts" })).toHaveProperty("value", "");
+  });
+
+  it("updates shortcuts as pages change and searches the whole catalogue without losing stock filters", async () => {
+    const mock = vi.fn(async (url: string) => {
+      if (url.includes("categories")) return response({ configured: true, categories: [], subcategories: [] });
+      const params = new URL(url, "https://test.invalid").searchParams;
+      const second = params.get("page") === "2" || params.get("search") === "Netflix";
+      return response({ configured: true, listings: [account(second ? "Netflix account" : "Facebook account", second ? 2 : 1)], meta: meta(2, second && !params.has("search") ? 2 : 1, 2) });
+    });
+    vi.stubGlobal("fetch", mock);
+    render(<AccountsBrowser purchaseEnabled />);
+    expect(await screen.findByRole("button", { name: /^Facebook$/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    const netflix = await screen.findByRole("button", { name: /^Netflix$/ });
+    expect(screen.queryByRole("button", { name: /^Facebook$/ })).toBeNull();
+    fireEvent.click(netflix);
+    await waitFor(() => expect(mock.mock.calls.some(([url]) => String(url).includes("search=Netflix") && String(url).includes("page=1") && String(url).includes("inStock=true"))).toBe(true));
   });
 
   it("gives both account reads enough time for a cold shared snapshot", async () => {

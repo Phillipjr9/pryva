@@ -41,9 +41,11 @@ import {
   type AccsZoneRef,
 } from "@/lib/providers/accszone";
 import { logger } from "@/lib/platform/logger";
+import { CatalogueReadTimeout, withCatalogueReadTimeout } from "@/lib/platform/catalogue-read-timeout";
 import { clearLocalSnapshots, readSharedSnapshot, SnapshotUnavailableError } from "@/lib/platform/shared-snapshot";
 import { usdMicros, usdString } from "@/lib/payments/supplier-money";
 import { warrantyDaysForGroup, type FulfilmentMode } from "@/lib/services/warranty";
+import { mentionsTwitterAccount } from "@/lib/services/accounts/platform-shortcuts";
 
 /** Opaque, stable routing tokens. Not initials, not abbreviations. */
 const PRIMARY_TOKEN = "1";
@@ -369,6 +371,13 @@ type BrowseCatalog = {
   stale?: boolean;
 };
 const BROWSE_TTL_MS = 5 * 60 * 1000;
+// A separate, short-lived candidate can report an incomplete source without
+// ever replacing the last complete combined snapshot. Its shared lease also
+// prevents every shopper starting a new crawl during an outage.
+const CANDIDATE_TTL_MS = 30_000;
+// A source that stops responding must not indefinitely hide the healthy one.
+// This is a read-only deadline; the underlying shared work is not cancelled.
+const BROWSE_SOURCE_TIMEOUT_MS = 35_000;
 const MAX_SECONDARY_PAGES = 100;
 
 export function clearMarketplaceCatalogCache(): void {
@@ -406,44 +415,93 @@ async function secondaryListings(): Promise<{ listings: MarketplaceListing[]; ch
   throw new Error("Catalogue exceeds the pagination safety bound");
 }
 
-async function buildCombinedCatalog(): Promise<BrowseCatalog> {
-  const [primary, secondary] = await Promise.all([primaryListings(), secondaryListings()]);
-  // A complete combined snapshot requires every configured source. Publishing
-  // just the healthy half would hide products until the next crawl; publishing
-  // an expired process-local fallback would falsely mark it freshly refreshed.
-  if (isBulkaccConfigured() && (!primary || primary.partial || primary.stale)) {
-    throw new Error("Primary catalogue did not complete");
-  }
+type BrowseConfiguration = { primary: boolean; secondary: boolean };
+type Candidate = { catalog: BrowseCatalog | null };
+
+/** A candidate contains only complete per-source walks, even when one is down. */
+async function buildCandidateCatalog(config: BrowseConfiguration): Promise<BrowseCatalog | null> {
+  const [primaryResult, secondaryResult] = await Promise.allSettled([
+    config.primary ? withCatalogueReadTimeout(primaryListings, BROWSE_SOURCE_TIMEOUT_MS) : Promise.resolve(null),
+    config.secondary ? withCatalogueReadTimeout(secondaryListings, BROWSE_SOURCE_TIMEOUT_MS) : Promise.resolve(null),
+  ]);
+  const primary = primaryResult.status === "fulfilled" ? primaryResult.value : null;
+  const secondary = secondaryResult.status === "fulfilled" ? secondaryResult.value : null;
+  // Never publish an incomplete pagination walk. A complete but older local
+  // fallback may be browsed, but its original time and stale marker must survive.
+  const usablePrimary = primary && primary.partial === false && typeof primary.checkedAt === "string" && Number.isFinite(Date.parse(primary.checkedAt)) ? primary : null;
+  const usableSecondary = secondary && typeof secondary.checkedAt === "string" && Number.isFinite(Date.parse(secondary.checkedAt)) ? secondary : null;
+  if (config.primary && !usablePrimary) logger.warn("Account catalogue source unavailable", {
+    source: "primary", reason: primaryResult.status === "rejected" && primaryResult.reason instanceof CatalogueReadTimeout
+      ? "timeout" : primary?.partial ? "incomplete" : "unavailable",
+  });
+  if (config.secondary && !usableSecondary) logger.warn("Account catalogue source unavailable", {
+    source: "secondary", reason: secondaryResult.status === "rejected" && secondaryResult.reason instanceof CatalogueReadTimeout ? "timeout" : "unavailable",
+  });
+  if ((config.primary || config.secondary) && !usablePrimary && !usableSecondary) return null;
+
+  const partial = (config.primary && !usablePrimary) || (config.secondary && !usableSecondary);
   return {
-    listings: [...(primary?.listings ?? []), ...secondary.listings],
-    checkedAt: [primary?.checkedAt, secondary.checkedAt]
+    listings: [...(usablePrimary?.listings ?? []), ...(usableSecondary?.listings ?? [])],
+    checkedAt: [usablePrimary?.checkedAt, usableSecondary?.checkedAt]
       .filter((date): date is string => !!date).sort()[0] ?? new Date().toISOString(),
-    source: primary ? "primary" as const : secondary.listings.length ? "fallback" as const : "none" as const,
-    partial: false,
+    source: usablePrimary ? "primary" : usableSecondary?.listings.length ? "fallback" : "none",
+    partial: !!partial,
+    stale: usablePrimary?.stale === true,
   };
 }
 
+function validBrowseCatalog(value: BrowseCatalog | null | undefined): value is BrowseCatalog {
+  return !!value && Array.isArray(value.listings) && value.listings.every((listing) => listing && typeof listing.slug === "string") &&
+    typeof value.partial === "boolean" && typeof value.checkedAt === "string" && Number.isFinite(Date.parse(value.checkedAt));
+}
+
 /**
- * All instances read and atomically replace the same complete PostgreSQL value.
- * During refreshes, shoppers immediately receive the previous complete value;
- * supplier failures never truncate it. Live price and stock checks at checkout
- * are intentionally independent of this browse snapshot.
+ * A separately leased, explicitly partial candidate avoids a source outage
+ * hiding another healthy feed on a cold start. An unavailable sentinel is
+ * cached briefly too, so repeated requests do not stampede either provider.
  */
-async function combinedCatalog(): Promise<BrowseCatalog> {
-  const key = `accounts:v2:${isBulkaccConfigured()}:${isAccsZoneConfigured()}`;
-  const snapshot = await readSharedSnapshot<BrowseCatalog>({
-    key,
-    ttlMs: BROWSE_TTL_MS,
+async function candidateCatalog(config: BrowseConfiguration): Promise<BrowseCatalog> {
+  const snapshot = await readSharedSnapshot<Candidate>({
+    key: `accounts:candidate:v1:${config.primary}:${config.secondary}`,
+    ttlMs: CANDIDATE_TTL_MS,
     refresh: async () => {
-      const value = await buildCombinedCatalog();
-      return { value, checkedAt: value.checkedAt };
+      const catalog = await buildCandidateCatalog(config);
+      return { value: { catalog }, checkedAt: catalog?.checkedAt ?? new Date().toISOString() };
     },
   });
-  if (!snapshot.value || !Array.isArray(snapshot.value.listings) ||
-      !snapshot.value.listings.every((listing) => listing && typeof listing.slug === "string")) {
-    throw new SnapshotUnavailableError("The stored catalogue is invalid");
+  const catalog = snapshot.value?.catalog;
+  if (!validBrowseCatalog(catalog)) throw new SnapshotUnavailableError();
+  return { ...catalog, stale: snapshot.stale || catalog.stale === true };
+}
+
+/**
+ * The complete PostgreSQL snapshot remains authoritative and is never replaced
+ * by an incomplete or stale candidate. If no complete snapshot exists, return
+ * the separate candidate with an explicit partial/stale marker instead of
+ * hiding a healthy source. Checkout independently rechecks price and stock.
+ */
+async function combinedCatalog(): Promise<BrowseCatalog> {
+  const config = { primary: isBulkaccConfigured(), secondary: isAccsZoneConfigured() };
+  try {
+    const snapshot = await readSharedSnapshot<BrowseCatalog>({
+      key: `accounts:v2:${config.primary}:${config.secondary}`,
+      ttlMs: BROWSE_TTL_MS,
+      // A different instance may hold an empty full-catalogue lease while a
+      // usable partial candidate already exists. Do not wait 30 seconds for a
+      // full publication that cannot happen until the missing source recovers.
+      skipColdWait: true,
+      refresh: async () => {
+        const value = await candidateCatalog(config);
+        if (value.partial || value.stale) throw new Error("Account catalogue refresh incomplete");
+        return { value, checkedAt: value.checkedAt };
+      },
+    });
+    if (!validBrowseCatalog(snapshot.value) || snapshot.value.partial) throw new SnapshotUnavailableError("The stored catalogue is invalid");
+    return { ...snapshot.value, stale: snapshot.stale || snapshot.value.stale === true };
+  } catch (error) {
+    if (!(error instanceof SnapshotUnavailableError)) throw error;
+    return candidateCatalog(config);
   }
-  return { ...snapshot.value, partial: false, stale: snapshot.stale };
 }
 
 function categoryEntries(listings: MarketplaceListing[], field: "group" | "category") {
@@ -465,6 +523,9 @@ export async function listMarketplaceSubcategories(categoryId: number): Promise<
 
 function matchesSearch(listing: MarketplaceListing, search: string): boolean {
   const haystack = ` ${listing.title} ${listing.group ?? ""} ${listing.category ?? ""} `.toLowerCase();
+  // The shortcut searches the whole catalogue, including products titled X
+  // rather than Twitter. Do not broaden this to Xbox, Netflix, or other Xs.
+  if (search.trim().toLowerCase() === "twitter") return mentionsTwitterAccount(haystack);
   return search.toLowerCase().split(/\s+/).every((term) => haystack.includes(term));
 }
 
@@ -549,7 +610,7 @@ export async function listMarketplaceListings(query: ListingQuery = {}): Promise
   const perPage = Number.isSafeInteger(query.perPage) && (query.perPage as number) > 0 ? Math.min(query.perPage as number, 60) : 24;
   const catalog = await combinedCatalog();
   const result = await pageInMemory(catalog.listings, query, page, perPage, catalog.source);
-  return { ...result, partial: false, checkedAt: catalog.checkedAt, stale: catalog.stale };
+  return { ...result, partial: catalog.partial, checkedAt: catalog.checkedAt, stale: catalog.stale };
 }
 
 /**
