@@ -14,18 +14,20 @@ export default async function AppOtpCheckoutPage({
   searchParams,
 }: {
   params: Promise<{ offerId: string }>;
-  searchParams: Promise<{ country?: string | string[] }>;
+  searchParams: Promise<{ country?: string | string[]; from?: string | string[] }>;
 }) {
   const [{ offerId }, query] = await Promise.all([params, searchParams]);
   const user = await requireUser("/dashboard/services");
   const country = explorerCountry(query.country);
+  // The return target is an allowlisted shelf, never an arbitrary URL.
+  const backCategory = query.from === "numbers" ? "numbers" : "verification";
   if (!country || !/^otp-[a-f0-9]{24}$/.test(offerId)) {
-    return <Unavailable countryCode={country?.code ?? null} />;
+    return <Unavailable countryCode={country?.code ?? null} backCategory={backCategory} />;
   }
 
   const { listing } = await findOtpCheckoutOffer(country.code, offerId);
-  const back = `/dashboard/services?country=${country.code}&category=verification`;
-  if (!listing) return <Unavailable countryCode={country.code} />;
+  const back = `/dashboard/services?country=${country.code}&category=${backCategory}`;
+  if (!listing) return <Unavailable countryCode={country.code} backCategory={backCategory} />;
 
   const purchasePlan = {
     ...listing.plan,
@@ -68,8 +70,8 @@ export default async function AppOtpCheckoutPage({
   );
 }
 
-function Unavailable({ countryCode }: { countryCode: string | null }) {
-  const back = countryCode ? `/dashboard/services?country=${countryCode}&category=verification` : "/dashboard/services";
+function Unavailable({ countryCode, backCategory }: { countryCode: string | null; backCategory: "numbers" | "verification" }) {
+  const back = countryCode ? `/dashboard/services?country=${countryCode}&category=${backCategory}` : "/dashboard/services";
   return (
     <div className="grid gap-4">
       <Link href={back} className="w-fit text-meta font-semibold text-lav-700 hover:underline">← Back to services</Link>

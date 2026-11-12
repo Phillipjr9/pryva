@@ -249,6 +249,113 @@ export function ServiceCard({ item, countryName }: { item: ExplorerItem; country
   );
 }
 
+/** Preserve the checkout identity while returning shoppers to the shelf they used. */
+function numberPlansOffer(item: ExplorerItem, countryCode: string): ExplorerItem {
+  if (!item.action) return item;
+  const locked = { ...item, action: null };
+  if (!/^otp-[a-f0-9]{24}$/.test(item.id)) return locked;
+  try {
+    const url = new URL(item.action.href, "https://catalog.invalid");
+    if (url.origin !== "https://catalog.invalid" || url.pathname !== `/dashboard/services/otp/${item.id}` ||
+        url.searchParams.getAll("country").length !== 1 || url.searchParams.get("country") !== countryCode) return locked;
+    url.searchParams.set("from", "numbers");
+    return { ...item, action: { ...item.action, href: `${url.pathname}${url.search}${url.hash}` } };
+  } catch {
+    return locked;
+  }
+}
+
+/** The verification feed is also the app-specific part of Number plans. Keep
+ * its status separate from rentals and retain every offer's own checkout link. */
+function NumberAppOffers({
+  countryName, countryCode, feed, pending, search, retryBlocked, onRetry,
+}: {
+  countryName: string;
+  countryCode: string;
+  feed: LiveState | null;
+  pending: boolean;
+  search: string;
+  retryBlocked: boolean;
+  onRetry: () => void;
+}) {
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  const [openGroups, setOpenGroups] = useState(() => new Map<string, boolean>());
+  const [visibleOffers, setVisibleOffers] = useState(() => new Map<string, number>());
+  const groups = useMemo(() => {
+    // This is the verification feed, not similarly named digital products or a
+    // hand-written app list. A name groups options visually but never merges or
+    // discards their individual price, stock, ID or action.
+    // Pending or missing feeds are not proof of country coverage, even if a
+    // cached or malformed payload happens to contain rows.
+    const entries = filterExplorerItems(!pending && feed?.live ? feed.items : [], "verification", search)
+      .filter((item) => item.source === "live" && item.coverage === "catalog-country");
+    const byName = new Map<string, { name: string; items: ExplorerItem[] }>();
+    for (const item of entries) {
+      const key = item.name.trim().toLocaleLowerCase();
+      const group = byName.get(key);
+      if (group) group.items.push(item);
+      else byName.set(key, { name: item.name, items: [item] });
+    }
+    return [...byName.entries()].map(([key, group]) => ({ key, ...group }));
+  }, [feed, pending, search]);
+  const offers = groups.reduce((total, group) => total + group.items.length, 0);
+  const retryable = feed?.reason === "error" || feed?.reason === "throttled";
+  const unconfirmed = !feed || !feed.live || feed.failed || feed.partial;
+  const cachedWarning = groups.length > 0 && unconfirmed && ["sign-in", "unconfigured", "environment", "funding", "throttled"].includes(feed?.reason ?? "");
+
+  return (
+    <section aria-labelledby="number-apps-title" aria-busy={pending || undefined} className="mt-5 rounded-2xl border border-lav-200 bg-lav-50/40 p-3 sm:p-4">
+      <h3 id="number-apps-title" className="text-[0.9375rem] font-semibold text-ink">Apps for single-use numbers</h3>
+      <p className="mt-1 text-meta text-ink-2">Choose a service to see its reported number offers for {countryName}. Availability and platform acceptance can change.</p>
+      <div aria-live="polite" className="mt-2 text-meta text-ink-3">
+        {groups.length > 0 && <p>{groups.length} {groups.length === 1 ? "service" : "services"} · {offers} {offers === 1 ? "offer" : "offers"}{unconfirmed ? " shown" : ""}</p>}
+        {pending ? <p>Loading app listings for {countryName}…</p>
+          : feed?.reason === "sign-in" ? <p>Your session has expired. <Link href="/login?next=%2Fdashboard%2Fservices" className="font-semibold underline">Sign in again</Link> to load apps.</p>
+          : feed?.reason === "unconfigured" ? <p>App listings are not connected yet.</p>
+          : feed?.reason === "environment" ? <p>App listings are unavailable in this environment.</p>
+          : feed?.reason === "funding" ? <p>App listings are paused while we restock.</p>
+          : feed?.reason === "throttled" ? <p>App listings were requested too quickly. Please wait before retrying.</p>
+          : unconfirmed ? <p>{groups.length ? "App listings may be incomplete or out of date." : "App listings are temporarily unavailable."}</p>
+          : groups.length === 0 ? <p>{search.trim() ? `No app listings match your search for ${countryName}.` : `No app listings were reported for ${countryName}.`}</p>
+          : null}
+        {cachedWarning && <p>App listings may be incomplete or out of date.</p>}
+        {feed?.fetchedAt && <p>Apps checked: <time dateTime={feed.fetchedAt}>{new Date(feed.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
+        {!pending && retryable && <button type="button" onClick={onRetry} disabled={retryBlocked} className="mt-1 font-semibold text-lav-700 underline disabled:opacity-50">Retry apps</button>}
+      </div>
+      <div className="mt-3 grid gap-2">
+        {groups.slice(0, visible).map((group, index) => {
+          const open = openGroups.get(group.key) ?? (index === 0 || !!search.trim());
+          const limit = visibleOffers.get(group.key) ?? PAGE_SIZE;
+          const panelId = `number-app-options-${index}`;
+          return (
+            <div key={group.key} className="overflow-hidden rounded-xl border border-line bg-white">
+              <h4 className="m-0">
+                <button type="button" aria-expanded={open} aria-controls={open ? panelId : undefined}
+                  onClick={() => setOpenGroups((current) => new Map(current).set(group.key, !open))}
+                  className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-cream/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-lav-400">
+                  <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-lav-50/70">{itemArt(group.items[0], "sm")}</span>
+                  <span className="min-w-0 flex-1 break-words font-semibold text-ink">{group.name}</span>
+                  <span className="shrink-0 text-micro text-ink-3">{group.items.length} {group.items.length === 1 ? "option" : "options"}</span>
+                  <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
+                </button>
+              </h4>
+              {open && <div id={panelId} className="border-t border-line p-2.5">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {group.items.slice(0, limit).map((item) => <ServiceCard key={item.id} item={numberPlansOffer(item, countryCode)} countryName={countryName} />)}
+                </div>
+                {limit < group.items.length && <button type="button" onClick={() => setVisibleOffers((current) => new Map(current).set(group.key, limit + PAGE_SIZE))}
+                  className="mt-3 rounded-full border border-line px-3 py-2 text-micro font-semibold text-ink-2">More options for {group.name} ({group.items.length - limit} remaining)</button>}
+              </div>}
+            </div>
+          );
+        })}
+      </div>
+      {visible < groups.length && <button type="button" onClick={() => setVisible((current) => current + PAGE_SIZE)}
+        className="mt-3 rounded-full border border-line bg-white px-4 py-2.5 text-meta font-semibold text-ink-2 hover:border-lav-300">Show more apps ({groups.length - visible} remaining)</button>}
+    </section>
+  );
+}
+
 /** Keep country and category shareable, and allow Back to restore the choice. */
 function writeSelection(country: string, category: ExplorerFilter) {
   const params = new URLSearchParams();
@@ -375,6 +482,9 @@ export function ServiceExplorer({
   const verificationPending = category === "verification" && !!selectedCountry && (!liveState || liveState.country !== country || liveState.loading);
   const verificationUnavailable = category === "verification" && !verificationPending && !!liveState &&
     (!liveState.live || liveState.failed || liveState.partial);
+  const appFeed = liveState?.verificationFeed ?? null;
+  const numberAppsPending = category === "numbers" && (!liveState || !appFeed || liveState.verificationLoading);
+  const numberAppsUnconfirmed = category === "numbers" && !!appFeed && (!appFeed.live || appFeed.failed || appFeed.partial);
   /**
    * Social promotion lists every offer the supplier sells, which is hundreds
    * rather than a handful. Grouping by platform keeps that navigable: each one
@@ -603,11 +713,12 @@ export function ServiceExplorer({
 
           <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-meta leading-relaxed border-amber-200 bg-amber-50/70 text-amber-900`}>
             <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-            {verificationPending ? <p><strong>Checking live availability.</strong> Results will appear as soon as the catalogue responds.</p>
-              : liveState?.country === country && liveState.live && liveState.reason !== "funding" && !liveState.partial && !liveState.failed ? <p><strong>Live listings are current.</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. <Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).lead}</strong>{" "}{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).rest} <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
+            {verificationPending || numberAppsPending ? <p><strong>Checking live availability.</strong> Results will appear as soon as the catalogue responds.</p>
+              : numberAppsUnconfirmed && !liveState?.reason ? <p><strong>App availability is not confirmed.</strong> General plans and rentals can still be browsed below. <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>
+              : liveState?.country === country && liveState.live && liveState.reason !== "funding" && !liveState.partial && !liveState.failed && !numberAppsUnconfirmed ? <p><strong>Live listings are current.</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. <Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).lead}</strong>{" "}{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).rest} <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
           </div>
 
-          <section aria-labelledby="services-title" aria-busy={verificationPending || undefined} className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-3.5 sm:p-6">
+          <section aria-labelledby="services-title" aria-busy={verificationPending || numberAppsPending || undefined} className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-3.5 sm:p-6">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Sparkle className="h-3.5 w-3.5" /> Step 03</p>
@@ -615,6 +726,7 @@ export function ServiceExplorer({
                 <p aria-live="polite" className="mt-1 text-meta text-ink-3">
                   {verificationPending && filtered.length === 0 ? "Loading app verification listings…"
                     : verificationUnavailable && filtered.length === 0 ? "App verification listings are unavailable right now"
+                    : category === "numbers" ? <>{filtered.length} general plan or rental {`listing${filtered.length === 1 ? "" : "s"}`}</>
                     : <>{filtered.length} {`listing${filtered.length === 1 ? "" : "s"}`}{verificationPending ? " so far" : ""}</>}
                   {" · "}{selectedCountry.name} selected
                 </p>
@@ -627,9 +739,7 @@ export function ServiceExplorer({
             </div>
 
             {category === "numbers" && <div className="mt-3 rounded-xl border border-line bg-white p-3 text-meta text-ink-2">
-              <p>Number plans shows general plans and rentals for {selectedCountry?.name ?? "the selected country"}. App-specific SMS numbers are grouped under App verification, not duplicated here.</p>
-              <button type="button" onClick={() => chooseCategory("verification")} className="mt-2 font-semibold text-lav-700 underline">Browse app-specific verification numbers</button>
-              <p className="mt-2">Choose another country to check its offers. If more listings are loaded than shown, use Show more below.</p>
+              <p>Browse app-specific single-use numbers alongside general plans and rentals for {selectedCountry.name}. Some countries are view-only; each offer shows if purchasing is available. Choose another country to check its offers.</p>
             </div>}
             {enableDigitalCatalogue && <label className="mt-3 flex items-center gap-2 text-meta text-ink-2"><input type="checkbox" checked={stockOnly} onChange={(event) => { setStockOnly(event.target.checked); setVisible(PAGE_SIZE); }} />Show catalogue listings with reported stock only</label>}
             {enableDigitalCatalogue && category === "subscriptions" && <p className="mt-2 text-meta text-ink-2">Browse subscription product types below or search by product name. {stockOnly ? "Out-of-stock and unknown-stock listings are hidden; clear the stock filter to include them." : "All reported availability states are included; ordering is checked separately."} Use load more to browse remaining catalogue pages.</p>}
@@ -659,6 +769,17 @@ export function ServiceExplorer({
               </div>
             )}
 
+            {category === "numbers" && (tag === "all" || tag === "Single use") && <NumberAppOffers
+              key={country}
+              countryName={selectedCountry.name}
+              countryCode={selectedCountry.code}
+              feed={appFeed}
+              pending={numberAppsPending}
+              search={search}
+              retryBlocked={liveState?.verificationRetryBlocked ?? false}
+              onRetry={() => setLiveRevision((value) => value + 1)}
+            />}
+
             {liveState?.loading && <p role="status" className="mt-3 text-meta text-ink-3">Live listings are still loading. Available feeds are shown as they arrive.</p>}
             {liveState?.country === country && (liveState.reason === "funding" || liveState.reason === "throttled" || liveState.reason === "error" || liveState.reason === "sign-in") && (
               <p role="status" className="mt-4 text-meta text-amber-800">
@@ -670,6 +791,7 @@ export function ServiceExplorer({
                 {(liveState.reason === "error" || liveState.reason === "throttled") && <button type="button" className="font-semibold underline disabled:opacity-50" disabled={liveState.loading || liveState.retryBlocked} onClick={() => setLiveRevision((value) => value + 1)}>Retry</button>}
               </p>
             )}
+            {category === "numbers" && <h3 className="mt-5 text-[0.9375rem] font-semibold text-ink">General plans &amp; rentals</h3>}
             {platformGroups ? (
               <div className="mt-3 grid gap-2.5 sm:mt-4 sm:gap-3">
                 {platformGroups.map((group, index) => {
@@ -733,6 +855,7 @@ export function ServiceExplorer({
                 <p className="text-[0.875rem] font-semibold text-ink">
                   {verificationUnavailable ? "Matches cannot be confirmed while listings are unavailable"
                     : category === "verification" && !filtering ? `No app verification listings were reported for ${selectedCountry.name}`
+                    : category === "numbers" ? "No general plans or rentals match these filters"
                     : "No listings match these filters"}
                 </p>
                 <p className="mt-1 text-meta text-ink-2">{category === "verification" && !filtering
