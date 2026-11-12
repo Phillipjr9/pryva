@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { digitalArtwork, type DigitalArtwork } from "@/lib/content/digital-artwork";
+import type { DigitalArtwork } from "@/lib/content/digital-artwork";
+import { topupArtwork } from "@/lib/services/foxreload/topup-artwork";
 import { reportedGiftTerms, type ReportedGiftTerms } from "@/lib/services/gift-cards/reported-terms";
 import { NextRequest } from "next/server";
 import { requireAuthApi } from "@/lib/identity/auth";
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
       const approved = checkout.get(publicId);
       const stock = typeof product.quantity === "number" && Number.isSafeInteger(product.quantity) && product.quantity >= 0
         ? product.quantity > 0 ? "reported" : "out" : "unknown";
-      const artwork = digitalArtwork(name, typeof product.slug === "string" ? product.slug : undefined);
+      const artwork = topupArtwork(name, typeof product.slug === "string" ? product.slug : undefined, product.categoryId, product.deliveryType);
       const terms = product.deliveryType === "code" ? reportedGiftTerms(product.attributes) : null;
       items.push({ id: publicId, name, stock, stockQuantity: stock === "unknown" ? null : product.quantity as number, ...(artwork ? { artwork } : {}), ...(terms ? { reportedTerms: terms } : {}), ...(approved?.name === name ? { checkout: approved.kind } : {}) });
     }

@@ -1,10 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/digital-artwork/[key]/route";
+import { CATEGORY_ART } from "@/lib/content/digital-artwork";
+import { LEGACY_CATEGORY_IMAGE_IDS } from "@/lib/services/foxreload/legacy-category-images";
 
 const params = (key: string) => ({ params: Promise.resolve({ key }) });
 const request = new Request("https://example.test/digital-artwork/cod-mobile-activision");
 afterEach(() => vi.unstubAllGlobals());
 describe("public fixed artwork endpoint", () => {
+  it("keeps legacy image IDs server-side and in sync with the fixed keys", () => {
+    expect(Object.keys(LEGACY_CATEGORY_IMAGE_IDS).sort()).toEqual(Object.keys(CATEGORY_ART).sort());
+    expect(Object.values(LEGACY_CATEGORY_IMAGE_IDS).every((id) => /^[a-f0-9-]{36}$/.test(id))).toBe(true);
+  });
   it("rejects unknown keys without any upstream request", async () => {
     const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
     expect((await GET(request, params("__proto__"))).status).toBe(404);

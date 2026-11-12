@@ -1,11 +1,11 @@
-import { CATEGORY_ART } from "@/lib/content/digital-artwork";
+import { LEGACY_CATEGORY_IMAGE_IDS } from "@/lib/services/foxreload/legacy-category-images";
 
 // Only fixed, reviewed image identifiers can be fetched. Never proxy a URL
 // supplied by a visitor or a catalogue listing.
 export async function GET(_request: Request, { params }: { params: Promise<{ key: string }> }) {
   const { key } = await params;
-  if (!Object.hasOwn(CATEGORY_ART, key)) return new Response(null, { status: 404 });
-  const id = CATEGORY_ART[key as keyof typeof CATEGORY_ART];
+  if (!Object.hasOwn(LEGACY_CATEGORY_IMAGE_IDS, key)) return new Response(null, { status: 404 });
+  const id = LEGACY_CATEGORY_IMAGE_IDS[key as keyof typeof LEGACY_CATEGORY_IMAGE_IDS];
   try {
     const upstream = await fetch(`https://cdn.marix.cc/catalog/category/${id}`, {
       redirect: "error", signal: AbortSignal.timeout(5000), cache: "no-store",
