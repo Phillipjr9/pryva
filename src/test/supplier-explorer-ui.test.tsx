@@ -188,3 +188,17 @@ describe("service explorer live listings", () => {
     expect(screen.getAllByText(/refreshed too quickly/).length).toBeGreaterThan(1);
   });
 });
+
+it("does not blame a healthy social shelf for a failed verification feed", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    const feed = new URL(url, "https://example.test").searchParams.get("feed");
+    if (feed === "verification") return { ok: true, json: async () => ({ ok: true, country: "us", live: true, partial: true, items: [] }) };
+    return { ok: true, json: async () => ({ ok: true, country: "us", live: true, items: [], fetchedAt: "2026-11-11T20:00:00Z" }) };
+  }));
+  render(<ServiceExplorer initialCountry="us" initialCategory="social" />);
+  expect(await screen.findByText(/Live listings are current/)).toBeTruthy();
+  expect(screen.queryByText(/Some live listings could not be loaded/)).toBeNull();
+  const verification = screen.getAllByRole("button", { name: /App verification/i }).find(button => button.hasAttribute("aria-pressed"));
+  fireEvent.click(verification!);
+  expect(await screen.findByText(/Some live listings could not be loaded/)).toBeTruthy();
+});

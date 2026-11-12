@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchCatalogue } from "@/lib/platform/catalog-fetch";
-import type { ExplorerItem } from "@/lib/services/service-explorer";
+import type { ExplorerItem, ExplorerFilter } from "@/lib/services/service-explorer";
 
 type Reason = "environment" | "unconfigured" | "funding" | "throttled" | "error" | null;
 export type LiveState = {
@@ -12,16 +12,17 @@ export type LiveState = {
 type Feed = "numbers" | "social" | "esim" | "verification";
 const FEEDS: Feed[] = ["numbers", "social", "esim", "verification"];
 const FEED_CATEGORIES: Record<Feed, string[]> = {
-  numbers: ["numbers", "email", "verification"], social: ["social"], esim: ["esim"], verification: ["verification"],
+  numbers: ["numbers", "email"], social: ["social"], esim: ["esim"], verification: ["verification"],
 };
 
 /** Independent requests let a fast feed render even while another is slow or
  * unavailable. Results are keyed to the country/scope and late requests cannot
  * restore listings for a destination the shopper has already left. */
-export function useLiveServiceExplorer(country: string, revision: number, allEsimDestinations: boolean) {
+export function useLiveServiceExplorer(country: string, revision: number, allEsimDestinations: boolean, category: ExplorerFilter = "all", enabled = true) {
   const scope = `${country}:${revision}:${allEsimDestinations}`;
-  const [state, setState] = useState<{ scope: string; value: LiveState } | null>(null);
+  const [state, setState] = useState<{ scope: string; value: LiveState; feeds: Array<[Feed, LiveState]> } | null>(null);
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     const results = new Map<Feed, LiveState>();
     function publish() {
@@ -39,7 +40,7 @@ export function useLiveServiceExplorer(country: string, revision: number, allEsi
         : gaps.some((entry) => entry.reason === "funding") ? "funding"
         : gaps.some((entry) => entry.reason === "environment") ? "environment"
         : !live && entries.length === FEEDS.length ? "unconfigured" : null;
-      setState({ scope, value: { country, items, live, partial: gaps.length > 0,
+      setState({ scope, feeds: [...results.entries()], value: { country, items, live, partial: gaps.length > 0,
         failed: entries.some((entry) => entry.failed), reason,
         loading: results.size < FEEDS.length,
         fetchedAt: entries.flatMap((entry) => entry.fetchedAt ? [entry.fetchedAt] : []).sort().pop() ?? null,
@@ -68,6 +69,22 @@ export function useLiveServiceExplorer(country: string, revision: number, allEsi
       })();
     }
     return () => controller.abort();
-  }, [country, revision, allEsimDestinations, scope]);
-  return state?.scope === scope ? state.value : null;
+  }, [country, revision, allEsimDestinations, scope, enabled]);
+  if (!enabled || state?.scope !== scope) return null;
+  // Keep every result cached for category switching, but only report health of
+  // feeds belonging to the shelf the customer is actually viewing.
+  if (category === "all") return state.value;
+  const relevant = FEEDS.filter(feed => category === "verification" ? feed === "verification" : FEED_CATEGORIES[feed].includes(category));
+  const entries = state.feeds.filter(([feed]) => relevant.includes(feed)).map(([, value]) => value);
+  const gaps = entries.filter(entry => entry.failed || entry.partial || (!entry.live && entry.reason !== "unconfigured"));
+  const live = entries.some(entry => entry.live);
+  const reason: Reason = gaps.some(entry => entry.reason === "error") ? "error"
+    : gaps.some(entry => entry.reason === "throttled") ? "throttled"
+    : gaps.some(entry => entry.reason === "funding") ? "funding"
+    : gaps.some(entry => entry.reason === "environment") ? "environment"
+    : relevant.length > 0 && !live && entries.length === relevant.length ? "unconfigured" : null;
+  return { ...state.value, live, reason, partial: gaps.length > 0,
+    failed: entries.some(entry => entry.failed), loading: entries.length < relevant.length,
+    fetchedAt: entries.flatMap(entry => entry.fetchedAt ? [entry.fetchedAt] : []).sort()[0] ?? null };
+
 }

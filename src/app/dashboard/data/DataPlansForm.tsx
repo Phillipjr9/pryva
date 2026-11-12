@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { fetchCatalogue } from "@/lib/platform/catalog-fetch";
 import { BrandIcon } from "@/components/BrandIcon";
 import type { PublicUser } from "@/lib/identity/auth";
 import type { ClubkonnectPlan } from "@/lib/providers/clubkonnect";
 
-interface DataPlansFormProps { user: PublicUser; initialPlanId?: string }
+interface DataPlansFormProps { user?: PublicUser; initialPlanId?: string }
 type Catalogue = { plans: ClubkonnectPlan[]; checkedAt: string; stale: boolean; checkoutReason: string };
 const money = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" });
 
@@ -25,7 +26,7 @@ export function DataPlansForm({ initialPlanId }: DataPlansFormProps) {
   const [search, setSearch] = useState("");
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/airtime/plans", { cache: "no-store", signal: controller.signal })
+    fetchCatalogue("/api/airtime/plans", controller.signal)
       .then(async response => {
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || "Unable to load data plans.");

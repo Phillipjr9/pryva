@@ -55,3 +55,17 @@ it("explains the smaller number-plan shelf and opens app verification without ch
   expect(screen.getByRole("heading", { level: 1, name: "App verification" })).toBeTruthy();
   expect(new URLSearchParams(window.location.search).get("country")).toBe("ng");
 });
+
+it("loads the live data catalogue inside the data category without unrelated feeds", async () => {
+  const fetchMock = vi.fn(async (url: string) => { void url; return ({ ok: true, json: async () => ({
+    plans: [{ id: "bundle-1", networkCode: "01", network: "MTN", name: "Live 1GB bundle", publishedAmountKobo: 50000 }],
+    checkedAt: "2026-11-11T20:00:00Z", stale: false, checkoutReason: "Checkout is being connected.",
+  }) }); });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<ServiceExplorer initialCountry="us" initialCategory="data" enableDigitalCatalogue />);
+  expect(await screen.findByRole("heading", { name: "Live 1GB bundle" })).toBeTruthy();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(fetchMock.mock.calls[0][0]).toBe("/api/airtime/plans");
+  expect(screen.queryByText(/Some live listings could not be loaded/)).toBeNull();
+  expect(screen.getByText(/Purchases are not available from this catalogue yet/)).toBeTruthy();
+});

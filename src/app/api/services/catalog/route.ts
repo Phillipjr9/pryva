@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
     (!requestedFeed || requestedFeed === "numbers") ? readSocial() : null,
     (!requestedFeed || requestedFeed === "social") ? readBoost() : null,
     (!requestedFeed || requestedFeed === "esim") ? readEsim() : null,
-    (!requestedFeed || requestedFeed === "numbers" || requestedFeed === "verification") ? readOtp() : null,
+    (!requestedFeed || requestedFeed === "verification") ? readOtp() : null,
   ]);
 
   const sources = [supplier, boost, esim, otp].filter((source): source is NonNullable<typeof source> => source !== null);
