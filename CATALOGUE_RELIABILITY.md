@@ -250,8 +250,10 @@ published Nigerian catalogue while stating that checkout and delivery are not
 connected. After reconciliation, 407 tests across 41 affected files passed,
 including the previously failing test files; build, typecheck, lint, enforced
 pricing audit and production dependency audit passed. The full suite was not
-repeated after this second merge. The migration files and runner still match the
-newest production commit.
+repeated after this second merge. A further production deployment was started
+from `7dac2a5`, a small category-card width fix on top of `2095bed`; the
+candidate incorporates it too, and 79 layout/explorer tests passed after that
+merge. The migration files and runner match that production history.
 
 No authenticated production catalogue response or paid order was obtained during
 this investigation. Obtain the affected page/category, country, approximate UTC
