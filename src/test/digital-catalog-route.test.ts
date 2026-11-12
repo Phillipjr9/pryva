@@ -85,6 +85,33 @@ describe("read-only digital catalogue route", () => {
     expect(data.items[2]).not.toHaveProperty("artwork");
     expect(JSON.stringify(data)).not.toMatch(/evil|tracker|slug|activision-us-80/);
   });
+  it("uses each reviewed top-up category without exposing provider fields or changing stock and checkout", async () => {
+    const { createHash } = await import("node:crypto");
+    const pool = "019e9cf1-b2ba-7a43-ae4f-e04ad8450667";
+    const oxide = "019e9cf4-df7e-7822-ba2f-a354d1961549";
+    const direct = "direct_topup";
+    const id = `digital-${createHash("sha256").update("raw-pool-spin").digest("hex").slice(0, 24)}`;
+    mocks.topupOffers.mockReturnValue([{ id, name: "Golden Spin" }]);
+    mocks.page.mockResolvedValueOnce({ rows: [
+      { id: "raw-oxide", name: "3550 Coins (40% more value)", slug: "fazer-3550-coins-40-more-value-0147ab", categoryId: oxide, deliveryType: direct, quantity: 7, price: "123.45", imagePath: "https://evil.test/track" },
+      ...[["Golden Spin", "golden-spin"], ["5 Scratchers", "5-scratchers"], ["20 000 Coins", "20-000-coins"], ["20 Cash", "20-cash"], ["3 Golden Shots", "3-golden-shots"]].map(([name, suffix], i) => ({ id: i === 0 ? "raw-pool-spin" : `raw-pool-${i}`, name, slug: `8-ball-pool-${suffix}`, categoryId: pool, deliveryType: direct, quantity: 1 })),
+      { id: "raw-other", name: "20 Cash", slug: "unrelated", categoryId: "unreviewed-category", deliveryType: direct, quantity: 0 },
+      { id: "raw-mismatch", name: "20 Cash", slug: "8-ball-pool-20-cash", categoryId: oxide, deliveryType: direct },
+    ], nextCursor: "next", searchLimited: false });
+    const response = await GET(request("?category=topups&stock=available"));
+    const data = await response.json();
+    expect(response.status).toBe(200);
+    expect(data.items[0]).toMatchObject({ name: "3550 Coins (40% more value)", artwork: { kind: "category", key: "oxide-survival-island" }, stock: "reported", stockQuantity: 7 });
+    expect(data.items.slice(1, 6).map((item: { artwork: unknown }) => item.artwork)).toEqual(Array(5).fill({ kind: "category", key: "8-ball-pool" }));
+    expect(data.items[1]).toMatchObject({ id, name: "Golden Spin", stock: "reported", stockQuantity: 1, checkout: "topups" });
+    expect(data.items[0]).not.toHaveProperty("checkout");
+    expect(data.items[6]).toMatchObject({ stock: "out", stockQuantity: 0 });
+    expect(data.items[6]).not.toHaveProperty("artwork");
+    expect(data.items[7]).not.toHaveProperty("artwork");
+    expect(JSON.stringify(data)).not.toMatch(/raw-|019e9cf|fazer-|evil|track|123\.45|categoryId|imagePath|slug/);
+    expect(mocks.page).toHaveBeenCalledTimes(1);
+    expect(mocks.page).toHaveBeenCalledWith({ query: undefined, cursor: undefined, category: "topups", inStockOnly: true });
+  });
   it("filters categories and links only exact approved products to checkout", async () => {
     const { createHash } = await import("node:crypto");
     const id = `digital-${createHash("sha256").update("supplier-1").digest("hex").slice(0, 24)}`;

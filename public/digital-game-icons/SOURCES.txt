@@ -1,0 +1,47 @@
+Product artwork sources
+=======================
+
+These are reduced, locally served thumbnails of the named products' app icons
+or logos, included solely to identify catalogue listings. Game artwork and marks
+remain the property of their respective owners; the pages below document where
+each image was obtained, not a claim that the images are freely licensed.
+Review rights and replace/remove artwork if the owner requests it.
+
+8-ball-pool.webp — https://apkpure.com/8-ball-pool-android-1/com.miniclip.eightballpool
+oxide-survival-island.webp — https://oxide-survival-simulator.en.aptoide.com/app
+acecraft.webp — https://apkmody.com/games/acecraft
+ace-racer.webp — https://mwm.ai/apps/ace-racer/1593356371
+afk-journey.webp — https://iconly.design/icons/afk-journey-1628970855
+age-of-empires-mobile.webp — https://age-of-empires-mobile.en.aptoide.com/app
+age-of-magic.webp — https://age-of-magic-playkot-ltd.en.aptoide.com/app
+genshin-impact.webp — https://appbrain.com/app/genshin-impact/com.miHoYo.GenshinImpact
+goddess-of-victory-nikke.webp — https://goddess-of-victory-nikke.en.softonic.com/iphone
+growtopia.webp — https://www.appbrain.com/app/growtopia/com.rtsoft.growtopia
+hay-day.webp — https://apkpure.com/hay-day-android-app/com.supercell.hayday
+life-makeover.webp — https://apkpure.com/life-makeover/com.archosaur.seareal.yslzm.gp
+lifeafter.webp — https://lifeafter.en.aptoide.com/app
+lords-mobile.webp — https://lords-mobile.en.uptodown.com/android
+love-and-deepspace.webp — https://love-deepspace.es.aptoide.com/app
+once-human.webp — https://projecteoe.en.uptodown.com/android
+pixel-gun-3d.webp — https://pixelgun3d.com/
+point-blank.webp — https://pointblank.zepetto.com/
+super-sus.webp — https://super-sus.en.aptoide.com/app
+tft-mobile.webp — https://www.appbrain.com/app/tft-teamfight-tactics/com.riotgames.league.teamfighttactics
+whiteout-survival.webp — https://www.iosicongallery.com/icons/whiteout-survival-2023-09-14/
+wild-rift.webp — https://league-of-legends-wild-rift.en.uptodown.com/android
+wuthering-waves.webp — https://wuthering-waves.en.uptodown.com/android
+yalla-ludo.webp — https://apkpure.com/yalla-ludo-ludo-jackaroo/com.yalla.yallagames
+arena-breakout-infinite.webp — https://brandfetch.com/arenabreakoutinfinite.com
+arena-breakout.webp — https://www.logoinspo.com/icons/arena-breakout-realistic-fps
+arena-of-valor.webp — https://realm-of-valor.en.aptoide.com/app
+asphalt-9.webp — https://pgyer.com/apk/apk/com.gameloft.android.ANMP.GloftA9HM
+azur-lane.webp — https://azur-lane.en.aptoide.com/app
+bigo-live.webp — https://www.freelogovectors.net/bigolive-logo/
+black-clover-m.webp — https://black-clover-m.en.aptoide.com/app
+blood-strike.webp — https://iconpusher.com/package/com.netease.newspike
+brawl-stars.webp — https://supercell-s-brawl-starts.en.softonic.com/android
+bullet-echo.webp — https://www.taptap.io/app/190726
+clash-of-clans.webp — https://clash-of-clans.br.uptodown.com/android
+clash-royale.webp — https://appbrain.com/app/clash-royale/com.supercell.clashroyale
+delta-force.webp — https://brandfetch.com/playdeltaforce.com
+ea-fc-mobile.webp — https://apkmody.com/games/ea-sports-fc-mobile

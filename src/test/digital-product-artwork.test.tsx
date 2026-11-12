@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { DigitalProductIcon } from "@/components/DigitalProductIcon";
-import { digitalArtwork, parseDigitalArtwork } from "@/lib/content/digital-artwork";
+import { CATEGORY_ART, categoryArtworkSrc, digitalArtwork, parseDigitalArtwork, type CategoryArt } from "@/lib/content/digital-artwork";
 
 afterEach(cleanup);
 describe("curated digital product artwork", () => {
@@ -120,6 +122,34 @@ describe("curated digital product artwork", () => {
     expect(container.querySelector("img")).toBeNull();
     expect(container.querySelector("svg")).toBeTruthy();
     expect(screen.queryByRole("img")).toBeNull();
+  });
+  it("bundles a real image for every allowed category key instead of relying on the image proxy", () => {
+    const sources = readFileSync(join(process.cwd(), "public/digital-game-icons/SOURCES.txt"), "utf8");
+    // The client-side registry contains no upstream image IDs or URLs.
+    expect(Object.values(CATEGORY_ART).every((value) => value === true)).toBe(true);
+    for (const key of Object.keys(CATEGORY_ART) as CategoryArt[]) {
+      const src = categoryArtworkSrc(key);
+      expect(src.startsWith("/")).toBe(true);
+      const bytes = readFileSync(join(process.cwd(), "public", src.slice(1)));
+      expect(bytes.length).toBeGreaterThan(100);
+      if (src.endsWith(".webp")) {
+        expect(bytes.subarray(0, 4).toString()).toBe("RIFF");
+        expect(bytes.subarray(8, 12).toString()).toBe("WEBP");
+        expect(sources).toContain(`${key}.webp — https://`);
+      }
+      expect(parseDigitalArtwork({ kind: "category", key })).toEqual({ kind: "category", key });
+    }
+  });
+  it("renders the specific local 8 Ball Pool and Oxide images and recovers across image errors", () => {
+    const { container, rerender } = render(<DigitalProductIcon name="Golden Spin" artwork={{ kind: "category", key: "8-ball-pool" }} />);
+    const image = container.querySelector("img")!;
+    expect(image.getAttribute("src")).toBe("/digital-game-icons/8-ball-pool.webp");
+    expect(image.getAttribute("referrerpolicy")).toBe("no-referrer");
+    fireEvent.error(image);
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("svg")).toBeTruthy();
+    rerender(<DigitalProductIcon name="3550 Coins (40% more value)" artwork={{ kind: "category", key: "oxide-survival-island" }} />);
+    expect(container.querySelector("img")?.getAttribute("src")).toBe("/digital-game-icons/oxide-survival-island.webp");
   });
   it("serves Likee's bundled mark rather than the supplier artwork proxy", () => {
     const { container } = render(<DigitalProductIcon name="Likee Diamonds 100" />);

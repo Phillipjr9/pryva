@@ -76,6 +76,30 @@ describe("digital listings in service categories", () => {
     const card = (await screen.findByRole("heading", { name: "80 + 8 CP" })).closest("article")!;
     expect(card.querySelector("img")?.getAttribute("src")).toContain("/digital-brand-icons/call-of-duty-mobile.png");
   });
+  it("shows each screenshot top-up's own local game icon while keeping unknown items neutral", async () => {
+    const poolNames = ["Golden Spin", "5 Scratchers", "20 000 Coins", "20 Cash", "3 Golden Shots"];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const root = new URL(url, "https://example.test").searchParams.get("category");
+      const items = [
+        { id: id("a"), name: "3550 Coins (40% more value)", stock: "reported", artwork: { kind: "category", key: "oxide-survival-island" } },
+        ...poolNames.map((name, index) => ({ id: `digital-${(index + 1).toString(16).padStart(24, "0")}`, name, stock: "reported", checkout: "topups", artwork: { kind: "category", key: "8-ball-pool" } })),
+        { id: id("b"), name: "Unknown 20 Coins", stock: "reported", artwork: { kind: "category", key: "https://evil.test/tracker" } },
+      ];
+      return response({ ok: true, items: root === "topups" ? items : [], nextCursor: null });
+    }));
+    render(<ServiceExplorer initialCountry="ng" initialCategory="topups" enableDigitalCatalogue />);
+    const oxide = (await screen.findByRole("heading", { name: "3550 Coins (40% more value)" })).closest("article")!;
+    expect(oxide.querySelector("img")?.getAttribute("src")).toBe("/digital-game-icons/oxide-survival-island.webp");
+    for (const name of poolNames) {
+      const card = (await screen.findByRole("heading", { name })).closest("article")!;
+      expect(card.querySelector("img")?.getAttribute("src")).toBe("/digital-game-icons/8-ball-pool.webp");
+      expect(within(card).getByRole("link", { name: "Check price and availability" }).getAttribute("href")).toContain("/dashboard/digital-topups?product=digital-");
+    }
+    const unknown = (await screen.findByRole("heading", { name: "Unknown 20 Coins" })).closest("article")!;
+    expect(unknown.querySelector("img")).toBeNull();
+    expect(unknown.querySelector("svg")).toBeTruthy();
+    expect(within(unknown).getByRole("button", { name: "Ordering paused" })).toHaveProperty("disabled", true);
+  });
   it("groups the actual game roots together and loads the next page without losing the first", async () => {
     const fetchMock = vi.fn(async (url: string) => {
       const params = new URL(url, "https://example.test").searchParams;
