@@ -10,19 +10,26 @@ export default function DashboardLoading() {
   return (
     <SkeletonPage>
       <div className="animate-pulse rounded-[1.75rem] border border-ink bg-ink p-5 sm:p-6">
-        <SkeletonBlock className="h-3 w-32 rounded-full bg-white/15" />
-        <SkeletonBlock className="mt-3 h-9 w-44 rounded-xl bg-white/20" />
-        <div className="mt-5 grid grid-cols-1 gap-3 border-t border-white/10 pt-4 sm:grid-cols-3 sm:gap-2">
-          {[0, 1, 2].map((index) => (
-            <div key={index}>
-              <SkeletonBlock className="h-2.5 w-14 rounded-full bg-white/15" />
-              <SkeletonBlock className="mt-2 h-4 w-16 rounded-md bg-white/20" />
-            </div>
-          ))}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <SkeletonBlock className="h-3 w-32 rounded-full bg-white/15" />
+            <SkeletonBlock className="mt-3 h-9 w-44 rounded-xl bg-white/20" />
+            <SkeletonBlock className="mt-3 h-3 w-48 rounded-full bg-white/15" />
+          </div>
+          <div className="flex w-full gap-2 sm:w-auto">
+            <SkeletonBlock className="h-9 flex-1 rounded-full bg-white/20 sm:w-24 sm:flex-none" />
+            <SkeletonBlock className="h-9 flex-1 rounded-full bg-white/15 sm:w-28 sm:flex-none" />
+          </div>
         </div>
-        <div className="mt-4 flex gap-2">
-          <SkeletonBlock className="h-9 w-24 rounded-full bg-white/20" />
-          <SkeletonBlock className="h-9 w-28 rounded-full bg-white/15" />
+        <div className="mt-5 flex flex-wrap items-end justify-between gap-4 border-t border-white/10 pt-4">
+          <div className="flex items-center gap-3">
+            <SkeletonBlock className="h-10 w-10 rounded-xl bg-white/15" />
+            <div>
+              <SkeletonBlock className="h-3 w-24 rounded-full bg-white/15" />
+              <SkeletonBlock className="mt-2 h-2.5 w-20 rounded-full bg-white/10" />
+            </div>
+          </div>
+          <SkeletonBlock className="h-3 w-40 rounded-full bg-white/15" />
         </div>
       </div>
 

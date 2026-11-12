@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, count, desc, eq, sum } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/identity/auth";
@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/dashboard/EmptyState";
 import { BalanceHero } from "@/components/dashboard/BalanceHero";
 import { readServiceReadiness } from "@/lib/services/service-readiness";
 import { orderByReadiness, SERVICE_STATE_DOT, SERVICE_STATE_LABEL } from "@/lib/services/service-states";
+import { countActiveRentedNumbers } from "@/lib/services/numbers/active-rentals";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -66,7 +67,12 @@ export default async function DashboardOverviewPage() {
     })),
   );
 
-  const [recentOrders, recentTx, activeOrderRows, [orderCount], [activeCount], [refundedRow]] =
+  // One server timestamp keeps the rental count and the first countdown render
+  // consistent. The countdown takes over with the browser clock after hydration.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
+
+  const [recentOrders, recentTx, activeOrderRows, [orderCount], activeNumbers] =
     await Promise.all([
       db
         .select()
@@ -87,25 +93,11 @@ export default async function DashboardOverviewPage() {
         .orderBy(desc(orders.createdAt))
         .limit(50),
       db.select({ value: count() }).from(orders).where(eq(orders.userId, user.id)),
-      db
-        .select({ value: count() })
-        .from(orders)
-        .where(and(eq(orders.userId, user.id), eq(orders.status, "active"))),
-      db
-        .select({ value: sum(orders.amount) })
-        .from(orders)
-        .where(and(eq(orders.userId, user.id), eq(orders.status, "refunded"))),
+      countActiveRentedNumbers(user.id, new Date(now)),
     ]);
 
   // Aggregates, never a slice: headline numbers must describe the whole account.
   const totalOrders = Number(orderCount?.value ?? 0);
-  const activeOrders = Number(activeCount?.value ?? 0);
-  const refundedToWallet = Number(refundedRow?.value ?? 0);
-
-  // This dynamic server timestamp is also passed to the countdown for a stable
-  // first render; the browser clock takes over after hydration.
-  // eslint-disable-next-line react-hooks/purity
-  const now = Date.now();
   const liveCodes: LiveCode[] = activeOrderRows
     .filter((order) => {
       if (order.service !== "numbers" && order.service !== "email-otp") return false;
@@ -134,11 +126,7 @@ export default async function DashboardOverviewPage() {
       <BalanceHero
         name={firstName(user.name)}
         balance={user.walletBalance}
-        stats={[
-          { label: "Active", value: String(activeOrders), note: "active orders" },
-          { label: "Shown with code", value: String(liveCodes.filter((order) => order.otpCode).length), note: "in cards below" },
-          { label: "Refunded", value: formatNaira(refundedToWallet), note: "back to wallet" },
-        ]}
+        activeNumbers={activeNumbers}
       />
 
       {/* Keep a live code card and a country hint near the active account state,
@@ -228,10 +216,10 @@ export default async function DashboardOverviewPage() {
             <span className="min-w-0 flex-1">
               <span className="block break-words text-[0.875rem] font-semibold leading-snug text-ink group-hover:text-lav-700">{accountShortcut.label}</span>
               <span className="mt-0.5 block text-micro leading-snug text-ink-3">Browse account listings · separate from App verification</span>
-            </span>
-            <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2 py-1 text-micro font-semibold text-ink-2">
-              <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${SERVICE_STATE_DOT[accountState]}`} />
-              <span className="hidden min-[390px]:inline">{SERVICE_STATE_LABEL[accountState]}</span>
+              <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-1 text-micro font-semibold text-ink-2">
+                <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${SERVICE_STATE_DOT[accountState]}`} />
+                {SERVICE_STATE_LABEL[accountState]}
+              </span>
             </span>
             <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0 text-ink-3 group-hover:text-lav-700" />
           </Link>
