@@ -1,4 +1,4 @@
-import { BitcallError, cancelBitcallOtpActivation, isBitcallConfigured } from "@/lib/providers/bitcall";
+import { BitcallError, cancelBitcallOtpActivation, getBitcallOtpOffer, isBitcallConfigured } from "@/lib/providers/bitcall";
 import { plans, type Plan } from "@/lib/services/catalog";
 import {
   buyFleexaRental,
@@ -8,12 +8,15 @@ import {
   listFleexaRentAreas,
 } from "@/lib/providers/fleexa";
 import {
+  bitcallDeclaredCountryMatches,
   buyOtpNumber,
   isAmbiguousOtpPurchase,
   matchesCountry,
   otpOfferPublicId,
   readOtpOffersForSupplier,
+  type OtpOffer,
 } from "@/lib/services/numbers/otp-suppliers";
+import { supplierAmountToNgn } from "@/lib/payments/supplier-currency";
 import { checkMargin, MARGIN_BLOCKED_MESSAGE } from "@/lib/services/margin-guard";
 import { deliveryWindowMs } from "@/lib/services/registry";
 import { FLEEXA_PROVIDER, type OrderProvider } from "@/lib/services/order-providers";
@@ -182,6 +185,32 @@ export async function fulfillPlan(plan: Plan, options: FulfillPlanOptions = {}):
   return intent.kind === "sms" ? fulfillNumber(plan, intent, options) : fulfillRental(plan, intent, options);
 }
 
+/** Independently confirm the exact offer and its destination before any spend. */
+async function confirmBitcallOffer(offer: OtpOffer, country: string, regionName: string): Promise<OtpOffer> {
+  let detail: Awaited<ReturnType<typeof getBitcallOtpOffer>>;
+  try {
+    detail = await getBitcallOtpOffer(offer.ref);
+  } catch (error) {
+    if (error instanceof BitcallError && error.code === "NOT_FOUND") {
+      throw new FleexaError("That app offer is no longer available", 409, "OTP_OFFER_STALE");
+    }
+    // A failed GET did not spend money. Do not forward upstream error text.
+    throw new FleexaError("The selected offer could not be confirmed", 503, "OTP_CONFIRMATION_UNAVAILABLE");
+  }
+  if (!detail || !detail.countryCode ||
+      [detail.countryCode, ...(detail.declaredCountries ?? [])].some((value) => !bitcallDeclaredCountryMatches(value, country, regionName))) {
+    throw new FleexaError("That app offer is no longer available", 409, "OTP_OFFER_STALE");
+  }
+  // The detail endpoint must affirm current stock, not merely omit a zero.
+  // A missing count is not evidence that it is safe to start a paid request.
+  if (typeof detail.availableCount !== "number" || !Number.isSafeInteger(detail.availableCount) || detail.availableCount <= 0) {
+    throw new FleexaError("That destination's stock could not be confirmed", 503, "SERVICE_UNAVAILABLE");
+  }
+  const costNgn = detail.currency ? await supplierAmountToNgn(detail.price, detail.currency) : null;
+  if (costNgn === null) throw new FleexaError("That destination has no usable price", 503, "COST_UNKNOWN");
+  return { ...offer, costNgn, stock: detail.availableCount };
+}
+
 /**
  * A single-use verification number, purchased from Bitcall only.
  *
@@ -212,7 +241,7 @@ async function fulfillNumber(plan: Plan, intent: SmsIntent, options: FulfillPlan
   if (read.errorCode || read.stale) {
     throw new FleexaError("The selected service could not be confirmed", read.errorCode === "INSUFFICIENT_BALANCE" ? 402 : 503, read.errorCode ?? "STALE_CATALOG");
   }
-  const offers = read.offers;
+  const offers = read.offers.filter((offer) => offer.supplier === "bitcall" && offer.country.toLowerCase() === intent.country);
   const selectedOffer = options.otpOfferId
     ? offers.find((offer) => otpOfferPublicId(intent.country, offer.ref, offer.app) === options.otpOfferId)
     : null;
@@ -263,10 +292,16 @@ async function fulfillNumber(plan: Plan, intent: SmsIntent, options: FulfillPlan
       continue;
     }
 
+    // The country-filtered catalogue is documented, but it does not have to
+    // repeat a country on each pool. The exact-offer GET does: check it, plus its
+    // current price and stock, before marking or starting the paid request.
+    const confirmed = await confirmBitcallOffer(offer, intent.country, plan.region);
+    guardMargin(plan, confirmed.costNgn);
+
     let providerAccepted = false;
     try {
       await options.onOtpAttempt?.();
-      const bought = await buyOtpNumber(offer, async (providerRequestId) => {
+      const bought = await buyOtpNumber(confirmed, async (providerRequestId) => {
         providerAccepted = true;
         await options.onOtpAccepted?.(providerRequestId);
       });
@@ -275,7 +310,7 @@ async function fulfillNumber(plan: Plan, intent: SmsIntent, options: FulfillPlan
       if (!bought.number) throw new Error("Provider accepted an activation without a usable phone number");
       if (
         typeof bought.providerCostNgn === "number" &&
-        bought.providerCostNgn > (offer.costNgn ?? 0)
+        bought.providerCostNgn > (confirmed.costNgn ?? 0)
       ) {
         // The quote is the best pre-spend signal available. If the supplier
         // charged more, the sale may have landed below the floor; it cannot be
@@ -283,13 +318,13 @@ async function fulfillNumber(plan: Plan, intent: SmsIntent, options: FulfillPlan
         console.error("Provider charged more than the quoted cost", {
           slug: plan.slug,
           provider: bought.supplier,
-          quotedNgn: offer.costNgn,
+          quotedNgn: confirmed.costNgn,
           chargedNgn: bought.providerCostNgn,
         });
       }
       return {
         provider: bought.supplier,
-        providerCostNgn: bought.providerCostNgn ?? offer.costNgn,
+        providerCostNgn: bought.providerCostNgn ?? confirmed.costNgn,
         providerRequestId: bought.providerRequestId,
         referenceCode: bought.number,
         // The code arrives later; the order page polls for it.

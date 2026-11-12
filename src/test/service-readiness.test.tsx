@@ -68,13 +68,16 @@ describe("service readiness", () => {
     expect(live.state).toBe("buy");
   });
 
-  it("does not mark disabled data, subscriptions, or proxies ready just because a key exists", () => {
+  it("marks proxies ready from the configured supplier while keeping unfinished data and subscriptions paused", () => {
     config.preview = false;
     config.fleexa = true;
     const states = new Map(readServiceReadiness().map((entry) => [entry.id, entry]));
-    for (const id of ["proxies", "data", "subscriptions"] as const) {
+    expect(states.get("proxies")?.state).toBe("buy");
+    expect(states.get("proxies")?.detail).toMatch(/live proxy plans/i);
+    expect(serviceConfigured("proxies")).toBe(true);
+    expect(laneConfigured("proxies")).toBe(true);
+    for (const id of ["data", "subscriptions"] as const) {
       expect(states.get(id)?.state).toBe("paused");
-      expect(states.get(id)?.detail).not.toMatch(/can be bought/i);
       expect(serviceConfigured(id)).toBe(false);
       expect(laneConfigured(id)).toBe(false);
     }

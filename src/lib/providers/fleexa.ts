@@ -8,6 +8,8 @@
  *                   GET /email/check/:emailId, POST /email/cancel
  *   • Rentals     — GET /rent/sms4/areas, POST /rent/sms4/buy,
  *                   GET /rent/sms4/numbers, GET /rent/sms4/sms
+ *   • Proxies     — GET /proxy/status, GET /proxy/plans, POST /proxy/order,
+ *                   GET /proxy/orders/:id, POST /proxy/orders/:id/extract
  *   • Account     — GET /profile, GET /balance
  *
  * Auth: `Authorization: Bearer flx_live_...` or X-API-Key.
@@ -82,7 +84,7 @@ function refusalText(payload: unknown): string {
 
 async function fleexaFetch(
   path: string,
-  init: { method?: "GET" | "POST"; body?: Record<string, unknown> } = {},
+  init: { method?: "GET" | "POST"; body?: Record<string, unknown>; idempotencyKey?: string } = {},
 ): Promise<Record<string, unknown>> {
   // Purchase and cancellation are enabled. The request/response field names
   // are still parsed defensively (see the pickString alias lists) because the
@@ -105,6 +107,7 @@ async function fleexaFetch(
         "X-API-Key": key,
         Accept: "application/json",
         ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(init.idempotencyKey ? { "Idempotency-Key": init.idempotencyKey } : {}),
       },
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -582,4 +585,158 @@ export async function getFleexaStatus(): Promise<FleexaStatus> {
       error: error instanceof FleexaError ? error.message : "Unreachable",
     };
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Residential proxies                                                 */
+/* ------------------------------------------------------------------ */
+
+export type FleexaProxyStatus = {
+  enabled: boolean;
+  currency: "NGN";
+  expiryHours: number;
+  planCount: number;
+  countryCount: number;
+};
+export type FleexaProxyPlan = {
+  id: string;
+  label: string;
+  quantity: number;
+  priceNgn: number;
+  perIpNgn: number;
+};
+export type FleexaProxyCountry = { code: string; name: string; states: string[] };
+export type FleexaProxyCatalogue = {
+  status: FleexaProxyStatus;
+  plans: FleexaProxyPlan[];
+  categories: { id: string; name: string; type: number; description: string }[];
+  countries: FleexaProxyCountry[];
+};
+export type FleexaProxyCredentials = {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  url: string;
+};
+export type FleexaProxySlot = {
+  id: string;
+  status: "purchased" | "active" | "expired" | "stopped";
+  country: string;
+  amountPaid: number;
+  currency: string;
+  proxyType: number;
+  extractRequired: boolean;
+  expiresAt: string | null;
+  credentials: FleexaProxyCredentials | null;
+};
+
+function proxyData(payload: Record<string, unknown>): UnknownRecord {
+  const value = asRecord(payload.data);
+  if (!Object.keys(value).length) throw new FleexaError("Invalid proxy response", 502, "INVALID_PROXY_RESPONSE");
+  return value;
+}
+function proxyString(value: unknown, max = 160): string {
+  if (typeof value !== "string" || !value.trim() || value.length > max || /[\u0000-\u001f\u007f]/.test(value)) throw new FleexaError("Invalid proxy response", 502, "INVALID_PROXY_RESPONSE");
+  return value.trim();
+}
+function proxyInt(value: unknown, min = 0, max = 2_147_483_647): number {
+  const parsed = typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value;
+  if (!Number.isSafeInteger(parsed) || (parsed as number) < min || (parsed as number) > max) throw new FleexaError("Invalid proxy response", 502, "INVALID_PROXY_RESPONSE");
+  return parsed as number;
+}
+function parseProxyPlan(value: unknown): FleexaProxyPlan {
+  const row = asRecord(value);
+  return {
+    id: proxyString(row.id, 80), label: proxyString(row.label, 100),
+    quantity: proxyInt(row.quantity, 1, 100), priceNgn: proxyInt(row.price_ngn, 1),
+    perIpNgn: proxyInt(row.per_ip_ngn, 1),
+  };
+}
+function parseProxyCountry(value: unknown): FleexaProxyCountry {
+  const row = asRecord(value);
+  if (!Array.isArray(row.states)) throw new FleexaError("Invalid proxy response", 502, "INVALID_PROXY_RESPONSE");
+  return { code: proxyString(row.code, 2).toUpperCase(), name: proxyString(row.name, 100), states: row.states.map((state) => proxyString(state, 100)) };
+}
+function parseProxyCredentials(value: unknown): FleexaProxyCredentials | null {
+  if (value === null || value === undefined) return null;
+  const row = asRecord(value);
+  return {
+    host: proxyString(row.host, 255), port: proxyInt(row.port, 1, 65535),
+    username: proxyString(row.username, 255), password: proxyString(row.password, 512),
+    url: proxyString(row.url, 1200),
+  };
+}
+function parseProxySlot(value: unknown, defaults: { country?: string; amountPaid?: number; currency?: string; proxyType?: number } = {}): FleexaProxySlot {
+  const row = asRecord(value);
+  const status = row.status;
+  if (status !== "purchased" && status !== "active" && status !== "expired" && status !== "stopped") throw new FleexaError("Invalid proxy response", 502, "INVALID_PROXY_RESPONSE");
+  const expiresAt = row.expires_at;
+  if (expiresAt !== null && expiresAt !== undefined && (typeof expiresAt !== "string" || !Number.isFinite(Date.parse(expiresAt)))) throw new FleexaError("Invalid proxy response", 502, "INVALID_PROXY_RESPONSE");
+  return {
+    id: proxyString(row.id, 100), status, country: proxyString(row.country ?? defaults.country, 2).toUpperCase(),
+    amountPaid: proxyInt(row.amount_paid ?? defaults.amountPaid ?? 0, 0), currency: proxyString(row.currency ?? defaults.currency ?? "NGN", 3).toUpperCase(),
+    proxyType: proxyInt(row.proxy_type ?? defaults.proxyType ?? 2, 2, 3), extractRequired: row.extract_required === true,
+    expiresAt: typeof expiresAt === "string" ? expiresAt : null,
+    credentials: parseProxyCredentials(row.credentials),
+  };
+}
+
+export async function getFleexaProxyCatalogue(): Promise<FleexaProxyCatalogue> {
+  const [statusPayload, plansPayload] = await Promise.all([fleexaFetch("/proxy/status"), fleexaFetch("/proxy/plans")]);
+  const status = proxyData(statusPayload), plansData = proxyData(plansPayload);
+  if (status.enabled !== true || status.currency !== "NGN" || !Array.isArray(plansData.plans) || !Array.isArray(plansData.countries) || !Array.isArray(plansData.categories)) {
+    throw new FleexaError("Proxy catalogue is unavailable", 503, "PROXY_UNAVAILABLE");
+  }
+  const expiryHours = proxyInt(status.expiry_hours, 1, 6);
+  const plans = plansData.plans.map(parseProxyPlan);
+  const countries = plansData.countries.map(parseProxyCountry);
+  const categories = plansData.categories.map((value) => {
+    const row = asRecord(value);
+    return { id: proxyString(row.id, 80), name: proxyString(row.name, 120), type: proxyInt(row.type, 1, 10), description: proxyString(row.description, 300) };
+  });
+  if (!plans.length || !countries.length) throw new FleexaError("Proxy catalogue is empty", 503, "PROXY_UNAVAILABLE");
+  return {
+    status: { enabled: true, currency: "NGN", expiryHours, planCount: proxyInt(status.plan_count), countryCount: proxyInt(status.country_count) },
+    plans, countries, categories,
+  };
+}
+
+export async function buyFleexaProxy(input: { planId: string; country: string; state: string; proxyType: 2 | 3; idempotencyKey: string }): Promise<{ transactionId: string; reference: string; amountPaid: number; currency: string; slots: FleexaProxySlot[] }> {
+  const result = await fleexaFetch("/proxy/order", {
+    method: "POST", idempotencyKey: input.idempotencyKey,
+    body: { plan_id: input.planId, country: input.country, ...(input.state ? { state: input.state } : {}), proxy_type: input.proxyType },
+  });
+  const data = proxyData(result);
+  if (!Array.isArray(data.slots)) throw new FleexaError("Invalid proxy order receipt", 502, "INVALID_PROXY_RESPONSE");
+  return {
+    transactionId: proxyString(data.transaction_id, 100), reference: proxyString(data.reference, 160),
+    amountPaid: proxyInt(data.amount_paid, 1), currency: proxyString(data.currency, 3).toUpperCase(),
+    slots: data.slots.map((slot) => parseProxySlot(slot, { country: typeof data.country === "string" ? data.country : input.country, amountPaid: proxyInt(data.amount_paid, 1), currency: typeof data.currency === "string" ? data.currency : "NGN", proxyType: input.proxyType })),
+  };
+}
+
+export async function extractFleexaProxy(slotId: string, defaults: { country?: string; proxyType?: number } = {}): Promise<FleexaProxySlot> {
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(slotId)) throw new FleexaError("Invalid proxy identifier", 400, "INVALID_PROXY_ID");
+  const payload = await fleexaFetch(`/proxy/orders/${encodeURIComponent(slotId)}/extract`, { method: "POST", body: {} });
+  const data = proxyData(payload);
+  const parsed = parseProxySlot({ ...data, country: data.country ?? defaults.country, currency: data.currency ?? "NGN", amount_paid: data.amount_paid ?? 0, proxy_type: data.proxy_type ?? defaults.proxyType ?? 2 }, defaults);
+  if (parsed.status !== "active" || !parsed.credentials) throw new FleexaError("Proxy credentials are not available", 502, "INVALID_PROXY_RESPONSE");
+  return parsed;
+}
+
+export async function getFleexaProxySlot(slotId: string, defaults: { country?: string; proxyType?: number } = {}): Promise<FleexaProxySlot> {
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(slotId)) throw new FleexaError("Invalid proxy identifier", 400, "INVALID_PROXY_ID");
+  const payload = await fleexaFetch(`/proxy/orders/${encodeURIComponent(slotId)}`);
+  const data = proxyData(payload);
+  return parseProxySlot({ ...data, country: data.country ?? defaults.country, currency: data.currency ?? "NGN", amount_paid: data.amount_paid ?? 0, proxy_type: data.proxy_type ?? defaults.proxyType ?? 2 }, defaults);
+}
+
+export async function revealFleexaProxy(slotId: string, defaults: { country?: string; proxyType?: number } = {}): Promise<FleexaProxySlot> {
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(slotId)) throw new FleexaError("Invalid proxy identifier", 400, "INVALID_PROXY_ID");
+  const payload = await fleexaFetch(`/proxy/orders/${encodeURIComponent(slotId)}/reveal`, { method: "POST", body: {} });
+  const data = proxyData(payload);
+  const parsed = parseProxySlot({ ...data, country: data.country ?? defaults.country, currency: data.currency ?? "NGN", amount_paid: data.amount_paid ?? 0, proxy_type: data.proxy_type ?? defaults.proxyType ?? 2 }, defaults);
+  if (parsed.status !== "active" || !parsed.credentials) throw new FleexaError("Proxy credentials are not available", 409, "PROXY_CREDENTIALS_UNAVAILABLE");
+  return parsed;
 }

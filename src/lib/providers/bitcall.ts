@@ -43,6 +43,7 @@
 import "server-only";
 import { createRateLimiter } from "@/lib/platform/rate-limit";
 import { readJsonWithLimit } from "@/lib/platform/request-body";
+import { retryAfterDelayMs } from "@/lib/platform/retry-after";
 import { logger } from "@/lib/platform/logger";
 import { ProviderError } from "@/lib/providers/types";
 
@@ -283,6 +284,8 @@ async function gatewayFetch(
   options: {
     query?: Record<string, string | number | undefined>;
     body?: Record<string, unknown>;
+    /** Optional deadline for a read-only catalogue walk. */
+    signal?: AbortSignal;
     /** This call reads the catalogue on a customer's behalf. */
     catalogRead?: boolean;
     /**
@@ -332,7 +335,9 @@ async function gatewayFetch(
         ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
       },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: options.signal
+        ? AbortSignal.any([options.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
+        : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       cache: "no-store",
     });
   } catch (error) {
@@ -345,15 +350,19 @@ async function gatewayFetch(
   }
 
   const requestId = response.headers.get("x-request-id");
-  const retryAfter = Number.parseFloat(response.headers.get("Retry-After") ?? "");
+  const retryAfterMs = retryAfterDelayMs(response.headers.get("Retry-After"));
+  const parsedRetryAfter = retryAfterMs === null ? null : Math.ceil(retryAfterMs / 1000);
+  const retryAfter = parsedRetryAfter !== null && Number.isSafeInteger(parsedRetryAfter) && parsedRetryAfter >= 0 ? parsedRetryAfter : null;
 
   let payload: unknown = null;
   if (response.status !== 204) {
     try {
       payload = await readJsonWithLimit(response, 4_194_304);
     } catch {
-      // A body that is not JSON is a contract failure regardless of status.
       await response.body?.cancel().catch(() => {});
+      // A proxy can throttle with an HTML body; the status and cooldown still
+      // forbid retrying early even though there is no usable error envelope.
+      if (response.status === 429) throw new BitcallError("Gateway rate limited", 429, "RATE_LIMITED", requestId, [], retryAfter);
       throw new BitcallError("Invalid gateway response", 502, "SERVICE_RESPONSE_INVALID", requestId);
     }
   }
@@ -364,7 +373,7 @@ async function gatewayFetch(
 
   // Their error envelope can accompany a non-2xx status. Trust the code.
   if (!response.ok || upstreamCode) {
-    const code = upstreamCode ?? (response.status === 429 ? "RATE_LIMITED" : "SERVICE_RESPONSE_INVALID");
+    const code = response.status === 429 ? "RATE_LIMITED" : upstreamCode ?? "SERVICE_RESPONSE_INVALID";
     const fields = Array.isArray(errorBody.fields)
       ? (errorBody.fields as unknown[]).filter((f): f is string => typeof f === "string").slice(0, 20)
       : [];
@@ -377,7 +386,7 @@ async function gatewayFetch(
       code,
       requestId ?? pickString(errorBody, ["requestId"]),
       fields,
-      Number.isFinite(retryAfter) && retryAfter >= 0 ? retryAfter : null,
+      retryAfter,
     );
   }
 
@@ -818,6 +827,10 @@ export type BitcallOtpOffer = {
   /** The price this offer charges. Units and cost-vs-retail are not assumed here. */
   price: number | null;
   currency: string | null;
+  /** Present only when the offer itself explicitly names a destination. */
+  countryCode?: string;
+  /** Multiple explicit country fields must all agree with the selected destination. */
+  declaredCountries?: string[];
   /** Numbers in stock. Offers with none are omitted by the gateway entirely. */
   availableCount: number | null;
   /**
@@ -833,6 +846,7 @@ export type BitcallOtpService = {
   name: string | null;
   slug: string | null;
   countryCode: string | null;
+  declaredCountries?: string[];
   offers: BitcallOtpOffer[];
 };
 
@@ -846,13 +860,26 @@ export type BitcallOtpService = {
  */
 function parseOtpMoney(row: Record<string, unknown>): { amount: number | null; currency: string | null } {
   const nested = asRecord(row.price);
-  const amount =
-    nonNegative(pickNumber(nested, ["amount", "value"])) ??
-    nonNegative(pickNumber(row, ["price", "amount", "cost"]));
-  const currency =
-    currencyCode(pickString(nested, ["currency"])) ??
-    currencyCode(pickString(row, ["currency"]));
-  return { amount, currency };
+  const hasMoneyObject = row.price !== null && typeof row.price === "object" && !Array.isArray(row.price);
+  const legacyAmount = row.price !== null && row.price !== undefined
+    ? pickNumber(row, ["price"])
+    : pickNumber(row, ["amount", "cost"]);
+  return {
+    amount: nonNegative(hasMoneyObject ? pickNumber(nested, ["amount", "value"]) : legacyAmount),
+    // A currency outside a nested price is not evidence for an incomplete price.
+    currency: currencyCode(hasMoneyObject ? pickString(nested, ["currency"]) : legacyAmount === null ? null : pickString(row, ["currency"])),
+  };
+}
+
+/** Only explicit fields are country evidence; a serviceId or slug is opaque. */
+function otpDeclaredCountries(row: UnknownRecord): string[] {
+  const nested = asRecord(row.country);
+  const values = [
+    pickString(row, ["country_code"]), pickString(row, ["countryCode"]), pickString(row, ["country"]),
+    pickString(nested, ["countryCode"]), pickString(nested, ["country_code"]), pickString(nested, ["code"]),
+    pickString(nested, ["name", "countryName"]),
+  ].filter((value): value is string => value !== null);
+  return [...new Set(values.map((value) => value.trim()))];
 }
 
 function parseOtpOffer(row: unknown): BitcallOtpOffer | null {
@@ -861,41 +888,32 @@ function parseOtpOffer(row: unknown): BitcallOtpOffer | null {
   const serviceId = pickString(offer, ["serviceId", "service_id", "id"]);
   if (!serviceId) return null;
   const money = parseOtpMoney(offer);
+  const countries = otpDeclaredCountries(offer);
   return {
     serviceId,
     price: money.amount,
     currency: money.currency,
+    ...(countries.length ? { countryCode: countries[0] } : {}),
+    ...(countries.length > 1 ? { declaredCountries: countries } : {}),
     availableCount: nonNegative(pickNumber(offer, ["availableCount", "available_count", "available", "stock", "count"])),
     successRate: nonNegative(pickNumber(offer, ["successRate", "success_rate", "success"])),
   };
 }
 
-function parseOtpService(row: unknown, fallbackCountryCode?: string): BitcallOtpService {
+function parseOtpService(row: unknown): BitcallOtpService {
   const service = asRecord(row);
   const pools = Array.isArray(service.pools) ? service.pools : [];
   const offers: BitcallOtpOffer[] = [];
-  const seen = new Set<string>();
   for (const entry of pools) {
     const offer = parseOtpOffer(entry);
-    if (!offer?.serviceId || seen.has(offer.serviceId)) continue;
-    seen.add(offer.serviceId);
-    offers.push(offer);
+    if (offer) offers.push(offer);
   }
-  const countryCode = pickString(service, ["country_code", "countryCode", "country"]) ?? fallbackCountryCode ?? (() => {
-    const byId = pickString(service, ["serviceId", "service_id", "id"]);
-    if (!byId) return null;
-    const segments = byId.split("-").filter(Boolean);
-    return segments.length >= 3 ? segments[1] ?? null : null;
-  })() ?? (() => {
-    const slug = pickString(service, ["slug", "serviceSlug"]);
-    if (!slug) return null;
-    const segments = slug.split("-").filter(Boolean);
-    return segments.length >= 2 ? segments[0] ?? null : null;
-  })();
+  const countries = otpDeclaredCountries(service);
   return {
     name: pickString(service, ["name", "title", "serviceName"]),
     slug: pickString(service, ["slug", "serviceSlug"]),
-    countryCode,
+    countryCode: countries[0] ?? null,
+    ...(countries.length > 1 ? { declaredCountries: countries } : {}),
     offers,
   };
 }
@@ -992,18 +1010,51 @@ async function readCataloguePages(
  * the full feed. Batches bound concurrent read requests, not catalogue size. An
  * upstream failure or a pagination loop fails the read rather than caching an
  * incomplete list. Paid operations never use this read-only pagination helper. */
-async function readAllOtpPages(path: string, pageSize: number, query?: Record<string, string | number | undefined>): Promise<CataloguePage[]> {
+const OTP_MAX_PAGES = 50;
+const OTP_SERVICE_KEYS = ["data", "items", "services"];
+const OTP_COUNTRY_KEYS = ["data", "items", "countries"];
+
+function otpRows(payload: unknown, keys: string[] = OTP_SERVICE_KEYS): UnknownRecord[] {
+  const record = asRecord(payload);
+  if (!Array.isArray(payload) && !keys.some((key) => Array.isArray(record[key]))) {
+    throw new BitcallError("Invalid OTP catalogue response", 502, "SERVICE_RESPONSE_INVALID");
+  }
+  return rowsFrom(payload, keys);
+}
+
+async function readAllOtpPages(
+  path: string,
+  pageSize: number,
+  query?: Record<string, string | number | undefined>,
+  signal?: AbortSignal,
+): Promise<CataloguePage[]> {
+  // On the first failed page, abort sibling reads immediately. In particular a
+  // 429 must not be hidden behind another page that stalls until the deadline.
+  const controller = new AbortController();
+  const walkSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
+  let firstFailure: unknown;
   const fetchPage = async (page: number): Promise<CataloguePage> => {
     try {
-      return { page, payload: await gatewayFetch("GET", path, { query: { ...query, page, pageSize } }), error: null };
-    } catch (error) { return { page, payload: null, error }; }
+      return { page, payload: await gatewayFetch("GET", path, { query: { ...query, page, pageSize }, signal: walkSignal }), error: null };
+    } catch (error) {
+      if (firstFailure === undefined) {
+        firstFailure = error;
+        controller.abort();
+      }
+      throw firstFailure;
+    }
   };
   const pages: CataloguePage[] = [];
   const fingerprints = new Set<string>();
   let next = 1;
   let last: number | null = null;
   while (true) {
-    const end = last === null ? next : Math.min(next + 3, last);
+    if (walkSignal.aborted || next > OTP_MAX_PAGES) {
+      throw new BitcallError("OTP catalogue walk exceeded its budget", 502, "CATALOGUE_INCOMPLETE");
+    }
+    // Small batches avoid multiplying provider-account traffic when several
+    // destination catalogues are read at the same time.
+    const end = last === null ? next : Math.min(next + 1, last, OTP_MAX_PAGES);
     const batch = await Promise.all(pageNumbers(next, end).map(fetchPage));
     for (const entry of batch) {
       if (entry.error !== null) throw entry.error;
@@ -1014,14 +1065,27 @@ async function readAllOtpPages(path: string, pageSize: number, query?: Record<st
       if (declaredPage !== null && declaredPage !== entry.page) {
         throw new BitcallError("OTP catalogue pagination did not advance", 502, "CATALOGUE_INCOMPLETE");
       }
-      const rows = rowsFrom(entry.payload);
+      if (total !== null && (!Number.isSafeInteger(total) || total < 0 || total > OTP_MAX_PAGES ||
+        (total < entry.page && !(entry.page === 1 && total === 0)) ||
+        (last !== null && last !== total))) {
+        throw new BitcallError("OTP catalogue pagination metadata conflicts", 502, "CATALOGUE_INCOMPLETE");
+      }
+      const rows = otpRows(entry.payload, path === "/v1/otp/countries" ? OTP_COUNTRY_KEYS : OTP_SERVICE_KEYS);
+      const declaredCount = pickNumber(meta, ["total"]);
+      if ((total === 0 && (rows.length > 0 || meta.hasNext === true)) ||
+          (declaredCount !== null && (!Number.isSafeInteger(declaredCount) || declaredCount < 0 ||
+            (declaredCount === 0 && rows.length > 0) || (declaredCount > 0 && rows.length === 0) || rows.length > declaredCount))) {
+        // A positive reported total with an empty page is not evidence of no
+        // inventory. Likewise, rows cannot belong to a zero-sized catalogue.
+        throw new BitcallError("OTP catalogue pagination metadata conflicts", 502, "CATALOGUE_INCOMPLETE");
+      }
       const fingerprint = JSON.stringify(rows);
       if (entry.page > 1 && fingerprints.has(fingerprint)) {
         throw new BitcallError("OTP catalogue pagination repeated a page", 502, "CATALOGUE_INCOMPLETE");
       }
       fingerprints.add(fingerprint);
       pages.push(entry);
-      if (total !== null && Number.isSafeInteger(total) && total >= entry.page) last = total;
+      if (total !== null && total >= entry.page) last = total;
       if (typeof meta.hasNext === "boolean") {
         if (!meta.hasNext) {
           if (last !== null && entry.page < last) throw new BitcallError("OTP catalogue pagination metadata conflicts", 502, "CATALOGUE_INCOMPLETE");
@@ -1042,26 +1106,61 @@ async function readAllOtpPages(path: string, pageSize: number, query?: Record<st
 }
 
 /**
- * The service catalogue.
- *
- * One collection, paginated: the endpoint accepts `q` and paging only. It
- * carries no country field and *no country filter*, so this is where services
- * get their names, never their destinations — see `listBitcallOtpCountryEntries`.
+ * The service catalogue is global unless the documented `country_code` filter
+ * is sent. Filter with a value published by /v1/otp/countries, never a guessed
+ * service ID. A filtered row may omit a country; preserve that absence so callers
+ * can detect conflicting explicit country fields rather than masking them.
  */
 export async function listBitcallOtpServices(
   filter: { q?: string; pageSize?: number; countryCode?: string } = {},
+  options: { signal?: AbortSignal } = {},
 ): Promise<BitcallOtpService[]> {
-  const pages = await readAllOtpPages("/v1/otp/services", filter.pageSize ?? OTP_PAGE_SIZE, { q: filter.q, ...(filter.countryCode ? { countryCode: filter.countryCode } : {}) });
+  const pages = await readAllOtpPages("/v1/otp/services", filter.pageSize ?? OTP_PAGE_SIZE, {
+    q: filter.q, country_code: filter.countryCode,
+  }, options.signal);
   const services: BitcallOtpService[] = [];
   for (const entry of pages) {
-    // A page that failed is not a page that said "no more services": the read
-    // throws rather than returning the pages before it as the whole catalogue.
     if (entry.error !== null) throw entry.error;
-    services.push(...rowsFrom(entry.payload).map((row) => parseOtpService(row, filter.countryCode)).filter((service) => service.offers.length > 0));
+    for (const row of otpRows(entry.payload)) {
+      const service = parseOtpService(row);
+      // An explicit empty pools array is valid. Missing pools or unreadable
+      // offers cannot be discarded while claiming the catalogue is complete:
+      // even one valid empty row alongside a malformed one used to look like 0.
+      if (!Array.isArray(row.pools) || service.offers.length !== row.pools.length) {
+        throw new BitcallError("Unreadable OTP services", 502, "SERVICE_RESPONSE_INVALID");
+      }
+      if (service.offers.length > 0) services.push(service);
+    }
   }
   return services;
 }
 
+/**
+ * Resolve one exact provider-published offer. Unlike the list, this documented
+ * response is flat and includes an explicit country on each offer. Used just
+ * before spending so even an upstream filter regression cannot buy a number in
+ * a different country. A name-search result or incomplete response is not a
+ * confirmation of the chosen ID.
+ */
+export async function getBitcallOtpOffer(serviceId: string): Promise<(Omit<BitcallOtpOffer, "countryCode"> & { countryCode: string | null }) | null> {
+  if (!serviceId.trim() || serviceId.length > 200) {
+    throw new BitcallError("Invalid service reference", 400, "VALIDATION_ERROR");
+  }
+  const payload = await gatewayFetch("GET", `/v1/otp/services/${encodeURIComponent(serviceId)}`, {
+    signal: AbortSignal.timeout(6_000),
+  });
+  const rows = otpRows(payload);
+  const meta = asRecord(asRecord(payload).meta);
+  const page = pickNumber(meta, ["page"]);
+  const totalPages = pickNumber(meta, ["totalPages", "total_pages"]);
+  const total = pickNumber(meta, ["total"]);
+  if (rows.length !== 1 || pickString(rows[0], ["serviceId", "service_id"]) !== serviceId ||
+      meta.hasNext === true || (page !== null && page !== 1) ||
+      (totalPages !== null && totalPages !== 1) || (total !== null && total !== 1)) return null;
+  const offer = parseOtpOffer(rows[0]);
+  if (!offer) return null;
+  return { ...offer, countryCode: offer.countryCode ?? null };
+}
 
 /**
  * Offers for one service, addressed either by a `serviceId` the catalog published
@@ -1084,13 +1183,10 @@ export async function findBitcallOtpService(reference: string): Promise<BitcallO
 }
 
 /**
- * One destination, as the country catalogue states it.
- *
- * This is the only documented place an offer's destination exists: the response
- * names a `countryCode`, and its `pools[]` are the offers published for that
- * country, each with its price and stock. Filtering the *service* catalogue by
- * country — what this client used to do — cannot work, because a service row
- * never says which country it belongs to.
+ * One destination published by the country catalogue. The documented response
+ * provides country codes and starting prices, not individual service offers.
+ * The optional pools field is retained for compatibility with older responses;
+ * use the country-filtered service catalogue for current app-specific offers.
  */
 export type BitcallOtpCountryEntry = {
   /** The provider's own identifier, e.g. `US_1`. Sent back, never built. */
@@ -1126,13 +1222,17 @@ function parseOtpCountryEntry(row: unknown): BitcallOtpCountryEntry {
   };
 }
 
-/** Every destination the catalogue publishes, pooled offers included. */
-export async function listBitcallOtpCountryEntries(): Promise<BitcallOtpCountryEntry[]> {
-  const pages = await readAllOtpPages("/v1/otp/countries", OTP_PAGE_SIZE);
+/** Every destination the catalogue publishes, with optional legacy pools. */
+export async function listBitcallOtpCountryEntries(options: { signal?: AbortSignal } = {}): Promise<BitcallOtpCountryEntry[]> {
+  const pages = await readAllOtpPages("/v1/otp/countries", OTP_PAGE_SIZE, undefined, options.signal);
   const entries: BitcallOtpCountryEntry[] = [];
   for (const entry of pages) {
     if (entry.error !== null) throw entry.error;
-    entries.push(...rowsFrom(entry.payload, ["data", "countries", "items"]).map(parseOtpCountryEntry));
+    const rows = otpRows(entry.payload, OTP_COUNTRY_KEYS).map(parseOtpCountryEntry);
+    if (rows.some((row) => !row.countryCode || row.countryCode.trim().length > 100)) {
+      throw new BitcallError("Unreadable OTP country", 502, "SERVICE_RESPONSE_INVALID");
+    }
+    entries.push(...rows);
   }
   return entries;
 }

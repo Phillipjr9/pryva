@@ -14,7 +14,7 @@ const provider = vi.hoisted(() => ({
   listAreas: vi.fn(),
   cancelSms: vi.fn(),
 }));
-const bitcall = vi.hoisted(() => ({ configured: true, buyOtp: vi.fn(), listOtp: vi.fn() }));
+const bitcall = vi.hoisted(() => ({ configured: true, buyOtp: vi.fn(), listOtp: vi.fn(), detail: vi.fn() }));
 
 vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/providers/fleexa")>();
@@ -34,8 +34,13 @@ vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
   return {
     ...actual,
     isBitcallConfigured: () => bitcall.configured,
-    listBitcallOtpServices: bitcall.listOtp,
-    listBitcallOtpCountryEntries: async () => [],
+    listBitcallOtpServices: async (filter: { countryCode: string }) => {
+      const rows = await bitcall.listOtp(filter) as Array<{ countryCode: string }>;
+      return rows.filter((row) => row.countryCode.split("_")[0] === filter.countryCode.split("_")[0]);
+    },
+    listBitcallOtpCountryEntries: async () => ["NG", "US", "GB", "CA", "DE", "GH"]
+      .map((code) => ({ countryCode: `${code}_1`, name: null, pools: [] })),
+    getBitcallOtpOffer: bitcall.detail,
     buyBitcallOtpActivation: bitcall.buyOtp,
   };
 });
@@ -48,9 +53,14 @@ beforeEach(() => {
   clearOtpCatalogueCache();
   provider.configured = true;
   bitcall.configured = true;
-  // No country filter is sent: the endpoint accepts none. Each row states its own
-  // country, which is what the fallback path attributes on.
+  // The mock applies the provider country filter to these fixture rows.
   bitcall.listOtp.mockImplementation(async () => SMS_SERVICES);
+  bitcall.detail.mockImplementation(async (ref: string) => {
+    const rows = await bitcall.listOtp.mock.results.at(-1)?.value as Array<{ countryCode: string; offers: Array<{ serviceId: string }> }>;
+    const row = rows?.find((entry) => entry.offers.some((offer) => offer.serviceId === ref));
+    const offer = row?.offers.find((entry) => entry.serviceId === ref);
+    return offer && row ? { ...offer, countryCode: row.countryCode } : null;
+  });
   bitcall.buyOtp.mockResolvedValue({ activationId: "act-1", phoneNumber: "+2348000000000", price: 100, currency: "NGN", status: "pending" });
 });
 afterEach(() => { vi.restoreAllMocks(); });

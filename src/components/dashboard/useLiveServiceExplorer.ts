@@ -88,6 +88,7 @@ export function useLiveServiceExplorer(country: string, revision: number, allEsi
               value = { country, items: data.items.filter((item: ExplorerItem) => item && typeof item.id === "string" && FEED_CATEGORIES[feed].includes(item.category)), live: data.live !== false, partial: !!data.partial,
                 failed: false, reason: data.partial && !reason ? "error" : reason,
                 fetchedAt: typeof data.fetchedAt === "string" && Number.isFinite(Date.parse(data.fetchedAt)) ? data.fetchedAt : null,
+                retryAt: data.partial ? retryAfterDeadline(response.headers?.get("retry-after") ?? null) : undefined,
                 loading: false };
             } else {
               if (response.status === 401) value.reason = "sign-in";

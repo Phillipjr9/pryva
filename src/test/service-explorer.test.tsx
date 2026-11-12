@@ -52,6 +52,7 @@ describe("country-first service explorer", () => {
     for (const category of ["verification", "social", "esim", "subscriptions", "data"]) {
       expect(items.some((item) => item.category === category)).toBe(false);
     }
+    expect(items.some((item) => item.category === "proxies" && item.source === "live")).toBe(true);
     // Supplier-backed entries arrive separately; a platform vocabulary is not a listing.
     expect(items.some((item) => item.id.startsWith("verification-") || item.id.startsWith("social-"))).toBe(false);
     expect(ids).toContain("gift-cards");
@@ -71,8 +72,11 @@ describe("country-first service explorer", () => {
     expect(nigeria.some((item) => item.id === "plan-vn-us")).toBe(false);
     expect(us.some((item) => item.id === "plan-vn-us")).toBe(true);
     expect(us.some((item) => item.id === "plan-vn-ng")).toBe(false);
-    const regional = us.find((item) => item.id === "plan-proxy-eu-10");
-    expect(regional).toMatchObject({ coverage: "unconfirmed", action: null });
+    expect(us.some((item) => item.id === "plan-proxy-eu-10")).toBe(false);
+    expect(us.find((item) => item.id === "residential-proxies")).toMatchObject({
+      category: "proxies", source: "live", coverage: "unconfirmed",
+      action: { href: "/dashboard/proxies" }, price: null,
+    });
     // Email is no longer a set of catalogue plans, so nothing here matches a
     // country -- and nothing needs to. The free inbox is a tool item that shows
     // up in every country with the same shape.

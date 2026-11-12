@@ -19,6 +19,9 @@ export function isVercelPreview(): boolean {
 }
 
 export function financialActionsUnavailable(): boolean {
-  if (forceLiveListings()) return false;
-  return isPreviewDatabase() || isVercelPreview();
+  // An override intended for local browsing must never disable the deployed
+  // preview guard. In particular, preview wallets may contain simulated funds.
+  if (isVercelPreview()) return true;
+  if (!process.env.VERCEL_ENV?.trim() && forceLiveListings()) return false;
+  return isPreviewDatabase();
 }

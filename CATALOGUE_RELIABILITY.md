@@ -95,3 +95,72 @@ results do not verify live integrations.
 This validation was performed on the working branch before production
 verification. No authenticated production catalogue request or paid transaction
 was performed as part of the local audit.
+
+## 2026-11-12 app-verification investigation — local only
+
+The previous Bitcall listing code relied on country fields on global service
+rows, although the documented rows can omit them. The local adapter now reads
+published country codes and requests services using `country_code`, then
+rejects contradictory explicit country metadata. Empty, loading, partial and
+unavailable verification feeds are presented separately. The admin stock report
+uses the same country-filtered reads instead of assuming country rows contain
+pools.
+
+Before an activation, checkout independently reads the exact published offer and
+checks its country, reported stock, convertible price and margin. An unreadable
+or mismatched offer is refused before the paid-call marker; an ambiguous paid
+response remains in review without a wallet debit or automatic retry. The
+provider's documented activation body has no price-limit field, so this read is
+not a price lock: a change between confirmation and activation remains possible.
+
+Filtered catalogue attribution relies on Bitcall honoring its documented filter;
+individual list pools can omit country metadata. Exact-offer confirmation avoids
+a wrong-country purchase, but does not independently verify every displayed
+listing. Country/offer caches, request coalescing and the throttle cooldown are
+per instance, not a cross-instance provider quota; walks have bounded pages and
+deadlines. No live supplier response, paid activation or production deployment
+was made during this investigation. The shopper reports zero across all
+countries; the authenticated production response remains unknown, so the code
+mismatch is a plausible cause, not proof of the reported zero.
+
+Local validation: 258 focused tests passed, including a synthetic provider
+catalogue covering every country in the selector. This is not proof of actual
+supplier coverage. Before the final country-name refinement, the full suite
+passed 3,240 of 3,244 with the same four previously recorded mobile-data and
+supplier-copy failures. Typecheck, lint, production build, pricing audit and diff
+check also passed.
+
+### Combined production baseline
+
+Production subsequently moved to `26f2b08`, which includes a residential-proxy
+release and migration `0046_proxy_slots.sql`; the live build log reports 48
+migrations recorded. The working branch was fast-forwarded to include that
+production commit before the OTP changes, so an eventual deployment would not
+overwrite the proxy release. Production and main must still be checked again
+immediately before promotion, since another release could land in the meantime.
+
+The first combined full suite reported 16 failures, all reproduced against an
+untouched snapshot of `26f2b08`; they include a broken `/dashboard/proxies` link
+and four test fixtures that did not replay migration 0046. The fixture lists
+were updated and the five financial/migration test files then passed 178/178.
+The final full run passed 3,247/3,259 tests; the remaining 12 failures reproduce
+on the untouched production baseline and have not been fixed. The final 19-file
+catalogue, proxy and safety selection passed 321/321 tests. The combined build,
+typecheck, lint and pricing audit passed. An empty supplier page that claims a
+positive total, or a nonempty page claiming zero, now fails as incomplete rather
+than being presented as a complete catalogue.
+
+The Vercel configuration has `FORCE_LIVE_LISTINGS` enabled for previews. In the
+live baseline it bypasses the shared financial-action guard, not just listing
+reads. The new code makes Vercel preview fail that guard even when the flag is
+set; it also fails closed on a Vercel production deployment with no configured
+database. A simulated checkout test confirms the supplier gate is never opened
+in that case. Existing older preview deployments keep their old code and require
+separate attention; neither this guard nor a preview is a substitute for keeping
+production database and supplier credentials out of preview. The configuration
+itself was not changed.
+
+The owner confirmed that a verified backup is available, but it was not
+independently inspected. The OTP fix adds no migration; its migration files and
+runner match `26f2b08`, whose build reported all 48 files recorded. No paid test
+order was placed.

@@ -48,8 +48,9 @@ export function supplierConfigured(source: SupplierSource): boolean {
  * rather than what the current deployment allows.
  */
 export function serviceConfigured(id: ServiceId): boolean {
-  // A general supplier credential does not implement these delivery paths.
-  if (id === "data" || id === "subscriptions" || id === "proxies") return false;
+  // These families still lack complete purchase/fulfilment routes. Proxies
+  // have a dedicated API adapter and are gated again by live status/plans at checkout.
+  if (id === "data" || id === "subscriptions") return false;
   const { sale } = serviceById(id);
   switch (sale.kind) {
     case "supplier":

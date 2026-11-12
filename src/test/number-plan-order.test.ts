@@ -24,10 +24,12 @@ vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
   return {
     ...actual,
     isBitcallConfigured: () => bitcall.configured,
-    listBitcallOtpServices: bitcall.list,
-    // Attribution now comes from the country catalogue; these tests exercise the
-    // service-row fallback, so the country read is empty on purpose.
-    listBitcallOtpCountryEntries: async () => [],
+    listBitcallOtpServices: async (filter: { countryCode?: string }) => {
+      const rows = await bitcall.list(filter) as Array<{ countryCode: string }>;
+      return rows.filter((row) => row.countryCode === filter.countryCode);
+    },
+    listBitcallOtpCountryEntries: async () => ["NG", "US", "GB", "CA", "DE", "GH"]
+      .map((code) => ({ countryCode: `${code}_1`, name: null, pools: [] })),
     buyBitcallOtpActivation: bitcall.buy,
   };
 });
@@ -49,8 +51,7 @@ function fleexaRows(costs: Record<string, number>) {
 
 function gatewayRows(costs: Record<string, number>) {
   return Object.entries(costs).map(([country, usd]) => ({
-    // The service catalogue states no country and accepts no country filter, so a
-    // row that names its own country is the only shape the fallback can attribute.
+    // The mock applies the provider's country filter to these explicit fixtures.
     countryCode: `${country}_1`,
     name: "WhatsApp",
     offers: [{ serviceId: `ALPHA-${country}-whatsapp`, price: usd, currency: "USD", availableCount: 10 }],

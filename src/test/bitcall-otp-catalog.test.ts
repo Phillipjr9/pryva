@@ -84,6 +84,20 @@ describe("Bitcall app-specific OTP catalogue", () => {
     expect(items[0].description).toContain("purchasing is locked for this country");
   });
 
+  it("never relabels another country's or another supplier's offer as the selected country", async () => {
+    const foreign = { ...offers[0], ref: "wrong-country", country: "us" };
+    const otherSupplier: OtpOffer = { ...offers[0], ref: "wrong-supplier", supplier: "fleexa" };
+    const items = bitcallOtpItemsForCountry([offers[0], foreign, otherSupplier], "ng", "Nigeria");
+    expect(items).toHaveLength(1);
+    expect(items[0].id).toBe(otpOfferPublicId("ng", offers[0].ref, offers[0].app));
+
+    state.read.mockResolvedValue({ offers: [foreign, otherSupplier], errorCode: null });
+    for (const ref of [foreign.ref, otherSupplier.ref]) {
+      const result = await findOtpCheckoutOffer("ng", otpOfferPublicId("ng", ref, "WhatsApp"));
+      expect(result.listing).toBeNull();
+    }
+  });
+
   it("re-resolves an opaque offer ID from the live listing before checkout", async () => {
     const id = otpOfferPublicId("ng", "private-service-id-1", "WhatsApp");
     const result = await findOtpCheckoutOffer("ng", id, { refresh: true });

@@ -54,6 +54,9 @@ export function bitcallOtpItemsForCountry(
   // Never collapse pools into one stock number or silently discard long labels.
   const byApp = new Map<string, OtpOffer[]>();
   for (const offer of offers) {
+    // Defend the presentation boundary too: never relabel another destination's
+    // offer as belonging to the currently selected country.
+    if (offer.supplier !== "bitcall" || offer.country.toLowerCase() !== country.code) continue;
     const named = offer.app?.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
     const key = named?.toLocaleLowerCase() ?? "";
     const group = byApp.get(key);
@@ -123,7 +126,8 @@ export async function findOtpCheckoutOffer(
   if (read.errorCode) return { listing: null, errorCode: read.errorCode };
   // The app is not required to resolve an offer: the id is the ref plus whatever
   // label the provider gave it, which may be none.
-  const offer = read.offers.find((entry) => otpOfferPublicId(country.code, entry.ref, entry.app) === offerId);
+  const offer = read.offers.find((entry) => entry.supplier === "bitcall" && entry.country.toLowerCase() === country.code &&
+    otpOfferPublicId(country.code, entry.ref, entry.app) === offerId);
   if (!offer) return { listing: null, errorCode: null };
   const sellable = canSell(plan, offer);
   return {

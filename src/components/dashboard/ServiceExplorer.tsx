@@ -370,6 +370,11 @@ export function ServiceExplorer({
     ]);
   }, [country, liveState, digital.items, reviewedItems, subcategory]);
   const filtered = useMemo(() => filterExplorerItems(items, category, search, tag), [items, category, search, tag]);
+  // An unresolved or failed verification feed is not a zero-stock result. The
+  // hook can be null for the first render or immediately after a country switch.
+  const verificationPending = category === "verification" && !!selectedCountry && (!liveState || liveState.country !== country || liveState.loading);
+  const verificationUnavailable = category === "verification" && !verificationPending && !!liveState &&
+    (!liveState.live || liveState.failed || liveState.partial);
   /**
    * Social promotion lists every offer the supplier sells, which is hundreds
    * rather than a handful. Grouping by platform keeps that navigable: each one
@@ -598,15 +603,21 @@ export function ServiceExplorer({
 
           <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-meta leading-relaxed border-amber-200 bg-amber-50/70 text-amber-900`}>
             <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-            {liveState?.country === country && liveState.live && liveState.reason !== "funding" && !liveState.failed ? <p><strong>Live listings are current.</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. {liveState.partial && "Some listings may be missing. "}<Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).lead}</strong>{" "}{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).rest} <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
+            {verificationPending ? <p><strong>Checking live availability.</strong> Results will appear as soon as the catalogue responds.</p>
+              : liveState?.country === country && liveState.live && liveState.reason !== "funding" && !liveState.partial && !liveState.failed ? <p><strong>Live listings are current.</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. <Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).lead}</strong>{" "}{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).rest} <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
           </div>
 
-          <section aria-labelledby="services-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-3.5 sm:p-6">
+          <section aria-labelledby="services-title" aria-busy={verificationPending || undefined} className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-3.5 sm:p-6">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Sparkle className="h-3.5 w-3.5" /> Step 03</p>
                 <h2 id="services-title" className="mt-1 text-[1rem] font-semibold text-ink">{selectedCategory ? `Explore ${selectedCategory.label}` : "Explore services"}</h2>
-                <p aria-live="polite" className="mt-1 text-meta text-ink-3">{filtered.length} {`listing${filtered.length === 1 ? "" : "s"}`} · {selectedCountry.name} selected</p>
+                <p aria-live="polite" className="mt-1 text-meta text-ink-3">
+                  {verificationPending && filtered.length === 0 ? "Loading app verification listings…"
+                    : verificationUnavailable && filtered.length === 0 ? "App verification listings are unavailable right now"
+                    : <>{filtered.length} {`listing${filtered.length === 1 ? "" : "s"}`}{verificationPending ? " so far" : ""}</>}
+                  {" · "}{selectedCountry.name} selected
+                </p>
                 {liveState?.country === country && liveState.fetchedAt && <p className="mt-1 text-micro text-ink-3">Stock checked: <time dateTime={liveState.fetchedAt}>{new Date(liveState.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
               </div>
               <div className="relative w-full sm:max-w-[260px]">
@@ -717,10 +728,16 @@ export function ServiceExplorer({
                 {filtered.slice(0, visible).map((item) => <ServiceCard key={item.id} item={item} countryName={selectedCountry.name} />)}
               </div>
             )}
-            {filtered.length === 0 && (
+            {filtered.length === 0 && !verificationPending && (!verificationUnavailable || filtering) && (
               <div className="rounded-2xl border border-dashed border-line bg-cream/50 p-8 text-center">
-                <p className="text-[0.875rem] font-semibold text-ink">No listings match these filters</p>
-                <p className="mt-1 text-meta text-ink-2">Try another search, category or country. This doesn&apos;t indicate live availability.</p>
+                <p className="text-[0.875rem] font-semibold text-ink">
+                  {verificationUnavailable ? "Matches cannot be confirmed while listings are unavailable"
+                    : category === "verification" && !filtering ? `No app verification listings were reported for ${selectedCountry.name}`
+                    : "No listings match these filters"}
+                </p>
+                <p className="mt-1 text-meta text-ink-2">{category === "verification" && !filtering
+                  ? "Try another country or check back later. Availability can change."
+                  : "Try another search, category or country. This doesn't indicate live availability."}</p>
                 {category === "subscriptions" && !search && !digital.loading && <p className="mt-3 text-meta text-ink-2">No subscription listings have loaded for this selection. Try loading more catalogue pages or <Link href="/dashboard/support" className="font-semibold text-lav-700 underline">Ask about subscriptions</Link>. Availability depends on each product.</p>}
                 {(search || tag !== "all") && <button type="button" onClick={() => { setSearch(""); setTag("all"); setVisible(PAGE_SIZE); }} className="mt-3 text-meta font-semibold text-lav-700 underline underline-offset-2">Clear filters</button>}
               </div>

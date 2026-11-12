@@ -21,7 +21,8 @@ const state = vi.hoisted(() => ({
   productsError: null as string | null,
   manual: 0,
   accszone: false,
-  otpCountries: [] as unknown[],
+  otpOffers: [] as Array<{ supplier: "bitcall"; ref: string; country: string; app: string; costNgn: number; stock: number }>,
+  otpFailures: [] as string[],
 }));
 
 vi.mock("@/lib/providers/fleexa", async (importOriginal) => {
@@ -66,7 +67,15 @@ vi.mock("@/lib/services/boosts/smm-catalog", async (importOriginal) => {
 
 vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/providers/bitcall")>();
-  return { ...actual, isBitcallConfigured: () => state.bitcall, listBitcallOtpCountryEntries: async () => state.otpCountries };
+  return { ...actual, isBitcallConfigured: () => state.bitcall };
+});
+
+vi.mock("@/lib/services/numbers/otp-suppliers", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/numbers/otp-suppliers")>();
+  return { ...actual, readOtpOffersForSupplier: async (_supplier: string, country: string) => ({
+    offers: state.otpOffers.filter((offer) => offer.country === country),
+    errorCode: state.otpFailures.includes(country) ? "SERVICE_UNAVAILABLE" : null,
+  }) };
 });
 
 vi.mock("@/lib/providers/accszone", async (importOriginal) => {
@@ -129,10 +138,8 @@ beforeEach(() => {
   state.bulkacc = true;
   state.smm = true;
   state.bitcall = true;
-  state.otpCountries = [{
-    countryCode: "NG_1", name: "Nigeria", serviceCount: 1, availableCount: 15, startingPrice: 900, currency: "NGN",
-    pools: [{ serviceId: "s1", price: 900, currency: "NGN", availableCount: 15, successRate: 90 }],
-  }];
+  state.otpOffers = [{ supplier: "bitcall", ref: "s1", country: "ng", app: "WhatsApp", costNgn: 900, stock: 15 }];
+  state.otpFailures = [];
   state.snapshot = snapshot();
   state.snapshotError = null;
   state.boost = boostSnapshot();
@@ -178,6 +185,17 @@ describe("the stock report", () => {
     const numbers = lanes.find((lane) => lane.lane === "numbers")!;
     expect(numbers.lines.find((line) => line.id === "vn-ng")?.stock).toBe(15);
     expect(numbers.sellable).toBeGreaterThan(0);
+  });
+
+  it("does not report a failed country read as zero inventory", async () => {
+    state.otpFailures = ["us"];
+    const { lanes } = await buildStockReport();
+    const numbers = lanes.find((lane) => lane.lane === "numbers")!;
+    expect(numbers.error).toBe("Some number catalogues could not be confirmed");
+    expect(numbers.lines.find((line) => line.id === "vn-us")).toMatchObject({
+      state: "unknown", stock: null, note: "the live number catalogue could not be confirmed",
+    });
+    expect(numbers.lines.find((line) => line.id === "vn-ng")?.stock).toBe(15);
   });
 
   it("keeps the rest of the report when one feed throws", async () => {

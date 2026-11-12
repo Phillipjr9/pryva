@@ -27,8 +27,7 @@ vi.mock("@/lib/providers/bitcall", async (importOriginal) => {
     bitcallKeyEnvironment: () => "live" as const,
     getBitcallBalance: async () => ({ balance: 12.5, currency: "USD" }),
     listBitcallOtpServices: gate.list,
-    // Empty: this endpoint's fixtures exercise the service-row probe path.
-    listBitcallOtpCountryEntries: async () => [],
+    listBitcallOtpCountryEntries: async () => [{ countryCode: "NG_1", name: "Nigeria", pools: [] }],
     buyBitcallOtpActivation: gate.buy,
     cancelBitcallOtpActivation: gate.cancel,
   };
