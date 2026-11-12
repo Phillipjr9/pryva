@@ -16,6 +16,14 @@ describe("digital category browser", () => {
     mocks.rate.mockResolvedValueOnce({ unavailable: true }); expect((await GET()).status).toBe(503);
     expect(mocks.categories).not.toHaveBeenCalled();
   });
+  it("includes the remaining cooldown on a throttled request", async () => {
+    const now = Date.now();
+    mocks.rate.mockResolvedValueOnce({ allowed: false, resetTime: now + 45_000 });
+    const response = await GET();
+    expect(response.status).toBe(429);
+    expect(Number(response.headers.get("retry-after"))).toBeGreaterThanOrEqual(44);
+    expect(mocks.categories).not.toHaveBeenCalled();
+  });
   it("returns safe root labels, including newly added categories, without prices or supplier metadata", async () => {
     mocks.categories.mockResolvedValue([{ slug: "topups", name: "Other language", inStockCount: 123 }, { slug: "new-category", name: " New \n category ", secret: "hidden" }, { slug: "../bad", name: "Bad" }, { slug: "topups", name: "Duplicate" }]);
     const response = await GET();

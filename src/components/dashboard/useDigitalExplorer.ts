@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { cataloguePool, fetchCatalogue } from "@/lib/platform/catalog-fetch";
+import { catalogueFailureReason, cataloguePool, fetchCatalogue, type CatalogueFailureReason } from "@/lib/platform/catalog-fetch";
+import { retryAfterDeadline } from "@/lib/platform/retry-after";
+import { useRetryCooldown } from "@/lib/platform/use-retry-cooldown";
 import { parseDigitalArtwork } from "@/lib/content/digital-artwork";
 import type { ExplorerFilter, ExplorerItem } from "@/lib/services/service-explorer";
 import { digitalServiceFamily, DIGITAL_FAMILY_LABELS } from "@/lib/services/digital-service-category";
@@ -25,8 +27,18 @@ const ROOTS: Root[] = [
 ];
 const ALL_PRODUCTS: Root = { slug: "", category: "tools", label: "Digital product · all categories", icon: "subscriptions", allOnly: true };
 
-type Page = { root: Root; items: ExplorerItem[]; next: string | null; limited: boolean; error: boolean };
+type Page = { root: Root; items: ExplorerItem[]; next: string | null; limited: boolean; error: boolean; reason?: CatalogueFailureReason; retryAt?: number };
 type State = { scope: string; pages: Page[]; loading: boolean; loadingMore: boolean };
+
+function retryable(page: Page): boolean {
+  return page.error && (!page.reason || page.reason === "error" || page.reason === "throttled");
+}
+
+function mergePage(previous: Page, next: Page): Page {
+  if (next.error) return { ...previous, error: true, reason: next.reason, retryAt: next.retryAt };
+  const seen = new Set(previous.items.map((item) => item.id));
+  return { ...next, items: [...previous.items, ...next.items.filter((item) => !seen.has(item.id))] };
+}
 
 function rootsFor(category: ExplorerFilter): Root[] {
   if (category !== "all") {
@@ -46,9 +58,17 @@ async function load(root: Root, query: string, cursor: string | undefined, signa
   if (query.length >= 2) params.set("q", query);
   else if (cursor) params.set("cursor", cursor);
   try {
-    const response = await fetchCatalogue(`/api/services/digital-catalog?${params}`, signal);
+    // The All view fans out across many shelves. Two attempts per shelf keep a
+    // supplier outage from immediately consuming the entire browsing budget.
+    const response = await fetchCatalogue(`/api/services/digital-catalog?${params}`, signal, { maxAttempts: 2 });
     const data = await response.json().catch(() => null);
-    if (!response.ok || !data?.ok || !Array.isArray(data.items) ||
+    if (!response.ok) {
+      const reason = catalogueFailureReason(response.status, data?.code);
+      // A missing throttle header is not permission for an immediate manual retry.
+      const retryAt = retryAfterDeadline(response.headers?.get("retry-after") ?? null, reason === "throttled" ? 60_000 : 0);
+      return { root, items: [], next: cursor ?? null, limited: false, error: true, reason, retryAt };
+    }
+    if (!data?.ok || !Array.isArray(data.items) ||
         !(data.nextCursor === null || (typeof data.nextCursor === "string" && data.nextCursor.length <= 512 && data.nextCursor !== cursor))) throw new Error("Unavailable");
     const items: ExplorerItem[] = [];
     for (const value of data.items) {
@@ -69,7 +89,7 @@ async function load(root: Root, query: string, cursor: string | undefined, signa
     }
     return { root, items, next: data.nextCursor, limited: data.searchLimited === true, error: false };
   } catch {
-    return { root, items: [], next: cursor ?? null, limited: false, error: true };
+    return { root, items: [], next: cursor ?? null, limited: false, error: true, reason: "error" };
   }
 }
 
@@ -77,14 +97,15 @@ export function useDigitalExplorer(enabled: boolean, category: ExplorerFilter, s
   const query = search.trim().slice(0, 128);
   const globalSearch = category === "all" && !subcategory && query.length >= 2;
   const catalogQuery = globalSearch ? query : "";
-  const [revision, setRevision] = useState(0);
+  const [giftRevision, setGiftRevision] = useState(0);
   // Local category search reuses loaded pages instead of refetching every keypress.
-  const scope = `${enabled}:${category}:${catalogQuery}:${stockOnly}:${subcategory?.id ?? ""}:${revision}`;
+  const scope = `${enabled}:${category}:${catalogQuery}:${stockOnly}:${subcategory?.id ?? ""}`;
   const [state, setState] = useState<State>({ scope: "", pages: [], loading: false, loadingMore: false });
   const [giftSearch, setGiftSearch] = useState<{ scope: string; page: Page } | null>(null);
   const giftQuery = enabled && category !== "all" && category !== "tools" && category !== "email" && !subcategory && query.length >= 2 ? query : "";
-  const giftSearchScope = `${category}:${giftQuery}:${stockOnly}:${revision}`;
+  const giftSearchScope = `${category}:${giftQuery}:${stockOnly}:${giftRevision}`;
   const controllerRef = useRef<AbortController | null>(null);
+  const activePageWork = useRef<AbortSignal | null>(null);
   useEffect(() => {
     if (!giftQuery) return;
     const controller = new AbortController();
@@ -122,41 +143,75 @@ export function useDigitalExplorer(enabled: boolean, category: ExplorerFilter, s
       return () => { clearTimeout(timer); controller.abort(); };
     }
     return () => controller.abort();
-  }, [enabled, category, globalSearch, catalogQuery, scope, revision, stockOnly, subcategory]);
+  }, [enabled, category, globalSearch, catalogQuery, scope, stockOnly, subcategory]);
 
   const current = state.scope === scope ? state : { scope, pages: [], loading: enabled && (globalSearch || rootsFor(category).length > 0), loadingMore: false };
-  const loadMore = useCallback(async () => {
-    const signal = controllerRef.current?.signal;
-    if (!signal || signal.aborted || state.scope !== scope || state.loading || state.loadingMore || globalSearch) return;
-    const pending = state.pages.filter((page) => page.next);
-    if (!pending.length) return;
-    setState((previous) => ({ ...previous, loadingMore: true }));
-    const nextPages: Page[] = [];
-    await cataloguePool(pending, async (page) => {
-      nextPages.push(await load(page.root, "", page.next!, signal, stockOnly));
-    }, signal);
-    if (signal.aborted) return;
-    setState((previous) => {
-      if (previous.scope !== scope) return previous;
-      const pages = previous.pages.map((page) => {
-        const next = nextPages.find((result) => result.root.slug === page.root.slug);
-        if (!next) return page;
-        if (next.error) return { ...page, error: true };
-        const seen = new Set(page.items.map((item) => item.id));
-        return { ...next, items: [...page.items, ...next.items.filter((item) => !seen.has(item.id))] };
-      });
-      return { ...previous, pages, loadingMore: false };
-    });
-  }, [state, scope, globalSearch, stockOnly]);
   const extra = giftQuery && giftSearch?.scope === giftSearchScope ? giftSearch.page : null;
   const giftSearchLoading = !!giftQuery && !extra;
+  const failures = [...current.pages, ...(extra ? [extra] : [])].filter((page) => page.error);
+  const retryAt = Math.max(0, ...failures.filter(retryable).map((page) => page.retryAt ?? 0));
+  const retryBlocked = useRetryCooldown(retryAt);
+
+  const loadMore = useCallback(async () => {
+    const signal = controllerRef.current?.signal;
+    if (!signal || signal.aborted || activePageWork.current === signal || state.scope !== scope || state.loading || state.loadingMore || globalSearch || retryAt > Date.now()) return;
+    // A failed page is retried separately so its cursor and earlier results survive.
+    const pending = state.pages.filter((page) => page.next && !page.error);
+    if (!pending.length) return;
+    activePageWork.current = signal;
+    setState((previous) => ({ ...previous, loadingMore: true }));
+    try {
+      const nextPages: Page[] = [];
+      await cataloguePool(pending, async (page) => {
+        nextPages.push(await load(page.root, "", page.next!, signal, stockOnly));
+      }, signal);
+      if (signal.aborted) return;
+      setState((previous) => {
+        if (previous.scope !== scope) return previous;
+        const pages = previous.pages.map((page) => {
+          const next = nextPages.find((result) => result.root.slug === page.root.slug);
+          return next ? mergePage(page, next) : page;
+        });
+        return { ...previous, pages, loadingMore: false };
+      });
+    } finally {
+      if (activePageWork.current === signal) activePageWork.current = null;
+    }
+  }, [state, scope, globalSearch, stockOnly, retryAt]);
+
+  const retry = useCallback(async () => {
+    const signal = controllerRef.current?.signal;
+    if (!signal || signal.aborted || activePageWork.current === signal || state.scope !== scope || state.loading || state.loadingMore || giftSearchLoading || retryAt > Date.now()) return;
+    if (extra && retryable(extra)) setGiftRevision((value) => value + 1);
+    const pending = state.pages.filter(retryable);
+    if (!pending.length) return;
+    activePageWork.current = signal;
+    setState((previous) => ({ ...previous, loadingMore: true }));
+    try {
+      await cataloguePool(pending, async (page) => {
+        const next = await load(page.root, catalogQuery, page.next ?? undefined, signal, stockOnly);
+        if (signal.aborted) return;
+        setState((previous) => previous.scope !== scope ? previous : {
+          ...previous, pages: previous.pages.map((old) => old.root.slug === page.root.slug ? mergePage(old, next) : old),
+        });
+      }, signal);
+      if (!signal.aborted) setState((previous) => previous.scope !== scope ? previous : { ...previous, loadingMore: false });
+    } finally {
+      if (activePageWork.current === signal) activePageWork.current = null;
+    }
+  }, [state, scope, catalogQuery, stockOnly, extra, giftSearchLoading, retryAt]);
+
   const seen = new Set<string>();
   const items = [...current.pages.flatMap((page) => page.items), ...(extra?.items ?? [])].filter((item) => {
     if (category !== "all" && (item.allOnly || item.category !== category)) return false;
     if (seen.has(item.id)) return false;
     seen.add(item.id); return true;
   });
-  return { items, loading: current.loading || giftSearchLoading, loadingMore: current.loadingMore, error: current.pages.some((page) => page.error) || !!extra?.error,
-    limited: current.pages.some((page) => page.limited) || !!extra?.limited, hasMore: !globalSearch && current.pages.some((page) => !!page.next),
-    loadMore, retry: () => setRevision((value) => value + 1) };
+  // If failures differ, preserve a real outage rather than labelling all of
+  // them as a harmless configuration or rate-limit condition.
+  const reason = (["error", "sign-in", "throttled", "environment", "unconfigured"] as const)
+    .find((candidate) => failures.some((page) => (page.reason ?? "error") === candidate)) ?? null;
+  return { items, loading: current.loading || giftSearchLoading, pageLoading: current.loading, loadingMore: current.loadingMore, error: failures.length > 0, reason, retryBlocked,
+    limited: current.pages.some((page) => page.limited) || !!extra?.limited, hasMore: !globalSearch && current.pages.some((page) => !!page.next && !page.error),
+    loadMore, retry };
 }

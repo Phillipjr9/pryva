@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { DigitalCatalogBrowser } from "@/app/dashboard/digital-catalog/DigitalCatalogBrowser";
 import { AvailableDigitalProducts } from "@/app/dashboard/digital-catalog/AvailableDigitalProducts";
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 const reply = (data: object, status = 200) => ({ ok: status === 200, json: async () => data });
 
 describe("digital catalogue browser", () => {
@@ -61,6 +61,42 @@ describe("digital catalogue browser", () => {
     render(<DigitalCatalogBrowser />);
     expect((await screen.findByRole("link", { name: "Check price and availability" })).getAttribute("href")).toBe("/dashboard/digital-topups?product=digital-abc");
   });
+  it("does not offer a pointless retry for an unconnected regional catalogue", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ error: "This catalogue is not connected yet.", code: "unconfigured" }, { status: 503, headers: { "Retry-After": "60" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<DigitalCatalogBrowser fixedCategory="games" />);
+    expect((await screen.findByRole("alert")).textContent).toContain("not connected yet");
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the previous page visible while a throttled next page awaits retry", async () => {
+    vi.useFakeTimers();
+    let finishRetry: ((response: Response) => void) | undefined;
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ ok: true, items: [{ id: "1", name: "First game", stock: "reported" }], nextCursor: "next", searchLimited: false, skipped: false }))
+      .mockResolvedValueOnce(new Response("busy", { status: 429, headers: { "Retry-After": "6" } }))
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { finishRetry = resolve; }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<DigitalCatalogBrowser fixedCategory="games" />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.getByText("First game")).toBeTruthy();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Next page" })); });
+    expect(screen.getByText("First game")).toBeTruthy();
+    expect(screen.getByText(/previously loaded page is shown/)).toBeTruthy();
+    const retry = screen.getByRole("button", { name: "Retry" });
+    expect(retry).toHaveProperty("disabled", true);
+    await act(async () => { await vi.advanceTimersByTimeAsync(6_000); });
+    expect(retry).toHaveProperty("disabled", false);
+    await act(async () => { fireEvent.click(retry); });
+    expect(screen.getByText("First game")).toBeTruthy();
+    expect(finishRetry).toBeDefined();
+    await act(async () => { finishRetry!(Response.json({ ok: true, items: [{ id: "2", name: "Second game", stock: "reported" }], nextCursor: null, searchLimited: false, skipped: false })); });
+    expect(screen.getByText("Second game")).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[2][0])).toContain("cursor=next");
+  });
+
   it("reports provider errors and can retry", async () => {
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
       if (url.endsWith("/categories")) return reply({ ok: true, categories: [] });

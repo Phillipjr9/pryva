@@ -178,6 +178,15 @@ describe("service explorer live listings", () => {
     expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   });
 
+  it("asks a signed-out shopper to sign in instead of repeatedly retrying", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ error: "Please sign in" }, { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
+    expect((await screen.findByRole("link", { name: "Sign in again" })).getAttribute("href")).toBe("/login?next=%2Fdashboard%2Fservices");
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
   it("names a throttle as a throttle and still offers the retry", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 429, json: async () => ({ error: "slow down", reason: "throttled" }) });
     vi.stubGlobal("fetch", fetchMock);

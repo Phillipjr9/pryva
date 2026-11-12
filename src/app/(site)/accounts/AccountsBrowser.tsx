@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { fetchCatalogue } from "@/lib/platform/catalog-fetch";
+import { fetchCatalogue, SHARED_CATALOGUE_TIMEOUT_MS } from "@/lib/platform/catalog-fetch";
 import { formatNaira } from "@/lib/services/catalog";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/platform/utils";
@@ -89,6 +89,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
 
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const requestId = useRef(0);
+  const listingsRequest = useRef<AbortController | null>(null);
 
   // Debounce the search box so we don't hammer the provider.
   useEffect(() => {
@@ -104,7 +105,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
     const controller = new AbortController();
     const url = activeCategory ? `/api/accounts/categories?categoryId=${activeCategory}` : "/api/accounts/categories";
 
-    fetchCatalogue(url, controller.signal)
+    fetchCatalogue(url, controller.signal, { timeoutMs: SHARED_CATALOGUE_TIMEOUT_MS })
       .then((response) => {
         if (!response.ok) throw new Error("Categories unavailable");
         return response.json();
@@ -130,6 +131,9 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
   }, [activeCategory]);
 
   const loadListings = useCallback(async () => {
+    listingsRequest.current?.abort();
+    const controller = new AbortController();
+    listingsRequest.current = controller;
     const current = ++requestId.current;
     setLoading(true);
     setError(null);
@@ -141,7 +145,7 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
     if (search) params.set("search", search);
 
     try {
-      const response = await fetchCatalogue(`/api/accounts/listings?${params.toString()}`);
+      const response = await fetchCatalogue(`/api/accounts/listings?${params.toString()}`, controller.signal, { timeoutMs: SHARED_CATALOGUE_TIMEOUT_MS });
       const data = (await response.json()) as {
         configured?: boolean;
         partial?: boolean;
@@ -166,23 +170,27 @@ export function AccountsBrowser({ purchaseEnabled }: { purchaseEnabled: boolean 
       setLastChecked(data.checkedAt && Number.isFinite(Date.parse(data.checkedAt))
         ? new Date(data.checkedAt).toLocaleString() : null);
     } catch {
-      if (current === requestId.current) {
+      if (!controller.signal.aborted && current === requestId.current) {
         setError("Could not load accounts. Check your connection.");
         setListings([]);
         setMeta(null);
         setLastChecked(null);
       }
     } finally {
+      if (listingsRequest.current === controller) listingsRequest.current = null;
       if (current === requestId.current) setLoading(false);
     }
   }, [activeCategory, activeSubcategory, search, sort, page, inStockOnly]);
 
   useEffect(() => {
     const version = requestId;
+    const request = listingsRequest;
     const timer = setTimeout(() => void loadListings(), 0);
     return () => {
       clearTimeout(timer);
       version.current++;
+      request.current?.abort();
+      request.current = null;
     };
   }, [loadListings]);
 

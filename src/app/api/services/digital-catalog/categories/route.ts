@@ -1,7 +1,9 @@
 import { requireAuthApi } from "@/lib/identity/auth";
 import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import { catalogRateLimiter } from "@/lib/platform/rate-limit";
+import { retryAfterReset } from "@/lib/platform/retry-after";
 import { isFoxreloadConfigured, readFoxreloadBrowseCategories } from "@/lib/providers/foxreload";
+import { digitalCatalogueFailure } from "@/lib/services/foxreload/catalogue-failure";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -13,10 +15,11 @@ const labels: Record<string, string> = {
 export async function GET() {
   const user = await requireAuthApi();
   if (!user) return Response.json({ error: "Please sign in." }, { status: 401 });
-  if (financialActionsUnavailable() || !isFoxreloadConfigured()) return Response.json({ error: "Categories are unavailable right now." }, { status: 503 });
+  if (financialActionsUnavailable()) return Response.json({ error: "Categories are unavailable in this environment.", code: "environment" }, { status: 503, headers: { "Cache-Control": "private, no-store", "Retry-After": "60" } });
+  if (!isFoxreloadConfigured()) return Response.json({ error: "Categories are not connected yet.", code: "unconfigured" }, { status: 503, headers: { "Cache-Control": "private, no-store", "Retry-After": "60" } });
   const limit = await catalogRateLimiter(`digital-catalog-categories:${user.id}`);
-  if (limit.unavailable) return Response.json({ error: "Categories are temporarily unavailable." }, { status: 503 });
-  if (!limit.allowed) return Response.json({ error: "Too many requests. Try again shortly." }, { status: 429 });
+  if (limit.unavailable) return Response.json({ error: "Categories are temporarily unavailable." }, { status: 503, headers: { "Cache-Control": "private, no-store", "Retry-After": "30" } });
+  if (!limit.allowed) return Response.json({ error: "Too many requests. Try again shortly." }, { status: 429, headers: { "Cache-Control": "private, no-store", "Retry-After": retryAfterReset(limit.resetTime) } });
   try {
     const rows = await readFoxreloadBrowseCategories();
     const seen = new Set<string>();
@@ -31,5 +34,5 @@ export async function GET() {
       categories.push({ id: slug, name: labels[slug] ?? cleaned });
     }
     return Response.json({ ok: true, categories }, { headers: { "Cache-Control": "private, no-store" } });
-  } catch { return Response.json({ error: "Could not load categories. Try again later." }, { status: 503 }); }
+  } catch (error) { return digitalCatalogueFailure(error, "Could not load categories. Try again later."); }
 }

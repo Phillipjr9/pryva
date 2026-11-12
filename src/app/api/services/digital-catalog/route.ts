@@ -5,10 +5,12 @@ import { NextRequest } from "next/server";
 import { requireAuthApi } from "@/lib/identity/auth";
 import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import { catalogRateLimiter } from "@/lib/platform/rate-limit";
+import { retryAfterReset } from "@/lib/platform/retry-after";
 import { listedCodeOffers } from "@/lib/services/foxreload/code-orders";
 import { listedTopupOffers } from "@/lib/services/foxreload/topup-orders";
 import { listedEsimOffers } from "@/lib/services/foxreload/esim-orders";
 import { isFoxreloadConfigured, readFoxreloadBrowsePage } from "@/lib/providers/foxreload";
+import { digitalCatalogueFailure } from "@/lib/services/foxreload/catalogue-failure";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -17,7 +19,7 @@ export const maxDuration = 30;
 export async function GET(request: NextRequest) {
   const user = await requireAuthApi();
   if (!user) return Response.json({ error: "Please sign in." }, { status: 401 });
-  if (financialActionsUnavailable()) return Response.json({ error: "This catalogue is unavailable in this environment." }, { status: 503 });
+  if (financialActionsUnavailable()) return Response.json({ error: "This catalogue is unavailable in this environment.", code: "environment" }, { status: 503, headers: { "Cache-Control": "private, no-store", "Retry-After": "60" } });
   const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   const cursor = request.nextUrl.searchParams.get("cursor") ?? "";
   const category = request.nextUrl.searchParams.get("category") ?? "";
@@ -26,10 +28,10 @@ export async function GET(request: NextRequest) {
       (cursor && (cursor.length > 512 || /[\u0000-\u001f\u007f]/.test(cursor))) || (query && cursor) || !["all", "available"].includes(stock) || (category && !/^[a-z0-9][a-z0-9-]{0,127}$/i.test(category))) {
     return Response.json({ error: "Invalid catalogue request." }, { status: 400 });
   }
-  if (!isFoxreloadConfigured()) return Response.json({ error: "This catalogue is not connected yet." }, { status: 503 });
+  if (!isFoxreloadConfigured()) return Response.json({ error: "This catalogue is not connected yet.", code: "unconfigured" }, { status: 503, headers: { "Cache-Control": "private, no-store", "Retry-After": "60" } });
   const limit = await catalogRateLimiter(`digital-catalog:${user.id}`);
-  if (limit.unavailable) return Response.json({ error: "Catalogue temporarily unavailable." }, { status: 503 });
-  if (!limit.allowed) return Response.json({ error: "Too many requests. Try again shortly." }, { status: 429 });
+  if (limit.unavailable) return Response.json({ error: "Catalogue temporarily unavailable." }, { status: 503, headers: { "Cache-Control": "private, no-store", "Retry-After": "30" } });
+  if (!limit.allowed) return Response.json({ error: "Too many requests. Try again shortly." }, { status: 429, headers: { "Cache-Control": "private, no-store", "Retry-After": retryAfterReset(limit.resetTime) } });
   try {
     const page = await readFoxreloadBrowsePage({ query: query || undefined, cursor: cursor || undefined, ...(category ? { category } : {}), ...(stock === "available" ? { inStockOnly: true } : {}) });
     const items: { id: string; name: string; stock: "reported" | "out" | "unknown"; stockQuantity: number | null; artwork?: DigitalArtwork; reportedTerms?: ReportedGiftTerms; checkout?: "codes" | "topups" | "esims" }[] = [];
@@ -58,8 +60,8 @@ export async function GET(request: NextRequest) {
       items.push({ id: publicId, name, stock, stockQuantity: stock === "unknown" ? null : product.quantity as number, ...(artwork ? { artwork } : {}), ...(terms ? { reportedTerms: terms } : {}), ...(approved?.name === name ? { checkout: approved.kind } : {}) });
     }
     return Response.json({ ok: true, items, nextCursor: page.nextCursor, searchLimited: page.searchLimited, skipped: skipped > 0 }, { headers: { "Cache-Control": "private, no-store" } });
-  } catch {
+  } catch (error) {
     // Never relay upstream error bodies, which may contain account information.
-    return Response.json({ error: "Could not load the catalogue. Try again later." }, { status: 503, headers: { "Cache-Control": "private, no-store" } });
+    return digitalCatalogueFailure(error, "Could not load the catalogue. Try again later.");
   }
 }

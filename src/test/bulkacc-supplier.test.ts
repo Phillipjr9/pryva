@@ -275,6 +275,21 @@ describe("supplier client: money-spending safety", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("marks an expired local fallback stale for every concurrent waiter", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ data: {
+      items: [{ code: "1", name: "Facebook", price: 1, inStock: 4, min: 1 }],
+      totalCount: 1, totalPages: 1, pageIndex: 1, pageSize: 200,
+    } })).mockRejectedValue(new Error("connection down"));
+    vi.stubGlobal("fetch", fetchMock);
+    const first = await readBulkaccCatalog();
+    await vi.advanceTimersByTimeAsync(300_001);
+    const [fallback, concurrent] = await Promise.all([readBulkaccCatalog(), readBulkaccCatalog()]);
+    expect(fallback).toMatchObject({ products: first.products, checkedAt: first.checkedAt, stale: true });
+    expect(concurrent).toEqual(fallback);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("walks beyond the old 25-page cutoff and publishes only the complete catalogue", async () => {
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
       const page = Number(new URL(url).searchParams.get("pageIndex"));

@@ -137,6 +137,14 @@ describe("FoxReload client", () => {
     await expect(readFoxreloadBrowseCategories()).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
   });
 
+  it("preserves a read-only supplier throttle cooldown without retrying", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("Too many requests", {
+      status: 429, headers: { "Retry-After": "42" },
+    }));
+    await expect(readFoxreloadBrowsePage()).rejects.toMatchObject({ status: 429, retryAfterSeconds: 42 });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("uses the documented stock filter for browsing and search only when requested", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ items: [], nextCursor: null })));

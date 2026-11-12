@@ -7,6 +7,7 @@ const runtime = vi.hoisted(() => ({
   products: [] as Record<string, unknown>[],
   catalogError: null as Error | null,
   catalogPartial: false,
+  catalogStale: false,
   productError: null as Error | null,
   legacyListings: [] as Record<string, unknown>[],
   legacyPaged: false,
@@ -41,7 +42,7 @@ vi.mock("@/lib/providers/bulkacc", () => {
     readBulkaccCatalog: async () => {
       runtime.calls.listAllProducts += 1;
       if (runtime.catalogError) throw runtime.catalogError;
-      return { products: runtime.products, partial: runtime.catalogPartial, checkedAt: new Date().toISOString() };
+      return { products: runtime.products, partial: runtime.catalogPartial, stale: runtime.catalogStale, checkedAt: new Date().toISOString() };
     },
     getProduct: async (code: string) => {
       runtime.calls.getProduct += 1;
@@ -156,6 +157,7 @@ beforeEach(() => {
   runtime.products = [SPOTIFY, GMAIL, SOLD_OUT];
   runtime.catalogError = null;
   runtime.catalogPartial = false;
+  runtime.catalogStale = false;
   runtime.productError = null;
   runtime.legacyListings = [{
     id: 7, slug: "legacy-instagram", title: "Instagram account", price: "0.44",
@@ -272,6 +274,30 @@ describe("sourcing order", () => {
     expect(second.listings[0].slug).toBe("p2:legacy-instagram");
     expect(first.meta.total).toBe(second.meta.total);
     expect(first.meta.total).toBeGreaterThan(3);
+  });
+
+  it("never publishes an expired local fallback as a fresh combined catalogue", async () => {
+    runtime.catalogStale = true;
+    await expect(listMarketplaceListings()).rejects.toThrow("temporarily unavailable");
+  });
+
+  it("keeps the warm shared snapshot stale when a local fallback cannot refresh", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-12T12:00:00Z"));
+    try {
+      const initial = await listMarketplaceListings({ perPage: 60 });
+      runtime.catalogStale = true;
+      runtime.products = [];
+      await vi.advanceTimersByTimeAsync(300_001);
+      const stale = await listMarketplaceListings({ perPage: 60 });
+      expect(stale.stale).toBe(true);
+      await vi.advanceTimersByTimeAsync(0);
+      const stillStale = await listMarketplaceListings({ perPage: 60 });
+      expect(stillStale.stale).toBe(true);
+      expect(stillStale.checkedAt).toBe(initial.checkedAt);
+      expect(stillStale.meta.total).toBe(initial.meta.total);
+      expect(stillStale.listings.some((listing) => listing.slug.startsWith("p1:"))).toBe(true);
+    } finally { vi.useRealTimers(); }
   });
 
   it("keeps the last complete combined catalogue when a refresh fails", async () => {

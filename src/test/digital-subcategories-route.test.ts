@@ -19,6 +19,14 @@ describe("catalogue child categories", () => {
     mocks.rate.mockResolvedValueOnce({ allowed: false }); expect((await GET(request("?parent=games"))).status).toBe(429);
     expect(mocks.children).not.toHaveBeenCalled();
   });
+  it("includes the remaining cooldown on a throttled request", async () => {
+    const now = Date.now();
+    mocks.rate.mockResolvedValueOnce({ allowed: false, resetTime: now + 45_000 });
+    const response = await GET(request("?parent=games"));
+    expect(response.status).toBe(429);
+    expect(Number(response.headers.get("retry-after"))).toBeGreaterThanOrEqual(44);
+    expect(mocks.children).not.toHaveBeenCalled();
+  });
   it("sanitizes and paginates direct children", async () => {
     mocks.children.mockResolvedValueOnce({ rows: [{ slug: "topups-call-of-duty", name: "Call of Duty", price: "secret" }, { slug: "bad/slash", name: "Bad" }, { slug: "topups-call-of-duty", name: "Duplicate" }], nextCursor: "next" });
     const result = await GET(request("?parent=topups&name=Call%20of%20Duty&cursor=old"));

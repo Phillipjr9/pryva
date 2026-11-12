@@ -10,6 +10,7 @@ vi.mock("@/lib/services/foxreload/code-orders", () => ({ listedCodeOffers: mocks
 vi.mock("@/lib/services/foxreload/topup-orders", () => ({ listedTopupOffers: mocks.topupOffers }));
 vi.mock("@/lib/services/foxreload/esim-orders", () => ({ listedEsimOffers: mocks.esimOffers }));
 import { GET } from "@/app/api/services/digital-catalog/route";
+import { ProviderError } from "@/lib/providers/types";
 const request = (query = "") => new NextRequest(`https://example.test/api/services/digital-catalog${query}`);
 
 beforeEach(() => {
@@ -41,6 +42,26 @@ describe("read-only digital catalogue route", () => {
     mocks.rate.mockResolvedValueOnce({ allowed: false, unavailable: true }).mockResolvedValueOnce({ allowed: false });
     expect((await GET(request())).status).toBe(503);
     expect((await GET(request())).status).toBe(429);
+    expect(mocks.page).not.toHaveBeenCalled();
+  });
+  it("sends the rate-limit reset time instead of inviting immediate retries", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+    mocks.rate.mockResolvedValueOnce({ allowed: false, resetTime: 1_040_000 });
+    const response = await GET(request());
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("40");
+    expect(mocks.page).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+  it("identifies an unavailable environment or an unconnected catalogue without exposing configuration", async () => {
+    mocks.preview.mockReturnValueOnce(true);
+    const preview = await GET(request());
+    expect(preview.status).toBe(503);
+    expect(await preview.json()).toMatchObject({ code: "environment" });
+    mocks.configured.mockReturnValueOnce(false);
+    const unconfigured = await GET(request());
+    expect(unconfigured.status).toBe(503);
+    expect(await unconfigured.json()).toMatchObject({ code: "unconfigured" });
     expect(mocks.page).not.toHaveBeenCalled();
   });
   it("only returns names, reported stock state and hashed IDs, never costs or fulfillment data", async () => {
@@ -95,6 +116,20 @@ describe("read-only digital catalogue route", () => {
     ], nextCursor: null, searchLimited: false });
     const data = await (await GET(request())).json();
     expect(data.items.map((item: { name: string }) => item.name)).toEqual(["Real product"]);
+  });
+  it("preserves an upstream throttle without revealing its error text", async () => {
+    mocks.page.mockRejectedValueOnce(Object.assign(new ProviderError("secret provider details", { provider: "foxreload", status: 429 }), { retryAfterSeconds: 42 }));
+    const response = await GET(request());
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("42");
+    expect(await response.text()).not.toContain("secret");
+  });
+  it.each([401, 403])("treats supplier HTTP %s as a connection problem, not a shopper sign-in failure", async (status) => {
+    mocks.page.mockRejectedValueOnce(new ProviderError("private credential", { provider: "foxreload", status }));
+    const response = await GET(request());
+    expect(response.status).toBe(503);
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(await response.json()).toEqual({ error: "This catalogue is not connected right now.", code: "unconfigured" });
   });
   it("hides upstream errors", async () => {
     mocks.page.mockRejectedValueOnce(new Error("private provider secret"));
