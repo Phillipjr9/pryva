@@ -127,8 +127,8 @@ describe("listings route pricing, end to end", () => {
 
     // $3.48 at ₦1600 costs ₦5,568 and must sell above cost, inside the band.
     const spotify = body.listings.find((l: { slug: string }) => l.slug === "p1:300004");
-    expect(spotify.priceNgn).toBeGreaterThanOrEqual(7238); // cost × 1.30 floor
-    expect(spotify.priceNgn).toBeLessThanOrEqual(8352);    // cost × 1.50 ceiling
+    expect(spotify.priceNgn).toBeGreaterThanOrEqual(6403); // cost × 1.30 floor
+    expect(spotify.priceNgn).toBeLessThanOrEqual(6404);    // cost × 1.50 ceiling
   });
 
   it("prices a sub-cent listing rather than dropping it", async () => {

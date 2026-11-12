@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { cataloguePool, fetchCatalogue } from "@/lib/platform/catalog-fetch";
 import { parseDigitalArtwork } from "@/lib/content/digital-artwork";
 import type { ExplorerFilter, ExplorerItem } from "@/lib/services/service-explorer";
-import { digitalServiceFamily, DIGITAL_FAMILY_LABELS, type DigitalFamily } from "@/lib/services/digital-service-category";
+import { digitalServiceFamily, DIGITAL_FAMILY_LABELS } from "@/lib/services/digital-service-category";
 import { reportedGiftTerms } from "@/lib/services/gift-cards/reported-terms";
 
-type Root = { slug: string; category: ExplorerItem["category"]; label: string; icon: "esim" | "bulk" | "data" | "gift-cards" | "subscriptions" | "games" | "topups" | "prepaid"; giftCardsOnly?: boolean; allOnly?: boolean };
+type Root = { slug: string; familyShelf?: string; category: ExplorerItem["category"]; label: string; icon: "esim" | "bulk" | "data" | "gift-cards" | "subscriptions" | "games" | "topups" | "prepaid"; giftCardsOnly?: boolean; allOnly?: boolean };
 // Only known real product families. Test-order listings are not a customer shelf.
 const ROOTS: Root[] = [
   { slug: "esim", category: "esim", label: "Travel eSIM", icon: "esim" },
@@ -32,7 +33,7 @@ function rootsFor(category: ExplorerFilter): Root[] {
     const roots = ROOTS.filter((root) => root.category === category);
     // Also scan the whole catalogue for explicitly named gift cards which may
     // be filed under another family. This stream is cursor-paged like the rest.
-    return roots.length ? [...roots, ALL_PRODUCTS] : roots;
+    return category === "tools" || category === "email" ? roots : [...roots, ALL_PRODUCTS];
   }
   // Sample each shelf, plus a cursor-paged whole-catalogue stream so new or
   // unmapped families remain browsable in All services.
@@ -45,7 +46,7 @@ async function load(root: Root, query: string, cursor: string | undefined, signa
   if (query.length >= 2) params.set("q", query);
   else if (cursor) params.set("cursor", cursor);
   try {
-    const response = await fetch(`/api/services/digital-catalog?${params}`, { cache: "no-store", signal });
+    const response = await fetchCatalogue(`/api/services/digital-catalog?${params}`, signal);
     const data = await response.json().catch(() => null);
     if (!response.ok || !data?.ok || !Array.isArray(data.items) ||
         !(data.nextCursor === null || (typeof data.nextCursor === "string" && data.nextCursor.length <= 512 && data.nextCursor !== cursor))) throw new Error("Unavailable");
@@ -53,8 +54,7 @@ async function load(root: Root, query: string, cursor: string | undefined, signa
     for (const value of data.items) {
       if (!value || typeof value !== "object" || typeof value.id !== "string" || !/^digital-[a-f0-9]{24}$/.test(value.id) || typeof value.name !== "string" || !value.name || !["reported", "out", "unknown"].includes(value.stock)) continue;
       const checkout = value.checkout === "codes" || value.checkout === "topups" || value.checkout === "esims" ? value.checkout : null;
-      const family = digitalServiceFamily(value.name, checkout ?? undefined, root.slug)
-        ?? (!root.allOnly ? root.category as DigitalFamily : null);
+      const family = digitalServiceFamily(value.name, checkout ?? undefined, root.familyShelf ?? root.slug);
       if (root.giftCardsOnly && family !== "gift-cards") continue;
       const category = family ?? "tools";
       const label = family ? DIGITAL_FAMILY_LABELS[family] : "Digital product · category unconfirmed";
@@ -64,7 +64,7 @@ async function load(root: Root, query: string, cursor: string | undefined, signa
       const termDetails = [terms?.value ? `Reported value: ${terms.value.amount} ${terms.value.currency}` : null,
         terms?.country ? `Reported country: ${terms.country}` : null].filter(Boolean);
       items.push({ id: value.id, category, name: value.name, description: label, tag: label, ...(!family ? { allOnly: true } : {}),
-        artwork: { kind: "digital-product", art: parseDigitalArtwork(value.artwork) }, source: "catalog", coverage: "unconfirmed", stock: null, myUnits: null, price: null,
+        artwork: { kind: "digital-product", art: parseDigitalArtwork(value.artwork) }, source: "catalog", coverage: "unconfirmed", stock: typeof value.stockQuantity === "number" && Number.isSafeInteger(value.stockQuantity) && value.stockQuantity >= 0 ? value.stockQuantity : null, myUnits: null, price: null,
         detail: [`${value.stock === "reported" ? "Stock reported" : value.stock === "out" ? "Out of stock (reported)" : "Stock unknown"}`, ...termDetails, terms?.country ? "Redemption eligibility unconfirmed" : "region unconfirmed"].join(" · "), orderingPaused: !checkout || value.stock !== "reported", action: checkout && value.stock === "reported" ? { label: "Check price and availability", href: `/dashboard/digital-${checkout}?product=${encodeURIComponent(value.id)}` } : null });
     }
     return { root, items, next: data.nextCursor, limited: data.searchLimited === true, error: false };
@@ -82,7 +82,7 @@ export function useDigitalExplorer(enabled: boolean, category: ExplorerFilter, s
   const scope = `${enabled}:${category}:${catalogQuery}:${stockOnly}:${subcategory?.id ?? ""}:${revision}`;
   const [state, setState] = useState<State>({ scope: "", pages: [], loading: false, loadingMore: false });
   const [giftSearch, setGiftSearch] = useState<{ scope: string; page: Page } | null>(null);
-  const giftQuery = enabled && category !== "all" && ROOTS.some((root) => root.category === category) && !subcategory && query.length >= 2 ? query : "";
+  const giftQuery = enabled && category !== "all" && category !== "tools" && category !== "email" && !subcategory && query.length >= 2 ? query : "";
   const giftSearchScope = `${category}:${giftQuery}:${stockOnly}:${revision}`;
   const controllerRef = useRef<AbortController | null>(null);
   useEffect(() => {
@@ -104,20 +104,20 @@ export function useDigitalExplorer(enabled: boolean, category: ExplorerFilter, s
     const categoryRoots = rootsFor(category);
     const selectedRoot = subcategory && category === "all" ? ROOTS.find((root) => root.slug === subcategory.root) : categoryRoots[0];
     const chosen = subcategory
-      ? [{ ...(selectedRoot ?? { ...ALL_PRODUCTS, allOnly: true }), slug: subcategory.id, label: subcategory.name, giftCardsOnly: false }]
+      ? [{ ...(selectedRoot ?? { ...ALL_PRODUCTS, allOnly: true }), slug: subcategory.id, familyShelf: subcategory.root ?? selectedRoot?.slug, label: subcategory.name, giftCardsOnly: false }]
       : categoryRoots;
     const roots = enabled ? (globalSearch ? [ALL_PRODUCTS] : chosen) : [];
     if (roots.length) {
       const timer = setTimeout(() => {
         const results = new Map<string, Page>();
-        for (const root of roots) {
-          void load(root, catalogQuery, undefined, controller.signal, stockOnly).then((page) => {
+        void cataloguePool(roots, async (root) => {
+          await load(root, catalogQuery, undefined, controller.signal, stockOnly).then((page) => {
             if (controller.signal.aborted) return;
             results.set(root.slug, page);
             const pages = roots.flatMap((item) => results.has(item.slug) ? [results.get(item.slug)!] : []);
             setState({ scope, pages, loading: results.size < roots.length, loadingMore: false });
           });
-        }
+        }, controller.signal);
       }, catalogQuery ? 450 : 0);
       return () => { clearTimeout(timer); controller.abort(); };
     }
@@ -128,10 +128,13 @@ export function useDigitalExplorer(enabled: boolean, category: ExplorerFilter, s
   const loadMore = useCallback(async () => {
     const signal = controllerRef.current?.signal;
     if (!signal || signal.aborted || state.scope !== scope || state.loading || state.loadingMore || globalSearch) return;
-    const pending = state.pages.filter((page) => page.next && !page.error);
+    const pending = state.pages.filter((page) => page.next);
     if (!pending.length) return;
     setState((previous) => ({ ...previous, loadingMore: true }));
-    const nextPages = await Promise.all(pending.map((page) => load(page.root, "", page.next!, signal, stockOnly)));
+    const nextPages: Page[] = [];
+    await cataloguePool(pending, async (page) => {
+      nextPages.push(await load(page.root, "", page.next!, signal, stockOnly));
+    }, signal);
     if (signal.aborted) return;
     setState((previous) => {
       if (previous.scope !== scope) return previous;
@@ -154,6 +157,6 @@ export function useDigitalExplorer(enabled: boolean, category: ExplorerFilter, s
     seen.add(item.id); return true;
   });
   return { items, loading: current.loading || giftSearchLoading, loadingMore: current.loadingMore, error: current.pages.some((page) => page.error) || !!extra?.error,
-    limited: current.pages.some((page) => page.limited) || !!extra?.limited, hasMore: !globalSearch && current.pages.some((page) => !!page.next && !page.error),
+    limited: current.pages.some((page) => page.limited) || !!extra?.limited, hasMore: !globalSearch && current.pages.some((page) => !!page.next),
     loadMore, retry: () => setRevision((value) => value + 1) };
 }

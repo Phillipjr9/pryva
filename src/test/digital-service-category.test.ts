@@ -4,7 +4,28 @@ import { reviewedDigitalItems } from "@/lib/services/reviewed-digital-items";
 
 describe("product-purpose grouping, independent of supplier and delivery", () => {
   it.each([
+    ["Netflix account", "codes", "accounts"],
+    ["Aged Facebook account", "codes", "accounts"],
+    ["Instagram followers boost", "topups", "social"],
+    ["Telegram SMS verification", "codes", "verification"],
+    ["Residential proxies", "codes", "proxies"],
+    ["MTN mobile data bundle", "codes", "data"],
+    ["US virtual number rental", "codes", "numbers"],
+    ["Telegram Stars", "codes", "topups"],
     ["Disney+ 3 months", "codes", "subscriptions"],
+    ["NordVPN 12 months", "codes", "subscriptions"],
+    ["YouTube Music Family", "topups", "subscriptions"],
+    ["CapCut Pro 1 month", "topups", "subscriptions"],
+    ["Showmax 30 days", "codes", "subscriptions"],
+    ["HBO Max 1 month", "codes", "subscriptions"],
+    ["Google One 2TB", "codes", "subscriptions"],
+    ["Duolingo Super", "topups", "subscriptions"],
+    ["Grok Premium", "topups", "subscriptions"],
+    ["Cursor Pro", "codes", "subscriptions"],
+    ["Example app annual subscription", "codes", "subscriptions"],
+    ["Example subscription gift card", "codes", "gift-cards"],
+    ["PUBG Premium currency pack", "topups", "games"],
+    ["Unknown Premium product", "codes", null],
     ["Apple Music 1 month", "codes", "subscriptions"],
     ["Netflix 1 month", "codes", "subscriptions"],
     ["Telegram Premium 3 months", "topups", "subscriptions"],
@@ -33,4 +54,14 @@ describe("product-purpose grouping, independent of supplier and delivery", () =>
     expect(digitalServiceFamily("Free Fire diamonds", "topups", "topups")).toBe("games");
     expect(digitalServiceFamily("Generic title", undefined, "subscriptions")).toBe("subscriptions");
   });
+});
+
+it("keeps explicitly identified products in one family regardless of supplier shelf", () => {
+  for (const shelf of [undefined, "subscriptions", "games", "topups", "gift-cards", "prepaid-finance"]) {
+    expect(digitalServiceFamily("Netflix account", "codes", shelf)).toBe("accounts");
+    expect(digitalServiceFamily("Netflix Gift Card", "codes", shelf)).toBe("gift-cards");
+    expect(digitalServiceFamily("PUBG diamonds", "topups", shelf)).toBe("games");
+    expect(digitalServiceFamily("Telegram Stars", "codes", shelf)).toBe("topups");
+    expect(digitalServiceFamily("NordVPN 12 months", "codes", shelf)).toBe("subscriptions");
+  }
 });

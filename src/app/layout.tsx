@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { Analytics } from "@vercel/analytics/next";
 // One self-hosted variable font covers Jakarta's full weight range. The browser
 // loads only the character subsets it needs (including latin-ext for ₦).
 import "@fontsource-variable/plus-jakarta-sans";
@@ -103,6 +104,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <ServiceWorkerRegistration />
         <ToastProvider>{children}</ToastProvider>
         <SupportFloatButton />
+        <Analytics />
       </body>
     </html>
   );

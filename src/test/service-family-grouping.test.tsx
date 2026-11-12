@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { ServiceExplorer } from "@/components/dashboard/ServiceExplorer";
 import { EXPLORER_CATEGORIES, explorerCategory, mergeExplorerSources, type ExplorerItem } from "@/lib/services/service-explorer";
 import { SERVICE_IDS } from "@/lib/services/registry";
@@ -45,4 +45,27 @@ it("keeps all gift-card offers visible rather than hiding a more expensive suppl
     giftCardEquivalenceKey: "same-reviewed-terms" });
   render(<ServiceExplorer initialCountry="ng" initialCategory="gift-cards" reviewedItems={[gift("cheap", 1000), gift("other", 1200)]} />);
   expect(screen.getAllByRole("heading", { name: "Same gift card" })).toHaveLength(2);
+});
+
+it("explains the smaller number-plan shelf and opens app verification without changing country", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ ok: true, country: "ng", live: true, items: [] }) })));
+  render(<ServiceExplorer initialCountry="ng" initialCategory="numbers" />);
+  expect(screen.getByText(/App-specific SMS numbers are grouped under App verification/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Browse app-specific verification numbers" }));
+  expect(screen.getByRole("heading", { level: 1, name: "App verification" })).toBeTruthy();
+  expect(new URLSearchParams(window.location.search).get("country")).toBe("ng");
+});
+
+it("loads the live data catalogue inside the data category without unrelated feeds", async () => {
+  const fetchMock = vi.fn(async (url: string) => { void url; return ({ ok: true, json: async () => ({
+    plans: [{ id: "bundle-1", networkCode: "01", network: "MTN", name: "Live 1GB bundle", publishedAmountKobo: 50000 }],
+    checkedAt: "2026-11-11T20:00:00Z", stale: false, checkoutReason: "Checkout is being connected.",
+  }) }); });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<ServiceExplorer initialCountry="us" initialCategory="data" enableDigitalCatalogue />);
+  expect(await screen.findByRole("heading", { name: "Live 1GB bundle" })).toBeTruthy();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(fetchMock.mock.calls[0][0]).toBe("/api/airtime/plans");
+  expect(screen.queryByText(/Some live listings could not be loaded/)).toBeNull();
+  expect(screen.getByText(/Purchases are not available from this catalogue yet/)).toBeTruthy();
 });

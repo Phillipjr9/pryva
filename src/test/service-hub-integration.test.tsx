@@ -24,14 +24,14 @@ beforeEach(() => {
 describe("service hub destination pages", () => {
   it("does not display unverified data prices even on an old plan link", () => {
     const html = renderToStaticMarkup(<DataPlansForm user={user} initialPlanId="airtel-1gb" />);
-    expect(html).toContain("Data plans are not available yet");
+    expect(html).toContain("Loading current bundles");
     expect(html).not.toContain("Airtel 1GB");
     expect(html).not.toContain("MTN 1GB");
   });
 
   it("keeps data and subscription purchases disabled because neither can be delivered", () => {
     const data = renderToStaticMarkup(<DataPlansForm user={user} />);
-    expect(data).toContain("Data plans are not available yet");
+    expect(data).toContain("Loading current bundles");
     const digital = renderToStaticMarkup(<DigitalServicesForm user={user} service={getDigitalService("netflix")!} />);
     expect(digital).toContain("Digital subscriptions are not available yet");
     expect(digital).not.toContain("Save 51% vs monthly");
