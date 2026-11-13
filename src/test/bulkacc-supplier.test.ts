@@ -75,6 +75,19 @@ describe("supplier client: money-spending safety", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("distinguishes local and supplier rate limits without changing the public error code", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({}, 429));
+    vi.stubGlobal("fetch", fetchMock);
+    runtime.limit.mockResolvedValueOnce({ allowed: false, resetTime: Date.now() + 30_000 });
+    await expect(getProduct("1")).rejects.toMatchObject({ code: "rate_limit_exceeded", retryAfterSeconds: 30 });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(logged()).toContain("local_budget");
+    await expect(getProduct("1")).rejects.toMatchObject({ code: "rate_limit_exceeded" });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(logged()).toContain('"origin":"supplier"');
+    expect(logged()).not.toContain(API_KEY);
+  });
+
   it("pins the base URL so the key cannot be forwarded, and refuses redirects", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ data: 1 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -301,6 +314,38 @@ describe("supplier client: money-spending safety", () => {
     expect(complete.products).toHaveLength(27);
     expect(complete.partial).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(27);
+  });
+
+  it("backs off catalogue reads after a supplier 429 without retrying a purchase", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("{}", { status: 429, headers: { "Retry-After": "90" } }))
+      .mockResolvedValueOnce(jsonResponse({ data: { items: [{ code: "1", name: "Account", price: 1 }],
+        totalCount: 1, totalPages: 1, pageIndex: 1, pageSize: 200 } }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(readBulkaccCatalog()).rejects.toMatchObject({ code: "rate_limit_exceeded" });
+    await expect(readBulkaccCatalog()).rejects.toMatchObject({ code: "rate_limit_exceeded", retryAfterSeconds: 90 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect((await readBulkaccCatalog()).products).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns a completed walk with bad rows as explicitly partial", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ data: {
+      items: [{ code: "1", name: "Good", price: 1 }, { code: "2", name: "Bad", price: null }],
+      totalCount: 2, totalPages: 1, pageIndex: 1, pageSize: 200,
+    } })));
+    const result = await readBulkaccCatalog();
+    expect(result).toMatchObject({ partial: true, skipped: 1, products: [{ code: "1" }] });
+  });
+
+  it("does not mistake a short page with a malformed row for a complete walk", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ data: {
+      items: [{ code: "1", name: "Good", price: 1 }, { code: "2", name: "Bad", price: null }],
+      totalCount: 3, totalPages: 1, pageIndex: 1, pageSize: 200,
+    } })));
+    await expect(readBulkaccCatalog()).rejects.toMatchObject({ code: "bad_response" });
   });
 
   it("does not call a failed logical response an empty healthy catalogue", async () => {

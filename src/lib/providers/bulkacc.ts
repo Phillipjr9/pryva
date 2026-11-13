@@ -38,6 +38,7 @@
 import "server-only";
 import { createRateLimiter } from "@/lib/platform/rate-limit";
 import { logger } from "@/lib/platform/logger";
+import { retryAfterDelayMs } from "@/lib/platform/retry-after";
 import { usdMicros, usdStringFromMicros, SupplierMoneyError } from "@/lib/payments/supplier-money";
 import { ProviderError } from "@/lib/providers/types";
 
@@ -123,6 +124,9 @@ export type BulkaccProductPage = {
   pageIndex: number;
   pageSize: number;
   totalPages: number;
+  /** Raw and rejected rows are counted separately from sellable products. */
+  rawCount: number;
+  skipped: number;
 };
 
 function toPositiveIntOrNull(value: unknown): number | null {
@@ -184,7 +188,12 @@ async function request(
 
   const budget = await supplierBudget("bulkacc:shared-key-budget");
   if (budget.unavailable) throw new BulkaccError("Supplier rate limit is unavailable", "rate_limit_unavailable", 503);
-  if (!budget.allowed) throw new BulkaccError("Marketplace is busy", "rate_limit_exceeded", 429);
+  if (!budget.allowed) {
+    const retryAfter = Number.isFinite(budget.resetTime)
+      ? Math.max(1, Math.ceil((budget.resetTime - Date.now()) / 1000)) : 60;
+    logger.warn("Supplier request rate limited", { path: safePath(path), origin: "local_budget", retryAfterSeconds: retryAfter });
+    throw new BulkaccError("Marketplace is busy", "rate_limit_exceeded", 429, retryAfter);
+  }
 
   const url = new URL(`${baseUrl()}${path}`);
   url.searchParams.set("apiKey", key);
@@ -215,8 +224,8 @@ async function request(
     clearTimeout(timeout);
   }
 
-  const retryAfterHeader = response.headers.get("retry-after");
-  const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : undefined;
+  const retryDelay = retryAfterDelayMs(response.headers.get("retry-after"));
+  const retryAfterSeconds = retryDelay === null ? undefined : Math.max(1, Math.ceil(retryDelay / 1000));
   const text = await response.text().catch(() => "");
 
   let envelope: Envelope | null = null;
@@ -231,7 +240,8 @@ async function request(
     const code = response.status === 429 ? "rate_limit_exceeded"
       : response.status === 401 || response.status === 403 ? "auth_failed"
       : "http_error";
-    logger.warn("Supplier request failed", { path: safePath(path), status: response.status, code });
+    logger.warn("Supplier request failed", { path: safePath(path), status: response.status, code,
+      ...(response.status === 429 ? { origin: "supplier" } : {}) });
     throw new BulkaccError(
       code === "auth_failed" ? "Marketplace credentials were rejected" : "Marketplace request failed",
       code,
@@ -274,14 +284,23 @@ const MAX_CATALOG_PAGES = 100;
 const CATALOG_PAGE_SIZE = 200;
 const CATALOG_CRAWL_DEADLINE_MS = 30_000;
 
-export type BulkaccCatalog = { products: BulkaccProduct[]; partial: boolean; checkedAt: string; stale?: boolean };
+export type BulkaccCatalog = {
+  products: BulkaccProduct[]; partial: boolean; checkedAt: string; stale?: boolean;
+  /** A full page walk with malformed rows omitted, not an interrupted crawl. */
+  skipped?: number;
+};
 type CacheEntry = { value: BulkaccCatalog; expiresAt: number };
 let catalogCache: CacheEntry | null = null;
 let catalogPending: Promise<BulkaccCatalog> | null = null;
+// A read-only crawl must not immediately restart after a 429. This cooldown is
+// per instance; the shared candidate snapshot separately limits cross-instance
+// retry frequency. It does not block purchases or retry any spending request.
+let catalogRetryAt = 0;
 
 export function clearBulkaccCache(): void {
   catalogCache = null;
   catalogPending = null;
+  catalogRetryAt = 0;
 }
 
 /** One page of the product list. */
@@ -322,6 +341,8 @@ export async function listProducts(pageIndex = 1, pageSize = CATALOG_PAGE_SIZE):
     pageIndex: toPositiveIntOrNull(data?.pageIndex) ?? pageIndex,
     pageSize: toPositiveIntOrNull(data?.pageSize) ?? pageSize,
     totalPages: toPositiveIntOrNull(data?.totalPages) ?? 1,
+    rawCount: rawItems.length,
+    skipped: rawItems.length - items.length,
   };
 }
 
@@ -334,9 +355,15 @@ export async function listProducts(pageIndex = 1, pageSize = CATALOG_PAGE_SIZE):
 export async function readBulkaccCatalog(): Promise<BulkaccCatalog> {
   if (catalogCache && Date.now() < catalogCache.expiresAt) return catalogCache.value;
   if (catalogPending) return catalogPending;
+  if (catalogRetryAt > Date.now()) {
+    if (catalogCache) return { ...catalogCache.value, stale: true };
+    throw new BulkaccError("Marketplace is busy", "rate_limit_exceeded", 429, Math.ceil((catalogRetryAt - Date.now()) / 1000));
+  }
   const pending = (async () => {
     const products: BulkaccProduct[] = [];
     const seen = new Set<string>();
+    let rawCount = 0;
+    let skipped = 0;
     const checkedAt = new Date().toISOString();
     const deadline = Date.now() + CATALOG_CRAWL_DEADLINE_MS;
     for (let page = 1; page <= MAX_CATALOG_PAGES; page++) {
@@ -345,6 +372,8 @@ export async function readBulkaccCatalog(): Promise<BulkaccCatalog> {
       if (result.pageIndex !== page || result.totalPages < page || result.totalPages > MAX_CATALOG_PAGES) {
         throw new BulkaccError("Catalogue pagination stalled", "bad_response", 502);
       }
+      rawCount += result.rawCount;
+      skipped += result.skipped;
       let added = 0;
       for (const product of result.items) {
         if (seen.has(product.code)) continue;
@@ -353,17 +382,28 @@ export async function readBulkaccCatalog(): Promise<BulkaccCatalog> {
         added++;
       }
       if (page >= result.totalPages) {
-        if (products.length < result.totalCount) {
+        // Raw row count only proves pagination was not short. A skipped row is
+        // still an incomplete catalogue and must never replace a good snapshot.
+        if (rawCount < result.totalCount || (skipped === 0 && products.length < result.totalCount)) {
           throw new BulkaccError("Catalogue is incomplete", "bad_response", 502);
         }
-        const value = { products, partial: false, checkedAt };
-        catalogCache = { value, expiresAt: Date.now() + CATALOG_TTL_MS };
+        const value: BulkaccCatalog = { products, partial: skipped > 0, checkedAt, ...(skipped ? { skipped } : {}) };
+        // A later bad feed must not erase the last complete local fallback.
+        if (!skipped || !catalogCache || catalogCache.value.partial) {
+          catalogCache = { value, expiresAt: Date.now() + (skipped ? 30_000 : CATALOG_TTL_MS) };
+        }
         return value;
       }
       if (!added) throw new BulkaccError("Catalogue pagination stalled", "bad_response", 502);
     }
     throw new BulkaccError("Catalogue exceeds the pagination safety bound", "bad_response", 502);
   })().catch((error: unknown) => {
+    if (error instanceof BulkaccError && error.code === "rate_limit_exceeded") {
+      const delay = error.retryAfterSeconds;
+      const seconds = typeof delay === "number" && Number.isFinite(delay) && delay > 0
+        ? Math.ceil(delay) : 60;
+      catalogRetryAt = Math.min(Number.MAX_SAFE_INTEGER, Date.now() + seconds * 1000);
+    }
     // Keep the last complete local value, but mark it so a caller cannot
     // republish this expired fallback as a newly refreshed shared snapshot.
     // The fallback is inside the coalesced promise: all waiters see the same result.

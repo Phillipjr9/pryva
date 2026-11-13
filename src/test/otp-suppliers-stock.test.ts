@@ -83,6 +83,26 @@ describe("otp stock aggregation", () => {
     expect(read.offers).toMatchObject([{ supplier: "bitcall", ref: "us-whatsapp-pool", country: "us", app: "WhatsApp", stock: 9 }]);
   });
 
+  it("quarantines a conflicting country row while retaining unambiguous offers as partial", async () => {
+    bitcall.configured.mockReturnValue(true);
+    bitcall.listCountryEntries.mockResolvedValue([
+      { countryCode: "US_1", name: "United States" },
+      { countryCode: "US_2", name: "France" },
+    ]);
+    bitcall.listServices.mockResolvedValue([{
+      name: "WhatsApp", countryCode: null,
+      offers: [{ serviceId: "safe", price: 500, currency: "NGN", availableCount: 9 }],
+    }]);
+    const { readOtpOffersForSupplier, clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");
+    clearOtpCatalogueCache();
+    const read = await readOtpOffersForSupplier("bitcall", "us", "United States");
+    expect(read).toMatchObject({ partial: true, degraded: "outage", errorCode: "SERVICE_RESPONSE_INVALID", offers: [{ ref: "safe" }] });
+    expect(bitcall.listServices).toHaveBeenCalledExactlyOnceWith({ countryCode: "US_1" }, { signal: expect.any(AbortSignal) });
+    // Partial reads must not enter the healthy cache.
+    await readOtpOffersForSupplier("bitcall", "us", "United States");
+    expect(bitcall.listServices).toHaveBeenCalledTimes(2);
+  });
+
   it("does not invent a provider code when the selected country is absent", async () => {
     bitcall.configured.mockReturnValue(true);
     const { readOtpOffersForSupplier, clearOtpCatalogueCache } = await import("@/lib/services/numbers/otp-suppliers");

@@ -680,13 +680,26 @@ The browse snapshot refreshes after five minutes. Once a good payload exists,
 an expired read returns it immediately with stale:true while one leaseholder
 refreshes in the background (registered with Vercel waitUntil). Other instances
 do not duplicate the crawl. A failed warm refresh has a 30-second retry
-cooldown. On a cold start with no good payload, concurrent readers wait up to
-30 seconds for the leaseholder, then receive HTTP 503 rather than a partial
-catalogue. Supplier crawls have a 30-page-time deadline plus each request's own
-20-second timeout, and the listing/category functions have a 60-second limit.
+cooldown. On a cold start, a separate candidate may serve a complete walk from
+one healthy source as partial if another is down. A walk that finished but
+skipped malformed products is also partial and never replaces the complete
+snapshot. If no usable candidate exists, readers receive HTTP 503. The primary
+crawl has a 30-second deadline and each request has a 20-second timeout; account
+listing/category functions have a 60-second limit.
 
-partial:false now means the stored walk completed; stale:true means it is an
-older complete walk. Neither flag is a stock guarantee. Checkout still reads
+Account supplier requests share a 30-per-minute local budget across reads and
+purchases. "Supplier request rate limited" with origin local_budget identifies a
+local refusal; "Supplier request failed" with status 429 and origin supplier is
+an actual upstream refusal. An instance delays further catalogue crawls after a
+429, respecting Retry-After when available, without retrying purchases. This
+cooldown is per instance, not a distributed provider cooldown. The candidate is
+shared for 30 seconds, but interrupted walks still restart at page one: a walk
+requiring more than the shared budget can remain unavailable. Do not increase
+the budget blindly or delete a good snapshot; a durable, consistency-checked
+resumable crawl is still needed for larger catalogues.
+
+partial:false means the stored walk completed without rejected products;
+stale:true means it is an older walk. Neither flag is a stock guarantee. Checkout still reads
 the selected product directly and rechecks live price, quantity and stock. Do
 not replace those reads with the snapshot, and never automatically retry an
 ambiguous paid supplier order.

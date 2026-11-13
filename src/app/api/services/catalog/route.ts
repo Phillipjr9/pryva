@@ -145,13 +145,14 @@ export async function GET(request: NextRequest) {
       otpRetryAfter = read.retryAfterSeconds ?? 60;
     }
     if (read.errorCode && read.offers.length === 0) throw otpCatalogProviderError(read.errorCode);
-    return { offers: read.offers, partial: read.partial ?? false, degraded: read.degraded ?? null, fetchedAt: read.fetchedAt ?? null };
+    return { offers: read.offers, partial: read.partial ?? false, degraded: read.degraded ?? null,
+      fetchedAt: read.fetchedAt ?? null, countryConflict: read.errorCode === "SERVICE_RESPONSE_INVALID" };
   });
 
   let supplier: Source<Awaited<ReturnType<typeof readSupplierSnapshot>>> | null = null;
   let boost: Source<Awaited<ReturnType<typeof readBoostSnapshot>>> | null = null;
   let esim: Source<Awaited<ReturnType<typeof readEsimCatalog>>> | null = null;
-  let otp: Source<{ offers: Awaited<ReturnType<typeof readOtpOffersForSupplier>>["offers"]; partial: boolean; degraded: "funding" | "outage" | null; fetchedAt: string | null; }> | null = null;
+  let otp: Source<{ offers: Awaited<ReturnType<typeof readOtpOffersForSupplier>>["offers"]; partial: boolean; degraded: "funding" | "outage" | null; fetchedAt: string | null; countryConflict: boolean; }> | null = null;
 
   [supplier, boost, esim, otp] = await Promise.all([
     (!requestedFeed || requestedFeed === "numbers") ? readSocial() : null,
@@ -244,7 +245,7 @@ export async function GET(request: NextRequest) {
 
   const items = [
     ...(supplier?.snapshot ? supplierItemsForCountry(supplier.snapshot, country.code) : []),
-    ...(otp?.snapshot ? bitcallOtpItemsForCountry(otp.snapshot.offers, country.code, country.name) : []),
+    ...(otp?.snapshot ? bitcallOtpItemsForCountry(otp.snapshot.offers, country.code, country.name, !otp.snapshot.countryConflict) : []),
     ...(esim?.snapshot ? esimItemsForCountry(esim.snapshot.listings, country.code) : []),
     ...(boost?.snapshot ? boostItems(boost.snapshot) : []),
   ];

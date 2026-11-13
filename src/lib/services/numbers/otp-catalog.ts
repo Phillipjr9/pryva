@@ -41,6 +41,7 @@ export function bitcallOtpItemsForCountry(
   offers: OtpOffer[],
   countryCode: string,
   countryName: string,
+  allowCheckout = true,
 ): ExplorerItem[] {
   const country = explorerCountry(countryCode);
   if (!country) return [];
@@ -75,14 +76,15 @@ export function bitcallOtpItemsForCountry(
     for (const [index, offer] of candidates.entries()) {
       const label = readableLabel(offer.app) ?? "Verification number";
       const id = otpOfferPublicId(country.code, offer.ref, offer.app);
-      const sellable = plan !== null && canSell(plan, offer);
+      const sellable = allowCheckout && plan !== null && canSell(plan, offer);
       const brand = appBrand(label);
       items.push({
         id,
         category: "verification",
         name: label,
-        description: plan
-          ? "Live app-specific number offer"
+        description: !allowCheckout
+          ? "Live stock listing · purchasing is temporarily unavailable"
+          : plan ? "Live app-specific number offer"
           : "Live stock listing · purchasing is locked for this country",
         tag: brand?.tag ?? "Other",
         artwork: brand ? { kind: "brand", name: brand.brand } : verificationArtwork(label),

@@ -331,7 +331,7 @@ function fromAccsZone(listing: {
 }
 
 /** Whole primary catalog, or null when the primary cannot serve it. */
-async function primaryListings(): Promise<{ listings: MarketplaceListing[]; partial: boolean; stale: boolean; checkedAt: string } | null> {
+async function primaryListings(): Promise<{ listings: MarketplaceListing[]; partial: boolean; skipped: number; stale: boolean; checkedAt: string } | null> {
   if (!isBulkaccConfigured()) return null;
   try {
     const snapshot = await readBulkaccCatalog();
@@ -339,7 +339,7 @@ async function primaryListings(): Promise<{ listings: MarketplaceListing[]; part
       const listing = toListing(product);
       return { ...listing, browseGroup: browseGroupFor(listing) };
     });
-    return { listings, partial: snapshot.partial, stale: snapshot.stale === true, checkedAt: snapshot.checkedAt };
+    return { listings, partial: snapshot.partial, skipped: snapshot.skipped ?? 0, stale: snapshot.stale === true, checkedAt: snapshot.checkedAt };
   } catch (error) {
     // A primary catalog failure is exactly when the fallback earns its place.
     logger.warn("Primary account catalog unavailable, falling back", {
@@ -428,7 +428,10 @@ async function buildCandidateCatalog(config: BrowseConfiguration): Promise<Brows
   const secondary = secondaryResult.status === "fulfilled" ? secondaryResult.value : null;
   // Never publish an incomplete pagination walk. A complete but older local
   // fallback may be browsed, but its original time and stale marker must survive.
-  const usablePrimary = primary && primary.partial === false && typeof primary.checkedAt === "string" && Number.isFinite(Date.parse(primary.checkedAt)) ? primary : null;
+  // Only a completed page walk with explicitly rejected products may be served
+  // as partial; an interrupted or otherwise incomplete walk remains unusable.
+  const usablePrimary = primary && (!primary.partial || (primary.skipped > 0 && primary.listings.length > 0)) &&
+    typeof primary.checkedAt === "string" && Number.isFinite(Date.parse(primary.checkedAt)) ? primary : null;
   const usableSecondary = secondary && typeof secondary.checkedAt === "string" && Number.isFinite(Date.parse(secondary.checkedAt)) ? secondary : null;
   if (config.primary && !usablePrimary) logger.warn("Account catalogue source unavailable", {
     source: "primary", reason: primaryResult.status === "rejected" && primaryResult.reason instanceof CatalogueReadTimeout
@@ -439,7 +442,7 @@ async function buildCandidateCatalog(config: BrowseConfiguration): Promise<Brows
   });
   if ((config.primary || config.secondary) && !usablePrimary && !usableSecondary) return null;
 
-  const partial = (config.primary && !usablePrimary) || (config.secondary && !usableSecondary);
+  const partial = (config.primary && (!usablePrimary || usablePrimary.partial)) || (config.secondary && !usableSecondary);
   return {
     listings: [...(usablePrimary?.listings ?? []), ...(usableSecondary?.listings ?? [])],
     checkedAt: [usablePrimary?.checkedAt, usableSecondary?.checkedAt]

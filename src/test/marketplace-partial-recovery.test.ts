@@ -9,6 +9,7 @@ import * as schema from "@/db/schema";
 const state = vi.hoisted(() => ({
   db: undefined as unknown,
   primaryError: false,
+  primarySkipped: 0,
   secondaryError: false,
   primaryGate: null as Promise<void> | null,
   primaryReads: 0,
@@ -27,7 +28,7 @@ vi.mock("@/lib/providers/bulkacc", () => ({
     state.primaryReads++;
     if (state.primaryGate) await state.primaryGate;
     if (state.primaryError) throw new Error("private primary failure");
-    return { partial: false, checkedAt: new Date().toISOString(), products: [{
+    return { partial: state.primarySkipped > 0, skipped: state.primarySkipped, checkedAt: new Date().toISOString(), products: [{
       code: "100", name: "Facebook account", groupName: "Facebook", categoryName: "Facebook",
       inStock: 12, min: 1, priceUsd: "1.000000",
     }] };
@@ -69,7 +70,7 @@ beforeAll(async () => {
 afterAll(async () => { await pg.close(); });
 beforeEach(async () => {
   vi.stubEnv("DATABASE_URL", "postgres://embedded-test/db");
-  state.primaryError = false; state.secondaryError = false; state.primaryGate = null;
+  state.primaryError = false; state.primarySkipped = 0; state.secondaryError = false; state.primaryGate = null;
   state.primaryReads = 0; state.secondaryReads = 0;
   clearMarketplaceCatalogCache();
   await database.delete(schema.catalogSnapshots);
@@ -124,6 +125,18 @@ describe("account catalogue partial recovery through the shared database", () =>
     expect(recovered.listings.map((listing: { title: string }) => listing.title).sort()).toEqual(["Facebook account", "Instagram account"]);
     expect(readAccountListings(recovered)?.incomplete).toBe(false);
     expect((await rows()).find((row) => row.key === "accounts:v2:true:true")?.payload).toMatchObject({ partial: false });
+  });
+
+  it("serves a completed walk with rejected rows as partial without publishing it as complete", async () => {
+    state.primarySkipped = 1;
+    state.secondaryError = true;
+    const response = await getListings(listingRequest());
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ partial: true, listings: [{ slug: "p1:100" }] });
+    const current = await rows();
+    expect(current.find((row) => row.key === "accounts:v2:true:true")?.payload).toBeNull();
+    expect(current.find((row) => row.key === "accounts:candidate:v1:true:true")?.payload).toMatchObject({ catalog: { partial: true } });
   });
 
   it("never overwrites a last complete snapshot when a later source fails", async () => {

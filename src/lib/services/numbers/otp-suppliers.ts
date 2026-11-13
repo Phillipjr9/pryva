@@ -202,8 +202,10 @@ function withBudget<T>(work: (signal: AbortSignal) => Promise<T>, ms: number): P
 /** Reads one supplier's catalogue. Throws when it cannot be read. */
 async function fetchOffers(
   supplier: OtpSupplierId, country: string, regionName: string, signal?: AbortSignal, refresh = false,
-): Promise<OtpOffer[]> {
-  return supplier === "fleexa" ? fleexaOffers(country, regionName) : bitcallOffers(country, regionName, signal, refresh);
+): Promise<{ offers: OtpOffer[]; partial: boolean }> {
+  return supplier === "fleexa"
+    ? { offers: await fleexaOffers(country, regionName), partial: false }
+    : bitcallOffers(country, regionName, signal, refresh);
 }
 
 function mergeOtpOffer(existing: OtpOffer, next: OtpOffer): OtpOffer {
@@ -291,10 +293,11 @@ export function bitcallDeclaredCountryMatches(value: string, country: string, re
 }
 
 /** Never build a provider country identifier: send back only one it published. */
-function bitcallCodesForCountry(entries: BitcallOtpCountryEntry[], country: string, regionName: string): string[] {
+function bitcallCodesForCountry(entries: BitcallOtpCountryEntry[], country: string, regionName: string): { codes: string[]; partial: boolean } {
   const target = normalizeCountryCode(country);
-  if (!target) return [];
+  if (!target) return { codes: [], partial: false };
   const codes = new Set<string>();
+  let partial = false;
   for (const entry of entries) {
     const code = entry.countryCode?.trim();
     if (!code || code.length > 100) continue;
@@ -303,18 +306,21 @@ function bitcallCodesForCountry(entries: BitcallOtpCountryEntry[], country: stri
     const byName = bitcallCountryNameIso(name);
     const namedTarget = byName === target || (!!name && name.toLocaleLowerCase() === regionName.trim().toLocaleLowerCase());
     if (byCode && byName && byCode !== byName && (byCode === target || byName === target)) {
-      throw new BitcallError("Conflicting OTP country metadata", 502, "SERVICE_RESPONSE_INVALID");
+      // Log only recognized ISO codes, not raw supplier-controlled text.
+      logger.warn("Conflicting OTP country metadata", { requested: target, codeCountry: byCode, nameCountry: byName });
+      partial = true;
+      continue;
     }
     if (byCode === target || (!byCode && namedTarget)) codes.add(code);
   }
   // A malformed upstream response must not turn a single browse into an
   // unbounded fan-out; never silently present a truncated read as complete.
   if (codes.size > 10) throw new BitcallError("Too many OTP country filters", 502, "CATALOGUE_INCOMPLETE");
-  return [...codes];
+  return { codes: [...codes], partial };
 }
 
-async function bitcallOffers(country: string, regionName: string, signal?: AbortSignal, refresh = false): Promise<OtpOffer[]> {
-  if (!isBitcallConfigured()) return [];
+async function bitcallOffers(country: string, regionName: string, signal?: AbortSignal, refresh = false): Promise<{ offers: OtpOffer[]; partial: boolean }> {
+  if (!isBitcallConfigured()) return { offers: [], partial: false };
   if (bitcallCatalogueRetryAt > Date.now()) {
     throw new BitcallError("OTP catalogue is cooling down", 429, "LOCAL_RATE_BUDGET", null, [],
       Math.ceil((bitcallCatalogueRetryAt - Date.now()) / 1000));
@@ -322,7 +328,7 @@ async function bitcallOffers(country: string, regionName: string, signal?: Abort
 
   const countries = await bitcallCountries(refresh);
   if (signal?.aborted) throw new BitcallError("OTP catalogue read expired", 502, "CATALOGUE_INCOMPLETE");
-  const codes = bitcallCodesForCountry(countries, country, regionName);
+  const { codes, partial } = bitcallCodesForCountry(countries, country, regionName);
   const seen = new Map<string, { app: string | null; entry: BitcallOtpOffer }>();
 
   // The documented country_code filter makes each pool in the response an
@@ -364,7 +370,7 @@ async function bitcallOffers(country: string, regionName: string, signal?: Abort
   const rates = await supplierNgnRates([...seen.values()].flatMap(({ entry }) =>
     entry.currency && entry.price !== null && entry.price > 0 ? [entry.currency] : [],
   ));
-  return [...seen.entries()].map(([ref, { app, entry }]) => ({
+  const offers = [...seen.entries()].map(([ref, { app, entry }]) => ({
     supplier: "bitcall" as const,
     ref,
     country,
@@ -373,6 +379,7 @@ async function bitcallOffers(country: string, regionName: string, signal?: Abort
       ? supplierAmountWithRates(entry.price, entry.currency, rates) : null,
     stock: entry.availableCount,
   }));
+  return { offers, partial };
 }
 
 /**
@@ -457,12 +464,16 @@ export async function readOtpOffersForSupplier(
 
   const load = async (): Promise<OtpOfferRead> => {
     try {
-      const offers = rankWithinSupplier(await withBudget((signal) => fetchOffers(supplier, country, regionName, signal, refresh), budgetMs));
+      const result = await withBudget((signal) => fetchOffers(supplier, country, regionName, signal, refresh), budgetMs);
+      const offers = rankWithinSupplier(result.offers);
       const at = Date.now();
       // An older request, or one started before cache invalidation, must not
       // overwrite a later checkout/refresh result.
-      if (latestCatalogueRead.get(key) === sequence) catalogueCache.set(key, { at, offers });
-      return { offers, errorCode: null, partial: false, degraded: null, stale: false, fetchedAt: new Date(at).toISOString() };
+      if (!result.partial && latestCatalogueRead.get(key) === sequence) catalogueCache.set(key, { at, offers });
+      // Fail checkout closed on a partial directory; browsing can still show the
+      // unambiguous offers with a clear incomplete flag.
+      return { offers, errorCode: result.partial ? "SERVICE_RESPONSE_INVALID" : null, partial: result.partial,
+        degraded: result.partial ? "outage" : null, stale: false, fetchedAt: new Date(at).toISOString() };
     } catch (error) {
       const retryAfterSeconds = bitcallCatalogueCooldown(error);
       const stale = cached && Date.now() - cached.at < CATALOGUE_TTL_MS * 3 ? cached.offers : null;
@@ -511,7 +522,8 @@ export async function otpSupplierProbe(
 ): Promise<{ offers: OtpOffer[]; errorCode: string | null }> {
   if (!otpSupplierConfigured(supplier)) return { offers: [], errorCode: "NOT_CONFIGURED" };
   try {
-    return { offers: rankWithinSupplier(await withBudget((signal) => fetchOffers(supplier, country, regionName, signal, true), CATALOGUE_BUDGET_MS)), errorCode: null };
+    const result = await withBudget((signal) => fetchOffers(supplier, country, regionName, signal, true), CATALOGUE_BUDGET_MS);
+    return { offers: rankWithinSupplier(result.offers), errorCode: result.partial ? "SERVICE_RESPONSE_INVALID" : null };
   } catch (error) {
     bitcallCatalogueCooldown(error);
     return { offers: [], errorCode: errorCodeOf(error) };
