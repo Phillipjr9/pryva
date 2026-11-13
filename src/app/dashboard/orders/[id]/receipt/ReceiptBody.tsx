@@ -1,4 +1,3 @@
-import { BrandMark } from "@/components/brand/BrandLockup";
 import { formatNaira } from "@/lib/services/catalog";
 import {
   RECEIPT_DOCUMENT_TITLE,
@@ -10,6 +9,7 @@ import {
   receiptStatusNote,
   receiptStatusTone,
   type ReceiptData,
+  type ReceiptLedgerAmount,
 } from "@/lib/payments/receipt";
 
 /**
@@ -19,11 +19,9 @@ import {
  * test can print it without a database. Nothing here reads `provider` -- the field
  * exists on the row and must never reach a customer, least of all on paper.
  *
- * The layout is a paid invoice, not a list of key/value pairs: a letterhead, a
- * billed-to block, a dated document number, one priced item, a single total, and a
- * footnote that says what the document is not. That order is what a bank clerk,
- * an accountant or a customs officer looks for, and putting the reference in the
- * letterhead means a photocopy still identifies itself if the bottom half is lost.
+ * The document distinguishes the order amount from its recorded wallet activity.
+ * It is called a payment receipt only when the charge is recorded consistently;
+ * otherwise it is an order record and does not claim a payment took place.
  *
  * `print-document` is load-bearing: globals.css hides the rest of the app for
  * print and drops this element's card chrome, so the sheet that comes out of the
@@ -35,13 +33,19 @@ const TONE_CLASS: Record<ReturnType<typeof receiptStatusTone>, string> = {
   settled: "border-emerald-200 bg-emerald-50 text-emerald-900",
   pending: "border-amber-200 bg-amber-50 text-amber-900",
   reversed: "border-line bg-cream-2 text-ink-2",
+  closed: "border-line bg-cream-2 text-ink-2",
 };
 
 const TONE_DOT: Record<ReturnType<typeof receiptStatusTone>, string> = {
   settled: "bg-emerald-500",
   pending: "bg-amber-500",
   reversed: "bg-ink-3",
+  closed: "bg-ink-3",
 };
+
+function ledgerAmount(value: ReceiptLedgerAmount) {
+  return value.state === "recorded" ? formatNaira(value.amount) : value.state === "ambiguous" ? "Needs review" : "Not recorded";
+}
 
 function Meta({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
@@ -63,6 +67,12 @@ export function ReceiptBody({ receipt }: { receipt: ReceiptData }) {
   const items = receiptLineItems(receipt, amountLabel);
   const refunded = receipt.refundedAt ?? null;
   const statusNote = receiptStatusNote(receipt.status, refunded);
+  const payment = receipt.wallet;
+  const documentTitle = payment.charge.state === "recorded" && !payment.needsReview
+    ? RECEIPT_DOCUMENT_TITLE : "Order record";
+  const paymentMethod = payment.charge.state === "recorded"
+    ? "Wallet balance" : payment.charge.state === "ambiguous" ? "Needs review" : "No wallet charge recorded";
+  const showRefund = payment.refund.state !== "not-recorded" || receipt.status === "refunded";
 
   return (
     <article
@@ -72,7 +82,6 @@ export function ReceiptBody({ receipt }: { receipt: ReceiptData }) {
       {/* Letterhead ------------------------------------------------------- */}
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line px-5 py-5 sm:px-8 sm:py-6">
         <div className="flex min-w-0 items-center gap-3">
-          <BrandMark size="md" />
           <div className="min-w-0">
             <p className="text-[1rem] font-semibold leading-tight tracking-tight text-ink">PryvaLogs</p>
             <p className="text-meta leading-tight text-ink-3">pryvalogs.com</p>
@@ -85,7 +94,7 @@ export function ReceiptBody({ receipt }: { receipt: ReceiptData }) {
             id="receipt-title"
             className="text-micro font-bold uppercase tracking-[0.16em] text-ink-3"
           >
-            {RECEIPT_DOCUMENT_TITLE}
+            {documentTitle}
           </h1>
           <p className="mt-1 font-mono text-[0.9375rem] font-semibold tabular-nums text-ink">
             {receipt.reference}
@@ -94,35 +103,32 @@ export function ReceiptBody({ receipt }: { receipt: ReceiptData }) {
         </div>
       </header>
 
-      {/*
-        Billed to / paid with.
-        A document that does not name the buyer cannot be filed by the buyer.
-      */}
+      {/* Identify the customer without implying that a payment was made. */}
       <section className="grid gap-4 border-b border-line px-5 py-5 sm:grid-cols-2 sm:px-8">
         <div className="min-w-0">
-          <p className="text-micro font-semibold uppercase tracking-[0.12em] text-ink-3">Billed to</p>
+          <p className="text-micro font-semibold uppercase tracking-[0.12em] text-ink-3">Customer</p>
           <p className="mt-1 break-words text-[0.9375rem] font-semibold leading-snug text-ink">
             {receipt.customerName}
           </p>
           <p className="break-words text-meta leading-snug text-ink-2">{receipt.customerEmail}</p>
         </div>
         <div className="min-w-0 sm:text-right">
-          <p className="text-micro font-semibold uppercase tracking-[0.12em] text-ink-3">Paid with</p>
-          <p className="mt-1 text-[0.9375rem] font-semibold leading-snug text-ink">{receipt.paidWith}</p>
-          <p className="text-meta leading-snug text-ink-2">Amount charged in Nigerian Naira</p>
+          <p className="text-micro font-semibold uppercase tracking-[0.12em] text-ink-3">Payment method</p>
+          <p className="mt-1 text-[0.9375rem] font-semibold leading-snug text-ink">{paymentMethod}</p>
+          <p className="text-meta leading-snug text-ink-2">Amounts in Nigerian Naira</p>
         </div>
       </section>
 
       {/* The charge --------------------------------------------------------- */}
       <section className="px-5 py-5 sm:px-8" aria-labelledby="receipt-charge">
         <h2 id="receipt-charge" className="sr-only">
-          Amount charged
+          Order amount and wallet activity
         </h2>
         {/* `relative` keeps the `sr-only` heading inside this scroll container;
             without it the heading resolves against the page and stretches it. */}
         <div className="relative overflow-x-auto">
           <table className="w-full border-collapse text-left">
-            <caption className="sr-only">Item charged on this receipt</caption>
+            <caption className="sr-only">Order amount and recorded wallet activity</caption>
             <thead>
               <tr className="border-b border-line">
                 <th scope="col" className="pb-2 text-micro font-semibold uppercase tracking-[0.12em] text-ink-3">
@@ -153,12 +159,20 @@ export function ReceiptBody({ receipt }: { receipt: ReceiptData }) {
             <tfoot>
               <tr className="print-keep border-t border-ink/15">
                 <th scope="row" className="py-3 pr-4 text-left text-[0.9375rem] font-semibold text-ink">
-                  Total charged
+                  Order total
                 </th>
                 <td className="py-3 text-right text-[1.125rem] font-semibold tabular-nums text-ink">
                   {amountLabel}
                 </td>
               </tr>
+              <tr className="print-keep border-t border-line">
+                <th scope="row" className="py-3 pr-4 text-left text-meta font-semibold text-ink">Recorded wallet charge</th>
+                <td className="py-3 text-right text-meta font-semibold tabular-nums text-ink">{ledgerAmount(payment.charge)}</td>
+              </tr>
+              {showRefund && <tr className="print-keep border-t border-line">
+                <th scope="row" className="py-3 pr-4 text-left text-meta font-semibold text-ink">Recorded wallet refund</th>
+                <td className="py-3 text-right text-meta font-semibold tabular-nums text-ink">{ledgerAmount(payment.refund)}</td>
+              </tr>}
             </tfoot>
           </table>
         </div>
@@ -175,6 +189,11 @@ export function ReceiptBody({ receipt }: { receipt: ReceiptData }) {
             <span className="min-w-0 text-meta leading-relaxed text-ink-2">{statusNote}</span>
           ) : null}
         </div>
+        {payment.needsReview && (
+          <p role="note" className="print-keep mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-meta leading-relaxed text-amber-900 print:bg-white">
+            The order and wallet records need review. Contact support and quote the reference before relying on this document as proof of payment.
+          </p>
+        )}
       </section>
 
       {/* Document metadata, then the small print. -------------------------- */}

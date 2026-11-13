@@ -59,7 +59,7 @@ function serverHidden(): boolean {
   return false;
 }
 
-export function AssistantPresence({ state = "idle" }: { state?: PresenceState }) {
+export function AssistantPresence({ state = "idle", textOnly = false }: { state?: PresenceState; textOnly?: boolean }) {
   const hidden = useSyncExternalStore(subscribe, readHidden, serverHidden);
 
   const toggle = useCallback(() => {
@@ -71,6 +71,15 @@ export function AssistantPresence({ state = "idle" }: { state?: PresenceState })
     }
     for (const listener of listeners) listener();
   }, []);
+
+  if (textOnly) {
+    return (
+      <div className="rounded-2xl border border-lav-200 bg-lav-50/50 px-3 py-2.5">
+        <p className="text-[0.875rem] font-semibold text-ink">PryvaLogs assistant</p>
+        <p className="text-meta text-ink-2" aria-live="polite">{state === "thinking" ? "Reading your message and checking the account…" : "Here, and ready when you are."}</p>
+      </div>
+    );
+  }
 
   if (hidden) {
     return (

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, Clock, Copy, Shield } from "@/components/icons";
+
 import { formatNaira } from "@/lib/services/catalog";
 
 type Props = {
@@ -209,7 +209,7 @@ export function OrderActions({
 
         {active && remaining && (
           <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-lav-50 px-3 py-1.5 text-meta font-medium text-lav-700">
-            <Clock className="h-3.5 w-3.5" /> Delivery window closes in {remaining}
+             Delivery window closes in {remaining}
           </p>
         )}
 
@@ -224,7 +224,7 @@ export function OrderActions({
                 onClick={() => copy(referenceCode, "reference")}
                 className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line bg-white px-2.5 py-1.5 text-micro font-semibold text-ink-2 hover:border-lav-300"
               >
-                {copied === "reference" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+
                 {copied === "reference" ? "Copied" : "Copy"}
               </button>
             </div>
@@ -249,7 +249,7 @@ export function OrderActions({
                 Verification code
               </p>
               <button type="button" onClick={() => copy(liveOtp, "otp")} className="inline-flex items-center gap-1 text-micro font-semibold text-lav-700">
-                {copied === "otp" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+
                 {copied === "otp" ? "Copied" : "Copy code"}
               </button>
             </div>
@@ -286,8 +286,8 @@ export function OrderActions({
       <div className="rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
         {refundedNow || settledStatus === "refunded" ? (
           <p className="mt-2 flex items-center gap-2 text-[0.8125rem] text-ink-2">
-            <Check className="h-4 w-4 text-emerald-600" />
-            {formatNaira(amount)} was returned to your wallet. It&apos;s already spendable.
+
+            This order is marked refunded. Check wallet activity for the recorded refund.
           </p>
         ) : isSelfRefundCandidate(settledStatus, singleNumberRefundCandidate, liveOtp) ? (
           <div className="mt-2">
@@ -309,12 +309,12 @@ export function OrderActions({
           </div>
         ) : active || settledStatus === "review" || settledStatus === "processing" ? (
           <p className="mt-2 flex items-center gap-2 text-[0.8125rem] text-ink-2">
-            <Shield className="h-4 w-4 text-lav-700" />
+
             {active ? "Your order is active. If it stalls, contact support with your order reference." : "This order is not complete yet. Check its status and contact support with your order reference before trying again."}
           </p>
         ) : (
           <p className="mt-2 flex items-center gap-2 text-[0.8125rem] text-ink-2">
-            <ArrowRight className="h-4 w-4 text-lav-600" />
+
             This order is settled. Buy another from the pricing page whenever you need one.
           </p>
         )}

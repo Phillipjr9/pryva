@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { Check, Refresh } from "@/components/icons";
+
 
 /**
  * The activation material for an eSIM order.
@@ -75,7 +75,7 @@ export function EsimProfile({
           disabled={checking}
           className="inline-flex w-fit items-center gap-2 rounded-xl border border-line bg-white px-4 py-2 text-meta font-semibold text-ink hover:border-lav-300 disabled:opacity-60"
         >
-          <Refresh className={`h-4 w-4 ${checking ? "animate-spin" : ""}`} aria-hidden="true" />
+
           {checking ? "Checking…" : "Check delivery"}
         </button>
         {message ? <p className="text-meta text-ink-2">{message}</p> : null}
@@ -122,7 +122,7 @@ export function EsimProfile({
             onClick={copy}
             className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2 text-meta font-semibold text-ink hover:border-lav-300"
           >
-            {copied ? <Check className="h-4 w-4 text-emerald-600" aria-hidden="true" /> : null}
+
             {copied ? "Copied" : "Copy"}
           </button>
         </div>

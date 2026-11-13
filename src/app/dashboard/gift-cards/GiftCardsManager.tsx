@@ -1,13 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useId, useRef } from "react";
 import { formatNaira } from "@/lib/services/catalog";
-import { Gift, Copy, Check, ShoppingCart, Shield } from "@/components/icons";
+
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PaymentLoading } from "@/components/ui/PaymentLoading";
-import { fireConfetti } from "@/components/ui/Confetti";
-import { BrandIcon } from "@/components/BrandIcon";
 import { BRAND_GIFT_CARDS, type BrandGiftCardCatalogEntry } from "@/lib/services/gift-cards/brand-catalog";
 import type { GiftCard } from "@/db/schema";
 import type { PublicUser } from "@/lib/identity/auth";
@@ -30,6 +28,7 @@ const TAB_LABELS: Record<Tab, string> = {
 
 export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create", checkoutDenominationId }: GiftCardsManagerProps) {
   const router = useRouter();
+  const fieldId = useId();
   const creating = useRef(false);
   const redeeming = useRef(false);
   const orderingBrand = useRef(false);
@@ -139,7 +138,6 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
       }
 
       try { window.localStorage.removeItem(storageKey); } catch { /* replay is safer than another debit */ }
-      fireConfetti();
       setBrandOrderSuccess({
         code: data.code,
         reference: data.reference,
@@ -198,7 +196,6 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
       }
 
       try { window.localStorage.removeItem(storageKey); } catch { /* replay is safer than another debit */ }
-      fireConfetti();
       setSuccess({ code: data.code, amount: data.amount });
       router.refresh();
       setAmount(5000);
@@ -235,7 +232,6 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
         throw new Error(data.error || "Redemption failed");
       }
 
-      fireConfetti();
       setRedeemSuccess(data.amount);
       setRedeemCode("");
       router.refresh();
@@ -258,7 +254,7 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
 
   return (
     <>
-      <PaymentLoading show={loading || redeemLoading || brandOrderLoading} message="Processing your order..." />
+      <PaymentLoading textOnly show={loading || redeemLoading || brandOrderLoading} message="Processing your order..." />
       <div className="space-y-6">
         {/* Tabs */}
         {!checkoutDenominationId && <div className="flex flex-wrap gap-2 border-b border-line">
@@ -274,9 +270,9 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
                 }
                 setActiveTab(tab);
               }}
-              className={`px-4 py-2 text-[0.875rem] font-medium transition-colors ${
+              className={`min-h-11 px-4 py-2 text-[0.875rem] font-medium transition-colors ${
                 activeTab === tab
-                  ? "border-b-2 border-lav-600 text-lav-600 font-semibold"
+                  ? "border-b-2 border-lav-600 text-lav-700 font-semibold"
                   : "text-ink-2 hover:text-ink"
               }`}
             >
@@ -307,7 +303,6 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
                         : "border-line bg-white hover:bg-cream/60"
                     }`}
                   >
-                    <BrandIcon brand={brand.brand} size={44} variant="tile" decorative />
                     <div>
                       <p className="text-[0.9375rem] font-bold text-ink">{brand.name}</p>
                       <p className="text-meta text-ink-3 uppercase tracking-wider font-medium">{brand.region}</p>
@@ -321,14 +316,13 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
             <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line/60 pb-5">
                 <div className="flex items-center gap-3">
-                  <BrandIcon brand={selectedBrand.brand} size={42} variant="tile" decorative />
                   <div>
                     <h2 className="text-[1.25rem] font-bold text-ink">{selectedBrand.name}</h2>
                     <p className="text-[0.8125rem] text-ink-2">{selectedBrand.tagline}</p>
                   </div>
                 </div>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-micro font-semibold text-emerald-800 border border-emerald-200/60">
-                  <Shield className="h-3.5 w-3.5 text-emerald-600" /> {brandSalesEnabled ? "Digital code delivery" : "Currently unavailable"}
+                   {brandSalesEnabled ? "Digital code delivery" : "Currently unavailable"}
                 </span>
               </div>
 
@@ -380,7 +374,7 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
               {/* Order Success */}
               {brandOrderSuccess && (
                 <div className="flow-arrive mt-6 rounded-xl border border-green-200 bg-green-50 p-6 text-center">
-                  <Gift className="mx-auto h-12 w-12 text-green-600 mb-2" />
+
                   <p className="text-[1.125rem] font-bold text-green-800 mb-1">
                     {brandOrderSuccess.cardName} Delivered!
                   </p>
@@ -395,13 +389,9 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
                       type="button"
                       aria-label="Copy gift card code"
                       onClick={() => copyCode(brandOrderSuccess.code)}
-                      className="rounded-lg p-2 text-ink-2 hover:bg-cream"
+                      className="min-h-11 rounded-lg px-3 py-2 text-meta font-semibold text-ink-2 hover:bg-cream"
                     >
-                      {copied === brandOrderSuccess.code ? (
-                        <Check className="h-5 w-5 text-green-600" />
-                      ) : (
-                        <Copy className="h-5 w-5" />
-                      )}
+                      {copied === brandOrderSuccess.code ? "Copied" : "Copy"}
                     </button>
                   </div>
                   <div className="mt-4 rounded-xl bg-white/70 border border-green-100 p-3 text-left">
@@ -438,7 +428,7 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
                     disabled={!brandSalesEnabled || brandOrderLoading || user.walletBalance < selectedDenom.priceNgn}
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-lav-700 px-6 py-4 text-[1rem] font-semibold text-white transition-colors hover:bg-lav-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                   >
-                    <ShoppingCart className="h-5 w-5" />
+
                     {!brandSalesEnabled
                       ? "Currently unavailable"
                       : brandOrderLoading
@@ -460,16 +450,17 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
         {/* Create Tab (Pryva Internal Wallet Gift Card) */}
         {activeTab === "create" && (
           <div className="space-y-6">
-            <div>
-              <label className="block text-[0.875rem] font-medium text-ink mb-3">
+            <fieldset>
+              <legend className="block text-[0.875rem] font-medium text-ink mb-3">
                 Select Amount
-              </label>
+              </legend>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                 {presetAmounts.map((preset) => (
                   <button
                     key={preset}
                     type="button"
                     onClick={() => setAmount(preset)}
+                    aria-pressed={amount === preset}
                     className={`rounded-xl border p-3 text-center transition-colors ${
                       amount === preset
                         ? "border-lav-600 bg-lav-50 text-lav-700"
@@ -480,13 +471,14 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
                   </button>
                 ))}
               </div>
-            </div>
+            </fieldset>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-ink mb-2">
+              <label htmlFor={`${fieldId}-amount`} className="block text-[0.875rem] font-medium text-ink mb-2">
                 Custom Amount (₦1,000 - ₦500,000)
               </label>
               <input
+                id={`${fieldId}-amount`}
                 type="number"
                 min={1000}
                 max={500000}
@@ -498,10 +490,11 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-ink mb-2">
+              <label htmlFor={`${fieldId}-recipient`} className="block text-[0.875rem] font-medium text-ink mb-2">
                 Recipient Email (Optional)
               </label>
               <input
+                id={`${fieldId}-recipient`}
                 type="email"
                 value={recipientEmail}
                 onChange={(e) => setRecipientEmail(e.target.value)}
@@ -511,10 +504,11 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-ink mb-2">
+              <label htmlFor={`${fieldId}-message`} className="block text-[0.875rem] font-medium text-ink mb-2">
                 Personal Message (Optional)
               </label>
               <textarea
+                id={`${fieldId}-message`}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={3}
@@ -538,7 +532,7 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
 
             {success && (
               <div className="flow-arrive rounded-xl border border-green-200 bg-green-50 p-6 text-center">
-                <Gift className="mx-auto h-12 w-12 text-green-600 mb-3" />
+
                 <p className="text-[1.125rem] font-semibold text-green-700 mb-2">
                   Gift Card Created!
                 </p>
@@ -553,13 +547,9 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
                     type="button"
                     aria-label="Copy gift card code"
                     onClick={() => copyCode(success.code)}
-                    className="rounded-lg p-2 text-ink-2 hover:bg-cream"
+                    className="min-h-11 rounded-lg px-3 py-2 text-meta font-semibold text-ink-2 hover:bg-cream"
                   >
-                    {copied === success.code ? (
-                      <Check className="h-5 w-5 text-green-600" />
-                    ) : (
-                      <Copy className="h-5 w-5" />
-                    )}
+                    {copied === success.code ? "Copied" : "Copy"}
                   </button>
                 </div>
                 <p className="mt-3 text-[0.8125rem] text-green-600">
@@ -587,10 +577,11 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
         {activeTab === "redeem" && (
           <div className="space-y-6">
             <div>
-              <label className="block text-[0.875rem] font-medium text-ink mb-2">
+              <label htmlFor={`${fieldId}-redeem`} className="block text-[0.875rem] font-medium text-ink mb-2">
                 Gift Card Code
               </label>
               <input
+                id={`${fieldId}-redeem`}
                 type="text"
                 value={redeemCode}
                 onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
@@ -607,7 +598,7 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
 
             {redeemSuccess && (
               <div className="flow-arrive rounded-xl border border-green-200 bg-green-50 p-6 text-center">
-                <Check className="mx-auto h-12 w-12 text-green-600 mb-3" />
+
                 <p className="text-[1.125rem] font-semibold text-green-700 mb-2">
                   Gift Card Redeemed!
                 </p>
@@ -656,7 +647,7 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
               </div>
             ) : cards.length === 0 ? (
               <div className="rounded-xl border border-line bg-white p-8 text-center">
-                <Gift className="mx-auto h-12 w-12 text-ink-3 mb-3" />
+
                 <p className="text-[0.9375rem] text-ink-2">
                   No wallet gift cards purchased yet
                 </p>
@@ -666,22 +657,18 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
                 {cards.map((card) => (
                   <div
                     key={card.id}
-                    className="flex items-center justify-between rounded-xl border border-line bg-white p-4"
+                    className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-line bg-white p-4"
                   >
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <code className="font-bold text-ink">{card.code}</code>
+                        <code className="break-all font-bold text-ink">{card.code}</code>
                         <button
                           type="button"
                           aria-label="Copy gift card code"
                           onClick={() => copyCode(card.code)}
-                          className="rounded p-1 text-ink-2 hover:bg-cream"
+                          className="min-h-11 rounded px-3 py-2 text-meta font-semibold text-ink-2 hover:bg-cream"
                         >
-                          {copied === card.code ? (
-                            <Check className="h-4 w-4 text-green-600" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
+                          {copied === card.code ? "Copied" : "Copy"}
                         </button>
                       </div>
                       <p className="text-[0.8125rem] text-ink-2 mt-1">
@@ -689,6 +676,7 @@ export function GiftCardsManager({ user, brandSalesEnabled, initialTab = "create
                       </p>
                     </div>
                     <div className="text-right">
+                      <p className="text-micro text-ink-3">Issued amount</p>
                       <p className="font-bold text-ink">
                         {formatNaira(card.initialAmount)}
                       </p>

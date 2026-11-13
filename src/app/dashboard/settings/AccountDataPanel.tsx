@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "@/components/ui/Toast";
-import { ArrowRight, Download, Loader2, Shield } from "@/components/icons";
+
 
 /**
  * Your data.
@@ -45,9 +45,7 @@ export function AccountDataPanel() {
   return (
     <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
       <div className="flex items-start gap-2.5">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-lav-50 text-lav-700">
-          <Download className="h-4 w-4" />
-        </span>
+
         <div>
           <h2 className="text-[0.9375rem] font-semibold">Your data</h2>
           <p className="mt-0.5 text-meta text-ink-2">
@@ -65,17 +63,17 @@ export function AccountDataPanel() {
         >
           {busy ? (
             <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Preparing…
+               Preparing…
             </>
           ) : (
             <>
-              <Download className="h-3.5 w-3.5" /> Download my data
+               Download my data
             </>
           )}
         </button>
 
         <p className="flex items-start gap-2 rounded-xl bg-cream/70 px-3.5 py-2.5 text-meta leading-relaxed text-ink-2">
-          <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
+
           <span>
             The file can contain redeemable gift-card codes — store it somewhere private. It covers
             selected activity, not a complete personal-data record.
@@ -89,7 +87,7 @@ export function AccountDataPanel() {
             href="#close-account"
             className="inline-flex items-center gap-1 font-semibold text-lav-700 hover:underline"
           >
-            Close my account <ArrowRight className="h-3 w-3" />
+            Close my account
           </a>
         </p>
       </div>

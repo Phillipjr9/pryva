@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Lock } from "@/components/icons";
+
 import { formatNaira } from "@/lib/services/catalog";
 import { PAYSTACK_TOPUP_UPDATED, forgetPaystackTopUp, notifyPaystackTopUpsChanged, readPendingPaystackTopUps, type PendingPaystackTopUp } from "@/lib/payments/paystack-topup-intent";
 import { PaystackTopUpFlow } from "@/components/dashboard/PaystackTopUpFlow";
@@ -47,8 +47,8 @@ function LiveTopUp({ balance, userId, testMode }: { balance: number; userId: str
           <button type="button" className="ml-3 font-semibold underline" onClick={() => clearAfterReview(entry.reference)}>Clear after reconciliation</button>
         </li>)}</ul>
       </div>}
-      <button type="button" onClick={() => setOpen(true)} disabled={storageState !== "ready" || pending.length > 0} className="btn btn-primary mt-4 w-full !whitespace-normal !py-3.5 !leading-snug disabled:opacity-50">Review a top-up <ArrowRight className="h-4 w-4" /></button>
-      <p className="mt-3 flex items-start gap-1.5 text-meta leading-relaxed text-ink-3"><Lock className="mt-0.5 h-3 w-3 shrink-0 text-lav-500" /> Your wallet is credited only after payment is confirmed. Payment credentials stay in Paystack checkout.</p>
+      <button type="button" onClick={() => setOpen(true)} disabled={storageState !== "ready" || pending.length > 0} className="btn btn-primary mt-4 w-full !whitespace-normal !py-3.5 !leading-snug disabled:opacity-50">Review a top-up </button>
+      <p className="mt-3 flex items-start gap-1.5 text-meta leading-relaxed text-ink-3"> Your wallet is credited only after payment is confirmed. Payment credentials stay in Paystack checkout.</p>
     </section>
     {open && <PaystackTopUpFlow balance={balance} userId={userId} testMode={testMode} onClose={() => setOpen(false)} />}
   </>;

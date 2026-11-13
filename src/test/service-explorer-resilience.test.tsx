@@ -94,7 +94,7 @@ describe("service explorer resilience", () => {
     expect(screen.queryByText("Malformed app")).toBeNull();
     expect(screen.getByText(/Some live listings could not be loaded/)).toBeTruthy();
     expect(screen.getByText(/Affected: App verification/)).toBeTruthy();
-    expect(screen.queryByText(/Live listings are current/)).toBeNull();
+    expect(screen.queryByText(/Supplier listings loaded/)).toBeNull();
   });
 
   it("offers a recovery screen for a real render error without exposing its raw message", () => {

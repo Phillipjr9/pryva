@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Globe, Sparkle } from "@/components/icons";
+
 import { CountrySelector } from "@/components/dashboard/CountrySelector";
 
 /** The overview starts the same country-first flow as the full service hub. */
@@ -13,7 +13,7 @@ export function CountryLaunch() {
       <div className="relative grid gap-3 md:grid-cols-[1fr_1.05fr] md:items-center md:gap-5">
         <div>
           <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700">
-            <Sparkle className="h-3.5 w-3.5" /> Your service hub
+             Your service hub
           </p>
           <h2 id="country-launch-title" className="mt-1.5 text-[1.25rem] font-semibold leading-tight text-ink sm:mt-2 sm:text-[1.6rem]">
             Find what you need, <span className="text-display italic text-lav-700">where you need it.</span>
@@ -26,7 +26,7 @@ export function CountryLaunch() {
           <input type="hidden" name="country" value={country || "ng"} />
           <CountrySelector id="dashboard-country" value={country} onChange={setCountry} />
           <button type="submit" className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-meta font-semibold text-white transition-colors hover:bg-lav-800 sm:mt-4 sm:py-3 sm:text-[0.875rem]">
-            <Globe className="h-4 w-4" /> {country ? "Explore services for selected country" : "Explore all services (Nigeria default)"} <ArrowRight className="h-4 w-4" />
+             {country ? "Explore services for selected country" : "Explore all services (Nigeria default)"}
           </button>
         </form>
       </div>

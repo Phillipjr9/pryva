@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "@/components/ui/Toast";
-import { Loader2, Shield } from "@/components/icons";
+
 
 type Session = {
   id: string;
@@ -75,9 +75,7 @@ export function SessionsCard() {
     <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5 sm:col-span-2">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-2.5">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-lav-50 text-lav-700">
-            <Shield className="h-4 w-4" />
-          </span>
+
           <div>
             <h2 className="text-[0.9375rem] font-semibold">Active sessions</h2>
             <p className="mt-0.5 text-[0.8125rem] text-ink-2">
@@ -94,7 +92,7 @@ export function SessionsCard() {
           >
             {busy === "all" ? (
               <>
-                <Loader2 className="h-3 w-3 animate-spin" /> Signing out…
+                 Signing out…
               </>
             ) : (
               "Sign out other devices"
@@ -133,7 +131,7 @@ export function SessionsCard() {
                 type="button"
                 onClick={() => void revoke(session.id)}
                 disabled={busy === session.id}
-                className="rounded-full px-2.5 py-1 text-meta font-semibold text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50"
+                className="min-h-11 rounded-full px-2.5 py-1 text-meta font-semibold text-rose-700 transition-colors hover:bg-rose-50 disabled:opacity-50"
               >
                 {busy === session.id ? "Signing out…" : "Sign out"}
               </button>

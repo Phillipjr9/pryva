@@ -79,21 +79,28 @@ describe("avatar selection", () => {
 });
 
 describe("where the picture appears", () => {
-  it("replaces the initials in the dashboard sidebar", () => {
+  /**
+   * The dashboard is text-only now: the sidebar and the settings Profile section
+   * carry the customer's name, not a derived mark. The avatar helpers stay
+   * exported (other surfaces may use them), so what matters here is that no
+   * mark and no claim about the person's appearance reached the dashboard.
+   */
+  it("shows the customer's name in the sidebar instead of a generated mark", () => {
     const html = renderToStaticMarkup(
       <DashboardShell buildId="test" user={{ name: user.name, email: user.email, walletBalance: 0 }}>
         <p>content</p>
       </DashboardShell>,
     );
     expect(html).not.toContain("/images/avatars/");
-    expect(html).toContain("ring-1 ring-black/5");
+    expect(html).not.toContain("ring-1 ring-black/5");
     expect(html).not.toContain(">AD<");
+    expect(html).toContain("Ada Demo");
   });
 
-  it("heads the Profile section in settings", () => {
+  it("heads the Profile section in settings with its name, not a portrait", () => {
     const html = renderToStaticMarkup(<SettingsForm user={user} canSendVerification={false} />);
     expect(html).not.toContain("/images/avatars/");
-    expect(html).toContain("ring-1 ring-black/5");
+    expect(html).not.toContain("ring-1 ring-black/5");
     expect(html).toContain("Profile");
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/platform/utils";
 import { CheckCircle, XCircle, AlertCircle, Info, Close } from "@/components/icons";
 
@@ -91,12 +92,14 @@ interface ToastContainerProps {
 }
 
 function ToastContainer({ toasts, removeToast }: ToastContainerProps) {
+  const pathname = usePathname();
+  const textOnly = pathname === "/dashboard" || Boolean(pathname?.startsWith("/dashboard/"));
   if (toasts.length === 0) return null;
 
   return (
     <div className="fixed bottom-4 right-4 z-[200] flex flex-col gap-2 max-w-sm">
       {toasts.map((toast) => (
-        <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
+        <ToastItem key={toast.id} toast={toast} textOnly={textOnly} onClose={() => removeToast(toast.id)} />
       ))}
     </div>
   );
@@ -105,9 +108,10 @@ function ToastContainer({ toasts, removeToast }: ToastContainerProps) {
 interface ToastItemProps {
   toast: Toast;
   onClose: () => void;
+  textOnly: boolean;
 }
 
-function ToastItem({ toast, onClose }: ToastItemProps) {
+function ToastItem({ toast, onClose, textOnly }: ToastItemProps) {
   const icons = {
     success: CheckCircle,
     error: XCircle,
@@ -119,6 +123,9 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
 
   return (
     <div
+      // A toast that is only visible is not announced. An error interrupts; a
+      // confirmation waits its turn in the polite queue.
+      role={toast.type === "error" ? "alert" : "status"}
       className={cn(
         "flex items-start gap-3 rounded-xl border p-4 shadow-lg animate-in slide-in-from-right",
         {
@@ -129,14 +136,26 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
         }
       )}
     >
-      <Icon
+      {!textOnly && <Icon
         className={cn("h-5 w-5 shrink-0 mt-0.5", {
           "text-green-600": toast.type === "success",
           "text-red-600": toast.type === "error",
           "text-yellow-600": toast.type === "warning",
           "text-blue-600": toast.type === "info",
         })}
-      />
+      />}
+      {/* Shape alone must not carry the meaning: the severity is spelled out
+          for every surface, not only the dashboard's text-only variant. A
+          screen reader, a greyscale print-out and a colour-blind reader all get
+          the same word. */}
+      <span className={cn("shrink-0 self-start rounded-full px-2 py-0.5 text-micro font-bold uppercase tracking-[0.08em]", {
+        "bg-green-100 text-green-800": toast.type === "success",
+        "bg-red-100 text-red-800": toast.type === "error",
+        "bg-yellow-100 text-yellow-800": toast.type === "warning",
+        "bg-blue-100 text-blue-800": toast.type === "info",
+      })}>
+        {toast.type === "success" ? "Success" : toast.type === "error" ? "Error" : toast.type === "warning" ? "Warning" : "Info"}
+      </span>
       <p
         className={cn("flex-1 text-[0.875rem]", {
           "text-green-700": toast.type === "success",
@@ -149,14 +168,15 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
       </p>
       <button
         onClick={onClose}
-        className={cn("shrink-0 rounded-lg p-1 hover:bg-black/5", {
+        aria-label="Dismiss notification"
+        className={cn("min-h-11 shrink-0 rounded-lg px-2 text-meta font-semibold hover:bg-black/5", {
           "text-green-600": toast.type === "success",
           "text-red-600": toast.type === "error",
           "text-yellow-600": toast.type === "warning",
           "text-blue-600": toast.type === "info",
         })}
       >
-        <Close className="h-4 w-4" />
+        {textOnly ? "Dismiss" : <Close className="h-4 w-4" />}
       </button>
     </div>
   );

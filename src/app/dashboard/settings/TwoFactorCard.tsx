@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Shield } from "@/components/icons";
+
 import { PasswordInput } from "@/components/ui/PasswordInput";
 
 /**
@@ -118,9 +118,7 @@ export function TwoFactorCard({
   return (
     <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
       <div className="flex items-start justify-between gap-2">
-        <span className="grid h-8 w-8 place-items-center rounded-lg bg-lav-50 text-lav-700">
-          <Shield className="h-4 w-4" />
-        </span>
+
         <span
           className={
             enabled
@@ -241,6 +239,7 @@ export function TwoFactorCard({
           <div>
             <label htmlFor="totp-password" className="field-label">Password</label>
             <PasswordInput
+            textOnly
               id="totp-password"
               autoComplete="current-password"
               value={password}

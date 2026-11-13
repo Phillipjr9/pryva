@@ -36,6 +36,7 @@ vi.mock("next/navigation", () => ({
 let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
 let OrdersPage: typeof import("@/app/dashboard/orders/page").default;
+let ReceiptPage: typeof import("@/app/dashboard/orders/[id]/receipt/page").default;
 
 const CUSTOMER = "11111111-1111-4111-8111-111111111111";
 const SOMEONE_ELSE = "22222222-2222-4222-8222-222222222222";
@@ -106,6 +107,7 @@ beforeAll(async () => {
     [CUSTOMER, SOMEONE_ELSE, NEW_CUSTOMER],
   );
   ({ default: OrdersPage } = await import("@/app/dashboard/orders/page"));
+  ({ default: ReceiptPage } = await import("@/app/dashboard/orders/[id]/receipt/page"));
 }, 120_000);
 
 afterAll(async () => {
@@ -122,6 +124,25 @@ afterEach(() => {
 });
 
 describe("a history that fits on one page is shown as it always was", () => {
+  it("only marks an unexpired code live for an active or delivered, unrefunded order", async () => {
+    await pg.query(
+      `INSERT INTO orders (reference, user_id, service, product_slug, product_name, plan_label, region, duration, amount, provider, status, otp_code, expires_at, refunded_at)
+       VALUES
+         ('LIVE-ACTIVE', $1, 'numbers', 'test', 'Active code', 'One', 'NG', '20 min', 500, 'test', 'active', '1234', now() + interval '1 hour', NULL),
+         ('LIVE-DELIVERED', $1, 'numbers', 'test', 'Delivered code', 'One', 'NG', '20 min', 500, 'test', 'delivered', '4567', now() + interval '1 hour', NULL),
+         ('REFUNDED-CODE', $1, 'numbers', 'test', 'Refunded code', 'One', 'NG', '20 min', 500, 'test', 'refunded', '9999', now() + interval '1 hour', now()),
+         ('INCONSISTENT-CODE', $1, 'numbers', 'test', 'Refund timestamp', 'One', 'NG', '20 min', 500, 'test', 'active', '8888', now() + interval '1 hour', now()),
+         ('EXPIRED-CODE', $1, 'numbers', 'test', 'Expired code', 'One', 'NG', '20 min', 500, 'test', 'active', '7777', now() - interval '1 hour', NULL),
+         ('UNKNOWN-WINDOW', $1, 'numbers', 'test', 'Unknown window', 'One', 'NG', '20 min', 500, 'test', 'active', '6666', NULL, NULL)`,
+      [CUSTOMER],
+    );
+
+    const html = await render();
+    expect(html.match(/Code live/g)).toHaveLength(2);
+    expect(html).toContain("Refunded code");
+    expect(html).toContain("Expired code");
+  });
+
   it("lists every order, with counts in the filters and no pager, in one statement", async () => {
     await seedHistory(CUSTOMER, 30);
     const spy = vi.spyOn(pg, "query");
@@ -226,6 +247,48 @@ describe("a history that fits on one page is shown as it always was", () => {
 
     // The first of each: refunded orders matching history-17, of which there are none.
     expect(html).toContain("Nothing matches that");
+  });
+});
+
+describe("order documents use the owner's wallet entries", () => {
+  it("distinguishes an uncharged attempt, a charge and a recorded refund", async () => {
+    const { rows: [order] } = await pg.query<{ id: string }>(
+      `INSERT INTO orders (reference, user_id, service, product_slug, product_name, plan_label, region, duration, amount, provider, status)
+       VALUES ('RECEIPT-TEST', $1, 'numbers', 'test', 'Test number', 'One', 'NG', '20 min', 1500, 'test', 'review') RETURNING id`,
+      [CUSTOMER],
+    );
+    // An unrelated customer's ledger row must never be used as this buyer's payment.
+    await pg.query(
+      `INSERT INTO wallet_transactions (user_id, order_id, type, amount, balance_after, description, reference)
+       VALUES ($1, $2, 'debit', 2200, 0, 'Other account', 'OTHER-ENTRY')`,
+      [SOMEONE_ELSE, order.id],
+    );
+    const document = async () => renderToStaticMarkup(await ReceiptPage({ params: Promise.resolve({ id: order.id }) }));
+    const uncharged = await document();
+    expect(uncharged).toContain("Order record");
+    expect(uncharged).toContain("No wallet charge recorded");
+    expect(uncharged).not.toContain("₦2,200");
+
+    await pg.query("UPDATE orders SET status = 'delivered' WHERE id = $1", [order.id]);
+    await pg.query(
+      `INSERT INTO wallet_transactions (user_id, order_id, type, amount, balance_after, description, reference)
+       VALUES ($1, $2, 'debit', 1500, 0, 'Purchase', 'BUY-ENTRY')`,
+      [CUSTOMER, order.id],
+    );
+    const charged = await document();
+    expect(charged).toContain("Payment receipt");
+    expect(charged).toContain("Recorded wallet charge");
+    expect(charged).not.toContain("₦2,200");
+
+    await pg.query("UPDATE orders SET status = 'refunded', refunded_at = now() WHERE id = $1", [order.id]);
+    await pg.query(
+      `INSERT INTO wallet_transactions (user_id, order_id, type, amount, balance_after, description, reference)
+       VALUES ($1, $2, 'refund', 1500, 1500, 'Refund', 'REFUND-ENTRY')`,
+      [CUSTOMER, order.id],
+    );
+    const refunded = await document();
+    expect(refunded).toContain("Recorded wallet refund");
+    expect(refunded).not.toContain("wallet records need review");
   });
 });
 

@@ -3,7 +3,7 @@
 import { useId, useState, type InputHTMLAttributes } from "react";
 import { Eye, EyeOff } from "@/components/icons";
 
-type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type">;
+type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { textOnly?: boolean };
 
 /**
  * A password field with a reveal toggle.
@@ -19,7 +19,7 @@ type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type">;
  * name and a pressed state rather than a decorative icon, because revealing the
  * value is the entire point of it.
  */
-export function PasswordInput({ className = "field", id, ...props }: PasswordInputProps) {
+export function PasswordInput({ className = "field", id, textOnly = false, ...props }: PasswordInputProps) {
   const [revealed, setRevealed] = useState(false);
   const generatedId = useId();
   const inputId = id ?? generatedId;
@@ -32,7 +32,7 @@ export function PasswordInput({ className = "field", id, ...props }: PasswordInp
         type={revealed ? "text" : "password"}
         // `field` sets padding with a shorthand inside @layer components, so the
         // utility wins and keeps typed text out from under the button.
-        className={`${className} pr-11`}
+        className={`${className} ${textOnly ? "pr-20" : "pr-11"}`}
       />
       <button
         type="button"
@@ -44,9 +44,9 @@ export function PasswordInput({ className = "field", id, ...props }: PasswordInp
         // Inset rather than flush to the edge: the app has two field styles
         // (.field at 0.9rem radius, and the reset form's own rounded-xl), and an
         // inset transparent button matches both without guessing a radius.
-        className="absolute inset-y-1 right-1 grid w-9 place-items-center rounded-lg text-ink-3 transition-colors hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lav-500"
+        className={`absolute inset-y-1 right-1 grid place-items-center rounded-lg text-ink-3 transition-colors hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lav-500 ${textOnly ? "px-3 text-meta font-semibold" : "w-9"}`}
       >
-        {revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        {textOnly ? (revealed ? "Hide" : "Show") : revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
       </button>
     </div>
   );

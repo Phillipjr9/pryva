@@ -105,7 +105,10 @@ describe("features that had an endpoint but no screen", () => {
     const trigger = renderToStaticMarkup(<CommandPaletteTrigger onClick={() => undefined} />);
     // Phones and tablets previously had no way to open the palette at all.
     expect(trigger).toContain("Search the dashboard");
-    expect(trigger).toContain("lg:hidden");
+    // The trigger is a text control at every width, not a phone-only icon button.
+    expect(trigger).toContain('>Search<');
+    expect(trigger).toContain("min-h-9");
+    expect(trigger).not.toContain("hidden");
     const palette = renderToStaticMarkup(<CommandPalette isOpen onClose={() => undefined} />);
     expect(palette).toContain("Search orders, transactions, gift cards");
     expect(palette).toContain("aria-modal=\"true\"");

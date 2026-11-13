@@ -11,7 +11,7 @@ export type ServiceState = "buy" | "preview" | "free" | "paused" | "unavailable"
 
 /** Customer-facing wording. Short enough for a badge, explicit enough to be true. */
 export const SERVICE_STATE_LABEL: Record<ServiceState, string> = {
-  buy: "Ready to buy",
+  buy: "Ordering enabled",
   preview: "Catalogue only",
   free: "Free tool",
   paused: "Ordering paused",
@@ -20,7 +20,7 @@ export const SERVICE_STATE_LABEL: Record<ServiceState, string> = {
 
 /** Where the state comes from, for the hub's summary line and the audit doc. */
 export const SERVICE_STATE_NOTE: Record<ServiceState, string> = {
-  buy: "ordering works end to end today",
+  buy: "ordering is configured; availability is checked for each listing",
   preview: "listings can be browsed; checkout is not open",
   free: "no payment involved",
   paused: "the supplier is not connected yet",

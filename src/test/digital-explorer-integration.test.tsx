@@ -67,16 +67,24 @@ describe("digital listings in service categories", () => {
     expect(screen.queryByRole("heading", { name: "Mystery code" })).toBeNull();
     expect(screen.queryByText("Wallet gift manager")).toBeNull();
   });
-  it("renders curated artwork for generic denomination names on explorer cards", async () => {
+  /**
+   * The dashboard listing is text-only. Artwork metadata is still produced
+   * server-side for other surfaces, but no card may render a product image, and
+   * an unrecognised product must not look different from a recognised one.
+   */
+  it("renders every top-up card as text, with or without curated artwork", async () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       const root = new URL(url, "https://example.test").searchParams.get("category");
       return response({ ok: true, items: root === "topups" ? [{ id: id("a"), name: "80 + 8 CP", stock: "reported", artwork: { kind: "local", key: "call-of-duty-mobile" } }] : [], nextCursor: null });
     }));
     render(<ServiceExplorer initialCountry="ng" initialCategory="topups" enableDigitalCatalogue />);
     const card = (await screen.findByRole("heading", { name: "80 + 8 CP" })).closest("article")!;
-    expect(card.querySelector("img")?.getAttribute("src")).toContain("/digital-brand-icons/call-of-duty-mobile.png");
+    expect(card.querySelector("img")).toBeNull();
+    expect(card.querySelector("svg")).toBeNull();
+    expect(within(card).getByRole("heading", { name: "80 + 8 CP" })).toBeTruthy();
   });
-  it("shows each screenshot top-up's own local game icon while keeping unknown items neutral", async () => {
+
+  it("keeps known and unknown top-ups identical apart from their own details", async () => {
     const poolNames = ["Golden Spin", "5 Scratchers", "20 000 Coins", "20 Cash", "3 Golden Shots"];
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       const root = new URL(url, "https://example.test").searchParams.get("category");
@@ -88,16 +96,16 @@ describe("digital listings in service categories", () => {
       return response({ ok: true, items: root === "topups" ? items : [], nextCursor: null });
     }));
     render(<ServiceExplorer initialCountry="ng" initialCategory="topups" enableDigitalCatalogue />);
-    const oxide = (await screen.findByRole("heading", { name: "3550 Coins (40% more value)" })).closest("article")!;
-    expect(oxide.querySelector("img")?.getAttribute("src")).toBe("/digital-game-icons/oxide-survival-island.webp");
-    for (const name of poolNames) {
+    for (const name of ["3550 Coins (40% more value)", ...poolNames, "Unknown 20 Coins"]) {
       const card = (await screen.findByRole("heading", { name })).closest("article")!;
-      expect(card.querySelector("img")?.getAttribute("src")).toBe("/digital-game-icons/8-ball-pool.webp");
-      expect(within(card).getByRole("link", { name: "Check price and availability" }).getAttribute("href")).toContain("/dashboard/digital-topups?product=digital-");
+      // No remote tracker, no bundled image: the card is its text.
+      expect(card.querySelector("img")).toBeNull();
+      expect(card.querySelector("svg")).toBeNull();
     }
+    // Purchase paths are unchanged: each screenshot top-up keeps its own link.
+    const goldenSpin = (await screen.findByRole("heading", { name: "Golden Spin" })).closest("article")!;
+    expect(within(goldenSpin).getByRole("link", { name: "Check price and availability" }).getAttribute("href")).toBe(`/dashboard/digital-topups?product=digital-${"0".repeat(23)}1`);
     const unknown = (await screen.findByRole("heading", { name: "Unknown 20 Coins" })).closest("article")!;
-    expect(unknown.querySelector("img")).toBeNull();
-    expect(unknown.querySelector("svg")).toBeTruthy();
     expect(within(unknown).getByRole("button", { name: "Ordering paused" })).toHaveProperty("disabled", true);
   });
   it("groups the actual game roots together and loads the next page without losing the first", async () => {

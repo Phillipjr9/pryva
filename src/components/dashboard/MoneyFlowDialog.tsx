@@ -1,18 +1,16 @@
 "use client";
 
-import { useEffect, useId, useRef, type CSSProperties, type ReactNode } from "react";
-import { Check, Wallet } from "@/components/icons";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import styles from "./MoneyFlow.module.css";
 
 export type MoneyFlowStage = "details" | "review" | "processing" | "done";
 
 /** Shared accessible shell for the real-money review and confirmation flows. */
-export function MoneyFlowDialog({ stage, title, onClose, canClose = true, lead, centered = false, children }: {
+export function MoneyFlowDialog({ stage, title, onClose, canClose = true, centered = false, children }: {
   stage: MoneyFlowStage;
   title: string;
   onClose: () => void;
   canClose?: boolean;
-  lead?: ReactNode;
   centered?: boolean;
   children: ReactNode;
 }) {
@@ -49,11 +47,10 @@ export function MoneyFlowDialog({ stage, title, onClose, canClose = true, lead, 
       <div className={styles.inner}>
         <div className={styles.top}>
           <nav className={styles.steps} aria-label="Transaction progress">
-            {["Details", "Review", "Processing", "Done"].map((label, index) => <span key={label} aria-current={index === rank ? "step" : undefined} className={`${styles.step} ${index < rank ? styles.stepDone : index === rank ? styles.stepActive : ""}`}><span className={styles.stepNumber}>{index < rank ? "✓" : index + 1}</span>{label}</span>)}
+            {["Details", "Review", "Processing", "Done"].map((label, index) => <span key={label} aria-current={index === rank ? "step" : undefined} className={`${styles.step} ${index < rank ? styles.stepDone : index === rank ? styles.stepActive : ""}`}>{index + 1}. {label}{index < rank ? " (complete)" : ""}</span>)}
           </nav>
-          <button type="button" className={styles.close} aria-label="Close transaction dialog" disabled={!canClose} onClick={onClose}>×</button>
+          <button type="button" className={styles.close} aria-label="Close transaction dialog" disabled={!canClose} onClick={onClose}>Close</button>
         </div>
-        {lead}
         <h2 id={id} ref={heading} tabIndex={-1} className={styles.title} style={centered ? { textAlign: "center" } : undefined}>{title}</h2>
         {children}
       </div>
@@ -61,36 +58,27 @@ export function MoneyFlowDialog({ stage, title, onClose, canClose = true, lead, 
   </div>;
 }
 
-export function MoneyRoute({ from, fromNote, to, toNote, moving = false }: { from: string; fromNote: string; to: string; toNote: string; moving?: boolean }) {
-  return <div className={`${styles.track} ${moving ? styles.moving : ""}`} aria-label={`${from} to ${to}`}>
-    <div className={styles.party}><div className={styles.partyIcon}><Wallet /></div><div className={styles.partyName}>{from}</div><div className={styles.partySub}>{fromNote}</div></div>
-    <div className={styles.route} aria-hidden="true"><span className={styles.routeArrow}>→</span></div>
-    <div className={styles.party}><div className={styles.partyIcon}><Wallet /></div><div className={styles.partyName}>{to}</div><div className={styles.partySub}>{toNote}</div></div>
+export function MoneyRoute({ from, fromNote, to, toNote }: { from: string; fromNote: string; to: string; toNote: string }) {
+  return <div className={styles.track}>
+    <div className={styles.party}><div className={styles.partySub}>From</div><div className={styles.partyName}>{from}</div><div className={styles.partySub}>{fromNote}</div></div>
+    <div className={styles.party}><div className={styles.partySub}>To</div><div className={styles.partyName}>{to}</div><div className={styles.partySub}>{toNote}</div></div>
   </div>;
 }
 
-/** Indeterminate animation: only the first, actually completed step is checked. */
+/** Text labels distinguish completed, current and waiting steps. */
 export function MoneyProcessing({ detail, from, fromNote, to, toNote, steps, current = 1 }: {
   detail: string; from: string; fromNote: string; to: string; toNote: string; steps: [string, string, string]; current?: 1 | 2;
 }) {
   return <>
     <p className={styles.processingSub} style={{ textAlign: "center" }} role="status">{detail}</p>
-    <MoneyRoute from={from} fromNote={fromNote} to={to} toNote={toNote} moving />
+    <MoneyRoute from={from} fromNote={fromNote} to={to} toNote={toNote} />
     <div className={`${styles.progress} ${styles.indeterminate}`} aria-hidden="true"><span /></div>
     <ul className={styles.list}>
       {steps.map((label, index) => <li key={label} className={`${styles.listItem} ${index < current ? styles.listDone : index === current ? styles.listCurrent : ""}`}>
-        <span className={styles.listIcon} aria-hidden="true">{index < current ? "✓" : ""}</span>{label}
+        {label} <span className={styles.listState}>{index < current ? "Complete" : index === current ? "In progress" : "Waiting"}</span>
       </li>)}
     </ul>
   </>;
-}
-
-export function MoneyOrbit() {
-  return <div className={styles.orbit} style={{ "--orbit-progress": "45%" } as CSSProperties} aria-hidden="true"><span className={styles.orbitMark}><Wallet /></span></div>;
-}
-
-export function MoneyResultIcon() {
-  return <div className={styles.resultIcon} aria-hidden="true"><Check /></div>;
 }
 
 export function downloadTextReceipt(filename: string, content: string) {

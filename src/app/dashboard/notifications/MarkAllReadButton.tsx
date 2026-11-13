@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check } from "@/components/icons";
+
 
 export function MarkAllReadButton() {
   const [pending, setPending] = useState(false);
@@ -36,7 +36,7 @@ export function MarkAllReadButton() {
         disabled={pending}
         className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-meta font-semibold text-ink-2 transition-colors hover:bg-cream disabled:opacity-60"
       >
-        <Check className="h-3.5 w-3.5" />
+
         {pending ? "Marking…" : "Mark all read"}
       </button>
       {error && <p role="alert" className="mt-1 text-xs text-red-600">{error}</p>}

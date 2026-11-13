@@ -21,6 +21,8 @@ type Props = {
   nextPath: string;
   otpOfferId?: string;
   unavailableSlugs?: string[];
+  /** Customer dashboard presents labels rather than icons. */
+  textOnly?: boolean;
 };
 
 /**
@@ -38,7 +40,7 @@ function newRequestId(): string {
   return `${hex(8)}-${hex(4)}-4${hex(3)}-${variant}${hex(3)}-${hex(12)}`;
 }
 
-export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath, otpOfferId, unavailableSlugs = [] }: Props) {
+export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath, otpOfferId, unavailableSlugs = [], textOnly = false }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState(0);
   const plans = useMemo(() => groups[tab]?.plans ?? [], [groups, tab]);
@@ -154,8 +156,9 @@ export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath
 
   return (
     <>
-      <PaymentLoading show={pending} message="Processing your order..." />
+      <PaymentLoading textOnly={textOnly} show={pending} message="Processing your order..." />
       <PaymentSuccess
+        textOnly={textOnly}
         show={!!success}
         title={success?.review ? "Order under review" : "Order Complete"}
         message={success?.review ? success.reviewMessage : `${success?.name} is now in your dashboard.`}
@@ -166,9 +169,9 @@ export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath
       {success && (
         <div className="card relative overflow-hidden p-7 sm:p-9">
           <div className="pointer-events-none absolute -right-16 -top-16 h-52 w-52 rounded-full bg-lav-100 blur-2xl" />
-          <span className="grid h-12 w-12 place-items-center rounded-full bg-lav-100 text-lav-700">
+          {!textOnly && <span className="grid h-12 w-12 place-items-center rounded-full bg-lav-100 text-lav-700">
             <Check className="h-6 w-6" />
-          </span>
+          </span>}
           <h3 className="mt-5 text-2xl font-medium">{success.review ? "Order needs review." : "Order complete."}</h3>
           <p className="mt-2 max-w-md text-[0.9375rem] leading-relaxed text-ink-2">
             {success.review ? <>{success.reviewMessage} </> : <><span className="font-semibold text-ink">{success.name}</span> is now in your dashboard. Your verification code appears in the order details as soon as it arrives. </>}
@@ -181,7 +184,7 @@ export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath
           <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
             <Link href={`/dashboard/orders/${success.id}`} className="btn btn-primary">
               {success.review ? "View order status" : "View code & details"}
-              <ArrowRight className="h-4 w-4" />
+              {!textOnly && <ArrowRight className="h-4 w-4" />}
             </Link>
             {!success.review && (
               <button
@@ -217,7 +220,7 @@ export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 xl:grid-cols-3">
+          <div className={`grid ${textOnly ? "grid-cols-1 min-[480px]:grid-cols-2" : "grid-cols-2"} gap-2.5 sm:gap-3.5 xl:grid-cols-3`}>
             {plans.map((plan) => {
               const isSelected = plan.slug === selected?.slug;
               return (
@@ -239,14 +242,14 @@ export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <span className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
-                        {hasCountryFlag(plan.region) && (
+                        {!textOnly && hasCountryFlag(plan.region) && (
                           <CountryFlag region={plan.region} size={20} decorative />
                         )}
                         {plan.name}
                       </span>
                       <span className="mt-1 block text-meta text-ink-3">{plan.planLabel}</span>
                     </div>
-                    <span
+                    {textOnly ? (isSelected && <span className="shrink-0 text-micro font-semibold text-lav-700">Selected</span>) : <span
                       className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border transition-colors ${
                         isSelected
                           ? "border-lav-700 bg-lav-700 text-white"
@@ -254,7 +257,7 @@ export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath
                       }`}
                     >
                       <Check className="h-3 w-3" />
-                    </span>
+                    </span>}
                   </div>
 
                   <div className="mt-2.5 flex items-end gap-2 sm:mt-4">
@@ -278,7 +281,7 @@ export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath
                         key={feature}
                         className={`${index >= 2 ? "hidden sm:flex" : "flex"} items-start gap-1.5 text-meta text-ink-2 sm:text-[0.8125rem]`}
                       >
-                        <Check className="mt-0.5 h-3 w-3 shrink-0 text-lav-500" />
+                        {!textOnly && <Check className="mt-0.5 h-3 w-3 shrink-0 text-lav-500" />}
                         {feature}
                       </li>
                     ))}
@@ -286,7 +289,7 @@ export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath
 
                   {plan.badge && (
                     <span className="absolute -top-2.5 right-4 inline-flex items-center gap-1 rounded-full bg-lav-100 px-2.5 py-1 text-micro font-bold uppercase tracking-[0.1em] text-lav-700">
-                      <Sparkle className="h-2.5 w-2.5" />
+                      {!textOnly && <Sparkle className="h-2.5 w-2.5" />}
                       {plan.badge}
                     </span>
                   )}
@@ -305,10 +308,10 @@ export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath
               </p>
               <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-ink-3">
                 <span className="inline-flex items-center gap-1">
-                  <Shield className="h-3 w-3 text-lav-500" /> Support for delivery issues
+                  {!textOnly && <Shield className="h-3 w-3 text-lav-500" />} Support for delivery issues
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <Lock className="h-3 w-3 text-lav-500" /> Secure Naira checkout
+                  {!textOnly && <Lock className="h-3 w-3 text-lav-500" />} Secure Naira checkout
                 </span>
                 {signedIn && walletBalance !== null && (
                   <span className="inline-flex items-center gap-1">
@@ -335,7 +338,7 @@ export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath
                   className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
                   {pending ? "Processing…" : "Pay from wallet"}
-                  {!pending && <ArrowRight className="h-4 w-4" />}
+                  {!textOnly && !pending && <ArrowRight className="h-4 w-4" />}
                 </button>
               ) : (
                 <Link
@@ -343,7 +346,7 @@ export function PlanPurchase({ groups, signedIn, userId, walletBalance, nextPath
                   className="btn btn-primary w-full sm:w-auto"
                 >
                   Sign in to buy
-                  <ArrowRight className="h-4 w-4" />
+                  {!textOnly && <ArrowRight className="h-4 w-4" />}
                 </Link>
               )}
               {error && (

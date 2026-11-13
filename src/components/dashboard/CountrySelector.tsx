@@ -1,6 +1,5 @@
 "use client";
 
-import { CountryFlag } from "@/components/CountryFlag";
 import { EXPLORER_COUNTRIES } from "@/lib/content/explorer-countries";
 import { explorerCountry } from "@/lib/services/service-explorer";
 
@@ -14,30 +13,24 @@ type Props = {
 };
 
 export function CountrySelector({ id, value, onChange, name }: Props) {
-  const selected = explorerCountry(value);
-
   return (
     <div>
       <label htmlFor={id} className="mb-2 block text-meta font-semibold text-ink-2">
         Country of service
       </label>
       <div className="relative flex items-center rounded-xl border border-line bg-white transition-colors focus-within:border-lav-500 focus-within:ring-4 focus-within:ring-lav-100">
-        <span className="pointer-events-none absolute left-3.5">
-          <CountryFlag code={selected?.code} region={selected?.name ?? "Choose a country"} size={24} decorative />
-        </span>
         <select
           id={id}
           name={name}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="min-h-12 w-full appearance-none rounded-xl bg-transparent py-3 pl-12 pr-10 text-[0.875rem] font-medium text-ink outline-none"
+          className="min-h-12 w-full rounded-xl bg-transparent py-3 pl-3.5 pr-3 text-[0.875rem] font-medium text-ink outline-none"
         >
           <option value="">Select a country</option>
           {EXPLORER_COUNTRIES.map((country) => <option key={country.code} value={country.code}>{country.name}{country.dial ? ` (${country.dial})` : ""}</option>)}
         </select>
-        <span className="pointer-events-none absolute right-4 text-ink-3" aria-hidden="true">⌄</span>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-1.5" aria-label="Quick country choices">
+      <div className="mt-3 flex flex-wrap items-center gap-1.5" role="group" aria-label="Quick country choices">
         <span className="mr-1 text-micro text-ink-3">Quick select:</span>
         {QUICK_COUNTRIES.map((code) => {
           const country = explorerCountry(code)!;
@@ -50,7 +43,6 @@ export function CountrySelector({ id, value, onChange, name }: Props) {
               onClick={() => onChange(code)}
               className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-micro font-semibold transition-colors ${active ? "border-lav-400 bg-lav-100 text-lav-800" : "border-line bg-white/75 text-ink-2 hover:border-lav-300"}`}
             >
-              <CountryFlag code={country.code} size={15} decorative radius={8} />
               {country.name === "United States" ? "US" : country.name === "United Kingdom" ? "UK" : country.name}
             </button>
           );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AssistantPresence, type PresenceState } from "@/components/support/AssistantPresence";
@@ -87,7 +87,7 @@ function timeOf(iso: string): string {
   });
 }
 
-function Bubble({ message }: { message: ChatMessage }) {
+function Bubble({ message, textOnly }: { message: ChatMessage; textOnly: boolean }) {
   const mine = message.role === "customer";
   const assistant = message.role === "assistant";
   const admin = message.role === "admin";
@@ -113,12 +113,12 @@ function Bubble({ message }: { message: ChatMessage }) {
       <div className="flex items-center gap-1.5">
         {assistant ? (
           <>
-            <Sparkle className="h-3.5 w-3.5 text-lav-700" />
+            {!textOnly && <Sparkle className="h-3.5 w-3.5 text-lav-700" />}
             <span className="text-micro font-semibold text-lav-800">PryvaLogs assistant</span>
           </>
         ) : admin ? (
           <>
-            <User className="h-3.5 w-3.5 text-ink-2" />
+            {!textOnly && <User className="h-3.5 w-3.5 text-ink-2" />}
             <span className="text-micro font-semibold text-ink">PryvaLogs support team</span>
           </>
         ) : (
@@ -144,12 +144,18 @@ export function SupportChat({
   examples = [],
   closed = false,
   escalated: initiallyEscalated = false,
+  compact = false,
+  textOnly = false,
 }: {
   ticketId?: string | null;
   initialMessages?: ChatMessage[];
   examples?: string[];
   closed?: boolean;
   escalated?: boolean;
+  /** Keep the composer reachable inside the small floating support panel. */
+  compact?: boolean;
+  /** Hide illustrations and glyphs on the customer dashboard. */
+  textOnly?: boolean;
 }) {
   const router = useRouter();
   const [ticketId, setTicketId] = useState<string | null>(initialTicketId);
@@ -161,7 +167,8 @@ export function SupportChat({
   const [status, setStatus] = useState<string | null>(null);
   const [escalated, setEscalated] = useState(initiallyEscalated);
   const [escalating, setEscalating] = useState(false);
-  const endRef = useRef<HTMLDivElement | null>(null);
+  const messageId = useId();
+  const logRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const question = draftFromHash(window.location.hash);
@@ -172,8 +179,10 @@ export function SupportChat({
   }, []);
 
   useEffect(() => {
-    // Scroll once the transcript grows, and only inside this card — never the page.
-    endRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    // Only scroll the transcript itself. scrollIntoView also scrolls ancestors,
+    // which used to shift the floating panel and the page as soon as it opened.
+    const log = logRef.current;
+    if (log && (messages.length > 0 || sending)) log.scrollTop = log.scrollHeight;
   }, [messages.length, sending]);
 
   const send = useCallback(async () => {
@@ -270,10 +279,10 @@ export function SupportChat({
 
   return (
     <div className="grid gap-3">
-      <AssistantPresence state={presence} />
+      {!compact && <AssistantPresence state={presence} textOnly={textOnly} />}
 
       <section
-        className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-4 sm:p-5"
+        className={`border border-line bg-[#fffdfa] ${compact ? "rounded-2xl p-3" : "rounded-[1.5rem] p-4 sm:p-5"}`}
         aria-label="Support conversation"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -284,7 +293,8 @@ export function SupportChat({
         </div>
 
         <div
-          className="mt-3 grid max-h-[26rem] gap-2.5 overflow-y-auto pr-1"
+          ref={logRef}
+          className={`mt-3 grid gap-2.5 overflow-y-auto pr-1 ${compact ? "max-h-[min(10rem,25dvh)]" : "max-h-[26rem]"}`}
           role="log"
           aria-live="polite"
           aria-relevant="additions"
@@ -292,34 +302,32 @@ export function SupportChat({
           {showGreeting ? (
             <div className={`${BUBBLE_BASE} mr-auto rounded-bl-md border border-lav-200 bg-lav-50/60`}>
               <div className="flex items-center gap-1.5">
-                <Sparkle className="h-3.5 w-3.5 text-lav-700" />
+                {!textOnly && <Sparkle className="h-3.5 w-3.5 text-lav-700" />}
                 <span className="text-micro font-semibold text-lav-800">PryvaLogs assistant</span>
               </div>
               <p className="mt-1.5 text-[0.875rem] leading-relaxed text-ink-2">
-                Describe it the way you would to a person. I read your account and can settle most problems
-                without waiting — and when I cannot, I say so and a person takes over with the details already in
-                hand.
+                {compact
+                  ? "Tell us what happened. The assistant can check your account or connect you with a person."
+                  : "Describe it the way you would to a person. I read your account and can settle most problems without waiting — and when I cannot, I say so and a person takes over with the details already in hand."}
               </p>
             </div>
           ) : null}
 
           {messages.map((message) => (
-            <Bubble key={message.id} message={message} />
+            <Bubble key={message.id} message={message} textOnly={textOnly} />
           ))}
 
           {sending ? (
             <div className="mr-auto flex items-center gap-2 rounded-2xl rounded-bl-md border border-lav-200 bg-lav-50/40 px-4 py-2.5">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-lav-700" />
+              {!textOnly && <Loader2 className="h-3.5 w-3.5 animate-spin text-lav-700" />}
               <span className="text-meta text-ink-2">Checking your account…</span>
             </div>
           ) : null}
-
-          <div ref={endRef} />
         </div>
 
         {error ? (
           <p className="mt-3 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50/70 px-3 py-2 text-meta text-rose-800">
-            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {!textOnly && <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
             {error}
           </p>
         ) : null}
@@ -336,11 +344,11 @@ export function SupportChat({
               void send();
             }}
           >
-            <label htmlFor="support-message" className="sr-only">
+            <label htmlFor={messageId} className="sr-only">
               Your message
             </label>
             <textarea
-              id="support-message"
+              id={messageId}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
@@ -351,7 +359,7 @@ export function SupportChat({
                   void send();
                 }
               }}
-              rows={3}
+              rows={compact ? 2 : 3}
               maxLength={8000}
               placeholder={
                 messages.length === 0
@@ -381,10 +389,10 @@ export function SupportChat({
               <button
                 type="submit"
                 disabled={sending || draft.trim().length < 2}
-                className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-[0.8125rem] font-semibold text-white hover:bg-ink-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-ink px-4 py-2 text-[0.8125rem] font-semibold text-white hover:bg-ink-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                {messages.length === 0 ? "Ask the assistant" : "Send"}
+                {!textOnly && (sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />)}
+                {sending && textOnly ? "Sending…" : messages.length === 0 ? "Ask the assistant" : "Send"}
               </button>
 
               {ticketId && !escalated ? (

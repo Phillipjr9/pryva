@@ -109,7 +109,7 @@ describe("service readiness", () => {
       { state: "buy" },
       { state: "unavailable" },
     ]);
-    expect(summary).toContain("2 ready to buy");
+    expect(summary).toContain("2 ordering enabled");
     expect(summary).toContain("1 not connected");
     expect(summary).not.toContain("ordered");
     expect(readinessSummary([])).toBe("");

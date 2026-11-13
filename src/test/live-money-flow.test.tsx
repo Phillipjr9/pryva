@@ -126,7 +126,7 @@ describe("Paystack return confirmation", () => {
     expect(await screen.findByRole("heading", { name: "Funds added to your wallet" })).toBeTruthy();
     expect(screen.getByText("₦7,000")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Download receipt" })).toBeTruthy();
-    expect(mocks.confetti).toHaveBeenCalledTimes(1);
+    expect(mocks.confetti).not.toHaveBeenCalled();
     expect(readPendingPaystackTopUps(localStorage, userId)).toHaveLength(0);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
@@ -213,7 +213,7 @@ describe("withdrawal request review", () => {
       const path = String(url);
       if (path === "/api/wallet/bank-accounts" && !init?.method) return response({ ok: true, bankAccounts: [] });
       if (path === "/api/wallet/banks") return response({ ok: true, banks: [{ name: "Test Bank", code: "044" }] });
-      if (path === "/api/wallet/withdraw/history") return response({ ok: true, withdrawals: [] });
+      if (path === "/api/wallet/withdraw/history") return response({ ok: true, withdrawals: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } });
       if (path === "/api/wallet/verify-account") return new Promise<Response>((resolve) => { finishVerify = resolve; });
       if (path === "/api/wallet/bank-accounts" && init?.method === "POST") {
         expect(JSON.parse(init.body as string)).toMatchObject({ bankCode: "044", accountNumber: "1234567890", expectedAccountName: "Test Customer" });
@@ -245,7 +245,7 @@ describe("withdrawal request review", () => {
       const path = String(url);
       if (path === "/api/wallet/bank-accounts") return response({ ok: true, bankAccounts: [bank] });
       if (path === "/api/wallet/banks") return response({ ok: true, banks: [] });
-      if (path === "/api/wallet/withdraw/history") return response({ ok: true, withdrawals: [] });
+      if (path === "/api/wallet/withdraw/history") return response({ ok: true, withdrawals: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } });
       if (path === "/api/wallet/withdraw" && init?.method === "POST") {
         postCount++;
         expect(JSON.parse(init.body as string)).toEqual({ requestId, amount: 6000, bankAccountId: bankId });

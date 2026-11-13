@@ -88,7 +88,7 @@ export function BrandLockup({
   return (
     <Link
       href={href}
-      aria-label="Pryva home"
+      aria-label="PryvaLogs home"
       className="inline-flex shrink-0 items-center rounded-xl outline-none transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:ring-lav-400"
     >
       {content}

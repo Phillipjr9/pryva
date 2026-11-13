@@ -1,37 +1,38 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/identity/auth";
 import { formatNaira } from "@/lib/services/catalog";
 import { walletEntryDirection, walletEntrySign } from "@/lib/payments/wallet-activity";
-import { ArrowRight, Chat, Clock, Receipt, Shield } from "@/components/icons";
-import { ServiceIcon } from "@/components/ServiceIcon";
+
 import { LiveCodeCard, type LiveCode } from "@/components/dashboard/LiveCodeCard";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { BalanceHero } from "@/components/dashboard/BalanceHero";
 import { readServiceReadiness } from "@/lib/services/service-readiness";
-import { orderByReadiness, SERVICE_STATE_DOT, SERVICE_STATE_LABEL } from "@/lib/services/service-states";
+import { orderByReadiness, SERVICE_STATE_LABEL } from "@/lib/services/service-states";
 import { countActiveRentedNumbers } from "@/lib/services/numbers/active-rentals";
+import { isPreviewDatabase } from "@/lib/platform/demo-policy";
+import { CODE_TRIM_WHITESPACE, hasLiveOrderCode } from "@/lib/services/order-history";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
 
 const quickBuys = [
-  { label: "Number plans", note: "App-specific & general plans", href: "/dashboard/services?country=ng&category=numbers", service: "numbers" as const, category: "numbers" },
-  { label: "Social boosts", note: "Followers, likes & views", href: "/dashboard/services?country=ng&category=social", service: "social-promotion" as const, category: "social" },
-  { label: "eSIM data", note: "Travel data plans", href: "/dashboard/services?country=ng&category=esim", service: "esim" as const, category: "esim" },
-  { label: "Residential proxies", note: "Clean rotating IP pools", href: "/dashboard/services?country=ng&category=proxies", service: "proxies" as const, category: "proxies" },
-  { label: "Social & Digital Accounts", note: "Social media, email & aged listings", href: "/dashboard/accounts", service: "accounts" as const, category: "accounts" },
-  { label: "Games & gaming", note: "Games, keys & credits", href: "/dashboard/services?category=games", service: "games" as const, category: "games" },
-  { label: "Account top-ups", note: "Game & account credits", href: "/dashboard/services?category=topups", service: "topups" as const, category: "topups" },
-  { label: "Gift cards", note: "Vouchers & app stores", href: "/dashboard/services?category=gift-cards", service: "gift-cards" as const, category: "gift-cards" },
-  { label: "Subscriptions", note: "Entertainment & tools", href: "/dashboard/services?category=subscriptions", service: "subscriptions" as const, category: "subscriptions" },
-  { label: "Prepaid & finance", note: "Prepaid products & cards", href: "/dashboard/services?category=prepaid", service: "prepaid" as const, category: "prepaid" },
-  { label: "Mobile data & airtime", note: "MTN, Airtel, Glo & 9mobile", href: "/dashboard/services?category=data", service: "data" as const, category: "data" },
-  { label: "Temporary inbox", note: "Free disposable email", href: "/dashboard/inbox", service: "email-otp" as const, category: "email" },
-  { label: "Bulk orders", note: "Volume basket discounts", href: "/dashboard/bulk-orders", service: "bulk" as const, category: "tools" },
+  { label: "Number plans", note: "App-specific & general plans", href: "/dashboard/services?country=ng&category=numbers", category: "numbers" },
+  { label: "Social boosts", note: "Followers, likes & views", href: "/dashboard/services?country=ng&category=social", category: "social" },
+  { label: "eSIM data", note: "Travel data plans", href: "/dashboard/services?country=ng&category=esim", category: "esim" },
+  { label: "Residential proxies", note: "Clean rotating IP pools", href: "/dashboard/services?country=ng&category=proxies", category: "proxies" },
+  { label: "Social & Digital Accounts", note: "Social media, email & aged listings", href: "/dashboard/accounts", category: "accounts" },
+  { label: "Games & gaming", note: "Games, keys & credits", href: "/dashboard/services?category=games", category: "games" },
+  { label: "Account top-ups", note: "Game & account credits", href: "/dashboard/services?category=topups", category: "topups" },
+  { label: "Gift cards", note: "Vouchers & app stores", href: "/dashboard/services?category=gift-cards", category: "gift-cards" },
+  { label: "Subscriptions", note: "Entertainment & tools", href: "/dashboard/services?category=subscriptions", category: "subscriptions" },
+  { label: "Prepaid & finance", note: "Prepaid products & cards", href: "/dashboard/services?category=prepaid", category: "prepaid" },
+  { label: "Mobile data & airtime", note: "MTN, Airtel, Glo & 9mobile", href: "/dashboard/services?category=data", category: "data" },
+  { label: "Temporary inbox", note: "Free disposable email", href: "/dashboard/inbox", category: "email" },
+  { label: "Bulk orders", note: "Volume basket discounts", href: "/dashboard/bulk-orders", category: "tools" },
 ] as const;
 
 function statusStyle(status: string) {
@@ -72,38 +73,52 @@ export default async function DashboardOverviewPage() {
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
 
-  const [recentOrders, recentTx, activeOrderRows, [orderCount], activeNumbers] =
+  const liveCriteria = and(
+    eq(orders.userId, user.id),
+    inArray(orders.service, ["numbers", "email-otp"]),
+    inArray(orders.status, ["active", "delivered"]),
+    gt(orders.expiresAt, new Date(now)),
+    isNull(orders.refundedAt),
+  );
+  const liveFields = {
+    id: orders.id, productName: orders.productName, planLabel: orders.planLabel,
+    region: orders.region, amount: orders.amount, referenceCode: orders.referenceCode,
+    otpCode: orders.otpCode, expiresAt: orders.expiresAt, createdAt: orders.createdAt,
+    status: orders.status, refundedAt: orders.refundedAt,
+  };
+  // The preview adapter cannot evaluate translate; its process-local data is
+  // small, so use the JS predicate there. Real databases filter before limiting,
+  // using JavaScript's exact trim whitespace set, so blank codes cannot hide
+  // older eligible ones (including when the blank is Unicode whitespace).
+  const liveQuery = isPreviewDatabase()
+    ? db.select(liveFields).from(orders).where(liveCriteria).orderBy(desc(orders.createdAt), desc(orders.id))
+    : db.select(liveFields).from(orders)
+      .where(and(liveCriteria, sql`translate(${orders.otpCode}, ${CODE_TRIM_WHITESPACE}, '') <> ''`))
+      .orderBy(desc(orders.createdAt), desc(orders.id)).limit(2);
+
+  const [recentOrders, recentTx, liveRows, [orderCount], activeNumbers] =
     await Promise.all([
       db
         .select()
         .from(orders)
         .where(eq(orders.userId, user.id))
-        .orderBy(desc(orders.createdAt))
+        .orderBy(desc(orders.createdAt), desc(orders.id))
         .limit(4),
       db
         .select()
         .from(walletTransactions)
         .where(eq(walletTransactions.userId, user.id))
-        .orderBy(desc(walletTransactions.createdAt))
+        .orderBy(desc(walletTransactions.createdAt), desc(walletTransactions.id))
         .limit(4),
-      db
-        .select()
-        .from(orders)
-        .where(and(eq(orders.userId, user.id), eq(orders.status, "active")))
-        .orderBy(desc(orders.createdAt))
-        .limit(50),
+      liveQuery,
       db.select({ value: count() }).from(orders).where(eq(orders.userId, user.id)),
       countActiveRentedNumbers(user.id, new Date(now)),
     ]);
 
   // Aggregates, never a slice: headline numbers must describe the whole account.
   const totalOrders = Number(orderCount?.value ?? 0);
-  const liveCodes: LiveCode[] = activeOrderRows
-    .filter((order) => {
-      if (order.service !== "numbers" && order.service !== "email-otp") return false;
-      if (!order.expiresAt) return Boolean(order.otpCode);
-      return new Date(order.expiresAt).getTime() > now;
-    })
+  const liveCodes: LiveCode[] = liveRows
+    .filter((order) => hasLiveOrderCode(order, now))
     .slice(0, 2)
     .map((order) => ({
       id: order.id,
@@ -118,7 +133,7 @@ export default async function DashboardOverviewPage() {
     }));
 
   // min-w-0 plus minmax(0,…) tracks: an implicit auto grid track is sized to its
-  // items' min-content, and a truncated order reference is long enough to push
+  // items' min-content, and an unbroken order reference is long enough to push
   // the whole overview past a 375px viewport once an order exists.
   return (
     <div className="grid min-w-0 grid-cols-1 gap-4">
@@ -135,7 +150,6 @@ export default async function DashboardOverviewPage() {
         <LiveCodeCard codes={liveCodes} initialNow={now} />
       ) : (
         <EmptyState
-          icon={Clock}
           title="No code waiting right now"
           body="When a verification code arrives it lands here first, with a timer."
           action={{ label: "Explore number plans", href: "/dashboard/services?category=numbers" }}
@@ -152,7 +166,7 @@ export default async function DashboardOverviewPage() {
               href="/dashboard/orders"
               className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline"
             >
-              View all <ArrowRight className="h-3 w-3" />
+              View all
             </Link>
           </div>
 
@@ -169,10 +183,10 @@ export default async function DashboardOverviewPage() {
                   className="flex items-center justify-between gap-3 py-3 transition-colors hover:bg-lav-50/40"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-[0.875rem] font-semibold text-ink">
+                    <p className="[overflow-wrap:anywhere] text-[0.875rem] font-semibold text-ink">
                       {order.productName} · {order.planLabel}
                     </p>
-                    <p className="truncate text-meta text-ink-3">
+                    <p className="[overflow-wrap:anywhere] text-meta text-ink-3">
                       {order.reference} ·{" "}
                       {new Date(order.createdAt).toLocaleDateString("en-NG", {
                         day: "numeric",
@@ -199,47 +213,43 @@ export default async function DashboardOverviewPage() {
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <h3 className="text-[1rem] font-semibold">Quick actions</h3>
-              <p className="mt-0.5 text-meta text-ink-3">Choose the next service or plan you need.</p>
+              <p className="mt-0.5 text-meta text-ink-3">Labels show setup; check each listing for availability.</p>
             </div>
             <Link
               href="/dashboard/services?country=ng"
               className="inline-flex shrink-0 items-center gap-1 text-meta font-semibold text-lav-700 hover:underline"
             >
-              <Receipt className="h-3 w-3" /> All services
+               All services
             </Link>
           </div>
           <Link
             href={accountShortcut.href}
             className="group mt-3 flex min-h-[76px] min-w-0 items-center gap-3 rounded-2xl border border-lav-200 bg-lav-50/70 p-3 transition-colors hover:border-lav-400 hover:bg-lav-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-lav-500 sm:p-3.5"
           >
-            <ServiceIcon service={accountShortcut.service} size="sm" />
             <span className="min-w-0 flex-1">
               <span className="block break-words text-[0.875rem] font-semibold leading-snug text-ink group-hover:text-lav-700">{accountShortcut.label}</span>
               <span className="mt-0.5 block text-micro leading-snug text-ink-3">Browse account listings · separate from App verification</span>
               <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-1 text-micro font-semibold text-ink-2">
-                <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${SERVICE_STATE_DOT[accountState]}`} />
                 {SERVICE_STATE_LABEL[accountState]}
               </span>
             </span>
-            <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0 text-ink-3 group-hover:text-lav-700" />
+
           </Link>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-2.5 lg:grid-cols-1">
             {serviceTiles.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
-                className="group flex min-w-0 flex-col items-center gap-1.5 rounded-xl border border-line bg-white p-2 text-center transition-all hover:border-lav-300 hover:shadow-xs sm:flex-row sm:items-center sm:gap-2.5 sm:p-2.5 sm:text-left"
+                className="group flex min-w-0 items-start rounded-xl border border-line bg-white p-3 text-left transition-all hover:border-lav-300 hover:shadow-xs"
               >
-                <ServiceIcon service={item.service} size="sm" />
                 <span className="min-w-0 flex-1">
-                  <span className="flex min-w-0 items-center justify-center gap-1.5 sm:justify-start">
-                    <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${SERVICE_STATE_DOT[item.state]}`} />
+                  <span className="flex min-w-0 items-center gap-1.5">
                     <span className="block min-w-0 text-[0.8125rem] font-semibold leading-tight text-ink group-hover:text-lav-700 sm:text-[0.8125rem]">{item.label}</span>
                   </span>
                   <span className="hidden truncate text-micro text-ink-3 sm:block">{item.note}</span>
-                  <span className="sr-only"> — {SERVICE_STATE_LABEL[item.state]}</span>
+                  <span className="mt-1 block break-words text-micro font-medium leading-snug text-ink-2">{SERVICE_STATE_LABEL[item.state]}</span>
                 </span>
-                <ArrowRight className="hidden h-3.5 w-3.5 shrink-0 text-ink-3 transition-colors group-hover:text-lav-600 sm:block" />
+
               </Link>
             ))}
           </div>
@@ -275,7 +285,7 @@ export default async function DashboardOverviewPage() {
               {recentTx.map((tx) => (
                 <div key={tx.id} className="flex items-start justify-between gap-2 py-2.5">
                   <div className="min-w-0">
-                    <p className="truncate text-[0.8125rem] font-medium text-ink">{tx.description}</p>
+                    <p className="[overflow-wrap:anywhere] text-[0.8125rem] font-medium text-ink">{tx.description}</p>
                     <p className="text-micro text-ink-3">
                       {tx.reference} · Bal. {formatNaira(tx.balanceAfter)}
                     </p>
@@ -296,7 +306,7 @@ export default async function DashboardOverviewPage() {
 
         <section className="grid gap-2.5 rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
           <p className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
-            <Shield className="h-4 w-4 text-lav-700" /> Need help with an order?
+             Need help with an order?
           </p>
           <p className="text-[0.8125rem] leading-relaxed text-ink-2">
             If a code doesn&apos;t arrive, contact support with your order reference. Refund eligibility
@@ -307,16 +317,16 @@ export default async function DashboardOverviewPage() {
               href="/dashboard/orders"
               className="flex items-center justify-between rounded-lg bg-white/80 px-3 py-2 text-meta font-medium text-ink-2 hover:text-lav-700"
             >
-              Find an order code <ArrowRight className="h-3.5 w-3.5" />
+              Find an order code
             </Link>
             <Link
               href="/dashboard/support"
               className="flex items-center justify-between rounded-lg bg-white/80 px-3 py-2 text-meta font-medium text-ink-2 hover:text-lav-700"
             >
               <span className="inline-flex items-center gap-1.5">
-                <Chat className="h-3.5 w-3.5" /> Message support
+                 Message support
               </span>
-              <ArrowRight className="h-3.5 w-3.5" />
+
             </Link>
           </div>
         </section>

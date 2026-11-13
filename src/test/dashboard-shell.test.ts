@@ -122,22 +122,20 @@ describe("dashboard navigation", () => {
     expect(shell).not.toContain(">\n                Need help?\n");
   });
 
-  it("keeps controls in one row on ordinary phones and can wrap on tiny screens", () => {
-    const header = shell.slice(shell.indexOf("rounded-[1.25rem]"), shell.indexOf("<main"));
-    expect(header).toContain("max-[340px]:flex-wrap");
-    expect(header).not.toMatch(/(?<!:)\bflex-wrap\b/);
-    // The greeting yields space instead of the controls at ordinary widths.
+  it("keeps the header controls together, wrapping before they overlap a large balance", () => {
+    const header = shell.slice(shell.indexOf('data-dashboard-header className="relative'), shell.indexOf("<main"));
+    // Most balances fit on one row; longer values can move the control group
+    // below the menu instead of shrinking its parent underneath the search icon.
+    expect(header).toContain("flex flex-wrap items-center");
+    expect(header).toContain("min-w-0 shrink-0 items-center gap-2.5 lg:shrink");
+    expect(header).toContain("max-w-full flex-wrap items-center");
     expect(header).toContain("truncate text-[0.875rem]");
     expect(header).toContain("shrink-0 items-center");
   });
 
-  it("renders the bell icon-only in the header, with no label to wrap", () => {
-    // The bell was given `h-9 w-9 p-0` from outside while still rendering a
-    // "Notifications" label and its own padding. The label could not fit, and
-    // `overflow-wrap: anywhere` from the shared `.btn` rule broke it one
-    // character per line — the vertical "Notifications" that ran out of the bar.
+  it("renders a compact text-labelled notification control in the header", () => {
     expect(shell).not.toContain("NotificationBell className=\"h-9 w-9 p-0\"");
-    expect(shell).toContain("<NotificationBell iconOnly />");
+    expect(shell).toContain('<NotificationBell textOnly alignToHeader viewAllHref="/dashboard/notifications" />');
   });
 
   it("lifts the floating help button clear of the mobile tab bar", () => {
@@ -153,6 +151,8 @@ describe("dashboard navigation", () => {
     );
     expect(float).toContain("raisedAboveTabBar");
     expect(float).toContain("4.75rem");
+    // The tabs stay visible until lg, not just until sm.
+    expect(float).toContain("lg:bottom-5");
     // Outside the dashboard there is no tab bar, so the button stays put.
     expect(float).toContain("bottom-4 sm:bottom-5");
   });

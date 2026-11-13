@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { DigitalProductIcon } from "@/components/DigitalProductIcon";
 import { useState } from "react";
 
 type Kind = "codes" | "topups" | "esims";
@@ -25,8 +24,8 @@ export function AvailableDigitalProducts({ offers, starsEnabled }: { offers: Off
       <div><label htmlFor="available-kind" className="block text-meta font-semibold text-ink">Product type</label><select id="available-kind" value={kind} onChange={(event) => { setKind(event.target.value as Kind | "all"); setLimit(PAGE_SIZE); }} className="mt-2 min-h-11 w-full rounded-xl border border-line px-3 py-2"><option value="all">All types</option><option value="codes">Codes and game keys</option><option value="topups">Account top-ups</option><option value="esims">Travel eSIMs</option></select></div>
     </div>
     {filtered.length || showStars ? <ul className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-      {showStars && <li className="rounded-xl border border-line p-3"><div className="flex items-center gap-3"><DigitalProductIcon name="Telegram Stars" /><p className="font-semibold text-ink">Telegram Stars</p></div><p className="text-meta text-ink-3">Account top-up</p><Link href="/dashboard/telegram-stars" className="mt-1 inline-block text-meta font-semibold text-lav-700 underline">Check price and availability</Link></li>}
-      {filtered.slice(0, limit).map((offer) => <li key={`${offer.kind}:${offer.id}`} className="rounded-xl border border-line p-3"><div className="flex items-center gap-3"><DigitalProductIcon name={offer.name} /><p className="min-w-0 font-semibold text-ink">{offer.name}</p></div><p className="text-meta text-ink-3">{labels[offer.kind]} · {offer.region}</p><Link href={`/dashboard/digital-${offer.kind}?product=${encodeURIComponent(offer.id)}`} className="mt-1 inline-block text-meta font-semibold text-lav-700 underline">Check price and availability</Link></li>)}
+      {showStars && <li className="rounded-xl border border-line p-3"><div className="flex items-center gap-3"><p className="font-semibold text-ink">Telegram Stars</p></div><p className="text-meta text-ink-3">Account top-up</p><Link href="/dashboard/telegram-stars" className="mt-1 inline-block text-meta font-semibold text-lav-700 underline">Check price and availability</Link></li>}
+      {filtered.slice(0, limit).map((offer) => <li key={`${offer.kind}:${offer.id}`} className="rounded-xl border border-line p-3"><div className="flex items-center gap-3"><p className="min-w-0 font-semibold text-ink">{offer.name}</p></div><p className="text-meta text-ink-3">{labels[offer.kind]} · {offer.region}</p><Link href={`/dashboard/digital-${offer.kind}?product=${encodeURIComponent(offer.id)}`} className="mt-1 inline-block text-meta font-semibold text-lav-700 underline">Check price and availability</Link></li>)}
     </ul> : <p className="mt-4 text-meta text-ink-2">{offers.length || starsEnabled ? "No configured products match your search." : "No digital products are currently configured for checkout. You can still explore the catalogue below."}</p>}
     {filtered.length > limit && <button type="button" onClick={() => setLimit((value) => value + PAGE_SIZE)} className="mt-4 rounded-lg border border-line px-3 py-2 text-meta font-semibold">Show more products</button>}
   </section>;

@@ -58,7 +58,7 @@ describe("service explorer live listings", () => {
     render(<ServiceExplorer initialCountry="us" initialCategory="verification" />);
     expect(await screen.findByRole("heading", { name: "Stale WhatsApp" })).toBeTruthy();
     expect(screen.getByText(/Live listings may be incomplete or out of date/)).toBeTruthy();
-    expect(screen.queryByText(/Live listings are current/)).toBeNull();
+    expect(screen.queryByText(/Live listings loaded/)).toBeNull();
     expect(screen.getByText("2026-01-01 12:34:56 UTC")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Retry" }).hasAttribute("disabled")).toBe(true);
   });
@@ -81,7 +81,7 @@ describe("service explorer live listings", () => {
     expect(screen.getByText(/Live listings are still loading/)).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(4);
     await act(async () => { finishOtp({ ok: true, json: async () => ({ ok: true, country: "us", live: true, items: [] }) }); });
-    expect(await screen.findByText(/Live listings are current/)).toBeTruthy();
+    expect(await screen.findByText(/Live listings loaded/)).toBeTruthy();
     const social = screen.getAllByRole("button", { name: /Social promotion/i }).find((button) => button.hasAttribute("aria-pressed"));
     expect(social).toBeTruthy();
     fireEvent.click(social!);
@@ -103,13 +103,13 @@ describe("service explorer live listings", () => {
     render(<ServiceExplorer initialCountry="us" initialCategory="all" />);
     const retry = await screen.findByRole("button", { name: "Retry" });
     expect(screen.getByText(/Live listings are still loading/)).toBeTruthy();
-    expect(screen.queryByText(/Live listings are current/)).toBeNull();
+    expect(screen.queryByText(/Live listings loaded/)).toBeNull();
     expect(retry).toHaveProperty("disabled", false);
     fireEvent.click(retry);
     expect(await screen.findByRole("heading", { name: "Recovered rental" })).toBeTruthy();
     expect(numbersReads).toBe(2);
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("feed=verification"))).toHaveLength(1);
-    expect(screen.queryByText(/Live listings are current/)).toBeNull();
+    expect(screen.queryByText(/Live listings loaded/)).toBeNull();
   });
 
   it("keeps successful listings visible and reports a failed feed", async () => {
@@ -158,7 +158,7 @@ describe("service explorer live listings", () => {
     expect(within(card).getAllByText("7 left").length).toBeGreaterThan(0);
     expect(within(card).getByText("Not tracked")).toBeTruthy();
     expect(within(card).getByRole("button", { name: "Purchasing locked" }).hasAttribute("disabled")).toBe(true);
-    expect(screen.getByText(/Live listings are current/)).toBeTruthy();
+    expect(screen.getByText(/Live listings loaded/)).toBeTruthy();
     expect(screen.getByText("2026-01-01 12:34:56 UTC")).toBeTruthy();
   });
 
@@ -284,7 +284,7 @@ it("does not blame a healthy social shelf for a failed verification feed", async
     return { ok: true, json: async () => ({ ok: true, country: "us", live: true, items: [], fetchedAt: "2026-11-11T20:00:00Z" }) };
   }));
   render(<ServiceExplorer initialCountry="us" initialCategory="social" />);
-  expect(await screen.findByText(/Live listings are current/)).toBeTruthy();
+  expect(await screen.findByText(/Live listings loaded/)).toBeTruthy();
   expect(screen.queryByText(/Some live listings could not be loaded/)).toBeNull();
   const verification = screen.getAllByRole("button", { name: /App verification/i }).find(button => button.hasAttribute("aria-pressed"));
   fireEvent.click(verification!);

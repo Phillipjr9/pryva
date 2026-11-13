@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/identity/auth";
 import { ORDER_HISTORY_PAGE_SIZE as ORDERS_PER_PAGE } from "@/lib/platform/pagination";
 import { formatNaira } from "@/lib/services/catalog";
-import { orderHistoryPageNumber, readOrderHistory, type OrderHistoryRow } from "@/lib/services/order-history";
-import { ArrowRight, ArrowUpRight, Clock, Receipt, Search, Sparkle } from "@/components/icons";
+import { hasLiveOrderCode, orderHistoryPageNumber, readOrderHistory, type OrderHistoryRow } from "@/lib/services/order-history";
+
 import { EmptyState } from "@/components/dashboard/EmptyState";
 
 export const metadata: Metadata = { title: "Orders" };
@@ -88,6 +88,9 @@ export default async function OrdersPage({
   const firstShown = (page - 1) * ORDERS_PER_PAGE + 1;
   const lastShown = firstShown + rows.length - 1;
   const narrowed = status !== "all" || query.length > 0;
+  // This dynamic server page uses one request-time instant for every row.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
 
   return (
     <div className="grid gap-4">
@@ -99,7 +102,7 @@ export default async function OrdersPage({
           </p>
         </div>
         <Link href="/pricing" className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.8125rem]">
-          <Sparkle className="h-3.5 w-3.5" /> New order
+           New order
         </Link>
       </div>
 
@@ -126,14 +129,14 @@ export default async function OrdersPage({
           </div>
           <form action="/dashboard/orders" className="relative w-full sm:w-64">
             {status !== "all" && <input type="hidden" name="status" value={status} />}
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-3" />
+
             <input
               type="search"
               name="q"
               defaultValue={q}
               placeholder="Search reference or product"
               aria-label="Search orders"
-              className="w-full rounded-full border border-line bg-white py-2 pl-9 pr-3 text-meta text-ink outline-none placeholder:text-ink-3 focus:border-lav-300"
+              className="w-full rounded-full border border-line bg-white py-2 px-3 text-meta text-ink outline-none placeholder:text-ink-3 focus:border-lav-300"
             />
           </form>
         </div>
@@ -141,14 +144,12 @@ export default async function OrdersPage({
 
       {totals.all === 0 ? (
         <EmptyState
-          icon={Receipt}
           title="No orders yet"
           body="Orders and their references appear here. Temporary inboxes are free and never create an order, so they do not appear in this list."
           action={{ label: "Browse pricing", href: "/pricing" }}
         />
       ) : rows.length === 0 ? (
         <EmptyState
-          icon={Search}
           title="Nothing matches that"
           body={`No ${status === "all" ? "" : `${status} `}orders match “${query}”. Try the reference number or a product name.`}
           action={{ label: "Clear filters", href: "/dashboard/orders" }}
@@ -171,8 +172,7 @@ export default async function OrdersPage({
                 <div className="divide-y divide-line/80">
                   {/* `relative` anchor for the desktop receipt link below. */}
                   {group.items.map((order) => {
-                    const expires = order.expiresAt ? new Date(order.expiresAt) : null;
-                    const live = expires && expires.getTime() > Date.now();
+                    const live = hasLiveOrderCode(order, now);
                     return (
                       <div key={order.id} className="relative">
                       <Link
@@ -180,10 +180,10 @@ export default async function OrdersPage({
                         className="grid gap-1.5 px-4 py-3.5 transition-colors hover:bg-lav-50/40 md:grid-cols-[1.45fr_0.9fr_0.7fr_0.75fr_0.25fr] md:items-center md:gap-3 md:px-5"
                       >
                         <div className="min-w-0">
-                          <p className="truncate text-[0.875rem] font-semibold text-ink">
+                          <p className="[overflow-wrap:anywhere] text-[0.875rem] font-semibold text-ink">
                             {order.productName}
                           </p>
-                          <p className="truncate text-meta text-ink-3">
+                          <p className="[overflow-wrap:anywhere] text-meta text-ink-3">
                             {order.planLabel} · {order.reference}
                           </p>
                         </div>
@@ -202,17 +202,15 @@ export default async function OrdersPage({
                           >
                             {order.status}
                           </span>
-                          {live && order.otpCode && (
+                          {live && (
                             <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-lav-50 px-2 py-1 text-micro font-semibold text-lav-700">
-                              <Clock className="h-2.5 w-2.5" /> Code live
+                               Code live
                             </span>
                           )}
                         </div>
-                        <span className="hidden justify-self-end text-ink-3 md:block">
-                          <ArrowUpRight className="h-4 w-4" />
-                        </span>
+
                         <span className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 md:hidden">
-                          Open order <ArrowRight className="h-3 w-3" />
+                          Open order
                         </span>
                       </Link>
                       {/*
@@ -227,7 +225,7 @@ export default async function OrdersPage({
                         aria-label={`Receipt for ${order.productName}, ${order.reference}`}
                         className="mb-3 ml-4 inline-flex items-center gap-1.5 text-meta font-semibold text-ink-3 hover:text-lav-700 md:absolute md:right-14 md:top-1/2 md:mb-0 md:ml-0 md:-translate-y-1/2"
                       >
-                        <Receipt className="h-3.5 w-3.5" aria-hidden="true" />
+
                         Receipt
                       </Link>
                       </div>

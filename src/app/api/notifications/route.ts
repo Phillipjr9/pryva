@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     const userNotifications = await db.query.notifications.findMany({
       where: eq(notifications.userId, user.id),
-      orderBy: [desc(notifications.createdAt)],
+      orderBy: [desc(notifications.createdAt), desc(notifications.id)],
       limit,
       offset,
     });

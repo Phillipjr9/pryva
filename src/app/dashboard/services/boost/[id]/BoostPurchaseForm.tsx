@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Lock } from "@/components/icons";
+
 import { formatNaira } from "@/lib/services/catalog";
 
 /** Persist the attempt before sending. A reload or lost response must not
@@ -119,7 +119,7 @@ export function BoostPurchaseForm({ listing, walletBalance, userId }: { listing:
     return (
       <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50/60 p-5">
         <p className="flex items-center gap-2 text-[0.9375rem] font-semibold text-emerald-900">
-          <Check className="h-4 w-4" /> Boost started
+           Boost started
         </p>
         <p className="mt-1 text-meta text-emerald-900">
           {receipt.quantity.toLocaleString("en-NG")} {listing.tag.toLowerCase()} for{" "}
@@ -131,7 +131,7 @@ export function BoostPurchaseForm({ listing, walletBalance, userId }: { listing:
         )}
         <div className="mt-3 flex flex-wrap gap-3">
           <Link href="/dashboard/orders" className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem]">
-            View orders <ArrowRight className="h-3.5 w-3.5" />
+            View orders
           </Link>
           <button
             type="button"
@@ -208,7 +208,7 @@ export function BoostPurchaseForm({ listing, walletBalance, userId }: { listing:
         {pending ? "Placing order…" : <>Pay {formatNaira(total)} from wallet</>}
       </button>
       <p className="flex items-center gap-1.5 text-micro text-ink-3">
-        <Lock className="h-3 w-3" /> Charged from your Pryva wallet. If the order outcome is uncertain,
+         Charged from your Pryva wallet. If the order outcome is uncertain,
         the order and charge are held for review rather than automatically retried or refunded.
       </p>
     </div>

@@ -138,10 +138,24 @@ export async function redeemGiftCard(params: {
   return result;
 }
 
+/**
+ * The status a customer should see for a card, not the status stored on the row.
+ *
+ * Redemption checks expiry synchronously, so an expired card cannot be spent
+ * even if nothing ever swept its `active` status. History has to say the same
+ * thing; otherwise a lapsed card is advertised as available.
+ */
+export function giftCardDisplayStatus(
+  card: { status: string; expiresAt: Date },
+  now: number = Date.now(),
+): string {
+  return card.status === "active" && card.expiresAt.getTime() <= now ? "expired" : card.status;
+}
+
 export async function getUserGiftCards(userId: string) {
   return db.query.giftCards.findMany({
     where: eq(giftCards.purchasedBy, userId),
-    orderBy: (cards, { desc }) => [desc(cards.createdAt)],
+    orderBy: (cards, { desc }) => [desc(cards.createdAt), desc(cards.id)],
   });
 }
 

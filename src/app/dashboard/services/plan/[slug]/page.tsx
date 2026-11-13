@@ -6,7 +6,6 @@ import { findPlan } from "@/lib/services/catalog";
 import { isPlanFulfillable } from "@/lib/services/fulfillment";
 import { isRentalOrderingUnconfigured } from "@/lib/services/numbers/number-availability";
 import { canPreviewPlan, explorerCountry } from "@/lib/services/service-explorer";
-import { CountryFlag } from "@/components/CountryFlag";
 import { PlanPurchase } from "@/components/purchase/PlanPurchase";
 
 export const metadata: Metadata = { title: "Plan details" };
@@ -40,7 +39,7 @@ export default async function DashboardPlanPage({
       <Link href={back} className="w-fit text-meta font-semibold text-lav-700 hover:underline">← Back to services</Link>
       <div>
         <p className="flex items-center gap-2 text-meta font-semibold uppercase tracking-[0.14em] text-lav-700">
-          <CountryFlag code={country.code} size={20} decorative radius={10} /> {country.name} selected
+          {country.name} selected
         </p>
         <h1 className="mt-2 text-[1.6rem] font-semibold text-ink">{plan.name}</h1>
         <p className="mt-1 text-[0.8125rem] text-ink-2">{plan.planLabel} · {plan.duration}</p>
@@ -53,6 +52,7 @@ export default async function DashboardPlanPage({
             appears in the order details as soon as it arrives.
           </div>
           <PlanPurchase
+            textOnly
             groups={[{ label: plan.planLabel, plans: [plan] }]}
             signedIn
             userId={user.id}

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { formatNaira } from "@/lib/services/catalog";
 import { maskAccountNumber, withdrawalStatusLabel, type WithdrawalReceipt, type WithdrawalSubmitResult } from "@/lib/payments/withdrawal-receipt";
-import { MoneyFlowDialog, MoneyOrbit, MoneyProcessing, MoneyResultIcon, MoneyRoute, downloadTextReceipt, moneyDate } from "./MoneyFlowDialog";
+import { MoneyFlowDialog, MoneyProcessing, MoneyRoute, downloadTextReceipt, moneyDate } from "./MoneyFlowDialog";
 import styles from "./MoneyFlow.module.css";
 
 export type WithdrawalReview = { amount: number; fee: number; bankAccountId: string; bankName: string; accountNumber: string; accountName: string };
@@ -63,36 +63,41 @@ export function WithdrawalReviewDialog({ review, onSubmit, onClose, testMode = f
   }
 
   const refunded = receipt?.status === "failed" || receipt?.status === "rejected";
+  // Only a provider-accepted or settled payout may be called sent. A `pending`
+  // row has not reached the bank yet.
+  const sent = receipt?.status === "processing" || receipt?.status === "completed";
   const title = stage === "review"
     ? "Review your withdrawal"
     : stage === "processing"
       ? "Sending your payout"
       : stage === "done"
-        ? (refunded ? "Payout not sent" : "Payout sent")
+        ? (refunded ? "Payout not sent" : sent ? "Payout sent" : "Payout requested")
         : "Payout needs attention";
-  return <MoneyFlowDialog stage={stage === "unconfirmed" ? "processing" : stage} title={title} onClose={onClose} canClose={stage !== "processing"} centered={stage !== "review"} lead={stage === "processing" ? <MoneyOrbit /> : stage === "done" ? <MoneyResultIcon /> : undefined}>
+  return <MoneyFlowDialog stage={stage === "unconfirmed" ? "processing" : stage} title={title} onClose={onClose} canClose={stage !== "processing"} centered={stage !== "review"}>
     {testMode && <p className={styles.notice}>PAYSTACK TEST MODE — this is not a real bank payout.</p>}
     {stage === "review" && <>
       <p className={styles.description}>Confirm the payout details. The transfer is sent as soon as you confirm.</p>
       <p className={styles.small}>The account name above is the name the withdrawal is paid into. It must be the name that funded this wallet — a payout to a third-party account is refused.</p>
       <div className={styles.amount}>{formatNaira(review.amount)}</div>
-      <MoneyRoute from="Your wallet" fromNote="Funds reserved" to={review.bankName} toNote={maskAccountNumber(review.accountNumber)} />
+      <MoneyRoute from="Your wallet" fromNote="Reserved when you confirm" to={review.bankName} toNote={maskAccountNumber(review.accountNumber)} />
       <div className={styles.summary}>
         <div className={styles.row}><span>Account name</span><strong>{review.accountName}</strong></div>
         <div className={styles.row}><span>Account</span><strong>{review.bankName} · {maskAccountNumber(review.accountNumber)}</strong></div>
         <div className={styles.row}><span>Bank payout requested</span><strong>{formatNaira(review.amount)}</strong></div>
         <div className={styles.row}><span>Withdrawal fee</span><strong>{formatNaira(review.fee)}</strong></div>
-        <div className={`${styles.row} ${styles.rowTotal}`}><span>Wallet amount reserved</span><strong>{formatNaira(review.amount + review.fee)}</strong></div>
+        <div className={`${styles.row} ${styles.rowTotal}`}><span>Wallet amount to be reserved</span><strong>{formatNaira(review.amount + review.fee)}</strong></div>
       </div>
       <p className={styles.hint} style={{ marginTop: 12 }}>The transfer is sent immediately after you confirm. It is not finished until your bank accepts it; if it fails, the amount and fee return to your wallet.</p>
       <div className={styles.actions}><button type="button" className={styles.button} onClick={onClose}>Edit</button><button type="button" className={`${styles.button} ${styles.primary}`} onClick={() => void confirm()}>Send payout</button></div>
     </>}
-    {stage === "processing" && <MoneyProcessing detail="Reserving the amount and sending the transfer." from="Your wallet" fromNote="Reserved" to="Bank account" toNote="Sending now" steps={["Withdrawal confirmed", "Wallet funds reserved", "Sending the transfer"]} />}
+    {stage === "processing" && <MoneyProcessing detail="Reserving the amount and sending the transfer." from="Your wallet" fromNote="Reservation pending" to="Bank account" toNote="Sending now" steps={["Details confirmed", "Reserving wallet funds", "Sending the transfer"]} />}
     {stage === "done" && receipt && <>
       <div className={styles.result}><strong className={styles.resultAmount}>{formatNaira(receipt.amount)}</strong><p className={styles.description}>
         {refunded
           ? "The payout could not be sent, so the amount and fee are back in your wallet."
-          : "The payout was sent. It becomes Paid out once your bank confirms it."}
+          : sent
+            ? "The payout was sent. It becomes Paid out once your bank confirms it."
+            : "Your request is recorded. Check Requests for its current status."}
       </p></div>
       <div className={styles.receipt}>
         <div className={styles.row}><span>Status at receipt</span><strong>{receiptStatus(receipt)}</strong></div>

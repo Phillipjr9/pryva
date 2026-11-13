@@ -19,11 +19,19 @@ describe("hydration-safe order countdowns", () => {
   it("renders the same live-code countdown even if the browser clock advances before hydration", () => {
     vi.useFakeTimers();
     vi.setSystemTime(initialNow);
-    const server = renderToStaticMarkup(<LiveCodeCard codes={[code]} initialNow={initialNow} />);
+    const coded = { ...code, otpCode: "123456" };
+    const server = renderToStaticMarkup(<LiveCodeCard codes={[coded]} initialNow={initialNow} />);
     vi.setSystemTime(initialNow + 45_000);
-    const client = renderToStaticMarkup(<LiveCodeCard codes={[code]} initialNow={initialNow} />);
+    const client = renderToStaticMarkup(<LiveCodeCard codes={[coded]} initialNow={initialNow} />);
     expect(server).toBe(client);
     expect(server).toContain("02:05");
+
+    // Without a code there is nothing to copy or count down; the card says so.
+    expect(server).toContain("Live codes");
+    const waiting = renderToStaticMarkup(<LiveCodeCard codes={[code]} initialNow={initialNow} />);
+    expect(waiting).toContain("Waiting for code");
+    expect(waiting).not.toContain("02:05");
+    expect(waiting).not.toContain("Copy");
   });
 
   it("renders order details using the server timestamp, not the hydration time", () => {

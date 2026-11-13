@@ -33,14 +33,16 @@ describe("selecting a service on a phone", () => {
     expect(source).not.toMatch(/grid grid-cols-2 gap-2\.5/);
   });
 
-  it("keeps the long card detail for sm and up instead of dropping it", () => {
+  it("keeps the card's coverage detail on a phone and its units from sm up", () => {
     const source = read("components/dashboard/ServiceExplorer.tsx");
-    // Coverage, units and the labelled action are hidden on phones only.
+    // Units are a desktop extra; the coverage line is present at every width in
+    // one node, so a phone is never left without an explanation.
     expect(source).toContain('className="hidden sm:mt-2 sm:block"><UnitsStatus');
-    expect(source).toContain("hidden min-h-[1.2rem] text-meta font-semibold text-ink sm:block");
-    // The phone control is still a 44px target and keeps its accessible name.
+    expect(source).toContain("sm:mt-3\">{item.detail ?? coverage}");
+    expect(source).not.toContain('sm:hidden">{item.detail ?? coverage}');
+    // The action is a 44px target at every width and keeps its accessible name.
     expect(source).toContain("aria-label={action.label}");
-    expect(source).toContain("grid h-11 w-11 place-items-center");
+    expect(source).toContain("min-h-11 w-full items-center justify-center");
   });
 
   it("renders one heading and one control per service, never a hidden duplicate", () => {
@@ -49,11 +51,10 @@ describe("selecting a service on a phone", () => {
     const card = heading.closest("article")!;
     expect(within(card).getAllByRole("heading")).toHaveLength(1);
     expect(within(card).getAllByRole("link")).toHaveLength(1);
-    // The phone line carries type and price on a single row.
-    const phoneLine = [...card.querySelectorAll("p")].find(
-      (line) => line.className.includes("sm:hidden") && line.textContent?.includes("Single use · ₦"),
-    );
-    expect(phoneLine, "the compact phone line is missing").toBeTruthy();
+    // Type and price share one line, rendered once rather than once per breakpoint.
+    const priceLine = [...card.querySelectorAll("p")].find((line) => line.textContent?.includes("Single use") && line.textContent?.includes("₦"));
+    expect(priceLine, "the type and price line is missing").toBeTruthy();
+    expect(card.textContent?.match(/Single use/g)).toHaveLength(1);
   });
 
   it("puts the overview's eight services in a balanced two-column phone tray", () => {

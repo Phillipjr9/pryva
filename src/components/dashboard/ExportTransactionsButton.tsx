@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "@/components/ui/Toast";
-import { Download, FileJson, FileText, Loader2 } from "@/components/icons";
+
 
 /**
  * Export the wallet ledger as CSV or JSON.
@@ -67,7 +67,7 @@ export function ExportTransactionsButton() {
         aria-haspopup="menu"
         className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-meta font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-ink disabled:opacity-50"
       >
-        {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+
         {exporting ? "Exporting…" : "Export"}
       </button>
 
@@ -88,7 +88,7 @@ export function ExportTransactionsButton() {
               onClick={() => void handleExport("csv")}
               className="flex w-full items-center gap-3 px-4 py-3 text-left text-[0.8125rem] font-medium text-ink transition-colors hover:bg-cream"
             >
-              <FileText className="h-4 w-4 text-ink-2" />
+
               Export as CSV
             </button>
             <button
@@ -97,7 +97,7 @@ export function ExportTransactionsButton() {
               onClick={() => void handleExport("json")}
               className="flex w-full items-center gap-3 px-4 py-3 text-left text-[0.8125rem] font-medium text-ink transition-colors hover:bg-cream"
             >
-              <FileJson className="h-4 w-4 text-ink-2" />
+
               Export as JSON
             </button>
           </div>

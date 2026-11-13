@@ -46,7 +46,7 @@ describe("brand presentation", () => {
     const html = decodeURIComponent(renderToStaticMarkup(<BrandLockup size="md" />));
     expect(html).toContain("/images/brand/pryva-mark.png");
     expect(html).toContain("Pryva");
-    expect(html).toContain('aria-label="Pryva home"');
+    expect(html).toContain('aria-label="PryvaLogs home"');
 
     const markOnly = decodeURIComponent(renderToStaticMarkup(<BrandMark size="sm" />));
     expect(markOnly).toContain("/images/brand/pryva-mark.png");

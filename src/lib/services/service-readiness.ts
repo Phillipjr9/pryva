@@ -32,7 +32,7 @@ const DETAIL: Record<ServiceId, Copy> = {
       : "Live app-specific offers are not connected, so verification orders cannot be placed.",
   social: ({ preview, supplier }) =>
     supplier("smm")
-      ? "Boosts are priced live and can be bought from your wallet."
+      ? "Ordering is configured; check each boost for current price and availability."
       : preview
         ? "Ordering is unavailable in this environment."
         : "The boosting panel is not connected, so nothing here can be ordered or charged.",
@@ -59,7 +59,7 @@ const DETAIL: Record<ServiceId, Copy> = {
       : "The temporary inbox is free and needs no order. Paid inbox durations are not mapped yet.",
   accounts: ({ preview, supplier }) =>
     supplier("marketplace")
-      ? "Live marketplace listings can be bought from your wallet."
+      ? "Ordering is configured; listings and availability are checked when browsing and at checkout."
       : preview
         ? "Ordering is unavailable in this environment."
         : "Marketplace ordering is not connected, so there are no available listings to buy.",

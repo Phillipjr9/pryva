@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserGiftCards } from "@/lib/services/gift-cards/credit";
+import { getUserGiftCards, giftCardDisplayStatus } from "@/lib/services/gift-cards/credit";
 import { requireAuthApi } from "@/lib/identity/auth";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     }
 
     const cards = await getUserGiftCards(user.id);
+    const now = Date.now();
 
     return NextResponse.json({
       ok: true,
@@ -22,7 +23,8 @@ export async function GET(request: NextRequest) {
         initialAmount: card.initialAmount,
         recipientEmail: card.recipientEmail,
         message: card.message,
-        status: card.status,
+        // Reflect enforced expiry in history without mutating the record.
+        status: giftCardDisplayStatus(card, now),
         expiresAt: card.expiresAt.toISOString(),
         redeemedAt: card.redeemedAt?.toISOString() || null,
         createdAt: card.createdAt.toISOString(),

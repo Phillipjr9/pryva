@@ -163,12 +163,33 @@ describe("active rented numbers on the dashboard", () => {
     const metrics = [...document.querySelectorAll("dt")].map((entry) => entry.textContent?.trim());
     expect(metrics).not.toContain("Shown with code");
     expect(metrics).not.toContain("Refunded");
-    expect(document.querySelector("#live-codes-heading")?.textContent).toContain("Live now");
+    expect(document.querySelector("#live-codes-heading")?.textContent).toContain("Live codes");
     expect(document.querySelector('section[aria-labelledby="live-codes-heading"]')?.textContent).toContain("123456");
     expect(html).toContain("refunded");
     expect(html).toContain("Refund for previous order");
     expect(document.querySelector('a[href="/dashboard/wallet"]')?.textContent).toContain("Top up");
     expect(document.querySelector('a[href="/dashboard/wallet#withdraw"]')?.textContent).toContain("Withdraw");
+  });
+
+  it("shows the newest eligible codes, including delivered codes, regardless of newer uncoded orders", async () => {
+    await database.insert(schema.orders).values([
+      rental({ status: "delivered", productSlug: "vn-us", otpCode: "456789", createdAt: new Date(now.getTime() - 120_000) }),
+      rental({ otpCode: "987654", createdAt: new Date(now.getTime() - 60_000) }),
+      rental({ userId: OTHER, otpCode: "111111" }),
+      rental({ status: "refunded", otpCode: "222222" }),
+      rental({ refundedAt: past, otpCode: "333333" }),
+      rental({ expiresAt: past, otpCode: "444444" }),
+      rental({ expiresAt: null, otpCode: "555555" }),
+      ...["\u00a0", "\ufeff", "\u2003\u2028", " \t\n"].map((otpCode, i) => rental({ otpCode, createdAt: new Date(now.getTime() + (100 + i) * 1000) })),
+      ...Array.from({ length: 60 }, (_, i) => rental({ otpCode: i % 2 ? " \t " : null, createdAt: new Date(now.getTime() + i * 1000) })),
+    ]);
+    const { document } = await renderedDashboard();
+    const text = document.querySelector('section[aria-labelledby="live-codes-heading"]')?.textContent ?? "";
+    expect(text).toContain("456789");
+    expect(text).toContain("987654");
+    for (const excluded of ["111111", "222222", "333333", "444444", "555555"]) expect(text).not.toContain(excluded);
+    // A whitespace-only code is still no code: it must not be offered for copying.
+    expect(text).toContain("Live codes");
   });
 
   it("shows zero when there are no confirmed rentals", async () => {
