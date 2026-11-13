@@ -724,3 +724,55 @@ There is still no production load-test result, supplier rate limits and stock
 remain external dependencies, and the Aurora pause/capacity and pool guidance
 above still applies. Run representative load tests and keep the database
 awake/appropriately sized before making a capacity guarantee.
+
+Loyalty progress preview — DISCOUNTS NOT LIVE
+--------------------------------------------
+The approved levels are 1: 0 completed orders / 0%, 2: 5 / 0.5%,
+3: 15 / 1%, 4: 30 / 1.5%, and 5: 60 / 2%. No checkout applies a loyalty
+discount. Do not announce the rates as active.
+
+A read-only progress preview is disabled by default. Setting LOYALTY_START_AT to
+an explicit UTC timestamp in YYYY-MM-DDTHH:mm:ss.sssZ format enables the preview
+at that instant on persistent databases. An unset, invalid or future timestamp,
+or a preview database, hides it. The start instant is not persisted: do not set
+it until the program's prospective launch is approved, never backdate it, and
+keep it identical on every instance and deployment. Changing it recalculates all
+progress. A durable immutable launch configuration is required before monetary
+rewards go live. No historical order before the configured start is counted.
+
+The preview requires a matching wallet debit of at least ₦500, confirmed
+fulfilment, no refund timestamp and no refund ledger entry. Bulk units are
+separate rows and each unit must independently meet these checks and the minimum.
+A refund removes that unit from progress. Counting is scoped to the authenticated
+user and runs from stored orders, without changing the ledger. Confirmed account,
+social, subscription/digital-code and third-party gift-card deliveries count;
+single-use numbers require a confirmed code; rentals require an issued number;
+eSIMs require profile credentials; proxies require a confirmed transaction.
+Active boosts and incomplete, failed, reviewed or unknown service paths do not
+count. Airtime and data paths are not yet included. This is a conservative
+preview, not a guarantee that every future checkout has been integrated. A read
+failure hides the card instead of presenting an invented zero.
+
+Account pricing now includes a server-only, dormant discount comparison helper.
+It is not called by the existing promo or purchase routes and does not activate
+loyalty or alter live discount selection. It compares volume, loyalty and a
+validated provider promo against an undiscounted basis, checks separate cost
+floors and indicates whether the winning promo must be sent to the supplier.
+It rejects subminimum baskets and promo-adjusted bases. Before wiring it in,
+implement a fresh authenticated account quote, explicit consent to the displayed
+amount and purchase-time revalidation, preserving existing request-id handling,
+stock/provider safeguards and reconciliation. Persist the pricing terms with the
+order; settle how progress/refund changes are serialized with checkout. A
+changed quote must require customer review before charging.
+
+Every supported checkout needs an authenticated, server-side quote and charge
+path, idempotent retries, clear customer-visible final price and stored audit
+terms. Compute loyalty from the undiscounted price, then compare separately with
+other valid promotional/volume quotes and charge the best eligible one; do not
+stack. Verify each candidate against its own current cost and margin floor,
+including minimum charges. Some promotions change the underlying cost, so their
+floors cannot be assumed identical. Keep the current 15% minimum markup and
+fail closed when a cost or quote cannot be verified. Face-value wallet credit,
+free tools and unfinished/paused purchase paths must not be enabled or discounted
+as a side effect. Test each service's delivery, refund, repricing, concurrency,
+retry and quote-versus-charge behaviour before enabling it.

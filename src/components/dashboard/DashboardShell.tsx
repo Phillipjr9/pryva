@@ -67,7 +67,7 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "Buy",
     items: [
-      { href: "/dashboard/services", label: "All services", nav: "services" },
+      { href: "/dashboard/services", label: "Marketplace", nav: "services" },
       { href: "/dashboard/services", label: "Number plans", art: "numbers", category: "numbers" },
       { href: "/dashboard/services", label: "eSIM", art: "esim", category: "esim" },
       { href: "/dashboard/services", label: "Mobile data & airtime", art: "data", category: "data" },
@@ -104,7 +104,7 @@ const mobileTabs: Array<{ href: string; label: string; nav: NavArt }> = [
   { href: "/dashboard", label: "Home", nav: "overview" },
   { href: "/dashboard/orders", label: "Orders", nav: "orders" },
   { href: "/dashboard/wallet", label: "Wallet", nav: "wallet" },
-  { href: "/dashboard/services", label: "Services", nav: "services" },
+  { href: "/dashboard/services", label: "Marketplace", nav: "services" },
   { href: "/dashboard/support", label: "Support", nav: "support" },
 ];
 
@@ -223,6 +223,54 @@ export function DashboardShell({
    * confusion the split removes.
    */
   const groups = navGroups;
+  // Marketplace is the main entry point; direct service shortcuts remain one click away.
+  const primaryBuyCount = 1;
+  const isItemActive = (item: NavItem) => isRouteActive(pathname, item.href) &&
+    (item.href !== "/dashboard/services" || (item.category ? item.category === selectedCategory : !selectedCategory));
+
+  function renderNavItem(item: NavItem) {
+    const Icon = item.icon;
+    const active = isItemActive(item);
+    const categoryParams = new URLSearchParams();
+    if (selectedCountry) categoryParams.set("country", selectedCountry);
+    if (item.category) categoryParams.set("category", item.category);
+    const href = item.href === "/dashboard/services" && categoryParams.size > 0 ? `${item.href}?${categoryParams}` : item.href;
+    const badge =
+      item.href === "/dashboard/notifications" && unreadNotifications > 0
+        ? unreadNotifications
+        : null;
+    return (
+      <Link
+        key={`${item.href}:${item.category ?? "all"}`}
+        href={href}
+        aria-current={active ? "page" : undefined}
+        onClick={() => setOpen(false)}
+        className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-[0.8125rem] font-medium transition-colors ${
+          active ? "bg-lav-100/80 text-lav-800" : "text-ink-2 hover:bg-white hover:text-ink"
+        }`}
+      >
+        {item.digitalArtwork ? (
+          <DigitalProductIcon name={item.digitalArtwork} size={20} />
+        ) : item.brand ? (
+          <BrandIcon brand={item.brand} size={20} decorative />
+        ) : item.art ? (
+          <span aria-hidden="true"><ServiceIcon service={item.art} size="xs" className="overflow-hidden rounded-[5px]" /></span>
+        ) : item.nav ? (
+          <NavIcon name={item.nav} />
+        ) : (
+          Icon && <Icon className={`h-4 w-4 ${active ? "text-lav-700" : "text-ink-3"}`} />
+        )}
+        {item.label}
+        {badge ? (
+          <span className="ml-auto rounded-full bg-lav-700 px-1.5 py-0.5 text-micro font-bold text-white">
+            {badge}
+          </span>
+        ) : (
+          active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-lav-500" />
+        )}
+      </Link>
+    );
+  }
 
   const sidebar = (mobile: boolean) => (
     <div className="flex h-full flex-col">
@@ -257,49 +305,13 @@ export function DashboardShell({
             <p className="px-3 text-micro font-semibold uppercase tracking-[0.16em] text-ink-3">
               {group.label}
             </p>
-            {group.items.map((item) => {
-              const Icon = item.icon;
-              const active = isRouteActive(pathname, item.href) &&
-                (item.href !== "/dashboard/services" || (item.category ? item.category === selectedCategory : !selectedCategory));
-              const categoryParams = new URLSearchParams();
-              if (selectedCountry) categoryParams.set("country", selectedCountry);
-              if (item.category) categoryParams.set("category", item.category);
-              const href = item.href === "/dashboard/services" && categoryParams.size > 0 ? `${item.href}?${categoryParams}` : item.href;
-              const badge =
-                item.href === "/dashboard/notifications" && unreadNotifications > 0
-                  ? unreadNotifications
-                  : null;
-              return (
-                <Link
-                  key={`${item.href}:${item.category ?? "all"}`}
-                  href={href}
-                  onClick={() => setOpen(false)}
-                  className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-[0.8125rem] font-medium transition-colors ${
-                    active ? "bg-lav-100/80 text-lav-800" : "text-ink-2 hover:bg-white hover:text-ink"
-                  }`}
-                >
-                  {item.digitalArtwork ? (
-                    <DigitalProductIcon name={item.digitalArtwork} size={20} />
-                  ) : item.brand ? (
-                    <BrandIcon brand={item.brand} size={20} decorative />
-                  ) : item.art ? (
-                    <span aria-hidden="true"><ServiceIcon service={item.art} size="xs" className="overflow-hidden rounded-[5px]" /></span>
-                  ) : item.nav ? (
-                    <NavIcon name={item.nav} />
-                  ) : (
-                    Icon && <Icon className={`h-4 w-4 ${active ? "text-lav-700" : "text-ink-3"}`} />
-                  )}
-                  {item.label}
-                  {badge ? (
-                    <span className="ml-auto rounded-full bg-lav-700 px-1.5 py-0.5 text-micro font-bold text-white">
-                      {badge}
-                    </span>
-                  ) : (
-                    active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-lav-500" />
-                  )}
-                </Link>
-              );
-            })}
+            {(group.label === "Buy" ? group.items.slice(0, primaryBuyCount) : group.items).map(renderNavItem)}
+            {group.label === "Buy" && (
+              <details key={pathname + (selectedCategory ?? "")} open={group.items.slice(primaryBuyCount).some(isItemActive)} className="group/more">
+                <summary className="cursor-pointer rounded-xl px-3 py-2 text-[0.8125rem] font-semibold text-lav-700 hover:bg-white focus-visible:outline-2 focus-visible:outline-lav-500">More services</summary>
+                <div className="grid gap-0.5">{group.items.slice(primaryBuyCount).map(renderNavItem)}</div>
+              </details>
+            )}
           </div>
         ))}
       </nav>
@@ -354,10 +366,10 @@ export function DashboardShell({
               <NotificationBell textOnly compactOnMobile alignToHeader viewAllHref="/dashboard/notifications" />
               <Link
                 href="/dashboard/services"
-                aria-label="Browse services"
+                aria-label="Open marketplace"
                 className="btn btn-primary hidden h-9 shrink-0 !px-3.5 !py-0 !text-[0.8125rem] lg:inline-flex"
               >
-                <span className="whitespace-nowrap">Services</span>
+                <span className="whitespace-nowrap">Marketplace</span>
               </Link>
               <button
                 type="button"

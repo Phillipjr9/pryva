@@ -592,23 +592,79 @@ export function ServiceExplorer({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Explore PryvaLogs</p>
-          <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">{selectedCategory?.label ?? "Your service hub"}</h1>
-          <p className="mt-1.5 max-w-2xl text-[0.8125rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Pick a country once, then browse the matched services.` : "Pick a country once and browse categories without redoing the choice every time."}</p>
+          <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">{selectedCategory?.label ?? "Marketplace"}</h1>
+          <p className="mt-1.5 max-w-2xl text-[0.8125rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Check each listing for availability and any location requirements.` : "Choose a service, then browse its offers. Location and checkout requirements vary by service."}</p>
         </div>
         <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline">My orders </Link>
       </div>
 
       {rejectedNotice}
 
-      <section aria-labelledby="choose-country-title" className="relative overflow-hidden rounded-[1.5rem] border border-lav-200/80 bg-[#f6f1fc] p-4 sm:p-6">
-        <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 h-48 w-48 rounded-full bg-lav-300/30 blur-3xl" />
-        <div className="relative grid gap-3 md:grid-cols-[1fr_1.1fr] md:items-center md:gap-4">
+      <section aria-labelledby="categories-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-4 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"> Country</p>
-            <h2 id="choose-country-title" className="mt-1.5 text-[1.125rem] font-semibold text-ink sm:mt-2 sm:text-[1.25rem]">Pick a country once.</h2>
-            <p className="mt-1.5 max-w-sm text-meta leading-relaxed text-ink-2">Your selection is remembered on this device when browser storage is available.</p>
+            <p className="text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Step 01</p>
+            <h2 id="categories-title" className="mt-1 text-[1rem] font-semibold text-ink">Choose a service</h2>
           </div>
-          <div className="rounded-2xl border border-white/80 bg-white/60 p-3 shadow-sm sm:p-4">
+          {selectedCountry && <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-meta font-semibold text-ink-2">
+            {selectedCountry.name}
+          </span>}
+        </div>
+        {summary ? <p className="mt-1.5 text-meta text-ink-3">{summary} Labels describe setup, not current stock. Check each listing for availability.</p> : null}
+        <div className="mt-3 sm:mt-4">
+          <label htmlFor="service-category" className="sr-only">Service category</label>
+          <select
+            id="service-category"
+            value={category}
+            onChange={(event) => chooseCategory(explorerCategory(event.target.value))}
+            aria-describedby={selectedCategory ? "service-category-description" : undefined}
+            className="min-h-11 w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-meta font-semibold text-ink focus:border-lav-400 focus:outline-none focus:ring-4 focus:ring-lav-100 sm:max-w-lg"
+          >
+            <option value="all">All categories</option>
+            {SERVICE_CATEGORY_GROUPS.map((group) => (
+              <optgroup key={group.id} label={group.label}>
+                {orderedCategories.filter((entry) => group.categories.includes(entry.id)).map((entry) => {
+                  const state = readinessById.get(entry.id);
+                  return (
+                    <option key={entry.id} value={entry.id}>
+                      {entry.label}{state ? ` · ${SERVICE_STATE_LABEL[state.state]}` : ""}
+                    </option>
+                  );
+                })}
+              </optgroup>
+            ))}
+          </select>
+          {selectedCategory && (
+            <p id="service-category-description" className="mt-2 text-meta text-ink-3">{selectedCategory.description}</p>
+          )}
+        </div>
+        {(category === "all" || category === "accounts") && <p className="mt-3 text-meta leading-relaxed text-ink-2">
+          Looking for paid email or social accounts? <Link href="/dashboard/accounts" className="font-semibold text-lav-700 underline underline-offset-2">Browse account listings</Link> without choosing a country. {category === "all" && <>For a free disposable address, <Link href="/dashboard/inbox" className="font-semibold text-lav-700 underline underline-offset-2">open the temporary inbox</Link>.</>}
+        </p>}
+        {selectedReadiness && selectedReadiness.state !== "buy" && selectedReadiness.state !== "free" ? (
+          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-line bg-white px-3.5 py-2.5 text-meta text-ink-2">
+            <span className="min-w-0 flex-1">
+              <strong className="font-semibold text-ink">{SERVICE_STATE_LABEL[selectedReadiness.state]}.</strong>{" "}
+              {selectedReadiness.detail}
+            </span>
+            <Link
+              href={`/dashboard/support#ask=${encodeURIComponent(`When will ${selectedReadiness.label} be available to order?`)}`}
+              className="shrink-0 font-semibold text-lav-700 underline underline-offset-2"
+            >
+              Ask about it
+            </Link>
+          </div>
+        ) : null}
+      </section>
+
+      <section aria-labelledby="choose-country-title" className="rounded-[1.5rem] border border-lav-200/80 bg-[#f6f1fc] p-4 sm:p-5">
+        <div className="grid gap-3 md:grid-cols-[1fr_1.1fr] md:items-center md:gap-4">
+          <div>
+            <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Step 02</p>
+            <h2 id="choose-country-title" className="mt-1 text-[1rem] font-semibold text-ink">Country for relevant offers</h2>
+            <p className="mt-1.5 max-w-sm text-meta leading-relaxed text-ink-2">Some services aren’t country-specific. Change your selection any time; it is remembered on this device when browser storage is available.</p>
+          </div>
+          <div className="rounded-xl border border-white/80 bg-white/60 p-3">
             <CountrySelector id="service-country" value={country} onChange={chooseCountry} />
           </div>
         </div>
@@ -635,59 +691,7 @@ export function ServiceExplorer({
         </div>
       ) : (
         <>
-          <section aria-labelledby="categories-title" className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-4 sm:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Step 02</p>
-                <h2 id="categories-title" className="mt-1 text-[1rem] font-semibold text-ink">Choose a category</h2>
-              </div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-meta font-semibold text-ink-2">
-                {selectedCountry.name}
-              </span>
-            </div>
-            {summary ? <p className="mt-1.5 text-meta text-ink-3">{summary} These labels describe configuration; check each listing for current availability.</p> : null}
-            <div className="mt-3 sm:mt-4">
-              <label htmlFor="service-category" className="sr-only">Service category</label>
-              <select
-                id="service-category"
-                value={category}
-                onChange={(event) => chooseCategory(explorerCategory(event.target.value))}
-                aria-describedby={selectedCategory ? "service-category-description" : undefined}
-                className="min-h-11 w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-meta font-semibold text-ink focus:border-lav-400 focus:outline-none focus:ring-4 focus:ring-lav-100 sm:max-w-lg"
-              >
-                <option value="all">All categories</option>
-                {SERVICE_CATEGORY_GROUPS.map((group) => (
-                  <optgroup key={group.id} label={group.label}>
-                    {orderedCategories.filter((entry) => group.categories.includes(entry.id)).map((entry) => {
-                      const state = readinessById.get(entry.id);
-                      return (
-                        <option key={entry.id} value={entry.id}>
-                          {entry.label}{state ? ` · ${SERVICE_STATE_LABEL[state.state]}` : ""}
-                        </option>
-                      );
-                    })}
-                  </optgroup>
-                ))}
-              </select>
-              {selectedCategory && (
-                <p id="service-category-description" className="mt-2 text-meta text-ink-3">{selectedCategory.description}</p>
-              )}
-            </div>
-            {selectedReadiness && selectedReadiness.state !== "buy" && selectedReadiness.state !== "free" ? (
-              <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-line bg-white px-3.5 py-2.5 text-meta text-ink-2">
-                <span className="min-w-0 flex-1">
-                  <strong className="font-semibold text-ink">{SERVICE_STATE_LABEL[selectedReadiness.state]}.</strong>{" "}
-                  {selectedReadiness.detail}
-                </span>
-                <Link
-                  href={`/dashboard/support#ask=${encodeURIComponent(`When will ${selectedReadiness.label} be available to order?`)}`}
-                  className="shrink-0 font-semibold text-lav-700 underline underline-offset-2"
-                >
-                  Ask about it
-                </Link>
-              </div>
-            ) : null}
-          </section>
+
 
           <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-meta leading-relaxed border-amber-200 bg-amber-50/70 text-amber-900`}>
 
@@ -699,7 +703,7 @@ export function ServiceExplorer({
           <section aria-labelledby="services-title" aria-busy={verificationPending || numberAppsPending || undefined} className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-3.5 sm:p-6">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"> Step 03</p>
+                <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700">Step 03</p>
                 <h2 id="services-title" className="mt-1 text-[1rem] font-semibold text-ink">{selectedCategory ? `Explore ${selectedCategory.label}` : "Explore services"}</h2>
                 <p aria-live="polite" className="mt-1 text-meta text-ink-3">
                   {verificationPending && filtered.length === 0 ? "Loading app verification listings…"
@@ -715,6 +719,11 @@ export function ServiceExplorer({
                 <input type="search" value={search} onChange={(event) => { setQuickSelection(null); setSearch(event.target.value); setVisible(PAGE_SIZE); }} aria-label="Search services" placeholder="Search services or platforms" className="min-h-11 w-full rounded-xl border border-line bg-white py-2 px-3 text-meta text-ink outline-none placeholder:text-ink-3 focus:border-lav-400 focus:ring-4 focus:ring-lav-100" />
               </div>
             </div>
+
+            {category === "email" && <div role="note" className="mt-4 rounded-xl border border-lav-200 bg-lav-50/60 p-3 text-meta leading-relaxed text-ink-2">
+              <p><strong className="text-ink">Looking to buy an email account?</strong> Temporary inbox and email verification services are separate from paid accounts. Browse paid email accounts, including Gmail and others when listed, in Social &amp; Digital Accounts. Availability and checkout depend on the listing.</p>
+              <Link href="/dashboard/accounts" className="mt-2 inline-block font-semibold text-lav-700 underline underline-offset-2">Browse email accounts</Link>
+            </div>}
 
             <QuickShortcuts
               key={`${country}:${category}:${subcategory?.id ?? ""}`}

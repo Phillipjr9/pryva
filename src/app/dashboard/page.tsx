@@ -10,6 +10,9 @@ import { walletEntryDirection, walletEntrySign } from "@/lib/payments/wallet-act
 import { LiveCodeCard, type LiveCode } from "@/components/dashboard/LiveCodeCard";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { BalanceHero } from "@/components/dashboard/BalanceHero";
+import { LoyaltyProgress } from "@/components/dashboard/LoyaltyProgress";
+import { readLoyaltyProgress } from "@/lib/services/loyalty/progress";
+import { logger } from "@/lib/platform/logger";
 import { readServiceReadiness } from "@/lib/services/service-readiness";
 import { orderByReadiness, SERVICE_STATE_LABEL } from "@/lib/services/service-states";
 import { countActiveRentedNumbers } from "@/lib/services/numbers/active-rentals";
@@ -68,6 +71,25 @@ export default async function DashboardOverviewPage() {
     })),
   );
 
+  function renderServiceTile(item: (typeof serviceTiles)[number]) {
+    return (
+      <Link
+        key={item.label}
+        href={item.href}
+        className="group flex min-w-0 items-start rounded-xl border border-line bg-white p-3 text-left transition-all hover:border-lav-300 hover:shadow-xs"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="block min-w-0 text-[0.8125rem] font-semibold leading-tight text-ink group-hover:text-lav-700 sm:text-[0.8125rem]">{item.label}</span>
+          </span>
+          <span className="hidden truncate text-micro text-ink-3 sm:block">{item.note}</span>
+          <span className="mt-1 block break-words text-micro font-medium leading-snug text-ink-2">{SERVICE_STATE_LABEL[item.state]}</span>
+        </span>
+
+      </Link>
+    );
+  }
+
   // One server timestamp keeps the rental count and the first countdown render
   // consistent. The countdown takes over with the browser clock after hydration.
   // eslint-disable-next-line react-hooks/purity
@@ -96,7 +118,7 @@ export default async function DashboardOverviewPage() {
       .where(and(liveCriteria, sql`translate(${orders.otpCode}, ${CODE_TRIM_WHITESPACE}, '') <> ''`))
       .orderBy(desc(orders.createdAt), desc(orders.id)).limit(2);
 
-  const [recentOrders, recentTx, liveRows, [orderCount], activeNumbers] =
+  const [recentOrders, recentTx, liveRows, [orderCount], activeNumbers, loyalty] =
     await Promise.all([
       db
         .select()
@@ -113,6 +135,10 @@ export default async function DashboardOverviewPage() {
       liveQuery,
       db.select({ value: count() }).from(orders).where(eq(orders.userId, user.id)),
       countActiveRentedNumbers(user.id, new Date(now)),
+      readLoyaltyProgress(user.id, new Date(now)).catch(() => {
+        logger.warn("Loyalty progress could not be read");
+        return null;
+      }),
     ]);
 
   // Aggregates, never a slice: headline numbers must describe the whole account.
@@ -143,6 +169,8 @@ export default async function DashboardOverviewPage() {
         balance={user.walletBalance}
         activeNumbers={activeNumbers}
       />
+
+      <LoyaltyProgress progress={loyalty} />
 
       {/* Keep a live code card and a country hint near the active account state,
           while letting recent activity and quick actions lead the page. */}
@@ -216,10 +244,10 @@ export default async function DashboardOverviewPage() {
               <p className="mt-0.5 text-meta text-ink-3">Labels show setup; check each listing for availability.</p>
             </div>
             <Link
-              href="/dashboard/services?country=ng"
+              href="/dashboard/services"
               className="inline-flex shrink-0 items-center gap-1 text-meta font-semibold text-lav-700 hover:underline"
             >
-               All services
+               Marketplace
             </Link>
           </div>
           <Link
@@ -228,7 +256,7 @@ export default async function DashboardOverviewPage() {
           >
             <span className="min-w-0 flex-1">
               <span className="block break-words text-[0.875rem] font-semibold leading-snug text-ink group-hover:text-lav-700">{accountShortcut.label}</span>
-              <span className="mt-0.5 block text-micro leading-snug text-ink-3">Browse account listings · separate from App verification</span>
+              <span className="mt-0.5 block text-micro leading-snug text-ink-3">Social and email accounts · separate from the free inbox</span>
               <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-1 text-micro font-semibold text-ink-2">
                 {SERVICE_STATE_LABEL[accountState]}
               </span>
@@ -236,33 +264,14 @@ export default async function DashboardOverviewPage() {
 
           </Link>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-2.5 lg:grid-cols-1">
-            {serviceTiles.map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className="group flex min-w-0 items-start rounded-xl border border-line bg-white p-3 text-left transition-all hover:border-lav-300 hover:shadow-xs"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <span className="block min-w-0 text-[0.8125rem] font-semibold leading-tight text-ink group-hover:text-lav-700 sm:text-[0.8125rem]">{item.label}</span>
-                  </span>
-                  <span className="hidden truncate text-micro text-ink-3 sm:block">{item.note}</span>
-                  <span className="mt-1 block break-words text-micro font-medium leading-snug text-ink-2">{SERVICE_STATE_LABEL[item.state]}</span>
-                </span>
-
-              </Link>
-            ))}
+            {serviceTiles.slice(0, 4).map(renderServiceTile)}
           </div>
-          <div className="mt-4 rounded-xl border border-dashed border-line bg-cream/30 px-3 py-2.5">
-            <p className="text-[0.8125rem] font-medium uppercase tracking-[0.12em] text-ink-3">Recommended next</p>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-[0.8125rem] text-ink-3">
-              <Link href="/dashboard/services?country=ng&category=numbers" className="font-semibold text-lav-700 hover:underline">Numbers</Link>
-              <span>•</span>
-              <Link href="/dashboard/services?country=ng&category=social" className="font-semibold text-lav-700 hover:underline">Social</Link>
-              <span>•</span>
-              <Link href="/dashboard/services?country=ng&category=esim" className="font-semibold text-lav-700 hover:underline">eSIM</Link>
+          <details className="mt-3 rounded-xl border border-line bg-cream/30 p-3">
+            <summary className="cursor-pointer text-meta font-semibold text-lav-700">More services</summary>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-2.5 lg:grid-cols-1">
+              {serviceTiles.slice(4).map(renderServiceTile)}
             </div>
-          </div>
+          </details>
         </section>
       </div>
 

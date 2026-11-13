@@ -13,7 +13,7 @@ import { listedEsimOffers } from "@/lib/services/foxreload/esim-orders";
 import { starsSalesConfigured } from "@/lib/services/foxreload/stars-orders";
 import { reviewedDigitalItems } from "@/lib/services/reviewed-digital-items";
 
-export const metadata: Metadata = { title: "Service hub" };
+export const metadata: Metadata = { title: "Marketplace" };
 export const dynamic = "force-dynamic";
 
 export default async function DashboardServicesPage({

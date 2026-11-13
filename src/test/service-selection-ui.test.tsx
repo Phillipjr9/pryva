@@ -67,6 +67,18 @@ describe("choosing services", () => {
     expect(screen.queryByRole("heading", { name: "Airtel 1GB" })).toBeNull();
   });
 
+  it("directs people looking for paid email accounts from Email OTP to the account marketplace", () => {
+    window.history.replaceState(null, "", "/dashboard/services?country=us&category=email");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ ok: true, country: "us", live: true, items: [] })));
+    render(<ServiceExplorer initialCountry="us" initialCategory="email" />);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search services" }), { target: { value: "Gmail" } });
+    expect(screen.getByText(/Temporary inbox and email verification services are separate from paid accounts/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Browse email accounts" }).getAttribute("href")).toBe("/dashboard/accounts");
+    fireEvent.change(screen.getByRole("combobox", { name: "Service category" }), { target: { value: "esim" } });
+    expect(screen.queryByRole("link", { name: "Browse email accounts" })).toBeNull();
+    expect(new URLSearchParams(window.location.search).get("country")).toBe("us");
+  });
+
   it("initializes the dropdown from a category link and resets filters when selecting all", () => {
     window.history.replaceState(null, "", "/dashboard/services?country=us&category=esim");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ ok: true, country: "us", live: true, items: [] })));

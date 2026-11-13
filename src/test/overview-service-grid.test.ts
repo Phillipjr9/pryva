@@ -29,12 +29,19 @@ describe("overview service hub", () => {
     expect(overview).toContain('quickBuys.find((item) => item.category === "accounts")');
     expect(overview).toContain('quickBuys.filter((item) => item.category !== "accounts")');
     expect(overview).toContain('href={accountShortcut.href}');
-    expect(overview).toContain("separate from App verification");
+    expect(overview).toContain("separate from the free inbox");
+  });
+
+  it("shows a short set of quick actions and keeps the rest under a disclosure", () => {
+    expect(overview).toContain("serviceTiles.slice(0, 4).map(renderServiceTile)");
+    expect(overview).toContain("serviceTiles.slice(4).map(renderServiceTile)");
+    expect(overview).toContain(">More services</summary>");
+    expect(overview).not.toContain("Recommended next");
   });
 
   it("keeps the shortcut status below the description instead of squeezing its label", () => {
     const shortcut = overview.slice(overview.indexOf('href={accountShortcut.href}'), overview.indexOf('<div className="mt-3 grid'));
-    expect(shortcut.indexOf("separate from App verification")).toBeLessThan(shortcut.indexOf("{SERVICE_STATE_LABEL[accountState]}"));
+    expect(shortcut.indexOf("separate from the free inbox")).toBeLessThan(shortcut.indexOf("{SERVICE_STATE_LABEL[accountState]}"));
     expect(shortcut).not.toContain("<ArrowRight");
     expect(shortcut).not.toContain("hidden min-[390px]:inline");
     expect(shortcut).toContain("mt-2 inline-flex");

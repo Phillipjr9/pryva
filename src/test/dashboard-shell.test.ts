@@ -99,7 +99,7 @@ describe("dashboard navigation", () => {
     expect(shell).toContain('{ href: "/dashboard/proxies", label: "Proxies", art: "proxies"');
     expect(shell).toContain('href: "/dashboard/services", label: "Gift cards"');
     // Every row, including this one, carries a real image rather than a glyph.
-    expect(shell).toContain('label: "All services", nav: "services"');
+    expect(shell).toContain('label: "Marketplace", nav: "services"');
   });
 
   it("gives the bottom bar exactly five thumb-reach tabs", () => {
@@ -133,7 +133,7 @@ describe("dashboard navigation", () => {
     expect(header).not.toContain('flex-wrap');
     // Wallet and services stay reachable via the mobile navigation.
     expect(shell).toContain('{ href: "/dashboard/wallet", label: "Wallet", nav: "wallet" }');
-    expect(shell).toContain('{ href: "/dashboard/services", label: "Services", nav: "services" }');
+    expect(shell).toContain('{ href: "/dashboard/services", label: "Marketplace", nav: "services" }');
   });
 
   it("lifts the floating help button clear of the mobile tab bar", () => {

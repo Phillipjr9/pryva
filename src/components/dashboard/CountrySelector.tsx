@@ -1,5 +1,6 @@
 "use client";
 
+import { CountryFlag } from "@/components/CountryFlag";
 import { EXPLORER_COUNTRIES } from "@/lib/content/explorer-countries";
 import { explorerCountry } from "@/lib/services/service-explorer";
 
@@ -13,12 +14,14 @@ type Props = {
 };
 
 export function CountrySelector({ id, value, onChange, name }: Props) {
+  const selected = explorerCountry(value);
   return (
     <div>
       <label htmlFor={id} className="mb-2 block text-meta font-semibold text-ink-2">
         Country of service
       </label>
       <div className="relative flex items-center rounded-xl border border-line bg-white transition-colors focus-within:border-lav-500 focus-within:ring-4 focus-within:ring-lav-100">
+        {selected && <span className="ml-3.5"><CountryFlag code={selected.code} size={22} decorative /></span>}
         <select
           id={id}
           name={name}
@@ -43,6 +46,7 @@ export function CountrySelector({ id, value, onChange, name }: Props) {
               onClick={() => onChange(code)}
               className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-micro font-semibold transition-colors ${active ? "border-lav-400 bg-lav-100 text-lav-800" : "border-line bg-white/75 text-ink-2 hover:border-lav-300"}`}
             >
+              <CountryFlag code={country.code} size={18} decorative />
               {country.name === "United States" ? "US" : country.name === "United Kingdom" ? "UK" : country.name}
             </button>
           );
