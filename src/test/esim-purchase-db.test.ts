@@ -40,6 +40,7 @@ let pg: PGlite;
 let database: PgliteDatabase<typeof schema>;
 let purchase: typeof import("@/app/api/esim/purchase/route").POST;
 let refund: typeof import("@/app/api/admin/refunds/route").POST;
+let walletModule: typeof import("@/lib/payments/reservations");
 
 function offer() {
   return {
@@ -79,6 +80,7 @@ beforeAll(async () => {
   for (const file of files) await pg.exec(await readFile(`migrations/${file}`, "utf8"));
   database = drizzle(pg, { schema });
   mocks.db = database;
+  walletModule = await import("@/lib/payments/reservations");
   ({ POST: purchase } = await import("@/app/api/esim/purchase/route"));
   ({ POST: refund } = await import("@/app/api/admin/refunds/route"));
 }, 30_000);
@@ -169,18 +171,43 @@ describe("eSIM purchase with the real unique index and wallet transaction", () =
     expect(await balance()).toBe(50_000);
   });
 
-  it("rolls back activation and leaves a recoverable uncharged review when the wallet changed", async () => {
-    // The signed-in balance can be stale after another purchase.
+  it("never reaches the supplier when the wallet cannot cover the plan", async () => {
+    // The signed-in balance can be stale after another purchase. The hold, not
+    // the stale figure, is what decides — and it decides before any spend.
     await database.update(schema.users).set({ walletBalance: 1_000 }).where(eq(schema.users.id, USER));
     const response = await purchase(request(randomUUID()));
+    expect(response.status).toBe(402);
+    expect(mocks.purchase).not.toHaveBeenCalled();
+    expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
+    expect(await balance()).toBe(1_000);
+    expect(await database.select().from(schema.walletReservations)).toHaveLength(0);
+  });
+
+  it("leaves a delivered profile held for review if the hold cannot be settled", async () => {
+    // The supplier delivered, so the money is owed; the settle is what failed.
+    // Nothing may be released here and the activation code must not be exposed.
+    vi.spyOn(walletModule, "settleReservation").mockRejectedValueOnce(new Error("database down"));
+    const response = await purchase(request(randomUUID()));
     expect(response.status).toBe(409);
+
     const [order] = await database.select().from(schema.orders);
     expect(order).toMatchObject({ status: "review", providerRequestId: "ord_provider", esimActivationCode: null });
     expect(await database.select().from(schema.walletTransactions)).toHaveLength(0);
-    expect(await balance()).toBe(1_000);
-    expect((await refund(refundRequest(order.id, true))).status).toBe(409);
-    expect((await database.select().from(schema.orders))[0].status).toBe("review");
-    expect(await balance()).toBe(1_000);
+    // The funds stay held, and the hold is parked so no path can release it.
+    expect(await balance()).toBe(50_000);
+    const [hold] = await database.select().from(schema.walletReservations);
+    expect(hold.status).toBe("review");
+    const [account] = await database.select({ reserved: schema.users.walletReserved }).from(schema.users);
+    expect(account.reserved).toBe(9_800);
+    // An operator asked to make this customer whole: the refund is allowed, but
+    // only because it closes the hold in the same transaction. Without that the
+    // customer would end up with the refund *and* the parked charge.
+    expect((await refund(refundRequest(order.id, true))).status).toBe(200);
+    const [released] = await database.select().from(schema.walletReservations);
+    expect(released.status).toBe("released");
+    const [after] = await database.select({ reserved: schema.users.walletReserved }).from(schema.users);
+    expect(after.reserved).toBe(0);
+    expect(await balance()).toBe(59_800);
   });
 
   it("never refunds a refused, uncharged eSIM order, even with reconciliation confirmed", async () => {

@@ -234,7 +234,14 @@ export async function POST(request: NextRequest) {
       if (unresolved) throw new PendingPurchase(unresolved.reference);
       const [updated] = await tx.update(users)
         .set({ walletBalance: sql`${users.walletBalance} - ${price.totalNgn}` })
-        .where(and(eq(users.id, user.id), gte(users.walletBalance, price.totalNgn), isNull(users.suspendedAt), isNull(users.deletedAt)))
+        // Availability, not balance: money held for another in-flight purchase is
+        // in `wallet_balance` but is already spoken for.
+        .where(and(
+          eq(users.id, user.id),
+          sql`${users.walletBalance} - ${users.walletReserved} >= ${price.totalNgn}`,
+          isNull(users.suspendedAt),
+          isNull(users.deletedAt),
+        ))
         .returning({ balance: users.walletBalance });
       if (!updated) throw new InsufficientBalance();
       const [created] = await tx.insert(orders).values({

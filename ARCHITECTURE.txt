@@ -136,11 +136,31 @@ A new money path:
 
   1. `beginPurchase()` with a unique rate-limit bucket and the product's copy.
   2. Resolve the price server-side; never trust a client total.
-  3. Buy upstream before debiting, and release upstream if the charge fails —
-     that is the order every existing path uses.
-  4. `afterPurchase()` once the order exists.
-  5. A client-supplied `requestId`, unique per attempt, so a retry replays
+  3. Reserve funds first: `reserveWallet({ userId, requestId, amount, fingerprint })`
+     atomically checks `wallet_balance - wallet_reserved >= amount` and bumps
+     `wallet_reserved`. The invariant is **available = balance - reserved**; every
+     debit, withdrawal, gift-card purchase and number/eSIM purchase must use it.
+     The hold is bound to `(user_id, request_id)` so concurrent retries are
+     arbitrated by the unique index, not by a race.
+  4. Buy upstream while the hold is open.
+  5. On confirmed provider success: `settleReservation()` inside the same
+     transaction that debits `wallet_balance` and drops `wallet_reserved`, writing
+     one `wallet_transactions` row. On definitive provider failure:
+     `releaseReservation()` — only `wallet_reserved` is reduced, no ledger row.
+     On ambiguous/timeout/unknown: `holdForReview()` — the hold stays in
+     `review` with no auto-release and no auto-retry; an operator decides via
+     `resolveReviewedReservation()`. A crash between reserve and settle leaves an
+     open hold that the nightly `wallet-holds` step reports without mutating.
+  6. `afterPurchase()` once the order exists (where still used; new paths settle
+     directly).
+  7. A client-supplied `requestId`, unique per attempt, so a retry replays
      instead of buying twice.
+
+  Reference implementation: `src/app/api/esim/purchase/route.ts` and
+  `src/app/api/orders/route.ts` (number plans). Helpers live in
+  `src/lib/payments/reservations.ts`; the schema is `wallet_reservations` plus
+  `users.wallet_reserved` (migration 0047). `openHolds()` / `expiredHolds()` are
+  for the wallet page and the nightly report-only step.
 
 
 What is deliberately not unified
