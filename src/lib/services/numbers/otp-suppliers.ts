@@ -561,8 +561,9 @@ export async function readOtpOffersForSupplier(
     const snapshot = await readSupplierCatalogue(
       sharedKey,
       async () => {
-        const offers = rankWithinSupplier(await withBudget((signal) => fetchOffers(supplier, country, regionName, signal, true), budgetMs));
-        return { offers, fetchedAt: new Date().toISOString(), partial: false, degraded: null };
+        const result = await withBudget((signal) => fetchOffers(supplier, country, regionName, signal, true), budgetMs);
+        const offers = rankWithinSupplier(result.offers);
+        return { offers, fetchedAt: new Date().toISOString(), partial: result.partial, degraded: result.partial ? "outage" : null };
       },
       5 * 60_000,
     );
