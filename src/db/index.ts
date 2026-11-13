@@ -398,14 +398,18 @@ function sortDescendingByCreatedAt<T extends Record<string, unknown>>(items: T[]
 }
 
 export type PreviewState = Record<
-  | "users" | "sessions" | "orders" | "walletTransactions" | "paymentTopups"
+  | "users" | "sessions" | "orders" | "walletTransactions" | "walletReservations" | "paymentTopups"
   | "contactMessages" | "giftCards" | "scheduledOrders" | "notifications"
   | "securityViolations" | "withdrawals" | "bankAccounts" | "adminAuditLog"
   | "userTwoFactor" | "twoFactorRecoveryCodes" | "twoFactorChallenges"
   | "productReviews" | "supportTickets" | "supportMessages"
   | "webauthnCredentials" | "webauthnChallenges" | "emailChangeRequests"
   | "referralCodes" | "referrals"
-  | "accountSignals" | "fraudEvents" | "adminBans",
+  | "accountSignals" | "fraudEvents" | "adminBans"
+  | "catalogSnapshots" | "rateLimitBuckets"
+  | "bulkBatches" | "proxySlots" | "foxreloadQuotes"
+  | "walletEmailOutbox" | "firstPurchaseEmailClaims"
+  | "reconciliationRuns" | "webhookEvents" | "emailDeliveryEvents" | "onboardingEmailLog",
   Array<Record<string, unknown>>
 >;
 
@@ -443,12 +447,24 @@ const mockState: PreviewState =
     accountSignals: [],
     fraudEvents: [],
     adminBans: [],
+    walletReservations: [],
+    catalogSnapshots: [],
+    rateLimitBuckets: [],
+    bulkBatches: [],
+    proxySlots: [],
+    foxreloadQuotes: [],
+    walletEmailOutbox: [],
+    firstPurchaseEmailClaims: [],
+    reconciliationRuns: [],
+    webhookEvents: [],
+    emailDeliveryEvents: [],
+    onboardingEmailLog: [],
   };
 
 // Next can load route handlers and server components in separate bundles.
 // Share the in-memory preview state across those bundles in this process.
 if (!databaseUrl) {
-  for (const key of ["users", "sessions", "orders", "walletTransactions", "paymentTopups", "contactMessages", "giftCards", "scheduledOrders", "notifications", "securityViolations", "withdrawals", "bankAccounts", "adminAuditLog", "userTwoFactor", "twoFactorRecoveryCodes", "twoFactorChallenges", "productReviews", "supportTickets", "supportMessages", "webauthnCredentials", "webauthnChallenges", "emailChangeRequests", "referralCodes", "referrals", "accountSignals", "fraudEvents", "adminBans"] as const) {
+  for (const key of ["users", "sessions", "orders", "walletTransactions", "walletReservations", "paymentTopups", "contactMessages", "giftCards", "scheduledOrders", "notifications", "securityViolations", "withdrawals", "bankAccounts", "adminAuditLog", "userTwoFactor", "twoFactorRecoveryCodes", "twoFactorChallenges", "productReviews", "supportTickets", "supportMessages", "webauthnCredentials", "webauthnChallenges", "emailChangeRequests", "referralCodes", "referrals", "accountSignals", "fraudEvents", "adminBans", "catalogSnapshots", "rateLimitBuckets", "bulkBatches", "proxySlots", "foxreloadQuotes", "walletEmailOutbox", "firstPurchaseEmailClaims", "reconciliationRuns", "webhookEvents", "emailDeliveryEvents", "onboardingEmailLog"] as const) {
     mockState[key] ??= [];
   }
   globalForDb.__arenaPryvaMockState = mockState;

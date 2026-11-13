@@ -1,8 +1,10 @@
 import "server-only";
 import { createHash } from "node:crypto";
 
+import { persistentDatabaseConfigured } from "@/lib/platform/database-config";
 import { financialActionsUnavailable } from "@/lib/platform/financial-environment";
 import { getBitcallEsimPlan, isBitcallConfigured, listBitcallEsimCountries, listBitcallEsimPlans, type BitcallEsimPlan } from "@/lib/providers/bitcall";
+import { readSupplierCatalogue, supplierCatalogueKey } from "@/lib/platform/supplier-catalogue-snapshot";
 import { isFundingFailure } from "@/lib/providers/types";
 import { getFreshNgnRate, type NgnQuoteCurrency } from "@/lib/payments/exchange-rate";
 import { logger } from "@/lib/platform/logger";
@@ -106,53 +108,61 @@ type EsimSnapshot = {
   fetchedAt: string;
 };
 
+function bitcallIdentity(): string {
+  return `${process.env.BITCALL_KEY_ID?.trim() ?? ""}\0${process.env.BITCALL_API_SECRET?.trim() ?? ""}`;
+}
+
+const ESIM_SNAPSHOT_FAMILY = "bitcall-esim";
+
+async function fetchEsimSnapshotRaw(): Promise<EsimSnapshot> {
+  const [plans, countries] = await Promise.allSettled([listBitcallEsimPlans(), listBitcallEsimCountries()]);
+  if (plans.status === "rejected") {
+    if (isFundingFailure(plans.reason)) throw plans.reason;
+    throw new Error("eSIM catalog unavailable");
+  }
+  // A locally budgeted partial walk is treated as incomplete upstream,
+  // not as an empty catalogue. The shared layer will not publish it and will
+  // instead preserve the last complete snapshot when one exists.
+  if (plans.value.partial && plans.value.partialReason === "budget") {
+    throw new Error("eSIM catalogue walk hit local budget");
+  }
+  return {
+    plans: plans.value.plans,
+    countries: countries.status === "fulfilled" ? countries.value.slice(0, 400) : [],
+    returned: plans.value.returned,
+    unreadable: plans.value.unreadable,
+    partial: plans.value.partial || countries.status === "rejected",
+    degraded: countries.status === "fulfilled" && !plans.value.partial
+      ? null
+      : countries.status === "rejected" && isFundingFailure(countries.reason) ? "funding" : "outage",
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
 const CATALOG_TTL_MS = 2 * 60_000;
 let snapshotCache: { expires: number; snapshot: EsimSnapshot } | null = null;
 let snapshotInFlight: Promise<EsimSnapshot> | null = null;
 let catalogCache: { expires: number; catalog: EsimCatalog } | null = null;
 let catalogInFlight: Promise<EsimCatalog> | null = null;
 
-/** A short-lived, process-local read cache; the shared gateway budget still protects the credential across instances. */
-async function readEsimSnapshot(refresh = false): Promise<EsimSnapshot> {
+/** Local fallback when no persistent database is configured (dev / tests). */
+async function readLocalEsimSnapshot(refresh = false): Promise<EsimSnapshot> {
   if (!isBitcallConfigured()) throw new Error("eSIM provider not configured");
   if (!refresh && snapshotCache && snapshotCache.expires > Date.now()) return snapshotCache.snapshot;
   if (snapshotInFlight) return snapshotInFlight;
   snapshotInFlight = (async () => {
     try {
-      const [plans, countries] = await Promise.allSettled([listBitcallEsimPlans(), listBitcallEsimCountries()]);
-      // The plan catalog is the product; without it there is nothing to show.
-      // The country list only annotates coverage, so it degrades instead.
-      // Keep an unfunded-account refusal intact: it is not an outage.
-      if (plans.status === "rejected") {
-        if (isFundingFailure(plans.reason)) throw plans.reason;
-        throw new Error("eSIM catalog unavailable");
-      }
-      // A local budget limit is not evidence that products disappeared upstream.
-      // Retain a recent complete snapshot, preserving its original age and marking degradation.
-      if (plans.value.partial && plans.value.partialReason === "budget" && snapshotCache &&
-          !snapshotCache.snapshot.partial && Date.now() - Date.parse(snapshotCache.snapshot.fetchedAt) < 5 * 60_000) {
-        return { ...snapshotCache.snapshot, partial: true, degraded: "outage" as const };
-      }
-      const snapshot: EsimSnapshot = {
-        plans: plans.value.plans,
-        countries: countries.status === "fulfilled" ? countries.value.slice(0, 400) : [],
-        returned: plans.value.returned,
-        unreadable: plans.value.unreadable,
-        partial: plans.value.partial || countries.status === "rejected",
-        degraded: countries.status === "fulfilled" && !plans.value.partial
-          ? null
-          : countries.status === "rejected" && isFundingFailure(countries.reason) ? "funding" : "outage",
-        fetchedAt: new Date().toISOString(),
-      };
+      const snapshot = await fetchEsimSnapshotRaw();
       snapshotCache = { snapshot, expires: Date.now() + CATALOG_TTL_MS };
       return snapshot;
     } catch (error) {
+      if (isFundingFailure(error)) throw error;
       if (snapshotCache && Date.now() - Date.parse(snapshotCache.snapshot.fetchedAt) < 5 * 60_000) {
         const stale = { ...snapshotCache.snapshot, partial: true, degraded: "outage" as const, fetchedAt: snapshotCache.snapshot.fetchedAt };
         snapshotCache = { snapshot: stale, expires: Date.now() + CATALOG_TTL_MS };
         return stale;
       }
-      throw error;
+      throw error instanceof Error && error.message === "eSIM catalogue walk hit local budget" ? new Error("eSIM catalog unavailable") : error;
     }
   })();
   try {
@@ -160,6 +170,26 @@ async function readEsimSnapshot(refresh = false): Promise<EsimSnapshot> {
   } finally {
     snapshotInFlight = null;
   }
+}
+
+/**
+ * Process-local in dev, cross-instance shared in production.
+ *
+ * The supplier snapshot table is the single writer per credential scope; a
+ * partial or budget-limited walk is never published as a complete value, so a
+ * good previous complete snapshot is preserved rather than hidden. This is the
+ * difference between "the feed is slow" and "the catalogue is gone".
+ */
+async function readEsimSnapshot(refresh = false): Promise<EsimSnapshot> {
+  if (!isBitcallConfigured()) throw new Error("eSIM provider not configured");
+  if (!persistentDatabaseConfigured()) return readLocalEsimSnapshot(refresh);
+  // Shared snapshot is the source of truth for cross-instance coherence; the
+  // 30-second TTL and lease prevent a browser refresh loop from hammering the
+  // supplier. A partial or budget-limited walk never replaces a good complete
+  // value — the shared layer returns the previous stale snapshot instead.
+  const identity = bitcallIdentity();
+  const key = supplierCatalogueKey(ESIM_SNAPSHOT_FAMILY, identity);
+  return readSupplierCatalogue(key, fetchEsimSnapshotRaw);
 }
 
 /** Rejects provider text, and anything naming the source, before it can reach a customer. */

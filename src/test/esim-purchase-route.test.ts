@@ -27,6 +27,12 @@ const state = vi.hoisted(() => ({
   debits: [] as any[],
   purchased: [] as any[],
   txError: null as Error | null,
+  /** In-memory holds, enough to exercise every branch the route can take. */
+  holds: new Map<string, { status: string; amount: number }>(),
+  reserveCalls: 0,
+  releases: [] as any[],
+  settled: [] as any[],
+  reviewed: [] as any[],
 }));
 
 vi.mock("@/lib/identity/auth", () => ({ getCurrentUser: async () => state.user, requireAuthApi: async () => state.user }));
@@ -59,17 +65,47 @@ vi.mock("@/lib/services/esim/esim-fulfilment", () => ({
   },
 }));
 
-vi.mock("@/lib/payments/wallet", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/payments/wallet")>();
-  return {
-    ...actual,
-    debitWalletInTx: async (_tx: unknown, entry: unknown) => {
-      if (state.txError) throw state.txError;
-      state.debits.push(entry);
-      return state.balance;
-    },
-  };
-});
+/**
+ * The hold lifecycle, in memory. The real module is proved against embedded
+ * PostgreSQL in `wallet-reservations.test.ts` and `wallet-reservation-races.test.ts`;
+ * here it stands in so this suite can stay a route test with a mock database.
+ */
+vi.mock("@/lib/payments/reservations", () => ({
+  reserveWallet: async (input: { requestId: string; amount: number }) => {
+    state.reserveCalls++;
+    const existing = state.holds.get(input.requestId);
+    if (existing) return { kind: "existing", reservationId: input.requestId, status: existing.status, balance: state.balance, orderId: null };
+    if (state.balance < input.amount) return { kind: "insufficient", balance: state.balance };
+    state.holds.set(input.requestId, { status: "held", amount: input.amount });
+    return { kind: "reserved", reservationId: input.requestId, balance: state.balance - input.amount };
+  },
+  settleReservation: async (input: { reservationId: string; amount: number; reference: string; orderId?: string }) => {
+    const hold = state.holds.get(input.reservationId);
+    if (!hold || hold.status !== "held") return { balance: state.balance, reservationAlreadyClosed: true };
+    if (state.txError) throw state.txError;
+    hold.status = "settled";
+    state.settled.push({ ...input });
+    state.debits.push({ amount: input.amount, type: "debit", orderId: input.orderId, reference: input.reference });
+    state.balance -= input.amount;
+    return { balance: state.balance, reservationAlreadyClosed: false };
+  },
+  releaseReservation: async (input: { reservationId: string }) => {
+    const hold = state.holds.get(input.reservationId);
+    if (!hold || hold.status !== "held") return { released: false, balance: state.balance };
+    hold.status = "released";
+    state.releases.push({ ...input });
+    return { released: true, balance: state.balance };
+  },
+  holdForReview: async (input: { reservationId: string }) => {
+    const hold = state.holds.get(input.reservationId);
+    if (!hold || hold.status !== "held") return false;
+    hold.status = "review";
+    state.reviewed.push({ ...input });
+    return true;
+  },
+  linkReservationToOrder: async () => undefined,
+  availableBalance: async () => state.balance,
+}));
 
 function selectChain(result: unknown) {
   const api: Record<string, unknown> = {
@@ -173,6 +209,11 @@ beforeEach(() => {
   state.debits = [];
   state.purchased = [];
   state.txError = null;
+  state.holds = new Map();
+  state.reserveCalls = 0;
+  state.releases = [];
+  state.settled = [];
+  state.reviewed = [];
 });
 
 describe("POST /api/esim/purchase", () => {
@@ -371,12 +412,14 @@ describe("POST /api/esim/purchase", () => {
     expect(state.purchased).toEqual([]);
   });
 
-  it("stops at the balance check when the wallet cannot cover it", async () => {
+  it("stops before claiming anything when the wallet cannot cover the plan", async () => {
     state.user = { id: "u1", walletBalance: 1_000 };
     const response = await POST(request(valid));
     expect(response.status).toBe(402);
     expect(state.purchased).toEqual([]);
     expect(state.inserts).toEqual([]);
+    // A refusal costs no hold: nothing was reserved for an order that cannot pay.
+    expect(state.holds.size).toBe(0);
   });
 
   it("charges nothing when the supplier refuses", async () => {

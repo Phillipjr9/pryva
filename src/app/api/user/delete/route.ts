@@ -2,7 +2,7 @@ import { isVercelPreview } from "@/lib/platform/financial-environment";
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { and, count, desc, eq, notInArray } from "drizzle-orm";
+import { and, count, desc, eq, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   accountDeletions,
@@ -21,6 +21,7 @@ import {
   users,
   walletEmailOutbox,
   walletTransactions,
+  walletReservations,
   webauthnCredentials,
   withdrawals,
 } from "@/db/schema";
@@ -186,7 +187,14 @@ export async function POST(request: NextRequest) {
       .select({ total: count() })
       .from(withdrawals)
       .where(and(eq(withdrawals.userId, user.id), notInArray(withdrawals.status, FINISHED_WITHDRAWALS)));
-    const block = deletionBlock({ pendingWithdrawals: Number(pending?.total ?? 0) });
+    // Holds are money committed to a supplier that may settle at any moment.
+    // Closing the account while they are open would lose both the money and the
+    // ability to refund it if delivery never arrives.
+    const [heldEarly] = await db.select({ total: sql<number>`coalesce(sum(${walletReservations.amount}), 0)` }).from(walletReservations)
+      .where(and(eq(walletReservations.userId, user.id), eq(walletReservations.status, "held")));
+    const [reviewEarly] = await db.select({ total: sql<number>`coalesce(sum(${walletReservations.amount}), 0)` }).from(walletReservations)
+      .where(and(eq(walletReservations.userId, user.id), eq(walletReservations.status, "review")));
+    const block = deletionBlock({ pendingWithdrawals: Number(pending?.total ?? 0), heldTotal: Number(heldEarly?.total ?? 0), reviewTotal: Number(reviewEarly?.total ?? 0) });
     if (block) {
       return NextResponse.json({ ok: false, ...block }, { status: 409 });
     }
@@ -244,7 +252,11 @@ export async function POST(request: NextRequest) {
       // the owner rather than closing while a committed payout is in flight.
       const [pendingNow] = await tx.select({ total: count() }).from(withdrawals)
         .where(and(eq(withdrawals.userId, user.id), notInArray(withdrawals.status, FINISHED_WITHDRAWALS)));
-      const lateBlock = deletionBlock({ pendingWithdrawals: Number(pendingNow?.total ?? 0) });
+      const [heldNow] = await tx.select({ total: sql<number>`coalesce(sum(${walletReservations.amount}), 0)` }).from(walletReservations)
+        .where(and(eq(walletReservations.userId, user.id), eq(walletReservations.status, "held")));
+      const [reviewNow] = await tx.select({ total: sql<number>`coalesce(sum(${walletReservations.amount}), 0)` }).from(walletReservations)
+        .where(and(eq(walletReservations.userId, user.id), eq(walletReservations.status, "review")));
+      const lateBlock = deletionBlock({ pendingWithdrawals: Number(pendingNow?.total ?? 0), heldTotal: Number(heldNow?.total ?? 0), reviewTotal: Number(reviewNow?.total ?? 0) });
       if (lateBlock) return { kind: "blocked", block: lateBlock };
 
       // Acknowledgement names an amount, not just a boolean: an intervening

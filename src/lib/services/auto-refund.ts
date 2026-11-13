@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { and, eq, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { orders, users, walletTransactions } from "@/db/schema";
+import { orders, users, walletReservations, walletTransactions } from "@/db/schema";
 import { cancelUpstream } from "@/lib/services/fulfillment";
 import { flagReconciliation } from "@/lib/services/reconciliation";
 import { deliveryWindowMs } from "@/lib/services/registry";
@@ -33,6 +33,13 @@ export async function processAutoRefunds(): Promise<{ refunded: number; cancelle
   );
   const candidates = await db.select().from(orders).where(eligible)
     .orderBy(sql`${orders.refundCheckedAt} ASC NULLS FIRST`, orders.createdAt, orders.id).limit(100);
+  // A review hold means the supplier may already have taken the money. Refunding
+  // automatically there would pay the customer for a purchase we funded, so those
+  // rows are left for a human even though their order status looks refundable.
+  const reviewed = new Set(
+    (await db.select({ orderId: walletReservations.orderId }).from(walletReservations)
+      .where(eq(walletReservations.status, "review"))).map((row) => row.orderId),
+  );
   let refunded = 0;
   let cancelled = 0;
 
@@ -40,6 +47,7 @@ export async function processAutoRefunds(): Promise<{ refunded: number; cancelle
     // Belt and braces: the SQL already encodes this, but a future edit to the
     // query should not silently widen what gets an automatic refund.
     if (!isUndeliveredSingleNumber(candidate)) continue;
+    if (reviewed.has(candidate.id)) continue;
 
     try {
       // Mark before network I/O, so an unavailable or slow supplier cannot

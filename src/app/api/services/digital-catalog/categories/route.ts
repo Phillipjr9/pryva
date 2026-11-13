@@ -6,7 +6,7 @@ import { isFoxreloadConfigured, readFoxreloadBrowseCategories } from "@/lib/prov
 import { digitalCatalogueFailure } from "@/lib/services/foxreload/catalogue-failure";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 const labels: Record<string, string> = {
   esim: "eSIM", rewarble: "Rewarble", "test-orders": "Test products", "game-currency": "Game currency codes",
   topups: "Account top-ups", "gaming-services": "Gaming services", games: "Games", "app-stores": "App stores",

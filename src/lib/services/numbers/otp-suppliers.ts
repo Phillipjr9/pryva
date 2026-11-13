@@ -11,6 +11,8 @@ import {
   type BitcallOtpCountryEntry,
   type BitcallOtpOffer,
 } from "@/lib/providers/bitcall";
+import { persistentDatabaseConfigured } from "@/lib/platform/database-config";
+import { readSupplierCatalogue, supplierCatalogueKey } from "@/lib/platform/supplier-catalogue-snapshot";
 import { buyFleexaSmsNumber, FleexaError, isFleexaConfigured, listFleexaSmsServices } from "@/lib/providers/fleexa";
 import { logger } from "@/lib/platform/logger";
 import { supplierAmountToNgn, supplierAmountWithRates, supplierNgnRates } from "@/lib/payments/supplier-currency";
@@ -61,15 +63,19 @@ export type BoughtNumber = {
 /**
  * How long a catalogue read may take before it is treated as "nothing on offer".
  *
- * Bitcall's OTP feed can legitimately take longer than a few seconds when it is
+ * Bitcall's OTP feed can legitimately take ~20 seconds for a cold multi-page walk when it is
  * serving a wider publish set or a slow region. This budget is deliberately
  * above the previous short value so a valid, slower read is not mistaken for a
  * dead feed and a customer-facing verification list disappears.
  */
-const CATALOGUE_BUDGET_MS = 12_000;
+const CATALOGUE_BUDGET_MS = 20_000;
 
 /** Catalogues are read-only, so a stale answer is safe for a short while. */
 const CATALOGUE_TTL_MS = 60_000;
+
+function bitcallOtpIdentity(): string {
+  return `${process.env.BITCALL_KEY_ID?.trim() ?? ""}\0${process.env.BITCALL_API_SECRET?.trim() ?? ""}`;
+}
 
 type CacheEntry = { at: number; offers: OtpOffer[]; };
 const catalogueCache = new Map<string, CacheEntry>();
@@ -244,17 +250,21 @@ async function fleexaOffers(country: string, regionName: string): Promise<OtpOff
   return [...offersByKey.values()];
 }
 
-/** A shared cold read avoids re-fetching the country list for every destination. */
-function bitcallCountries(refresh: boolean): Promise<BitcallOtpCountryEntry[]> {
+async function fetchBitcallCountriesRaw(): Promise<BitcallOtpCountryEntry[]> {
+  return listBitcallOtpCountryEntries({ signal: AbortSignal.timeout(CATALOGUE_BUDGET_MS) });
+}
+
+/** Per-instance coalescing; in production also shared across instances. */
+async function readLocalBitcallCountries(refresh: boolean): Promise<BitcallOtpCountryEntry[]> {
   if (!refresh && countryCache && Date.now() - countryCache.at < CATALOGUE_TTL_MS) {
-    return Promise.resolve(countryCache.entries);
+    return countryCache.entries;
   }
   if (countryRead) return countryRead;
   // The country walk has its own deadline: one caller timing out must not abort
   // the same shared read for a different country. A caller whose own budget
   // expires still cannot start any subsequent service requests.
   let current: Promise<BitcallOtpCountryEntry[]>;
-  current = listBitcallOtpCountryEntries({ signal: AbortSignal.timeout(CATALOGUE_BUDGET_MS) })
+  current = fetchBitcallCountriesRaw()
     .then((entries) => {
       if (countryRead === current) countryCache = { at: Date.now(), entries };
       return entries;
@@ -262,6 +272,39 @@ function bitcallCountries(refresh: boolean): Promise<BitcallOtpCountryEntry[]> {
     .finally(() => { if (countryRead === current) countryRead = null; });
   countryRead = current;
   return current;
+}
+
+/** A shared cold read avoids re-fetching the country list for every destination. */
+function bitcallCountries(refresh: boolean): Promise<BitcallOtpCountryEntry[]> {
+  if (!persistentDatabaseConfigured()) return readLocalBitcallCountries(refresh);
+  const key = supplierCatalogueKey("bitcall-otp-countries", bitcallOtpIdentity());
+  // Countries are a stable directory; they change slower than offers and are
+  // needed for every country lookup. Share them so a cold instance does not
+  // re-walk the whole directory per destination.
+  return (async () => {
+    try {
+      const snapshot = await readSupplierCatalogue(
+        key,
+        async () => {
+          const entries = await fetchBitcallCountriesRaw();
+          return { entries, fetchedAt: new Date().toISOString(), partial: false, degraded: null };
+        },
+        10 * 60_000,
+      );
+      // Populate local cache from shared so following local reads are consistent.
+      countryCache = { at: Date.parse(snapshot.fetchedAt), entries: snapshot.entries };
+      return snapshot.entries;
+    } catch (error) {
+      // Shared layer may be stale (returns previous stale snapshot) or throw
+      // SnapshotUnavailable. Fall back to local coalescing rather than failing
+      // the country, but never hide a funding refusal behind stale data.
+      if (error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "23505") throw error;
+      // If shared returned stale snapshot, it is thrown as value with partial:true inside readSupplierCatalogue? Actually readSupplierCatalogue maps stale to partial:outage.
+      // That still reaches caller as successful snapshot (with partial). So this catch is only for true unavailability.
+      // Use local path which has its own stale-while-error behaviour (3x TTL window).
+      return readLocalBitcallCountries(refresh);
+    }
+  })();
 }
 
 /** Recognize the provider's published ISO-like code, not an opaque offer ID. */
@@ -438,15 +481,13 @@ export function otpOfferPublicId(country: string, ref: string, app: string | nul
 }
 
 /** Read one supplier's offers while preserving a safe error code for storefront status. */
-export async function readOtpOffersForSupplier(
+async function readLocalOtpOffersForSupplier(
   supplier: OtpSupplierId,
   country: string,
   regionName: string,
   budgetMs: number = CATALOGUE_BUDGET_MS,
   refresh = false,
 ): Promise<OtpOfferRead> {
-  if (!otpSupplierConfigured(supplier)) return { offers: [], errorCode: "NOT_CONFIGURED" };
-
   const key = `${supplier}:${country}`;
   const cached = catalogueCache.get(key);
   if (!refresh && cached && Date.now() - cached.at < CATALOGUE_TTL_MS) return {
@@ -499,6 +540,61 @@ export async function readOtpOffersForSupplier(
   });
   if (!refresh) catalogueReads.set(pendingKey, current);
   return current;
+}
+
+export async function readOtpOffersForSupplier(
+  supplier: OtpSupplierId,
+  country: string,
+  regionName: string,
+  budgetMs: number = CATALOGUE_BUDGET_MS,
+  refresh = false,
+): Promise<OtpOfferRead> {
+  if (!otpSupplierConfigured(supplier)) return { offers: [], errorCode: "NOT_CONFIGURED" };
+  if (!persistentDatabaseConfigured()) return readLocalOtpOffersForSupplier(supplier, country, regionName, budgetMs, refresh);
+
+  // Cross-instance shared catalogue: one supplier walk per country per
+  // credential scope, not one per shopper per instance. A partial or failed
+  // walk never replaces a good complete value — the previous snapshot stays
+  // visible marked stale.
+  const sharedKey = supplierCatalogueKey(`bitcall-otp:${country.toLowerCase()}`, bitcallOtpIdentity());
+  try {
+    const snapshot = await readSupplierCatalogue(
+      sharedKey,
+      async () => {
+        const offers = rankWithinSupplier(await withBudget((signal) => fetchOffers(supplier, country, regionName, signal, true), budgetMs));
+        return { offers, fetchedAt: new Date().toISOString(), partial: false, degraded: null };
+      },
+      5 * 60_000,
+    );
+    // Keep local cache coherent for checkout paths that bypass shared (e.g. tests).
+    const at = Date.parse(snapshot.fetchedAt);
+    if (Number.isFinite(at)) catalogueCache.set(`${supplier}:${country}`, { at, offers: snapshot.offers });
+    return {
+      offers: snapshot.offers,
+      errorCode: null,
+      partial: snapshot.partial,
+      degraded: snapshot.degraded,
+      stale: snapshot.partial,
+      fetchedAt: snapshot.fetchedAt,
+    };
+  } catch (error) {
+    const retryAfterSeconds = bitcallCatalogueCooldown(error);
+    // Funding failure is actionable (restocking vs outage) and must not be
+    // hidden behind stale data.
+    const funding = (() => {
+      try { return Boolean(error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "INSUFFICIENT_BALANCE"); } catch { return false; }
+    })();
+    if (funding) {
+      return { offers: [], errorCode: errorCodeOf(error), partial: false, degraded: "funding", retryAfterSeconds };
+    }
+    // For transient outages, try the local stale window before giving up.
+    const cached = catalogueCache.get(`${supplier}:${country}`);
+    const stale = cached && Date.now() - cached.at < CATALOGUE_TTL_MS * 3 ? cached.offers : null;
+    if (stale && stale.length > 0) {
+      return { offers: stale, errorCode: errorCodeOf(error), partial: true, degraded: "outage", stale: true, fetchedAt: new Date(cached!.at).toISOString(), retryAfterSeconds };
+    }
+    return { offers: [], errorCode: errorCodeOf(error), partial: false, degraded: "outage", retryAfterSeconds };
+  }
 }
 
 export async function otpOffersForSupplier(

@@ -3,12 +3,13 @@ import { randomBytes } from "node:crypto";
 import { authorizeAdminApi } from "@/lib/identity/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { orders, users, walletTransactions } from "@/db/schema";
-import { eq, and, isNull, ne, sql } from "drizzle-orm";
+import { orders, users, walletReservations, walletTransactions } from "@/db/schema";
+import { eq, and, inArray, isNull, ne, sql } from "drizzle-orm";
 import { logger } from "@/lib/platform/logger";
 import { flagReconciliation } from "@/lib/services/reconciliation";
 import { recordAdminAction } from "@/lib/admin/admin-audit";
 import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
+import { closeHoldForRefund } from "@/lib/payments/reservations";
 import { isJsonRequest, readJsonWithLimit, RequestBodyTooLargeError } from "@/lib/platform/request-body";
 import { isSameOriginMutation } from "@/lib/platform/net";
 
@@ -112,13 +113,25 @@ export async function POST(request: NextRequest) {
         eq(walletTransactions.orderId, order.id), eq(walletTransactions.userId, order.userId),
         eq(walletTransactions.type, "debit"), eq(walletTransactions.amount, order.amount),
       )).limit(1);
-      if (!debit) throw new UnpaidOrderError();
+      // A delivered-but-unsettled order has no debit row yet; its funds are still
+      // committed by a wallet hold. Refunding it is allowed only if that hold is
+      // closed in the same transaction, or the credit would be funded twice and
+      // the parked hold would later charge an order already marked refunded.
+      const [hold] = debit
+        ? [null]
+        : await tx.select({ id: walletReservations.id }).from(walletReservations).where(and(
+            eq(walletReservations.orderId, order.id),
+            inArray(walletReservations.status, ["held", "review"]),
+          )).limit(1);
+      if (!debit && !hold) throw new UnpaidOrderError();
 
       const [user] = await tx.update(users)
         .set({ walletBalance: sql`${users.walletBalance} + ${order.amount}` })
         .where(eq(users.id, order.userId))
         .returning({ balance: users.walletBalance });
       if (!user) throw new Error("Refund user not found");
+
+      if (hold) await closeHoldForRefund({ tx, orderId: order.id });
 
       await tx.insert(walletTransactions).values({
         userId: order.userId,

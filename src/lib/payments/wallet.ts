@@ -99,6 +99,16 @@ export async function creditWallet(input: WalletEntryInput): Promise<number> {
  * at all: the automatic refund sweep credits `amount` back to the wallet without
  * ever checking that a debit happened, so a half-written row would pay out real
  * money for nothing.
+ *
+ * ## Availability, not balance
+ *
+ * The condition is `wallet_balance - wallet_reserved >= amount`, not
+ * `wallet_balance >= amount`. Funds committed to an in-flight purchase
+ * (`wallet_reservations`) are still *in* the balance but are not the customer's
+ * to spend a second time; a route that ignored them could take the money a
+ * pending order is going to settle with, and that order would then fail after the
+ * supplier had already been paid. Preview data and every account with nothing
+ * held behave exactly as before, because `wallet_reserved` is 0.
  */
 export async function debitWalletInTx(tx: any, input: WalletEntryInput): Promise<number> {
   validateWalletEntry(input, "debit");
@@ -106,12 +116,16 @@ export async function debitWalletInTx(tx: any, input: WalletEntryInput): Promise
   const [updated] = await tx
     .update(users)
     .set({ walletBalance: sql`${users.walletBalance} - ${input.amount}` })
-    .where(sql`${users.id} = ${input.userId} AND ${users.walletBalance} >= ${input.amount} AND ${users.suspendedAt} IS NULL AND ${users.deletedAt} IS NULL`)
+    .where(sql`${users.id} = ${input.userId} AND ${users.walletBalance} - ${users.walletReserved} >= ${input.amount} AND ${users.suspendedAt} IS NULL AND ${users.deletedAt} IS NULL`)
     .returning({ balance: users.walletBalance });
 
   if (!updated) {
     const [current] = await tx
-      .select({ balance: users.walletBalance, suspendedAt: users.suspendedAt, deletedAt: users.deletedAt })
+      .select({
+        balance: sql<number>`${users.walletBalance} - ${users.walletReserved}`,
+        suspendedAt: users.suspendedAt,
+        deletedAt: users.deletedAt,
+      })
       .from(users)
       .where(eq(users.id, input.userId))
       .limit(1);

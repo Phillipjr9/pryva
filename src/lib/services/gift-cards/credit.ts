@@ -82,7 +82,9 @@ export async function createGiftCard(params: {
 
     const [user] = await tx.update(users)
       .set({ walletBalance: sql`${users.walletBalance} - ${amount}` })
-      .where(and(eq(users.id, userId), gte(users.walletBalance, amount), isNull(users.suspendedAt), isNull(users.deletedAt)))
+      // Buying a gift card spends real money, so it must not be funded with
+      // funds another in-flight purchase has already committed.
+      .where(and(eq(users.id, userId), sql`${users.walletBalance} - ${users.walletReserved} >= ${amount}`, isNull(users.suspendedAt), isNull(users.deletedAt)))
       .returning({ balance: users.walletBalance });
     if (!user) throw new Error("Insufficient wallet balance or user not found");
     await tx.insert(walletTransactions).values({

@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { lagosDay, runDailyReconciliation } from "@/lib/payments/daily-reconciliation";
 import { processAutoRefunds } from "@/lib/services/auto-refund";
+import { expiredHolds } from "@/lib/payments/reservations";
 import { sweepPendingNumberCodes } from "@/lib/services/numbers/number-code-sync";
 import { dispatchWalletEmails, walletEmailConfigured } from "@/lib/email/wallet-email-outbox";
 import { sweepTopupOrders } from "@/lib/services/foxreload/topup-orders";
@@ -176,6 +177,25 @@ async function handler(request: NextRequest) {
     return { ok: true, detail: `refunded ${refunded}, released ${cancelled}` };
   });
 
+  // Wallet holds that outlived their window. This *reports* and nothing more:
+  // releasing them would refund an order the supplier may have accepted, and
+  // settling them would charge for one nobody confirmed. Naming them is what
+  // turns "a customer's money is stuck" into a fixable queue item.
+  const holds = await runStep("wallet-holds", async () => {
+    const stale = await expiredHolds(25);
+    if (stale.length === 0) return { ok: true, detail: "no open holds past their window" };
+    for (const hold of stale) {
+      logger.error("Wallet hold past its window needs a decision", {
+        reservationId: hold.id,
+        service: hold.service,
+        amount: hold.amount,
+        status: hold.status,
+        orderId: hold.orderId,
+      });
+    }
+    return { ok: false, detail: `${stale.length} open hold(s) need review` };
+  });
+
   // An eSIM bought while the supplier was still provisioning is recorded
   // uncharged until its profile can be read. This sweep finishes those, and
   // charges only what it can actually hand over.
@@ -248,7 +268,7 @@ async function handler(request: NextRequest) {
     };
   });
 
-  const allOk = close.ok && emails.ok && onboarding.ok && boosts.ok && numberCodes.ok && stars.ok && codes.ok && foxEsims.ok && topups.ok && refunds.ok && esim.ok && scheduled.ok && rentals.ok && referrals.ok && payouts.ok && webhookLog.ok && retention.ok;
+  const allOk = close.ok && emails.ok && onboarding.ok && boosts.ok && numberCodes.ok && stars.ok && codes.ok && foxEsims.ok && topups.ok && refunds.ok && holds.ok && esim.ok && scheduled.ok && rentals.ok && referrals.ok && payouts.ok && webhookLog.ok && retention.ok;
   logger.info("Nightly run finished", {
     day,
     allOk,
@@ -262,6 +282,7 @@ async function handler(request: NextRequest) {
     foxEsims: foxEsims.detail,
     topups: topups.detail,
     refunds: refunds.detail,
+    holds: holds.detail,
     esim: esim.detail,
     scheduled: scheduled.detail,
     rentals: rentals.detail,
@@ -270,7 +291,7 @@ async function handler(request: NextRequest) {
   });
 
   return NextResponse.json(
-    { ok: allOk, day, steps: { close, emails, onboarding, boosts, numberCodes, stars, codes, foxEsims, topups, refunds, esim, scheduled, rentals, referrals, retention } },
+    { ok: allOk, day, steps: { close, emails, onboarding, boosts, numberCodes, stars, codes, foxEsims, topups, refunds, holds, esim, scheduled, rentals, referrals, retention } },
     { status: allOk ? 200 : 207, headers: { "Cache-Control": "no-store" } },
   );
 }

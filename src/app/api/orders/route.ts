@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users, type Order } from "@/db/schema";
 import { afterPurchase, beginPurchase } from "@/lib/checkout/purchase";
@@ -7,7 +7,14 @@ import { getCurrentUser } from "@/lib/identity/auth";
 import { findPlan, type Plan } from "@/lib/services/catalog";
 import { FleexaError } from "@/lib/providers/fleexa";
 import { fulfilmentIntent, fulfillPlan, type FulfilledOrder } from "@/lib/services/fulfillment";
-import { debitWalletInTx, InsufficientFundsError, makeReference } from "@/lib/payments/wallet";
+import {
+  holdForReview,
+  linkReservationToOrder,
+  releaseReservation,
+  reserveWallet,
+  settleReservation,
+} from "@/lib/payments/reservations";
+import { makeReference } from "@/lib/payments/wallet";
 import { findOtpCheckoutOffer } from "@/lib/services/numbers/otp-catalog";
 import { isAmbiguousOtpPurchase } from "@/lib/services/numbers/otp-suppliers";
 import { ORDER_PROVIDERS } from "@/lib/services/order-providers";
@@ -15,6 +22,13 @@ import { ORDER_PROVIDERS } from "@/lib/services/order-providers";
 export const dynamic = "force-dynamic";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * How long a number-plan hold stays live for the operator report. Comfortably
+ * past the provider's own delivery window, so a working order never looks
+ * abandoned; it is not a release timer.
+ */
+const NUMBER_HOLD_TTL_MS = 2 * 60 * 60 * 1000;
 
 type ReceiptSource = Pick<
   Order, "id" | "reference" | "productName" | "planLabel" | "service" | "amount" | "status"
@@ -55,6 +69,7 @@ async function findRequestOrder(userId: string, requestId: string): Promise<Orde
   return row ?? null;
 }
 
+/** The ledger balance, which is what a receipt has always reported. */
 async function currentBalance(userId: string): Promise<number> {
   const [row] = await db
     .select({ balance: users.walletBalance })
@@ -62,6 +77,16 @@ async function currentBalance(userId: string): Promise<number> {
     .where(eq(users.id, userId))
     .limit(1);
   return row?.balance ?? 0;
+}
+
+/** What the customer can still spend: balance minus funds held for other orders. */
+async function spendableBalance(userId: string): Promise<number> {
+  const [row] = await db
+    .select({ available: sql<number>`${users.walletBalance} - ${users.walletReserved}` })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return row?.available ?? 0;
 }
 
 async function placeClaimedNumberOrder(
@@ -87,7 +112,11 @@ async function placeClaimedNumberOrder(
     return receipt(existing, await currentBalance(userId), true);
   }
 
-  const current = await currentBalance(userId);
+  // A courtesy read, not the spend guard: `reserveWallet` below is what actually
+  // decides, under a row lock, whether this account can cover the plan. Asking
+  // for `spendableBalance` here means the answer already excludes money held for
+  // another order in flight, so the refusal is honest rather than optimistic.
+  const current = await spendableBalance(userId);
   if (current < plan.price) {
     return Response.json({ ok: false, error: `Your wallet balance is ₦${current.toLocaleString("en-NG")} — top up to continue.` }, { status: 402 });
   }
@@ -138,6 +167,48 @@ async function placeClaimedNumberOrder(
     return Response.json({ ok: false, error: "Check your orders before trying again.", safeToRetry: true }, { status: 409 });
   }
 
+  // Hold the money before the supplier can be reached. Two tabs, a resubmit and
+  // a second device all contend here on the account row, so at most one of them
+  // per affordable amount gets to spend. This is the check the old
+  // `balance < price` read above only pretended to be.
+  const reservation = await reserveWallet({
+    userId,
+    requestId,
+    service: plan.service,
+    amount: plan.price,
+    fingerprint: requestIntent,
+    ttlMs: NUMBER_HOLD_TTL_MS,
+  });
+  if (reservation.kind !== "reserved") {
+    // Nothing has been bought and the claim we just wrote must not survive as an
+    // order nobody can pay for.
+    const reason =
+      reservation.kind === "insufficient"
+        ? "The wallet could not cover this number when it was reserved; nothing was charged and no provider was contacted."
+        : reservation.kind === "ineligible"
+          ? "Account unavailable before the provider purchase; nothing was charged."
+          : "This attempt key was already used; nothing was charged.";
+    await db.update(orders).set({ status: "cancelled", reconciliationNote: reason })
+      .where(and(eq(orders.id, orderId), eq(orders.status, "review"))).catch(() => undefined);
+
+    if (reservation.kind === "insufficient") {
+      return Response.json(
+        { ok: false, error: `Your wallet balance is ₦${reservation.balance.toLocaleString("en-NG")} — top up to continue.` },
+        { status: 402 },
+      );
+    }
+    if (reservation.kind === "ineligible") {
+      return Response.json({ ok: false, error: "This account cannot start a purchase. Nothing was charged." }, { status: 403 });
+    }
+    const winner = await findRequestOrder(userId, requestId);
+    if (winner && winner.id !== orderId && matchesIntent(winner)) {
+      return receipt(winner, await currentBalance(userId), true);
+    }
+    return Response.json({ ok: false, error: "Check your orders before trying again.", safeToRetry: true }, { status: 409 });
+  }
+  const holdId = reservation.reservationId;
+  await linkReservationToOrder({ reservationId: holdId, orderId }).catch(() => undefined);
+
   let providerCallStarted = false;
   let fulfilled: FulfilledOrder;
   const markAttempt = async () => {
@@ -146,7 +217,7 @@ async function placeClaimedNumberOrder(
         .from(users).where(eq(users.id, userId)).for("update").limit(1);
       if (!account || account.suspendedAt || account.deletedAt) throw new Error("Account is not eligible to purchase");
       const [updated] = await tx.update(orders).set({
-        reconciliationNote: "Number provider purchase started; outcome is being tracked. Nothing has been charged.",
+        reconciliationNote: "Number provider purchase started; funds held and outcome is being tracked. Nothing has been charged.",
       }).where(and(eq(orders.id, orderId), eq(orders.status, "review"))).returning({ id: orders.id });
       if (!updated) throw new Error("Order claim is no longer available");
     });
@@ -169,9 +240,16 @@ async function placeClaimedNumberOrder(
     const ambiguous = (providerCallStarted && (intent.kind !== "sms" || isAmbiguousOtpPurchase(error))) ||
       (error instanceof FleexaError && error.code === "AMBIGUOUS_PURCHASE");
     if (ambiguous) {
+      // The provider may have bought the number. Keep the funds held (never
+      // released, never retried) and park both the order and the hold for a human.
       await db.update(orders).set({
-        reconciliationNote: "The number purchase outcome is uncertain. No wallet charge was made; reconcile before any retry.",
+        reconciliationNote: "The number purchase outcome is uncertain. The wallet hold requires reconciliation; nothing was charged and no retry may start.",
       }).where(and(eq(orders.id, orderId), eq(orders.status, "review")));
+      await holdForReview({
+        reservationId: holdId,
+        userId,
+        note: "Number purchase outcome uncertain",
+      }).catch(() => undefined);
       return Response.json({
         ok: true,
         pending: true,
@@ -181,14 +259,25 @@ async function placeClaimedNumberOrder(
       }, { status: 202 });
     }
 
-    await db.update(orders).set({
-      status: "cancelled",
-      reconciliationNote: "The provider did not confirm a purchase; nothing was charged.",
-    }).where(and(eq(orders.id, orderId), eq(orders.status, "review")));
+    // A definite non-purchase: nothing to reconcile, so the hold goes back in the
+    // same transaction that cancels the claim.
+    const released = await db.transaction(async (tx) => {
+      await tx.update(orders).set({
+        status: "cancelled",
+        reconciliationNote: "The provider did not confirm a purchase; the wallet hold was released and nothing was charged.",
+      }).where(and(eq(orders.id, orderId), eq(orders.status, "review")));
+      return releaseReservation({
+        tx,
+        reservationId: holdId,
+        userId,
+        reason: "Provider did not confirm a purchase",
+      });
+    });
     return Response.json({
       ok: false,
       error: "We couldn't confirm that number offer. Nothing was charged; you can safely start a new attempt.",
       safeToRetry: true,
+      balance: released.balance,
     }, { status: 503 });
   }
 
@@ -205,14 +294,19 @@ async function placeClaimedNumberOrder(
         reconciliationNote: null,
       }).where(and(eq(orders.id, orderId), eq(orders.status, "review"))).returning({ id: orders.id });
       if (!activated) throw new Error("OTP order claim is no longer awaiting activation");
-      return debitWalletInTx(tx, {
+      // Settle the hold with the delivery: the funds were committed before the
+      // provider was called, so this cannot be refused for want of money.
+      const settled = await settleReservation({
+        tx,
+        reservationId: holdId,
         userId,
         amount: plan.price,
-        type: "debit",
-        description: `${productName} · ${planLabel}`.slice(0, 200),
+        description: `${productName} · ${planLabel}`,
         orderId,
         reference,
       });
+      if (settled.reservationAlreadyClosed) throw new Error("Number wallet hold was already closed elsewhere");
+      return settled.balance;
     });
     void afterPurchase(userId);
     return receipt({
@@ -233,23 +327,25 @@ async function placeClaimedNumberOrder(
     // The provider activation is already confirmed. Rollback leaves the order in
     // review and the accepted provider reference persisted; never buy again or
     // charge based on an uncertain database outcome.
-    const insufficient = error instanceof InsufficientFundsError;
     await db.update(orders).set({
       status: "review",
       providerRequestId: fulfilled.providerRequestId,
       providerCostNgn: fulfilled.providerCostNgn,
-      reconciliationNote: insufficient
-        ? "The provider accepted the number but the wallet no longer covered it; nothing was charged."
-        : "The provider accepted the number but the wallet charge requires reconciliation.",
+      reconciliationNote: "The provider accepted the number but the wallet hold could not be settled; review before charging or releasing.",
     }).where(and(eq(orders.id, orderId), eq(orders.status, "review")));
+    // The provider delivered and we owe for it: a hold that could not settle is a
+    // human decision, never an automatic release.
+    await holdForReview({
+      reservationId: holdId,
+      userId,
+      note: "Provider delivered but the hold could not be settled",
+    }).catch(() => undefined);
     return Response.json({
       ok: true,
       pending: true,
       balance: await currentBalance(userId),
       order: { id: orderId, reference, productName: productName, planLabel, service: plan.service, amount: plan.price, status: "review" },
-      message: insufficient
-        ? "The provider accepted the activation but your wallet no longer covered the order. Nothing was charged; do not submit it again yet."
-        : "We could not confirm the wallet charge. Check this order and your balance before retrying.",
+      message: "We could not confirm the wallet charge. Check this order and your balance before retrying.",
     }, { status: 202 });
   }
 }

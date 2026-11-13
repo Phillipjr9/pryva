@@ -6,6 +6,7 @@ import { users, walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/identity/auth";
 import { formatNaira } from "@/lib/services/catalog";
 import { walletEntryDirection, walletEntrySign } from "@/lib/payments/wallet-activity";
+import { openHolds } from "@/lib/payments/reservations";
 import { TopUpForm } from "@/components/dashboard/TopUpForm";
 import { ExportTransactionsButton } from "@/components/dashboard/ExportTransactionsButton";
 import { WithdrawalDashboard } from "./WithdrawalDashboard";
@@ -55,6 +56,12 @@ export default async function WalletPage({
       .from(users).where(eq(users.id, user.id)).limit(1),
   ]);
 
+  // Money committed to an order that has not finished yet. It is still in the
+  // balance — the ledger only moves when a purchase settles — but it is not
+  // spendable, which is why the headline can differ from a naive sum of history.
+  const holds = await openHolds(user.id);
+  const available = Math.max(0, user.walletBalance - holds.total);
+
   const added = Number(creditRow?.value ?? 0) + Number(refundRow?.value ?? 0);
   const spent = Number(spentRow?.value ?? 0);
   const spendCount = Number(debitCount?.value ?? 0);
@@ -72,6 +79,7 @@ export default async function WalletPage({
 
       {paystackTestMode && <p role="note" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8125rem] leading-relaxed text-amber-900"><strong>Paystack test mode.</strong> A test key cannot take real payments. Production checkout is disabled with this key; use an isolated staging database for testing.</p>}
       {!provenanceKnown && <p role="note" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[0.8125rem] text-amber-900">Your wallet funds need a source-of-funds review before withdrawal. Your balance remains available for eligible purchases and refunds. Contact support for help.</p>}
+      {holds.total > 0 && <p role="note" className="rounded-2xl border border-line bg-cream/70 px-4 py-3 text-[0.8125rem] leading-relaxed text-ink-2"><strong>{formatNaira(holds.total)} is held.</strong> That money is reserved for {holds.holdCount === 1 ? "an order" : "orders"} still being completed and is not available to spend again. It is charged only if the order is delivered; if it fails, the hold is released automatically and nothing leaves your wallet.{holds.review > 0 ? " Part of it is waiting on a support check." : ""}</p>}
       {provenanceKnown && source.referral > 0 && <p role="note" className="rounded-2xl border border-lav-200 bg-lav-50 px-4 py-3 text-[0.8125rem] text-lav-900">{formatNaira(source.referral)} of your balance is nonwithdrawable referral credit. Withdrawable balance: {formatNaira(withdrawable)} before fees.</p>}
       <TopUpReturn key={`${params.topup ?? ""}:${params.reference ?? params.trxref ?? ""}`} status={params.topup} reference={params.reference ?? params.trxref} userId={user.id} testMode={paystackTestMode} />
 
@@ -82,9 +90,13 @@ export default async function WalletPage({
 
           </div>
           <p className="mt-2 text-[1.9rem] font-semibold leading-none">
-            {formatNaira(user.walletBalance)}
+            {formatNaira(available)}
           </p>
-          <p className="mt-2 text-micro text-white/55">See transaction history below</p>
+          <p className="mt-2 text-micro text-white/55">
+            {holds.total > 0
+              ? `${formatNaira(holds.total)} held for an order in progress · ${formatNaira(user.walletBalance)} total`
+              : "See transaction history below"}
+          </p>
         </div>
         <div className="rounded-2xl border border-line bg-[#fffdfa] p-5">
           <div className="flex items-center justify-between">

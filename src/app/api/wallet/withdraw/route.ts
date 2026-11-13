@@ -193,8 +193,11 @@ export async function POST(request: NextRequest) {
 
       const [debited] = await tx.update(users)
         .set({ walletBalance: sql`${users.walletBalance} - ${totalDeduction}` })
-        .where(and(eq(users.id, user.id), gte(users.walletBalance, totalDeduction), isNull(users.suspendedAt), isNull(users.deletedAt),
-          sql`wallet_provenance_known = true AND wallet_balance - referral_credit_balance >= ${totalDeduction}`))
+        // `wallet_balance - wallet_reserved` is what the customer can actually
+        // send out: funds held for an in-flight purchase cannot be cashed out
+        // from under the order that is going to settle them.
+        .where(and(eq(users.id, user.id), sql`${users.walletBalance} - ${users.walletReserved} >= ${totalDeduction}`, isNull(users.suspendedAt), isNull(users.deletedAt),
+          sql`wallet_provenance_known = true AND wallet_balance - wallet_reserved - referral_credit_balance >= ${totalDeduction}`))
         .returning({ balance: users.walletBalance });
       if (!debited) throw new InsufficientWithdrawalBalance();
 
@@ -272,7 +275,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     if (error instanceof InsufficientWithdrawalBalance) {
-      return NextResponse.json({ error: "Your withdrawable balance cannot cover the amount and fee, or your wallet needs a source-of-funds review. Referral credit cannot be withdrawn; contact support if your balance needs review." }, { status: 400 });
+      return NextResponse.json({ error: "Your withdrawable balance cannot cover the amount and fee. Funds held for an order in progress, non-withdrawable referral credit, or a source-of-funds review can make your available balance lower than your total. Check your wallet for held funds and contact support if your balance needs review." }, { status: 400 });
     }
     logger.error("Withdrawal request failed", { error });
     return NextResponse.json({ error: "Failed to process withdrawal request" }, { status: 500 });

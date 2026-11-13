@@ -28,7 +28,7 @@ let pg: PGlite;
 let database: ReturnType<typeof drizzle<typeof schema>>;
 let fetchMock: ReturnType<typeof vi.fn>;
 
-async function applyMigrations(target: PGlite, through = "0040") {
+async function applyMigrations(target: PGlite, through = "0047") {
   const files = (await readdir("migrations")).filter((file) => /^\d{4}_.*\.sql$/.test(file) && file.slice(0, 4) <= through).sort();
   for (const file of files) await target.exec(await readFile(`migrations/${file}`, "utf8"));
 }

@@ -51,11 +51,11 @@ export const TOMBSTONE_NAME = "Deleted account";
 
 /** Why a deletion cannot proceed right now. */
 export type DeletionBlock = {
-  code: "WITHDRAWAL_IN_FLIGHT" | "FORFEITURE_NOT_ACKNOWLEDGED";
+  code: "WITHDRAWAL_IN_FLIGHT" | "WALLET_HOLD_IN_FLIGHT" | "FORFEITURE_NOT_ACKNOWLEDGED";
   error: string;
   /** Where the customer can fix it, so the refusal is actionable. */
   action: { label: string; href: string };
-  detail?: { withdrawals?: number };
+  detail?: { withdrawals?: number; heldTotal?: number };
 };
 
 /**
@@ -66,8 +66,12 @@ export type DeletionBlock = {
  * owner can no longer sign in to see whether it arrived, and the payout record
  * would be the only trace. A balance is different — that decision is theirs, and
  * they are warned in as many words (`forfeitureWarning`).
+ *
+ * Wallet holds are the same family: money is already committed to a supplier
+ * that may settle moments later. Closing the account would forfeit funds that
+ * are not yet settled and leave the resulting order without an owner to refund.
  */
-export function deletionBlock(account: { pendingWithdrawals: number }): DeletionBlock | null {
+export function deletionBlock(account: { pendingWithdrawals: number; heldTotal?: number; reviewTotal?: number }): DeletionBlock | null {
   if (account.pendingWithdrawals > 0) {
     return {
       code: "WITHDRAWAL_IN_FLIGHT",
@@ -75,6 +79,16 @@ export function deletionBlock(account: { pendingWithdrawals: number }): Deletion
         "A withdrawal from this account is still being processed. Wait until it is settled, then close the account — otherwise you would have no way to see whether the money arrived.",
       action: { label: "Check my withdrawals", href: "/dashboard/wallet" },
       detail: { withdrawals: account.pendingWithdrawals },
+    };
+  }
+  const held = (account.heldTotal ?? 0) + (account.reviewTotal ?? 0);
+  if (held > 0) {
+    const waiting = (account.reviewTotal ?? 0) > 0 ? " waiting on a support check" : "";
+    return {
+      code: "WALLET_HOLD_IN_FLIGHT",
+      error: `₦${held.toLocaleString()} is still held for an order in progress${waiting}. Wait until it is delivered or released, then close the account — otherwise the money and the delivery would be lost with it.`,
+      action: { label: "Check my orders", href: "/dashboard/orders" },
+      detail: { heldTotal: held },
     };
   }
   return null;

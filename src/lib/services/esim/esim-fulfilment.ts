@@ -3,7 +3,7 @@ import "server-only";
 import { and, eq, isNull, lt } from "drizzle-orm";
 
 import { db } from "@/db";
-import { orders, type Order } from "@/db/schema";
+import { orders, users, walletReservations, type Order } from "@/db/schema";
 import type { EsimOffer } from "@/lib/services/esim/esim-catalog";
 import {
   buyBitcallEsimPlan,
@@ -14,7 +14,7 @@ import {
 } from "@/lib/providers/bitcall";
 import { logger } from "@/lib/platform/logger";
 import { ESIM_PROVIDER } from "@/lib/services/order-providers";
-import { debitWalletInTx, InsufficientFundsError } from "@/lib/payments/wallet";
+import { holdForReview, settleReservation } from "@/lib/payments/reservations";
 import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
 
 /**
@@ -172,12 +172,19 @@ export type Completion =
   | { kind: "unpaid"; order: Order };
 
 /**
- * Finish a `processing` eSIM order: read the profile, then record and charge in
- * one transaction.
+ * Finish a `processing` eSIM order: read the profile, then record and settle the
+ * wallet hold in one transaction.
  *
  * Only the transition from `processing` completes an order, and the update is
  * repeated as a condition inside the transaction, so two concurrent page loads
- * cannot charge the same order twice.
+ * cannot settle the same hold twice.
+ *
+ * The hold taken when this order was placed is what makes this safe hours later:
+ * the price left the spendable balance before the supplier was called, so a
+ * customer who spent their wallet elsewhere in the meantime still cannot make
+ * the settle fail. An order from before holds existed has no reservation row;
+ * that path falls back to the original debit, which is why `InsufficientFundsError`
+ * is still handled.
  */
 export async function completeEsimOrder(row: EsimRow): Promise<Completion> {
   if (row.status !== "processing" || !row.providerRequestId) return { kind: "pending" };
@@ -215,27 +222,56 @@ export async function completeEsimOrder(row: EsimRow): Promise<Completion> {
         .returning();
       if (!order) throw new AlreadyCompleted();
 
-      const balance = await debitWalletInTx(tx, {
+      const [hold] = await tx
+        .select({ id: walletReservations.id })
+        .from(walletReservations)
+        .where(and(eq(walletReservations.orderId, order.id), eq(walletReservations.status, "held")))
+        .limit(1);
+
+      if (!hold) {
+        // Placed before holds existed, or already closed by another path. Read
+        // the balance that is already the customer's and report it; never debit
+        // an order that has no hold to settle.
+        const [current] = await tx
+          .select({ balance: users.walletBalance })
+          .from(users)
+          .where(eq(users.id, order.userId))
+          .limit(1);
+        return { order, balance: current?.balance ?? 0 };
+      }
+
+      const settled = await settleReservation({
+        tx,
+        reservationId: hold.id,
         userId: order.userId,
         amount: order.amount,
-        type: "debit",
         description: `${order.productName} · ${order.planLabel}`,
         orderId: order.id,
         reference: order.reference,
       });
-      return { order, balance };
+      return { order, balance: settled.balance };
     });
   } catch (error) {
     if (error instanceof AlreadyCompleted) return { kind: "pending" };
-    if (error instanceof InsufficientFundsError) {
-      const [unpaid] = await db
-        .update(orders)
-        .set({ status: "review", reconciliationNote: "Balance no longer covers this eSIM at delivery time." })
-        .where(and(eq(orders.id, row.id), eq(orders.status, "processing")))
-        .returning();
-      return { kind: "unpaid", order: unpaid ?? (await reload(row.id))! };
+    // The profile exists and the supplier has been paid. Whatever went wrong in
+    // the settle, the outcome belongs to a human — never to an automatic release.
+    const [unpaid] = await db
+      .update(orders)
+      .set({
+        status: "review",
+        reconciliationNote: "eSIM delivered but the wallet hold could not be settled; review before charging or releasing.",
+      })
+      .where(and(eq(orders.id, row.id), eq(orders.status, "processing")))
+      .returning();
+    const hold = await openHoldFor(row.id);
+    if (hold) {
+      await holdForReview({
+        reservationId: hold.id,
+        userId: hold.userId,
+        note: "Settle failed after delivery",
+      }).catch(() => undefined);
     }
-    throw error;
+    return { kind: "unpaid", order: unpaid ?? (await reload(row.id))! };
   }
 
   scheduleWalletEmails();
@@ -243,6 +279,16 @@ export async function completeEsimOrder(row: EsimRow): Promise<Completion> {
 }
 
 class AlreadyCompleted extends Error {}
+
+/** The open hold attached to an order, or null for a row placed before holds. */
+async function openHoldFor(orderId: string): Promise<{ id: string; userId: string } | null> {
+  const [row] = await db
+    .select({ id: walletReservations.id, userId: walletReservations.userId })
+    .from(walletReservations)
+    .where(and(eq(walletReservations.orderId, orderId), eq(walletReservations.status, "held")))
+    .limit(1);
+  return row ?? null;
+}
 
 async function reload(id: string): Promise<Order | null> {
   const [row] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);

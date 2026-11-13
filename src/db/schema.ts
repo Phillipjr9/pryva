@@ -40,6 +40,17 @@ export const users = pgTable("users", {
   googleSubject: varchar("google_subject", { length: 255 }).unique(),
   passwordHash: text("password_hash").notNull(),
   walletBalance: integer("wallet_balance").notNull().default(0),
+  /**
+   * Money already committed to in-flight purchases (`wallet_reservations`).
+   *
+   * Moved out of `wallet_balance` by a reserve and back by a release or a
+   * settle, inside one UPDATE, so the two figures can never disagree within a
+   * committed transaction. It exists because "balance was enough" read before a
+   * supplier call is not a reservation: two concurrent orders both read the same
+   * balance and both spend. Available funds are `wallet_balance` — reserved
+   * money is no longer available, and no route may spend it twice.
+   */
+  walletReserved: integer("wallet_reserved").notNull().default(0),
   // NULL until the owner proves control of the address. Privilege that is granted
   // by matching this row's email (ADMIN_EMAILS) must not treat an unverified
   // address as the owner's: signup accepted any string.
@@ -405,6 +416,45 @@ export const orders = pgTable(
   ],
 );
 
+/**
+ * A durable hold on wallet funds, taken before any paid supplier call.
+ *
+ * The status vocabulary is the whole of `RESERVATION_STATUS` above: a `held` row
+ * is money moved out of the spendable balance but not yet spent; `settled` and
+ * `released` are the two clean endings; `review` is the honest one for an outcome
+ * nobody can classify, and it stays there until a human decides.
+ *
+ * `(user_id, request_id)` is unique, mirroring the order idempotency key: a
+ * retried purchase replays its hold instead of reserving the same price twice.
+ * See `migrations/0047_wallet_reservations.sql`.
+ */
+export const walletReservations = pgTable(
+  "wallet_reservations",
+  {
+    id: uuid("id").primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    requestId: uuid("request_id").notNull(),
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    service: varchar("service", { length: 40 }).$type<OrderServiceTag>().notNull(),
+    amount: integer("amount").notNull(),
+    status: varchar("status", { length: 24 }).$type<ReservationStatus>().notNull(),
+    /** Offer/plan + price + terms, so a retry against a different basket is refused. */
+    fingerprint: varchar("fingerprint", { length: 160 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+    releasedAt: timestamp("released_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("wallet_reservations_user_request_idx").on(table.userId, table.requestId),
+    // The hot read is every open hold for one account. Partial, so settled and
+    // released history does not have to be scanned to find them.
+    index("wallet_reservations_open_idx").on(table.userId).where(sql`status IN ('held', 'review')`),
+    index("wallet_reservations_expiry_idx").on(table.expiresAt).where(sql`status = 'held'`),
+  ],
+);
+
 /** Provider-side proxy slots attached to a Pryva order; credentials are never persisted. */
 export const proxySlots = pgTable("proxy_slots", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -450,6 +500,25 @@ export const foxreloadQuotes = pgTable("foxreload_quotes", {
  */
 export const WALLET_DEBIT_TYPES = ["debit", "withdrawal"] as const;
 export const WALLET_CREDIT_TYPES = ["credit", "refund"] as const;
+
+/**
+ * Every status a wallet hold may hold.
+ *
+ * `held` is money that moved out of the spendable balance but has not been
+ * spent. A path may only end its own hold: `settled` when the supplier delivered,
+ * `released` when the supplier definitively did nothing, and `review` when the
+ * answer is unknown. `review` never releases and never retries — releasing funds
+ * for an order the supplier may have accepted is how a customer gets a free
+ * product, and retrying is how we pay twice.
+ */
+export const RESERVATION_STATUS = {
+  held: "held",
+  settled: "settled",
+  released: "released",
+  review: "review",
+} as const;
+
+export type ReservationStatus = (typeof RESERVATION_STATUS)[keyof typeof RESERVATION_STATUS];
 
 /** Every value the ledger's `type` column is allowed to hold. */
 export type WalletEntryType = (typeof WALLET_DEBIT_TYPES)[number] | (typeof WALLET_CREDIT_TYPES)[number];
