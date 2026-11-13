@@ -37,6 +37,8 @@ type Props = {
   iconOnly?: boolean;
   /** A compact, text-labelled control and panel for the customer dashboard. */
   textOnly?: boolean;
+  /** Show an icon on phones and the text label on desktop. */
+  compactOnMobile?: boolean;
   /** Anchor the phone-width popover to the positioned dashboard header. */
   alignToHeader?: boolean;
   /** A history page for this surface, if one exists. */
@@ -52,7 +54,7 @@ const POLL_DEFAULT = 30_000;
  * and admin console operators (same endpoint, scoped to their admin session).
  * Clicking a notification marks it read and dismisses the pop-up item.
  */
-export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconOnly = false, textOnly = false, alignToHeader = false, viewAllHref }: Props) {
+export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconOnly = false, textOnly = false, compactOnMobile = false, alignToHeader = false, viewAllHref }: Props) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
@@ -192,13 +194,14 @@ export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconO
         aria-expanded={open}
         aria-controls={open ? popoverId : undefined}
         className={`inline-flex items-center gap-1.5 rounded-xl border border-line bg-white text-[0.8125rem] font-semibold text-ink-2 hover:border-lav-300 focus:outline-none focus:ring-2 focus:ring-lav-400 ${
-          textOnly ? "min-h-9 shrink-0 justify-center px-3 py-1.5"
+          compactOnMobile ? "relative h-10 w-10 shrink-0 justify-center rounded-full !p-0 lg:h-auto lg:min-h-9 lg:w-auto lg:rounded-xl lg:!px-3 lg:!py-1.5"
+            : textOnly ? "min-h-9 shrink-0 justify-center px-3 py-1.5"
             : iconOnly ? "h-9 w-9 shrink-0 justify-center !p-0"
             : "px-3 py-2"
         } ${className ?? ""} disabled:opacity-50`}
         disabled={loading}
       >
-        {textOnly ? <span>Alerts</span> : <Bell className="h-3.5 w-3.5 shrink-0" />}
+        {compactOnMobile ? <><Bell className="h-5 w-5 shrink-0 lg:hidden" /><span className="hidden lg:inline">Alerts</span></> : textOnly ? <span>Alerts</span> : <Bell className="h-3.5 w-3.5 shrink-0" />}
         {unreadCount > 0 && (
           /*
            * The count, when it actually fits.
@@ -210,13 +213,15 @@ export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconO
            */
           <span
             className={
-              iconOnly && !textOnly
+              compactOnMobile
+                ? "absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-600 lg:static lg:grid lg:h-4 lg:min-w-4 lg:place-items-center lg:px-1 lg:text-[10px] lg:font-bold lg:leading-none lg:text-white"
+                : iconOnly && !textOnly
                 ? "h-2 w-2 shrink-0 rounded-full bg-rose-600"
                 : "grid h-4 min-w-4 shrink-0 place-items-center rounded-full bg-rose-600 px-1 text-[10px] font-bold leading-none text-white"
             }
             aria-hidden="true"
           >
-            {iconOnly && !textOnly ? null : unreadCount > 9 ? "9+" : unreadCount}
+            {compactOnMobile ? <span className="hidden lg:inline">{unreadCount > 9 ? "9+" : unreadCount}</span> : iconOnly && !textOnly ? null : unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
         {iconOnly || textOnly ? null : <span className="hidden whitespace-nowrap sm:block">Notifications</span>}

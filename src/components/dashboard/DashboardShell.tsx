@@ -10,6 +10,7 @@ import { BrandIcon } from "@/components/BrandIcon";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { NavIcon, type NavArt } from "@/components/dashboard/NavIcon";
 import { BrandLockup } from "@/components/brand/BrandLockup";
+import { Menu } from "@/components/icons";
 import { formatNaira } from "@/lib/services/catalog";
 import { EXPLORER_COUNTRIES } from "@/lib/content/explorer-countries";
 import type { ExplorerCategory } from "@/lib/services/service-explorer";
@@ -329,60 +330,45 @@ export function DashboardShell({
         </aside>
 
         <div className="min-w-0 flex-1">
-          {/* Keep the controls together on normal phones, but let the group
-              move to a second row when a large balance would otherwise overlap
-              the menu. The desktop greeting can still shrink and truncate. */}
-          <div data-dashboard-header className="relative z-[55] mb-4 flex flex-wrap items-center justify-between gap-2 rounded-[1.25rem] border border-line bg-[#fffdfa]/80 px-3 py-2.5 backdrop-blur sm:gap-3 lg:mb-5 lg:px-5 lg:py-3">
-            <div className="flex min-w-0 shrink-0 items-center gap-2.5 lg:shrink">
+          {/* Match the public mobile header: brand on the left, compact actions
+              on the right. Wallet and services remain in the bottom navigation. */}
+          <div data-dashboard-header className="relative z-[55] mb-4 flex min-h-[66px] items-center justify-between gap-2 lg:mb-5 lg:min-h-0 lg:rounded-[1.25rem] lg:border lg:border-line lg:bg-[#fffdfa]/80 lg:px-5 lg:py-3 lg:backdrop-blur">
+            <div className="lg:hidden">
+              <BrandLockup size="sm" />
+            </div>
+            <div className="hidden min-w-0 lg:block">
+              <p className="text-micro uppercase tracking-[0.16em] text-ink-3">Dashboard</p>
+              <p className="truncate text-[0.875rem] font-semibold leading-tight text-ink">
+                Hello, {user.name.split(" ")[0]}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5 lg:gap-2">
+              <CommandPaletteTrigger onClick={() => setCommandPaletteOpen(true)} />
+              <Link
+                href="/dashboard/wallet"
+                aria-label={`Wallet balance ${formatNaira(user.walletBalance)} — open wallet`}
+                className="hidden items-center gap-1.5 rounded-full border border-lav-200 bg-lav-50 px-3 py-1.5 text-meta font-semibold text-lav-800 transition-colors hover:border-lav-300 hover:bg-lav-100 lg:inline-flex"
+              >
+                {formatNaira(user.walletBalance)}
+              </Link>
+              <NotificationBell textOnly compactOnMobile alignToHeader viewAllHref="/dashboard/notifications" />
+              <Link
+                href="/dashboard/services"
+                aria-label="Browse services"
+                className="btn btn-primary hidden h-9 shrink-0 !px-3.5 !py-0 !text-[0.8125rem] lg:inline-flex"
+              >
+                <span className="whitespace-nowrap">Services</span>
+              </Link>
               <button
                 type="button"
                 onClick={() => setOpen(true)}
-                className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-line bg-white px-3 text-meta font-semibold text-ink lg:hidden"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-line bg-white/70 text-ink lg:hidden"
                 aria-label="Open menu"
                 aria-expanded={open}
                 aria-controls={open ? "dashboard-mobile-menu" : undefined}
               >
-                Menu
+                <Menu className="h-5 w-5" />
               </button>
-              <span className="hidden text-meta font-semibold sm:inline-flex lg:hidden">PryvaLogs</span>
-              <div className="hidden min-w-0 lg:block">
-                <p className="text-micro uppercase tracking-[0.16em] text-ink-3">Dashboard</p>
-                <p className="truncate text-[0.875rem] font-semibold leading-tight text-ink">
-                  Hello, {user.name.split(" ")[0]}
-                </p>
-              </div>
-            </div>
-            {/* Keep controls in one row except on exceptionally narrow screens. */}
-            <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5 sm:gap-2">
-              <CommandPaletteTrigger onClick={() => setCommandPaletteOpen(true)} />
-              {/* The balance belongs at the top of every dashboard page, on every
-                  width — it is the number people come back to check. */}
-              <Link
-                href="/dashboard/wallet"
-                aria-label={`Wallet balance ${formatNaira(user.walletBalance)} — open wallet`}
-                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-lav-200 bg-lav-50 px-2.5 py-1.5 text-meta font-semibold text-lav-800 transition-colors hover:border-lav-300 hover:bg-lav-100 sm:px-3"
-              >
-                {formatNaira(user.walletBalance)}
-              </Link>
-              <NotificationBell textOnly alignToHeader viewAllHref="/dashboard/notifications" />
-
-              {/*
-                "Need help?" used to sit here. It was wide, it duplicated the
-                Support entry in the sidebar and in the mobile tab bar, and it was
-                what pushed this row over the available width — the reason the
-                controls ended up on top of each other. Support is still one tap
-                away on every width (sidebar on desktop, bottom tab on mobile),
-                so removing it here costs no route, only a duplicate.
-
-                Controls wrap when the available width is too narrow.
-              */}
-              <Link
-                href="/dashboard/services"
-                aria-label="Browse services"
-                className="btn btn-primary h-9 shrink-0 !px-3 !py-0 !text-[0.8125rem] sm:!px-3.5 sm:!text-[0.8125rem]"
-              >
-                <span className="whitespace-nowrap">Services</span>
-              </Link>
             </div>
           </div>
 
