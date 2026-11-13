@@ -15,7 +15,7 @@ import { isFoxreloadConfigured, readFoxreloadBrowsePage } from "@/lib/providers/
 import { digitalCatalogueFailure } from "@/lib/services/foxreload/catalogue-failure";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 /** Read-only customer-safe names, reported stock and optional product terms; never wholesale costs. */
 export async function GET(request: NextRequest) {

@@ -7,7 +7,7 @@ import { isFoxreloadConfigured, readFoxreloadCategoryChildren } from "@/lib/prov
 import { digitalCatalogueFailure } from "@/lib/services/foxreload/catalogue-failure";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   const user = await requireAuthApi();
