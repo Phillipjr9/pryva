@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     const transactions = await db.query.walletTransactions.findMany({
       columns: { createdAt: true, description: true, type: true, amount: true, balanceAfter: true, reference: true },
       where: eq(walletTransactions.userId, user.id),
-      orderBy: [desc(walletTransactions.createdAt)],
+      orderBy: [desc(walletTransactions.createdAt), desc(walletTransactions.id)],
       limit: MAX_CUSTOMER_EXPORT_ROWS + 1,
     });
     if (transactions.length > MAX_CUSTOMER_EXPORT_ROWS) return tooLarge();

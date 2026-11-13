@@ -33,8 +33,14 @@ describe("country-first service explorer", () => {
     for (const title of ["Phone &amp; connectivity", "Digital products &amp; accounts", "Growth &amp; everyday tools"]) {
       expect(markup).toContain(title);
     }
-    expect(markup).toContain("min-[360px]:grid-cols-2");
+    // At ordinary phone widths, a two-column card left too little room for its
+    // status. Wider phones/tablets can use two cards, and wide desktops can
+    // fit three groups without squeezing their contents.
+    expect(markup).toContain("min-[520px]:grid-cols-2");
+    expect(markup).toContain("lg:grid-cols-2");
+    expect(markup).toContain("xl:grid-cols-3");
     expect(markup).toContain("min-h-[88px]");
+    expect(markup).toContain('role="group" aria-label="Quick country choices"');
     expect(markup).not.toContain("overflow-x-auto px-1 pb-1");
   });
 

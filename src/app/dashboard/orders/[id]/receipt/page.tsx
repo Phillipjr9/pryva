@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { orders } from "@/db/schema";
+import { orders, walletTransactions } from "@/db/schema";
 import { requireUser } from "@/lib/identity/auth";
 import { formatDateNigerian } from "@/lib/platform/date-utils";
-import { ArrowLeft, Download, FileText } from "@/components/icons";
+import { receiptWalletSummary } from "@/lib/payments/receipt";
+
 import { ReceiptBody } from "./ReceiptBody";
 import { PrintButton } from "./PrintButton";
 
@@ -46,6 +47,19 @@ export default async function OrderReceiptPage({ params }: { params: Promise<{ i
     .limit(1);
   if (!order) notFound();
 
+  // The order amount can be a quote on a cancelled or review-stage attempt.
+  // Read the owner's actual wallet entries rather than inferring a debit/refund
+  // from the order status. Three rows already mean the record needs review.
+  const ledger = await db.select({ type: walletTransactions.type, amount: walletTransactions.amount })
+    .from(walletTransactions)
+    .where(and(
+      eq(walletTransactions.userId, user.id),
+      eq(walletTransactions.orderId, order.id),
+      inArray(walletTransactions.type, ["debit", "refund"]),
+    ))
+    .limit(3);
+  const wallet = receiptWalletSummary(order, ledger);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
@@ -53,7 +67,7 @@ export default async function OrderReceiptPage({ params }: { params: Promise<{ i
           href={`/dashboard/orders/${order.id}`}
           className="inline-flex items-center gap-1.5 text-meta font-semibold text-ink-2 hover:text-ink"
         >
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+
           Back to the order
         </Link>
         <div className="flex flex-wrap items-center gap-2">
@@ -61,7 +75,7 @@ export default async function OrderReceiptPage({ params }: { params: Promise<{ i
             href={`/dashboard/orders/${order.id}`}
             className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2.5 text-meta font-semibold text-ink-2 transition-colors hover:border-lav-300 hover:text-ink"
           >
-            <FileText className="h-4 w-4" aria-hidden="true" />
+
             Order details
           </Link>
           <PrintButton />
@@ -75,7 +89,7 @@ export default async function OrderReceiptPage({ params }: { params: Promise<{ i
         path that could produce a *different* file from the printed one.
       */}
       <p className="flex items-start gap-2 text-meta leading-relaxed text-ink-3 print:hidden">
-        <Download className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+
         <span>
           Choose &ldquo;Save as PDF&rdquo; as the destination to keep a copy. The printed sheet carries the
           same reference as this one.
@@ -93,7 +107,7 @@ export default async function OrderReceiptPage({ params }: { params: Promise<{ i
           amount: order.amount,
           status: order.status,
           createdAt: formatDateNigerian(order.createdAt, { includeTime: true }),
-          paidWith: "Wallet balance",
+          wallet,
           customerName: user.name,
           customerEmail: user.email,
           refundedAt: order.refundedAt ? formatDateNigerian(order.refundedAt, { includeTime: true }) : null,

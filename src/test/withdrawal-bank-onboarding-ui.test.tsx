@@ -31,7 +31,7 @@ function fetchFor(accounts: unknown[]) {
     const path = String(url);
     if (path === "/api/wallet/bank-accounts") return response({ ok: true, bankAccounts: accounts });
     if (path === "/api/wallet/banks") return response({ ok: true, banks: [{ name: "Access Bank", code: "044" }] });
-    if (path === "/api/wallet/withdraw/history") return response({ ok: true, withdrawals: [] });
+    if (path === "/api/wallet/withdraw/history") return response({ ok: true, withdrawals: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } });
     throw new Error(`Unexpected request ${path}`);
   });
 }
@@ -66,6 +66,20 @@ describe("with no bank account yet", () => {
     expect((await screen.findByRole("option", { name: "Access Bank" })) as HTMLOptionElement).toBeTruthy();
   });
 
+  it("does not present a failed bank-account fetch as a new customer with no accounts", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: RequestInfo | URL) => {
+      const path = String(url);
+      if (path === "/api/wallet/bank-accounts") return response({ ok: false, error: "down" }, 503);
+      if (path === "/api/wallet/banks") return response({ ok: true, banks: [] });
+      if (path === "/api/wallet/withdraw/history") return response({ ok: true, withdrawals: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } });
+      throw new Error(`Unexpected request ${path}`);
+    }));
+    render(<WithdrawalDashboard balance={10000} userId={userId} />);
+    expect(await screen.findByText(/bank accounts could not be loaded/)).toBeTruthy();
+    expect(screen.queryByText("Add a bank account first")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Review withdrawal" })).toBeNull();
+  });
+
   it("keeps the panel reachable from the tab strip too", async () => {
     vi.stubGlobal("fetch", fetchFor([]));
     Element.prototype.scrollIntoView = vi.fn();
@@ -75,6 +89,44 @@ describe("with no bank account yet", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Bank accounts/ }));
     expect(document.getElementById("bank-accounts")).toBeTruthy();
+  });
+});
+
+describe("the requests list", () => {
+  /** A page is not the whole history: the count and the paging say so. */
+  it("reports the account-wide total and pages through older requests", async () => {
+    const rows = Array.from({ length: 20 }, (_, index) => ({
+      id: `wd-${index}`, reference: `WD-${index}`, amount: 5000, fee: 0,
+      bankName: "Access Bank", accountNumber: "0123456789", accountName: "Test User",
+      status: "completed", createdAt: new Date(2026, 0, index + 1).toISOString(),
+    }));
+    vi.stubGlobal("fetch", vi.fn(async (url: RequestInfo | URL) => {
+      const path = String(url);
+      if (path === "/api/wallet/bank-accounts") return response({ ok: true, bankAccounts: [] });
+      if (path === "/api/wallet/banks") return response({ ok: true, banks: [] });
+      if (path === "/api/wallet/withdraw/history") return response({ ok: true, withdrawals: rows, pagination: { page: 1, limit: 20, total: 21, totalPages: 2 } });
+      if (path === "/api/wallet/withdraw/history?page=2") return response({ ok: true, withdrawals: rows.slice(0, 1), pagination: { page: 2, limit: 20, total: 21, totalPages: 2 } });
+      throw new Error(`Unexpected request ${path}`);
+    }));
+
+    render(<WithdrawalDashboard balance={10000} userId={userId} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Requests (21)" }));
+    expect(await screen.findByText("Showing 20 of 21 requests · Page 1 of 2")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Older requests" }));
+    expect(await screen.findByText("Showing 1 of 21 requests · Page 2 of 2")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Newer requests" })).toBeTruthy();
+  });
+
+  it("does not call a failed history empty", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: RequestInfo | URL) => {
+      const path = String(url);
+      if (path === "/api/wallet/withdraw/history") return response({ ok: false }, 503);
+      throw new Error(`Unexpected request ${path}`);
+    }));
+    render(<WithdrawalDashboard balance={10000} userId={userId} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Requests" }));
+    expect(await screen.findByText(/Requests could not be loaded/)).toBeTruthy();
+    expect(screen.queryByText("No withdrawal requests yet")).toBeNull();
   });
 });
 

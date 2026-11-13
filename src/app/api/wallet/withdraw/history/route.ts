@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       .select()
       .from(withdrawals)
       .where(eq(withdrawals.userId, user.id))
-      .orderBy(desc(withdrawals.createdAt))
+      .orderBy(desc(withdrawals.createdAt), desc(withdrawals.id))
       .limit(limit)
       .offset(offset);
 

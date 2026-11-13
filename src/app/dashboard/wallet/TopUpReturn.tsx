@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { fireConfetti } from "@/components/ui/Confetti";
-import { MoneyFlowDialog, MoneyOrbit, MoneyProcessing, MoneyResultIcon, downloadTextReceipt, moneyDate } from "@/components/dashboard/MoneyFlowDialog";
+import { MoneyFlowDialog, MoneyProcessing, downloadTextReceipt, moneyDate } from "@/components/dashboard/MoneyFlowDialog";
 import { formatNaira } from "@/lib/services/catalog";
 import { forgetPaystackTopUp, notifyPaystackTopUpsChanged } from "@/lib/payments/paystack-topup-intent";
 import styles from "@/components/dashboard/MoneyFlow.module.css";
@@ -54,7 +53,6 @@ export function TopUpReturn({ status, reference, userId, testMode = false }: { s
             ? (result.credited === false ? "This test payment was already added to your staging wallet." : "Test payment confirmed and added to your staging wallet. No real payment was made.")
             : (result.credited === false ? "This payment was already added to your wallet." : "Payment confirmed and added to your wallet."));
           try { forgetPaystackTopUp(window.localStorage, userId, reference!); notifyPaystackTopUpsChanged(); } catch { /* Receipt is still valid; retain recovery state if it cannot be cleared. */ }
-          fireConfetti();
         } else if (response.status === 402 && result.status === "failed") {
           setState("failed");
           setMessage(typeof result.error === "string" ? result.error : "Paystack reports this payment failed. Check your wallet history or contact support before paying again.");
@@ -103,7 +101,7 @@ export function TopUpReturn({ status, reference, userId, testMode = false }: { s
 
   const verifying = state === "verifying";
   const title = verifying ? "Confirming your payment" : state === "credited" ? (testMode ? "Test funds added to your wallet" : "Funds added to your wallet") : state === "failed" ? "Payment needs attention" : "Payment not confirmed yet";
-  return <MoneyFlowDialog stage={state === "credited" ? "done" : "processing"} title={title} onClose={close} centered lead={verifying ? <MoneyOrbit /> : state === "credited" ? <MoneyResultIcon /> : undefined}>
+  return <MoneyFlowDialog stage={state === "credited" ? "done" : "processing"} title={title} onClose={close} centered>
     {testMode && <p className={styles.notice}>PAYSTACK TEST MODE — no real payment is made.</p>}
     {verifying && <>
       <MoneyProcessing detail="The return from checkout is not confirmation of payment." from="Paystack" fromNote="Payment status" to="Your wallet" toNote="Credit after confirmation" steps={["Payment reference received", "Verifying payment and wallet credit", "Receipt after confirmation"]} />

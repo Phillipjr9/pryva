@@ -10,7 +10,7 @@ import { TopUpForm } from "@/components/dashboard/TopUpForm";
 import { ExportTransactionsButton } from "@/components/dashboard/ExportTransactionsButton";
 import { WithdrawalDashboard } from "./WithdrawalDashboard";
 import { TopUpReturn } from "./TopUpReturn";
-import { ArrowRight, Card, Check, Clock, Refresh, Shield, Wallet } from "@/components/icons";
+
 
 export const metadata: Metadata = { title: "Wallet" };
 export const dynamic = "force-dynamic";
@@ -31,7 +31,7 @@ export default async function WalletPage({
       .select()
       .from(walletTransactions)
       .where(eq(walletTransactions.userId, user.id))
-      .orderBy(desc(walletTransactions.createdAt))
+      .orderBy(desc(walletTransactions.createdAt), desc(walletTransactions.id))
       .limit(40),
     db
       .select({ value: sum(walletTransactions.amount) })
@@ -79,7 +79,7 @@ export default async function WalletPage({
         <div className="rounded-2xl bg-ink p-5 text-white">
           <div className="flex items-center justify-between">
             <p className="text-micro uppercase tracking-[0.16em] text-white/55">Available now</p>
-            <Wallet className="h-4 w-4 text-lav-200" />
+
           </div>
           <p className="mt-2 text-[1.9rem] font-semibold leading-none">
             {formatNaira(user.walletBalance)}
@@ -89,23 +89,23 @@ export default async function WalletPage({
         <div className="rounded-2xl border border-line bg-[#fffdfa] p-5">
           <div className="flex items-center justify-between">
             <p className="text-micro uppercase tracking-[0.16em] text-ink-3">Added in total</p>
-            <Card className="h-4 w-4 text-lav-600" />
+
           </div>
           <p className="mt-2 text-[1.55rem] font-semibold leading-none">{formatNaira(added)}</p>
           <p className="mt-2 text-micro text-ink-3">Credits and refunds (including gift-card redemptions)</p>
         </div>
         <div className="rounded-2xl border border-line bg-[#fffdfa] p-5">
           <div className="flex items-center justify-between">
-            <p className="text-micro uppercase tracking-[0.16em] text-ink-3">Spent in total</p>
-            <Refresh className="h-4 w-4 text-lav-600" />
+            <p className="text-micro uppercase tracking-[0.16em] text-ink-3">Debited in total</p>
+
           </div>
           <p className="mt-2 text-[1.55rem] font-semibold leading-none">{formatNaira(spent)}</p>
-          <p className="mt-2 text-micro text-ink-3">{spendCount} purchase or gift-card charge{spendCount === 1 ? "" : "s"}; excludes withdrawals</p>
+          <p className="mt-2 text-micro text-ink-3">{spendCount} wallet debit{spendCount === 1 ? "" : "s"}; excludes withdrawals</p>
         </div>
       </div>
 
       {/* minmax(0,…) tracks: an implicit auto track is sized to its items’
-          min-content, and a truncated transaction reference is wide enough to
+          min-content, and an unbroken transaction reference is wide enough to
           push the whole wallet past a 320px viewport. */}
       <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start">
         <TopUpForm balance={user.walletBalance} userId={user.id} testMode={paystackTestMode} />
@@ -115,7 +115,9 @@ export default async function WalletPage({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-[1rem] font-semibold">Transaction history</h2>
               <div className="flex items-center gap-2.5">
-                <span className="text-micro text-ink-3">{transactions.length} newest entries</span>
+                <span className="text-micro text-ink-3">
+                  {transactions.length} newest entr{transactions.length === 1 ? "y" : "ies"} · export has all
+                </span>
                 {transactions.length > 0 && <ExportTransactionsButton />}
               </div>
             </div>
@@ -128,12 +130,13 @@ export default async function WalletPage({
                 {transactions.map((tx: { id: string; description: string; amount: number; type: string; balanceAfter: number; reference: string; createdAt: Date | string }) => (
                   <div key={tx.id} className="flex items-start justify-between gap-3 py-2.5">
                     <div className="min-w-0">
-                      <p className="truncate text-[0.8125rem] font-medium text-ink">{tx.description}</p>
-                      <p className="truncate text-micro text-ink-3">
+                      <p className="[overflow-wrap:anywhere] text-[0.8125rem] font-medium text-ink">{tx.description}</p>
+                      <p className="[overflow-wrap:anywhere] text-micro text-ink-3">
                         {tx.reference} ·{" "}
                         {new Date(tx.createdAt).toLocaleString("en-NG", {
                           day: "numeric",
                           month: "short",
+                          year: "numeric",
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
@@ -158,20 +161,20 @@ export default async function WalletPage({
 
           <div className="rounded-[1.5rem] border border-lav-200 bg-gradient-to-br from-lav-50 to-white p-5">
             <p className="flex items-center gap-2 text-[0.875rem] font-semibold text-ink">
-              <Shield className="h-4 w-4 text-lav-700" /> How money moves
+               How money moves
             </p>
             <ul className="mt-2.5 grid gap-2 text-[0.8125rem] text-ink-2">
               <li className="flex items-start gap-2">
-                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
+
                 Top-ups use Paystack checkout.
               </li>
               <li className="flex items-start gap-2">
-                <Refresh className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
+
                 Order refunds require support review.
               </li>
               <li className="flex items-start gap-2">
-                <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
-                Withdrawal requests reserve funds; rejected requests can be refunded.
+
+                Withdrawal requests reserve funds; a payout that fails or is rejected is refunded to your wallet.
               </li>
             </ul>
             <Link
@@ -179,7 +182,7 @@ export default async function WalletPage({
               className="mt-3.5 inline-flex items-center gap-1.5 text-meta font-semibold text-lav-700 hover:underline"
             >
               View your orders
-              <ArrowRight className="h-3.5 w-3.5" />
+
             </Link>
           </div>
         </div>

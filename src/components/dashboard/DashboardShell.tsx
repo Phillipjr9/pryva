@@ -1,16 +1,14 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CommandPalette, CommandPaletteTrigger } from "@/components/command/CommandPalette";
-import { ArrowRight, Close, Logout, Menu, Wallet } from "@/components/icons";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { DigitalProductIcon } from "@/components/DigitalProductIcon";
 import { BrandIcon } from "@/components/BrandIcon";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { NavIcon, type NavArt } from "@/components/dashboard/NavIcon";
-import { ProfileAvatar } from "@/components/dashboard/ProfileAvatar";
 import { BrandLockup } from "@/components/brand/BrandLockup";
 import { formatNaira } from "@/lib/services/catalog";
 import { EXPLORER_COUNTRIES } from "@/lib/content/explorer-countries";
@@ -138,7 +136,6 @@ function LogoutButton({ compact = false }: { compact?: boolean }) {
           compact ? "" : "w-full"
         }`}
       >
-        <Logout className="h-3.5 w-3.5" />
         {pending ? "Signing out…" : "Sign out"}
       </button>
       {error && <p role="alert" className="px-3 text-xs text-rose-700">{error}</p>}
@@ -170,6 +167,53 @@ export function DashboardShell({
   const selectedCategory = searchParams.get("category");
   const [open, setOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    mobileMenuRef.current?.querySelector<HTMLButtonElement>('[aria-label="Close menu"]')?.focus();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        return;
+      }
+      if (event.key !== "Tab" || !mobileMenuRef.current) return;
+      const focusable = Array.from(mobileMenuRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ));
+      if (!focusable.length) {
+        event.preventDefault();
+        mobileMenuRef.current.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !mobileMenuRef.current.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !mobileMenuRef.current.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    function closeAtDesktopWidth() {
+      if (window.matchMedia("(min-width: 1024px)").matches) setOpen(false);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", closeAtDesktopWidth);
+    closeAtDesktopWidth();
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", closeAtDesktopWidth);
+      document.body.style.overflow = previousOverflow;
+      if (!window.matchMedia("(min-width: 1024px)").matches) previousFocus?.focus();
+    };
+  }, [open]);
 
   /*
    * No operator group here any more. `/dashboard` redirects administrators to the
@@ -179,23 +223,25 @@ export function DashboardShell({
    */
   const groups = navGroups;
 
-  const sidebar = (
+  const sidebar = (mobile: boolean) => (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between lg:hidden">
-        <BrandLockup size="sm" />
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="grid h-9 w-9 place-items-center rounded-full border border-line bg-white text-ink"
-          aria-label="Close menu"
-        >
-          <Close className="h-4 w-4" />
-        </button>
-      </div>
-
-      <div className="mt-5 hidden lg:block">
-        <BrandLockup size="sm" />
-      </div>
+      {mobile ? (
+        <div className="flex items-center justify-between">
+          <BrandLockup size="sm" />
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="inline-flex min-h-11 items-center rounded-full border border-line bg-white px-3 text-meta font-semibold text-ink"
+            aria-label="Close menu"
+          >
+            Close
+          </button>
+        </div>
+      ) : (
+        <div className="mt-5">
+          <BrandLockup size="sm" />
+        </div>
+      )}
 
       {/*
         The balance card used to sit here, above the nav. It showed the same
@@ -259,9 +305,6 @@ export function DashboardShell({
 
       <div className="mt-auto border-t border-line pt-4">
         <div className="flex items-center gap-2.5">
-          {/* The profile mark: a flat glyph on a tint derived from the account
-              itself, so it is stable without pretending to be a photograph. */}
-          <ProfileAvatar seed={user.email} size={36} />
           <div className="min-w-0">
             <p className="truncate text-[0.8125rem] font-semibold text-ink">{user.name}</p>
             <p className="truncate text-micro text-ink-3">{user.email}</p>
@@ -282,34 +325,26 @@ export function DashboardShell({
 
       <div className="shell flex min-h-screen gap-6 py-4 lg:py-5">
         <aside className="sticky top-5 hidden h-[calc(100vh-2.5rem)] w-[248px] shrink-0 rounded-[1.5rem] border border-line bg-[#fffdfa]/90 p-4 backdrop-blur lg:block">
-          {sidebar}
+          {sidebar(false)}
         </aside>
 
         <div className="min-w-0 flex-1">
-          {/*
-            The header stays in one row on ordinary phone widths. On the very
-            narrowest screens it may wrap instead of clipping controls.
-
-            It used to be `flex-wrap`, so between roughly 400px and 640px the
-            right-hand controls could not fit beside the greeting and dropped
-            onto a second line — landing under each other rather than beside
-            each other. The controls now stay in one non-wrapping row and the
-            greeting is what gives way: `min-w-0` lets it truncate instead of
-            pushing its neighbours out of the bar.
-          */}
-          <div className="mb-4 flex items-center justify-between gap-2 max-[340px]:flex-wrap rounded-[1.25rem] border border-line bg-[#fffdfa]/80 px-3 py-2.5 backdrop-blur sm:gap-3 lg:mb-5 lg:px-5 lg:py-3">
-            <div className="flex min-w-0 items-center gap-2.5">
+          {/* Keep the controls together on normal phones, but let the group
+              move to a second row when a large balance would otherwise overlap
+              the menu. The desktop greeting can still shrink and truncate. */}
+          <div data-dashboard-header className="relative z-[55] mb-4 flex flex-wrap items-center justify-between gap-2 rounded-[1.25rem] border border-line bg-[#fffdfa]/80 px-3 py-2.5 backdrop-blur sm:gap-3 lg:mb-5 lg:px-5 lg:py-3">
+            <div className="flex min-w-0 shrink-0 items-center gap-2.5 lg:shrink">
               <button
                 type="button"
                 onClick={() => setOpen(true)}
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-white text-ink lg:hidden"
+                className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-line bg-white px-3 text-meta font-semibold text-ink lg:hidden"
                 aria-label="Open menu"
+                aria-expanded={open}
+                aria-controls={open ? "dashboard-mobile-menu" : undefined}
               >
-                <Menu className="h-4 w-4" />
+                Menu
               </button>
-              <span className="hidden sm:inline-flex lg:hidden">
-                <BrandLockup size="xs" />
-              </span>
+              <span className="hidden text-meta font-semibold sm:inline-flex lg:hidden">PryvaLogs</span>
               <div className="hidden min-w-0 lg:block">
                 <p className="text-micro uppercase tracking-[0.16em] text-ink-3">Dashboard</p>
                 <p className="truncate text-[0.875rem] font-semibold leading-tight text-ink">
@@ -318,7 +353,7 @@ export function DashboardShell({
               </div>
             </div>
             {/* Keep controls in one row except on exceptionally narrow screens. */}
-            <div className="flex min-w-0 max-w-full shrink-0 items-center gap-1.5 max-[340px]:flex-wrap sm:gap-2">
+            <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5 sm:gap-2">
               <CommandPaletteTrigger onClick={() => setCommandPaletteOpen(true)} />
               {/* The balance belongs at the top of every dashboard page, on every
                   width — it is the number people come back to check. */}
@@ -327,10 +362,9 @@ export function DashboardShell({
                 aria-label={`Wallet balance ${formatNaira(user.walletBalance)} — open wallet`}
                 className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-lav-200 bg-lav-50 px-2.5 py-1.5 text-meta font-semibold text-lav-800 transition-colors hover:border-lav-300 hover:bg-lav-100 sm:px-3"
               >
-                <Wallet className="h-3.5 w-3.5 text-lav-600" />
                 {formatNaira(user.walletBalance)}
               </Link>
-              <NotificationBell iconOnly />
+              <NotificationBell textOnly alignToHeader viewAllHref="/dashboard/notifications" />
 
               {/*
                 "Need help?" used to sit here. It was wide, it duplicated the
@@ -340,16 +374,14 @@ export function DashboardShell({
                 away on every width (sidebar on desktop, bottom tab on mobile),
                 so removing it here costs no route, only a duplicate.
 
-                "Services" stays: it steps down to an icon on narrow screens and
-                carries its own accessible name when the text is hidden.
+                Controls wrap when the available width is too narrow.
               */}
               <Link
                 href="/dashboard/services"
                 aria-label="Browse services"
                 className="btn btn-primary h-9 shrink-0 !px-3 !py-0 !text-[0.8125rem] sm:!px-3.5 sm:!text-[0.8125rem]"
               >
-                <span className="hidden whitespace-nowrap sm:inline">Services</span>
-                <ArrowRight className="h-3 w-3 shrink-0" />
+                <span className="whitespace-nowrap">Services</span>
               </Link>
             </div>
           </div>
@@ -360,7 +392,7 @@ export function DashboardShell({
             /* In development only. If a page looks unchanged after a deploy,
                this line is the fastest way to tell a stale tab from a real bug:
                compare it with /api/version. */
-            <p className="pb-6 text-center text-micro text-ink-3/70">
+            <p className="pb-6 text-center text-micro text-ink-3">
               build <span data-testid="build-id">{buildId}</span>
             </p>
           )}
@@ -369,14 +401,21 @@ export function DashboardShell({
 
       {open && (
         <div className="fixed inset-0 z-[60] lg:hidden">
-          <button
-            type="button"
-            aria-label="Close menu overlay"
+          <div
+            aria-hidden="true"
             className="absolute inset-0 bg-ink/30 backdrop-blur-sm"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 w-[86%] max-w-[300px] overflow-y-auto rounded-r-[1.5rem] border-r border-line bg-[#fffdfa] p-4 shadow-[var(--shadow-float)]">
-            {sidebar}
+          <div
+            id="dashboard-mobile-menu"
+            ref={mobileMenuRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Dashboard menu"
+            tabIndex={-1}
+            className="absolute inset-y-0 left-0 w-[86%] max-w-[300px] overflow-y-auto rounded-r-[1.5rem] border-r border-line bg-[#fffdfa] p-4 shadow-[var(--shadow-float)]"
+          >
+            {sidebar(true)}
           </div>
         </div>
       )}
@@ -385,6 +424,7 @@ export function DashboardShell({
           into 390px and left nothing reachable one-handed. */}
       <nav
         aria-label="Dashboard sections"
+        data-dashboard-bottom-nav
         className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-[#fffdfa]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
       >
         <div className="mx-auto flex max-w-md items-stretch justify-between px-1.5">

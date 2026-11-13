@@ -91,7 +91,7 @@ export async function cancelScheduledOrder(orderId: string, userId: string): Pro
 export async function getUserScheduledOrders(userId: string) {
   return db.query.scheduledOrders.findMany({
     where: eq(scheduledOrders.userId, userId),
-    orderBy: (orders, { desc }) => [desc(orders.createdAt)],
+    orderBy: (orders, { desc }) => [desc(orders.createdAt), desc(orders.id)],
     limit: 100,
   });
 }

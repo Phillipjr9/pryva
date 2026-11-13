@@ -2,9 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Clock, Copy } from "@/components/icons";
-import { CountryFlag } from "@/components/CountryFlag";
+
 import { formatNaira } from "@/lib/services/catalog";
 
 export type LiveCode = {
@@ -40,6 +38,10 @@ function formatCountdown(seconds: number): string {
  * The reason someone opens this dashboard: a code is on a timer and they need to
  * paste it somewhere. It gets its own card, a live countdown and a one-tap copy —
  * no navigating through Orders → order → copy.
+ *
+ * A number can be reserved and still have no code, so "Live now" would be a
+ * promise the card cannot keep. Those orders are shown as waiting instead, with
+ * no countdown and no copy button until a code actually arrives.
  */
 export function LiveCodeCard({ codes, initialNow }: { codes: LiveCode[]; initialNow: number }) {
   // The server timestamp is serialized with the page, so the first browser
@@ -80,19 +82,20 @@ export function LiveCodeCard({ codes, initialNow }: { codes: LiveCode[]; initial
     <section aria-labelledby="live-codes-heading" className="grid min-w-0 grid-cols-1 gap-2.5">
       <div className="flex items-center justify-between">
         <h2 id="live-codes-heading" className="text-[1rem] font-semibold">
-          Live now
+          {withTime.some((code) => code.otpCode?.trim()) ? "Live codes" : "Number orders"}
         </h2>
         <Link
           href="/dashboard/orders"
           className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline"
         >
-          All orders <ArrowRight className="h-3 w-3" />
+          All orders
         </Link>
       </div>
 
       {withTime.map((code) => {
         const expired = code.secondsLeft !== null && code.secondsLeft <= 0;
         const urgent = code.secondsLeft !== null && code.secondsLeft <= 120 && !expired;
+        const waiting = !code.otpCode?.trim();
 
         return (
           <div
@@ -101,18 +104,21 @@ export function LiveCodeCard({ codes, initialNow }: { codes: LiveCode[]; initial
           >
             <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
               <div className="flex min-w-0 items-center gap-2.5">
-                <CountryFlag region={code.region} size={24} decorative />
                 <div className="min-w-0">
-                  <p className="truncate text-[0.875rem] font-semibold text-ink">
+                  <p className="[overflow-wrap:anywhere] text-[0.875rem] font-semibold text-ink">
                     {code.referenceCode ?? code.planLabel}
                   </p>
-                  <p className="truncate text-meta text-ink-3">
+                  <p className="[overflow-wrap:anywhere] text-meta text-ink-3">
                     {code.productName} · {code.planLabel} · {formatNaira(code.amount)}
                   </p>
                 </div>
               </div>
 
-              {code.secondsLeft === null ? (
+              {waiting ? (
+                <span className="shrink-0 rounded-full bg-lav-50 px-2.5 py-1 text-micro font-semibold text-lav-700">
+                  {expired ? "Window closed · no code" : "Waiting for code"}
+                </span>
+              ) : code.secondsLeft === null ? (
                 <span className="shrink-0 rounded-full bg-lav-50 px-2.5 py-1 text-micro font-semibold text-lav-700">
                   No expiry
                 </span>
@@ -126,7 +132,7 @@ export function LiveCodeCard({ codes, initialNow }: { codes: LiveCode[]; initial
                         : "bg-emerald-50 text-emerald-700"
                   }`}
                 >
-                  <Clock className="h-3 w-3" />
+
                   {expired ? "Expired" : formatCountdown(code.secondsLeft)}
                 </span>
               )}
@@ -153,11 +159,11 @@ export function LiveCodeCard({ codes, initialNow }: { codes: LiveCode[]; initial
                 >
                   {copied === code.id ? (
                     <>
-                      <Check className="h-3.5 w-3.5" /> Copied
+                       Copied
                     </>
                   ) : (
                     <>
-                      <Copy className="h-3.5 w-3.5" /> Copy
+                       Copy
                     </>
                   )}
                 </button>

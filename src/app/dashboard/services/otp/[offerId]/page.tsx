@@ -3,7 +3,6 @@ import Link from "next/link";
 import { requireUser } from "@/lib/identity/auth";
 import { explorerCountry } from "@/lib/services/service-explorer";
 import { findOtpCheckoutOffer } from "@/lib/services/numbers/otp-catalog";
-import { CountryFlag } from "@/components/CountryFlag";
 import { PlanPurchase } from "@/components/purchase/PlanPurchase";
 
 export const metadata: Metadata = { title: "App verification checkout" };
@@ -40,7 +39,7 @@ export default async function AppOtpCheckoutPage({
       <Link href={back} className="w-fit text-meta font-semibold text-lav-700 hover:underline">← Back to services</Link>
       <div>
         <p className="flex items-center gap-2 text-meta font-semibold uppercase tracking-[0.14em] text-lav-700">
-          <CountryFlag code={listing.countryCode} size={20} decorative radius={10} /> {listing.countryName} · app verification
+          {listing.countryName} · app verification
         </p>
         <h1 className="mt-2 text-[1.6rem] font-semibold text-ink">{listing.app}</h1>
         <p className="mt-1 text-[0.8125rem] text-ink-2">Single-use SMS number · {listing.plan.duration}</p>
@@ -53,6 +52,7 @@ export default async function AppOtpCheckoutPage({
             the order is held for review and your wallet is not charged.
           </div>
           <PlanPurchase
+            textOnly
             groups={[{ label: purchasePlan.planLabel, plans: [purchasePlan] }]}
             signedIn
             userId={user.id}

@@ -34,7 +34,8 @@ describe("overview service hub", () => {
 
   it("keeps the shortcut status below the description instead of squeezing its label", () => {
     const shortcut = overview.slice(overview.indexOf('href={accountShortcut.href}'), overview.indexOf('<div className="mt-3 grid'));
-    expect(shortcut.indexOf("{SERVICE_STATE_LABEL[accountState]}")).toBeLessThan(shortcut.indexOf("<ArrowRight"));
+    expect(shortcut.indexOf("separate from App verification")).toBeLessThan(shortcut.indexOf("{SERVICE_STATE_LABEL[accountState]}"));
+    expect(shortcut).not.toContain("<ArrowRight");
     expect(shortcut).not.toContain("hidden min-[390px]:inline");
     expect(shortcut).toContain("mt-2 inline-flex");
   });

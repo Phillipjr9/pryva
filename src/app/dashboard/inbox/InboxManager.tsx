@@ -1,18 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  AlertCircle,
-  ArrowRight,
-  Check,
-  Clock,
-  Copy,
-  Loader2,
-  Mail,
-  Plus,
-  Refresh,
-  Trash2,
-} from "@/components/icons";
+
 import { EmptyState } from "@/components/dashboard/EmptyState";
 
 type InboxView = {
@@ -260,7 +249,7 @@ export function InboxManager() {
   if (loadState === "loading") {
     return (
       <div className="flex items-center justify-center rounded-2xl border border-line bg-white py-16 text-ink-3">
-        <Loader2 className="h-5 w-5 animate-spin" />
+        <span role="status">Loading your inbox…</span>
       </div>
     );
   }
@@ -269,7 +258,6 @@ export function InboxManager() {
     return (
       <div className="space-y-3">
         <EmptyState
-          icon={AlertCircle}
           title="Could not load your inbox"
           body="Something went wrong reading your inboxes. Try again, and contact support if it keeps happening."
         />
@@ -279,7 +267,7 @@ export function InboxManager() {
             onClick={reload}
             className="btn border border-line bg-white !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.8125rem] text-ink hover:border-lav-200"
           >
-            <Refresh className="h-3.5 w-3.5" /> Try again
+             Try again
           </button>
         </div>
       </div>
@@ -289,7 +277,6 @@ export function InboxManager() {
   if (!configured) {
     return (
       <EmptyState
-        icon={Mail}
         title={
           disabledReason === "preview"
             ? "Temporary inboxes are not available on this deployment"
@@ -326,11 +313,11 @@ export function InboxManager() {
             >
               {creating ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Creating…
+                   Creating…
                 </>
               ) : (
                 <>
-                  <Plus className="h-4 w-4" /> Create free inbox
+                   Create free inbox
                 </>
               )}
             </button>
@@ -356,11 +343,7 @@ export function InboxManager() {
                   onClick={() => void copyAddress(active.address, active.id)}
                   className="btn border border-line bg-white !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.8125rem] text-ink hover:border-lav-200"
                 >
-                  {copiedId === active.id ? (
-                    <Check className="h-3.5 w-3.5 text-emerald-600" />
-                  ) : (
-                    <Copy className="h-3.5 w-3.5" />
-                  )}
+
                   {copiedId === active.id ? "Copied" : "Copy"}
                 </button>
                 <button
@@ -369,11 +352,7 @@ export function InboxManager() {
                   disabled={checking}
                   className="btn border border-line bg-white !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.8125rem] text-ink hover:border-lav-200 disabled:opacity-50"
                 >
-                  {checking ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Refresh className="h-3.5 w-3.5" />
-                  )}
+
                   Check mail
                 </button>
                 <button
@@ -382,11 +361,7 @@ export function InboxManager() {
                   disabled={creating}
                   className="btn btn-primary !px-3.5 !py-2 !text-[0.8125rem] sm:!text-[0.8125rem] disabled:opacity-50"
                 >
-                  {creating ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Plus className="h-3.5 w-3.5" />
-                  )}
+
                   New email
                 </button>
               </div>
@@ -394,7 +369,7 @@ export function InboxManager() {
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-meta text-ink-3">
               <span className="flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5" />
+
                 {lastChecked
                   ? `Checked at ${lastChecked.toLocaleTimeString()}`
                   : "Auto-refreshing every 15 seconds"}
@@ -439,10 +414,13 @@ export function InboxManager() {
                           className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left hover:bg-lav-50/40"
                         >
                           <span className="min-w-0">
-                            <span className="block truncate text-[0.8125rem] font-medium text-ink">
+                            {/* An inbox subject and sender are the record of who wrote
+                                and what about; wrapping them keeps the whole value
+                                readable instead of hiding the end of a message. */}
+                            <span className="block [overflow-wrap:anywhere] text-[0.8125rem] font-medium text-ink">
                               {message.subject ?? "(no subject)"}
                             </span>
-                            <span className="mt-0.5 block truncate text-meta text-ink-3">
+                            <span className="mt-0.5 block [overflow-wrap:anywhere] text-meta text-ink-3">
                               {message.from ?? "unknown sender"}
                               {message.code ? ` · code ${message.code}` : ""}
                             </span>
@@ -470,11 +448,7 @@ export function InboxManager() {
                 disabled={discardingId === active.id}
                 className="btn border border-rose-200 bg-white !px-3 !py-1.5 !text-[0.8125rem] text-rose-700 hover:bg-rose-50 disabled:opacity-50"
               >
-                {discardingId === active.id ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Trash2 className="h-3.5 w-3.5" />
-                )}
+
                 Discard this email
               </button>
             </div>
@@ -487,7 +461,7 @@ export function InboxManager() {
           role="alert"
           className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[0.8125rem] leading-relaxed text-rose-700"
         >
-          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+
           {error}
         </p>
       )}
@@ -510,7 +484,7 @@ export function InboxManager() {
                 disabled={creating}
                 className="btn btn-primary !px-3.5 !py-2 !text-[0.8125rem]"
               >
-                <Plus className="h-3.5 w-3.5" /> Create new email
+                 Create new email
               </button>
             )}
           </div>
@@ -551,11 +525,7 @@ export function InboxManager() {
                       className="btn min-h-11 min-w-11 shrink-0 border border-line bg-white !p-2 text-ink hover:border-lav-200"
                       title="Copy address"
                     >
-                      {copiedId === inbox.id ? (
-                        <Check className="h-3.5 w-3.5 text-emerald-600" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5" />
-                      )}
+                      {copiedId === inbox.id ? "Copied" : "Copy address"}
                     </button>
 
                     {!isActive && (
@@ -565,11 +535,7 @@ export function InboxManager() {
                         disabled={isSelecting}
                         className="btn min-h-11 border border-line bg-white !px-3 !py-1.5 !text-[0.8125rem] text-ink hover:border-lav-200 disabled:opacity-50"
                       >
-                        {isSelecting ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <ArrowRight className="h-3 w-3" />
-                        )}
+
                         Use this inbox
                       </button>
                     )}
@@ -581,11 +547,7 @@ export function InboxManager() {
                       className="btn min-h-11 min-w-11 shrink-0 border border-line bg-white !p-2 text-rose-600 hover:border-rose-200 hover:bg-rose-50 disabled:opacity-50"
                       title="Delete inbox"
                     >
-                      {isDiscarding ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5" />
-                      )}
+                      {isDiscarding ? "Deleting…" : "Delete inbox"}
                     </button>
                   </div>
                 </li>
@@ -689,7 +651,7 @@ function EmailContentViewer({ body }: { body: string }) {
             onClick={() => void handleCopy()}
             className="btn border border-line bg-white !px-2.5 !py-1 !text-[0.8125rem] text-ink hover:border-lav-200"
           >
-            {copied ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+
             {copied ? "Copied" : "Copy text"}
           </button>
         </div>

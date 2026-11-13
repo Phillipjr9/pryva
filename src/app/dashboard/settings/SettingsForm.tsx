@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, Loader2, Lock, Mail, Shield, User } from "@/components/icons";
+
 import type { PublicUser } from "@/lib/identity/auth";
 import { AccountDataPanel } from "./AccountDataPanel";
 import { PasswordInput } from "@/components/ui/PasswordInput";
-import { ProfileAvatar } from "@/components/dashboard/ProfileAvatar";
 
 interface SettingsFormProps {
   user: PublicUser;
@@ -28,22 +27,17 @@ function Notice({ kind, children }: { kind: "error" | "success"; children: strin
           : "border-emerald-200 bg-emerald-50 text-emerald-800"
       }`}
     >
-      <Check className="h-3.5 w-3.5 shrink-0" />
+
       {children}
     </p>
   );
 }
 
 function Section({
-  icon: Icon,
-  media,
   title,
   note,
   children,
 }: {
-  icon: (props: { className?: string }) => React.ReactNode;
-  /** Replaces the small icon square — used by Profile, which shows the avatar. */
-  media?: React.ReactNode;
   title: string;
   note: string;
   children: React.ReactNode;
@@ -51,11 +45,6 @@ function Section({
   return (
     <section className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
       <div className="flex items-start gap-2.5">
-        {media ?? (
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-lav-50 text-lav-700">
-            <Icon className="h-4 w-4" />
-          </span>
-        )}
         <div>
           <h2 className="text-[0.9375rem] font-semibold">{title}</h2>
           <p className="mt-0.5 text-meta text-ink-2">{note}</p>
@@ -144,8 +133,6 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
       {success && <Notice kind="success">{success}</Notice>}
 
       <Section
-        icon={User}
-        media={<ProfileAvatar seed={user.email} size={32} />}
         title="Profile"
         note="The name shown on orders and support replies."
       >
@@ -184,7 +171,7 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
         >
           {savingProfile ? (
             <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
+               Saving…
             </>
           ) : (
             "Save profile"
@@ -193,7 +180,6 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
       </Section>
 
       <Section
-        icon={Lock}
         title="Password"
         note="Use something you don't use anywhere else. At least 8 characters."
       >
@@ -202,6 +188,7 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
             Current password
           </label>
           <PasswordInput
+            textOnly
             id="current-password"
             autoComplete="current-password"
             value={currentPassword}
@@ -215,6 +202,7 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
               New password
             </label>
             <PasswordInput
+            textOnly
               id="new-password"
               autoComplete="new-password"
               value={newPassword}
@@ -227,6 +215,7 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
               Confirm new password
             </label>
             <PasswordInput
+            textOnly
               id="confirm-password"
               autoComplete="new-password"
               value={confirmPassword}
@@ -243,7 +232,7 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
         >
           {savingPassword ? (
             <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Changing…
+               Changing…
             </>
           ) : (
             "Change password"
@@ -252,13 +241,12 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
       </Section>
 
       <Section
-        icon={Mail}
         title="Email verification"
         note="Proof that you control this address, and where a password reset would be sent."
       >
         {user.emailVerifiedAt ? (
           <p className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-[0.8125rem] font-medium text-emerald-800">
-            <Check className="h-3.5 w-3.5 shrink-0" />
+
             {user.email} was verified on{" "}
             {new Date(user.emailVerifiedAt).toLocaleDateString("en-NG", {
               day: "numeric",
@@ -292,7 +280,7 @@ export function SettingsForm({ user, canSendVerification }: SettingsFormProps) {
         )}
       </Section>
 
-      <Section icon={Shield} title="Account" note="Read-only details. Your data can be downloaded below.">
+      <Section title="Account" note="Read-only details. Your data can be downloaded below.">
         <dl className="grid gap-2 text-[0.8125rem] sm:grid-cols-2">
           <div className="flex items-center justify-between rounded-xl border border-line bg-white px-3.5 py-2.5">
             <dt className="text-ink-2">Member since</dt>

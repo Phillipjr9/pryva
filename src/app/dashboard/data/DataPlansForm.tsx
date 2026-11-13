@@ -5,7 +5,6 @@ import Link from "next/link";
 import { catalogueFailureReason, fetchCatalogue, SHARED_CATALOGUE_TIMEOUT_MS, type CatalogueFailureReason } from "@/lib/platform/catalog-fetch";
 import { retryAfterDeadline } from "@/lib/platform/retry-after";
 import { useRetryCooldown } from "@/lib/platform/use-retry-cooldown";
-import { BrandIcon } from "@/components/BrandIcon";
 import { QuickShortcuts } from "@/components/QuickShortcuts";
 import type { PublicUser } from "@/lib/identity/auth";
 import type { ClubkonnectPlan } from "@/lib/providers/clubkonnect";
@@ -42,13 +41,6 @@ function readCatalogue(value: unknown): Catalogue | null {
     ? body.checkoutReason : "Purchasing is unavailable from this catalogue.";
   if (!checkedAt || typeof body.stale !== "boolean" || checkoutReason !== body.checkoutReason) incomplete = true;
   return { plans, checkedAt, stale: body.stale !== false, checkoutReason, incomplete };
-}
-
-function NetworkMark({ code, name }: { code: string; name: string }) {
-  const brand = ({ "01": "mtn", "02": "glo", "04": "airtel" } as const)[code as "01" | "02" | "04"];
-  if (brand) return <BrandIcon brand={brand} decorative size={40} />;
-  // Do not apply a legacy 9mobile logo to a renamed carrier or invent a mark.
-  return <span aria-hidden="true" className="grid h-10 min-w-10 place-items-center rounded-lg border border-line px-2 text-meta font-semibold">{name}</span>;
 }
 
 export function DataPlansForm({ initialPlanId }: DataPlansFormProps) {
@@ -117,7 +109,7 @@ export function DataPlansForm({ initialPlanId }: DataPlansFormProps) {
       {initialPlanId && <p className="text-meta">Choose a current bundle below; old plan links do not select a different product automatically.</p>}
       <p role="status" className="text-meta">{visible.length} bundles · lowest price first</p>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{visible.map(plan => <article key={plan.id} className="rounded-xl border border-line bg-white p-4">
-        <div className="flex items-center gap-3"><NetworkMark code={plan.networkCode} name={plan.network} /><span className="text-meta font-semibold">{plan.network}</span></div>
+        <div className="flex items-center gap-3"><span className="text-meta font-semibold">{plan.network}</span></div>
         <h2 className="mt-3 text-[0.9375rem] font-semibold">{plan.name}</h2>
         <p className="mt-2 font-semibold">{money.format(plan.publishedAmountKobo / 100)}</p>
         {plan.dataType && <p className="mt-1 text-meta">{plan.dataType}</p>}

@@ -5,7 +5,7 @@ import { userTwoFactor } from "@/db/schema";
 import { listCredentialSummaries, relyingPartyFor } from "@/lib/identity/passkeys";
 import { remainingRecoveryCodes, twoFactorAvailable } from "@/lib/identity/two-factor";
 import type { PublicUser } from "@/lib/identity/auth";
-import { Clock, User } from "@/components/icons";
+
 import { PasskeysCard } from "@/components/settings/PasskeysCard";
 import { SessionsCard } from "./SessionsCard";
 import { TwoFactorCard } from "./TwoFactorCard";
@@ -75,7 +75,7 @@ export async function SecuritySection({ user }: { user: PublicUser }) {
 
       <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
         <h3 className="flex items-center gap-2 text-[0.9375rem] font-semibold">
-          <User className="h-4 w-4 text-lav-700" /> Habits that keep an account safe
+           Habits that keep an account safe
         </h3>
         <ul className="mt-2.5 grid gap-2 text-[0.8125rem] text-ink-2">
           {[
@@ -85,7 +85,7 @@ export async function SecuritySection({ user }: { user: PublicUser }) {
             "Sign out on shared devices when you're done.",
           ].map((tip) => (
             <li key={tip} className="flex items-start gap-2">
-              <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lav-600" />
+
               {tip}
             </li>
           ))}

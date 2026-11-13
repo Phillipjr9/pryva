@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { AlertCircle, Check, Copy, Gift, Send, Users } from "@/components/icons";
+
 import type { ReferralInvite } from "@/lib/content/referrals";
 
 type Props = {
@@ -58,7 +58,7 @@ export function ReferralProgram({ code, link, earned, invited, pending, percent,
     return (
       <div className="rounded-2xl border border-line bg-white p-5">
         <p className="flex items-start gap-2 text-[0.875rem] text-ink-2">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+
           Invite codes are unavailable right now. Please try again in a moment.
         </p>
       </div>
@@ -71,7 +71,7 @@ export function ReferralProgram({ code, link, earned, invited, pending, percent,
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-[1rem] font-semibold text-ink">
-              <Gift className="h-4 w-4 text-lav-700" /> Your invite link
+               Your invite link
             </h2>
             <p className="mt-1 max-w-xl text-[0.875rem] leading-relaxed text-ink-2">
               When someone joins with your link and their first order is delivered, you earn{" "}
@@ -86,7 +86,7 @@ export function ReferralProgram({ code, link, earned, invited, pending, percent,
         </div>
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <code className="flex-1 select-all truncate rounded-xl border border-line bg-white px-3 py-2.5 font-mono text-[0.8125rem] text-ink">
+          <code className="flex-1 select-all [overflow-wrap:anywhere] rounded-xl border border-line bg-white px-3 py-2.5 font-mono text-[0.8125rem] text-ink">
             {link}
           </code>
           <button
@@ -94,7 +94,7 @@ export function ReferralProgram({ code, link, earned, invited, pending, percent,
             onClick={() => void copy(link, "link")}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-[0.8125rem] font-semibold text-white hover:bg-ink-2"
           >
-            {copied === "link" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+
             {copied === "link" ? "Copied" : "Copy link"}
           </button>
         </div>
@@ -109,14 +109,14 @@ export function ReferralProgram({ code, link, earned, invited, pending, percent,
             onClick={() => void copy(code, "code")}
             className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2 py-1 text-ink-2 hover:bg-lav-50"
           >
-            {copied === "code" ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+
             {copied === "code" ? "Copied" : "Copy"}
           </button>
         </div>
 
         {error ? (
           <p role="alert" className="mt-3 flex items-start gap-1.5 text-[0.8125rem] font-medium text-rose-700">
-            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {error}
+             {error}
           </p>
         ) : null}
       </section>
@@ -136,7 +136,7 @@ export function ReferralProgram({ code, link, earned, invited, pending, percent,
 
       <section className="rounded-2xl border border-line bg-white p-5">
         <h2 className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
-          <Users className="h-4 w-4 text-lav-700" /> People you invited
+           People you invited
         </h2>
         {invites.length === 0 ? (
           <p className="mt-2 text-[0.875rem] text-ink-2">
@@ -155,7 +155,7 @@ export function ReferralProgram({ code, link, earned, invited, pending, percent,
                   className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-[#fffdfa] px-3 py-2.5"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-[0.875rem] font-medium text-ink">{invite.refereeLabel}</p>
+                    <p className="[overflow-wrap:anywhere] text-[0.875rem] font-medium text-ink">{invite.refereeLabel}</p>
                     <p className="text-micro text-ink-3">Joined {shortDate(invite.createdAt)}</p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -177,7 +177,7 @@ export function ReferralProgram({ code, link, earned, invited, pending, percent,
 
       <section className="rounded-2xl border border-line bg-[#fffdfa] p-5">
         <h2 className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
-          <Send className="h-4 w-4 text-lav-700" /> How it works
+           How it works
         </h2>
         <ol className="mt-2 grid gap-1.5 text-[0.8125rem] leading-relaxed text-ink-2">
           <li>1. Share your link or code — wherever you like.</li>

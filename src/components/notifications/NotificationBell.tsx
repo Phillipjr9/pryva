@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useLayoutEffect, useState, useCallback, useId, useRef } from "react";
+import Link from "next/link";
 
 import { Bell } from "@/components/icons";
 
@@ -34,6 +35,12 @@ type Props = {
    * go together, and only the owner of both can remove them consistently.
    */
   iconOnly?: boolean;
+  /** A compact, text-labelled control and panel for the customer dashboard. */
+  textOnly?: boolean;
+  /** Anchor the phone-width popover to the positioned dashboard header. */
+  alignToHeader?: boolean;
+  /** A history page for this surface, if one exists. */
+  viewAllHref?: string;
 };
 
 const POLL_DEFAULT = 30_000;
@@ -45,12 +52,16 @@ const POLL_DEFAULT = 30_000;
  * and admin console operators (same endpoint, scoped to their admin session).
  * Clicking a notification marks it read and dismisses the pop-up item.
  */
-export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconOnly = false }: Props) {
+export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconOnly = false, textOnly = false, alignToHeader = false, viewAllHref }: Props) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const popoverId = useId();
 
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
@@ -83,6 +94,63 @@ export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconO
     };
   }, [fetchNotifications, pollInterval]);
 
+  useLayoutEffect(() => {
+    if (!open || !popoverRef.current) return;
+    const panel = popoverRef.current;
+
+    function fitPopover() {
+      // The header can wrap when the balance is long, so a fixed subtraction
+      // from 100vh is not enough. Keep the entire panel above the visible tab
+      // bar, while retaining a scrollable list on short landscape screens.
+      panel.style.transform = "";
+      const top = panel.getBoundingClientRect().top;
+      const tabs = alignToHeader ? document.querySelector<HTMLElement>("[data-dashboard-bottom-nav]") : null;
+      const tabRect = tabs?.getBoundingClientRect();
+      const bottom = tabRect && tabRect.height > 0 ? Math.min(window.innerHeight, tabRect.top) : window.innerHeight;
+      const minimum = Math.min(150, Math.max(0, bottom - 16));
+      let shift = Math.max(0, top + minimum + 8 - bottom);
+      const triggerBottom = triggerRef.current?.getBoundingClientRect().bottom ?? top;
+      // If there is room for the header and footer below the bell, do not
+      // cover the trigger: it must remain tappable to close the popover.
+      if (bottom - triggerBottom - 16 >= 112) {
+        shift = Math.min(shift, Math.max(0, top - triggerBottom - 8));
+      }
+      if (shift) panel.style.transform = `translateY(-${shift}px)`;
+      panel.style.maxHeight = `${Math.max(0, Math.min(544, bottom - top + shift - 8))}px`;
+    }
+
+    fitPopover();
+    window.addEventListener("resize", fitPopover);
+    window.addEventListener("scroll", fitPopover, { passive: true });
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fitPopover);
+    const header = triggerRef.current?.closest<HTMLElement>("[data-dashboard-header]");
+    if (header) observer?.observe(header);
+    return () => {
+      window.removeEventListener("resize", fitPopover);
+      window.removeEventListener("scroll", fitPopover);
+      observer?.disconnect();
+    };
+  }, [open, alignToHeader]);
+
+  useEffect(() => {
+    if (!open) return;
+    function dismissOutside(event: PointerEvent) {
+      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) setOpen(false);
+    }
+    function dismissWithEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOpen(false);
+      triggerRef.current?.focus();
+    }
+    document.addEventListener("pointerdown", dismissOutside);
+    document.addEventListener("keydown", dismissWithEscape);
+    return () => {
+      document.removeEventListener("pointerdown", dismissOutside);
+      document.removeEventListener("keydown", dismissWithEscape);
+    };
+  }, [open]);
+
   const markRead = useCallback(async (id: string) => {
     try {
       await fetch("/api/notifications/mark-read", {
@@ -114,26 +182,23 @@ export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconO
 
   const toggle = () => setOpen((current) => !current);
 
-  const unread = notifications.filter((n) => !n.read);
-
   return (
-    <div className="relative inline-block">
+    <div ref={rootRef} className={`inline-block ${alignToHeader ? "static sm:relative" : "relative"}`}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={toggle}
         aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : "Notifications"}
         aria-expanded={open}
+        aria-controls={open ? popoverId : undefined}
         className={`inline-flex items-center gap-1.5 rounded-xl border border-line bg-white text-[0.8125rem] font-semibold text-ink-2 hover:border-lav-300 focus:outline-none focus:ring-2 focus:ring-lav-400 ${
-          iconOnly
-            ? // A square with no padding of its own: the size comes from the
-              // caller's `h-9 w-9`, and `!p-0` is needed because the shared `.btn`
-              // rule above sets padding that a bare `p-0` would not override.
-              "h-9 w-9 shrink-0 justify-center !p-0"
+          textOnly ? "min-h-9 shrink-0 justify-center px-3 py-1.5"
+            : iconOnly ? "h-9 w-9 shrink-0 justify-center !p-0"
             : "px-3 py-2"
         } ${className ?? ""} disabled:opacity-50`}
         disabled={loading}
       >
-        <Bell className="h-3.5 w-3.5 shrink-0" />
+        {textOnly ? <span>Alerts</span> : <Bell className="h-3.5 w-3.5 shrink-0" />}
         {unreadCount > 0 && (
           /*
            * The count, when it actually fits.
@@ -145,37 +210,47 @@ export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconO
            */
           <span
             className={
-              iconOnly
+              iconOnly && !textOnly
                 ? "h-2 w-2 shrink-0 rounded-full bg-rose-600"
                 : "grid h-4 min-w-4 shrink-0 place-items-center rounded-full bg-rose-600 px-1 text-[10px] font-bold leading-none text-white"
             }
             aria-hidden="true"
           >
-            {iconOnly ? null : unreadCount > 9 ? "9+" : unreadCount}
+            {iconOnly && !textOnly ? null : unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
-        {iconOnly ? null : <span className="hidden whitespace-nowrap sm:block">Notifications</span>}
+        {iconOnly || textOnly ? null : <span className="hidden whitespace-nowrap sm:block">Notifications</span>}
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 rounded-xl border border-line bg-white shadow-xl z-50">
-          <div className="px-4 py-3 border-b border-line">
+        <div
+          id={popoverId}
+          ref={popoverRef}
+          role="region"
+          aria-label="Notifications"
+          className={`absolute z-50 mt-2 flex max-h-[min(34rem,calc(100dvh-8rem))] flex-col overflow-hidden rounded-xl border border-line bg-white shadow-xl ${
+            alignToHeader
+              ? "right-3 top-full w-[min(20rem,calc(100%-1.5rem))] sm:right-0 sm:top-auto sm:w-80"
+              : "right-0 w-80 max-w-[calc(100vw-2rem)]"
+          }`}
+        >
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 border-b border-line px-4 py-1">
             <p className="text-micro font-semibold text-ink">Notifications</p>
             {unreadCount > 0 && (
               <button
                 type="button"
                 onClick={markAllRead}
-                className="ml-auto text-[0.8125rem] font-medium text-lav-700 hover:text-lav-800 underline"
+                className="inline-flex min-h-11 items-center text-[0.8125rem] font-medium text-lav-700 underline hover:text-lav-800"
               >
                 Mark all read
               </button>
             )}
           </div>
 
-          <div className="max-h-[28rem] overflow-y-auto">
+          <div className="min-h-0 max-h-[28rem] overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="px-4 py-8 text-center text-micro text-ink-3">
-                <span className="opacity-50">No notifications yet</span>
+                No notifications yet
               </div>
             ) : (
               <div className="divide-y divide-line/50">
@@ -191,7 +266,7 @@ export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconO
                     }`}
                   >
                     <div className="flex items-start gap-2">
-                      <div
+                      {!textOnly && <div
                         className={`mt-1 shrink-0 grid h-6 w-6 place-items-center rounded-full ${
                           notification.type === "chat_reply"
                             ? "bg-lav-100 text-lav-600"
@@ -201,12 +276,13 @@ export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconO
                         }`}
                       >
                         <Bell className="h-3 w-3" />
-                      </div>
+                      </div>}
                       <div className="min-w-0 flex-1">
                         <p className="text-[0.8125rem] font-semibold leading-tight">
                           {notification.title}
                           {!notification.read && (
-                            <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-lav-500" />
+                            textOnly ? <span className="ml-1.5 text-micro font-semibold text-lav-700">Unread</span>
+                              : <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-lav-500" />
                           )}
                         </p>
                         <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-ink-3 line-clamp-2">
@@ -220,18 +296,17 @@ export function NotificationBell({ pollInterval = POLL_DEFAULT, className, iconO
             )}
           </div>
 
-          <div className="px-4 py-2 border-t border-line/50">
-            <button
-              type="button"
-              onClick={() => {
-                void markAllRead();
-                setOpen(false);
-              }}
-              className="w-full rounded-lg border border-line bg-white px-3 py-1.5 text-[0.8125rem] font-medium text-ink-2 hover:bg-lav-50"
-            >
-              View all notifications
-            </button>
-          </div>
+          {viewAllHref && (
+            <div className="shrink-0 border-t border-line/50 px-4 py-1">
+              <Link
+                href={viewAllHref}
+                onClick={() => setOpen(false)}
+                className="flex min-h-11 w-full items-center justify-center rounded-lg border border-line bg-white px-3 py-1.5 text-center text-[0.8125rem] font-medium text-ink-2 hover:bg-lav-50"
+              >
+                View all notifications
+              </Link>
+            </div>
+          )}
         </div>
       )}
     </div>

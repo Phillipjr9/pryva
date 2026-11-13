@@ -9,18 +9,7 @@ import { parseWithdrawalReceipt, type WithdrawalSubmitResult } from "@/lib/payme
 import { useToast } from "@/components/ui/Toast";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { WithdrawalReviewDialog, type WithdrawalReview } from "@/components/dashboard/WithdrawalReviewDialog";
-import {
-  AlertCircle,
-  ArrowUpRight,
-  Card,
-  Check,
-  Loader2,
-  Plus,
-  Receipt,
-  Shield,
-  Trash2,
-  Wallet,
-} from "@/components/icons";
+
 
 interface BankAccount {
   id: string;
@@ -99,6 +88,11 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [historyState, setHistoryState] = useState<"loading" | "ready" | "error">("loading");
+  const [bankState, setBankState] = useState<"loading" | "ready" | "error">("loading");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotal, setHistoryTotal] = useState<number | null>(null);
+  const [historyPages, setHistoryPages] = useState(0);
+  const historyRequest = useRef(0);
   const [pendingIntents, setPendingIntents] = useState<WithdrawalIntent[]>([]);
   const [review, setReview] = useState<WithdrawalReview | null>(null);
   const [recoveryState, setRecoveryState] = useState<"loading" | "ready" | "unavailable">("loading");
@@ -132,10 +126,13 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
   // looked back at the form, which reads as a broken button.
   const [verifyError, setVerifyError] = useState<string | null>(null);
 
+  // Load once on mount. The fetchers are intentionally not dependencies: they
+  // reset loading state and would re-run on every render.
   useEffect(() => {
     fetchBankAccounts();
     fetchWithdrawalHistory();
     fetchBanks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -156,27 +153,49 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
   }, [intentKey]);
 
   async function fetchBankAccounts() {
+    // A failure used to be indistinguishable from "no accounts yet": the empty
+    // list looked like the customer had never added one, and its CTA invited a
+    // duplicate. The state is explicit so the panel can say which it is.
+    setBankState("loading");
     try {
       const response = await fetch("/api/wallet/bank-accounts");
       const data = await response.json();
-      if (data.ok) setBankAccounts(data.bankAccounts);
+      if (!response.ok || !data.ok || !Array.isArray(data.bankAccounts)) throw new Error("Unavailable");
+      setBankAccounts(data.bankAccounts);
+      setBankState("ready");
     } catch (error) {
       console.error("Failed to fetch bank accounts:", error);
+      setBankState("error");
     } finally {
       setLoaded(true);
     }
   }
 
-  async function fetchWithdrawalHistory() {
+  async function fetchWithdrawalHistory(page = 1) {
+    const request = ++historyRequest.current;
+    setHistoryPage(page);
     setHistoryState("loading");
     try {
-      const response = await fetch("/api/wallet/withdraw/history", { cache: "no-store" });
+      const url = page === 1 ? "/api/wallet/withdraw/history" : `/api/wallet/withdraw/history?page=${page}`;
+      const response = await fetch(url, { cache: "no-store" });
       const data = await response.json();
-      if (!response.ok || !data.ok || !Array.isArray(data.withdrawals)) throw new Error("History unavailable");
+      const pagination = data?.pagination;
+      if (!response.ok || !data.ok || !Array.isArray(data.withdrawals) ||
+          !pagination || pagination.page !== page || !Number.isSafeInteger(pagination.total) || pagination.total < 0 ||
+          !Number.isSafeInteger(pagination.totalPages) || pagination.totalPages < 0) throw new Error("History unavailable");
+      if (request !== historyRequest.current) return;
+      // A stale last page can disappear; return to the newest page rather than
+      // calling a non-empty history empty.
+      if (page > 1 && page > pagination.totalPages) {
+        await fetchWithdrawalHistory();
+        return;
+      }
       setWithdrawals(data.withdrawals);
+      setHistoryTotal(pagination.total);
+      setHistoryPages(pagination.totalPages);
       setHistoryState("ready");
     } catch {
-      setHistoryState("error");
+      if (request === historyRequest.current) setHistoryState("error");
     }
   }
 
@@ -334,7 +353,9 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
               ? "Payout could not be sent — the amount and fee are back in your wallet"
               : receipt.status === "completed"
                 ? "Payout sent and confirmed"
-                : "Payout sent to your bank",
+                : receipt.status === "processing"
+                  ? "Payout sent to your bank; it is not settled until the bank confirms"
+                  : "Withdrawal request recorded and queued",
         });
         setAmount("");
         setSelectedBankAccountId("");
@@ -454,7 +475,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: "withdraw", label: "Withdraw" },
-    { key: "history", label: `Requests${withdrawals.length ? ` (${withdrawals.length})` : ""}` },
+    { key: "history", label: `Requests${historyTotal !== null ? ` (${historyTotal})` : ""}` },
     { key: "accounts", label: `Bank accounts${bankAccounts.length ? ` (${bankAccounts.length})` : ""}` },
   ];
 
@@ -470,7 +491,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
           </p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-micro text-ink-3">
-          <Wallet className="h-3 w-3 text-lav-600" /> {formatNaira(balance)} withdrawable before fees
+           {formatNaira(balance)} withdrawable before fees
         </span>
       </div>
 
@@ -503,9 +524,15 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
 
       {activeTab === "withdraw" && (
         <div className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-5">
-          {bankAccounts.length === 0 ? (
+          {bankState === "loading" ? (
+            <p className="text-sm text-ink-2">Loading your bank accounts…</p>
+          ) : bankState === "error" ? (
+            <div role="alert" className="text-sm text-rose-700">
+              Your bank accounts could not be loaded, so a payout cannot be started safely.{" "}
+              <button type="button" className="font-semibold underline" onClick={() => void fetchBankAccounts()}>Retry</button>
+            </div>
+          ) : bankAccounts.length === 0 ? (
             <EmptyState
-              icon={Card}
               title="Add a bank account first"
               body="Add a Nigerian bank account and check the resolved account name carefully before requesting a payout."
               action={{ label: "Add a bank account", onClick: openAccountsTab }}
@@ -598,17 +625,17 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
               >
                 {loading ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Requesting…
+                     Requesting…
                   </>
                 ) : (
                   <>
-                    <ArrowUpRight className="h-4 w-4" /> Review withdrawal
+                     Review withdrawal
                   </>
                 )}
               </button>
 
               <p className="flex items-start gap-2 rounded-xl bg-lav-50 px-3 py-2.5 text-meta leading-relaxed text-lav-800">
-                <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+
                 No approval step: your payout is sent as soon as you confirm. “Sent to bank” means the provider accepted it; the status changes to
                 “Paid out” when the bank confirms, and a transfer that fails is refunded to your wallet.
               </p>
@@ -631,18 +658,17 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
           {historyState === "loading" ? (
             <p className="text-sm text-ink-2">Loading withdrawal requests…</p>
           ) : historyState === "error" ? (
-            <div role="alert" className="text-sm text-rose-700">Requests could not be loaded. <button type="button" className="font-semibold underline" onClick={() => void fetchWithdrawalHistory()}>Retry</button></div>
+            <div role="alert" className="text-sm text-rose-700">Requests could not be loaded. <button type="button" className="font-semibold underline" onClick={() => void fetchWithdrawalHistory(historyPage)}>Retry</button></div>
           ) : withdrawals.length === 0 ? (
             <EmptyState
-              icon={Receipt}
               title="No withdrawal requests yet"
               body="Once you request a payout it appears here with its reference and status."
-              action={{ label: "Request a withdrawal", href: "#withdraw" }}
+              action={{ label: "Request a withdrawal", onClick: () => setActiveTab("withdraw") }}
               className="!border-0 !bg-transparent !py-6"
             />
           ) : (
             <div className="grid gap-2">
-              <p className="text-xs text-ink-3">Showing the 20 most recent requests.</p>
+              <p className="text-xs text-ink-3">Showing {withdrawals.length} of {historyTotal} requests · Page {historyPage} of {historyPages}</p>
               {withdrawals.map((withdrawal) => (
                 <div
                   key={withdrawal.id}
@@ -653,7 +679,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                       <p className="text-[0.875rem] font-semibold text-ink">
                         {formatNaira(withdrawal.amount)}
                       </p>
-                      <p className="truncate text-meta text-ink-2">
+                      <p className="[overflow-wrap:anywhere] text-meta text-ink-2">
                         {withdrawal.bankName} · {withdrawal.accountNumber}
                       </p>
                     </div>
@@ -672,12 +698,16 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                   </div>
                   {withdrawal.failureReason && (
                     <p className="mt-1.5 flex items-start gap-1.5 text-meta text-rose-600">
-                      <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+
                       {withdrawal.failureReason}
                     </p>
                   )}
                 </div>
               ))}
+              {historyPages > 1 && <nav aria-label="Withdrawal request pages" className="flex flex-wrap items-center gap-3 text-meta font-semibold text-lav-700">
+                {historyPage > 1 && <button type="button" className="min-h-11 hover:underline" onClick={() => void fetchWithdrawalHistory(historyPage - 1)}>Newer requests</button>}
+                {historyPage < historyPages && <button type="button" className="min-h-11 hover:underline" onClick={() => void fetchWithdrawalHistory(historyPage + 1)}>Older requests</button>}
+              </nav>}
             </div>
           )}
         </div>
@@ -742,14 +772,14 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                     disabled={verifyingAccount || loading || !bankCode || accountNumber.length !== 10}
                     className="btn shrink-0 border border-line bg-white !px-3.5 !py-2.5 !text-[0.8125rem] sm:!text-[0.8125rem] text-ink hover:border-lav-200 disabled:opacity-50"
                   >
-                    {verifyingAccount ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Verify"}
+                    {verifyingAccount ? "Verifying…" : "Verify"}
                   </button>
                 </div>
               </div>
 
               {accountName && (
                 <p className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-meta font-medium text-emerald-800">
-                  <Check className="h-3.5 w-3.5" /> {accountName}
+                   {accountName}
                 </p>
               )}
 
@@ -772,7 +802,7 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                   else's account should find out before they have filled in a
                   withdrawal and been refused. */}
               <p className="flex gap-2 rounded-xl border border-lav-200 bg-lav-50 px-3 py-2.5 text-meta leading-relaxed text-ink-2">
-                <Shield className="mt-px h-3.5 w-3.5 shrink-0" />
+
                 <span>
                   Withdrawals are paid only to a bank account in the same name as the one that
                   funded your wallet. Money is never sent to a third-party account, so an account
@@ -790,11 +820,11 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
               >
                 {loading ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Saving…
+                     Saving…
                   </>
                 ) : (
                   <>
-                    <Plus className="h-4 w-4" /> Save bank account
+                     Save bank account
                   </>
                 )}
               </button>
@@ -825,11 +855,11 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                           </span>
                         )}
                       </p>
-                      <p className="truncate text-meta text-ink-2">{account.accountNumber}</p>
-                      <p className="truncate text-meta text-ink-3">{account.accountName}</p>
+                      <p className="[overflow-wrap:anywhere] text-meta text-ink-2">{account.accountNumber}</p>
+                      <p className="[overflow-wrap:anywhere] text-meta text-ink-3">{account.accountName}</p>
                       {account.payoutWarning && (
                         <p className="mt-1.5 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-micro leading-relaxed text-amber-900">
-                          <AlertCircle className="mt-px h-3 w-3 shrink-0" />
+
                           <span>{account.payoutWarning}</span>
                         </p>
                       )}
@@ -838,9 +868,9 @@ export function WithdrawalDashboard({ balance, userId, testMode = false }: { bal
                       type="button"
                       onClick={() => deleteBankAccount(account.id)}
                       aria-label={`Remove ${account.bankName} account`}
-                      className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-ink-3 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                      className="min-h-11 shrink-0 rounded-lg px-3 py-2 text-meta font-semibold text-ink-2 transition-colors hover:bg-rose-50 hover:text-rose-600"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      Remove
                     </button>
                   </div>
                 ))}

@@ -16,6 +16,8 @@ describe("separate Pryva credit and brand checkout", () => {
     expect(html).toContain("Send Wallet Credit");
     expect(html).not.toContain("Brand Gift Cards");
     expect(html).toContain("/dashboard/services?category=gift-cards");
+    // DashboardShell supplies the page's single main landmark.
+    expect(html).not.toContain("<main");
   });
   it("opens the selected legacy denomination without a second storefront", async () => {
     const html = renderToStaticMarkup(await BrandGiftCardCheckout({ searchParams: Promise.resolve({ denomination: "steam-usd-10" }) }));
@@ -24,6 +26,7 @@ describe("separate Pryva credit and brand checkout", () => {
     expect(html).toContain("16,500");
     expect(html).not.toContain("Select Gift Card Brand");
     expect(html).not.toContain("Send Wallet Credit");
+    expect(html).not.toContain("<main");
   });
   it("rejects unknown denomination ids", async () => {
     const html = renderToStaticMarkup(await BrandGiftCardCheckout({ searchParams: Promise.resolve({ denomination: "bogus" }) }));

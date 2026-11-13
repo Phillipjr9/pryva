@@ -33,8 +33,10 @@ describe("verification listing artwork", () => {
     const items = bitcallOtpItemsForCountry(offers, "us", "United States");
     expect(items).toHaveLength(apps.length);
     expect(items.every(i => i.stock === 3 && i.action !== null && i.artwork.kind === "verified-brand-logo")).toBe(true);
+    // The dashboard card is text-only: the reviewed mark is metadata, not markup.
     const html = renderToStaticMarkup(<ServiceCard item={items.find(i => i.name === "Adobe")!} countryName="United States" />);
-    expect(html).toContain('/verification-logos/adobe.svg');
+    expect(html).not.toContain("<img");
+    expect(html).toContain("Adobe");
   });
 
   it("matches exact titles in the real pinned icon collection, not substrings or guessed domains", () => {
@@ -55,7 +57,10 @@ describe("verification listing artwork", () => {
     expect(items.find(i => i.name === "unknown")?.artwork.kind).toBe("service");
     expect(items.every(i => i.stock === 3 && i.action !== null)).toBe(true);
     const html = renderToStaticMarkup(<ServiceCard item={items.find(i => i.name === "Activision")!} countryName="United States" />);
-    expect(html).toContain("https://cdn.jsdelivr.net/npm/simple-icons@16.36.0/icons/activision.svg");
-    expect(html).toContain('referrerPolicy="no-referrer"');
+    // No third-party icon CDN request reaches a customer's browser from the card.
+    expect(html).not.toContain("cdn.jsdelivr.net");
+    expect(html).not.toContain("google.com/s2/favicons");
+    expect(html).toContain("Activision");
+    expect(html).toContain("3 left");
   });
 });

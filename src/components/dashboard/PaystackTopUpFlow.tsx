@@ -6,7 +6,7 @@ import { WALLET_TOPUP_MAX_NGN, WALLET_TOPUP_MIN_NGN } from "@/lib/payments/topup
 import { isSafePaystackCheckoutUrl } from "@/lib/payments/paystack-checkout";
 import { navigateToPaystack } from "@/lib/payments/paystack-navigate";
 import { notifyPaystackTopUpsChanged, readPendingPaystackTopUps, rememberPaystackTopUp } from "@/lib/payments/paystack-topup-intent";
-import { MoneyFlowDialog, MoneyOrbit, MoneyProcessing, MoneyRoute } from "./MoneyFlowDialog";
+import { MoneyFlowDialog, MoneyProcessing, MoneyRoute } from "./MoneyFlowDialog";
 import styles from "./MoneyFlow.module.css";
 
 /** Real checkout is hosted by Paystack; no card data or PIN enters Pryva. */
@@ -106,7 +106,7 @@ export function PaystackTopUpFlow({ balance, userId, onClose, testMode = false }
 
   const processing = stage === "processing";
   const title = stage === "details" ? "Add funds to your wallet" : stage === "review" ? "Review your top-up" : returned ? "Payment not confirmed yet" : "Opening Paystack checkout";
-  return <MoneyFlowDialog stage={stage} title={title} onClose={onClose} canClose={!processing || Boolean(checkoutUrl) || returned} lead={processing && !returned ? <MoneyOrbit /> : undefined} centered={processing}>
+  return <MoneyFlowDialog stage={stage} title={title} onClose={onClose} canClose={!processing || Boolean(checkoutUrl) || returned} centered={processing}>
     {testMode && <p className={styles.notice}>PAYSTACK TEST MODE — use test data; no real payment is made.</p>}
     {stage === "details" && <>
       <p className={styles.description}>Choose an amount, then review it before continuing to Paystack.</p>

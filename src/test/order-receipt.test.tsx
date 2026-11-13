@@ -11,6 +11,7 @@ import {
   receiptStatusLabel,
   receiptStatusNote,
   receiptStatusTone,
+  receiptWalletSummary,
 } from "@/lib/payments/receipt";
 
 /**
@@ -36,7 +37,7 @@ const RECEIPT: ReceiptData = {
   amount: 1_500,
   status: "delivered",
   createdAt: "3 November 2026, 14:05",
-  paidWith: "Wallet balance",
+  wallet: receiptWalletSummary({ amount: 1_500, status: "delivered" }, [{ type: "debit", amount: 1_500 }]),
   customerName: "Ada Obi",
   customerEmail: "ada@example.com",
 };
@@ -55,14 +56,13 @@ describe("receiptStatusLabel", () => {
     expect(receiptStatusLabel("something_new")).toBe("something_new");
   });
 
-  it("groups every status into settled, in flight or reversed", () => {
+  it("does not treat cancellation or expiry as proof of a refund", () => {
     expect(receiptStatusTone("delivered")).toBe("settled");
     expect(receiptStatusTone("active")).toBe("settled");
     expect(receiptStatusTone("processing")).toBe("pending");
     expect(receiptStatusTone("review")).toBe("pending");
     expect(receiptStatusTone("refunded")).toBe("reversed");
-    expect(receiptStatusTone("cancelled")).toBe("reversed");
-    // An unknown value must not be presented as a completed payment.
+    for (const status of ["cancelled", "failed", "expired"]) expect(receiptStatusTone(status)).toBe("closed");
     expect(receiptStatusTone("something_new")).toBe("pending");
   });
 });
@@ -77,10 +77,45 @@ describe("receiptStatusNote", () => {
     expect(note).toContain("4 November 2026, 09:10");
   });
 
-  it("separates a settled payment from one still in flight", () => {
-    expect(receiptStatusNote("delivered")).toMatch(/paid in full/i);
+  it("describes order status without inventing a payment or reversal", () => {
+    expect(receiptStatusNote("delivered")).toMatch(/delivered/i);
     expect(receiptStatusNote("processing")).toMatch(/in progress/i);
-    expect(receiptStatusNote("failed")).toMatch(/reversed/i);
+    for (const status of ["cancelled", "failed", "expired", "review"]) {
+      expect(receiptStatusNote(status)).not.toMatch(/charge was reversed|paid in full|what was charged/i);
+    }
+  });
+});
+
+describe("receiptWalletSummary", () => {
+  it("does not turn an uncharged order attempt into a payment", () => {
+    expect(receiptWalletSummary({ amount: 1_500, status: "cancelled" }, [])).toEqual({
+      charge: { state: "not-recorded" }, refund: { state: "not-recorded" }, needsReview: false,
+    });
+  });
+
+  it("uses recorded charge and refund amounts rather than assuming them from status", () => {
+    expect(receiptWalletSummary({ amount: 1_500, status: "refunded" }, [
+      { type: "debit", amount: 1_500 }, { type: "refund", amount: 1_500 },
+    ])).toEqual({
+      charge: { state: "recorded", amount: 1_500 },
+      refund: { state: "recorded", amount: 1_500 },
+      needsReview: false,
+    });
+    expect(receiptWalletSummary({ amount: 1_500, status: "refunded" }, [
+      { type: "debit", amount: 1_500 },
+    ]).needsReview).toBe(true);
+  });
+
+  it("flags missing, mismatched, invalid or duplicate entries instead of guessing", () => {
+    expect(receiptWalletSummary({ amount: 1_500, status: "delivered" }, []).needsReview).toBe(true);
+    expect(receiptWalletSummary({ amount: 1_500, status: "delivered" }, [{ type: "debit", amount: 1_400 }]).needsReview).toBe(true);
+    expect(receiptWalletSummary({ amount: 1_500, status: "active" }, [{ type: "debit", amount: -1 }]).charge.state).toBe("ambiguous");
+    const duplicates = receiptWalletSummary({ amount: 1_500, status: "refunded" }, [
+      { type: "debit", amount: 1_500 }, { type: "refund", amount: 1_500 }, { type: "refund", amount: 1_500 },
+    ]);
+    expect(duplicates.needsReview).toBe(true);
+    expect(duplicates.charge.state).toBe("ambiguous");
+    expect(duplicates.refund.state).toBe("ambiguous");
   });
 });
 
@@ -137,7 +172,7 @@ describe("ReceiptBody", () => {
     expect(screen.getByText("Ada Obi")).toBeTruthy();
     expect(screen.getByText("ada@example.com")).toBeTruthy();
     expect(screen.getByText("Verified number · Nigeria")).toBeTruthy();
-    expect(screen.getAllByText("₦1,500").length).toBe(2); // line item and total
+    expect(screen.getAllByText("₦1,500").length).toBe(3); // order line, order total and actual wallet charge
     expect(screen.getByText("Delivered")).toBeTruthy();
     expect(screen.getByText("Virtual number")).toBeTruthy(); // not the raw "numbers" slug
     expect(screen.getByText("Wallet balance")).toBeTruthy();
@@ -146,14 +181,31 @@ describe("ReceiptBody", () => {
 
   it("names the buyer, so the document can be filed by the buyer", () => {
     render(<ReceiptBody receipt={RECEIPT} />);
-    expect(screen.getByText("Billed to")).toBeTruthy();
-    expect(screen.getByText("Paid with")).toBeTruthy();
+    expect(screen.getByText("Customer")).toBeTruthy();
+    expect(screen.getByText("Payment method")).toBeTruthy();
   });
 
-  it("says a refund happened, with the date, instead of leaving the status ambiguous", () => {
-    render(<ReceiptBody receipt={{ ...RECEIPT, status: "refunded", refundedAt: "4 November 2026, 09:10" }} />);
-    expect(screen.getByText("Refunded to wallet")).toBeTruthy();
-    expect(screen.getByText(/Refund processed 4 November 2026, 09:10/)).toBeTruthy();
+  it("shows a recorded refund separately from the order status and date", () => {
+    render(<ReceiptBody receipt={{ ...RECEIPT, status: "refunded", refundedAt: "4 November 2026, 09:10", wallet: receiptWalletSummary({ amount: 1_500, status: "refunded" }, [{ type: "debit", amount: 1_500 }, { type: "refund", amount: 1_500 }]) }} />);
+    expect(screen.getByText("Refunded")).toBeTruthy();
+    expect(screen.getByText("Recorded wallet refund")).toBeTruthy();
+    expect(screen.getByText(/Order marked refunded 4 November 2026, 09:10/)).toBeTruthy();
+  });
+
+  it("calls an uncharged attempt an order record, not a payment receipt", () => {
+    render(<ReceiptBody receipt={{ ...RECEIPT, status: "cancelled", wallet: receiptWalletSummary({ amount: 1_500, status: "cancelled" }, []) }} />);
+    expect(screen.getByRole("heading", { name: "Order record" })).toBeTruthy();
+    expect(screen.getByText("No wallet charge recorded")).toBeTruthy();
+    expect(screen.getByText("Not recorded")).toBeTruthy();
+    expect(screen.queryByText(/charge was reversed/i)).toBeNull();
+  });
+
+  it("warns when a refunded status has no recorded refund", () => {
+    render(<ReceiptBody receipt={{ ...RECEIPT, status: "refunded", wallet: receiptWalletSummary({ amount: 1_500, status: "refunded" }, [{ type: "debit", amount: 1_500 }]) }} />);
+    expect(screen.getByText("Recorded wallet refund")).toBeTruthy();
+    expect(screen.getByText("Not recorded")).toBeTruthy();
+    expect(screen.getByText(/order and wallet records need review/i)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Order record" })).toBeTruthy();
   });
 
   it("is explicit that it is not a tax invoice", () => {
@@ -176,7 +228,7 @@ describe("ReceiptBody", () => {
     render(<ReceiptBody receipt={RECEIPT} />);
     expect(screen.getByRole("heading", { level: 1, name: /payment receipt/i })).toBeTruthy();
     // Column headings make it a table a screen reader can read across.
-    expect(screen.getByRole("table", { name: /item charged/i })).toBeTruthy();
+    expect(screen.getByRole("table", { name: /order amount and recorded wallet activity/i })).toBeTruthy();
     expect(screen.getByRole("columnheader", { name: /description/i })).toBeTruthy();
     expect(screen.getByRole("columnheader", { name: /amount/i })).toBeTruthy();
   });

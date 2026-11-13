@@ -244,7 +244,7 @@ describe("app-specific offers in Number plans", () => {
     expect(within(section).getByRole("button", { name: /Stale Signal.*1 option/ })).toBeTruthy();
     expect(within(section).getByText("2026-11-12 12:00:00 UTC")).toBeTruthy();
     expect(within(section).getByRole("button", { name: "Retry apps" }).hasAttribute("disabled")).toBe(true);
-    expect(screen.queryByText(/Live listings are current/)).toBeNull();
+    expect(screen.queryByText(/Supplier listings loaded/)).toBeNull();
   });
 
   it("does not duplicate app offers in the All category", async () => {
@@ -267,6 +267,6 @@ describe("app-specific offers in Number plans", () => {
     const section = screen.getByRole("region", { name: "Apps for single-use numbers" });
     expect(await within(section).findByText(/App listings are not connected/)).toBeTruthy();
     expect(within(section).queryByText(/No app listings were reported/)).toBeNull();
-    expect(screen.queryByText(/Live listings are current/)).toBeNull();
+    expect(screen.queryByText(/Supplier listings loaded/)).toBeNull();
   });
 });

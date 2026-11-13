@@ -6,10 +6,9 @@ import { foxreloadQuotes, orders } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { CountryFlag } from "@/components/CountryFlag";
 import { formatNaira } from "@/lib/services/catalog";
 import Link from "next/link";
-import { ArrowLeft } from "@/components/icons";
+
 import { ClientConfirmation } from "./ClientConfirmation";
 import { TopupOrderSync } from "./TopupOrderSync";
 import { FoxEsimOrderSync } from "./FoxEsimOrderSync";
@@ -109,9 +108,9 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
         <div className="flex items-center gap-4">
           <Link
             href="/dashboard/orders"
-            className="grid h-10 w-10 place-items-center rounded-full border border-line bg-white text-ink hover:bg-cream"
+            className="inline-flex min-h-11 items-center rounded-full border border-line bg-white px-4 text-meta font-semibold text-ink hover:bg-cream"
           >
-            <ArrowLeft className="h-4 w-4" />
+            All orders
           </Link>
           <div>
             <h1 className="text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">
@@ -170,7 +169,6 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                   <div>
                     <p className="text-[0.8125rem] text-ink-3 mb-1">Region</p>
                     <div className="inline-flex items-center gap-2 text-[0.9375rem] font-medium text-ink">
-                      <CountryFlag region={order.region} size={16} decorative radius={8} />
                       <span>{order.region}</span>
                     </div>
                   </div>

@@ -6,22 +6,16 @@ import { DataPlansForm } from "@/app/dashboard/data/DataPlansForm";
 import { DigitalCategoryPicker } from "@/components/dashboard/DigitalCategoryPicker";
 import { useLiveServiceExplorer, type LiveState } from "@/components/dashboard/useLiveServiceExplorer";
 import { useDigitalExplorer } from "@/components/dashboard/useDigitalExplorer";
-import { DigitalProductIcon } from "@/components/DigitalProductIcon";
 import { QuickShortcuts, type QuickShortcut } from "@/components/QuickShortcuts";
-import { BrandIcon } from "@/components/BrandIcon";
-import { CountryFlag } from "@/components/CountryFlag";
 import { CountrySelector } from "@/components/dashboard/CountrySelector";
-import { NetworkBadge } from "@/components/NetworkBadge";
-import { ServiceIcon } from "@/components/ServiceIcon";
 import { UnitsStatus } from "@/components/dashboard/UnitsStatus";
-import { ArrowRight, ChevronDown, Globe, Lock, MailQuestion, Search, Shield, Sparkle } from "@/components/icons";
+
 import { formatNaira } from "@/lib/services/catalog";
 import { formatUnitCount } from "@/lib/services/service-units";
 import { explorerShortcuts, shortcutForExplorerItem } from "@/lib/services/quick-shortcuts";
 import {
   orderByReadiness,
   readinessSummary,
-  SERVICE_STATE_DOT,
   SERVICE_STATE_LABEL,
   type ServiceReadinessEntry,
 } from "@/lib/services/service-states";
@@ -88,19 +82,6 @@ const SERVICE_CATEGORY_GROUPS: ReadonlyArray<{
   },
 ];
 
-const CATEGORY_ICONS: Record<string, string> = {
-  verification: "💬",
-  social: "🚀",
-  numbers: "📱",
-  esim: "🌐",
-  proxies: "🛡️",
-  email: "✉️",
-  accounts: "👤",
-  subscriptions: "🎬",
-  data: "📶",
-  tools: "⚙️",
-};
-
 const POPULAR_COUNTRIES = [
   { code: "ng", name: "Nigeria", desc: "Local numbers & data" },
   { code: "us", name: "United States", desc: "US numbers & proxies" },
@@ -108,84 +89,6 @@ const POPULAR_COUNTRIES = [
   { code: "ca", name: "Canada", desc: "Canadian plans" },
   { code: "gh", name: "Ghana", desc: "Regional African plans" },
 ];
-
-/**
- * The fallback for an inbox whose provider is not recognised.
- *
- * Always decorative: the card beside it carries the listing's own name, so an
- * `aria-label` here would read that name twice.
- */
-function UnidentifiedInbox({ size }: { size: number }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="inline-flex shrink-0 items-center justify-center rounded-lg bg-lav-100 text-lav-700"
-      style={{ width: size, height: size }}
-    >
-      <MailQuestion width={Math.round(size * 0.55)} height={Math.round(size * 0.55)} />
-    </span>
-  );
-}
-
-function SiteFavicon({ domain, size }: { domain: string; size: number }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) return <UnidentifiedInbox size={size} />;
-
-  return (
-    <span
-      aria-hidden="true"
-      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line/70 bg-white"
-      style={{ width: size, height: size }}
-    >
-      {/* The supplier lists destination sites as well as mail providers. Their
-          published favicons are the only honest logos for brands not bundled
-          with the app; this endpoint returns the site's real favicon. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`}
-        alt=""
-        width={size}
-        height={size}
-        loading="lazy"
-        decoding="async"
-        referrerPolicy="no-referrer"
-        onError={() => setFailed(true)}
-        className="h-full w-full object-contain p-1"
-      />
-    </span>
-  );
-}
-
-function ListingLogo({ src, size }: { src: string; size: number }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) return <ServiceIcon service="accounts" size={size <= 28 ? "sm" : "md"} decorative />;
-  // Brand assets have already been matched to exact names in the server allowlist.
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt="" width={size} height={size} loading="lazy" decoding="async"
-    referrerPolicy="no-referrer" onError={() => setFailed(true)} className="shrink-0 rounded-lg object-contain" />;
-}
-
-function itemArt(item: ExplorerItem, size: "sm" | "md" = "md") {
-  const pixels = size === "sm" ? 28 : 42;
-  switch (item.artwork.kind) {
-    case "digital-product": return <DigitalProductIcon name={item.name} artwork={item.artwork.art} size={pixels} />;
-    case "brand": return <BrandIcon brand={item.artwork.name} size={pixels} decorative />;
-    case "network": return <NetworkBadge provider={item.artwork.name} size={pixels} />;
-    case "service": return <ServiceIcon service={item.artwork.name} size={size} />;
-    case "site-favicon": return <SiteFavicon key={item.artwork.domain} domain={item.artwork.domain} size={pixels} />;
-    case "simple-icon": {
-      const src = `https://cdn.jsdelivr.net/npm/simple-icons@${item.artwork.version}/icons/${item.artwork.slug}.svg`;
-      return <ListingLogo key={src} src={src} size={pixels} />;
-    }
-    case "verified-brand-logo": {
-      const src = `/verification-logos/${item.artwork.slug}.${item.artwork.format ?? "svg"}`;
-      return <ListingLogo key={src} src={src} size={pixels} />;
-    }
-    // A mailbox with no published favicon: Lucide's `mail-question`, never
-    // another provider's logo or the Temporary-inbox tool's mark.
-    case "unidentified-inbox": return <UnidentifiedInbox size={pixels} />;
-  }
-}
 
 export function ServiceCard({ item, countryName }: { item: ExplorerItem; countryName: string }) {
   const coverage = item.source === "live"
@@ -208,59 +111,47 @@ export function ServiceCard({ item, countryName }: { item: ExplorerItem; country
       ? "Purchasing locked"
       : item.category === "esim" && item.source === "live" ? "Price unavailable" : "See details";
 
-  /*
-   * One card, two densities. On a phone this is a 68 px row: artwork, name,
-   * one compact line with the type and price, and a single 44 px action. From
-   * `sm` up it opens into the full card (badge, description, coverage, price
-   * line, stock and units, labelled button).
-   *
-   * The alternative — a separate mobile card — would duplicate every heading
-   * and action in the DOM, so screen readers and the tests that count cards
-   * would see each service twice. Same markup, responsive classes only.
-   */
+  /* A single text-first card keeps the name, source and action readable on
+     phones without duplicating the listing for different breakpoints. */
   return (
-    <article className="group flex min-w-0 items-center gap-2.5 rounded-xl border border-line bg-white p-2.5 shadow-xs transition-all duration-200 hover:border-lav-300 sm:h-full sm:flex-col sm:items-stretch sm:gap-0 sm:rounded-2xl sm:p-4 sm:hover:-translate-y-0.5 sm:hover:shadow-md">
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-lav-50/70 sm:rounded-xl">{itemArt(item)}</div>
-      <div className="min-w-0 flex-1 sm:mt-3">
+    <article className="group flex min-w-0 flex-col items-stretch gap-2.5 rounded-xl border border-line bg-white p-2.5 shadow-xs transition-all duration-200 hover:border-lav-300 sm:h-full sm:gap-0 sm:rounded-2xl sm:p-4 sm:hover:-translate-y-0.5 sm:hover:shadow-md">
+      <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-start justify-between gap-2">
-          <h3 className="min-w-0 truncate text-[0.875rem] font-semibold leading-snug text-ink sm:whitespace-normal sm:break-words sm:text-[0.9375rem]">{item.name}</h3>
-          <span className={`hidden shrink-0 rounded-full px-2.5 py-1 text-micro font-bold uppercase tracking-[0.08em] sm:inline-flex ${sourceTone}`}>
+          <h3 className="min-w-0 break-words text-[0.875rem] font-semibold leading-snug text-ink sm:whitespace-normal sm:text-[0.9375rem]">{item.name}</h3>
+          <span className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-micro font-bold uppercase tracking-[0.08em] ${sourceTone}`}>
             {sourceLabel}
           </span>
         </div>
-        {/* Phones keep only what the choice needs: type and price, on one line. */}
-        <p className="mt-0.5 truncate text-micro text-ink-3 sm:hidden">
+        {/* One price line for every width: a phone needs the same figures as a
+            desktop, and a second hidden copy would be read out twice. */}
+        <p className="mt-0.5 break-words text-micro text-ink-3">
           <span className="capitalize">{item.tag}</span>
-          {/* Deliberately not the desktop wording: two visible-in-one-breakpoint
-              copies of the same sentence would be read out twice, and the tests
-              that look up the full price line would match both. */}
-          {price !== null ? ` · ${formatNaira(price)}${item.priceFrom ? "+" : ""}` : item.category === "verification" && item.source === "live" ? " · Ordering unavailable" : item.category === "esim" && item.source === "live" ? " · Price unavailable" : item.source === "live" ? " · Price on request" : " · Price not listed"}
+          {" · "}
+          <span>{priceLine}</span>
         </p>
-        {/* OTP stock comes directly from Bitcall's selected pool. Keep it visible
-            on phones too; hiding UnitsStatus at the mobile breakpoint made a
-            live listing look empty even when the supplier reported inventory. */}
+        {/* OTP stock is the live count for this app's selected pool. Keep it
+            visible on phones too; hiding UnitsStatus at the mobile breakpoint made
+            a live listing look empty even when the count was positive. */}
         {item.category === "verification" && item.source === "live" && (
-          <p className="mt-0.5 truncate text-micro text-ink-3 sm:hidden">
+          <p className="mt-0.5 break-words text-micro text-ink-3 sm:hidden">
             <span className="font-semibold">Stocks left:</span> {formatUnitCount(item.stock, "Not reported")}
           </p>
         )}
+        <p className="mt-1 hidden text-meta text-ink-3 sm:block">{item.description}</p>
         {/* Variants of one product differ by refill and order bounds, so a phone
-            needs that line as much as a desktop does. */}
-        {item.detail && <p className="mt-0.5 truncate text-micro text-ink-3 sm:hidden">{item.detail}</p>}
-        <p className="mt-1 hidden text-meta text-ink-3 sm:block">{item.description} · <span className="capitalize">{item.tag}</span></p>
-        <p className="mt-3 hidden text-micro leading-relaxed text-ink-3 sm:block">{item.detail ?? coverage}</p>
+            needs that line as much as a desktop does — one node, not two. */}
+        <p className="mt-0.5 break-words text-micro leading-relaxed text-ink-3 sm:mt-3">{item.detail ?? coverage}</p>
       </div>
-      <div className="shrink-0 sm:mt-auto sm:w-full sm:pt-3">
-        <p className="hidden min-h-[1.2rem] text-meta font-semibold text-ink sm:block">{priceLine}</p>
+      <div className="w-full sm:mt-auto sm:pt-3">
         <div className="hidden sm:mt-2 sm:block"><UnitsStatus stock={item.stock} owned={item.myUnits} /></div>
         {action ? (
           <Link
             href={action.href}
             aria-label={action.label}
-            className="grid h-11 w-11 place-items-center rounded-xl border border-lav-200 bg-lav-50 text-lav-800 transition-colors hover:border-lav-400 hover:bg-lav-100 sm:mt-3 sm:flex sm:h-auto sm:min-h-10 sm:w-full sm:justify-center sm:gap-1.5 sm:px-3 sm:py-2 sm:text-center sm:text-meta sm:font-semibold"
+            className="flex min-h-11 w-full items-center justify-center rounded-xl border border-lav-200 bg-lav-50 px-2.5 py-2 text-center text-micro font-semibold leading-snug text-lav-800 [overflow-wrap:anywhere] transition-colors hover:border-lav-400 hover:bg-lav-100 sm:mt-3 sm:min-h-10 sm:w-full sm:px-3 sm:text-meta"
           >
-            <span className="hidden sm:inline">{action.label}</span>
-            <ArrowRight className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+            <span>{action.label}</span>
+
           </Link>
         ) : (
           <button
@@ -268,10 +159,10 @@ export function ServiceCard({ item, countryName }: { item: ExplorerItem; country
             disabled
             aria-label={noAction}
             title={noAction}
-            className="grid h-11 w-11 place-items-center rounded-xl border border-line bg-cream/60 text-ink-3/80 disabled:cursor-not-allowed sm:mt-3 sm:flex sm:h-auto sm:min-h-10 sm:w-full sm:justify-center sm:px-3 sm:py-2 sm:text-meta sm:font-semibold"
+            className="flex min-h-11 w-full items-center justify-center rounded-xl border border-line bg-cream/60 px-2.5 py-2 text-center text-micro font-semibold leading-snug text-ink-3 [overflow-wrap:anywhere] disabled:cursor-not-allowed sm:mt-3 sm:min-h-10 sm:w-full sm:px-3 sm:text-meta"
           >
-            <span className="hidden sm:inline">{noAction}</span>
-            <Lock className="h-3.5 w-3.5" />
+            <span>{noAction}</span>
+
           </button>
         )}
       </div>
@@ -364,10 +255,9 @@ function NumberAppOffers({
                 <button type="button" aria-expanded={open} aria-controls={open ? panelId : undefined}
                   onClick={() => setOpenGroups((current) => new Map(current).set(group.key, !open))}
                   className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-cream/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-lav-400">
-                  <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-lav-50/70">{itemArt(group.items[0], "sm")}</span>
                   <span className="min-w-0 flex-1 break-words font-semibold text-ink">{group.name}</span>
                   <span className="shrink-0 text-micro text-ink-3">{group.items.length} {group.items.length === 1 ? "option" : "options"}</span>
-                  <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
+                  <span className="shrink-0 text-micro font-semibold text-lav-700">{open ? "Hide" : "Show"}</span>
                 </button>
               </h4>
               {open && <div id={panelId} className="border-t border-line p-2.5">
@@ -401,7 +291,7 @@ function writeSelection(country: string, category: ExplorerFilter) {
  * What the live catalogue request did, in the customer's terms.
  *
  * The three "not live" cases are deliberately distinct: an environment with
- * live listings switched off and a deployment with no supplier connected are
+ * live listings switched off and a deployment with no live integration are
  * both steady states, so they must not read as breakage or offer a Retry that
  * cannot change the answer. Only `error` and `throttled` are worth retrying.
  */
@@ -550,7 +440,7 @@ export function ServiceExplorer({
     return quickSelection ? matches.filter((item) => (item.source !== "live" || shortcutLiveIds.has(item.id)) && shortcutForExplorerItem(item)?.key === quickSelection.key) : matches;
   }, [items, category, search, tag, quickSelection, shortcutLiveIds]);
   /**
-   * Social promotion lists every offer the supplier sells, which is hundreds
+   * Social promotion lists every offer in the live catalogue, which is hundreds
    * rather than a handful. Grouping by platform keeps that navigable: each one
    * collapses to a header with its count and opens to its own paginated grid.
    * The server already orders by platform, so insertion order is the shelf order.
@@ -674,7 +564,7 @@ export function ServiceExplorer({
 
   const rejectedNotice = rejectedCountry || rejectedCategory ? (
     <p role="status" className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-meta leading-relaxed text-amber-900">
-      <Shield className="mt-0.5 h-4 w-4 shrink-0" />
+
       <span>
         That link asked for{rejectedCountry ? <> country <strong className="font-semibold">&ldquo;{truncate(rejectedCountry)}&rdquo;</strong></> : null}
         {rejectedCountry && rejectedCategory ? " and" : null}
@@ -709,7 +599,7 @@ export function ServiceExplorer({
           <h1 className="mt-1 text-[1.6rem] font-semibold leading-tight text-ink sm:text-[1.9rem]">{selectedCategory?.label ?? "Your service hub"}</h1>
           <p className="mt-1.5 max-w-2xl text-[0.8125rem] leading-relaxed text-ink-2">{selectedCategory ? `${selectedCategory.description}. Pick a country once, then browse the matched services.` : "Pick a country once and browse categories without redoing the choice every time."}</p>
         </div>
-        <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline">My orders <ArrowRight className="h-3.5 w-3.5" /></Link>
+        <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-meta font-semibold text-lav-700 hover:underline">My orders </Link>
       </div>
 
       {rejectedNotice}
@@ -718,7 +608,7 @@ export function ServiceExplorer({
         <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 h-48 w-48 rounded-full bg-lav-300/30 blur-3xl" />
         <div className="relative grid gap-3 md:grid-cols-[1fr_1.1fr] md:items-center md:gap-4">
           <div>
-            <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Globe className="h-3.5 w-3.5" /> Country</p>
+            <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"> Country</p>
             <h2 id="choose-country-title" className="mt-1.5 text-[1.125rem] font-semibold text-ink sm:mt-2 sm:text-[1.25rem]">Pick a country once.</h2>
             <p className="mt-1.5 max-w-sm text-meta leading-relaxed text-ink-2">Your selection is remembered on this device when browser storage is available.</p>
           </div>
@@ -730,7 +620,7 @@ export function ServiceExplorer({
 
       {!selectedCountry ? (
         <div className="rounded-[1.5rem] border border-dashed border-lav-200 bg-white/70 px-4 py-8 text-center sm:px-6 sm:py-10">
-          <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-lav-50 text-lav-700"><Globe className="h-5 w-5" /></span>
+
           <h2 className="mt-3 text-[1rem] font-semibold text-ink">Choose a country to explore</h2>
           <p className="mx-auto mt-1.5 max-w-md text-[0.8125rem] leading-relaxed text-ink-2">We&apos;ll show service categories and available listings after you make your selection.</p>
           <div className="mx-auto mt-5 grid max-w-xl grid-cols-2 gap-2 sm:mt-6 sm:grid-cols-3 sm:gap-3">
@@ -741,7 +631,6 @@ export function ServiceExplorer({
                 onClick={() => chooseCountry(c.code)}
                 className="flex flex-col items-center justify-center rounded-2xl border border-line bg-white p-3 transition-all hover:-translate-y-0.5 hover:border-lav-300 hover:shadow-xs sm:p-3.5"
               >
-                <CountryFlag code={c.code} size={28} decorative />
                 <span className="mt-2 text-[0.875rem] font-semibold text-ink">{c.name}</span>
                 <span className="mt-0.5 text-micro text-ink-3">{c.desc}</span>
               </button>
@@ -757,10 +646,10 @@ export function ServiceExplorer({
                 <h2 id="categories-title" className="mt-1 text-[1rem] font-semibold text-ink">Choose a category</h2>
               </div>
               <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-meta font-semibold text-ink-2">
-                <CountryFlag code={selectedCountry.code} size={18} decorative radius={9} /> {selectedCountry.name}
+                {selectedCountry.name}
               </span>
             </div>
-            {summary ? <p className="mt-1.5 text-meta text-ink-3">{summary}</p> : null}
+            {summary ? <p className="mt-1.5 text-meta text-ink-3">{summary} These labels describe configuration; check each listing for current availability.</p> : null}
             <div role="group" aria-label="Service categories" className="mt-3 space-y-4 sm:mt-4">
               <button
                 type="button"
@@ -768,10 +657,10 @@ export function ServiceExplorer({
                 aria-pressed={category === "all"}
                 className={`flex min-h-11 w-full items-center justify-between rounded-xl border px-3.5 py-2.5 text-left text-meta font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-lav-400 ${category === "all" ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}
               >
-                <span><span aria-hidden="true">⚡</span> All categories</span>
+                <span>All categories</span>
                 <span className="text-micro font-medium opacity-75">Browse everything</span>
               </button>
-              <div className="grid gap-3 lg:grid-cols-3 lg:gap-4">
+              <div className="grid gap-3 lg:grid-cols-2 lg:gap-4 xl:grid-cols-3">
                 {SERVICE_CATEGORY_GROUPS.map((group) => {
                   const groupEntries = orderedCategories.filter((entry) => group.categories.includes(entry.id));
                   return (
@@ -780,7 +669,10 @@ export function ServiceExplorer({
                         <h3 id={`category-group-${group.id}`} className="text-meta font-semibold text-ink">{group.label}</h3>
                         <p className="mt-0.5 text-micro leading-relaxed text-ink-3">{group.description}</p>
                       </div>
-                      <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 lg:grid-cols-1">
+                      {/* Each card needs enough room for its label and status.
+                          Two columns at typical phone widths squeezed the status
+                          into single letters; desktop groups need room too. */}
+                      <div className="grid grid-cols-1 gap-2 min-[520px]:grid-cols-2 lg:grid-cols-1">
                         {groupEntries.map((entry) => {
                           const state = readinessById.get(entry.id);
                           const selected = category === entry.id;
@@ -793,12 +685,10 @@ export function ServiceExplorer({
                               aria-pressed={selected}
                               className={`flex min-h-[88px] min-w-0 items-start gap-2.5 rounded-xl border p-2.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-lav-400 ${selected ? "border-lav-700 bg-lav-700 text-white" : "border-line bg-white text-ink hover:border-lav-300 hover:bg-lav-50/60"}`}
                             >
-                              <span aria-hidden="true" className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-base ${selected ? "bg-white/15" : "bg-lav-50"}`}>{CATEGORY_ICONS[entry.id] ?? "✨"}</span>
                               <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
                                 <span className="w-full break-words text-meta font-semibold leading-snug">{entry.label}</span>
                                 <span className={`line-clamp-2 text-micro leading-snug ${selected ? "text-white/80" : "text-ink-3"}`}>{entry.description}</span>
                                 {state && <span className={`mt-0.5 inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-0.5 text-micro font-semibold leading-tight ${selected ? "bg-white/15 text-white" : "bg-cream text-ink-2"}`}>
-                                  <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${selected ? "bg-current" : SERVICE_STATE_DOT[state.state]}`} />
                                   <span className="break-words">{SERVICE_STATE_LABEL[state.state]}</span>
                                 </span>}
                               </span>
@@ -813,7 +703,6 @@ export function ServiceExplorer({
             </div>
             {selectedReadiness && selectedReadiness.state !== "buy" && selectedReadiness.state !== "free" ? (
               <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-line bg-white px-3.5 py-2.5 text-meta text-ink-2">
-                <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${SERVICE_STATE_DOT[selectedReadiness.state]}`} />
                 <span className="min-w-0 flex-1">
                   <strong className="font-semibold text-ink">{SERVICE_STATE_LABEL[selectedReadiness.state]}.</strong>{" "}
                   {selectedReadiness.detail}
@@ -829,16 +718,16 @@ export function ServiceExplorer({
           </section>
 
           <div role="note" className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-meta leading-relaxed border-amber-200 bg-amber-50/70 text-amber-900`}>
-            <Shield className="mt-0.5 h-4 w-4 shrink-0" />
+
             {verificationPending || numberAppsPending || liveState?.loading ? <p><strong>Checking live availability.</strong> Results will appear as soon as the catalogue responds.</p>
               : numberAppsUnconfirmed && !liveState?.reason ? <p><strong>App availability is not confirmed.</strong> General plans and rentals can still be browsed below. <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>
-              : liveState?.country === country && liveState.live && liveState.reason !== "funding" && !liveState.partial && !liveState.failed && !numberAppsUnconfirmed ? <p><strong>Live listings are current.</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. <Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).lead}</strong>{" "}{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).rest} <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
+              : liveState?.country === country && liveState.live && liveState.reason !== "funding" && !liveState.partial && !liveState.failed && !numberAppsUnconfirmed ? <p><strong>Live listings loaded.</strong> Available listings, catalog plans and tools are labelled separately. Prices and coverage can change. <Link href="/dashboard/esim" className="font-semibold underline underline-offset-2">Check current eSIM plans</Link> or <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">view existing orders</Link>.</p> : <p><strong>{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).lead}</strong>{" "}{liveUnavailableCopy(liveState?.country === country ? liveState.reason : null).rest} <Link href="/dashboard/orders" className="font-semibold underline underline-offset-2">View existing orders</Link>.</p>}
           </div>
 
           <section aria-labelledby="services-title" aria-busy={verificationPending || numberAppsPending || undefined} className="rounded-[1.5rem] border border-line bg-[#fffdfa] p-3.5 sm:p-6">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"><Sparkle className="h-3.5 w-3.5" /> Step 03</p>
+                <p className="inline-flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.16em] text-lav-700"> Step 03</p>
                 <h2 id="services-title" className="mt-1 text-[1rem] font-semibold text-ink">{selectedCategory ? `Explore ${selectedCategory.label}` : "Explore services"}</h2>
                 <p aria-live="polite" className="mt-1 text-meta text-ink-3">
                   {verificationPending && filtered.length === 0 ? "Loading app verification listings…"
@@ -847,11 +736,11 @@ export function ServiceExplorer({
                     : <>{filtered.length} {`listing${filtered.length === 1 ? "" : "s"}`}{verificationPending ? " so far" : ""}</>}
                   {" · "}{selectedCountry.name} selected
                 </p>
-                {liveState?.country === country && liveState.fetchedAt && <p className="mt-1 text-micro text-ink-3">Stock checked: <time dateTime={liveState.fetchedAt}>{new Date(liveState.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
+                {liveState?.country === country && liveState.fetchedAt && <p className="mt-1 text-micro text-ink-3">Catalogue checked: <time dateTime={liveState.fetchedAt}>{new Date(liveState.fetchedAt).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time></p>}
               </div>
               <div className="relative w-full sm:max-w-[260px]">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
-                <input type="search" value={search} onChange={(event) => { setQuickSelection(null); setSearch(event.target.value); setVisible(PAGE_SIZE); }} aria-label="Search services" placeholder="Search services or platforms" className="min-h-11 w-full rounded-xl border border-line bg-white py-2 pl-9 pr-3 text-meta text-ink outline-none placeholder:text-ink-3 focus:border-lav-400 focus:ring-4 focus:ring-lav-100" />
+
+                <input type="search" value={search} onChange={(event) => { setQuickSelection(null); setSearch(event.target.value); setVisible(PAGE_SIZE); }} aria-label="Search services" placeholder="Search services or platforms" className="min-h-11 w-full rounded-xl border border-line bg-white py-2 px-3 text-meta text-ink outline-none placeholder:text-ink-3 focus:border-lav-400 focus:ring-4 focus:ring-lav-100" />
               </div>
             </div>
 
@@ -895,7 +784,7 @@ export function ServiceExplorer({
             </div>}
 
             {tags.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-1.5 border-t border-line pt-4" aria-label="Service types">
+              <div className="mt-4 flex flex-wrap gap-1.5 border-t border-line pt-4" role="group" aria-label="Service types">
                 <button type="button" onClick={() => { setTag("all"); setVisible(PAGE_SIZE); }} aria-pressed={tag === "all"} className={`rounded-lg px-2.5 py-1.5 text-micro font-semibold ${tag === "all" ? "bg-lav-100 text-lav-800" : "text-ink-3 hover:bg-cream"}`}>All types</button>
                 {tags.map((type) => <button key={type} type="button" onClick={() => { if (category === "numbers" && quickSelection && type !== "Single use") clearQuickSelection(); setTag(type); setVisible(PAGE_SIZE); }} aria-pressed={tag === type} className={`rounded-lg px-2.5 py-1.5 text-micro font-semibold ${tag === type ? "bg-lav-100 text-lav-800" : "text-ink-3 hover:bg-cream"}`}>{type}</button>)}
               </div>
@@ -946,15 +835,11 @@ export function ServiceExplorer({
                           aria-controls={open ? panelId : undefined}
                           className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-cream/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-lav-400"
                         >
-                          <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-lav-50/70">
-                            {itemArt(group.items[0], "sm")}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-[0.9375rem] font-semibold text-ink">{group.platform}</span>
+                          <span className="min-w-0 flex-1 break-words text-[0.9375rem] font-semibold text-ink">{group.platform}</span>
                           <span className="shrink-0 rounded-full bg-cream px-2 py-0.5 text-micro font-semibold text-ink-2">
-                            {group.items.length}
-                            <span className="sr-only"> {group.items.length === 1 ? "listing" : "listings"}</span>
+                            {group.items.length} {group.items.length === 1 ? "listing" : "listings"}
                           </span>
-                          <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
+                          <span className="shrink-0 text-micro font-semibold text-lav-700">{open ? "Hide" : "Show"}</span>
                         </button>
                       </h3>
                       {open && (

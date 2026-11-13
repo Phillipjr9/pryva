@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Plus, Wallet } from "@/components/icons";
+
 import { formatNaira } from "@/lib/services/catalog";
 import styles from "./BalanceHero.module.css";
 
@@ -26,7 +26,7 @@ export function BalanceHero({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="flex items-center gap-1.5 text-micro font-semibold uppercase tracking-[0.16em] text-white/75">
-              <Wallet className="h-3.5 w-3.5 shrink-0" /> Available to spend
+               Available to spend
             </p>
             <h1
               id="balance-heading"
@@ -44,13 +44,13 @@ export function BalanceHero({
               href="/dashboard/wallet"
               className="btn min-w-max flex-1 whitespace-nowrap bg-white !px-4 !py-2.5 !text-[0.8125rem] font-semibold text-ink shadow-sm hover:bg-white/90 sm:flex-none"
             >
-              <Plus className="h-3.5 w-3.5 shrink-0" /> Top up
+               Top up
             </Link>
             <Link
               href="/dashboard/wallet#withdraw"
               className="btn min-w-max flex-1 whitespace-nowrap border border-white/30 !px-4 !py-2.5 !text-[0.8125rem] font-semibold text-white hover:bg-white/10 sm:flex-none"
             >
-              <ArrowUpRight className="h-3.5 w-3.5 shrink-0" /> Withdraw
+               Withdraw
             </Link>
           </div>
         </div>
@@ -72,7 +72,7 @@ export function BalanceHero({
             href="/dashboard/wallet"
             className="inline-flex items-center gap-1 text-meta font-semibold text-white/80 hover:text-white"
           >
-            Full wallet and statement <ArrowRight className="h-3 w-3" />
+            Full wallet and statement
           </Link>
         </div>
       </div>

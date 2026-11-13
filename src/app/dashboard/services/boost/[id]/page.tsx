@@ -5,7 +5,6 @@ import { requireUser } from "@/lib/identity/auth";
 import { findBoostListing } from "@/lib/services/boosts/smm-catalog";
 import { isSmmPanelConfigured } from "@/lib/providers/smm-panel";
 import { formatNaira } from "@/lib/services/catalog";
-import { BrandIcon } from "@/components/BrandIcon";
 import { BoostPurchaseForm } from "./BoostPurchaseForm";
 
 export const metadata: Metadata = { title: "Buy a boost" };
@@ -43,9 +42,6 @@ export default async function BoostPage({ params }: { params: Promise<{ id: stri
       <div>
         <p className="text-meta font-semibold uppercase tracking-[0.14em] text-lav-700">Social promotion</p>
         <h1 className="mt-2 flex items-center gap-2.5 text-[1.6rem] font-semibold text-ink">
-          {listing.artwork.kind === "brand" && (
-            <BrandIcon brand={listing.artwork.name} size={28} variant="tile" decorative />
-          )}
           {listing.name}
         </h1>
         <p className="mt-1 text-[0.8125rem] text-ink-2">

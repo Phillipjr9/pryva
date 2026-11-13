@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowRight } from "@/components/icons";
+
 
 export type ReviewableOrder = {
   id: string;
@@ -169,7 +169,7 @@ export function ReviewForm({ orders }: { orders: ReviewableOrder[] }) {
           className="btn btn-primary btn-sm"
         >
           {pending ? "Submitting…" : "Submit for review"}
-          {!pending && <ArrowRight className="h-3.5 w-3.5" />}
+
         </button>
         <span className="text-meta text-ink-3">
           Published only after an operator checks it. Never edited by us.

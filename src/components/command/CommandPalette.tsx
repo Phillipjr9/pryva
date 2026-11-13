@@ -3,30 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatNaira } from "@/lib/services/catalog";
-import {
-  BarChart3,
-  Bell,
-  Calendar,
-  Chat,
-  Gift,
-  Grid,
-  Home,
-  Receipt,
-  Search,
-  Settings,
-  Shield,
-  ShoppingCart,
-  Sparkle,
-  Wallet,
-} from "@/components/icons";
-
-type Icon = React.ComponentType<{ className?: string }>;
 
 interface Command {
   id: string;
   label: string;
   hint?: string;
-  icon: Icon;
   group: "Navigate" | "Manage" | "Orders" | "Gift cards" | "Wallet activity";
   href: string;
 }
@@ -37,22 +18,22 @@ interface CommandPaletteProps {
 }
 
 const COMMANDS: Command[] = [
-  { id: "dashboard", label: "Dashboard overview", icon: BarChart3, group: "Navigate", href: "/dashboard" },
-  { id: "services", label: "Explore services", icon: Sparkle, group: "Navigate", href: "/dashboard/services" },
-  { id: "orders", label: "Orders", icon: Receipt, group: "Navigate", href: "/dashboard/orders" },
-  { id: "wallet", label: "Wallet", icon: Wallet, group: "Navigate", href: "/dashboard/wallet" },
-  { id: "accounts", label: "Digital accounts", icon: ShoppingCart, group: "Navigate", href: "/dashboard/accounts" },
-  { id: "digital", label: "Subscriptions", icon: Grid, group: "Navigate", href: "/dashboard/services?category=subscriptions" },
-  { id: "data", label: "Data plans", icon: Grid, group: "Navigate", href: "/dashboard/data" },
-  { id: "gift-cards", label: "Gift cards", icon: Gift, group: "Navigate", href: "/dashboard/services?category=gift-cards" },
-  { id: "pryva-gift-cards", label: "Pryva gift cards", icon: Gift, group: "Manage", href: "/dashboard/gift-cards" },
-  { id: "bulk", label: "Bulk orders", icon: ShoppingCart, group: "Navigate", href: "/dashboard/bulk-orders" },
-  { id: "scheduled", label: "Scheduled orders", icon: Calendar, group: "Navigate", href: "/dashboard/scheduled" },
-  { id: "notifications", label: "Notifications", icon: Bell, group: "Manage", href: "/dashboard/notifications" },
-  { id: "security", label: "Security settings", icon: Shield, group: "Manage", href: "/dashboard/settings#security" },
-  { id: "settings", label: "Settings", icon: Settings, group: "Manage", href: "/dashboard/settings" },
-  { id: "support", label: "Support", icon: Chat, group: "Manage", href: "/dashboard/support" },
-  { id: "home", label: "Marketing site", icon: Home, group: "Manage", href: "/" },
+  { id: "dashboard", label: "Dashboard overview", group: "Navigate", href: "/dashboard" },
+  { id: "services", label: "Explore services", group: "Navigate", href: "/dashboard/services" },
+  { id: "orders", label: "Orders", group: "Navigate", href: "/dashboard/orders" },
+  { id: "wallet", label: "Wallet", group: "Navigate", href: "/dashboard/wallet" },
+  { id: "accounts", label: "Digital accounts", group: "Navigate", href: "/dashboard/accounts" },
+  { id: "digital", label: "Subscriptions", group: "Navigate", href: "/dashboard/services?category=subscriptions" },
+  { id: "data", label: "Data plans", group: "Navigate", href: "/dashboard/data" },
+  { id: "gift-cards", label: "Gift cards", group: "Navigate", href: "/dashboard/services?category=gift-cards" },
+  { id: "pryva-gift-cards", label: "Pryva gift cards", group: "Manage", href: "/dashboard/gift-cards" },
+  { id: "bulk", label: "Bulk orders", group: "Navigate", href: "/dashboard/bulk-orders" },
+  { id: "scheduled", label: "Scheduled orders", group: "Navigate", href: "/dashboard/scheduled" },
+  { id: "notifications", label: "Notifications", group: "Manage", href: "/dashboard/notifications" },
+  { id: "security", label: "Security settings", group: "Manage", href: "/dashboard/settings#security" },
+  { id: "settings", label: "Settings", group: "Manage", href: "/dashboard/settings" },
+  { id: "support", label: "Support", group: "Manage", href: "/dashboard/support" },
+  { id: "home", label: "Marketing site", group: "Manage", href: "/" },
 ];
 
 type Row = {
@@ -60,7 +41,6 @@ type Row = {
   label: string;
   hint: string;
   group: Command["group"];
-  icon: Icon;
   href: string;
 };
 
@@ -81,6 +61,43 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const [active, setActive] = useState(0);
   const requestId = useRef(0);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    searchRef.current?.focus();
+
+    function containFocus(event: KeyboardEvent) {
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ));
+      if (!focusable.length) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !dialogRef.current.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !dialogRef.current.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", containFocus);
+    return () => {
+      document.removeEventListener("keydown", containFocus);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [isOpen]);
 
   const matches = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -140,7 +157,6 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           label: order.productName,
           hint: `${order.reference} · ${formatNaira(order.amount)} · ${order.status}`,
           group: "Orders" as const,
-          icon: Receipt,
           href: `/dashboard/orders/${order.id}`,
         })),
         ...(data.results.giftCards ?? []).map((card) => ({
@@ -148,7 +164,6 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           label: `Gift card ${card.code.slice(0, 4)}…`,
           hint: `${formatNaira(card.amount)} · ${card.status}`,
           group: "Gift cards" as const,
-          icon: Gift,
           href: "/dashboard/gift-cards",
         })),
         ...(data.results.transactions ?? []).map((transaction) => ({
@@ -156,7 +171,6 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           label: transaction.description,
           hint: `${transaction.type} · ${formatNaira(transaction.amount)} · ${transaction.reference}`,
           group: "Wallet activity" as const,
-          icon: Wallet,
           href: "/dashboard/wallet",
         })),
       ];
@@ -212,7 +226,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         setActive(event.key === "Home" ? 0 : Math.max(0, matches.length - 1));
         return;
       }
-      if (event.key === "Enter") {
+      if (event.key === "Enter" && event.target === searchRef.current) {
         event.preventDefault();
         const entry = matches[Math.min(active, Math.max(0, matches.length - 1))];
         if (entry) go(entry);
@@ -234,20 +248,22 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/50 p-4 pt-[16vh] backdrop-blur-sm sm:pt-[20vh]"
+      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/50 p-4 pt-[16dvh] backdrop-blur-sm sm:pt-[20dvh]"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Dashboard search and commands"
-        className="w-full max-w-2xl overflow-hidden rounded-2xl border border-line bg-white shadow-[var(--shadow-float)]"
+        tabIndex={-1}
+        className="flex max-h-[calc(84dvh-1rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-[var(--shadow-float)] sm:max-h-[calc(80dvh-1rem)]"
       >
-        <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-          <Search className="h-5 w-5 shrink-0 text-ink-2" />
+        <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-2">
           <input
+            ref={searchRef}
             type="search"
             value={search}
             onChange={(event) => {
@@ -257,14 +273,18 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             placeholder="Search orders, transactions, gift cards or jump to a page…"
             aria-label="Search the dashboard"
             className="min-w-0 flex-1 bg-transparent text-[0.9375rem] text-ink outline-none placeholder:text-ink-3"
-            autoFocus
           />
-          <kbd className="hidden rounded border border-line bg-cream px-2 py-0.5 text-meta font-medium text-ink-2 sm:block">
-            ESC
-          </kbd>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close dashboard search"
+            className="inline-flex min-h-11 shrink-0 items-center rounded-xl border border-line px-3 text-meta font-semibold text-ink-2 hover:bg-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lav-500"
+          >
+            Close
+          </button>
         </div>
 
-        <div ref={listRef} className="max-h-[min(26rem,60vh)] overflow-y-auto p-2" role="listbox" aria-label="Results">
+        <div ref={listRef} className="min-h-0 max-h-[26rem] flex-1 overflow-y-auto overscroll-contain p-2" role="listbox" aria-label="Results">
           {searching && (
             <p className="px-4 py-3 text-[0.8125rem] text-ink-3" role="status">
               Searching your orders and wallet…
@@ -287,7 +307,6 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                 {group}
               </p>
               {entries.map(({ entry, position }) => {
-                const Icon = entry.icon;
                 const isActive = position === activeIndex;
                 return (
                   <button
@@ -302,16 +321,12 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                       isActive ? "bg-lav-50" : "hover:bg-cream"
                     }`}
                   >
-                    <Icon className="h-4 w-4 shrink-0 text-ink-2" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[0.875rem] font-medium text-ink">{entry.label}</span>
                       {entry.hint && (
                         <span className="block truncate text-meta text-ink-3">{entry.hint}</span>
                       )}
                     </span>
-                    {isActive && (
-                      <span className="shrink-0 text-micro font-semibold text-ink-3">↵</span>
-                    )}
                   </button>
                 );
               })}
@@ -319,8 +334,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           ))}
         </div>
 
-        <p className="border-t border-line px-4 py-2 text-micro text-ink-3">
-          ↑↓ to move · ↵ to open · esc to close
+        <p className="shrink-0 border-t border-line px-4 py-2 text-micro text-ink-3">
+          Use arrow keys to move, Enter to open and Escape to close.
         </p>
       </div>
     </div>
@@ -341,28 +356,13 @@ export function CommandPaletteTrigger({ onClick }: { onClick: () => void }) {
   }, [onClick]);
 
   return (
-    <>
-      {/* Icon-only below lg: the full pill never fitted next to the balance and
-          notifications, which left phones and tablets with no way to search. */}
-      <button
-        type="button"
-        onClick={onClick}
-        aria-label="Search the dashboard"
-        className="grid h-9 w-9 place-items-center rounded-full border border-line bg-white/70 text-ink-2 transition-colors hover:bg-white lg:hidden"
-      >
-        <Search className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        onClick={onClick}
-        className="hidden items-center gap-2 rounded-full border border-line bg-white/70 px-3.5 py-2 text-[0.8125rem] font-medium text-ink-2 transition-colors hover:bg-white lg:flex"
-      >
-        <Search className="h-4 w-4" />
-        <span>Search…</span>
-        <kbd className="rounded border border-line bg-cream px-1.5 py-0.5 text-micro font-semibold text-ink-3">
-          ⌘K
-        </kbd>
-      </button>
-    </>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Search the dashboard"
+      className="inline-flex min-h-9 items-center rounded-full border border-line bg-white/70 px-3 py-2 text-meta font-semibold text-ink-2 transition-colors hover:bg-white"
+    >
+      Search
+    </button>
   );
 }

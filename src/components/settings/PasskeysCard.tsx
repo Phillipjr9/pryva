@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { AlertCircle, CheckCircle, Loader2, Lock, Trash2 } from "@/components/icons";
+
 import type { CredentialSummary } from "@/lib/identity/passkeys";
 import {
   encodeCreationOptions,
@@ -126,7 +126,7 @@ export function PasskeysCard({ passkeys, available }: Props) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-ink">
-            <Lock className="h-4 w-4 text-lav-600" /> Passkeys
+             Passkeys
           </p>
           <p className="mt-1 text-meta leading-relaxed text-ink-2">
             Sign in with your fingerprint, face or device PIN instead of typing a password. The key stays on
@@ -172,9 +172,9 @@ export function PasskeysCard({ passkeys, available }: Props) {
                 onClick={() => void removePasskey(passkey.id, passkey.label)}
                 disabled={pending !== null}
                 aria-label={`Remove ${passkey.label}`}
-                className="shrink-0 rounded-lg border border-line px-2 py-1.5 text-ink-2 hover:border-rose-300 hover:text-rose-700 disabled:opacity-50"
+                className="min-h-11 shrink-0 rounded-lg border border-line px-3 py-2 text-meta font-semibold text-ink-2 hover:border-rose-300 hover:text-rose-700 disabled:opacity-50"
               >
-                {pending === passkey.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                {pending === passkey.id ? "Removing…" : "Remove"}
               </button>
             </li>
           ))}
@@ -183,12 +183,12 @@ export function PasskeysCard({ passkeys, available }: Props) {
 
       {error ? (
         <p role="alert" className="mt-3 flex items-start gap-1.5 text-meta font-medium text-rose-700">
-          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {error}
+           {error}
         </p>
       ) : null}
       {notice ? (
         <p role="status" className="mt-3 flex items-start gap-1.5 text-meta font-medium text-emerald-700">
-          <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {notice}
+           {notice}
         </p>
       ) : null}
 
@@ -199,7 +199,7 @@ export function PasskeysCard({ passkeys, available }: Props) {
           disabled={pending !== null}
           className="mt-3 inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-[0.8125rem] font-semibold text-white hover:bg-ink-2 disabled:opacity-50"
         >
-          {pending === "add" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+
           {pending === "add" ? "Waiting for your device…" : "Add a passkey"}
         </button>
       ) : (

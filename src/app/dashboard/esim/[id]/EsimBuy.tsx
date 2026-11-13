@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { ArrowRight, Lock } from "@/components/icons";
+
 import { formatNaira } from "@/lib/services/catalog";
 
 /**
@@ -166,10 +166,10 @@ export function EsimBuy({
         className="inline-flex items-center justify-center gap-2 rounded-xl bg-lav-700 px-5 py-3 text-[0.9375rem] font-semibold text-white transition-colors hover:bg-lav-800 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {pending ? "Buying…" : `Buy ${name} · ${formatNaira(price)}`}
-        {pending ? null : <ArrowRight className="h-4 w-4" />}
+
       </button>
       <p className="flex items-center gap-1.5 text-micro text-ink-3">
-        <Lock className="h-3 w-3" aria-hidden="true" /> Charged from your wallet once the profile is issued.
+         Charged from your wallet once the profile is issued.
       </p>
     </div>
   );

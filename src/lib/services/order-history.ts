@@ -42,8 +42,24 @@ export type OrderHistoryRow = {
   status: string;
   otpCode: string | null;
   expiresAt: Date | string | null;
+  refundedAt: Date | string | null;
   createdAt: Date | string;
 };
+
+/** The ECMAScript trim whitespace set, also passed to SQL when finding live codes. */
+export const CODE_TRIM_WHITESPACE = "\u0009\u000a\u000b\u000c\u000d\u0020\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff";
+
+/** A displayed code is only live while its recorded window and order permit it. */
+export function hasLiveOrderCode(
+  order: Pick<OrderHistoryRow, "status" | "otpCode" | "expiresAt" | "refundedAt">,
+  now: number,
+): boolean {
+  if ((order.status !== "active" && order.status !== "delivered") || order.refundedAt || !order.otpCode?.trim() || !order.expiresAt) {
+    return false;
+  }
+  const expiry = new Date(order.expiresAt).getTime();
+  return Number.isFinite(expiry) && expiry > now;
+}
 
 export type OrderHistoryPage = {
   /** The orders to list: filtered, searched, newest first, at most one page. */
@@ -73,6 +89,7 @@ const LISTED_COLUMNS = {
   status: orders.status,
   otpCode: orders.otpCode,
   expiresAt: orders.expiresAt,
+  refundedAt: orders.refundedAt,
   createdAt: orders.createdAt,
 };
 
@@ -108,7 +125,7 @@ async function readPreviewHistory(
     .select(LISTED_COLUMNS)
     .from(orders)
     .where(eq(orders.userId, userId))
-    .orderBy(desc(orders.createdAt))) as OrderHistoryRow[];
+    .orderBy(desc(orders.createdAt), desc(orders.id))) as OrderHistoryRow[];
 
   const lowered = needle.toLowerCase();
   const matches = everything.filter((order) => {

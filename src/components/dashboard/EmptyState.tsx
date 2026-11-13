@@ -1,6 +1,4 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { ArrowRight } from "@/components/icons";
 
 /**
  * One empty state for the whole dashboard. Before this, each page invented its
@@ -8,14 +6,12 @@ import { ArrowRight } from "@/components/icons";
  * Wallet page looked like different products.
  */
 export function EmptyState({
-  icon: Icon,
   title,
   body,
   action,
   secondary,
   className = "",
 }: {
-  icon: (props: { className?: string }) => ReactNode;
   title: string;
   body: string;
   /**
@@ -31,10 +27,7 @@ export function EmptyState({
     <div
       className={`rounded-[1.5rem] border border-dashed border-line bg-[#fffdfa] px-6 py-9 text-center ${className}`}
     >
-      <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-lav-50 text-lav-700">
-        <Icon className="h-5 w-5" />
-      </span>
-      <p className="mt-3.5 text-[1rem] font-semibold text-ink">{title}</p>
+      <p className="text-[1rem] font-semibold text-ink">{title}</p>
       <p className="mx-auto mt-1.5 max-w-sm text-[0.8125rem] leading-relaxed text-ink-2">{body}</p>
       {(action || secondary) && (
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
@@ -45,7 +38,6 @@ export function EmptyState({
               className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.8125rem]"
             >
               {action.label}
-              <ArrowRight className="h-3.5 w-3.5" />
             </button>
           ) : (
             <Link
@@ -53,7 +45,6 @@ export function EmptyState({
               className="btn btn-primary !px-4 !py-2.5 !text-[0.8125rem] sm:!text-[0.8125rem]"
             >
               {action.label}
-              <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           ))}
           {secondary && (

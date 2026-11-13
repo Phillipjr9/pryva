@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/identity/auth";
 import { SupportStatusPill } from "@/components/support/SupportStatusPill";
 import { SupportChat, type ChatMessage } from "@/components/support/SupportChat";
 import { getThread, getTicketForUser } from "@/lib/support/support-tickets";
-import { AlertCircle, ArrowLeft } from "@/components/icons";
+
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +37,7 @@ export default async function SupportThreadPage({ params }: { params: Promise<{ 
           href="/dashboard/support"
           className="inline-flex items-center gap-1.5 text-meta text-ink-3 hover:text-lav-700"
         >
-          <ArrowLeft className="h-3.5 w-3.5" /> All conversations
+           All conversations
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <h1 className="min-w-0 text-[1.35rem] font-medium tracking-tight text-ink sm:text-[1.5rem]">
@@ -49,7 +49,7 @@ export default async function SupportThreadPage({ params }: { params: Promise<{ 
 
       {escalated ? (
         <div className="flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50/60 p-4">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+
           <p className="text-meta leading-relaxed text-rose-900">
             This is with a person now. Everything the assistant already checked is attached to the thread, so you
             will not be asked to explain it again. Replies appear here.
@@ -64,6 +64,7 @@ export default async function SupportThreadPage({ params }: { params: Promise<{ 
         reply looked like nothing happening at all.
       */}
       <SupportChat
+        textOnly
         ticketId={ticket.id}
         closed={ticket.status === "closed"}
         escalated={escalated}

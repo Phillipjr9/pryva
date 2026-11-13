@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { AlertTriangle, CheckCircle, Loader2, Logout, Shield, Trash2, XCircle } from "@/components/icons";
+
 import { DELETION_TERMS, forfeitureWarning } from "@/lib/identity/account-deletion";
 
 /**
@@ -115,9 +115,7 @@ export function DangerZone({
     return (
       <section className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50/50 p-5" aria-live="polite">
         <div className="flex items-start gap-2.5">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-700">
-            <CheckCircle className="h-4 w-4" />
-          </span>
+
           <div>
             <h2 className="text-[0.9375rem] font-semibold text-emerald-900">Your account is closed</h2>
             <p className="mt-1 text-meta leading-relaxed text-emerald-900/80">
@@ -153,7 +151,7 @@ export function DangerZone({
               href="/"
               className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-ink px-4 py-2 text-[0.8125rem] font-semibold text-white hover:bg-ink-2"
             >
-              <Logout className="h-3.5 w-3.5" /> Leave
+               Leave
             </Link>
           </div>
         </div>
@@ -164,9 +162,7 @@ export function DangerZone({
   return (
     <section id="close-account" className="rounded-[1.5rem] border border-rose-200 bg-rose-50/30 p-5">
       <div className="flex items-start gap-2.5">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-100 text-rose-700">
-          <AlertTriangle className="h-4 w-4" />
-        </span>
+
         <div className="min-w-0">
           <h2 className="text-[0.9375rem] font-semibold">Close my account</h2>
           <p className="mt-0.5 text-meta leading-relaxed text-ink-2">
@@ -183,14 +179,14 @@ export function DangerZone({
           onClick={() => setOpen(true)}
           className="btn mt-3.5 w-fit border border-rose-300 bg-white !px-4 !py-2.5 !text-[0.8125rem] text-rose-800 hover:border-rose-400"
         >
-          <Trash2 className="h-3.5 w-3.5" /> Show me what happens
+           Show me what happens
         </button>
       ) : (
         <div className="mt-4 grid gap-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-line bg-white p-3.5">
               <p className="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink">
-                <XCircle className="h-3.5 w-3.5 text-rose-600" /> Removed
+                 Removed
               </p>
               <ul className="mt-2 grid gap-1.5 text-meta text-ink-2">
                 {DELETION_TERMS.removed.map((item) => (
@@ -206,7 +202,7 @@ export function DangerZone({
 
             <div className="rounded-xl border border-line bg-white p-3.5">
               <p className="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink">
-                <Shield className="h-3.5 w-3.5 text-emerald-600" /> Records kept
+                 Records kept
               </p>
               <ul className="mt-2 grid gap-2 text-meta text-ink-2">
                 {DELETION_TERMS.kept.map((item) => (
@@ -226,7 +222,7 @@ export function DangerZone({
           {forfeiture ? (
             <div className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-meta leading-relaxed text-amber-900">
               <p className="flex items-start gap-2">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+
                 <span>
                   <span className="font-semibold">You will lose ₦{forfeiture.amount.toLocaleString()}.</span>{" "}
                   Closing your account forfeits the balance in it — it is not refunded, cannot be withdrawn
@@ -322,11 +318,11 @@ export function DangerZone({
             >
               {busy ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Closing…
+                   Closing…
                 </>
               ) : (
                 <>
-                  <Trash2 className="h-3.5 w-3.5" /> Delete my account permanently
+                   Delete my account permanently
                 </>
               )}
             </button>

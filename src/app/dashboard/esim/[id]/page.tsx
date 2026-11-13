@@ -5,8 +5,6 @@ import { notFound } from "next/navigation";
 import { esimOfferTerms, findEsimOffer, recheckEsimOffer } from "@/lib/services/esim/esim-catalog";
 import { requireUser } from "@/lib/identity/auth";
 import { formatNaira } from "@/lib/services/catalog";
-import { CountryFlag } from "@/components/CountryFlag";
-import { ServiceIcon } from "@/components/ServiceIcon";
 import { EsimBuy } from "./EsimBuy";
 import { classifyEsimUsage, ESIM_USAGE_LABELS } from "@/lib/services/esim/capabilities";
 
@@ -63,10 +61,8 @@ export default async function EsimPlanPage({ params }: { params: Promise<{ id: s
       </Link>
 
       <div className="flex items-start gap-3">
-        <ServiceIcon service="esim" size="lg" />
         <div className="min-w-0">
           <div className="inline-flex items-center gap-2 text-micro font-bold uppercase tracking-[0.16em] text-lav-700">
-            <CountryFlag region={offer.region} size={16} decorative radius={8} />
             <span>{offer.region}</span>
           </div>
           <h1 className="mt-1 text-[1.5rem] font-medium tracking-tight text-ink sm:text-[1.7rem]">{offer.name}</h1>
