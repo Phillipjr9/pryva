@@ -2,8 +2,8 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { foxreloadQuotes, orders, users, type Order } from "@/db/schema";
-import { debitWalletInTx, creditWalletInTx, InsufficientFundsError, makeReference } from "@/lib/payments/wallet";
+import { foxreloadQuotes, orders, users, walletReservations, type Order } from "@/db/schema";
+import { makeReference } from "@/lib/payments/wallet";
 import { scheduleWalletEmails } from "@/lib/email/schedule-wallet-emails";
 import { afterPurchase } from "@/lib/checkout/purchase";
 import { FOXRELOAD_PROVIDER } from "@/lib/services/order-providers";
@@ -11,10 +11,12 @@ import { createFoxreloadContractOrder, findFoxreloadOrderId, hasFoxreloadUsdFund
 import { decimalUnits } from "./contract";
 import { foxreloadRate } from "./exchange-rate";
 import { priceStars, prepareStarsProduct, TELEGRAM_STARS_PRODUCT, telegramUsername } from "./telegram-stars";
+import { holdForReview, linkReservationToOrder, releaseReservation, reserveWallet, settleReservation } from "@/lib/payments/reservations";
 
 const SERVICE = "subscriptions" as const;
 const SLUG = "telegram-stars";
 const QUOTE_MS = 2 * 60_000;
+const STAR_HOLD_TTL_MS = 2 * 60 * 60 * 1000;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type StarsResult =
@@ -87,27 +89,18 @@ export async function buyTelegramStars(input: { userId: string; quoteId: string;
   }
   const orderProduct = prepareStarsProduct(product);
   if (!orderProduct) return { kind: "error", code: "changed", message: "Product details changed. Get a new quote." };
-  // This balance is only a snapshot, not a supplier reservation. Fail closed
-  // on a known shortfall or an unreadable balance before creating a wallet debit.
   if (!await hasFoxreloadUsdFunds(quote.wholesaleTotal).catch(() => false)) return { kind: "error", code: "unavailable", message: "Stars are temporarily unavailable. Check your orders before trying again." };
   const reference = makeReference("STARS"), orderId = randomUUID();
+
+  // --- Claim order row first (idempotency) ---
   try {
-    await db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.userId}))`);
-      const [raced] = await tx.select().from(orders).where(and(eq(orders.userId, input.userId), eq(orders.requestId, requestId))).limit(1);
-      if (raced) throw new Replay(raced);
-      const [unresolved] = await tx.select({ reference: orders.reference }).from(orders).where(and(eq(orders.userId, input.userId), eq(orders.service, SERVICE), eq(orders.provider, FOXRELOAD_PROVIDER), eq(orders.productSlug, SLUG), inArray(orders.status, ["review", "processing"]), isNull(orders.refundedAt))).limit(1);
-      if (unresolved) throw new Pending(unresolved.reference);
-      await tx.insert(orders).values({ id: orderId, reference, userId: input.userId, requestId, requestIntent, service: SERVICE, productSlug: SLUG, productName: "Telegram Stars", planLabel: `${quote.quantity} Stars for @${username}`, quantity: quote.quantity, region: "Telegram", duration: "Digital delivery", amount: quote.amount, status: "review", provider: FOXRELOAD_PROVIDER, reconciliationNote: "Stars claimed; supplier order not yet started." });
-      const [consumed] = await tx.update(foxreloadQuotes).set({ orderId }).where(and(eq(foxreloadQuotes.id, quote.id), eq(foxreloadQuotes.userId, input.userId), isNull(foxreloadQuotes.orderId), gt(foxreloadQuotes.expiresAt, new Date()))).returning({ id: foxreloadQuotes.id });
-      if (!consumed) throw new Changed();
-      await debitWalletInTx(tx, { userId: input.userId, amount: quote.amount, type: "debit", description: `Telegram Stars · ${quote.quantity}`, orderId, reference });
-    });
+    const claimed = await db.insert(orders).values({ id: orderId, reference, userId: input.userId, requestId, requestIntent, service: SERVICE, productSlug: SLUG, productName: "Telegram Stars", planLabel: `${quote.quantity} Stars for @${username}`, quantity: quote.quantity, region: "Telegram", duration: "Digital delivery", amount: quote.amount, status: "review", provider: FOXRELOAD_PROVIDER, reconciliationNote: "Stars claimed; supplier order not yet started. Funds not yet held." }).onConflictDoNothing({ target: [orders.userId, orders.requestId] }).returning({ id: orders.id });
+    if (claimed.length === 0) {
+      const [winner] = await db.select().from(orders).where(and(eq(orders.userId, input.userId), eq(orders.requestId, requestId))).limit(1);
+      if (winner) return replay(winner, requestIntent);
+      return { kind: "error", code: "invalid", message: "This request belongs to a different purchase. Check your orders before retrying." };
+    }
   } catch (error) {
-    if (error instanceof Replay) return replay(error.order, requestIntent);
-    if (error instanceof Pending) return { kind: "error", code: "pending", message: "An earlier Stars purchase needs review before you can order again.", reference: error.reference };
-    if (error instanceof Changed) return { kind: "error", code: "changed", message: "This quote has expired or was used. Get a new quote." };
-    if (error instanceof InsufficientFundsError) return { kind: "error", code: "insufficient", message: "Insufficient wallet balance." };
     const code = (error as { code?: string; cause?: { code?: string } })?.code ?? (error as { cause?: { code?: string } })?.cause?.code;
     if (code === "23505") {
       const [winner] = await db.select().from(orders).where(and(eq(orders.userId, input.userId), eq(orders.requestId, requestId))).limit(1);
@@ -115,18 +108,54 @@ export async function buyTelegramStars(input: { userId: string; quoteId: string;
     }
     throw error;
   }
+
+  // --- Block second purchase while earlier is still review/processing ---
+  const [unresolved] = await db.select({ reference: orders.reference }).from(orders).where(and(eq(orders.userId, input.userId), eq(orders.service, SERVICE), eq(orders.provider, FOXRELOAD_PROVIDER), eq(orders.productSlug, SLUG), inArray(orders.status, ["review", "processing"]), isNull(orders.refundedAt), sql`${orders.id} != ${orderId}`)).limit(1);
+  if (unresolved) {
+    await db.update(orders).set({ status: "cancelled", reconciliationNote: "Another Stars purchase needs review before a new one can start; nothing was charged." }).where(and(eq(orders.id, orderId), eq(orders.status, "review"))).catch(()=>{});
+    return { kind: "error", code: "pending", message: "An earlier Stars purchase needs review before you can order again.", reference: unresolved.reference };
+  }
+
+  // --- Reserve funds atomically before any supplier call ---
+  const reservation = await reserveWallet({ userId: input.userId, requestId, service: SERVICE, amount: quote.amount, fingerprint: requestIntent, ttlMs: STAR_HOLD_TTL_MS });
+  if (reservation.kind !== "reserved") {
+    const reason = reservation.kind === "insufficient" ? "The wallet could not cover this Stars order when it was reserved; nothing was charged and no provider was contacted." : reservation.kind === "ineligible" ? "Account unavailable before the provider purchase; nothing was charged." : "This attempt key was already used with different details; nothing was charged.";
+    await db.update(orders).set({ status: "cancelled", reconciliationNote: reason }).where(and(eq(orders.id, orderId), eq(orders.status, "review"))).catch(()=>{});
+    if (reservation.kind === "insufficient") return { kind: "error", code: "insufficient", message: "Insufficient wallet balance." };
+    if (reservation.kind === "ineligible") return { kind: "error", code: "unavailable", message: "This account cannot start a purchase. Nothing was charged." };
+    if (reservation.kind === "conflict") return { kind: "error", code: "invalid", message: "This request belongs to a different purchase. Check your orders before retrying." };
+    // existing means replay — return winner
+    const [winner] = await db.select().from(orders).where(and(eq(orders.userId, input.userId), eq(orders.requestId, requestId))).limit(1);
+    if (winner) return replay(winner, requestIntent);
+    return { kind: "error", code: "invalid", message: "This request belongs to a different purchase. Check your orders before retrying." };
+  }
+  const holdId = reservation.reservationId;
+  await linkReservationToOrder({ reservationId: holdId, orderId }).catch(()=>{});
+  await db.update(orders).set({ reconciliationNote: "Stars funds held; supplier order not yet started. Nothing has been charged." }).where(eq(orders.id, orderId)).catch(()=>{});
+
+  // --- Consume quote atomically ---
+  const [consumed] = await db.update(foxreloadQuotes).set({ orderId }).where(and(eq(foxreloadQuotes.id, quote.id), eq(foxreloadQuotes.userId, input.userId), isNull(foxreloadQuotes.orderId), gt(foxreloadQuotes.expiresAt, new Date()))).returning({ id: foxreloadQuotes.id });
+  if (!consumed) {
+    await db.transaction(async (tx: any) => {
+      await tx.update(orders).set({ status: "cancelled", reconciliationNote: "This quote has expired or was used. Get a new quote. Hold released; nothing was charged." }).where(and(eq(orders.id, orderId), eq(orders.status, "review")));
+      await releaseReservation({ tx, reservationId: holdId, userId: input.userId, reason: "Quote already used or expired" });
+    }).catch(()=>{});
+    return { kind: "error", code: "changed", message: "This quote has expired or was used. Get a new quote." };
+  }
+
   scheduleWalletEmails();
   let providerId: string | null = null;
+  let supplierContacted = false;
   try {
     const canStart = await db.transaction(async (tx) => {
       const [account] = await tx.select({ suspendedAt: users.suspendedAt, deletedAt: users.deletedAt }).from(users).where(eq(users.id, input.userId)).for("update").limit(1);
       if (!account || account.suspendedAt || account.deletedAt) {
-        const [claimed] = await tx.update(orders).set({ status: "refunded", refundedAt: new Date(), reconciliationNote: "Account became unavailable before supplier order; debit returned." }).where(and(eq(orders.id, orderId), eq(orders.status, "review"), isNull(orders.refundedAt))).returning({ id: orders.id });
+        const [claimed] = await tx.update(orders).set({ status: "cancelled", reconciliationNote: "Account became unavailable before supplier order; hold released and nothing was charged." }).where(and(eq(orders.id, orderId), eq(orders.status, "review"), isNull(orders.refundedAt))).returning({ id: orders.id });
         if (!claimed) return false;
-        await creditWalletInTx(tx, { userId: input.userId, amount: quote.amount, type: "refund", description: "Telegram Stars · purchase not started", orderId, reference: makeReference("RFB") });
+        await releaseReservation({ tx, reservationId: holdId, userId: input.userId, reason: "Account unavailable before supplier order" });
         return false;
       }
-      const [claim] = await tx.update(orders).set({ status: "processing", reconciliationNote: "Stars supplier order creation started; verify outcome before any refund or retry." }).where(and(eq(orders.id, orderId), eq(orders.status, "review"), isNull(orders.refundedAt))).returning({ id: orders.id });
+      const [claim] = await tx.update(orders).set({ status: "processing", reconciliationNote: "Stars supplier order creation started; verify outcome before any refund or retry. Funds remain held." }).where(and(eq(orders.id, orderId), eq(orders.status, "review"), isNull(orders.refundedAt))).returning({ id: orders.id });
       return Boolean(claim);
     });
     if (!canStart) {
@@ -134,23 +163,29 @@ export async function buyTelegramStars(input: { userId: string; quoteId: string;
       const [current] = await db.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.userId, input.userId))).limit(1);
       return { kind: "order", id: orderId, reference, status: current?.status ?? "review", replayed: false };
     }
+    supplierContacted = true;
     const created = await createFoxreloadContractOrder({ product: orderProduct, quantity: quote.quantity, note: { username }, idempotencyKey: orderId, mock: false });
-    // Persist any valid identifier even if the rest of the response is malformed.
     if (created && typeof created === "object" && "id" in created && typeof created.id === "string" && uuid.test(created.id)) {
       providerId = created.id;
-      const [saved] = await db.update(orders).set({ providerRequestId: providerId, reconciliationNote: "Stars supplier order created; payment not yet confirmed." }).where(and(eq(orders.id, orderId), eq(orders.status, "processing"), isNull(orders.refundedAt))).returning({ id: orders.id });
+      const [saved] = await db.update(orders).set({ providerRequestId: providerId, reconciliationNote: "Stars supplier order created; payment not yet confirmed. Funds remain held." }).where(and(eq(orders.id, orderId), eq(orders.status, "processing"), isNull(orders.refundedAt))).returning({ id: orders.id });
       if (!saved) throw new Error("Order claim lost");
     }
     const verified = verifyStarsProviderOrder(created, { total: quote.wholesaleTotal, quantity: quote.quantity, requestId: orderId, quoteId, recipientIntent: requestIntent }, true);
     if (!verified) throw new Error("Supplier order terms could not be verified");
-    // Only this request can cross the payment boundary, and processing prevents
-    // the admin refund path from racing the in-flight payment.
     await payFoxreloadOrder(verified.id);
-    await db.update(orders).set({ status: "review", reconciliationNote: "Stars payment submitted; awaiting confirmed delivery." }).where(and(eq(orders.id, orderId), eq(orders.status, "processing"), isNull(orders.refundedAt)));
+    await db.update(orders).set({ status: "review", reconciliationNote: "Stars payment submitted; awaiting confirmed delivery. Funds remain held." }).where(and(eq(orders.id, orderId), eq(orders.status, "processing"), isNull(orders.refundedAt)));
     await syncTelegramStars(orderId, input.userId);
-  } catch {
-    // Never retry create/pay or auto-refund after a supplier call can start.
-    await db.update(orders).set({ status: "review", ...(providerId ? { providerRequestId: providerId } : {}), reconciliationNote: "Stars supplier outcome uncertain; reconcile before refund or retry." }).where(and(eq(orders.id, orderId), eq(orders.status, "processing"), isNull(orders.refundedAt))).catch(() => {});
+  } catch (e) {
+    if (supplierContacted) {
+      await db.update(orders).set({ status: "review", ...(providerId ? { providerRequestId: providerId } : {}), reconciliationNote: "Stars supplier outcome uncertain; reconcile before refund or retry. Funds remain held." }).where(and(eq(orders.id, orderId), eq(orders.status, "processing"), isNull(orders.refundedAt))).catch(() => {});
+      await holdForReview({ reservationId: holdId, userId: input.userId, note: "Stars supplier outcome uncertain" }).catch(()=>{});
+    } else {
+      // Never reached supplier: release hold and cancel
+      await db.transaction(async (tx: any) => {
+        await tx.update(orders).set({ status: "cancelled", reconciliationNote: "Stars purchase did not reach supplier; hold released and nothing was charged." }).where(and(eq(orders.id, orderId), inArray(orders.status, ["review","processing"])));
+        await releaseReservation({ tx, reservationId: holdId, userId: input.userId, reason: "Supplier never contacted" });
+      }).catch(()=>{});
+    }
   }
   const [saved] = await db.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.userId, input.userId))).limit(1);
   return { kind: "order", id: orderId, reference, status: saved?.status ?? "review", replayed: false };
@@ -162,7 +197,6 @@ export async function syncTelegramStars(orderId: string, userId: string): Promis
   if (!order?.requestId || !order.requestIntent) return;
   const [quote] = await db.select().from(foxreloadQuotes).where(and(eq(foxreloadQuotes.orderId, order.id), eq(foxreloadQuotes.userId, userId))).limit(1);
   if (!quote) return;
-  // Shared cooldown and fair sweep ordering; claim the check before network I/O.
   const [claim] = await db.update(foxreloadQuotes).set({ lastCheckedAt: new Date() }).where(and(eq(foxreloadQuotes.id, quote.id), or(isNull(foxreloadQuotes.lastCheckedAt), lte(foxreloadQuotes.lastCheckedAt, new Date(Date.now() - 20_000))))).returning({ id: foxreloadQuotes.id });
   if (!claim) return;
   const providerId = order.providerRequestId ?? await findFoxreloadOrderId(order.id).catch(() => null);
@@ -171,13 +205,40 @@ export async function syncTelegramStars(orderId: string, userId: string): Promis
   const verified = verifyStarsProviderOrder(raw, { id: providerId, total: quote.wholesaleTotal, quantity: quote.quantity, requestId: order.id, quoteId: quote.id, recipientIntent: order.requestIntent });
   if (!verified) return;
   if (!order.providerRequestId) {
-    const [linked] = await db.update(orders).set({ providerRequestId: verified.id, reconciliationNote: "Stars supplier order found; payment and delivery require verification." })
+    const [linked] = await db.update(orders).set({ providerRequestId: verified.id, reconciliationNote: "Stars supplier order found; payment and delivery require verification. Funds remain held." })
       .where(and(eq(orders.id, order.id), eq(orders.userId, userId), inArray(orders.status, ["review", "processing"]), isNull(orders.providerRequestId), isNull(orders.refundedAt))).returning({ id: orders.id });
     if (!linked) return;
   }
   if (!verified.completed) return;
-  const [saved] = await db.update(orders).set({ status: "delivered", reconciliationNote: null }).where(and(eq(orders.id, order.id), inArray(orders.status, ["review", "processing"]), eq(orders.providerRequestId, providerId), isNull(orders.refundedAt))).returning({ id: orders.id });
-  if (saved) void afterPurchase(userId);
+  // Delivery confirmed — settle hold and mark delivered in one tx
+  try {
+    await db.transaction(async (tx: any) => {
+      const [delivered] = await tx.update(orders).set({ status: "delivered", reconciliationNote: null }).where(and(eq(orders.id, order.id), inArray(orders.status, ["review", "processing"]), eq(orders.providerRequestId, providerId), isNull(orders.refundedAt))).returning({ id: orders.id });
+      if (!delivered) throw new Error("Order already closed");
+      // Settle held funds: balance goes down, reserved goes down, ledger written
+      const [hold] = await tx.select({ id: orders.id }).from(walletReservations).where(and(eq(walletReservations.orderId, order.id), eq(walletReservations.userId, userId))).limit(1).catch(()=>[] as any);
+      // Find open hold for this order
+      const holds = await tx.select({ id: walletReservations.id, amount: walletReservations.amount, status: walletReservations.status }).from(walletReservations).where(and(eq(walletReservations.orderId, order.id), inArray(walletReservations.status, ["held","review"]))).limit(1);
+      const holdRow = holds[0];
+      if (holdRow) {
+        // If in review, reopen to held first so settle's condition passes
+        if (holdRow.status === "review") {
+          await tx.update(walletReservations).set({ status: "held", updatedAt: new Date() }).where(and(eq(walletReservations.id, holdRow.id), eq(walletReservations.status, "review")));
+        }
+        const settled = await settleReservation({ tx, reservationId: holdRow.id, userId, amount: order.amount, description: `Telegram Stars · ${quote.quantity} for ${quote.productId}`, orderId: order.id, reference: order.reference });
+        if (settled.reservationAlreadyClosed) { /* already settled elsewhere */ }
+      } else {
+        // Legacy order without hold: fallback to direct debit already done earlier — no-op
+      }
+    });
+    scheduleWalletEmails();
+    void afterPurchase(userId);
+  } catch {
+    // Settle failed after delivery confirmed: park for review, never release
+    await db.update(orders).set({ status: "review", reconciliationNote: "Stars delivered but wallet hold could not be settled; review before retry." }).where(and(eq(orders.id, order.id), inArray(orders.status, ["review","processing"]), isNull(orders.refundedAt))).catch(()=>{});
+    const holds = await db.select({ id: walletReservations.id }).from(walletReservations).where(and(eq(walletReservations.orderId, order.id), eq(walletReservations.status, "held"))).limit(1);
+    if (holds[0]) await holdForReview({ reservationId: holds[0].id, userId, note: "Settle failed after delivery" }).catch(()=>{});
+  }
 }
 
 /** Bounded fair status sweep; it never creates, pays, refunds or retries orders. */
