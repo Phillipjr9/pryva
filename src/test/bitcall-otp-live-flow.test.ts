@@ -46,6 +46,7 @@ function makeGateway(options: {
   badCountries?: boolean;
   unreadableCountryRow?: boolean;
   contradictoryCountryName?: boolean;
+  mixedCountryNames?: boolean;
   emptyCountries?: boolean;
   unreadableServices?: boolean;
   mixedUnreadableServices?: boolean;
@@ -67,7 +68,8 @@ function makeGateway(options: {
       if (options.badCountries) return json({ unexpected: true });
       if (options.inconsistentCountryCount) return json({ data: [], meta: { page: 1, total: 1, totalPages: 1, hasNext: false } });
       const entries = options.emptyCountries ? [] : options.unreadableCountryRow ? [{ name: "United States" }]
-        : options.contradictoryCountryName ? [{ countryCode: "US_1", name: "France" }] : countries;
+        : options.contradictoryCountryName ? [{ countryCode: "US_1", name: "France" }]
+        : options.mixedCountryNames ? [...countries, { countryCode: "US_2", name: "France" }] : countries;
       return json({ data: entries, meta: { page: 1, totalPages: 1, hasNext: false } });
     }
     if (url.pathname === "/v1/otp/services") {
@@ -200,6 +202,21 @@ describe("documented OTP catalogue through the customer feed", () => {
     const read = await readOtpOffersForSupplier("bitcall", "us", "United States", undefined, true);
     expect(read.offers).toEqual([]);
     expect(read.errorCode).toBe("SERVICE_RESPONSE_INVALID");
+  });
+
+  it("shows safe results as partial while refusing checkout on conflicting country metadata", async () => {
+    const fetchMock = makeGateway({ mixedCountryNames: true });
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await GET(new NextRequest("https://pryva.test/api/services/catalog?country=us&feed=verification"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ partial: true, reason: "partial", items: [{ name: "WhatsApp", action: null, price: null }] });
+    const attempt = vi.fn();
+    await expect(fulfillPlan(findPlan("vn-us")!, {
+      otpOfferId: otpOfferPublicId("us", PRIVATE_US, "WhatsApp"), onOtpAttempt: attempt, onOtpAccepted: vi.fn(),
+    })).rejects.toMatchObject({ code: "SERVICE_RESPONSE_INVALID" });
+    expect(attempt).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.every(([, init]) => init.method === "GET")).toBe(true);
+    expect(fetchMock.mock.calls.every(([input]) => new URL(String(input)).searchParams.get("country_code") !== "US_2")).toBe(true);
   });
 
   it("distinguishes an unreadable country response from an empty catalogue", async () => {

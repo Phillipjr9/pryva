@@ -82,9 +82,7 @@ describe("service explorer live listings", () => {
     expect(fetchMock).toHaveBeenCalledTimes(4);
     await act(async () => { finishOtp({ ok: true, json: async () => ({ ok: true, country: "us", live: true, items: [] }) }); });
     expect(await screen.findByText(/Live listings loaded/)).toBeTruthy();
-    const social = screen.getAllByRole("button", { name: /Social promotion/i }).find((button) => button.hasAttribute("aria-pressed"));
-    expect(social).toBeTruthy();
-    fireEvent.click(social!);
+    fireEvent.change(screen.getByRole("combobox", { name: "Service category" }), { target: { value: "social" } });
     expect(await screen.findByRole("heading", { name: "Fast Instagram boost" })).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
@@ -286,7 +284,6 @@ it("does not blame a healthy social shelf for a failed verification feed", async
   render(<ServiceExplorer initialCountry="us" initialCategory="social" />);
   expect(await screen.findByText(/Live listings loaded/)).toBeTruthy();
   expect(screen.queryByText(/Some live listings could not be loaded/)).toBeNull();
-  const verification = screen.getAllByRole("button", { name: /App verification/i }).find(button => button.hasAttribute("aria-pressed"));
-  fireEvent.click(verification!);
+  fireEvent.change(screen.getByRole("combobox", { name: "Service category" }), { target: { value: "verification" } });
   expect(await screen.findByText(/Some live listings could not be loaded/)).toBeTruthy();
 });

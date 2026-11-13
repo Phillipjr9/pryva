@@ -55,29 +55,25 @@ const SOCIAL_TAGS = [
 const NUMBER_TAGS = ["Single use", "Rental", "Bundle"];
 const DATA_TAGS = ["MTN", "Airtel", "Glo", "9mobile"];
 
-/** Keep related services together; category cards wrap instead of hiding off-screen on phones. */
+/** Group related services in the compact category picker. */
 const SERVICE_CATEGORY_GROUPS: ReadonlyArray<{
   id: string;
   label: string;
-  description: string;
   categories: readonly ExplorerCategory[];
 }> = [
   {
     id: "connectivity",
     label: "Phone & connectivity",
-    description: "Numbers, verification, and internet access",
     categories: ["numbers", "verification", "esim", "data", "proxies"],
   },
   {
     id: "digital-products",
     label: "Digital products & accounts",
-    description: "Accounts, entertainment, games, and credit",
     categories: ["accounts", "subscriptions", "games", "topups", "gift-cards", "prepaid"],
   },
   {
     id: "growth-tools",
     label: "Growth & everyday tools",
-    description: "Audience growth, inboxes, and order helpers",
     categories: ["social", "email", "tools"],
   },
 ];
@@ -650,56 +646,32 @@ export function ServiceExplorer({
               </span>
             </div>
             {summary ? <p className="mt-1.5 text-meta text-ink-3">{summary} These labels describe configuration; check each listing for current availability.</p> : null}
-            <div role="group" aria-label="Service categories" className="mt-3 space-y-4 sm:mt-4">
-              <button
-                type="button"
-                onClick={() => chooseCategory("all")}
-                aria-pressed={category === "all"}
-                className={`flex min-h-11 w-full items-center justify-between rounded-xl border px-3.5 py-2.5 text-left text-meta font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-lav-400 ${category === "all" ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-lav-300"}`}
+            <div className="mt-3 sm:mt-4">
+              <label htmlFor="service-category" className="sr-only">Service category</label>
+              <select
+                id="service-category"
+                value={category}
+                onChange={(event) => chooseCategory(explorerCategory(event.target.value))}
+                aria-describedby={selectedCategory ? "service-category-description" : undefined}
+                className="min-h-11 w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-meta font-semibold text-ink focus:border-lav-400 focus:outline-none focus:ring-4 focus:ring-lav-100 sm:max-w-lg"
               >
-                <span>All categories</span>
-                <span className="text-micro font-medium opacity-75">Browse everything</span>
-              </button>
-              <div className="grid gap-3 lg:grid-cols-2 lg:gap-4 xl:grid-cols-3">
-                {SERVICE_CATEGORY_GROUPS.map((group) => {
-                  const groupEntries = orderedCategories.filter((entry) => group.categories.includes(entry.id));
-                  return (
-                    <section key={group.id} aria-labelledby={`category-group-${group.id}`} className="min-w-0 rounded-2xl border border-line bg-white/70 p-3 sm:p-4">
-                      <div className="mb-2.5">
-                        <h3 id={`category-group-${group.id}`} className="text-meta font-semibold text-ink">{group.label}</h3>
-                        <p className="mt-0.5 text-micro leading-relaxed text-ink-3">{group.description}</p>
-                      </div>
-                      {/* Each card needs enough room for its label and status.
-                          Two columns at typical phone widths squeezed the status
-                          into single letters; desktop groups need room too. */}
-                      <div className="grid grid-cols-1 gap-2 min-[520px]:grid-cols-2 lg:grid-cols-1">
-                        {groupEntries.map((entry) => {
-                          const state = readinessById.get(entry.id);
-                          const selected = category === entry.id;
-                          return (
-                            <button
-                              key={entry.id}
-                              type="button"
-                              title={`${entry.description}${state ? ` · ${SERVICE_STATE_LABEL[state.state]}` : ""}`}
-                              onClick={() => chooseCategory(entry.id)}
-                              aria-pressed={selected}
-                              className={`flex min-h-[88px] min-w-0 items-start gap-2.5 rounded-xl border p-2.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-lav-400 ${selected ? "border-lav-700 bg-lav-700 text-white" : "border-line bg-white text-ink hover:border-lav-300 hover:bg-lav-50/60"}`}
-                            >
-                              <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
-                                <span className="w-full break-words text-meta font-semibold leading-snug">{entry.label}</span>
-                                <span className={`line-clamp-2 text-micro leading-snug ${selected ? "text-white/80" : "text-ink-3"}`}>{entry.description}</span>
-                                {state && <span className={`mt-0.5 inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-0.5 text-micro font-semibold leading-tight ${selected ? "bg-white/15 text-white" : "bg-cream text-ink-2"}`}>
-                                  <span className="break-words">{SERVICE_STATE_LABEL[state.state]}</span>
-                                </span>}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </section>
-                  );
-                })}
-              </div>
+                <option value="all">All categories</option>
+                {SERVICE_CATEGORY_GROUPS.map((group) => (
+                  <optgroup key={group.id} label={group.label}>
+                    {orderedCategories.filter((entry) => group.categories.includes(entry.id)).map((entry) => {
+                      const state = readinessById.get(entry.id);
+                      return (
+                        <option key={entry.id} value={entry.id}>
+                          {entry.label}{state ? ` · ${SERVICE_STATE_LABEL[state.state]}` : ""}
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                ))}
+              </select>
+              {selectedCategory && (
+                <p id="service-category-description" className="mt-2 text-meta text-ink-3">{selectedCategory.description}</p>
+              )}
             </div>
             {selectedReadiness && selectedReadiness.state !== "buy" && selectedReadiness.state !== "free" ? (
               <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-line bg-white px-3.5 py-2.5 text-meta text-ink-2">
