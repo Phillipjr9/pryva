@@ -23,7 +23,9 @@ describe("country-first service explorer", () => {
     const markup = renderToStaticMarkup(<ServiceExplorer initialCountry="ng" initialCategory={null} />);
     expect(markup).toContain("Nigeria selected");
     expect(markup).not.toContain("Choose a country to explore");
-    expect(markup).toContain("Choose a category");
+    expect(markup).toContain("Choose a service");
+    expect(markup.indexOf("Step 01")).toBeLessThan(markup.indexOf("Step 02"));
+    expect(markup.indexOf("Step 02")).toBeLessThan(markup.indexOf("Step 03"));
     expect(markup).not.toContain("Start with a country.");
   });
 

@@ -207,13 +207,13 @@ describe("responsive overflow regressions", () => {
     expect(rule).toContain("(max-width: 1023px), (pointer: coarse)");
   });
 
-  it("allows dashboard header actions to wrap on narrow screens", () => {
+  it("keeps the compact dashboard header in one row without desktop-only actions on narrow screens", () => {
     const shell = readFileSync("src/components/dashboard/DashboardShell.tsx", "utf8");
-    expect(shell).toContain("mb-4 flex flex-wrap items-center justify-between gap-2");
-    expect(shell).toContain("min-w-0 shrink-0 items-center gap-2.5 lg:shrink");
-    // The action cluster wraps at every narrow width rather than squeezing the
-    // text controls into one unbreakable row.
-    expect(shell).toContain("flex min-w-0 max-w-full flex-wrap items-center gap-1.5 sm:gap-2");
-    expect(shell).not.toContain("max-[340px]:flex-wrap");
+    const header = shell.slice(shell.indexOf('data-dashboard-header className="relative'), shell.indexOf("<main"));
+    expect(header).toContain("flex min-h-[66px] items-center justify-between gap-2");
+    expect(header).toContain("flex shrink-0 items-center gap-1.5 lg:gap-2");
+    expect(header).toContain("lg:hidden");
+    expect(header).toContain("lg:inline-flex");
+    expect(header).not.toContain("flex-wrap");
   });
 });

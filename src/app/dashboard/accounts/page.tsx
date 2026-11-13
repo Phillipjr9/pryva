@@ -27,7 +27,7 @@ export default async function DashboardAccountsPage() {
             Social &amp; Digital Accounts
           </ServiceTitle>
           <p className="mt-1 text-[0.875rem] text-ink-2">
-            Buy Facebook, Instagram, TikTok, email and other digital accounts, including aged accounts where listed. Check each listing for its age, features and delivery details. Prices are in Naira; country coverage is not filtered here and stock can change.
+            Browse social and digital accounts, including email accounts such as Gmail and Outlook when listed. Search by provider below; shortcuts only show platforms on the loaded page. Check each listing for its age, features and delivery details. Prices are in Naira; country coverage is not filtered here and stock can change.
           </p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-micro text-ink-3">

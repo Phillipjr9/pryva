@@ -44,6 +44,22 @@ describe("account catalogue discovery", () => {
     });
   });
 
+  it("allows a Gmail search even when Gmail is not on the loaded page and retains the stock filter", async () => {
+    const mock = vi.fn(async (url: string) => {
+      if (url.includes("categories")) return response({ configured: true, categories: [], subcategories: [] });
+      const search = new URL(url, "https://test.invalid").searchParams.get("search");
+      return response({ configured: true, listings: [account(search === "Gmail" ? "Gmail account" : "Facebook account")], meta: meta(1) });
+    });
+    vi.stubGlobal("fetch", mock);
+    render(<AccountsBrowser purchaseEnabled={false} />);
+    expect(await screen.findByText("Facebook account")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Gmail" })).toBeNull();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search accounts" }), { target: { value: "Gmail" } });
+    expect(await screen.findByText("Gmail account")).toBeTruthy();
+    expect(mock.mock.calls.some(([url]) => String(url).includes("search=Gmail") && String(url).includes("inStock=true"))).toBe(true);
+    expect(screen.getByText(/Account purchases are temporarily paused/)).toBeTruthy();
+  });
+
   it("keeps the existing X / Twitter quick search accessible and clears it without changing stock filters", async () => {
     const mock = vi.fn(async (_url: string) => response({ configured: true, listings: [account("X account"), account("Xbox account", 2)], categories: [], meta: meta(2) }));
     vi.stubGlobal("fetch", mock);

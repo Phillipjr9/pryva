@@ -20,7 +20,7 @@ interface CommandPaletteProps {
 
 const COMMANDS: Command[] = [
   { id: "dashboard", label: "Dashboard overview", group: "Navigate", href: "/dashboard" },
-  { id: "services", label: "Explore services", group: "Navigate", href: "/dashboard/services" },
+  { id: "services", label: "Marketplace · services", group: "Navigate", href: "/dashboard/services" },
   { id: "orders", label: "Orders", group: "Navigate", href: "/dashboard/orders" },
   { id: "wallet", label: "Wallet", group: "Navigate", href: "/dashboard/wallet" },
   { id: "accounts", label: "Digital accounts", group: "Navigate", href: "/dashboard/accounts" },

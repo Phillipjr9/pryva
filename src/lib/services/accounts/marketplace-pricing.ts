@@ -67,6 +67,13 @@ export type PriceBreakdown = {
   markupPercent: number;
   fxRate: number;
   fxSource: string;
+  /** Server-only independent basis for comparing discounts without stacking. */
+  undiscountedTotalNgn: number;
+  /** Exact cost and exchange rate before display rounding; never send to the client. */
+  exactCostNgn: number;
+  exactFxRate: number;
+  /** A promo-adjusted breakdown must not be reused as an independent basis. */
+  hasProviderPromo: boolean;
 };
 
 function categoryPremiumPercent(
@@ -137,6 +144,10 @@ export async function priceMarketplaceListing(input: {
     ceilingNgn,
   );
 
+  const undiscountedTotalNgn = Math.min(
+    Math.max(roundUpToNgn(markedUpCents / 100, step), floorNgn),
+    ceilingNgn,
+  );
   const unitNgn = Math.ceil(totalNgn / quantity);
   const costNgn = Math.round(costNgnCents / 100);
   const discountNgn = Math.max(0, Math.round((markedUpCents - chargeableCents) / 100));
@@ -152,6 +163,10 @@ export async function priceMarketplaceListing(input: {
     markupPercent: Math.round(markupPercent(totalNgn, costNgn) * 10) / 10,
     fxRate: Math.round(rate * 100) / 100,
     fxSource: source,
+    undiscountedTotalNgn,
+    exactCostNgn: costNgnCents / 100,
+    exactFxRate: rate,
+    hasProviderPromo: false,
   };
 }
 
@@ -184,6 +199,7 @@ export function applyPromoDiscount(breakdown: PriceBreakdown, discountUsd: strin
 
   return {
     ...breakdown,
+    hasProviderPromo: true,
     totalNgn,
     unitNgn: Math.ceil(totalNgn / breakdown.quantity),
     costNgn: newCostNgn,
