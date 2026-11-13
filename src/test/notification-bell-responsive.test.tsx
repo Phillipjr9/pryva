@@ -51,6 +51,18 @@ describe("dashboard notification popover", () => {
     expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
   });
 
+  it("keeps the compact mobile bell labelled and exposes unread status", async () => {
+    stubNotifications();
+    render(<NotificationBell textOnly compactOnMobile alignToHeader viewAllHref="/dashboard/notifications" />);
+    const bell = await screen.findByRole("button", { name: "1 unread notifications" });
+    await waitFor(() => expect(bell.hasAttribute("disabled")).toBe(false));
+    expect(bell.className).toContain("h-10 w-10");
+    expect(bell.querySelector("svg")?.getAttribute("class")).toContain("lg:hidden");
+    expect(bell.textContent).toContain("Alerts");
+    fireEvent.click(bell);
+    expect(screen.getByRole("region", { name: "Notifications" })).toBeTruthy();
+  });
+
   it("dismisses on Escape or an outside pointer, returning focus on Escape", async () => {
     stubNotifications();
     render(<NotificationBell iconOnly alignToHeader viewAllHref="/dashboard/notifications" />);

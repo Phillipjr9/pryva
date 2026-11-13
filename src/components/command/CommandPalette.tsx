@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Search } from "@/components/icons";
 import { formatNaira } from "@/lib/services/catalog";
 
 interface Command {
@@ -360,9 +361,10 @@ export function CommandPaletteTrigger({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       aria-label="Search the dashboard"
-      className="inline-flex min-h-9 items-center rounded-full border border-line bg-white/70 px-3 py-2 text-meta font-semibold text-ink-2 transition-colors hover:bg-white"
+      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line bg-white/70 text-meta font-semibold text-ink-2 transition-colors hover:bg-white lg:h-auto lg:min-h-9 lg:w-auto lg:px-3 lg:py-2"
     >
-      Search
+      <Search className="h-5 w-5 lg:hidden" aria-hidden="true" />
+      <span className="hidden lg:inline">Search</span>
     </button>
   );
 }
