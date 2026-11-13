@@ -30,26 +30,28 @@ describe("choosing services", () => {
     }));
     render(<ServiceExplorer initialCountry={null} initialCategory={null} />);
     fireEvent.click(await screen.findByRole("button", { name: "Nigeria" }));
-    fireEvent.click(screen.getByRole("button", { name: /Social promotion/ }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Service category" }), { target: { value: "social" } });
     expect(screen.getByRole("heading", { level: 1, name: "Social promotion" })).toBeTruthy();
+    expect((screen.getByRole("combobox", { name: "Service category" }) as HTMLSelectElement).value).toBe("social");
     expect(screen.queryByRole("heading", { name: "WhatsApp" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Views" }));
     const card = (await screen.findByRole("heading", { name: "Instagram views" })).closest("article")!;
     // The only social card is an actual supplier response, not a fabricated entry.
     expect(within(card).getByRole("link", { name: "Order" }).getAttribute("href")).toBe("/dashboard/services/boost/live-views");
     expect(screen.queryByRole("heading", { name: "Instagram followers" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /App verification/ }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Service category" }), { target: { value: "verification" } });
     expect(await screen.findByRole("heading", { name: "WhatsApp" })).toBeTruthy();
     expect(window.location.search).toBe("?country=ng&category=verification");
     window.history.back();
     await waitFor(() => expect(window.location.search).toBe("?country=ng&category=social"));
     await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Social promotion" })).toBeTruthy());
+    expect((screen.getByRole("combobox", { name: "Service category" }) as HTMLSelectElement).value).toBe("social");
     expect(screen.queryByRole("heading", { name: "WhatsApp" })).toBeNull();
     window.history.forward();
     await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "App verification" })).toBeTruthy());
     expect(await screen.findByRole("heading", { name: "WhatsApp" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: /Number plans/ }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Service category" }), { target: { value: "numbers" } });
     expect(screen.getByRole("heading", { level: 1, name: "Number plans" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Rental" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Single use" })).toBeTruthy();
@@ -57,12 +59,28 @@ describe("choosing services", () => {
     expect(screen.getAllByRole("heading", { name: "Nigeria rental" })).toHaveLength(3);
     expect(screen.queryByRole("heading", { name: "Nigeria" })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /Mobile data & airtime/ }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Service category" }), { target: { value: "data" } });
     expect(screen.getByRole("heading", { level: 1, name: "Mobile data & airtime" })).toBeTruthy();
     expect(screen.getByText(/Purchases are not available from this catalogue yet/)).toBeTruthy();
     expect(await screen.findByText(/0 bundles · lowest price first/)).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "MTN 1GB" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Airtel 1GB" })).toBeNull();
+  });
+
+  it("initializes the dropdown from a category link and resets filters when selecting all", () => {
+    window.history.replaceState(null, "", "/dashboard/services?country=us&category=esim");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ ok: true, country: "us", live: true, items: [] })));
+    render(<ServiceExplorer initialCountry="us" initialCategory="esim" />);
+    const picker = screen.getByRole("combobox", { name: "Service category" }) as HTMLSelectElement;
+    expect(picker.value).toBe("esim");
+    const search = screen.getByRole("searchbox", { name: "Search services" }) as HTMLInputElement;
+    fireEvent.change(search, { target: { value: "travel" } });
+    fireEvent.change(picker, { target: { value: "all" } });
+    expect(picker.value).toBe("all");
+    expect(search.value).toBe("");
+    expect(screen.getByRole("heading", { name: "Explore services" })).toBeTruthy();
+    expect(new URLSearchParams(window.location.search).get("country")).toBe("us");
+    expect(new URLSearchParams(window.location.search).has("category")).toBe(false);
   });
 
   it("never retains another subscription or country as the active plan", () => {
@@ -100,7 +118,7 @@ describe("number-plan navigation", () => {
       ok: true, country: "us", live: true, partial: false, items: [{ id: "otp-1", category: "verification", name: "Test app", description: "Live listing", tag: "Other", artwork: { kind: "service", name: "numbers" }, source: "live", coverage: "catalog-country", stock: 7, myUnits: null, price: null, action: null }],
     }) }));
     render(<ServiceExplorer initialCountry="us" initialCategory="numbers" />);
-    fireEvent.click(screen.getByRole("button", { name: /App verification/ }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Service category" }), { target: { value: "verification" } });
     expect(screen.getByRole("heading", { level: 1, name: "App verification" })).toBeTruthy();
     expect(window.location.search).toBe("?country=us&category=verification");
     expect(await screen.findByRole("heading", { name: "Test app" })).toBeTruthy();

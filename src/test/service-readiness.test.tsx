@@ -127,8 +127,8 @@ describe("the hub's arrangement", () => {
     const { container } = render(
       <ServiceExplorer initialCountry="ng" initialCategory={null} readiness={readiness} />,
     );
-    const chips = [...container.querySelectorAll('[aria-label="Service categories"] button')].map(
-      (chip) => chip.textContent ?? "",
+    const chips = [...container.querySelectorAll('#service-category option')].map(
+      (option) => option.textContent ?? "",
     );
     const index = (label: string) => chips.findIndex((text) => text.includes(label));
     expect(index("Number plans")).toBeLessThan(index("Mobile data"));

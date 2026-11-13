@@ -11,14 +11,19 @@ const offer = (id: string, name: string): ExplorerItem => ({
   action: { label: "Check offer", href: `/dashboard/digital-esims?product=${id}` },
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.localStorage.clear(); });
-it("keeps category cards full-width inside desktop groups", () => {
+it("places every category in an accessible, grouped dropdown", () => {
   vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ ok: true, country: "ng", live: true, items: [] }) })));
   render(<ServiceExplorer initialCountry="ng" initialCategory={null} />);
-  const group = screen.getByRole("region", { name: "Phone & connectivity" });
-  const firstCard = within(group).getByRole("button", { name: /Number plans/ });
-  const cardGrid = firstCard.parentElement!;
-  expect(cardGrid.className).toContain("lg:grid-cols-1");
-  expect(cardGrid.className).not.toContain("xl:grid-cols-2");
+  const picker = screen.getByRole("combobox", { name: "Service category" }) as HTMLSelectElement;
+  expect(picker.value).toBe("all");
+  expect(within(picker).getAllByRole("option")).toHaveLength(EXPLORER_CATEGORIES.length + 1);
+  for (const entry of EXPLORER_CATEGORIES) {
+    expect(within(picker).getByRole("option", { name: entry.label }).getAttribute("value")).toBe(entry.id);
+  }
+  for (const group of ["Phone & connectivity", "Digital products & accounts", "Growth & everyday tools"]) {
+    expect(within(picker).getByRole("group", { name: group })).toBeTruthy();
+  }
+  expect(picker.className).toContain("min-h-11");
 });
 
 it("recognizes every service family and keeps offers from different sources on the same shelf", () => {
