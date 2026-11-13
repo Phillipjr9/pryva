@@ -12,6 +12,12 @@ import { isBitcallConfigured, getBitcallBalance } from "@/lib/providers/bitcall"
 import { esimItemsForCountry, readEsimCatalog } from "@/lib/services/esim/esim-catalog";
 import { explorerCountry } from "@/lib/services/service-explorer";
 import { isSmmPanelConfigured } from "@/lib/providers/smm-panel";
+import {
+  ClubkonnectAccountError,
+  isClubkonnectCatalogueConfigured,
+  isClubkonnectConfigured,
+  listClubkonnectCatalogue,
+} from "@/lib/providers/clubkonnect";
 import { resendConfigured } from "@/lib/email/resend-config";
 import { emailQueueStatus, recentEmailActivity } from "@/lib/email/email-delivery-events";
 import { isPaystackConfigured, paystackKeyMode, getBanks } from "@/lib/payments/paystack";
@@ -135,6 +141,31 @@ export async function GET(request: NextRequest) {
   // buyable, so it is reported whether or not it currently matters.
   const manualFulfilmentReachable = await isManualFulfilmentReachable();
 
+  /*
+   * Mobile data has its own failure vocabulary — no identifier, a refused
+   * identifier, or a catalogue that is served but unreadable — and on the
+   * storefront all three used to render as "nothing here". This is the one place
+   * that can say which it is. The supplier's refusal word is reported as its own
+   * short status token (`code`), never as a sentence, and never to a customer.
+   */
+  const dataCatalogueConfigured = isClubkonnectCatalogueConfigured();
+  const mobileData = !dataCatalogueConfigured
+    ? { catalogueConfigured: false as const, purchaseConfigured: isClubkonnectConfigured() }
+    : {
+        catalogueConfigured: true as const,
+        purchaseConfigured: isClubkonnectConfigured(),
+        catalogue: await (async () => {
+          try {
+            const catalogue = await listClubkonnectCatalogue();
+            return { ok: true as const, count: catalogue.plans.length, skipped: catalogue.skipped, emptyNetworks: catalogue.emptyNetworks };
+          } catch (error) {
+            return error instanceof ClubkonnectAccountError
+              ? { ok: false as const, code: error.code, reason: "account_rejected" as const }
+              : { ok: false as const, reason: "unreachable" as const };
+          }
+        })(),
+      };
+
   return NextResponse.json(
     {
       database: { persistent: persistentDatabaseConfigured() },
@@ -177,6 +208,7 @@ export async function GET(request: NextRequest) {
         queue: await probe("email-queue", () => emailQueueStatus()),
       },
       manualFulfilmentReachable,
+      mobileData,
     },
     { headers: { "Cache-Control": "no-store" } },
   );

@@ -29,6 +29,30 @@ describe("mobile data catalogue recovery", () => {
     expect(fetcher).toHaveBeenCalledTimes(3);
   });
 
+  it("says the catalogue is empty rather than rendering a blank grid", async () => {
+    // A published-but-empty catalogue used to leave the filter row alone on the
+    // page with no sentence at all: indistinguishable from a page that failed.
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({
+      plans: [], checkedAt: "2026-11-12T12:00:00Z", stale: false, checkoutReason: "Checkout is not connected.",
+    })));
+    render(<DataPlansForm />);
+    expect(await screen.findByText("No data bundles are published right now. Use Reload listings to check again.")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: "Reload listings" })).toHaveProperty("disabled", false);
+  });
+
+  it("names a network that has no readable bundle instead of staying silent", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({
+      plans: [{ id: "mtn", network: "MTN", networkCode: "01", name: "MTN 1GB", publishedAmountKobo: 50000 }],
+      checkedAt: "2026-11-12T12:00:00Z", stale: false, checkoutReason: "Checkout is not connected.",
+      incomplete: true, skipped: 3, emptyNetworks: ["Glo", "Airtel"],
+    })));
+    render(<DataPlansForm />);
+    expect(await screen.findByRole("heading", { name: "MTN 1GB" })).toBeTruthy();
+    expect(screen.getByText(/No bundles are listed right now for Glo and Airtel/)).toBeTruthy();
+    expect(screen.getByText(/Listings may be incomplete/)).toBeTruthy();
+  });
+
   it("explains a missing connection instead of suggesting repeated retries", async () => {
     const fetcher = vi.fn().mockResolvedValue(Response.json({ error: "The mobile data catalogue is not connected yet.", code: "unconfigured" }, {
       status: 503, headers: { "Retry-After": "60" },

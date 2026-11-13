@@ -362,3 +362,62 @@ describe("feed probes: configured is not the same as working", () => {
     expect(hosts).not.toContain("api.bitcall.io");
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* Mobile data                                                         */
+/* ------------------------------------------------------------------ */
+
+describe("mobile data diagnostics: why the catalogue is empty", () => {
+  const CLUBKONNECT_USER = "ck-account-123456";
+  const CATALOGUE = {
+    MOBILE_NETWORK: {
+      MTN: [{ ID: "01", PRODUCT: [{ PRODUCT_CODE: "4", PRODUCT_NAME: "1GB - Weekly", PRODUCT_AMOUNT: "410.00", DATA_TYPE: "SME" }] }],
+      Airtel: [{ ID: "04", PRODUCT: [{ PRODUCT_CODE: "14", PRODUCT_NAME: "1GB - 1 day", PRODUCT_AMOUNT: "499.91" }] }],
+    },
+  };
+
+  function stubCatalogue(body: unknown) {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(typeof input === "string" ? input : input.toString());
+      if (url.hostname === "www.nellobytesystems.com") return jsonResponse(body);
+      if (url.pathname.includes("products")) return jsonResponse(NO_BALANCE);
+      return jsonResponse({ data: "0.00", statusCode: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("reports the catalogue's own size and what could not be read", async () => {
+    vi.stubEnv("CLUBKONNECT_USER_ID", CLUBKONNECT_USER);
+    vi.stubEnv("CLUBKONNECT_API_KEY", "");
+    stubCatalogue(CATALOGUE);
+
+    const body = await (await GET(authed())).json();
+
+    // Half a credential cannot buy, but the catalogue only needs the account ID —
+    // the plans endpoint is called without an API key at all.
+    expect(body.mobileData).toMatchObject({ catalogueConfigured: true, purchaseConfigured: false });
+    expect(body.mobileData.catalogue).toEqual({ ok: true, count: 2, skipped: 0, emptyNetworks: [] });
+    expect(JSON.stringify(body)).not.toContain(CLUBKONNECT_USER);
+  });
+
+  it("names a refused account as a rejection instead of an outage", async () => {
+    vi.stubEnv("CLUBKONNECT_USER_ID", CLUBKONNECT_USER);
+    stubCatalogue({ status: "INVALID_CREDENTIALS" });
+
+    const body = await (await GET(authed())).json();
+
+    expect(body.mobileData.catalogue).toEqual({ ok: false, code: "INVALID_CREDENTIALS", reason: "account_rejected" });
+  });
+
+  it("says not configured rather than calling the supplier when the identifier is absent", async () => {
+    vi.stubEnv("CLUBKONNECT_USER_ID", "");
+    const fetchMock = stubCatalogue(CATALOGUE);
+
+    const body = await (await GET(authed())).json();
+
+    expect(body.mobileData).toEqual({ catalogueConfigured: false, purchaseConfigured: false });
+    const hosts = fetchMock.mock.calls.map(([input]) => new URL(String(input)).hostname);
+    expect(hosts).not.toContain("www.nellobytesystems.com");
+  });
+});

@@ -11,8 +11,23 @@ import type { ClubkonnectPlan } from "@/lib/providers/clubkonnect";
 
 interface DataPlansFormProps { user?: PublicUser; initialPlanId?: string }
 type DisplayPlan = Pick<ClubkonnectPlan, "id" | "network" | "networkCode" | "name" | "publishedAmountKobo" | "dataType">;
-type Catalogue = { plans: DisplayPlan[]; checkedAt: string | null; stale: boolean; checkoutReason: string; incomplete: boolean };
+type Catalogue = {
+  plans: DisplayPlan[];
+  checkedAt: string | null;
+  stale: boolean;
+  checkoutReason: string;
+  /** Something was missing from this read — malformed rows here, or on the server. */
+  incomplete: boolean;
+  /** Networks that were published with no readable bundle at all. */
+  emptyNetworks: string[];
+};
 const money = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" });
+
+/** "a", "a and b", "a, b and c" — a list a customer can read out loud. */
+function listNames(names: string[]): string {
+  const unique = [...new Set(names)];
+  return unique.length <= 1 ? unique.join("") : `${unique.slice(0, -1).join(", ")} and ${unique[unique.length - 1]}`;
+}
 
 /** A malformed row must not take down the page or hide other usable bundles. */
 function readCatalogue(value: unknown): Catalogue | null {
@@ -21,6 +36,7 @@ function readCatalogue(value: unknown): Catalogue | null {
   if (!Array.isArray(body.plans)) return null;
   const plans: DisplayPlan[] = [];
   const seen = new Set<string>();
+  const emptyNetworks: string[] = [];
   let incomplete = false;
   for (const raw of body.plans) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) { incomplete = true; continue; }
@@ -36,11 +52,17 @@ function readCatalogue(value: unknown): Catalogue | null {
     plans.push({ id: plan.id, network: plan.network, networkCode: plan.networkCode, name: plan.name,
       publishedAmountKobo: plan.publishedAmountKobo, dataType: typeof plan.dataType === "string" ? plan.dataType : null });
   }
+  // The server counts what it could not read; a partial catalogue is reported
+  // rather than presented as the whole thing.
+  if (body.incomplete === true) incomplete = true;
+  if (Array.isArray(body.emptyNetworks)) {
+    for (const name of body.emptyNetworks) if (typeof name === "string" && name.trim()) emptyNetworks.push(name.trim());
+  }
   const checkedAt = typeof body.checkedAt === "string" && Number.isFinite(Date.parse(body.checkedAt)) ? body.checkedAt : null;
   const checkoutReason = typeof body.checkoutReason === "string" && body.checkoutReason.trim()
     ? body.checkoutReason : "Purchasing is unavailable from this catalogue.";
   if (!checkedAt || typeof body.stale !== "boolean" || checkoutReason !== body.checkoutReason) incomplete = true;
-  return { plans, checkedAt, stale: body.stale !== false, checkoutReason, incomplete };
+  return { plans, checkedAt, stale: body.stale !== false, checkoutReason, incomplete, emptyNetworks };
 }
 
 export function DataPlansForm({ initialPlanId }: DataPlansFormProps) {
@@ -104,18 +126,22 @@ export function DataPlansForm({ initialPlanId }: DataPlansFormProps) {
     </p>}
     {catalogue && <>
       {catalogue.incomplete && <p role="status" className="text-meta text-amber-800">Some bundles or catalogue details could not be shown. Listings may be incomplete; use Reload listings to try again.</p>}
+      {/* A network the catalogue carries no readable bundle for is not an outage,
+          and it must not read as "no bundles at all" beside a healthy grid. */}
+      {catalogue.emptyNetworks.length > 0 && <p role="status" className="text-meta text-amber-800">No bundles are listed right now for {listNames(catalogue.emptyNetworks)}.</p>}
       <p className="text-meta text-ink-2">{catalogue.checkedAt ? <>Catalogue snapshot: <time dateTime={catalogue.checkedAt}>{new Date(catalogue.checkedAt).toLocaleString()}</time>.</> : "Catalogue snapshot time unavailable."} {catalogue.stale ? "Refresh delayed; these listings may have changed." : ""}</p>
       <p className="rounded-xl border border-line bg-white p-4 text-meta">Prices below are published catalogue prices, not checkout quotes. Numeric stock is not reported. {catalogue.checkoutReason}</p>
       {initialPlanId && <p className="text-meta">Choose a current bundle below; old plan links do not select a different product automatically.</p>}
       <p role="status" className="text-meta">{visible.length} bundles · lowest price first</p>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{visible.map(plan => <article key={plan.id} className="rounded-xl border border-line bg-white p-4">
+      {plans.length === 0 ? <p>No data bundles are published right now. Use Reload listings to check again.</p>
+        : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{visible.map(plan => <article key={plan.id} className="rounded-xl border border-line bg-white p-4">
         <div className="flex items-center gap-3"><span className="text-meta font-semibold">{plan.network}</span></div>
         <h2 className="mt-3 text-[0.9375rem] font-semibold">{plan.name}</h2>
         <p className="mt-2 font-semibold">{money.format(plan.publishedAmountKobo / 100)}</p>
         {plan.dataType && <p className="mt-1 text-meta">{plan.dataType}</p>}
         <p className="mt-2 text-meta text-ink-2">Currently listed · stock count unavailable</p>
-      </article>)}</div>
-      {!visible.length && <p>No matching bundles. Try another network or search.</p>}
+      </article>)}</div>}
+      {plans.length > 0 && !visible.length && <p>No matching bundles. Try another network or search.</p>}
     </>}
   </section>;
 }
