@@ -11,10 +11,44 @@ export function isClubkonnectConfigured(): boolean {
   return Boolean(process.env.CLUBKONNECT_USER_ID?.trim() && process.env.CLUBKONNECT_API_KEY?.trim());
 }
 
+/**
+ * Reading the published catalogue is not a purchase.
+ *
+ * `APIDatabundlePlansV3.asp` is called with `UserID` alone — the API key is not
+ * part of that request (see `read(..., authenticated: false)`), so demanding one
+ * here only ever reproduced the "catalogue is not connected yet" page on a
+ * deployment whose buyer credential had been blanked or rotated. The catalogue
+ * needs the account identifier and nothing else.
+ */
+export function isClubkonnectCatalogueConfigured(): boolean {
+  return Boolean(process.env.CLUBKONNECT_USER_ID?.trim());
+}
+
 export class ClubkonnectError extends Error {
   constructor() {
     super("Mobile data supplier is temporarily unavailable.");
     this.name = "ClubkonnectError";
+  }
+}
+
+/**
+ * The account was answered, and answered with a refusal.
+ *
+ * The host replies `{"status":"INVALID_CREDENTIALS"}` (or `MISSING_PHONE_NUMBER`)
+ * with HTTP 200 when the identifier is not an account it will serve. That is not
+ * an outage: retrying costs the same refusal every minute, which is exactly how a
+ * page ended up saying "please retry" forever. It is reported separately so the
+ * route can state the truth and the diagnostics feed can name the cause.
+ *
+ * `code` is restricted to a short upper-case token from the payload: it is the
+ * host's own status word, never a URL, an amount or a credential.
+ */
+export class ClubkonnectAccountError extends ClubkonnectError {
+  readonly code: string;
+  constructor(code: string) {
+    super();
+    this.name = "ClubkonnectAccountError";
+    this.code = code;
   }
 }
 
@@ -36,37 +70,108 @@ export type ClubkonnectPlan = {
   stock: null;
 };
 
-export function parseClubkonnectPlans(payload: unknown): ClubkonnectPlan[] {
-  const networks = row(row(payload).MOBILE_NETWORK);
+export type ClubkonnectCatalogue = {
+  plans: ClubkonnectPlan[];
+  /** Products the host published that could not be read. Never hidden from the page. */
+  skipped: number;
+  /** Networks the host published with no readable product at all. */
+  emptyNetworks: string[];
+};
+
+/**
+ * Published network labels are not display names.
+ *
+ * The catalogue groups products under keys like `MTN`, `Glo`, `Airtel` and
+ * `m_9mobile`; rendering the key verbatim printed "m_9mobile" on the cards and in
+ * the network filter. Codes are what a purchase needs, so the label comes from
+ * the code with the key only as a fallback.
+ */
+const NETWORK_NAMES: Record<string, string> = { "01": "MTN", "02": "Glo", "03": "9mobile", "04": "Airtel" };
+
+function networkName(key: string, code: string): string {
+  const known = NETWORK_NAMES[code];
+  if (known) return known;
+  const cleaned = key.replace(/^m_/i, "").replace(/[_-]+/g, " ").trim();
+  return cleaned ? cleaned.charAt(0).toUpperCase() + cleaned.slice(1) : key;
+}
+
+/** Fixed, non-credential status words the host returns instead of a catalogue. */
+const REFUSAL_CODES = new Set(["INVALID_CREDENTIALS", "MISSING_PHONE_NUMBER", "MISSING_USERID", "INVALID_USERID"]);
+
+/**
+ * Read one published catalogue.
+ *
+ * A single unreadable product used to throw, so one bad row — a blank amount, a
+ * renamed field, a duplicate code — emptied the whole page and the customer was
+ * told the service was down while every other bundle was fine. Rows are now read
+ * individually: good ones are kept, bad ones are counted, and the count is
+ * published so the page can say "some bundles could not be shown" instead of
+ * pretending the catalogue is complete.
+ *
+ * The envelope is still validated. A payload that is not a catalogue at all, or
+ * that names no readable product anywhere, must not render as "0 bundles
+ * available" — that is indistinguishable from a real outage of published stock.
+ */
+export function parseClubkonnectCatalogue(payload: unknown): ClubkonnectCatalogue {
+  const body = row(payload);
+  const refusal = typeof body.status === "string" ? body.status.trim().toUpperCase() : "";
+  if (refusal && !body.MOBILE_NETWORK && /^[A-Z_]{3,40}$/.test(refusal)) throw new ClubkonnectAccountError(refusal);
+
+  const networks = row(body.MOBILE_NETWORK);
   if (!Object.keys(networks).length) throw new ClubkonnectError();
+
   const plans: ClubkonnectPlan[] = [];
   const seen = new Set<string>();
+  const emptyNetworks: string[] = [];
+  let skipped = 0;
+
   for (const [network, groups] of Object.entries(networks)) {
-    if (!Array.isArray(groups)) throw new ClubkonnectError();
-    for (const group of groups) {
+    // A malformed network entry is one network's problem, not the catalogue's.
+    const entries = Array.isArray(groups) ? groups : [];
+    let readableHere = 0;
+    for (const group of entries) {
       const entry = row(group);
-      const networkCode = typeof entry.ID === "string" ? entry.ID : "";
-      if (!/^\d+$/.test(networkCode) || !Array.isArray(entry.PRODUCT)) throw new ClubkonnectError();
+      const networkCode = typeof entry.ID === "string" ? entry.ID.trim() : "";
+      // Networks are also published under prefixed keys (`m_9mobile`), so the
+      // label is not a network code; only `ID` is trusted for ordering.
+      if (!/^\d+$/.test(networkCode) || !Array.isArray(entry.PRODUCT)) continue;
       for (const item of entry.PRODUCT) {
         const product = row(item);
-        const productCode = typeof product.PRODUCT_CODE === "string" ? product.PRODUCT_CODE : "";
+        const productCode = typeof product.PRODUCT_CODE === "string" ? product.PRODUCT_CODE.trim() : "";
         const name = typeof product.PRODUCT_NAME === "string" ? product.PRODUCT_NAME.trim() : "";
-        const amount = String(product.PRODUCT_AMOUNT ?? "");
-        if (!/^\d+$/.test(productCode) || !name || !/^\d+(?:\.\d{1,2})?$/.test(amount)) throw new ClubkonnectError();
+        const amount = String(product.PRODUCT_AMOUNT ?? "").trim();
+        const id = `clubkonnect:${networkCode}:${productCode}`;
         const [whole, fraction = ""] = amount.split(".");
         const publishedAmountKobo = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
-        const id = `clubkonnect:${networkCode}:${productCode}`;
-        if (!Number.isSafeInteger(publishedAmountKobo) || publishedAmountKobo <= 0 || seen.has(id)) throw new ClubkonnectError();
+        if (!/^\d+$/.test(productCode) || !name || !/^\d+(?:\.\d{1,2})?$/.test(amount) ||
+            !Number.isSafeInteger(publishedAmountKobo) || publishedAmountKobo <= 0 || seen.has(id)) {
+          skipped += 1;
+          continue;
+        }
         seen.add(id);
-        plans.push({ id, network, networkCode, productCode, name, publishedAmountKobo,
+        readableHere += 1;
+        plans.push({ id, network: networkName(network, networkCode), networkCode, productCode, name, publishedAmountKobo,
           dataType: typeof product.DATA_TYPE === "string" ? product.DATA_TYPE : null, stock: null });
       }
     }
+    if (!readableHere && !emptyNetworks.includes(network)) emptyNetworks.push(network);
   }
-  return plans.sort((a, b) => a.publishedAmountKobo - b.publishedAmountKobo || a.id.localeCompare(b.id));
+
+  if (!plans.length) throw new ClubkonnectError();
+  return { plans: plans.sort((a, b) => a.publishedAmountKobo - b.publishedAmountKobo || a.id.localeCompare(b.id)), skipped, emptyNetworks };
 }
 
-async function read(endpoint: string, parameters: Record<string, string>, authenticated: boolean): Promise<unknown> {
+/** The plans alone, for callers that do not report how complete the read was. */
+export function parseClubkonnectPlans(payload: unknown): ClubkonnectPlan[] {
+  return parseClubkonnectCatalogue(payload).plans;
+}
+
+async function read(
+  endpoint: string,
+  parameters: Record<string, string>,
+  authenticated: boolean,
+  attempts = 1,
+): Promise<unknown> {
   const userId = process.env.CLUBKONNECT_USER_ID?.trim();
   const apiKey = process.env.CLUBKONNECT_API_KEY?.trim();
   if (!userId || (authenticated && !apiKey)) throw new ClubkonnectError();
@@ -74,18 +179,41 @@ async function read(endpoint: string, parameters: Record<string, string>, authen
   url.searchParams.set("UserID", userId);
   if (authenticated) url.searchParams.set("APIKey", apiKey!);
   for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
-  try {
-    const response = await fetch(url, { cache: "no-store", redirect: "error", signal: AbortSignal.timeout(20_000) });
-    if (!response.ok) throw new ClubkonnectError();
-    return await readJsonWithLimit(response, 2 * 1024 * 1024);
-  } catch {
-    // Never propagate fetch errors: URLs contain supplier credentials.
-    throw new ClubkonnectError();
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const response = await fetch(url, { cache: "no-store", redirect: "error", signal: AbortSignal.timeout(20_000) });
+      if (!response.ok) throw new ClubkonnectError();
+      return await readJsonWithLimit(response, 2 * 1024 * 1024);
+    } catch (error) {
+      /*
+       * Never propagate fetch errors: URLs contain supplier credentials.
+       *
+       * A refusal is final — the same identifier earns the same answer — so only
+       * transport and parse failures are retried, and only once. Without the
+       * retry, one slow response at cold start left the page empty until a
+       * customer happened to load it again after the read succeeded for somebody
+       * else.
+       */
+      if (error instanceof ClubkonnectAccountError || attempt >= attempts) throw new ClubkonnectError();
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
   }
 }
 
+/**
+ * Read the whole published catalogue, including how much of it was readable.
+ *
+ * Callers report `skipped` and `emptyNetworks`, because a page that silently
+ * drops four unreadable bundles is a page that lies about what is for sale.
+ */
+export async function listClubkonnectCatalogue(): Promise<ClubkonnectCatalogue> {
+  // The read is shared by every shopper, so it is worth two attempts; a refusal
+  // is not retried inside `read`.
+  return parseClubkonnectCatalogue(await read("/APIDatabundlePlansV3.asp", {}, false, 2));
+}
+
 export async function listClubkonnectPlans(): Promise<ClubkonnectPlan[]> {
-  return parseClubkonnectPlans(await read("/APIDatabundlePlansV3.asp", {}, false));
+  return (await listClubkonnectCatalogue()).plans;
 }
 
 // Explicit read-only allowlist. Never accept a caller-supplied endpoint: this

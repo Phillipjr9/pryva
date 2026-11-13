@@ -11,6 +11,18 @@ invented stock, conservative transaction-status interpreter, RequestID lookup,
 and explicit read-only catalogue endpoint allowlist for eight service families.
 Other catalogue contracts are raw/server-only and require normalization before UI use.
 
+## Catalogue read behaviour (customer-facing)
+
+`APIDatabundlePlansV3.asp` is called with `UserID` only; the API key is not part of
+that request, so the catalogue route gates on the identifier alone
+(`isClubkonnectCatalogueConfigured`). Reading tolerates individual bad rows and
+reports how many it skipped plus any network with no readable bundle, rather than
+withholding every bundle because one row was malformed. A payload the host answers
+with a refusal status (`INVALID_CREDENTIALS`, `MISSING_PHONE_NUMBER`) is reported to
+the route as `ClubkonnectAccountError` so the page does not invite retries that
+cannot succeed; the status word reaches only the log and
+`/api/diagnostics/integrations` (`mobileData.catalogue`), never a customer.
+
 ## Scope and documented requirements
 
 | Service | Purchase endpoint | Catalogue | Required recipient handling |
